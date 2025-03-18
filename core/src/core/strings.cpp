@@ -1,0 +1,202 @@
+#include "strings.h"
+
+#include "core/memory.h"
+
+u32 range_size(Range r) {
+  u32 c = ((r.max > r.min) ? (r.max - r.min) : 0);
+  return c;
+}
+
+b8 char_is_space(u8 c){
+  return c == ' ' || c == '\n' || c == '\t' || c == '\r' || c == '\f' || c == '\v';
+}
+
+b8 char_is_upper(u8 c){
+  return 'A' <= c && c <= 'Z';
+}
+
+b8 char_is_lower(u8 c){
+  return 'a' <= c && c <= 'z';
+}
+
+b8 char_is_alpha(u8 c){
+  return char_is_upper(c) || char_is_lower(c);
+}
+
+b8 char_is_slash(u8 c){
+  return c == '/' || c == '\\';
+}
+
+u8 char_to_lower(u8 c){
+  if (char_is_upper(c)) {
+    c += ('a' - 'A');
+  }
+  return c;
+}
+
+u8 char_to_upper(u8 c){
+  if (char_is_lower(c)) {
+    c += ('A' - 'a');
+  }
+  return c;
+}
+
+u8 char_to_correct_slash(u8 c){
+  if(char_is_slash(c)) {
+    c = '/';
+  }
+  return c;
+}
+
+u64 cstring8_length(u8* c) {
+  u8 *p = c;
+  for (;*p != 0; p += 1);
+  return p - c;
+}
+
+String str8(u8* str, u64 size) {
+  String result = {str, size};
+  return result;
+}
+
+String str8_range(u8* first, u8* one_past_last) {
+  String result = {first, (u64)(one_past_last - first)};
+  return result;
+}
+
+String str8_zero() {
+  String result = {};
+  return result;
+}
+
+String cstr8(const char* c) {
+  String result = {(u8*)c, cstring8_length((u8*)c)};
+  return result;
+}
+
+String cstr8_capped(void *cstr, void *cap) {
+  char *ptr = (char *)cstr;
+  char *opl = (char *)cap;
+  for (;ptr < opl && *ptr != 0; ptr += 1);
+  u64 size = (u64)(ptr - (char *)cstr);
+  String result = str8((u8*)cstr, size);
+  return result;
+}
+
+String str8_substr(String str, Range range) {
+  range.min = ClampTop(range.min, str.size);
+  range.max = ClampTop(range.max, str.size);
+  str.str += range.min;
+  str.size = range_size(range);
+  return str;
+}
+
+String str8_prefix(String str, u64 size) {
+  str.size = ClampTop(size, str.size);
+  return str;
+}
+
+String str8_skip(String str, u64 amt) {
+  amt = ClampTop(amt, str.size);
+  str.str += amt;
+  str.size -= amt;
+  return str;
+}
+
+String str8_postfix(String str, u64 size) {
+  size = ClampTop(size, str.size);
+  str.str = (str.str + str.size) - size;
+  str.size = size;
+  return str;
+}
+
+String str8_chop(String str, u64 amt) {
+  amt = ClampTop(amt, str.size);
+  str.size -= amt;
+  return str;
+}
+
+String push_str8_cat(Arena* arena, String s1, String s2) {
+  String str;
+  str.size = s1.size + s2.size;
+  str.str = push_array(arena, u8, str.size + 1);
+  MemCopy(str.str, s1.str, s1.size);
+  MemCopy(str.str + s1.size, s2.str, s2.size);
+  str.str[str.size] = 0;
+  return str;
+}
+
+String push_str8_copy(Arena* arena, String s) {
+  String str;
+  str.size = s.size;
+  str.str = push_array(arena, u8, str.size + 1);
+  MemCopy(str.str, s.str, s.size);
+  str.str[str.size] = 0;
+  return str;
+}
+
+String str8_chop_last_segment(String string){
+  if (string.size > 0){
+    u8 *ptr = string.str + string.size - 1;
+    for (;ptr >= string.str; ptr -= 1){
+      if (*ptr == '/' || *ptr == '\\') {
+        break;
+      }
+    }
+    if (ptr >= string.str){
+      string.size = (u64)(ptr - string.str) + 1;
+    }
+    else{
+      string.size = 0;
+    }
+  }
+  return string;
+}
+
+String str8_chop_last_slash(String string){
+  if (string.size > 0){
+    u8 *ptr = string.str + string.size - 1;
+    for (;ptr >= string.str; ptr -= 1){
+      if (*ptr == '/' || *ptr == '\\'){
+        break;
+      }
+    }
+    if (ptr >= string.str){
+      string.size = (u64)(ptr - string.str);
+    }
+    else{
+      string.size = 0;
+    }
+  }
+  return string;
+}
+
+String str8_skip_last_slash(String string) {
+  if (string.size > 0) {
+    u8* ptr = string.str + string.size - 1;
+    for (; ptr >= string.str; ptr -= 1) {
+      if (*ptr == '/' || *ptr == '\\') {
+        break;
+      }
+    }
+    if (ptr >= string.str) {
+      ptr += 1;
+      string.size = (u64)(string.str + string.size - ptr);
+      string.str = ptr;
+    }
+  }
+  return (string);
+}
+
+String str8_chop_last_dot(String string) {
+  String result = string;
+  u64 p = string.size;
+  for (; p > 0;) {
+    p -= 1;
+    if (string.str[p] == '.') {
+      result = str8_prefix(string, p);
+      break;
+    }
+  }
+  return (result);
+}
