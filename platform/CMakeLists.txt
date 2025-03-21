@@ -15,3 +15,4 @@ add_executable(platform ${SOURCES})
 target_compile_definitions(platform PRIVATE _DEBUG)
 
 target_link_libraries(platform "${CMAKE_SOURCE_DIR}/bin/core.lib")
+target_link_libraries(platform "${CMAKE_SOURCE_DIR}/bin/engine.lib")

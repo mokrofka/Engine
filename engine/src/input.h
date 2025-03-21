@@ -8,7 +8,7 @@
 
 b8 input_initialize(u64* memory_requirement, void* out_state);
 void input_shutdown();
-void input_update(f64 delta_time);
+void input_update();
 
 // keyboard input
 KAPI b8 input_is_key_down(Keys key);

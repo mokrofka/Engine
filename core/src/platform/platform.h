@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/strings.h"
+#include "strings.h"
 #include "input_types.h"
 #include "defines.h"
 
@@ -11,7 +11,6 @@ struct DynamicLibraryFunction {
 
 struct DynamicLibrary {
   void* handle;
-  String filename;
   String src_full_filename;
   String temp_full_filename;
   DynamicLibraryFunction* functions;
@@ -43,6 +42,7 @@ struct Window {
   struct WindowRendererState* renderer_state;
 };
 
+typedef void (*PlatformWindowClosedCallback)();
 typedef void (*PlatformProcessKey)(Keys key, b8 pressed);
 
 KAPI b8 platform_system_startup(u64* memory_requirement, struct PlatformState* state_out);
@@ -51,21 +51,21 @@ KAPI b8 window_create(Window* window, WindowConfig config);
   
 void platform_shutdown(struct PlatformState* plat_state);
 
-// KAPI b8 platform_pump_messages(struct PlatformState* plat_state);
-KAPI b8 platform_pump_messages(void* plat_state);
+KAPI b8 platform_pump_messages();
 
 void* platform_allocate(u64 size);
-struct Arena* platform_allocate_arena(u64 size);
+KAPI struct Arena* platform_allocate_arena(u64 size);
 void platform_free(void* block, b8 aligned);
 void* platform_zero_memory(void* block, u64 size);
 void* platform_copy_memory(void* dest, const void* source, u64 size);
 void* platform_set_memory(void* dest, i32 value, u64 size);
+b8 platform_compare_memory(void* a, void* b, u64 size);
 
 void platform_console_write(const char* message, u8 colour);
 void platform_console_write_error(const char* message, u8 colour);
 
 
-f64 platform_get_absolute_time();
+KAPI f64 platform_get_absolute_time();
 
 // Sleep on the thread for the provided ms. This blocks the main thread.
 // Should only be used for giving time back to the OS for unused update power.
@@ -78,6 +78,10 @@ KAPI void* platform_dynamic_library_load_function(const char* name, DynamicLibra
 KAPI u64 platform_get_last_write_time(String filename);
 KAPI b8 platform_compare_file_time(u64 new_dll_write_time, u64 dll_last_write_time);
 KAPI void platform_copy_file(String file, String new_file);
-KAPI void platform_get_EXE_filename(u8* buffer);
+KAPI u32 platform_get_EXE_filename(u8* buffer);
 
 KAPI void platform_register_process_key(PlatformProcessKey callback);
+KAPI void platform_register_window_closed_callback(PlatformWindowClosedCallback callback);
+KAPI void platform_window_destroy(Window* window);
+KAPI struct Win32HandleInfo platform_get_handle_info();
+KAPI struct WindowPlatformState* platform_get_window_handle();

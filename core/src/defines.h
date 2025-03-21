@@ -70,9 +70,13 @@ typedef unsigned char uchar;
 #define MemZeroArray(a)    MemZero((a),sizeof(a))
 #define MemZeroTyped(m,c)  MemZero((m),sizeof(*(m))*(c))
 
-#define MemCopy(dst, src, size)    copy_memory((dst), (src), (size))
-#define MemCopyStruct(dst,src)         copy_memory((dst),(src),sizeof(*(dst)))
-#define MemSet(dst, byte, size)    set_memory((dst), (byte), (size))
+#define MemCopy(d, s, c)         copy_memory((d), (s), (c))
+#define MemCopyStruct(d, s)      copy_memory((d), (s), sizeof(*(d)))
+#define MemCopyTyped(d, s, c)    copy_memory((d), (s), sizeof(*(d)) * (c))
+#define MemSet(d, byte, c)       set_memory((d), (byte), (c))
+#define MemCompare(a, b, size)   compare_memory((a), (b), (size))
+
+#define U32_MAX 4294967295U
 
 #define Sqr(x) ((x)*(x))
 #define Sign(x) ((x) < 0 ? -1 : (x) > 0 ? 1 : 0)
@@ -83,12 +87,9 @@ typedef unsigned char uchar;
 #define Glue(A,B) A##B
 #define Stringify(S) #S
 
-#define __MacroVar(name) Glue(name, __LINE__)
-#define Defer(start, end) for (      \
-    i32 __MacroVar(_i_) = (start, 0); \
-    !__MacroVar(_i_);                 \
-    (__MacroVar(_i_) += 1), end)
-    
+#define Defer(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
+#define Loop(it, count) for (u32 it = 0; it < (count); it += 1) 
+
 #ifdef KEXPORT
 // Exports
 #define KAPI __declspec(dllexport)

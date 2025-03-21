@@ -1,8 +1,8 @@
 #include "input.h"
 #include "event.h"
 
-#include "core/memory.h"
-#include "core/logger.h"
+#include <memory.h>
+#include <logger.h>
 
 struct KeyboardState {
   b8 keys[256];
@@ -21,7 +21,7 @@ struct InputState {
   MouseState mouse_previous;
 };
 
-internal InputState* state;
+global InputState* state;
 
 b8 input_initialize(u64* memory_requirement, void* out_state) {
   *memory_requirement = sizeof(InputState);
@@ -37,7 +37,7 @@ void input_shutdown() {
   
 }
 
-void input_update(f64 delta_time) {
+void input_update() {
   
   // Copy current states to previous states.
   MemCopyStruct(&state->keyboard_previous, &state->keyboard_current);

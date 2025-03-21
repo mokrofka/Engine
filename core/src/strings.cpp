@@ -1,86 +1,91 @@
 #include "strings.h"
 
-#include "core/memory.h"
+#include "memory.h"
+#include <string.h>
 
 u32 range_size(Range r) {
   u32 c = ((r.max > r.min) ? (r.max - r.min) : 0);
   return c;
 }
 
-b8 char_is_space(u8 c){
+b8 char_is_space(u8 c) {
   return c == ' ' || c == '\n' || c == '\t' || c == '\r' || c == '\f' || c == '\v';
 }
 
-b8 char_is_upper(u8 c){
+b8 char_is_upper(u8 c) {
   return 'A' <= c && c <= 'Z';
 }
 
-b8 char_is_lower(u8 c){
+b8 char_is_lower(u8 c) {
   return 'a' <= c && c <= 'z';
 }
 
-b8 char_is_alpha(u8 c){
+b8 char_is_alpha(u8 c) {
   return char_is_upper(c) || char_is_lower(c);
 }
 
-b8 char_is_slash(u8 c){
+b8 char_is_slash(u8 c) {
   return c == '/' || c == '\\';
 }
 
-u8 char_to_lower(u8 c){
+u8 char_to_lower(u8 c) {
   if (char_is_upper(c)) {
     c += ('a' - 'A');
   }
   return c;
 }
 
-u8 char_to_upper(u8 c){
+u8 char_to_upper(u8 c) {
   if (char_is_lower(c)) {
     c += ('A' - 'a');
   }
   return c;
 }
 
-u8 char_to_correct_slash(u8 c){
-  if(char_is_slash(c)) {
+u8 char_to_correct_slash(u8 c) {
+  if (char_is_slash(c)) {
     c = '/';
   }
   return c;
 }
 
-u64 cstring8_length(u8* c) {
-  u8 *p = c;
-  for (;*p != 0; p += 1);
+u64 cstr_length(u8* c) {
+  u8* p = c;
+  for (; *p != 0; p += 1);
   return p - c;
 }
 
-String str8(u8* str, u64 size) {
+String str(u8* str, u64 size) {
   String result = {str, size};
   return result;
 }
 
-String str8_range(u8* first, u8* one_past_last) {
+String str_range(u8* first, u8* one_past_last) {
   String result = {first, (u64)(one_past_last - first)};
   return result;
 }
 
-String str8_zero() {
+String str_zero() {
   String result = {};
   return result;
 }
 
-String cstr8(const char* c) {
-  String result = {(u8*)c, cstring8_length((u8*)c)};
+String cstr(const char* c) {
+  String result = {(u8*)c, cstr_length((u8*)c)};
   return result;
 }
 
-String cstr8_capped(void *cstr, void *cap) {
+String cstr_capped(void *cstr, void *cap) {
   char *ptr = (char *)cstr;
   char *opl = (char *)cap;
   for (;ptr < opl && *ptr != 0; ptr += 1);
   u64 size = (u64)(ptr - (char *)cstr);
-  String result = str8((u8*)cstr, size);
+  String result = str((u8*)cstr, size);
   return result;
+}
+
+b8 cstr_equal(const char* str0, const char* str1) {
+  return strcmp(str0, str1) == 0;
 }
 
 String str8_substr(String str, Range range) {
@@ -116,7 +121,7 @@ String str8_chop(String str, u64 amt) {
   return str;
 }
 
-String push_str8_cat(Arena* arena, String s1, String s2) {
+String push_str_cat(Arena* arena, String s1, String s2) {
   String str;
   str.size = s1.size + s2.size;
   str.str = push_array(arena, u8, str.size + 1);
@@ -126,7 +131,7 @@ String push_str8_cat(Arena* arena, String s1, String s2) {
   return str;
 }
 
-String push_str8_copy(Arena* arena, String s) {
+String push_str_copy(Arena* arena, String s) {
   String str;
   str.size = s.size;
   str.str = push_array(arena, u8, str.size + 1);
@@ -135,7 +140,7 @@ String push_str8_copy(Arena* arena, String s) {
   return str;
 }
 
-String str8_chop_last_segment(String string){
+String str_chop_last_segment(String string){
   if (string.size > 0){
     u8 *ptr = string.str + string.size - 1;
     for (;ptr >= string.str; ptr -= 1){
@@ -153,7 +158,7 @@ String str8_chop_last_segment(String string){
   return string;
 }
 
-String str8_chop_last_slash(String string){
+String str_chop_last_slash(String string){
   if (string.size > 0){
     u8 *ptr = string.str + string.size - 1;
     for (;ptr >= string.str; ptr -= 1){
@@ -171,7 +176,7 @@ String str8_chop_last_slash(String string){
   return string;
 }
 
-String str8_skip_last_slash(String string) {
+String str_skip_last_slash(String string) {
   if (string.size > 0) {
     u8* ptr = string.str + string.size - 1;
     for (; ptr >= string.str; ptr -= 1) {
@@ -188,7 +193,7 @@ String str8_skip_last_slash(String string) {
   return (string);
 }
 
-String str8_chop_last_dot(String string) {
+String str_chop_last_dot(String string) {
   String result = string;
   u64 p = string.size;
   for (; p > 0;) {

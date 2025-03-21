@@ -1,12 +1,12 @@
-#include "core/memory.h"
+#include "memory.h"
 #include "platform/platform.h"
 
-#include "core/logger.h"
-#include "core/asserts.h"
+#include "logger.h"
+#include "asserts.h"
 
 #include <windows.h>
 #include <windowsx.h>
-#include <stdlib.h>
+// #include <stdlib.h>
 
 struct Win32HandleInfo {
   HINSTANCE h_instance;
@@ -19,16 +19,16 @@ struct WindowPlatformState {
 struct PlatformState {
   Win32HandleInfo handle;
   Window* window;
-
+  PlatformWindowClosedCallback window_closed_callback;
   PlatformProcessKey process_key;
 };
 
-internal PlatformState* state;
+global PlatformState* state;
 
 // Clock
-internal f64 clock_frequency;
-internal UINT min_period;
-internal LARGE_INTEGER start_time;
+global f64 clock_frequency;
+global UINT min_period;
+global LARGE_INTEGER start_time;
 
 LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARAM l_param);
 
@@ -77,6 +77,7 @@ b8 window_create(Window* window, WindowConfig config) {
   // window = (Window*)malloc(sizeof(Window));
   window = (Window*)((u8*)state + sizeof(PlatformState));
   window->platform_state = (WindowPlatformState*)((u8*)window + sizeof(Window));
+  state->window = window;
   // window->platform_state = (WindowPlatformState*)malloc(sizeof(PlatformState));
   // PlatformState* state = (PlatformState*)window->platform_state;
   // state->window = window;
@@ -145,7 +146,7 @@ void platform_shutdown(PlatformState* plat_state) {
 }
 
 // b8 platform_pump_messages(PlatformState* plat_state) {
-b8 platform_pump_messages(void* plat_state) {
+b8 platform_pump_messages() {
   MSG message;
   while (PeekMessageA(&message, NULL, 0, 0, PM_REMOVE)) {
     TranslateMessage(&message);
@@ -187,6 +188,10 @@ void* platform_set_memory(void* dest, i32 value, u64 size) {
   return memset(dest, value, size);
 }
 
+b8 platform_compare_memory(void* a, void* b, u64 size) {
+  return memcmp(a, b, size) ? 0 : 1;
+}
+
 void platform_console_write(const char* message, u8 colour) {
   HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
   // FATAL,ERROR,WARN,INFO,DEBUG,TRACE
@@ -219,34 +224,20 @@ void platform_sleep(u64 ms) {
   Sleep(ms);
 }
 
-// b8 platform_dynamic_library_load(const char* name, DynamicLibrary* out_library) {
 b8 platform_dynamic_library_load(String name, DynamicLibrary* out_library) {
   if (!out_library) {
     return false;
   }
-  if (!name.str) {
+  if (!out_library->src_full_filename.str) {
+    return false;
   }
-
-  out_library->filename = name;
 
   u32 max_retries = 10;
   HMODULE library = LoadLibraryA((char*)name.str);
   if (!library) {
-    Assert(false);
+    AssertMsg(false, "Didn't load library");
   }
-
-  // for (u32 i = 0; i < max_retries; ++i) {
-  //   library = LoadLibraryA((char*)name.str);;
-  //   if (library) goto end;
-
-  //   // Wait and retry
-  //   Sleep(10);
-  // }
-  // if (!library) {
-  //   Assert(false);
-  // }
-
-  // end:
+  
   out_library->handle = library;
 
   return true;
@@ -278,7 +269,7 @@ void* platform_dynamic_library_load_function(const char* name, DynamicLibrary* l
 
   FARPROC f_addr = GetProcAddress((HMODULE)library->handle, name);
   if (!f_addr) {
-    Assert(f_addr);
+    AssertMsg(false, "Didn't load function");
   }
 
   return (void*)f_addr;
@@ -309,12 +300,32 @@ void platform_copy_file(String file, String new_file) {
   CopyFile((char*)file.str, (char*)new_file.str, false);
 }
 
-void platform_get_EXE_filename(u8* buffer) {
-  DWORD SizeOfFilename = GetModuleFileNameA(0, (char*)buffer, 100);
+u32 platform_get_EXE_filename(u8* buffer) {
+  DWORD size = GetModuleFileNameA(0, (char*)buffer, 100);
+  return size;
 }
 
 void platform_register_process_key(PlatformProcessKey callback) {
   state->process_key = callback;
+}
+
+void platform_register_window_closed_callback(PlatformWindowClosedCallback callback) {
+  state->window_closed_callback = callback;
+}
+
+void platform_window_destroy(Window* window) {
+  Trace("Destroying window...");
+  DestroyWindow(state->window->platform_state->hwnd);
+  state->window->platform_state->hwnd = 0;
+  state->window = 0;
+}
+
+Win32HandleInfo platform_get_handle_info() {
+  return state->handle;
+}
+
+WindowPlatformState* platform_get_window_handle() {
+  return state->window->platform_state;
 }
 
 LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARAM l_param) {
@@ -333,6 +344,7 @@ LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARA
       return 0;
     } break;
     case WM_CLOSE: {
+      state->window_closed_callback();
       return true;
     }
     case WM_DESTROY: {

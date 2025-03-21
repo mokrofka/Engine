@@ -1,17 +1,13 @@
 #include "memory.h"
 
 #include "platform/platform.h"
-#include "core/logger.h"
-#include "core/memory.h"
+#include "logger.h"
 
 global thread_local TCTX tctx_thread_local;
 
-void initialize_memory(void* app) {
-  Arena** arena = (Arena**)app;
-  *arena = platform_allocate_arena(GB(2));
-  
-  tctx_thread_local.arenas[0] = arena_alloc(*arena, MB(32));
-  tctx_thread_local.arenas[1] = arena_alloc(*arena, MB(32));
+void tctx_initialize(Arena* arena) {
+  tctx_thread_local.arenas[0] = arena_alloc(arena, MB(32));
+  tctx_thread_local.arenas[1] = arena_alloc(arena, MB(32));
 }
 
 void shutdown_memory() {
@@ -27,6 +23,10 @@ void* copy_memory(void* dest, const void* source, u64 size) {
 
 void* set_memory(void* dest, i32 value, u64 size) {
   return platform_set_memory(dest, value, size);
+}
+
+b8 compare_memory(void* a, void* b, u64 size) {
+  return platform_compare_memory(a, b, size);
 }
 
 internal b8 is_power_of_two(u64 x) {
@@ -141,6 +141,25 @@ void *arena_push(Arena *arena, u64 size, u64 align) {
 	if (offset+size <= arena->res) {
 		u8* buffer = (u8*)((u64)arena + ARENA_HEADER) + offset;
 		arena->pos = offset+size;
+
+    // MemZero(buffer, size);
+		return buffer;
+	}
+	// Return NULL if the arena is out of memory (or handle differently)
+  Fatal("Arena is out of memory!");
+}
+
+void *arena_push(Temp arena, u64 size, u64 align) {
+	// Align 'curr_offset' forward to the specified alignment
+	u64 curr_ptr = (u64)arena.arena + ARENA_HEADER + arena.arena->pos;
+	u64 offset = align_forward(curr_ptr, align);
+  u64 temp = (u64)arena.arena + ARENA_HEADER;
+	offset -= temp; // Change to relative offset
+
+	// Check to see if the backing memory has space left
+	if (offset+size <= arena.arena->res) {
+		u8* buffer = (u8*)((u64)arena.arena + ARENA_HEADER) + offset;
+		arena.arena->pos = offset+size;
 
     // MemZero(buffer, size);
 		return buffer;

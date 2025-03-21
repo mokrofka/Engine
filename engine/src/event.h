@@ -27,7 +27,6 @@ struct EventContext {
 typedef b8 (*PFN_on_event)(u16 code, void* sender, void* listener_inst, EventContext data);
 
 b8 event_initialize(u64* memory_requirement, void* state);
-b8 event_restore_state(void* out_state);
 void event_shutdown();
 
 KAPI b8 event_register(u16 code, void* listener, PFN_on_event on_event);

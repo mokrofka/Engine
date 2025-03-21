@@ -1,0 +1,14 @@
+#include "platform/platform.h"
+
+struct Application {
+  b8 (*initialize)(struct Application* app_inst);
+  b8 (*update)(struct Application* app_inst);
+  
+  String name;
+  String full_name;
+  Arena* arena;
+  void* state;
+  void* engine_state;
+  
+  DynamicLibrary game_lib;
+};

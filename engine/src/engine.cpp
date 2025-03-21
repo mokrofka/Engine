@@ -1,21 +1,42 @@
 #include "engine.h"
 
-#include <core/logger.h>
-#include <core/memory.h>
-#include <platform/platform.h>
+#include "application_type.h"
+#include "renderer/renderer_frontend.h"
 
+#include <logger.h>
+#include <memory.h>
+#include <platform/platform.h>
+#include <clock.h>
 #include "event.h"
 #include "input.h"
 
+struct EngineSystemStates {
+  u64 event_system_memory_requirement;
+  struct EventState* event_system;
+  
+  u64 input_system_memory_requirement;
+  struct InputState* input_system;
+  
+  u64 platform_system_memory_requirement;
+  struct PlatformState* platform_system;
+  
+  u64 renderer_system_memory_requirement;
+  struct RendererState* renderer_system;
+};
+
 struct EngineState {
-  struct Arena* main_arena;
-  struct Arena* permanent_arena;
-  struct Arena* transient_arena;
-  b8 is_initialized;
-  b8 is_used;
+  Application* game_inst;
+  Arena* arena;
+  b8 is_running;
+  b8 is_suspended;
   EngineSystemStates systems;
   Window* window;
+
+  Clock clock;
+  f64 last_time;
 };
+
+internal EngineState* engine_state;
 
 b8 test_event(u16 code, void* sender, void* listener_inst, EventContext context) {
   Info("event from engine");
@@ -25,21 +46,32 @@ b8 test_event(u16 code, void* sender, void* listener_inst, EventContext context)
   return true;
 }
 
-void test_game_function(void(*function)()) {
-  Info("hello");
-  Info("hello");
-  function();
-}
-
 internal void engine_on_process_key(Keys key, b8 pressed);
-  
-b8 application_on_key(u16 code, void* sender, void* listener_inst, EventContext context);
+internal void engine_on_window_closed();
 
-b8 engine_create(void* memory) {
-  EngineState* engine_state = (EngineState*)memory;
+  void* p1;
+  void* p2;
+  void* p3;
+  void* p4;
+b8 application_on_event(u16 code, void* sender, void* listener_inst, EventContext context);
+b8 application_on_key(u16 code, void* sender, void* listener_inst, EventContext context);
+internal void check_dll_changes(Application* app);
+
+b8 engine_create(Application* game_inst) {
+
+  // TODO: Remove this
+  Fatal("A test message: %f", 3.14f);
+  Error("A test message: %f", 3.14f);
+  Warn("A test message: %f", 3.14f);
+  Info("A test message: %f", 3.14f);
+  Debug("A test message: %f", 3.14f);
+  Trace("A test message: %f", 3.14f);
   
-  engine_state->permanent_arena = arena_alloc(engine_state->main_arena, MB(40));
-  engine_state->transient_arena = arena_alloc(engine_state->main_arena, MB(250));
+  game_inst->engine_state = push_struct(game_inst->arena, EngineState);
+  engine_state = (EngineState*)game_inst->engine_state;
+  engine_state->game_inst = game_inst;
+  
+  engine_state->arena = arena_alloc(game_inst->arena, MB(400));
 
   EngineSystemStates* systems = &engine_state->systems;
   
@@ -47,7 +79,7 @@ b8 engine_create(void* memory) {
   {
     u64* mem_required = &systems->platform_system_memory_requirement;
     platform_system_startup(mem_required, 0);
-    systems->platform_system = push_buffer(engine_state->permanent_arena, PlatformState, *mem_required);
+    systems->platform_system = push_buffer(engine_state->arena, PlatformState, *mem_required);
     if (!platform_system_startup(mem_required, systems->platform_system)) {
       Error("Failed to initialize platform layer");
       return false;
@@ -58,20 +90,24 @@ b8 engine_create(void* memory) {
   {
     u64* mem_required = &systems->event_system_memory_requirement;
     event_initialize(mem_required, 0);
-    systems->event_system = push_buffer(engine_state->permanent_arena, EventState, *mem_required);
+    systems->event_system = push_buffer(engine_state->arena, EventState, *mem_required);
     if (!event_initialize(mem_required, systems->event_system)) {
       Error("Failed to initialize event system");
       return false;
     }
     platform_register_process_key(engine_on_process_key);
+    platform_register_window_closed_callback(engine_on_window_closed);
+    
+    event_register(EVENT_CODE_APPLICATION_QUIT, 0, application_on_event);
     event_register(EVENT_CODE_KEY_PRESSED, 0, application_on_key);
+    event_register(EVENT_CODE_KEY_RELEASED, 0, application_on_key);
   }
   
   // Input system
   {
     u64* mem_required = &systems->input_system_memory_requirement;
     input_initialize(mem_required, 0);
-    systems->input_system = push_buffer(engine_state->permanent_arena, InputState, *mem_required);
+    systems->input_system = push_buffer(engine_state->arena, InputState, *mem_required);
     if (!input_initialize(mem_required, systems->input_system)) {
       Error("Failed to initialize input system");
       return false;
@@ -81,7 +117,7 @@ b8 engine_create(void* memory) {
   // Window creation
   {
     WindowConfig config = {
-      .name = cstr8("Engine.exe"),
+      .name = game_inst->name,
       .position_x = 100,
       .position_y = 100,
       .width = 1280,
@@ -90,23 +126,106 @@ b8 engine_create(void* memory) {
     window_create(engine_state->window, config);
   }
   
-  engine_state->is_initialized = true;
-  Trace("Engine creation");
+  // Renderer startup
+  {
+    u64* mem_required = &systems->renderer_system_memory_requirement;
+    renderer_initialize(mem_required, 0);
+    systems->renderer_system = push_buffer(engine_state->arena, RendererState, *mem_required);
+    if (!renderer_initialize(mem_required, systems->renderer_system)) {
+      Error("Failed to initialize renderer. Aborting application.");
+      return false;
+    }
+  }
+  
+
+  if (!engine_state->game_inst->initialize(engine_state->game_inst)) {
+    Fatal("Game failed to initialize.");
+    return false;
+  }
+
   return true;
 }
 
-b8 engine_restore_state(void* memory) {
-  EngineState* engine_state = (EngineState*)memory;
+b8 engine_run(Application* game_inst) {
+  engine_state->is_running = true;
   
-  EngineSystemStates systems = engine_state->systems;
+  clock_start(&engine_state->clock);
+  clock_update(&engine_state->clock);
+  engine_state->last_time = engine_state->clock.elapsed;
+  f64 running_time = 0;
+  u8 frame_count = 0;
+  f64 target_frame_seconds = 1.0f / 60;
+  
+  while (engine_state->is_running) {
+    
+    if (!platform_pump_messages()) {
+      engine_state->is_running = false;
+    }
 
-  event_restore_state(systems.event_system);
+    clock_update(&engine_state->clock);
+    f64 current_time = engine_state->clock.elapsed;
+    f64 delta = (current_time - engine_state->last_time);
+    f64 frame_start_time = platform_get_absolute_time();
 
+    check_dll_changes(game_inst);
+    if (!engine_state->game_inst->update(engine_state->game_inst)) {
+      Fatal("Game update failed, shutting down.");
+      engine_state->is_running = false;
+      break;
+    }
+
+    f64 frame_end_time = platform_get_absolute_time();
+    f64 frame_elapsed_time = frame_end_time - frame_start_time;
+    running_time += frame_elapsed_time;
+    f64 remaining_seconds = target_frame_seconds - frame_elapsed_time;
+
+    if (remaining_seconds > 0) {
+      u64 remaining_ms = (remaining_seconds * 1000);
+
+      // If there is time left, give it back to the OS.
+      b8 limit_frames = true;
+      if (remaining_ms > 0 && limit_frames) {
+        platform_sleep(remaining_ms - 1);
+      }
+
+      ++frame_count;
+    }
+
+    input_update();
+    
+    engine_state->last_time = current_time;
+  }
+  
+  engine_state->is_running = false;
+
+  
+  platform_window_destroy(engine_state->window);
+
+  event_unregister(EVENT_CODE_APPLICATION_QUIT, 0, application_on_event);
+  event_unregister(EVENT_CODE_KEY_PRESSED, 0, application_on_key);
+  event_unregister(EVENT_CODE_KEY_RELEASED, 0, application_on_key);
+  event_unregister(EVENT_CODE_KEY_RELEASED, 0, application_on_key);
   return true;
 }
 
 internal void engine_on_process_key(Keys key, b8 pressed) {
   input_process_key(key, pressed);
+}
+
+internal void engine_on_window_closed() {
+  event_fire(EVENT_CODE_APPLICATION_QUIT, 0, (EventContext){});
+}
+
+b8 application_on_event(u16 code, void* sender, void* listener_inst, EventContext context) {
+  switch (code) {
+    case EVENT_CODE_APPLICATION_QUIT: {
+      Info("EVENT_CORE_APPLICATION_QUIT received, shutting down.\n");
+      engine_state->is_running = false;
+      return true;
+    }
+  }
+  
+  return false;
 }
 
 b8 application_on_key(u16 code, void* sender, void* listener_inst, EventContext context) {
@@ -136,3 +255,26 @@ b8 application_on_key(u16 code, void* sender, void* listener_inst, EventContext 
   }
   return false;
 }
+
+void load_game_lib(Application* app) {
+  app->game_lib.dll_last_time_write = platform_get_last_write_time(app->game_lib.src_full_filename);
+  platform_copy_file(app->game_lib.src_full_filename, app->game_lib.temp_full_filename);
+  platform_dynamic_library_load(app->game_lib.temp_full_filename, &app->game_lib);
+  app->update = (b8(*)(Application*))platform_dynamic_library_load_function("application_update", &app->game_lib);
+}
+
+void unload_game_lib(Application* app) {
+  platform_dynamic_library_unload(&app->game_lib);
+  app->update = 0;
+}
+
+internal void check_dll_changes(Application* app) {
+  u64 new_game_dll_write_time = platform_get_last_write_time(app->game_lib.src_full_filename);
+  b8 game_write = platform_compare_file_time(new_game_dll_write_time, app->game_lib.dll_last_time_write);
+
+  if (game_write) {
+    unload_game_lib(app);
+    load_game_lib(app);
+  }
+}
+

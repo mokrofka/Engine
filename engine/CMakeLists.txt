@@ -3,7 +3,11 @@ cmake_minimum_required(VERSION 3.5.0)
 project(Engine)
 
 file(GLOB_RECURSE SOURCES ${CMAKE_SOURCE_DIR}/engine/src/*.cpp)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/bin/dll)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/bin)
+# list(FILTER SOURCES EXCLUDE REGEX ".*(ThirdPartyLib|renderer)/.*")
+
+# list(FILTER ALL_SOURCES EXCLUDE REGEX ".*ThirdPartyLib/.*")
+
 add_library(engine SHARED ${SOURCES})
 
 target_include_directories(engine PRIVATE ${CMAKE_SOURCE_DIR}/engine/src)
@@ -16,7 +20,7 @@ target_link_libraries(engine "${CMAKE_SOURCE_DIR}/bin/core.lib")
 
 target_compile_definitions(engine PRIVATE _DEBUG KEXPORT _CRT_SECURE_NO_WARNINGS)
 set_target_properties(engine PROPERTIES
-    ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/bin/dll #output binaries .lib import
+    ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/bin #output binaries .lib import
 )
 
 target_compile_options(engine PRIVATE -w -Wuninitialized -Wvarargs -fno-exceptions -fno-rtti)

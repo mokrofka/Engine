@@ -1,53 +1,56 @@
 #include "game.h"
 
-#include <platform/platform.h>
-#include <core/logger.h>
-#include <core/memory.h>
-
+#include <application_type.h>
 #include <engine.h>
 #include <event.h>
 
-void game_initialize(void* memory) {
-  GameState* game_state = (GameState*)memory;
-  
-  if (!game_state->is_initialized) {
-    game_state->permanent_arena = arena_alloc(game_state->main_arena, MB(40));
-    game_state->transient_arena = arena_alloc(game_state->main_arena, MB(200));
-    game_state->data = push_array(game_state->permanent_arena, MyData, 1);
-    game_state->is_initialized = true;
-  }
+#include <platform/platform.h>
+#include <logger.h>
+#include <memory.h>
+
+struct MyData {
+  i32 x,y,z; 
+};
+
+struct GameState {
+  struct Arena* arena;
+
+  MyData* data;
+};
+
+i32* i = (i32*)1; 
+
+void print() {
+  Info("it's function");
 }
 
 b8 test_event(u16 code, void* sender, void* listener_inst, EventContext context) {
   Info("I'm an event");
-  // Info("I'm an event");
-  // Info("I'm an event");
-  // Info("I'm an event");
-  // Info("I'm an event");
   return true;
 }
 
-i32* i = (i32*)1; 
-void print() {
-  Info("it's function");
+b8 application_initialize(Application* game_inst) {
+  game_inst->state = push_struct(game_inst->arena, GameState);
+  GameState* state = (GameState*)game_inst->state;
+  state->arena = arena_alloc(game_inst->arena, MB(400));
+
+  state->data = push_struct(state->arena, MyData);
+
+  // event_register(EVENT_CODE_KEY_PRESSED, i, test_event);
+  return true;
 }
   
-void game_update(void* memory) {
+b8 application_update(Application* game_inst) {
 
-  GameState* game_state = (GameState*)memory;
+  GameState* game_state = (GameState*)game_inst->state;
   
-  if (!game_state->is_stated) {
-    
-    engine_restore_state(game_state->engine_memory);
-    game_state->is_stated = true;
-    event_register(EVENT_CODE_KEY_PRESSED, i, test_event);
-  }
-  test_game_function(print);
-  EventContext context = {};
-  event_fire(EVENT_CODE_KEY_PRESSED, 0, context);
+  // test_game_function(print);
+  // EventContext context = {};
+  // event_fire(EVENT_CODE_KEY_PRESSED, 0, context);
 
   MyData* data = game_state->data;
   // Trace("my values are %i %i %i", data->x-=1,data->y+=1000,data->z++);
+  // Info("hello");
   
-  platform_sleep(100);
+  return true;
 }

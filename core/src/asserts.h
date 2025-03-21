@@ -24,7 +24,7 @@ report_assertion_failure(const char* expression, const char* message, const char
         }                                                            \
     }
 
-#define KASSERT_MSG(expr, message)                                        \
+#define AssertMsg(expr, message)                                        \
     {                                                                     \
         if (expr) {                                                       \
         } else {                                                          \

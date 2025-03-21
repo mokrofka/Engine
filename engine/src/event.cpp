@@ -1,6 +1,7 @@
 #include "event.h"
 
-#include "core/memory.h"
+#include "logger.h"
+#include "memory.h"
 
 struct Array {
   u32 res;
@@ -29,8 +30,8 @@ struct EventSystemState {
   void* memory;
 };
 
-internal EventSystemState* state;
-const u64 memory_reserved = KB(10);
+global EventSystemState* state;
+global const u64 memory_reserved = KB(10);
 
 b8 event_initialize(u64* memory_requirement, void* out_state) {
   *memory_requirement = sizeof(EventSystemState) + memory_reserved;
@@ -44,12 +45,6 @@ b8 event_initialize(u64* memory_requirement, void* out_state) {
   
   return true;
 }
-
-b8 event_restore_state(void* out_state) {
-  state = (EventSystemState*)out_state; 
-  return true;
-}
-
 // void event_shutdown() {
 //   // Free the events arrays. And objects pointed to should be destroyed on their own.
 //   for(u16 i = 0; i < MAX_MESSAGE_CODES; ++i){
@@ -68,54 +63,53 @@ b8 event_register(u16 code, void* listener, PFN_on_event on_event) {
   if (state->registered[code].events == 0) {
     // state->registered[code].events = push_array(state->arena, RegisteredEvent, 4);
     state->registered[code].events = push_array(state->arena, RegisteredEvent, 4);
-    state->registered[code].array = {.res = sizeof(RegisteredEvent)*4, .pos = 0};
+    state->registered[code].array = {.res = 4, .pos = 0};
   }
   
-  // u64 register_count = darray_length(state->registered[code].events);
-  u64 register_count = state->registered[code].array.pos/sizeof(RegisteredEvent);
+  u64 register_count = state->registered[code].array.pos;
   for (u64 i = 0; i < register_count; ++i) {
     if(state->registered[code].events[i].listener == listener) {
-      // TODO: warn
+      Warn("You're registering the same event!");
       return false;
     }
   }
+  
+  if (register_count >= state->registered[code].array.res) {
+    RegisteredEvent* events = push_array(state->arena, RegisteredEvent, state->registered[code].array.res*5);
+    MemCopyTyped(events, state->registered[code].events, state->registered[code].array.res);
+    state->registered[code].events = events;
+  } 
   
   // If at this point, no duplicate was found. Proceed with registration.
   RegisteredEvent event;
   event.listener = listener;
   event.callback = on_event;
   state->registered[code].events[register_count] = event;
-  state->registered[code].array.pos += sizeof(RegisteredEvent);
-  // darray_push(state.registered[code].events, event);
+  ++state->registered[code].array.pos;
 
   return true;
 }
 
-// b8 event_unregister(u16 code, void* listener, PFN_on_event on_event) {
-//   if (is_initialized == false) {
-//     return false;
-//   }
+b8 event_unregister(u16 code, void* listener, PFN_on_event on_event) {
+  // On nothing is registered for the code, boot out.
+  if (state->registered[code].array.pos == 0) {
+    Warn("you're trying to unregister nothing!");
+    return false;
+  }
   
-//   // On nothing is registered for the code, boot out.
-//   if (state.registered[code].events == 0) {
-//     // TODO: warn
-//     return false;
-//   }
+  u64 register_count = state->registered[code].array.pos;
+  for (u64 i = 0; i < register_count; ++i) {
+    RegisteredEvent e = state->registered[code].events[i];
+    if (e.listener == listener && e.callback == on_event) {
+      state->registered[code].events[i] = state->registered[code].events[register_count-1];
+      --state->registered[code].array.pos;
+      return true;
+    }
+  }
   
-//   u64 register_count = darray_length(state.registered[code].events);
-//   for (u64 i = 0; i < register_count; ++i) {
-//     RegisteredEvent e = state.registered[code].events[i];
-//     if (e.listener == listener && e.callback == on_event) {
-//       // Found one, remove it
-//       RegisteredEvent popped_event;
-//       darray_pop_at(state.registered[code].events, i, &popped_event);
-//       return true;
-//     }
-//   }
-  
-//   // Not found.
-//   return false;
-// }
+  // Not found.
+  return false;
+}
 
 b8 event_fire(u16 code, void* sender, EventContext context) {
   if (state->is_initialized == false) {
@@ -127,7 +121,7 @@ b8 event_fire(u16 code, void* sender, EventContext context) {
     return false;
   }
   
-  u64 register_count = state->registered[code].array.pos/sizeof(RegisteredEvent);
+  u64 register_count = state->registered[code].array.pos;
   for (u64 i = 0; i < register_count; ++i) {
     RegisteredEvent e = state->registered[code].events[i];
     if (e.callback(code, sender, e.listener, context)) {
