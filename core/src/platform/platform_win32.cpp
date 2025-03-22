@@ -78,10 +78,8 @@ b8 window_create(Window* window, WindowConfig config) {
   window = (Window*)((u8*)state + sizeof(PlatformState));
   window->platform_state = (WindowPlatformState*)((u8*)window + sizeof(Window));
   state->window = window;
-  // window->platform_state = (WindowPlatformState*)malloc(sizeof(PlatformState));
-  // PlatformState* state = (PlatformState*)window->platform_state;
-  // state->window = window;
-  
+  state->window->width = config.width;
+  state->window->height = config.height;
   
   u32 client_x = config.position_x;
   u32 client_y = config.position_y;
@@ -326,6 +324,11 @@ Win32HandleInfo platform_get_handle_info() {
 
 WindowPlatformState* platform_get_window_handle() {
   return state->window->platform_state;
+}
+
+void platform_get_framebuffer_size(u32* width, u32* height) {
+  *width = state->window->width;
+  *height = state->window->height;
 }
 
 LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARAM l_param) {

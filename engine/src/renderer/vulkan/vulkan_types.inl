@@ -82,6 +82,9 @@ struct VulkanSwapchain {
   VkImageView* views;
   
   VulkanImage depth_attachment;
+  
+  // framebuffers used for on-screen rendering.
+  VulkanFramebuffer* framebuffers;
 };
 
 enum VulkanCommandBufferState {
@@ -98,6 +101,11 @@ struct VulkanCommandBuffer {
   
   // Command buffer state.
   VulkanCommandBufferState state;
+};
+
+struct VulkanFence {
+  VkFence handle;
+  b8 is_signaled;
 };
 
 struct VulkanContext {
@@ -124,6 +132,18 @@ struct VulkanContext {
   
   // darray
   VulkanCommandBuffer* graphics_command_buffers;
+  
+  // darray
+  VkSemaphore* image_available_semaphores;
+  
+  // darray
+  VkSemaphore* queue_complete_semaphores;
+  
+  u32 in_flight_fence_count;
+  VulkanFence* in_flight_fences;
+  
+  // Holds pointers to fences which exist and are owned elsewhere.
+  VulkanFence** images_in_flight;
   
   u32 image_index;
   u32 current_frame;

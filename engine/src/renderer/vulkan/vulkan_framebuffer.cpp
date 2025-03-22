@@ -13,6 +13,7 @@ void vulkan_framebuffer_create(
   
   // Take a copy of the attachments, renderpass and attachment count
   // out_framebuffer->attachments = mallocate(VkImageView, attachment_count, MEMORY_TAG_RENDERER);
+  out_framebuffer->attachments = push_array(context->arena, VkImageView, attachment_count);
   for (u32 i = 0; i < attachment_count; ++i) {
     out_framebuffer->attachments[i] = attachments[i];
   }
@@ -28,6 +29,20 @@ void vulkan_framebuffer_create(
   framebuffer_create_info.width = width;
   framebuffer_create_info.height = height;
   framebuffer_create_info.layers = 1;
+  
+  VK_CHECK(vkCreateFramebuffer(
+    context->device.logical_device, 
+    &framebuffer_create_info, 
+    context->allocator, 
+    &out_framebuffer->handle));
 }
 
-void vulkan_framebuffer_destroy(VulkanContext* context, VulkanFramebuffer* framebuffer);
+void vulkan_framebuffer_destroy(VulkanContext* context, VulkanFramebuffer* framebuffer) {
+  vkDestroyFramebuffer(context->device.logical_device, framebuffer->handle, context->allocator);
+  if (framebuffer->attachments) {
+     
+  }
+  framebuffer->handle = 0;
+  framebuffer->attachment_count = 0;
+  framebuffer->renderpass = 0;
+}

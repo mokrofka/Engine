@@ -85,3 +85,4 @@ KAPI void platform_register_window_closed_callback(PlatformWindowClosedCallback 
 KAPI void platform_window_destroy(Window* window);
 KAPI struct Win32HandleInfo platform_get_handle_info();
 KAPI struct WindowPlatformState* platform_get_window_handle();
+KAPI void platform_get_framebuffer_size(u32* width, u32* height);

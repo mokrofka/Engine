@@ -198,7 +198,7 @@ b8 engine_run(Application* game_inst) {
   
   engine_state->is_running = false;
 
-  
+  renderer_shutdown();
   platform_window_destroy(engine_state->window);
 
   event_unregister(EVENT_CODE_APPLICATION_QUIT, 0, application_on_event);

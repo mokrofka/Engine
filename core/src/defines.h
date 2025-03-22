@@ -88,7 +88,6 @@ typedef unsigned char uchar;
 #define Stringify(S) #S
 
 #define Defer(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
-#define Loop(it, count) for (u32 it = 0; it < (count); it += 1) 
 
 #ifdef KEXPORT
 // Exports
