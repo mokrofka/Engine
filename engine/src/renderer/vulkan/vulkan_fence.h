@@ -8,4 +8,4 @@ void vulkan_fence_destroy(VulkanContext* context, VulkanFence* fence);
 
 b8 vulkan_fence_wait(VulkanContext* context, VulkanFence* fence, u64 timeout_ns);
 
-void vulkan_fence_reset(VulkanContext* context, VulkanFence fence);
+void vulkan_fence_reset(VulkanContext* context, VulkanFence* fence);

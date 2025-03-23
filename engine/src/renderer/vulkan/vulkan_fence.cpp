@@ -57,9 +57,9 @@ b8 vulkan_fence_wait(VulkanContext* context, VulkanFence* fence, u64 timeout_ns)
   return false;
 }
 
-void vulkan_fence_reset(VulkanContext* context, VulkanFence fence) {
-  if (fence.is_signaled) {
-    VK_CHECK(vkResetFences(context->device.logical_device, 1, &fence.handle));
-    fence.is_signaled = false;
+void vulkan_fence_reset(VulkanContext* context, VulkanFence* fence) {
+  if (fence->is_signaled) {
+    VK_CHECK(vkResetFences(context->device.logical_device, 1, &fence->handle));
+    fence->is_signaled = false;
   }
 }

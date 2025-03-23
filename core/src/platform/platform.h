@@ -44,6 +44,7 @@ struct Window {
 
 typedef void (*PlatformWindowClosedCallback)();
 typedef void (*PlatformProcessKey)(Keys key, b8 pressed);
+typedef void (*PlatformWindowResizedCallback)(struct Window* window);
 
 KAPI b8 platform_system_startup(u64* memory_requirement, struct PlatformState* state_out);
 
@@ -82,6 +83,8 @@ KAPI u32 platform_get_EXE_filename(u8* buffer);
 
 KAPI void platform_register_process_key(PlatformProcessKey callback);
 KAPI void platform_register_window_closed_callback(PlatformWindowClosedCallback callback);
+KAPI void platform_register_window_resized_callback(PlatformWindowResizedCallback callback);
+
 KAPI void platform_window_destroy(Window* window);
 KAPI struct Win32HandleInfo platform_get_handle_info();
 KAPI struct WindowPlatformState* platform_get_window_handle();

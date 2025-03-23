@@ -117,6 +117,14 @@ struct VulkanContext {
   // The framebuffer's current width.
   u32 framebuffer_height;
   
+  // Current generation of framebuffer size. If it does not match framebuffer_size_last_generation,
+  // a new one should be generated.
+  u64 framebuffer_size_generation;
+  
+  // The generation of the framebuffer when it was last created. Set to framebuffer_size_generation
+  // when updated.
+  u64 framebuffer_size_last_generation;
+  
   VkInstance instance;
   VkAllocationCallbacks* allocator;
   VkSurfaceKHR surface;
@@ -130,13 +138,13 @@ struct VulkanContext {
   VulkanSwapchain swapchain;
   VulkanRenderPass main_renderpass;
   
-  // darray
+  // array
   VulkanCommandBuffer* graphics_command_buffers;
   
-  // darray
+  // array
   VkSemaphore* image_available_semaphores;
   
-  // darray
+  // array
   VkSemaphore* queue_complete_semaphores;
   
   u32 in_flight_fence_count;

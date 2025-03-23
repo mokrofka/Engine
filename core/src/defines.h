@@ -77,6 +77,7 @@ typedef unsigned char uchar;
 #define MemCompare(a, b, size)   compare_memory((a), (b), (size))
 
 #define U32_MAX 4294967295U
+#define U64_MAX 18446744073709551615ULL
 
 #define Sqr(x) ((x)*(x))
 #define Sign(x) ((x) < 0 ? -1 : (x) > 0 ? 1 : 0)

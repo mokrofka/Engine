@@ -44,14 +44,22 @@ void renderer_shutdown() {
 }
 
 b8 renderer_begin_frame(f32 delta_time) {
-  // return backend->begin_frame(backend, delta_time);
+  return state->backend.begin_frame(&state->backend, delta_time);
 }
 
 b8 renderer_end_frame(f32 delta_time) {
-  // b8 result = backend->end_frame(backend, delta_time);
+  b8 result = state->backend.end_frame(&state->backend, delta_time);
   // ++backend->frame_number;
-  // return result;
+  return result;
   return true;
+}
+
+void renderer_on_resized(u16 width, u16 height) {
+  if (&state->backend) {
+    state->backend.resized(&state->backend, width, height);
+  } else {
+    Warn("renderer backend does not exist to accept resize: %i %i", width, height);
+  }
 }
 
 b8 renderer_draw_frame(RenderPacket* packet) {

@@ -33,6 +33,7 @@ b8 application_initialize(Application* game_inst) {
   game_inst->state = push_struct(game_inst->arena, GameState);
   GameState* state = (GameState*)game_inst->state;
   state->arena = arena_alloc(game_inst->arena, MB(400));
+  state->arena = arena_alloc(game_inst->arena, MB(400));
 
   state->data = push_struct(state->arena, MyData);
 

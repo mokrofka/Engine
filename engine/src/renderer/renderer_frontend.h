@@ -2,8 +2,6 @@
 
 #include "renderer_types.inl"
 
-#include "strings.h"
-
 struct StaticMeshData;
 struct PlatformState;
 

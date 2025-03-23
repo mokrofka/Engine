@@ -201,6 +201,7 @@ void vulkan_device_query_swapchain_support(
 
   if (out_support_info->format_count != 0) {
     if (out_support_info->format_count) {
+      // TODO: free memory
       out_support_info->formats = push_array(context->arena, VkSurfaceFormatKHR, out_support_info->format_count);
     }
     VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(
@@ -218,6 +219,7 @@ void vulkan_device_query_swapchain_support(
     0));
   if (out_support_info->present_mode_count != 0) {
     if (!out_support_info->present_modes) {
+      // TODO: free memory
       out_support_info->present_modes = push_array(context->arena, VkPresentModeKHR, out_support_info->present_mode_count);
     }
     VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(
@@ -459,7 +461,7 @@ internal b8 physical_device_meets_requirements(
 
     // Device extensions.
     {
-      Temp scratch = (tctx_get_scratch((0), (0)));
+      Temp scratch = GetScratch(0, 0);
       if (requirements->device_extension_names) {
         u32 available_extension_count = 0;
         VkExtensionProperties* available_extensions = 0;

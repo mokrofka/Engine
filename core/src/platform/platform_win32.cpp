@@ -1,12 +1,11 @@
-#include "memory.h"
 #include "platform/platform.h"
 
+#include "memory.h"
 #include "logger.h"
 #include "asserts.h"
 
 #include <windows.h>
 #include <windowsx.h>
-// #include <stdlib.h>
 
 struct Win32HandleInfo {
   HINSTANCE h_instance;
@@ -20,6 +19,7 @@ struct PlatformState {
   Win32HandleInfo handle;
   Window* window;
   PlatformWindowClosedCallback window_closed_callback;
+  PlatformWindowResizedCallback window_resized_callback;
   PlatformProcessKey process_key;
 };
 
@@ -311,6 +311,10 @@ void platform_register_window_closed_callback(PlatformWindowClosedCallback callb
   state->window_closed_callback = callback;
 }
 
+void platform_register_window_resized_callback(PlatformWindowResizedCallback callback) {
+  state->window_resized_callback = callback;
+}
+
 void platform_window_destroy(Window* window) {
   Trace("Destroying window...");
   DestroyWindow(state->window->platform_state->hwnd);
@@ -356,12 +360,19 @@ LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARA
     }
     case WM_SIZE: {
       // Get the updated size.
-      // RECT r;
-      // GetClientRect(hwnd, &r);
-      // u32 width = r.right - r.left;
-      // u32 height = r.bottom - r.top;
-
-      // TODO: Fire an event for window resize.
+      RECT r;
+      GetClientRect(hwnd, &r);
+      u32 width = r.right - r.left;
+      u32 height = r.bottom - r.top;
+      
+      Window* w = state->window;
+      
+      if (width != w->width || height != w->height) {
+        w->resizing = true;
+        w->width = width;
+        w->height = height;
+        state->window_resized_callback(state->window);
+      }
     } break;
     case WM_KEYDOWN:
     case WM_SYSKEYDOWN:

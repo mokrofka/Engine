@@ -48,13 +48,17 @@ b8 test_event(u16 code, void* sender, void* listener_inst, EventContext context)
 
 internal void engine_on_process_key(Keys key, b8 pressed);
 internal void engine_on_window_closed();
+internal void engine_on_window_resized(Window* window);
 
-  void* p1;
-  void* p2;
-  void* p3;
-  void* p4;
+void* p1;
+void* p2;
+void* p3;
+void* p4;
+
 b8 application_on_event(u16 code, void* sender, void* listener_inst, EventContext context);
 b8 application_on_key(u16 code, void* sender, void* listener_inst, EventContext context);
+b8 application_on_resized(u16 code, void* sender, void* listener_inst, EventContext context);
+
 internal void check_dll_changes(Application* app);
 
 b8 engine_create(Application* game_inst) {
@@ -97,10 +101,12 @@ b8 engine_create(Application* game_inst) {
     }
     platform_register_process_key(engine_on_process_key);
     platform_register_window_closed_callback(engine_on_window_closed);
+    platform_register_window_resized_callback(engine_on_window_resized);
     
     event_register(EVENT_CODE_APPLICATION_QUIT, 0, application_on_event);
     event_register(EVENT_CODE_KEY_PRESSED, 0, application_on_key);
     event_register(EVENT_CODE_KEY_RELEASED, 0, application_on_key);
+    event_register(EVENT_CODE_RESIZED, 0, application_on_resized);
   }
   
   // Input system
@@ -162,38 +168,44 @@ b8 engine_run(Application* game_inst) {
       engine_state->is_running = false;
     }
 
-    clock_update(&engine_state->clock);
-    f64 current_time = engine_state->clock.elapsed;
-    f64 delta = (current_time - engine_state->last_time);
-    f64 frame_start_time = platform_get_absolute_time();
+    if (!engine_state->is_suspended) {
+      clock_update(&engine_state->clock);
+      f64 current_time = engine_state->clock.elapsed;
+      f64 delta = (current_time - engine_state->last_time);
+      f64 frame_start_time = platform_get_absolute_time();
 
-    check_dll_changes(game_inst);
-    if (!engine_state->game_inst->update(engine_state->game_inst)) {
-      Fatal("Game update failed, shutting down.");
-      engine_state->is_running = false;
-      break;
-    }
-
-    f64 frame_end_time = platform_get_absolute_time();
-    f64 frame_elapsed_time = frame_end_time - frame_start_time;
-    running_time += frame_elapsed_time;
-    f64 remaining_seconds = target_frame_seconds - frame_elapsed_time;
-
-    if (remaining_seconds > 0) {
-      u64 remaining_ms = (remaining_seconds * 1000);
-
-      // If there is time left, give it back to the OS.
-      b8 limit_frames = true;
-      if (remaining_ms > 0 && limit_frames) {
-        platform_sleep(remaining_ms - 1);
+      check_dll_changes(game_inst);
+      if (!engine_state->game_inst->update(engine_state->game_inst)) {
+        Fatal("Game update failed, shutting down.");
+        engine_state->is_running = false;
+        break;
       }
 
-      ++frame_count;
-    }
+      RenderPacket packet;
+      packet.delta_time = delta;
+      renderer_draw_frame(&packet);
 
-    input_update();
-    
-    engine_state->last_time = current_time;
+      f64 frame_end_time = platform_get_absolute_time();
+      f64 frame_elapsed_time = frame_end_time - frame_start_time;
+      running_time += frame_elapsed_time;
+      f64 remaining_seconds = target_frame_seconds - frame_elapsed_time;
+
+      if (remaining_seconds > 0) {
+        u64 remaining_ms = (remaining_seconds * 1000);
+
+        // If there is time left, give it back to the OS.
+        b8 limit_frames = true;
+        if (remaining_ms > 0 && limit_frames) {
+          platform_sleep(remaining_ms - 1);
+        }
+
+        ++frame_count;
+      }
+
+      input_update();
+
+      engine_state->last_time = current_time;
+    }
   }
   
   engine_state->is_running = false;
@@ -214,6 +226,25 @@ internal void engine_on_process_key(Keys key, b8 pressed) {
 
 internal void engine_on_window_closed() {
   event_fire(EVENT_CODE_APPLICATION_QUIT, 0, (EventContext){});
+}
+
+internal void engine_on_window_resized(Window* window) {
+  // Handle minimization
+  if (window->width == 0 || window->height == 0) {
+    Info("Window minimized, suspending application.");
+    engine_state->is_suspended = true;
+  } else {
+    if (engine_state->is_suspended) {
+      Info("Window restored, resuming application.");
+      engine_state->is_suspended = false;
+    }
+
+    // Fire an event for anything listening for window resizes.
+    EventContext context = {0};
+    context.data.u16[0] = window->width;
+    context.data.u16[1] = window->height;
+    event_fire(EVENT_CODE_RESIZED, (Window*)window, context);
+  }
 }
 
 b8 application_on_event(u16 code, void* sender, void* listener_inst, EventContext context) {
@@ -254,6 +285,15 @@ b8 application_on_key(u16 code, void* sender, void* listener_inst, EventContext 
     }
   }
   return false;
+}
+
+b8 application_on_resized(u16 code, void* sender, void* listener_inst, EventContext context) {
+  u16 width = context.data.u16[0];
+  u16 height = context.data.u16[1];
+  Debug("Window resize: %i, %i", width, height);
+
+  renderer_on_resized(width, height);
+  return true;
 }
 
 void load_game_lib(Application* app) {

@@ -78,7 +78,6 @@ void vulkan_swapchain_present(
   present_info.pSwapchains = &swapchain->handle;
   present_info.pImageIndices = &present_image_index;
   present_info.pResults = 0;
-  VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
   
   VkResult result = vkQueuePresentKHR(present_queue, &present_info);
   
@@ -230,6 +229,7 @@ void create(VulkanContext* context, u32 width, u32 height, VulkanSwapchain* swap
 }
 
 void destroy(VulkanContext* context, VulkanSwapchain* swapchain) {
+  vkDeviceWaitIdle(context->device.logical_device);
   vulkan_image_destroy(context, &swapchain->depth_attachment);
 
   // Only destroy the views, not the images, since those are owned by the swapchain and are thus

@@ -1,8 +1,5 @@
 #include "vulkan_image.h"
 
-#include "vulkan_device.h"
-
-#include "memory.h"
 #include "logger.h"
 
 void vulkan_image_create(
