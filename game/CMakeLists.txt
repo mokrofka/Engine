@@ -17,5 +17,4 @@ set_target_properties(game PROPERTIES
 )
 
 target_compile_definitions(game PRIVATE _DEBUG _CRT_SECURE_NO_WARNINGS)
-# target_compile_definitions(game PRIVATE _DEBUG KEXPORT _CRT_SECURE_NO_WARNINGS)
-# target_link_options(game PRIVATE -Wl,/EXPORT:game_update)
+# target_compile_options(game PRIVATE -Wuninitialized -Wvarargs -fno-exceptions -fno-rtti)

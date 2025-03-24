@@ -47,13 +47,13 @@ void vulkan_command_buffer_begin(
   VkCommandBufferBeginInfo begin_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
   begin_info.flags = 0;
   if (is_single_use) {
-    begin_info.flags != VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
   }
   if (is_renderpass_continue) {
-    begin_info.flags != VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+    begin_info.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
   }
   if (is_simultaneous_use) {
-    begin_info.flags != VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+    begin_info.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
   }
   
   VK_CHECK(vkBeginCommandBuffer(command_buffer->handle, &begin_info));

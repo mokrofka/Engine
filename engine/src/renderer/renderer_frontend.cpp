@@ -55,7 +55,7 @@ b8 renderer_end_frame(f32 delta_time) {
 }
 
 void renderer_on_resized(u16 width, u16 height) {
-  if (&state->backend) {
+  if (state) {
     state->backend.resized(&state->backend, width, height);
   } else {
     Warn("renderer backend does not exist to accept resize: %i %i", width, height);

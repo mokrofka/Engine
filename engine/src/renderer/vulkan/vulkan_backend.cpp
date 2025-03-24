@@ -59,7 +59,7 @@ b8 vulkan_renderer_backend_initialize(RendererBackend* backend) {
   create_info.pApplicationInfo = &app_info;
   
   // Obtain a list of required extensions
-  char* required_extensions[3]; 
+  const char* required_extensions[3]; 
   required_extensions[0] = VK_KHR_SURFACE_EXTENSION_NAME;
   required_extensions[1] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
   required_extensions[2] = "VK_KHR_win32_surface";

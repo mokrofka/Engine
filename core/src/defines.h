@@ -91,13 +91,13 @@ typedef unsigned char uchar;
 #define Defer(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
 
 #ifdef KEXPORT
-// Exports
 #define KAPI __declspec(dllexport)
 #else
-// Imports
 #define KAPI __declspec(dllimport)
 #endif
 
 #define C_LINKAGE_BEGIN extern "C"{
 #define C_LINKAGE_END }
 #define C_LINKAGE extern "C"
+
+#define INLINE static inline

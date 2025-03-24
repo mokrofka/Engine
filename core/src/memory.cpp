@@ -2,6 +2,7 @@
 
 #include "platform/platform.h"
 #include "logger.h"
+#include "asserts.h"
 
 global thread_local TCTX tctx_thread_local;
 
@@ -98,6 +99,8 @@ Arena* arena_alloc(Arena *arena, u64 size, u64 align) {
 	}
 	// Return NULL if the arena is out of memory (or handle differently)
   Fatal("Arena is out of memory!");
+  Assert(true);
+  return 0;
 }
 
 void arena_clear(Arena *arena) {
@@ -147,6 +150,8 @@ void *arena_push(Arena *arena, u64 size, u64 align) {
 	}
 	// Return NULL if the arena is out of memory (or handle differently)
   Fatal("Arena is out of memory!");
+  Assert(true);
+  return 0;
 }
 
 void *arena_push(Temp arena, u64 size, u64 align) {
@@ -166,6 +171,8 @@ void *arena_push(Temp arena, u64 size, u64 align) {
 	}
 	// Return NULL if the arena is out of memory (or handle differently)
   Fatal("Arena is out of memory!");
+  Assert(true);
+  return 0;
 }
 
 TCTX* tctx_get_equipped() {

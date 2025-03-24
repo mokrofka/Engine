@@ -16,3 +16,11 @@ target_compile_definitions(platform PRIVATE _DEBUG)
 
 target_link_libraries(platform "${CMAKE_SOURCE_DIR}/bin/core.lib")
 target_link_libraries(platform "${CMAKE_SOURCE_DIR}/bin/engine.lib")
+
+# target_compile_options(core PRIVATE -Wuninitialized -Wvarargs -fno-exceptions -fno-rtti)
+
+# add_custom_command(
+#     TARGET platform
+#     POST_BUILD
+#     COMMAND ${CMAKE_COMMAND} -E env "cmd.exe" "/C" "${CMAKE_SOURCE_DIR}/post-build.bat"
+# )
