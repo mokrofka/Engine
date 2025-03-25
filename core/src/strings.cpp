@@ -1,6 +1,9 @@
 #include "strings.h"
 
 #include "memory.h"
+
+#include <stdarg.h>
+#include <stdio.h>
 #include <string.h>
 
 u32 range_size(Range r) {
@@ -67,6 +70,40 @@ String str_range(u8* first, u8* one_past_last) {
 
 String str_zero() {
   String result = {};
+  return result;
+}
+
+u8* str_format_v(u8* buffer, const char* format, char* va_listp) {
+  if (!format) {
+    return 0;
+  }
+
+  // Create a copy of the va_listp since vsnprintf can invalidate the elements of the list
+  // while finding the required buffer length.
+  va_list list_copy;
+#ifdef _MSC_VER
+  list_copy = va_listp;
+#elif defined(KPLATFORM_APPLE)
+  list_copy = va_listp;
+#else
+  va_copy(list_copy, va_listp);
+#endif
+  i32 length = vsnprintf(0, 0, format, list_copy);
+  va_end(list_copy);
+  vsnprintf((char*)buffer, length + 1, format, va_listp);
+  buffer[length] = 0;
+  return buffer;
+}
+
+char* str_format(u8* buffer, const char* format, ...) {
+  if (!format) {
+    return 0;
+  }
+
+  __builtin_va_list arg_ptr;
+  va_start(arg_ptr, format);
+  char* result = (char*)str_format_v(buffer, format, arg_ptr);
+  va_end(arg_ptr);
   return result;
 }
 

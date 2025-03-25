@@ -50,11 +50,6 @@ internal void engine_on_process_key(Keys key, b8 pressed);
 internal void engine_on_window_closed();
 internal void engine_on_window_resized(Window* window);
 
-void* p1;
-void* p2;
-void* p3;
-void* p4;
-
 b8 application_on_event(u16 code, void* sender, void* listener_inst, EventContext context);
 b8 application_on_key(u16 code, void* sender, void* listener_inst, EventContext context);
 b8 application_on_resized(u16 code, void* sender, void* listener_inst, EventContext context);
@@ -62,15 +57,6 @@ b8 application_on_resized(u16 code, void* sender, void* listener_inst, EventCont
 internal void check_dll_changes(Application* app);
 
 b8 engine_create(Application* game_inst) {
-
-  // TODO: Remove this
-  Fatal("A test message: %f", 3.14f);
-  Error("A test message: %f", 3.14f);
-  Warn("A test message: %f", 3.14f);
-  Info("A test message: %f", 3.14f);
-  Debug("A test message: %f", 3.14f);
-  Trace("A test message: %f", 3.14f);
-  
   game_inst->engine_state = push_struct(game_inst->arena, EngineState);
   engine_state = (EngineState*)game_inst->engine_state;
   engine_state->game_inst = game_inst;

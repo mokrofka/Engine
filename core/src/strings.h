@@ -28,10 +28,15 @@ KAPI u64 cstr_length(u8 *c);
 KAPI String str(u8* str, u64 size);
 KAPI String str_range(u8 *first, u8 *one_past_last);
 KAPI String str_zero();
+
+u8* str_format_v(u8* buffer, const char* format, char* va_listp);
+KAPI char* str_format(u8* buffer, const char* format, ...);
+
 KAPI String cstr(const char* c);
 KAPI String cstr_capped(void *cstr, void *cap);
 KAPI b8 cstr_equal(const char* str0, const char* str1);
 
+struct Temp;
 KAPI String push_str_cat(struct Arena* arena, String s1, String s2);
 KAPI String push_str_copy(struct Arena *arena, String s);
 

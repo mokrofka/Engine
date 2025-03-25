@@ -48,6 +48,9 @@ b8 platform_system_startup(u64* memory_requirement, struct PlatformState* out_st
   if (out_state == 0) {
     return true;
   }
+  
+  // TODO
+  SetCurrentDirectoryA("D:\\VS_Code\\Engine\\bin");
   state = out_state;
   state->handle.h_instance = GetModuleHandleA(0);
 
@@ -155,19 +158,14 @@ b8 platform_pump_messages() {
 }
 
 #define BaseAddress (void*)TB(2)
-void* platform_allocate(u64 size) {
+void* platform_allocate(u64 size, b8 at_base) {
   return VirtualAlloc(BaseAddress, size, MEM_RESERVE | MEM_COMMIT,
                       PAGE_READWRITE);
 }
 
-Arena* platform_allocate_arena(u64 size) {
-  void* buffer = VirtualAlloc(BaseAddress, size, MEM_RESERVE | MEM_COMMIT,
-                              PAGE_READWRITE);
-  Arena* arena = (Arena*)buffer;
-  // arena->base_pos = ARENA_HEADER;
-  arena->pos = 0;
-  arena->res = size;
-  return arena;
+void* platform_allocate(u64 size) {
+  return VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT,
+                      PAGE_READWRITE);
 }
 
 void platform_free(void* block, b8 aligned) {
@@ -193,7 +191,7 @@ b8 platform_compare_memory(void* a, void* b, u64 size) {
 void platform_console_write(const char* message, u8 colour) {
   HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
   // FATAL,ERROR,WARN,INFO,DEBUG,TRACE
-  static u8 levels[6] = {64, 4, 6, 2, 1, 8};
+  const u8 levels[6] = {64, 4, 6, 2, 1, 8};
   SetConsoleTextAttribute(console_handle, levels[colour]);
   OutputDebugStringA(message);
   u64 length = strlen(message);
@@ -204,7 +202,7 @@ void platform_console_write(const char* message, u8 colour) {
 void platform_console_write_error(const char* message, u8 colour) {
   HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
   // FATAL,ERROR,WARN,INFO,DEBUG,TRACE
-  static u8 levels[6] = {64, 4, 6, 2, 1, 8};
+  const u8 levels[6] = {64, 4, 6, 2, 1, 8};
   SetConsoleTextAttribute(console_handle, levels[colour]);
   OutputDebugStringA(message);
   u64 length = strlen(message);
@@ -382,6 +380,20 @@ LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARA
       b8 pressed = (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN);
       Keys key = (Keys)(u16)w_param;
       
+      // shift alt ctrl
+      b8 is_extended = (HIWORD(l_param) & KF_EXTENDED) == KF_EXTENDED;
+      // Keypress only determines if _any_ alt/ctrl/shift key is pressed. Determine which one if so.
+      if (w_param == VK_MENU) {
+        key = is_extended ? KEY_RALT : KEY_LALT;
+      } else if (w_param == VK_SHIFT) {
+        // Annoyingly, KF_EXTENDED is not set for shift keys.
+        u32 left_shift = MapVirtualKey(VK_LSHIFT, MAPVK_VK_TO_VSC);
+        u32 scancode = ((l_param & (0xFF << 16)) >> 16);
+        key = scancode == left_shift ? KEY_LSHIFT : KEY_RSHIFT;
+      } else if (w_param == VK_CONTROL) {
+        key = is_extended ? KEY_RCONTROL : KEY_LCONTROL;
+      }
+      
       // Pass to the input subsytem for processing.
       state->process_key(key, pressed);
     } break;
@@ -395,4 +407,118 @@ LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARA
   }
   
   return DefWindowProcA(hwnd, msg, w_param, l_param);
+}
+
+b8 filesystem_exists(String path) {
+  DWORD attributes = GetFileAttributesA((char*)path.str);
+  return (attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY));
+}
+
+void filesystem_file_size(FileHandle* handle, const char *path) {
+  LARGE_INTEGER size;
+  GetFileSizeEx(handle->handle, &size);
+}
+
+b8 filesystem_open(const char* path, FileModes mode, FileHandle* handle) {
+  handle->is_valid = false;
+  handle->handle = 0;
+  DWORD handle_permission = 0;
+  DWORD handle_creation = 0;
+
+  if ((mode & FILE_MODE_READ) != 0 && (mode & FILE_MODE_WRITE) != 0) {
+    handle_permission |= GENERIC_READ | GENERIC_WRITE;
+  } else if ((mode & FILE_MODE_READ) != 0 && (mode & FILE_MODE_WRITE) == 0) {
+    handle_permission |= GENERIC_READ;
+    handle_creation |= OPEN_EXISTING;
+
+  } else if ((mode & FILE_MODE_READ) == 0 && (mode & FILE_MODE_WRITE) != 0) {
+    handle_permission |= GENERIC_WRITE;
+    handle_creation |= CREATE_ALWAYS;
+  } else {
+    Error("Invalid mode passed while trying to open file: '%s'", path);
+    return false;
+  }
+  
+  HANDLE win32_handle = CreateFileA(path, handle_permission,
+                                     FILE_SHARE_READ, 0, handle_creation, 0, null);
+  if (win32_handle == INVALID_HANDLE_VALUE) {
+    Error("Error opening file: '%s", path);
+    return false;
+  }
+  
+  handle->handle = win32_handle;
+  handle->is_valid = true;
+
+  return true;
+}
+
+void filesystem_close(FileHandle* handle) {
+  if (handle->handle) {
+    CloseHandle(handle->handle);
+    handle->handle = 0;
+    handle->is_valid = false;
+  }
+}
+
+b8 fylesystem_read(FileHandle* handle, u64 size, void* dest) {
+  HANDLE win32_handle = handle->handle;
+  DWORD bytes_read;
+
+  if (handle->handle && dest) {
+    ReadFile(win32_handle, dest, size, &bytes_read, null);
+    if (bytes_read != size) {
+      return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+b8 filesystem_read_file(FileHandle* handle, void* dest) {
+  HANDLE win32_handle = handle->handle;
+  DWORD bytes_read;
+
+  if (handle->handle) {
+    LARGE_INTEGER size;
+    GetFileSizeEx(handle->handle, &size);
+    
+    ReadFile(win32_handle, dest, size.QuadPart, &bytes_read, null);
+    if (size.QuadPart != bytes_read) {
+      return false;
+    }
+    handle->size = bytes_read;
+    return true;
+  }
+  return false;
+}
+
+b8 filesystem_read_file(Arena* arena, FileHandle* handle, b8** dest) {
+  HANDLE win32_handle = handle->handle;
+  DWORD bytes_read;
+
+  if (handle->handle) {
+    LARGE_INTEGER size;
+    GetFileSizeEx(handle->handle, &size);
+    *dest = push_buffer(arena, b8, size.QuadPart);
+    
+    ReadFile(win32_handle, *dest, size.QuadPart, &bytes_read, null);
+    if (size.QuadPart != bytes_read) {
+      return false;
+    }
+    handle->size = bytes_read;
+    return true;
+  }
+  return false;
+}
+
+b8 filesystem_write(FileHandle* handle, u64 size, void* source) {
+  DWORD bytes_wrote;
+  if (handle->handle) {
+    WriteFile(handle->handle, source, size, &bytes_wrote, 0);
+    if (size != bytes_wrote) {
+      return false;
+    }
+    return true;
+  }
+  return false;
 }

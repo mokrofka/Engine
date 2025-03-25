@@ -6,14 +6,6 @@
 
 global thread_local TCTX tctx_thread_local;
 
-void tctx_initialize(Arena* arena) {
-  tctx_thread_local.arenas[0] = arena_alloc(arena, MB(32));
-  tctx_thread_local.arenas[1] = arena_alloc(arena, MB(32));
-}
-
-void shutdown_memory() {
-}
-
 void* zero_memory(void* block, u64 size) {
   return platform_zero_memory(block, size);
 }
@@ -56,29 +48,6 @@ internal u64 align_forward(u64 ptr, u64 align) {
 	return p;
 }
 
-// Arena* arena_alloc(Arena *arena, u64 size, u64 align) {
-// 	// Align 'curr_offset' forward to the specified alignment
-// 	u64 curr_ptr = (u64)arena + arena->base_pos + arena->pos;
-// 	u64 offset = align_forward(curr_ptr, align);
-//   u64 temp = (u64)&arena->base_pos;
-// 	offset -= temp; // Change to relative offset
-
-// 	// Check to see if the backing memory has space left
-// 	if (offset+size <= arena->res) {
-// 		Arena* ptr = (Arena*)((u8*)(&arena->base_pos) + offset);
-//     ptr->base_pos = ARENA_HEADER;
-//     ptr->pos = 0;
-//     ptr->res = size;
-// 		arena->pos = offset+size;
-
-// 		// Zero new memory by default
-//     // MemZero((u8*)(ptr) + ARENA_HEADER, size);
-// 		return ptr;
-// 	}
-// 	// Return NULL if the arena is out of memory (or handle differently)
-//   Fatal("Arena is out of memory!");
-// }
-
 Arena* arena_alloc(Arena *arena, u64 size, u64 align) {
 	// Align 'curr_offset' forward to the specified alignment
 	u64 curr_ptr = (u64)arena + ARENA_HEADER + arena->pos;
@@ -103,6 +72,13 @@ Arena* arena_alloc(Arena *arena, u64 size, u64 align) {
   return 0;
 }
 
+Arena* arena_alloc(u64 size) {
+  Arena* arena = (Arena*)platform_allocate(size, true);
+  arena->pos = 0;
+  arena->res = size;
+  return arena;
+}
+
 void arena_clear(Arena *arena) {
 	arena->pos = 0;
 }
@@ -113,25 +89,6 @@ u64 arena_pos(Arena *arena) {
   u64 pos = ARENA_HEADER + current->pos;
   return pos;
 }
-
-// void *arena_push(Arena *arena, u64 size, u64 align) {
-// 	// Align 'curr_offset' forward to the specified alignment
-// 	u64 curr_ptr = (u64)arena + arena->base_pos + arena->pos;
-// 	u64 offset = align_forward(curr_ptr, align);
-//   u64 temp = (u64)&arena->base_pos;
-// 	offset -= temp; // Change to relative offset
-
-// 	// Check to see if the backing memory has space left
-// 	if (offset+size <= arena->res) {
-// 		u8* buffer = (u8*)(&arena->base_pos) + offset;
-// 		arena->pos = offset+size;
-
-//     // MemZero(buffer, size);
-// 		return buffer;
-// 	}
-// 	// Return NULL if the arena is out of memory (or handle differently)
-//   Fatal("Arena is out of memory!");
-// }
 
 void *arena_push(Arena *arena, u64 size, u64 align) {
 	// Align 'curr_offset' forward to the specified alignment
@@ -175,10 +132,6 @@ void *arena_push(Temp arena, u64 size, u64 align) {
   return 0;
 }
 
-TCTX* tctx_get_equipped() {
-  return &tctx_thread_local;
-}
-
 Temp temp_begin(Arena* arena) {
   Temp temp = {arena, arena->pos};
   return temp;
@@ -188,8 +141,13 @@ void temp_end(Temp temp) {
   temp.arena->pos = temp.pos;
 }
 
+void tctx_initialize(Arena* arena) {
+  tctx_thread_local.arenas[0] = arena_alloc(arena, MB(32));
+  tctx_thread_local.arenas[1] = arena_alloc(arena, MB(32));
+}
+
 Temp tctx_get_scratch(Arena** conflics, u32 counts) {
-  TCTX* tctx = tctx_get_equipped();
+  TCTX* tctx = &tctx_thread_local;
   
   for (u32 i = 0; i < ArrayCount(tctx->arenas); i++) {
     b8 isConflictingArena = false;

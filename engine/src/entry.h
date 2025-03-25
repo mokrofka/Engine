@@ -7,6 +7,8 @@ extern b8 application_create(Application* out_app);
 extern b8 application_initialize(Application* app);
 
 int main() {
+  
+
   Application app_inst = {};
   
   if (!application_create(&app_inst)) {

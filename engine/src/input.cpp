@@ -38,7 +38,6 @@ void input_shutdown() {
 }
 
 void input_update() {
-  
   // Copy current states to previous states.
   MemCopyStruct(&state->keyboard_previous, &state->keyboard_current);
   MemCopyStruct(&state->mouse_previous, &state->mouse_previous);
@@ -46,10 +45,29 @@ void input_update() {
 
 void input_process_key(Keys key, b8 pressed) {
   // Only handle this if the state actually changed.
+  
   if (state->keyboard_current.keys[key] != pressed) {
     // Update internal state.
     state->keyboard_current.keys[key] = pressed;
-    
+
+    if (key == KEY_LALT) {
+      Info("Left alt %s.", pressed ? "pressed" : "released");
+    } else if (key == KEY_RALT) {
+      Info("Right alt %s.", pressed ? "pressed" : "released");
+    }
+
+    if (key == KEY_LCONTROL) {
+      Info("Left ctrl %s.", pressed ? "pressed" : "released");
+    } else if (key == KEY_RCONTROL) {
+      Info("Right ctrl %s.", pressed ? "pressed" : "released");
+    }
+
+    if (key == KEY_LSHIFT) {
+      Info("Left shift %s.", pressed ? "pressed" : "released");
+    } else if (key == KEY_RSHIFT) {
+      Info("Right shift %s.", pressed ? "pressed" : "released");
+    }
+
     // Fire off an event for immediate processing.
     EventContext context;
     context.data.u16[0] = key;

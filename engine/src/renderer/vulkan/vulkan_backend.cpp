@@ -10,6 +10,9 @@
 #include "vulkan_fence.h"
 #include "vulkan_utils.h"
 
+// Shaders
+#include "shaders/vulkan_object_shader.h"
+
 #include "logger.h"
 #include "strings.h"
 #include "memory.h"
@@ -197,6 +200,11 @@ b8 vulkan_renderer_backend_initialize(RendererBackend* backend) {
   context->images_in_flight = push_array(context->arena, VulkanFence*, context->swapchain.image_count);
   for (u32 i = 0; i < context->swapchain.image_count; ++i) {
     context->images_in_flight[i] = 0;
+  }
+
+  if (!vulkan_object_shader_create(context, &context->object_shader)) {
+    Error("Error loading built-in basic_lighting shader.");
+    return false;
   }
 
   Info("Vulkan renderer initialized successfully.");

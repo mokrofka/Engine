@@ -108,6 +108,24 @@ struct VulkanFence {
   b8 is_signaled;
 };
 
+struct VulkanShaderStage {
+  VkShaderModuleCreateInfo create_info; 
+  VkShaderModule handle;
+  VkPipelineShaderStageCreateInfo shader_state_create_info;
+};
+
+struct VulkanPipeline {
+  VkPipeline handle;
+  VkPipelineLayout pipeline_layout;
+};
+
+#define OBJECT_SHADER_STAGE_COUNT 2
+struct VulkanObjectShader {
+  VulkanShaderStage stages[OBJECT_SHADER_STAGE_COUNT];
+  
+  VulkanPipeline pipeline;
+};
+
 struct VulkanContext {
   struct Arena* arena;
    
@@ -157,6 +175,8 @@ struct VulkanContext {
   u32 current_frame;
   
   b8 recreating_swapchain;
+  
+  VulkanObjectShader object_shader;
   
   i32 (*find_memory_index)(u32 type_filter, u32 property_flags);
 };

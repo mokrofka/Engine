@@ -23,7 +23,7 @@ b8 load_game_lib(Application* app) {
 }
   
 b8 application_create(Application* out_app) {
-  out_app->arena = platform_allocate_arena(GB(1));
+  out_app->arena = arena_alloc(GB(1));
   tctx_initialize(out_app->arena);
   
   u8 buffer[100] = {};
