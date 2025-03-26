@@ -24,7 +24,7 @@ void vulkan_buffer_bind(VulkanContext* context, VulkanBuffer* buffer, u64 offset
 void* vulkan_buffer_lock_memory(VulkanContext* context, VulkanBuffer* buffer, u64 offset, u64 size, u32 flags);
 void vulkan_buffer_unlock_memory(VulkanContext* context, VulkanBuffer* buffer);
 
-void vulkan_buffer_load_data(VulkanContext* context, VulkanBuffer buffer, u64 offset, u64 size, u32 flags, const void* data);
+void vulkan_buffer_load_data(VulkanContext* context, VulkanBuffer* buffer, u64 offset, u64 size, u32 flags, const void* data);
 
 void vulkan_buffer_copy_to(
   VulkanContext* context,

@@ -147,11 +147,11 @@ void vulkan_buffer_unlock_memory(VulkanContext* context, VulkanBuffer* buffer) {
   vkUnmapMemory(context->device.logical_device, buffer->memory);
 }
 
-void vulkan_buffer_load_data(VulkanContext* context, VulkanBuffer buffer, u64 offset, u64 size, u32 flags, const void* data) {
+void vulkan_buffer_load_data(VulkanContext* context, VulkanBuffer* buffer, u64 offset, u64 size, u32 flags, const void* data) {
   void* data_ptr;
-  VK_CHECK(vkMapMemory(context->device.logical_device, buffer.memory, offset, size, flags, &data_ptr));
+  VK_CHECK(vkMapMemory(context->device.logical_device, buffer->memory, offset, size, flags, &data_ptr));
   MemCopy(data_ptr, data, size);
-  vkUnmapMemory(context->device.logical_device, buffer.memory);
+  vkUnmapMemory(context->device.logical_device, buffer->memory);
 }
 
 void vulkan_buffer_copy_to(

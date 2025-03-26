@@ -96,5 +96,8 @@ void vulkan_object_shader_destroy(VulkanContext* context, VulkanObjectShader* sh
 }
 
 void vulkan_object_shader_use(VulkanContext* context, VulkanObjectShader* shader) {
-
+  u32 image_index = context->image_index;
+  VkPipelineBindPoint bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS;
+  // NOTE suspicious command buffer pointer
+  vulkan_pipeline_bind(&context->graphics_command_buffers[image_index], bind_point, &shader->pipeline);
 }
