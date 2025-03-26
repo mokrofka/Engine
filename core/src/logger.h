@@ -21,7 +21,7 @@ enum LogLevel {
   LOG_LEVEL_TRACE = 5,
 };
 
-b8 initialize_logging();
+b8 initialize_logging(u64* memory_requirement, void* state);
 void shutdown_logging();
 
 KAPI void log_output(LogLevel level, const char* message, ...);

@@ -19,9 +19,8 @@ target_link_libraries(platform "${CMAKE_SOURCE_DIR}/bin/engine.lib")
 
 # target_compile_options(core PRIVATE -Wuninitialized -Wvarargs -fno-exceptions -fno-rtti)
 
-add_custom_command(
-    TARGET platform
-    COMMAND ${CMAKE_SOURCE_DIR}/post-build.bat
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-)
-
+# add_custom_command(
+#     # TARGET platform
+#     COMMAND ${CMAKE_SOURCE_DIR}/post-build.bat
+#     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+# )

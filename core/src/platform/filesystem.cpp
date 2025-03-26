@@ -9,7 +9,7 @@
 
 #include <windows.h>
 
-// b8 filesystem_exists(String path) {
+// b8 filesystem_file_size(String path) {
 //   DWORD attributes = GetFileAttributesA((char*)path.str);
 //   return (attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY));
 // }

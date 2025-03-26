@@ -7,11 +7,33 @@
 #include <stdarg.h>
 
 struct LoggerSystemState {
-
+  FileHandle log_file_handle;
 };
 
-b8 initialize_logging() {
-  // TODO: create log file.
+global LoggerSystemState* state;
+
+internal void append_to_log_file(const char* message) {
+  if (state && state->log_file_handle.is_valid) {
+    u64 length = cstr_length((u8*)message);
+    u64 written = 0;
+    if (!filesystem_write(&state->log_file_handle, length, message)) {
+      Error("writing to console.log");
+    }
+  }
+}
+
+b8 initialize_logging(u64* memory_requirement, void* out_state) {
+  *memory_requirement = sizeof(LoggerSystemState);
+  if (state == 0) {
+    return true;
+  }
+  Assign(state, out_state);
+  
+  if (!filesystem_open("console.log", FILE_MODE_WRITE, &state->log_file_handle)) {
+    Error("Unable to open console.log for writing.");
+    return false;
+  }
+  
   return true;
 }
 
@@ -21,7 +43,7 @@ void shutdown_logging() {
 
 void log_output(LogLevel level, const char* message, ...) {
   const char* level_strings[6] = {"[FATAL]: ", "[ERROR]: ", "[WARN]:  ", "[INFO]:  ", "[DEBUG]: ", "[TRACE]: "};
-  b8 is_error = level < LOG_LEVEL_WARN;
+  b8 is_error = level < 2;
   
   {
     Temp scratch = GetScratch(0, 0);
@@ -35,17 +57,19 @@ void log_output(LogLevel level, const char* message, ...) {
 
     str_format(out_message, "%s%s\n", level_strings[level], formatted);
 
-    // platform-specific output.
     if (is_error) {
       platform_console_write_error((char*)out_message, level);
     } else {
       platform_console_write((char*)out_message, level);
     }
+
+    if (level == LOG_LEVEL_FATAL) {
+      debugBreak();
+    }
+
+    // Queue a copy to be written to the log file
+    append_to_log_file((char*)out_message);
     ReleaseScratch(scratch);
-  }
-  
-  if (level == LOG_LEVEL_FATAL) {
-    debugBreak();
   }
 }
 

@@ -100,11 +100,11 @@ enum FileModes {
   FILE_MODE_WRITE = 0x2,
 };
 
-KAPI b8 filesystem_exists(String path);
+KAPI b8 filesystem_file_size(String path);
 void filesystem_file_size(FileHandle* handle, const char *path);
 KAPI b8 filesystem_open(const char* path, FileModes mode, FileHandle* handle);
 KAPI void filesystem_close(FileHandle* handle);
 KAPI b8 fylesystem_read(FileHandle* handle, u64 size, void* dest);
 KAPI b8 filesystem_read_file(FileHandle* handle, void* dest);
 KAPI b8 filesystem_read_file(Arena* arena, FileHandle* handle, b8** dest);
-KAPI b8 filesystem_write(FileHandle* handle, u64 size, void* source);
+KAPI b8 filesystem_write(FileHandle* handle, u64 size, const void* source);

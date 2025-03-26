@@ -42,6 +42,7 @@ b8 application_update(Application* game_inst) {
   v2 vec(1,2);
   // vec = vec * 2;
   vec = 2*vec;
+  vec = 2*vec;
 
   // Info("%f %f", vec.x,vec.y);
   if (input_is_key_down(KEY_A) && input_was_key_down(KEY_A)) {

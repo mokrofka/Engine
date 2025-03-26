@@ -14,7 +14,7 @@
 //   FILE_MODE_WRITE = 0x2,
 // };
 
-// KAPI b8 filesystem_exists(String path);
+// KAPI b8 filesystem_file_size(String path);
 
 // KAPI b8 filesystem_open(String path, FileModes mode, b8 binary, FileHandle* out_handle);
 

@@ -89,6 +89,7 @@ typedef unsigned char uchar;
 #define Stringify(S) #S
 
 #define Defer(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
+#define Assign(to, from) (to = (decltype(to))from)
 
 #ifdef KEXPORT
 #define KAPI __declspec(dllexport)

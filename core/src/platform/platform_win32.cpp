@@ -409,7 +409,7 @@ LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARA
   return DefWindowProcA(hwnd, msg, w_param, l_param);
 }
 
-b8 filesystem_exists(String path) {
+b8 filesystem_file_size(String path) {
   DWORD attributes = GetFileAttributesA((char*)path.str);
   return (attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY));
 }
@@ -511,7 +511,7 @@ b8 filesystem_read_file(Arena* arena, FileHandle* handle, b8** dest) {
   return false;
 }
 
-b8 filesystem_write(FileHandle* handle, u64 size, void* source) {
+b8 filesystem_write(FileHandle* handle, u64 size, const void* source) {
   DWORD bytes_wrote;
   if (handle->handle) {
     WriteFile(handle->handle, source, size, &bytes_wrote, 0);

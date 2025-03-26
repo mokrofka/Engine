@@ -125,3 +125,7 @@ union mat4 {
   
   v4 rows[4];
 };
+
+struct Vertex3D {
+  v3 position;
+};
