@@ -5,6 +5,7 @@
 
 #include "logger.h"
 #include "memory.h"
+#include "math/maths.h"
 
 struct RendererSystemState {
   Arena* arena;
@@ -49,9 +50,8 @@ b8 renderer_begin_frame(f32 delta_time) {
 
 b8 renderer_end_frame(f32 delta_time) {
   b8 result = state->backend.end_frame(&state->backend, delta_time);
-  // ++backend->frame_number;
+  ++state->backend.frame_number;
   return result;
-  return true;
 }
 
 void renderer_on_resized(u16 width, u16 height) {
@@ -65,6 +65,15 @@ void renderer_on_resized(u16 width, u16 height) {
 b8 renderer_draw_frame(RenderPacket* packet) {
   // If the begin frame returned successfully, mid-frame operations may continue.
   if (renderer_begin_frame(packet->delta_time)) {
+    
+    mat4 projection = mat4_perspective(deg_to_rad(45.0f), 1280/720.0f, 0.1f, 1000.0f);
+    local_persist f32 z = -1.0f;
+    z -= 0.01f;
+    mat4 view = mat4_translation(v3(0,0,z));
+
+    state->backend.update_global_state(projection, view, v3_zero(), v4_one(), 0);
+    // state->backend.update_global_state(mat4_identity(), view, v3_zero(), v4_one(), 0);
+    // state->backend.update_global_state(mat4_identity(), mat4_identity(), v3_zero(), v4_one(), 0);
     
     // End the fram. If this fails, it is likely unrecovarble.
     b8 result = renderer_end_frame(packet->delta_time);

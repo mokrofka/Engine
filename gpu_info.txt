@@ -235,7 +235,7 @@ VkPhysicalDeviceLimits:
 		-65536
 		65535
 	viewportSubPixelBits                            = 8
-	minMemoryMapAlignment                           = 64
+	minMemoryMapzlignment                           = 64
 	minTexelBufferOffsetAlignment                   = 0x00000040
 	minUniformBufferOffsetAlignment                 = 0x00000040
 	minStorageBufferOffsetAlignment                 = 0x00000040

@@ -22,6 +22,9 @@ struct EngineSystemStates {
   
   u64 renderer_system_memory_requirement;
   struct RendererState* renderer_system;
+  
+  u64 logging_system_memory_requirement;
+  struct LoggingState* logging_system;
 };
 
 struct EngineState {
@@ -71,6 +74,17 @@ b8 engine_create(Application* game_inst) {
     platform_system_startup(mem_required, 0);
     systems->platform_system = push_buffer(engine_state->arena, PlatformState, *mem_required);
     if (!platform_system_startup(mem_required, systems->platform_system)) {
+      Error("Failed to initialize platform layer");
+      return false;
+    }
+  }
+  
+  // Platform system
+  {
+    u64* mem_required = &systems->logging_system_memory_requirement;
+    logging_initialize(mem_required, 0);
+    systems->logging_system = push_buffer(engine_state->arena, LoggingState, *mem_required);
+    if (!logging_initialize(mem_required, systems->logging_system)) {
       Error("Failed to initialize platform layer");
       return false;
     }

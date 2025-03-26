@@ -1,5 +1,7 @@
 #pragma once
 
+#include "renderer/renderer_types.inl"
+
 #include "asserts.h"
 
 #include <vulkan/vulkan.h>
@@ -131,7 +133,20 @@ struct VulkanPipeline {
 
 #define OBJECT_SHADER_STAGE_COUNT 2
 struct VulkanObjectShader {
+  // vertex, fragment
   VulkanShaderStage stages[OBJECT_SHADER_STAGE_COUNT];
+  
+  VkDescriptorPool global_descriptor_pool;
+  VkDescriptorSetLayout global_descriptor_set_layout;
+  
+  // One descriptor set per frame - max 3 for triple-buffering
+  VkDescriptorSet global_descriptor_sets[3];
+  
+  // Global uniform object
+  GlobalUniformObject global_ubo;
+  
+  // Global uniform buffer
+  VulkanBuffer global_uniform_buffer;
   
   VulkanPipeline pipeline;
 };

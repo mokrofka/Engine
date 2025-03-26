@@ -231,17 +231,20 @@ b8 vulkan_renderer_backend_initialize(RendererBackend* backend) {
   // TODO temporary test code
   const u32 vert_count = 4;
   Vertex3D verts[vert_count] = {};
-  verts[0].position.x = 0.0;
-  verts[0].position.y = -0.5;
   
-  verts[1].position.x = 0.5;
-  verts[1].position.y = 0.5;
+  const f32 f = 1.0f;
   
-  verts[2].position.x = 0.0;
-  verts[2].position.y = 0.5;
+  verts[0].position.x = f*-0.5;
+  verts[0].position.y = f*-0.5;
   
-  verts[3].position.x = 0.5;
-  verts[3].position.y = -0.5;
+  verts[1].position.x = f*0.5;
+  verts[1].position.y = f*0.5;
+  
+  verts[2].position.x = f*-0.5;
+  verts[2].position.y = f*0.5;
+  
+  verts[3].position.x = f*0.5;
+  verts[3].position.y = f*-0.5;
   
   const u32 index_count = 6;
   u32 indices[index_count] = {0,1,2, 0,3,1};
@@ -389,7 +392,7 @@ b8 vulkan_renderer_backend_begin_frame(RendererBackend* backend, f32 delta_time)
   
   // Begin recording commands.
   VulkanCommandBuffer* command_buffer = &context->graphics_command_buffers[context->image_index];
-  vkResetCommandBuffer(command_buffer->handle, 0);
+  vkResetCommandBuffer(command_buffer->handle, 0); // TODO get rid of this
   vulkan_command_buffer_reset(command_buffer);
   vulkan_command_buffer_begin(command_buffer, false, false, false);
   
@@ -419,6 +422,22 @@ b8 vulkan_renderer_backend_begin_frame(RendererBackend* backend, f32 delta_time)
       &context->main_renderpass,
       context->swapchain.framebuffers[context->image_index].handle);
 
+
+  return true;
+}
+
+void vulkan_renderer_update_global_state(mat4 projection, mat4 view, v3 view_position, v4 ambient_colour, i32 mode) {
+  VulkanCommandBuffer* command_buffer = &context->graphics_command_buffers[context->image_index];
+
+  vulkan_object_shader_use(context, &context->object_shader);
+  
+  context->object_shader.global_ubo.projection = projection;
+  context->object_shader.global_ubo.view = view;
+  
+  // TODO other ubo properties
+  
+  vulkan_object_shader_update_global_state(context, &context->object_shader);
+  
   // TODO temporary test code
   vulkan_object_shader_use(context, &context->object_shader);
   
@@ -432,8 +451,6 @@ b8 vulkan_renderer_backend_begin_frame(RendererBackend* backend, f32 delta_time)
   // Issue the draw
   vkCmdDrawIndexed(command_buffer->handle, 6, 1, 0, 0, 0);
   // TODO end temporary test code
-
-  return true;
 }
 
 b8 vulkan_renderer_backend_end_frame(RendererBackend* backend, f32 delta_time) {

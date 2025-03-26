@@ -22,9 +22,9 @@ internal void append_to_log_file(const char* message) {
   }
 }
 
-b8 initialize_logging(u64* memory_requirement, void* out_state) {
+b8 logging_initialize(u64* memory_requirement, void* out_state) {
   *memory_requirement = sizeof(LoggerSystemState);
-  if (state == 0) {
+  if (out_state == 0) {
     return true;
   }
   Assign(state, out_state);
