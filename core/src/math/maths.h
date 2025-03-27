@@ -554,9 +554,9 @@ INLINE mat4 mat4_euler_y(f32 angle_radians) {
   f32 cos = Cos(angle_radians);
   f32 sin = Sin(angle_radians);
   mat4 mat = {
-    cos, 0, sin, 0,
+    cos, 0,-sin, 0,
     0,   1, 0,   0,
-   -sin, 0, cos, 0,
+    sin, 0, cos, 0,
     0,   0, 0,   1
   };
   return mat;
