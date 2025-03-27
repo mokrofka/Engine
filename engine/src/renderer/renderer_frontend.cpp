@@ -64,8 +64,8 @@ b8 renderer_draw_frame(RenderPacket* packet) {
   // If the begin frame returned successfully, mid-frame operations may continue.
   if (renderer_begin_frame(packet->delta_time)) {
     mat4 projection = mat4_perspective(deg_to_rad(45.0f), 1280/720.0f, 0.1f, 1000.0f);
-    local_persist f32 z = -10.0f;
-    z -= 0.1f;
+    local_persist f32 z = +10.0f;
+    z += 0.1f;
     mat4 view = mat4_translation(v3(0,0,z)); // -10.0f
 
     state->backend.update_global_state(projection, view, v3_zero(), v4_one(), 0);
