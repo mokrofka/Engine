@@ -379,11 +379,11 @@ void mat4::operator*=(mat4 mat) {
   *this = mat * *this;
 }
 
-INLINE mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near_clip, f32 far_clip) {
+INLINE mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far) {
   // mat4 matrix = mat4_identity();
   // f32 lr = 1.0f / (left - right);
   // f32 bt = 1.0f / (bottom - top);
-  // f32 nf = 1.0f / (near_clip - far_clip);
+  // f32 nf = 1.0f / (near - far);
   
   // matrix.data[0] = -2.0f * lr;
   // matrix.data[5] = -2.0f * bt;
@@ -391,38 +391,38 @@ INLINE mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near
   
   // matrix.data[12] = (left + right) * lr;
   // matrix.data[13] = (top + bottom) * bt;
-  // matrix.data[14] = (far_clip + near_clip) * nf;
+  // matrix.data[14] = (far + near) * nf;
   
   mat4 mat = {};
   mat.data[0*4 + 0] = 2.0f / (right - left);
   mat.data[1*4 + 1] = 2.0f / (bottom - top);
-  mat.data[2*4 + 2] = 1.0f / (far_clip - near_clip);
+  mat.data[2*4 + 2] = 1.0f / (far - near);
 
-  mat.data[2*4 + 3] = -near_clip / (far_clip - near_clip);
+  mat.data[2*4 + 3] = -near / (far - near);
 
   mat.data[3*4 + 3] = 1.0f;
 
   return mat;
 }
 
-INLINE mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near_clip, f32 far_clip) {
-  f32 half_tan_fov = Tan(fov_radians * 0.5f);
-  mat4 matrix = {};
-  matrix.data[0] = 1.0f / (aspect_ratio * half_tan_fov);
-  matrix.data[5] = 1.0f / half_tan_fov;
-  matrix.data[10] = -((far_clip + near_clip) / (far_clip - near_clip));
-  matrix.data[11] = -1.0f;
-  matrix.data[14] = -((2.0f * far_clip * near_clip) / (far_clip - near_clip));
-  return matrix;
+INLINE mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far) {
+  // f32 half_tan_fov = Tan(fov_radians * 0.5f);
+  // mat4 matrix = {};
+  // matrix.data[0] = 1.0f / (aspect_ratio * half_tan_fov);
+  // matrix.data[5] = 1.0f / half_tan_fov;
+  // matrix.data[10] = -((far + near) / (far - near));
+  // matrix.data[11] = -1.0f;
+  // matrix.data[14] = -((2.0f * far * near) / (far - near));
+  // return matrix;
   
-  // mat4 mat = {};
-  // mat.data[0*4 + 0] = 1.0f / (Tan(fov_radians/2.0f) * aspect_ratio);
-  // mat.data[1*4 + 1] = 1.0f / Tan(fov_radians/2.0f);
-  // mat.data[2*4 + 2] = far_clip / (far_clip - near_clip);
-  // mat.data[2*4 + 3] = (-far_clip * near_clip) / (far_clip - near_clip);
-  // mat.data[3*4 + 2] = 1.0f;
+  mat4 mat = {};
+  mat.data[0*4 + 0] = 1.0f / (Tan(fov_radians/2.0f) * aspect_ratio);
+  mat.data[1*4 + 1] = 1.0f / Tan(fov_radians/2.0f);
+  mat.data[2*4 + 2] = far / (far - near);
+  mat.data[2*4 + 3] = (-far * near) / (far - near);
+  mat.data[3*4 + 2] = 1.0f;
   
-  // return mat;
+  return mat;
 }
 
 INLINE mat4 mat4_look_at(v3 position, v3 target, v3 up) {
@@ -547,12 +547,19 @@ mat4 mat4_inverse(mat4 matrix) {
 }
 
 INLINE mat4 mat4_translation(v3 position) {
-  mat4 matrix = {
-    1,0,0,position.x,
-    0,1,0,position.y,
-    0,0,1,position.z,
-    0,0,0,1};
-  return matrix;
+  // mat4 matrix = {
+  //   1,0,0,position.x,
+  //   0,1,0,position.y,
+  //   0,0,1,position.z,
+  //   0,0,0,1};
+    
+  mat4 mat = mat4_identity();
+  
+  mat.data[3] = position.x;
+  mat.data[3 + 4] = position.y;
+  mat.data[3 + 8] = position.z;
+  
+  return mat;
 }
 
 INLINE mat4 mat4_scale(v3 scale) {

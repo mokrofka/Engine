@@ -78,7 +78,7 @@ b8 application_update(Application* game_inst) {
   recalculate_view_matrix();
 
   // HACK This should not be available outside the engine
-  renderer_set_view(state->view);
+  // renderer_set_view(state->view);
 
   return true;
 }
