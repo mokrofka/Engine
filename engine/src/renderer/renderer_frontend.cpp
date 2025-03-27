@@ -26,8 +26,6 @@ b8 renderer_initialize(u64* memory_requirement, void* out_state) {
   state->arena = (Arena*)&state->memory;
   state->backend.arena = state->arena;
   state->arena->res = MB(10);
-
-  // backend = (RendererBackend*)kallocate(sizeof(RendererBackend), MEMORY_TAG_RENDERER);
   
   // TODO: make this configurable
   renderer_backend_create(RENDERER_BACKENED_TYPE_VULKAN, &state->backend);
@@ -72,8 +70,6 @@ b8 renderer_draw_frame(RenderPacket* packet) {
     mat4 view = mat4_translation(v3(0,0,z));
 
     state->backend.update_global_state(projection, view, v3_zero(), v4_one(), 0);
-    // state->backend.update_global_state(mat4_identity(), view, v3_zero(), v4_one(), 0);
-    // state->backend.update_global_state(mat4_identity(), mat4_identity(), v3_zero(), v4_one(), 0);
     
     // End the fram. If this fails, it is likely unrecovarble.
     b8 result = renderer_end_frame(packet->delta_time);

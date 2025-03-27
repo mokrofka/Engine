@@ -111,7 +111,7 @@ b8 vulkan_object_shader_create(VulkanContext* context, VulkanObjectShader* out_s
   // Create uniform buffer
   if (!vulkan_buffer_create(
     context, 
-    sizeof(GlobalUniformObject), 
+    sizeof(GlobalUniformObject) * 3, 
     VkBufferUsageFlagBits(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
     true, 
@@ -174,7 +174,7 @@ void vulkan_object_shader_update_global_state(VulkanContext* context, struct Vul
   
   // Configure the descriptors for the given index
   u32 range = sizeof(GlobalUniformObject);
-  u64 offset = 0;
+  u64 offset = sizeof(GlobalUniformObject) * image_index;
 
   // Copy data to buffer
   vulkan_buffer_load_data(context, &shader->global_uniform_buffer, offset, range, 0, &shader->global_ubo);

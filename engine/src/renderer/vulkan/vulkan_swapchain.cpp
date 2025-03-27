@@ -113,7 +113,7 @@ void create(VulkanContext* context, u32 width, u32 height, VulkanSwapchain* swap
   }
   
   VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
-  for (i32 i = 0; i < context->device.swapchain_support.present_modes[i]; ++i) {
+  for (i32 i = 0; i < context->device.swapchain_support.present_mode_count; ++i) {
     VkPresentModeKHR mode = context->device.swapchain_support.present_modes[i];
     if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
       present_mode = mode;

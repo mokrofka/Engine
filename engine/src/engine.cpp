@@ -79,7 +79,7 @@ b8 engine_create(Application* game_inst) {
     }
   }
   
-  // Platform system
+  // Logging system
   {
     u64* mem_required = &systems->logging_system_memory_requirement;
     logging_initialize(mem_required, 0);
@@ -216,7 +216,7 @@ b8 engine_run(Application* game_inst) {
   event_unregister(EVENT_CODE_APPLICATION_QUIT, 0, application_on_event);
   event_unregister(EVENT_CODE_KEY_PRESSED, 0, application_on_key);
   event_unregister(EVENT_CODE_KEY_RELEASED, 0, application_on_key);
-  event_unregister(EVENT_CODE_KEY_RELEASED, 0, application_on_key);
+  event_unregister(EVENT_CODE_RESIZED, 0, application_on_resized);
   return true;
 }
 

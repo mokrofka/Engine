@@ -286,7 +286,7 @@ internal b8 select_physical_device(VulkanContext* context) {
     // NOTE: Enable this fi compute will be required.
     // requirements.compute = true;
     requirements.sampler_anisotropy = true;
-    requirements.discrete_gpu = false;
+    // requirements.discrete_gpu = false;
     // requirements.device_extension_names = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
     const char* ext = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
     requirements.device_extension_names = &ext;
@@ -397,7 +397,7 @@ internal b8 physical_device_meets_requirements(
   
   u32 queue_family_count = 0;
   vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, 0);
-  VkQueueFamilyProperties queue_families[32];
+  VkQueueFamilyProperties queue_families[32] = {};
   vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, queue_families);
   
   // Look at each queue and see what queues it supports
@@ -422,16 +422,23 @@ internal b8 physical_device_meets_requirements(
     if (queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT) {
       // Take the index if it is the current lowest. This increased the
       // likegood that it is a dedicated transfer queue.
-      if (current_transfer_score <= min_transfer_score) {
-        min_transfer_score = current_transfer_score;
-        out_queue_info->transfer_family_index = 0;
-      }
+      // if (current_transfer_score <= min_transfer_score) {
+      //   min_transfer_score = current_transfer_score;
+      //   out_queue_info->transfer_family_index = 0;
+      // }
+      out_queue_info->transfer_family_index = i;
     }
     
     VkBool32 supports_present = VK_FALSE;
-    VK_CHECK(vkGetPhysicalDeviceSurfaceSupportKHR(device, 1, context->surface, &supports_present));
+    VK_CHECK(vkGetPhysicalDeviceSurfaceSupportKHR(device, i, context->surface, &supports_present));
     if (supports_present) {
       out_queue_info->present_family_index = i;
+    }
+    if (out_queue_info->graphics_family_index != -1 &&
+        out_queue_info->transfer_family_index != -1 &&
+        out_queue_info->compute_family_index != -1 &&
+        out_queue_info->present_family_index != -1) {
+      break;
     }
   }
 
