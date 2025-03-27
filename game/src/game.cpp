@@ -26,7 +26,8 @@ internal void recalculate_view_matrix() {
     mat4 rotaion = mat4_euler_xyz(state->camera_euler.x, state->camera_euler.y, state->camera_euler.z);
     mat4 translation = mat4_translation(state->camera_position);
     
-    state->view = rotaion * translation;
+    state->view = translation * rotaion;
+    state->view = mat4_inverse(state->view);
     state->camera_view_dirty = false;
   }
 }
@@ -51,9 +52,10 @@ b8 application_initialize(Application* game_inst) {
   state = (GameState*)game_inst->state;
   state->arena = arena_alloc(game_inst->arena, MB(400));
   
-  state->camera_position = v3(0,0,-30.0f); state->camera_euler = v3_zero();
+  state->camera_position = v3(0,0,30.0f);
+  state->camera_euler = v3_zero();
   
-  // state->view = mat4_translation(v3(0, 0, 30.0f));
+  state->view = mat4_translation(v3(0, 0, 30.0f));
   state->camera_view_dirty = true;
   
   return true;
@@ -61,13 +63,57 @@ b8 application_initialize(Application* game_inst) {
 
 b8 application_update(Application* game_inst) {
   state = (GameState*)game_inst->state;
+  f32 delta_time = game_inst->delta_time;
   
+  f32 rotation_speed = 2.0f;
   // HACK temp back to move camera around
   if (input_is_key_down(KEY_A) || input_is_key_down(KEY_LEFT)) {
-    camera_yaw(1.0f * game_inst->delta_time);
+    camera_yaw(rotation_speed * game_inst->delta_time);
   }
   if (input_is_key_down(KEY_D) || input_is_key_down(KEY_RIGHT)) {
-    camera_yaw(-1.0f * game_inst->delta_time);
+    camera_yaw(-rotation_speed * game_inst->delta_time);
+  }
+  if (input_is_key_down(KEY_UP)) {
+    camera_pitch(rotation_speed * game_inst->delta_time);
+  }
+  if (input_is_key_down(KEY_DOWN)) {
+    camera_pitch(-rotation_speed * game_inst->delta_time);
+  }
+  
+  f32 temp_move_speed = 50.0f;
+  v3 velocity = v3_zero();
+  
+  if (input_is_key_down(KEY_W)) {
+    v3 forward = mat4_forward(state->view);
+    velocity += forward;
+  }
+  if (input_is_key_down(KEY_S)) {
+    v3 backward = mat4_backward(state->view);
+    velocity += backward;
+  }
+  
+  if (input_is_key_down(KEY_Q)) {
+    v3 left = mat4_left(state->view);
+    velocity += left;
+  }
+  if (input_is_key_down(KEY_E)) {
+    v3 right = mat4_right(state->view);
+    velocity += right;
+  }
+  
+  if (input_is_key_down(KEY_SPACE)) {
+    velocity.y += 1.0f;
+  }
+  if (input_is_key_down(KEY_X)) {
+    velocity.y -= 1.0f;
+  }
+  
+  v3 z = v3_zero();
+  if (z != velocity) {
+    // Be sure to normalize the velocity before applying speed 
+    v3_normalize(&velocity);
+    state->camera_position += velocity * temp_move_speed * delta_time;
+    state->camera_view_dirty = true;
   }
   
   recalculate_view_matrix();

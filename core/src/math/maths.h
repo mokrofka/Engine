@@ -266,6 +266,18 @@ INLINE b8 v3_compare(v3 vec_0, v3 vec_1, f32 tolerance) {
          Abs(vec_0.z - vec_1.z) <= tolerance;
 }
 
+internal const f32 tolerance = 1e-5;
+INLINE b8 operator==(v3 vec_0, v3 vec_1) {
+  return Abs(vec_0.x - vec_1.x) <= tolerance &&
+         Abs(vec_0.y - vec_1.y) <= tolerance &&
+         Abs(vec_0.z - vec_1.z) <= tolerance;
+}
+INLINE b8 operator!=(v3 vec_0, v3 vec_1) {
+  return !(Abs(vec_0.x - vec_1.x) <= tolerance &&
+           Abs(vec_0.y - vec_1.y) <= tolerance &&
+           Abs(vec_0.z - vec_1.z) <= tolerance);
+}
+
 INLINE f32 v3_distance(v3 vec_0, v3 vec_1) {
   v3 d = (v3){vec_0.x - vec_1.x, vec_0.y - vec_1.y, vec_0.z - vec_1.z};
   return v3_length(d);
@@ -402,6 +414,7 @@ INLINE mat4 mat4_perspective1(f32 fov_radians, f32 aspect_ratio, f32 near, f32 f
   
   return mat;
 }
+
 INLINE mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far) {
   mat4 mat = {};
   mat.data[0*4 + 0] = 1.0f / (Tan(fov_radians / 2.0f) * aspect_ratio);
@@ -565,7 +578,7 @@ INLINE mat4 mat4_euler_xyz(f32 x_radians, f32 y_radians, f32 z_radians) {
   mat4 rx = mat4_euler_x(x_radians);
   mat4 ry = mat4_euler_y(y_radians);
   mat4 rz = mat4_euler_z(z_radians);
-  mat4 mat = rx * ry * rx;
+  mat4 mat = rx * ry * rz;
   return mat;
 }
 
