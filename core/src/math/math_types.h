@@ -84,6 +84,9 @@ union v3 {
     y /= scalar;
     z /= scalar;
   }
+  inline v3 operator-() {
+    return v3(-x,-y,-z);
+  }
 };
 
 union v4 {
@@ -124,6 +127,7 @@ union mat4 {
   f32 data[16];
   
   v4 rows[4];
+  void operator*=(mat4 mat);
 };
 
 struct Vertex3D {

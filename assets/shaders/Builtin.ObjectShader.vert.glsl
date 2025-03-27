@@ -16,4 +16,6 @@ layout(push_constant) uniform push_constant {
 
 void main() {
   gl_Position = global_ubo.projection * global_ubo.view * u_push_constants.model * vec4(in_position, 1.0);
+  // gl_Position = global_ubo.view * u_push_constants.model * vec4(in_position, 1.0);
+  // gl_Position = vec4(in_position, 1.0);
 }

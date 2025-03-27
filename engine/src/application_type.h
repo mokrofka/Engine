@@ -12,5 +12,7 @@ struct Application {
   void* state;
   void* engine_state;
   
+  f64 delta_time;
+  
   DynamicLibrary game_lib;
 };
