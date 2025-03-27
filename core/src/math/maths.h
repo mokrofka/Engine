@@ -402,6 +402,14 @@ INLINE mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near_clip, f
   matrix.data[11] = -1.0f;
   matrix.data[14] = -((2.0f * far_clip * near_clip) / (far_clip - near_clip));
   return matrix;
+
+  // mat4 m = {};
+  // m.data[0*4 + 0] = 1.0f / (Tan(fov_radians / 2.0f) * aspect_ratio);
+  // m.data[1*4 + 1] = 1.0f / Tan(fov_radians / 2.0f);
+  // m.data[2*4 + 2] = far_clip / (far_clip - near_clip);
+  // m.data[2*4 + 3] = (-far_clip * near_clip) / (far_clip - near_clip);
+  // m.data[3*4 + 2] = 1.0f;
+  // return m;
 }
 
 INLINE mat4 mat4_look_at(v3 position, v3 target, v3 up) {
