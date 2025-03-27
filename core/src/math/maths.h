@@ -366,10 +366,10 @@ INLINE mat4 operator*(mat4 matrix_0, mat4 matrix_1) {
   for (i32 row = 0; row < 4; ++row) {
     for (i32 col = 0; col < 4; ++col) {
       result.data[row * 4 + col] =
-          matrix_0.data[row * 4 + 0] * matrix_1.data[0 * 4 + col] +
-          matrix_0.data[row * 4 + 1] * matrix_1.data[1 * 4 + col] +
-          matrix_0.data[row * 4 + 2] * matrix_1.data[2 * 4 + col] +
-          matrix_0.data[row * 4 + 3] * matrix_1.data[3 * 4 + col];
+          matrix_1.data[row * 4 + 0] * matrix_0.data[0 * 4 + col] +
+          matrix_1.data[row * 4 + 1] * matrix_0.data[1 * 4 + col] +
+          matrix_1.data[row * 4 + 2] * matrix_0.data[2 * 4 + col] +
+          matrix_1.data[row * 4 + 3] * matrix_0.data[3 * 4 + col];
     }
   }
   return result;
@@ -380,90 +380,50 @@ void mat4::operator*=(mat4 mat) {
 }
 
 INLINE mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far) {
-  // mat4 matrix = mat4_identity();
-  // f32 lr = 1.0f / (left - right);
-  // f32 bt = 1.0f / (bottom - top);
-  // f32 nf = 1.0f / (near - far);
-  
-  // matrix.data[0] = -2.0f * lr;
-  // matrix.data[5] = -2.0f * bt;
-  // matrix.data[10] = 2.0f * nf;
-  
-  // matrix.data[12] = (left + right) * lr;
-  // matrix.data[13] = (top + bottom) * bt;
-  // matrix.data[14] = (far + near) * nf;
-  
   mat4 mat = {};
   mat.data[0*4 + 0] = 2.0f / (right - left);
   mat.data[1*4 + 1] = 2.0f / (bottom - top);
   mat.data[2*4 + 2] = 1.0f / (far - near);
 
-  mat.data[2*4 + 3] = -near / (far - near);
+  mat.data[3*4 + 2] = -near / (far - near);
 
   mat.data[3*4 + 3] = 1.0f;
 
   return mat;
 }
 
-INLINE mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far) {
-  // f32 half_tan_fov = Tan(fov_radians * 0.5f);
-  // mat4 matrix = {};
-  // matrix.data[0] = 1.0f / (aspect_ratio * half_tan_fov);
-  // matrix.data[5] = 1.0f / half_tan_fov;
-  // matrix.data[10] = -((far + near) / (far - near));
-  // matrix.data[11] = -1.0f;
-  // matrix.data[14] = -((2.0f * far * near) / (far - near));
-  // return matrix;
-  
+INLINE mat4 mat4_perspective1(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far) {
   mat4 mat = {};
   mat.data[0*4 + 0] = 1.0f / (Tan(fov_radians/2.0f) * aspect_ratio);
   mat.data[1*4 + 1] = 1.0f / Tan(fov_radians/2.0f);
   mat.data[2*4 + 2] = far / (far - near);
-  mat.data[2*4 + 3] = (-far * near) / (far - near);
-  mat.data[3*4 + 2] = 1.0f;
+  mat.data[2*4 + 3] = 1.0f;
+  mat.data[3*4 + 2] = (-far * near) / (far - near);
+  
+  return mat;
+}
+INLINE mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far) {
+  mat4 mat = {};
+  mat.data[0*4 + 0] = 1.0f / (Tan(fov_radians / 2.0f) * aspect_ratio);
+  mat.data[1*4 + 1] = 1.0f / Tan(fov_radians / 2.0f);
+  mat.data[2*4 + 2] = -(far + near) / (far - near); // Flip sign
+  mat.data[2*4 + 3] = -1.0f; // Flip sign
+  mat.data[3*4 + 2] = (-2.0f * far * near) / (far - near); // Flip sign
   
   return mat;
 }
 
 INLINE mat4 mat4_look_at(v3 position, v3 target, v3 up) {
-  // mat4 matrix;
-  // v3 z_axis;
-  // z_axis.x = target.x - position.x;
-  // z_axis.y = target.y - position.y;
-  // z_axis.z = target.z - position.z;
-
-  // z_axis = v3_normal(z_axis);
-  // v3 x_axis = v3_normal(v3_cross(z_axis, up));
-  // v3 y_axis = v3_cross(x_axis, z_axis);
-
-  // matrix.data[0] = x_axis.x;
-  // matrix.data[1] = y_axis.x;
-  // matrix.data[2] = -z_axis.x;
-  // matrix.data[3] = 0;
-  // matrix.data[4] = x_axis.y;
-  // matrix.data[5] = y_axis.y;
-  // matrix.data[6] = -z_axis.y;
-  // matrix.data[7] = 0;
-  // matrix.data[8] = x_axis.z;
-  // matrix.data[9] = y_axis.z;
-  // matrix.data[10] = -z_axis.z;
-  // matrix.data[11] = 0;
-  // matrix.data[12] = -v3_dot(x_axis, position);
-  // matrix.data[13] = -v3_dot(y_axis, position);
-  // matrix.data[14] = v3_dot(z_axis, position);
-  // matrix.data[15] = 1.0f;
-
-  // return matrix;
-
   v3 z = v3_normal(target - position);
   v3 x = v3_normal(v3_cross(up, z));
   v3 y = v3_cross(z, x);
-
+  
   mat4 camera_view = {
-      x.x, x.y, x.z, -v3_dot(x, position),
-      y.x, y.y, y.z, -v3_dot(y, position),
-      z.x, z.y, z.z, -v3_dot(z, position),
-      0.0f, 0.0f, 0.0f, 1.0f};
+    x.x, y.x, z.x, 0.0f,
+    x.y, y.y, z.y, 0.0f,
+    x.z, y.z, z.z, 0.0f,
+   -v3_dot(x, position), -v3_dot(y, position), -v3_dot(z, position), 1.0f
+};
 
   return camera_view;
 }
@@ -488,6 +448,7 @@ INLINE mat4 mat4_transposed(mat4 matrix) {
   out_matrix.data[15] = matrix.data[15];
   return out_matrix;
 }
+
 mat4 mat4_inverse(mat4 matrix) {
   const f32* m = matrix.data;
 
@@ -547,95 +508,59 @@ mat4 mat4_inverse(mat4 matrix) {
 }
 
 INLINE mat4 mat4_translation(v3 position) {
-  // mat4 matrix = {
-  //   1,0,0,position.x,
-  //   0,1,0,position.y,
-  //   0,0,1,position.z,
-  //   0,0,0,1};
-    
-  mat4 mat = mat4_identity();
-  
-  mat.data[3] = position.x;
-  mat.data[3 + 4] = position.y;
-  mat.data[3 + 8] = position.z;
-  
+  mat4 mat = {
+      1,          0,          0,          0,
+      0,          1,          0,          0,
+      0,          0,          1,          0,
+      position.x, position.y, position.z, 1};
   return mat;
 }
 
 INLINE mat4 mat4_scale(v3 scale) {
-  mat4 matrix = {
+  mat4 mat = {
     scale.x,0,      0,      0,
     0,      scale.y,0,      0,
     0,      0,      scale.z,0,
     0,      0,      0,      1};
-  return matrix;
+  return mat;
 }
 
 INLINE mat4 mat4_euler_x(f32 angle_radians) {
-  // mat4 out_matrix = mat4_identity();
-  // f32 c = Cos(angle_radians);
-  // f32 s = Sin(angle_radians);
-
-  // out_matrix.data[5] = c;
-  // out_matrix.data[6] = s;
-  // out_matrix.data[9] = -s;
-  // out_matrix.data[10] = c;
-  // return out_matrix;
-  
-  
   f32 cos = Cos(angle_radians);
   f32 sin = Sin(angle_radians);
   mat4 mat = {
-    1, 0,    0,    0,
-    0, cos, -sin, 0,
-    0, sin,  cos,  0,
-    0, 0,    0,    1,
+    1,    0,     0,    0,
+    0,  cos,   sin,    0,
+    0, -sin,   cos,    0,
+    0,    0,     0,    1,
   };
   return mat;
 }
+
 INLINE mat4 mat4_euler_y(f32 angle_radians) {
-  // mat4 out_matrix = mat4_identity();
-  // f32 c = Cos(angle_radians);
-  // f32 s = Sin(angle_radians);
-
-  // out_matrix.data[0] = c;
-  // out_matrix.data[2] = -s;
-  // out_matrix.data[8] = s;
-  // out_matrix.data[10] = c;
-  // return out_matrix;
-  
   f32 cos = Cos(angle_radians);
   f32 sin = Sin(angle_radians);
   mat4 mat = {
-    cos,  0, -sin, 0,
-    0,    1,  0,   0,
-    -sin, 0,  cos, 0,
-    0,    0,  0,   1
+    cos, 0, sin, 0,
+    0,   1, 0,   0,
+   -sin, 0, cos, 0,
+    0,   0, 0,   1
   };
   return mat;
 }
+
 INLINE mat4 mat4_euler_z(f32 angle_radians) {
-  // mat4 out_matrix = mat4_identity();
-
-  // f32 c = Cos(angle_radians);
-  // f32 s = Sin(angle_radians);
-
-  // out_matrix.data[0] = c;
-  // out_matrix.data[1] = s;
-  // out_matrix.data[4] = -s;
-  // out_matrix.data[5] = c;
-  // return out_matrix;
-  
   f32 cos = Cos(angle_radians);
   f32 sin = Sin(angle_radians);
   mat4 mat = {
-    cos, -sin, 0, 0,
-    sin,  cos, 0, 0,
+    cos,  sin, 0, 0,
+   -sin,  cos, 0, 0,
     0,    0,   1, 0,
     0,    0,   0, 1
   };
   return mat;
 }
+
 INLINE mat4 mat4_euler_xyz(f32 x_radians, f32 y_radians, f32 z_radians) {
   mat4 rx = mat4_euler_x(x_radians);
   mat4 ry = mat4_euler_y(y_radians);

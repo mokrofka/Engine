@@ -232,7 +232,7 @@ b8 vulkan_renderer_backend_initialize(RendererBackend* backend) {
   const u32 vert_count = 4;
   Vertex3D verts[vert_count] = {};
   
-  const f32 f = 1.0f;
+  const f32 f = 10.0f;
   
   verts[0].position.x = f*-0.5;
   verts[0].position.y = f*-0.5;

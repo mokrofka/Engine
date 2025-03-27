@@ -125,8 +125,8 @@ b8 engine_create(Application* game_inst) {
     WindowConfig config = {
       .position_x = 100,
       .position_y = 100,
-      .width = 1280,
-      .height = 720,
+      .width = 680,
+      .height = 480,
       .name = game_inst->name
     };
     window_create(engine_state->window, config);

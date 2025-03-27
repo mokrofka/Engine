@@ -42,8 +42,7 @@ b8 renderer_initialize(u64* memory_requirement, void* out_state) {
   state->near_clip = 0.1f;
   state->far_clip = 1000.0f;
   state->projection = mat4_perspective(deg_to_rad(45.0f), 1280 / 720.0f, state->near_clip, state->far_clip);
-  // state->projection = mat4_translation(v3(1,1,111));
-  state->view = mat4_translation(v3(0, 0, 30.0f));
+  // state->view = mat4_translation(v3(0, 0, 30.0f));
 
   return true;
 }
