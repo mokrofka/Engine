@@ -125,8 +125,8 @@ b8 engine_create(Application* game_inst) {
     WindowConfig config = {
       .position_x = 100,
       .position_y = 100,
-      .width = 1280,
-      .height = 720,
+      .width = 680,
+      .height = 480,
       .name = game_inst->name
     };
     window_create(engine_state->window, config);
@@ -172,6 +172,7 @@ b8 engine_run(Application* game_inst) {
       clock_update(&engine_state->clock);
       f64 current_time = engine_state->clock.elapsed;
       f64 delta = (current_time - engine_state->last_time);
+      engine_state->game_inst->delta_time = delta;
       f64 frame_start_time = platform_get_absolute_time();
 
       check_dll_changes(game_inst);
@@ -269,20 +270,12 @@ b8 application_on_key(u16 code, void* sender, void* listener_inst, EventContext 
 
       // Block anything else from processing this.
       return true;
-    } else if (key_code == KEY_A) {
-      // Example on checking for a key
-      Debug("Explicit - A key pressed!");
     } else {
       Debug("'%c' key pressed in window.", key_code);
     }
   } else if (code == EVENT_CODE_KEY_RELEASED) {
     u16 key_code = context.data.u16[0];
-    if (key_code == KEY_B) {
-      // Example on checking for a key
-      Debug("Explicit - B key release!");
-    } else {
-      Debug("'%c' key released in window.", key_code);
-    }
+    Debug("'%c' key released in window.", key_code);
   }
   return false;
 }
