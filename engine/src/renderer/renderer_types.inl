@@ -34,6 +34,8 @@ struct RendererBackend {
   b8 (*end_frame)(struct RendererBackend* backend, f32 delta_time);
   
   b8 (*window_create)(struct RendererBackend* backend, struct Window* window);
+
+  void (*update_object)(mat4 model);
 };
 
 struct RenderPacket {

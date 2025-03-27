@@ -232,7 +232,7 @@ b8 vulkan_renderer_backend_initialize(RendererBackend* backend) {
   const u32 vert_count = 4;
   Vertex3D verts[vert_count] = {};
   
-  const f32 f = 1.0f;
+  const f32 f = 10.0f;
   
   verts[0].position.x = f*-0.5;
   verts[0].position.y = f*-0.5;
@@ -438,19 +438,6 @@ void vulkan_renderer_update_global_state(mat4 projection, mat4 view, v3 view_pos
   
   vulkan_object_shader_update_global_state(context, &context->object_shader);
   
-  // TODO temporary test code
-  vulkan_object_shader_use(context, &context->object_shader);
-  
-  // Bind vertex buffer at offset
-  VkDeviceSize offsets[1] = {0};
-  vkCmdBindVertexBuffers(command_buffer->handle, 0, 1, &context->object_vertex_buffer.handle, (VkDeviceSize*)offsets);
-  
-  // Bind index buffer at offset
-  vkCmdBindIndexBuffer(command_buffer->handle, context->object_index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
-  
-  // Issue the draw
-  vkCmdDrawIndexed(command_buffer->handle, 6, 1, 0, 0, 0);
-  // TODO end temporary test code
 }
 
 b8 vulkan_renderer_backend_end_frame(RendererBackend* backend, f32 delta_time) {
@@ -521,6 +508,26 @@ b8 vulkan_renderer_backend_end_frame(RendererBackend* backend, f32 delta_time) {
       context->image_index);
 
   return true;
+}
+
+void vulkan_backend_update_object(mat4 model) {
+  VulkanCommandBuffer* command_buffer = &context->graphics_command_buffers[context->image_index];
+  
+  vulkan_object_shader_update_object(context, &context->object_shader, model);
+  
+  // TODO temporary test code
+  vulkan_object_shader_use(context, &context->object_shader);
+  
+  // Bind vertex buffer at offset
+  VkDeviceSize offsets[1] = {0};
+  vkCmdBindVertexBuffers(command_buffer->handle, 0, 1, &context->object_vertex_buffer.handle, (VkDeviceSize*)offsets);
+  
+  // Bind index buffer at offset
+  vkCmdBindIndexBuffer(command_buffer->handle, context->object_index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
+  
+  // Issue the draw
+  vkCmdDrawIndexed(command_buffer->handle, 6, 1, 0, 0, 0);
+  // TODO end temporary test code
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(

@@ -63,13 +63,20 @@ void renderer_on_resized(u16 width, u16 height) {
 b8 renderer_draw_frame(RenderPacket* packet) {
   // If the begin frame returned successfully, mid-frame operations may continue.
   if (renderer_begin_frame(packet->delta_time)) {
-    
     mat4 projection = mat4_perspective(deg_to_rad(45.0f), 1280/720.0f, 0.1f, 1000.0f);
-    local_persist f32 z = -1.0f;
-    z -= 0.01f;
-    mat4 view = mat4_translation(v3(0,0,z));
+    local_persist f32 z = -10.0f;
+    z -= 0.1f;
+    mat4 view = mat4_translation(v3(0,0,z)); // -10.0f
 
     state->backend.update_global_state(projection, view, v3_zero(), v4_one(), 0);
+    
+    local_persist f32 angle = 0.01f;
+    angle += 0.01f;
+    
+    quat roation = quat_from_axis_angle(v3_forward(), angle, false);
+    mat4 model = quat_to_rotation_matrix(roation, v3_zero());
+    
+    state->backend.update_object(model);
     
     // End the fram. If this fails, it is likely unrecovarble.
     b8 result = renderer_end_frame(packet->delta_time);
