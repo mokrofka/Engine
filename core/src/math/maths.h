@@ -391,25 +391,6 @@ void mat4::operator*=(mat4 mat) {
   *this = mat * *this;
 }
 
-<<<<<<< HEAD
-INLINE mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near_clip, f32 far_clip) {
-  // f32 half_tan_fov = Tan(fov_radians * 0.5f);
-  // mat4 matrix = {};
-  // matrix.data[0] = 1.0f / (aspect_ratio * half_tan_fov);
-  // matrix.data[5] = 1.0f / half_tan_fov;
-  // matrix.data[10] = -((far_clip + near_clip) / (far_clip - near_clip));
-  // matrix.data[11] = -1.0f;
-  // matrix.data[14] = -((2.0f * far_clip * near_clip) / (far_clip - near_clip));
-  // return matrix;
-
-  mat4 m = {};
-  m.data[0*4 + 0] = 1.0f / (Tan(fov_radians / 2.0f) * aspect_ratio);
-  m.data[1*4 + 1] = 1.0f / Tan(fov_radians / 2.0f);
-  m.data[2*4 + 2] = far_clip / (far_clip - near_clip);
-  m.data[2*4 + 3] = 1.0f;
-  m.data[3*4 + 2] = (-far_clip * near_clip) / (far_clip - near_clip);
-  return m;
-=======
 INLINE mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far) {
   mat4 mat = {};
   mat.data[0*4 + 0] = 2.0f / (right - left);
@@ -443,7 +424,6 @@ INLINE mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 fa
   mat.data[3*4 + 2] = (-2.0f * far * near) / (far - near); // Flip sign
   
   return mat;
->>>>>>> camera
 }
 
 INLINE mat4 mat4_look_at(v3 position, v3 target, v3 up) {

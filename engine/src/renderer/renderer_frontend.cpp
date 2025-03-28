@@ -73,13 +73,6 @@ void renderer_on_resized(u16 width, u16 height) {
 b8 renderer_draw_frame(RenderPacket* packet) {
   // If the begin frame returned successfully, mid-frame operations may continue.
   if (renderer_begin_frame(packet->delta_time)) {
-<<<<<<< HEAD
-    mat4 projection = mat4_perspective(deg_to_rad(45.0f), 1280/720.0f, 0.1f, 1000.0f);
-    local_persist f32 z = +10.0f;
-    z += 0.1f;
-    mat4 view = mat4_translation(v3(0,0,z)); // -10.0f
-=======
->>>>>>> camera
 
     state->backend.update_global_state(state->projection, state->view, v3_zero(), v4_one(), 0);
     
@@ -103,4 +96,14 @@ b8 renderer_draw_frame(RenderPacket* packet) {
 
 void renderer_set_view(mat4 view) {
   state->view = view;
+}
+
+void renderer_create_texture(
+    const char* name, b8 auto_release, i32 width, i32 height, i32 channel_count,
+    const b8* pixels, b8 has_transparency, struct Texture* texture) {
+  state->backend.create_texture(name, auto_release, width, height, channel_count, pixels, has_transparency, texture);
+}
+
+void renderer_destroy_texture(struct Texture* texture) {
+  state->backend.destroy_texture(texture);
 }

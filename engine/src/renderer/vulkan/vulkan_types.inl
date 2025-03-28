@@ -211,3 +211,8 @@ struct VulkanContext {
   
   i32 (*find_memory_index)(u32 type_filter, u32 property_flags);
 };
+
+struct VulkanTextureData {
+  VulkanImage image;
+  VkSampler sampler;
+};
