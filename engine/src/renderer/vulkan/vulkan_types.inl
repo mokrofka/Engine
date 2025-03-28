@@ -132,6 +132,25 @@ struct VulkanPipeline {
 };
 
 #define OBJECT_SHADER_STAGE_COUNT 2
+
+struct VulkanDescriptorState {
+  // One per frame
+  u32 generations[3];
+};
+
+#define VULKAN_OBJECT_SHADER_DESCRIPTOR_COUNT 2
+
+struct VulkanObjectShaderObjectState {
+  // Per frame
+  VkDescriptorSet descriptor_sets[3];
+  
+  // Per descriptor
+  VulkanDescriptorState descriptor_states[VULKAN_OBJECT_SHADER_DESCRIPTOR_COUNT];
+};
+
+// Max number of objects
+#define VULKAN_OBJECT_MAX_OBJECT_COUNT 1024
+
 struct VulkanObjectShader {
   // vertex, fragment
   VulkanShaderStage stages[OBJECT_SHADER_STAGE_COUNT];
@@ -148,11 +167,23 @@ struct VulkanObjectShader {
   // Global uniform buffer
   VulkanBuffer global_uniform_buffer;
   
+  VkDescriptorPool object_descriptor_pool;
+  VkDescriptorSetLayout object_descriptor_set_layout;
+  // Object uniform buffers
+  VulkanBuffer object_uniform_buffer;
+  // TODO manage a free list of somd kind here instead
+  u32 object_uniform_buffer_index;
+  
+  // TODO make dynamic
+  VulkanObjectShaderObjectState object_states[VULKAN_OBJECT_MAX_OBJECT_COUNT];
+  
   VulkanPipeline pipeline;
 };
 
 struct VulkanContext {
   struct Arena* arena;
+  
+  f32 frame_delta_time;
    
   // The framebuffer's current width.
   u32 framebuffer_width;

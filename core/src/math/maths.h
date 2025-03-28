@@ -34,7 +34,7 @@ KAPI f32 Tan(f32 x);
 KAPI f32 Acos(f32 x);
 KAPI f32 Sqrt(f32 x);
 
-b8 is_power_of_2(u64 value) {
+INLINE b8 is_power_of_2(u64 value) {
     return (value != 0) && ((value & (value - 1)) == 0);
 }
 
@@ -387,7 +387,7 @@ INLINE mat4 operator*(mat4 matrix_0, mat4 matrix_1) {
   return result;
 }
 
-void mat4::operator*=(mat4 mat) {
+inline void mat4::operator*=(mat4 mat) {
   *this = mat * *this;
 }
 
@@ -462,7 +462,7 @@ INLINE mat4 mat4_transposed(mat4 matrix) {
   return out_matrix;
 }
 
-mat4 mat4_inverse(mat4 matrix) {
+INLINE mat4 mat4_inverse(mat4 matrix) {
   const f32* m = matrix.data;
 
   f32 t0 = m[10] * m[15];

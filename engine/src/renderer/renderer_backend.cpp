@@ -10,9 +10,9 @@ b8 renderer_backend_create(RendererBackendType type, RendererBackend* out_render
     out_renderer_backend->update_global_state = vulkan_renderer_update_global_state;
     out_renderer_backend->end_frame = vulkan_renderer_backend_end_frame;
     out_renderer_backend->resized = vulkan_renderer_backend_on_resize;
-    out_renderer_backend->update_object = vulkan_backend_update_object;
-    out_renderer_backend->create_texture = vulkan_backend_create_texture;
-    out_renderer_backend->destroy_texture = vulkan_backend_destroy_texture;
+    out_renderer_backend->update_object = vulkan_renderer_update_object;
+    out_renderer_backend->create_texture = vulkan_renderer_create_texture;
+    out_renderer_backend->destroy_texture = vulkan_renderer_destroy_texture;
     
     return true;
   }

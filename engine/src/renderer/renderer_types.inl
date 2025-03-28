@@ -18,6 +18,19 @@ struct GlobalUniformObject {
   mat4 m_reserved1; // 64 bytes, reserved for future use
 };
 
+struct ObjectUniformObject {
+  v4 diffuse_color; // 16 bytes
+  v4 v_reserved0;   // 16 bytes, reserved for future use
+  v4 v_reserved1;   // 16 bytes, reserved for future use
+  v4 v_reserved2;   // 16 bytes, reserved for future use
+};
+
+struct GeometryRenderData {
+  u32 object_id;
+  mat4 model;
+  struct Texture* textures[16];
+};
+
 struct RendererBackend {
   struct Arena* arena;
   void* internal_context;
@@ -35,11 +48,11 @@ struct RendererBackend {
   
   b8 (*window_create)(struct RendererBackend* backend, struct Window* window);
 
-  void (*update_object)(mat4 model);
+  void (*update_object)(GeometryRenderData data);
 
   void (*create_texture)(
       const char* name, b8 auto_release, i32 width, i32 height, i32 channel_count,
-      const b8* pixels, b8 has_transparency, struct Texture* texture);
+      const u8* pixels, b8 has_transparency, struct Texture* texture);
   void (*destroy_texture)(struct Texture* texture);
 };
 

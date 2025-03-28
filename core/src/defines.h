@@ -102,3 +102,5 @@ typedef unsigned char uchar;
 #define C_LINKAGE extern "C"
 
 #define INLINE static inline
+
+#define INVALID_ID 4294967295U

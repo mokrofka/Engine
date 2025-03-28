@@ -237,18 +237,32 @@ b8 vulkan_renderer_backend_initialize(RendererBackend* backend) {
   
   verts[0].position.x = f*-0.5;
   verts[0].position.y = f*-0.5;
+  verts[0].texcoord.x = 0.0f;
+  verts[0].texcoord.y = 0.0f;
   
   verts[1].position.x = f*0.5;
   verts[1].position.y = f*0.5;
+  verts[1].texcoord.x = 1.0f;
+  verts[1].texcoord.y = 1.0f;
   
   verts[2].position.x = f*-0.5;
   verts[2].position.y = f*0.5;
+  verts[2].texcoord.x = 0.0f;
+  verts[2].texcoord.y = 1.0f;
   
   verts[3].position.x = f*0.5;
   verts[3].position.y = f*-0.5;
+  verts[3].texcoord.x = 1.0f;
+  verts[3].texcoord.y = 0.0f;
   
   const u32 index_count = 6;
   u32 indices[index_count] = {0,1,2, 0,3,1};
+  
+  u32 object_id = 0;
+  if (!vulkan_object_shader_acquire_resources(context, &context->object_shader, &object_id)) {
+    Error("Failed to acquire shader resources.");
+    return false;
+  }
   
   upload_data_range(context, context->device.graphics_command_pool, 0, context->device.graphics_queue, &context->object_vertex_buffer, 0, sizeof(Vertex3D) * vert_count, verts);
   upload_data_range(context, context->device.graphics_command_pool, 0, context->device.graphics_queue, &context->object_index_buffer, 0, sizeof(u32) * index_count, indices);
@@ -340,6 +354,7 @@ void vulkan_renderer_backend_on_resize(RendererBackend* backend, u16 width, u16 
 }
 
 b8 vulkan_renderer_backend_begin_frame(RendererBackend* backend, f32 delta_time) {
+  context->frame_delta_time = delta_time;
   VulkanDevice* device = &context->device;
   
   // Check if recreating swap chain and boot out.
@@ -437,7 +452,7 @@ void vulkan_renderer_update_global_state(mat4 projection, mat4 view, v3 view_pos
   
   // TODO other ubo properties
   
-  vulkan_object_shader_update_global_state(context, &context->object_shader);
+  vulkan_object_shader_update_global_state(context, &context->object_shader, context->frame_delta_time);
   
 }
 
@@ -511,10 +526,10 @@ b8 vulkan_renderer_backend_end_frame(RendererBackend* backend, f32 delta_time) {
   return true;
 }
 
-void vulkan_backend_update_object(mat4 model) {
+void vulkan_renderer_update_object(GeometryRenderData data) {
   VulkanCommandBuffer* command_buffer = &context->graphics_command_buffers[context->image_index];
   
-  vulkan_object_shader_update_object(context, &context->object_shader, model);
+  vulkan_object_shader_update_object(context, &context->object_shader, data);
   
   // TODO temporary test code
   vulkan_object_shader_use(context, &context->object_shader);
@@ -722,11 +737,11 @@ internal b8 create_buffers(VulkanContext* context) {
   return true;
 }
 
-void vulkan_backend_create_texture(const char* name, b8 auto_release, i32 width, i32 height, i32 channel_count, const b8* pixels, b8 has_transparency, Texture* texture) {
+void vulkan_renderer_create_texture(const char* name, b8 auto_release, i32 width, i32 height, i32 channel_count, const u8* pixels, b8 has_transparency, Texture* texture) {
   texture->width = width;  
   texture->height = height;  
   texture->channel_count = channel_count;  
-  texture->generation = 0;  
+  texture->generation = INVALID_ID;
   
   // Internal data creation
   texture->internal_data = push_struct(context->arena, VulkanTextureData);
@@ -753,7 +768,7 @@ void vulkan_backend_create_texture(const char* name, b8 auto_release, i32 width,
     height, 
     image_format, 
     VK_IMAGE_TILING_OPTIMAL, 
-    VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+    VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     true,
     VK_IMAGE_ASPECT_COLOR_BIT,
@@ -774,6 +789,9 @@ void vulkan_backend_create_texture(const char* name, b8 auto_release, i32 width,
     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
   
   // Copy the data from the buffer
+  vulkan_image_copy_from_buffer(context, &data->image, staging.handle, &temp_buffer);
+  
+  // Copy the data from the buffer
   vulkan_image_transition_layout(
     context, 
     &temp_buffer, 
@@ -783,6 +801,8 @@ void vulkan_backend_create_texture(const char* name, b8 auto_release, i32 width,
     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   
   vulkan_command_buffer_end_single_use(context, pool, &temp_buffer, queue);
+  
+  vulkan_buffer_destroy(context, &staging);
 
   // Create a sampler for the texture
   VkSamplerCreateInfo sampler_info = {VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
@@ -812,7 +832,9 @@ void vulkan_backend_create_texture(const char* name, b8 auto_release, i32 width,
   ++texture->generation;
 }
 
-void vulkan_backend_destroy_texture(Texture* texture) {
+void vulkan_renderer_destroy_texture(Texture* texture) {
+  vkDeviceWaitIdle(context->device.logical_device);
+  
   VulkanTextureData* data = (VulkanTextureData*)texture->internal_data;
   
   vulkan_image_destroy(context, &data->image);

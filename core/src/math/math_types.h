@@ -132,4 +132,5 @@ union mat4 {
 
 struct Vertex3D {
   v3 position;
+  v2 texcoord;
 };
