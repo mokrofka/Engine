@@ -5,10 +5,12 @@
 // HACK This should not be available outside the engine
 #include <renderer/renderer_frontend.h>
 
+#include <event.h>
+
 #include <logger.h>
 #include <memory.h>
-#include "input.h"
-#include "math/maths.h"
+#include <input.h>
+#include <math/maths.h>
 
 struct GameState {
   struct Arena* arena;
@@ -64,6 +66,14 @@ b8 application_initialize(Application* game_inst) {
 b8 application_update(Application* game_inst) {
   state = (GameState*)game_inst->state;
   f32 delta_time = game_inst->delta_time;
+  
+  // TODO temp
+  if (input_is_key_up(KEY_T) && input_was_key_down(KEY_T)) {
+    Debug("Swapping texture!");
+    EventContext context = {};
+    event_fire(EVENT_CODE_DEBUG0, game_inst, context);
+  }
+  // TODO end temp
   
   f32 rotation_speed = 2.0f;
   // HACK temp back to move camera around

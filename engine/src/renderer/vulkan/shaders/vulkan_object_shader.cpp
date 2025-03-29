@@ -11,7 +11,10 @@
 
 #define BUILTIN_SHADER_NAME_OBJECT "Builtin.ObjectShader"
 
-b8 vulkan_object_shader_create(VulkanContext* context, VulkanObjectShader* out_shader) {
+b8 vulkan_object_shader_create(VulkanContext* context, Texture* default_diffuse, VulkanObjectShader* out_shader) {
+  // Take a copy of the dault texture pointers
+  out_shader->default_diffuse = default_diffuse;
+  
   char stage_type_strs[OBJECT_SHADER_STAGE_COUNT][5] = {"vert", "frag"};
   VkShaderStageFlagBits stage_types[OBJECT_SHADER_STAGE_COUNT] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
   
@@ -310,6 +313,15 @@ void vulkan_object_shader_update_object(VulkanContext* context, VulkanObjectShad
   for (u32 sampler_index = 0; sampler_index < sampler_count; ++sampler_index) {
     Texture* t = data.textures[sampler_index];
     u32* descriptor_generation = &object_state->descriptor_states[descriptor_index].generations[image_index];
+    
+    // If the texture hasn't been loaded yet, use the default
+    // TODO Determine which use the texture has and pull appropriate default based on that
+    if (t->generation == INVALID_ID) {
+      t = shader->default_diffuse;
+      
+      // Reset the descriptor generation if using the default texture
+      *descriptor_generation = INVALID_ID;
+    }
 
     // Check if the descriptor needs updating first
     if (t && (*descriptor_generation != t->generation || *descriptor_generation == INVALID_ID)) {

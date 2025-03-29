@@ -222,7 +222,7 @@ b8 vulkan_renderer_backend_initialize(RendererBackend* backend) {
     context->images_in_flight[i] = 0;
   }
 
-  if (!vulkan_object_shader_create(context, &context->object_shader)) {
+  if (!vulkan_object_shader_create(context, backend->default_diffuse, &context->object_shader)) {
     Error("Error loading built-in basic_lighting shader.");
     return false;
   }
@@ -393,6 +393,7 @@ b8 vulkan_renderer_backend_begin_frame(RendererBackend* backend, f32 delta_time)
     Warn("In-flight fence wait failure!");
     return false;
   }
+  
   
   // Acquire the next image from the swap chain. Pass along the semaphore that should signaled when this completes.
   // This same semaphore will later be waited on by the queue submission to ensure this image is available.
@@ -836,11 +837,13 @@ void vulkan_renderer_destroy_texture(Texture* texture) {
   vkDeviceWaitIdle(context->device.logical_device);
   
   VulkanTextureData* data = (VulkanTextureData*)texture->internal_data;
-  
-  vulkan_image_destroy(context, &data->image);
-  MemZeroStruct(&data->image);
-  vkDestroySampler(context->device.logical_device, data->sampler, context->allocator);
-  data->sampler = 0;
+  if (data) {
+    vulkan_image_destroy(context, &data->image);
+    MemZeroStruct(&data->image);
+    vkDestroySampler(context->device.logical_device, data->sampler, context->allocator);
+    data->sampler = 0;
+    // TODO free memory
+  }
   
   MemZeroStruct(texture);
 }

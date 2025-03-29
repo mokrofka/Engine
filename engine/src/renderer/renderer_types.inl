@@ -35,6 +35,9 @@ struct RendererBackend {
   struct Arena* arena;
   void* internal_context;
   u64 frame_number;
+  
+  // Pointers to default textures
+  Texture* default_diffuse;
 
   b8 (*initialize)(struct RendererBackend* backend);
 

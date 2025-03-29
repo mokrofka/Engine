@@ -177,6 +177,9 @@ struct VulkanObjectShader {
   // TODO make dynamic
   VulkanObjectShaderObjectState object_states[VULKAN_OBJECT_MAX_OBJECT_COUNT];
   
+  // Pointers to default textures
+  Texture* default_diffuse;
+  
   VulkanPipeline pipeline;
 };
 
@@ -236,6 +239,7 @@ struct VulkanContext {
   b8 recreating_swapchain;
   
   VulkanObjectShader object_shader;
+  
   
   u64 geometry_vertex_offset;
   u64 geometry_index_offset;
