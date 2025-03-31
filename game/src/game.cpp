@@ -10,7 +10,7 @@
 #include <logger.h>
 #include <memory.h>
 #include <input.h>
-#include <math/maths.h>
+#include <maths.h>
 
 struct GameState {
   struct Arena* arena;

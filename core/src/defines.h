@@ -33,9 +33,9 @@ typedef unsigned char uchar;
     B = temp;      \
   }
 
-#define internal      static
-#define global        static
-#define local_persist static
+#define internal static
+#define global   static
+#define local    static
 
 #define KB(n)  (((u64)(n)) << 10)
 #define MB(n)  (((u64)(n)) << 20)
@@ -65,16 +65,16 @@ typedef unsigned char uchar;
 #define MemberFromOffset(T,ptr,off) (T)((((U8 *)ptr)+(off)))
 #define CastFromMember(T,m,ptr)     (T*)(((U8*)ptr) - OffsetOf(T,m))
 
-#define MemZero(s,z)       zero_memory(s,z)
+#define MemZero(s,z)       zero_memory_(s,z)
 #define MemZeroStruct(s)   MemZero((s),sizeof(*(s)))
 #define MemZeroArray(a)    MemZero((a),sizeof(a))
 #define MemZeroTyped(m,c)  MemZero((m),sizeof(*(m))*(c))
 
-#define MemCopy(d, s, c)         copy_memory((d), (s), (c))
-#define MemCopyStruct(d, s)      copy_memory((d), (s), sizeof(*(d)))
-#define MemCopyTyped(d, s, c)    copy_memory((d), (s), sizeof(*(d)) * (c))
-#define MemSet(d, byte, c)       set_memory((d), (byte), (c))
-#define MemCompare(a, b, size)   compare_memory((a), (b), (size))
+#define MemCopy(d, s, c)         copy_memory_((d), (s), (c))
+#define MemCopyStruct(d, s)      copy_memory_((d), (s), sizeof(*(d)))
+#define MemCopyTyped(d, s, c)    copy_memory_((d), (s), sizeof(*(d)) * (c))
+#define MemSet(d, byte, c)       set_memory_((d), (byte), (c))
+#define MemCompare(a, b, size)   compare_memory_((a), (b), (size))
 
 #define U32_MAX 4294967295U
 #define U64_MAX 18446744073709551615ULL
@@ -104,3 +104,8 @@ typedef unsigned char uchar;
 #define INLINE static inline
 
 #define INVALID_ID 4294967295U
+
+struct String {
+  u8* str;
+  u64 size;
+};

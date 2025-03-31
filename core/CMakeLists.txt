@@ -13,7 +13,3 @@ set_target_properties(core PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/bin #output binaries .lib import
 )
 
-# target_compile_options(core PRIVATE -w -Wuninitialized -Wvarargs -fno-exceptions -fno-rtti)
-# target_compile_options(core PRIVATE -Wuninitialized -Wvarargs -fno-exceptions -fno-rtti)
-
-

@@ -1,6 +1,6 @@
 #include "maths.h"
 
-#include "platform/platform.h"
+#include "platform.h"
 
 #include <stdlib.h>
 #include <math.h>

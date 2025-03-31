@@ -6,7 +6,7 @@
 #include "resources/resources_types.h"
 
 #include "math/math_types.h"
-#include "math/maths.h"
+#include "maths.h"
 #include "logger.h"
 
 #define BUILTIN_SHADER_NAME_OBJECT "Builtin.ObjectShader"
@@ -277,12 +277,12 @@ void vulkan_object_shader_update_object(VulkanContext* context, VulkanObjectShad
   ObjectUniformObject obo;
   
   // TODO get diffuse colour from a material
-  local_persist f32 accumulator = 0.0f;
+  local f32 accumulator = 0.0f;
   accumulator += context->frame_delta_time;
   f32 s = (Sin(accumulator) + 1.0f) / 2.0f;
   obo.diffuse_color = v4(s,s,s, 1.0f);
   
-  // Load the data into the buffer   
+  // Load the data into the buffer
   vulkan_buffer_load_data(context, &shader->object_uniform_buffer, offset, range, 0, &obo);
   
   // Only do this if the descriptor has not yet been updated

@@ -1,7 +1,5 @@
 #include "vulkan_device.h"
 
-#include <logger.h>
-#include <memory.h>
 #include <strings.h>
 
 struct VulkanPhysicalDeviceRequirements {

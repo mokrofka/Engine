@@ -1,7 +1,5 @@
 #include "vulkan_framebuffer.h"
 
-#include "memory.h"
-
 void vulkan_framebuffer_create(
   VulkanContext* context,
   VulkanRenderPass* renderpass,

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "strings.h"
 #include "input_types.h"
 #include "defines.h"
 
@@ -57,10 +56,10 @@ KAPI b8 platform_pump_messages();
 void* platform_allocate(u64 size, b8 at_base);
 void* platform_allocate(u64 size);
 void platform_free(void* block, b8 aligned);
-void* platform_zero_memory(void* block, u64 size);
-void* platform_copy_memory(void* dest, const void* source, u64 size);
-void* platform_set_memory(void* dest, i32 value, u64 size);
-b8 platform_compare_memory(void* a, void* b, u64 size);
+void* platform_zero_memory_(void* block, u64 size);
+void* platform_copy_memory_(void* dest, const void* source, u64 size);
+void* platform_set_memory_(void* dest, i32 value, u64 size);
+b8 platform_compare_memory_(void* a, void* b, u64 size);
 
 void platform_console_write(const char* message, u8 colour);
 void platform_console_write_error(const char* message, u8 colour);
@@ -106,5 +105,21 @@ KAPI b8 filesystem_open(const char* path, FileModes mode, FileHandle* handle);
 KAPI void filesystem_close(FileHandle* handle);
 KAPI b8 fylesystem_read(FileHandle* handle, u64 size, void* dest);
 KAPI b8 filesystem_read_file(FileHandle* handle, void* dest);
-KAPI b8 filesystem_read_file(Arena* arena, FileHandle* handle, b8** dest);
+KAPI b8 filesystem_read_file(struct Arena* arena, FileHandle* handle, b8** dest);
 KAPI b8 filesystem_write(FileHandle* handle, u64 size, const void* source);
+
+struct Clock {
+  f64 start_time;
+  f64 elapsed;
+};
+
+// Updates the provided clock. Should be called just before checking elapsed time.
+// Has no effect on non-started clocks.
+KAPI void clock_update(Clock* clock);
+
+// Starts the provided clock. Resets elapsed.
+KAPI void clock_start(Clock* clock);
+
+// Stops the provided clock. Does not reset elapsed time.
+KAPI void clock_stop(Clock* clock);
+

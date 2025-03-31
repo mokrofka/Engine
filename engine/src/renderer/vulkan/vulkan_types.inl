@@ -2,12 +2,13 @@
 
 #include "renderer/renderer_types.inl"
 
-#include "asserts.h"
+#include <logger.h>
+#include <memory.h>
 
 #include <vulkan/vulkan.h>
 
-#define VK_CHECK(expr)           \
-  {                              \
+#define VK_CHECK(expr)          \
+  {                             \
     Assert(expr == VK_SUCCESS); \
   }
 
@@ -239,7 +240,6 @@ struct VulkanContext {
   b8 recreating_swapchain;
   
   VulkanObjectShader object_shader;
-  
   
   u64 geometry_vertex_offset;
   u64 geometry_index_offset;

@@ -1,7 +1,7 @@
 #include "event.h"
 
-#include "logger.h"
-#include "memory.h"
+#include <logger.h>
+#include <memory.h>
 
 struct Array {
   u32 res;

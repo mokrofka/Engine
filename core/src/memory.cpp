@@ -1,25 +1,24 @@
 #include "memory.h"
 
-#include "platform/platform.h"
+#include "platform.h"
 #include "logger.h"
-#include "asserts.h"
 
 global thread_local TCTX tctx_thread_local;
 
-void* zero_memory(void* block, u64 size) {
-  return platform_zero_memory(block, size);
+void* zero_memory_(void* block, u64 size) {
+  return platform_zero_memory_(block, size);
 }
 
-void* copy_memory(void* dest, const void* source, u64 size) {
-  return platform_copy_memory(dest, source, size);
+void* copy_memory_(void* dest, const void* source, u64 size) {
+  return platform_copy_memory_(dest, source, size);
 }
 
-void* set_memory(void* dest, i32 value, u64 size) {
-  return platform_set_memory(dest, value, size);
+void* set_memory_(void* dest, i32 value, u64 size) {
+  return platform_set_memory_(dest, value, size);
 }
 
-b8 compare_memory(void* a, void* b, u64 size) {
-  return platform_compare_memory(a, b, size);
+b8 compare_memory_(void* a, void* b, u64 size) {
+  return platform_compare_memory_(a, b, size);
 }
 
 internal b8 is_power_of_two(u64 x) {
@@ -90,7 +89,7 @@ u64 arena_pos(Arena *arena) {
   return pos;
 }
 
-void *arena_push(Arena *arena, u64 size, u64 align) {
+void *arena_push_(Arena *arena, u64 size, u64 align) {
 	// Align 'curr_offset' forward to the specified alignment
 	u64 curr_ptr = (u64)arena + ARENA_HEADER + arena->pos;
 	u64 offset = align_forward(curr_ptr, align);
@@ -111,7 +110,7 @@ void *arena_push(Arena *arena, u64 size, u64 align) {
   return 0;
 }
 
-void *arena_push(Temp arena, u64 size, u64 align) {
+void *arena_push_(Temp arena, u64 size, u64 align) {
 	// Align 'curr_offset' forward to the specified alignment
 	u64 curr_ptr = (u64)arena.arena + ARENA_HEADER + arena.arena->pos;
 	u64 offset = align_forward(curr_ptr, align);

@@ -1,7 +1,5 @@
 #include "vulkan_fence.h"
 
-#include <logger.h>
-
 void vulkan_fence_create(VulkanContext* context, b8 create_signaled, VulkanFence* out_fence) {
 
   // Make sure to signal the fence if required.

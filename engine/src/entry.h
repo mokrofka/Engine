@@ -1,13 +1,16 @@
 #include "application_type.h"
-#include "logger.h"
-#include "engine.h"
+
+#include <engine.h>
+
+#include <logger.h>
+#include <memory.h>
+#include <strings.h>
 
 extern b8 application_create(Application* out_app);
 
 extern b8 application_initialize(Application* app);
 
 int main() {
-  
   Application app_inst = {};
   
   if (!application_create(&app_inst)) {

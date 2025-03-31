@@ -18,7 +18,7 @@
 #include <logger.h>
 #include <strings.h>
 #include <memory.h>
-#include <platform/platform.h>
+#include <platform.h>
 #include <math/math_types.h>
 
 global VulkanContext* context;

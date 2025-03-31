@@ -3,9 +3,9 @@
 #include "renderer_backend.h"
 #include "resources/resources_types.h"
 
-#include "logger.h"
-#include "memory.h"
-#include "math/maths.h"
+#include <logger.h>
+#include <memory.h>
+#include <maths.h>
 
 // TODO temporary
 
@@ -127,7 +127,7 @@ b8 event_on_debug_event(u16 code, void* sender, void* listener_inst, EventContex
     "cobblestone",
     "paving",
     "paving2"};
-  local_persist i8 choice = 2;
+  local i8 choice = 2;
   ++choice;
   choice %= 3;
   
@@ -194,6 +194,7 @@ b8 renderer_initialize(u64* memory_requirement, void* out_state) {
       }
     }
   }
+  
   renderer_create_texture(
       "default",
       false,
@@ -253,7 +254,7 @@ b8 renderer_draw_frame(RenderPacket* packet) {
     state->backend.update_global_state(state->projection, state->view, v3_zero(), v4_one(), 0);
     
     mat4 model = mat4_translation(v3(0,0,0));
-    // local_persist f32 angle = 0.01f;
+    // local f32 angle = 0.01f;
     // angle += 0.01f;
     // quat roation = quat_from_axis_angle(v3_forward(), angle, false);
     // mat4 model = quat_to_rotation_matrix(roation, v3_zero());

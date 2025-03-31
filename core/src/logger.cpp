@@ -1,6 +1,5 @@
 #include "logger.h"
-#include "asserts.h"
-#include "platform/platform.h"
+#include "platform.h"
 #include "memory.h"
 #include "strings.h"
 

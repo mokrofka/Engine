@@ -2,11 +2,6 @@
 
 #include "defines.h"
 
-struct String {
-  u8* str;
-  u64 size;
-};
-
 struct Range {
   i32 min;
   i32 max;

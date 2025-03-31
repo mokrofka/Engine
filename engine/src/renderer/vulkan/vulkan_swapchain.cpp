@@ -3,9 +3,6 @@
 #include "vulkan_device.h"
 #include "vulkan_image.h"
 
-#include "logger.h"
-#include "memory.h"
-
 void create(VulkanContext* context, u32 width, u32 height, VulkanSwapchain* swapchain);
 void destroy(VulkanContext* context, VulkanSwapchain* swapchain);
 

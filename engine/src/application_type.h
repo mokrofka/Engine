@@ -1,4 +1,4 @@
-#include "platform/platform.h"
+#include "platform.h"
 
 struct Application {
   b8 (*initialize)(struct Application* app_inst);

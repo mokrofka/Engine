@@ -1,7 +1,7 @@
 #pragma once
 
 #include "defines.h"
-#include "math_types.h"
+#include "math/math_types.h"
 
 #define K_PI 3.14159265358979323846f
 #define K_PI_2 2.0f * K_PI
@@ -49,75 +49,75 @@ KAPI f32 frandom_in_range(f32 min, f32 max);
 
 
 INLINE v2 v2_zero() {
-  return (v2){0.0f, 0.0f};
+  return v2(0.0f, 0.0f);
 }
 
 INLINE v2 v2_one() {
-  return (v2){1.0f, 1.0f};
+  return v2(1.0f, 1.0f);
 }
 
 INLINE v2 v2_up() {
-  return (v2){0.0f, 1.0f};
+  return v2(0.0f, 1.0f);
 }
 
 INLINE v2 v2_down() {
-  return (v2){0.0f, -1.0f};
+  return v2(0.0f, -1.0f);
 }
 
 INLINE v2 v2_left() {
-  return (v2){-1.0f, 0.0f};
+  return v2(-1.0f, 0.0f);
 }
 
 INLINE v2 v2_right() {
-  return (v2){1.0f, 0.0f};
+  return v2(1.0f, 0.0f);
 }
 
 INLINE v2 operator+(v2 vec_0, v2 vec_1) {
-  return (v2){
+  return v2(
       vec_0.x + vec_1.x,
-      vec_0.y + vec_1.y};
+      vec_0.y + vec_1.y);
 }
 
 INLINE v2 operator-(v2 vec_0, v2 vec_1) {
-  return (v2){
+  return v2(
       vec_0.x - vec_1.x,
-      vec_0.y - vec_1.y};
+      vec_0.y - vec_1.y);
 }
 
 INLINE v2 operator*(v2 vec_0, v2 vec_1) {
-  return (v2){
+  return v2(
       vec_0.x * vec_1.x,
-      vec_0.y * vec_1.y};
+      vec_0.y * vec_1.y);
 }
 
 INLINE v2 operator*(v2 vec, f32 scalar) {
-  return (v2){
+  return v2(
       vec.x * scalar,
-      vec.y * scalar};
+      vec.y * scalar);
 }
 
 INLINE v2 operator*(f32 scalar, v2 vec) {
-  return (v2){
+  return v2(
       vec.x * scalar,
-      vec.y * scalar};
+      vec.y * scalar);
 }
 
 INLINE v2 operator/(v2 vec_0, v2 vec_1) {
-  return (v2){
+  return v2(
       vec_0.x / vec_1.x,
-      vec_0.y / vec_1.y};
+      vec_0.y / vec_1.y);
 }
 
 INLINE v2 operator/(v2 vec, f32 scalar) {
-  return (v2){
+  return v2(
       vec.x / scalar,
-      vec.y / scalar};
+      vec.y / scalar);
 }
 
 INLINE v2 operator/(f32 scalar, v2 vec) {
-  return (v2){
+  return v2(
       vec.x / scalar,
-      vec.y / scalar};
+      vec.y / scalar);
 }
 
 INLINE f32 v2_length_squared(v2 vec) {
@@ -147,9 +147,9 @@ INLINE b8 v2_compare(v2 vec_0, v2 vec_1, f32 tolerance) {
 }
 
 INLINE f32 v2_distance(v2 vec_0, v2 vec_1) {
-  v2 d = (v2){
+  v2 d = v2(
     vec_0.x - vec_1.x,
-    vec_0.y - vec_1.y};
+    vec_0.y - vec_1.y);
   return v2_length(d);
 }
 
@@ -158,83 +158,83 @@ INLINE f32 v2_distance(v2 vec_0, v2 vec_1) {
 
 
 INLINE v4 v3_to_v4(v3 vec, f32 w) {
-  return (v4){vec.x, vec.y, vec.z, w};
+  return v4(vec.x, vec.y, vec.z, w);
 }
 
 INLINE v3 v3_zero() {
-  return (v3){0.0f, 0.0f, 0.0f};
+  return v3(0.0f, 0.0f, 0.0f);
 }
 
 INLINE v3 v3_one() {
-  return (v3){1.0f, 1.0f, 1.0f};
+  return v3(1.0f, 1.0f, 1.0f);
 }
 
 INLINE v3 v3_up() {
-  return (v3){0.0f, 1.0f, 0.0f};
+  return v3(0.0f, 1.0f, 0.0f);
 }
 
 INLINE v3 v3_down() {
-  return (v3){0.0f, -1.0f, 0.0f};
+  return v3(0.0f, -1.0f, 0.0f);
 }
 
 INLINE v3 v3_left() {
-  return (v3){-1.0f, 0.0f, 0.0f};
+  return v3(-1.0f, 0.0f, 0.0f);
 }
 
 INLINE v3 v3_right() {
-  return (v3){1.0f, 0.0f, 0.0f};
+  return v3(1.0f, 0.0f, 0.0f);
 }
 
 INLINE v3 v3_forward() {
-  return (v3){0.0f, 0.0f, -1.0f};
+  return v3(0.0f, 0.0f, -1.0f);
 }
 
 INLINE v3 v3_back() {
-  return (v3){0.0f, 0.0f, 1.0f};
+  return v3(0.0f, 0.0f, 1.0f);
 }
 
 INLINE v3 operator+(v3 vec_0, v3 vec_1) {
-  return (v3){vec_0.x + vec_1.x, vec_0.y + vec_1.y, vec_0.z + vec_1.z};
+  return v3(vec_0.x + vec_1.x, vec_0.y + vec_1.y, vec_0.z + vec_1.z);
 }
 
 INLINE v3 operator-(v3 vec_0, v3 vec_1) {
-  return (v3){vec_0.x - vec_1.x, vec_0.y - vec_1.y, vec_0.z - vec_1.z};
+  return v3(vec_0.x - vec_1.x, vec_0.y - vec_1.y, vec_0.z - vec_1.z);
 }
 
 INLINE v3 operator*(v3 vec_0, v3 vec_1) {
-  return (v3){vec_0.x * vec_1.x, vec_0.y * vec_1.y, vec_0.z * vec_1.z};
+  return v3(vec_0.x * vec_1.x, vec_0.y * vec_1.y, vec_0.z * vec_1.z);
 }
 
 INLINE v3 operator*(v3 vec, f32 scalar) {
-  return (v3){
+  return v3(
       vec.x * scalar,
       vec.y * scalar,
-      vec.z * scalar};
+      vec.z * scalar);
 }
 
 INLINE v3 operator*(f32 scalar, v3 vec) {
-  return (v3){
+  return v3(
       vec.x * scalar,
       vec.y * scalar,
-      vec.z * scalar};
+      vec.z * scalar);
 }
 
 INLINE v3 operator/(v3 vec_0, v3 vec_1) {
-  return (v3){vec_0.x / vec_1.x, vec_0.y / vec_1.y, vec_0.z / vec_1.z};
+  return v3(vec_0.x / vec_1.x, vec_0.y / vec_1.y, vec_0.z / vec_1.z);
 }
 
 INLINE v3 operator/(v3 vec, f32 scalar) {
-  return (v3){
+  return v3(
       vec.x / scalar,
       vec.y / scalar,
-      vec.z / scalar};
+      vec.z / scalar);
 }
 
 INLINE v3 operator/(f32 scalar, v3 vec) {
-  return (v3){
+  return v3(
       vec.x / scalar,
       vec.y / scalar,
-      vec.z / scalar};
+      vec.z / scalar);
 }
 
 INLINE f32 v3_length_squared(v3 vec) {
@@ -279,7 +279,7 @@ INLINE b8 operator!=(v3 vec_0, v3 vec_1) {
 }
 
 INLINE f32 v3_distance(v3 vec_0, v3 vec_1) {
-  v3 d = (v3){vec_0.x - vec_1.x, vec_0.y - vec_1.y, vec_0.z - vec_1.z};
+  v3 d = v3(vec_0.x - vec_1.x, vec_0.y - vec_1.y, vec_0.z - vec_1.z);
   return v3_length(d);
 }
 
@@ -288,11 +288,11 @@ INLINE f32 v3_dot(v3 vec_0, v3 vec_1) {
 }
 
 INLINE v3 v3_cross(v3 vec_0, v3 vec_1) {
-  return (v3){
+  return v3(
     vec_0.y * vec_1.z - vec_0.z * vec_1.y,
     vec_0.z * vec_1.x - vec_0.x * vec_1.z,
     vec_0.x * vec_1.y - vec_0.y * vec_1.x
-  };
+  );
 }
 
 
@@ -300,30 +300,31 @@ INLINE v3 v3_cross(v3 vec_0, v3 vec_1) {
 
 
 INLINE v3 v4_to_v3(v4 vec) {
-  return (v3){vec.x, vec.y, vec.z};
+  return v3(vec.x, vec.y, vec.z);
 }
 
 INLINE v4 v4_zero() {
-  return (v4){0.0f, 0.0f, 0.0f, 0.0f};
+  return v4(0.0f, 0.0f, 0.0f, 0.0f);
 }
 
 INLINE v4 v4_one() {
-  return (v4){1.0f, 1.0f, 1.0f, 1.0f};
+  return v4(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
 INLINE v4 operator+(v4 vec_0, v4 vec_1) {
-  return (v4){vec_0.x + vec_1.x, vec_0.y + vec_1.y, vec_0.z + vec_1.z, vec_0.z + vec_1.z};
+  return v4(vec_0.x + vec_1.x, vec_0.y + vec_1.y, vec_0.z + vec_1.z, vec_0.z + vec_1.z);
 }
 
 INLINE v4 operator-(v4 vec_0, v4 vec_1) {
-  return (v4){vec_0.x - vec_1.x, vec_0.y - vec_1.y, vec_0.z - vec_1.z, vec_0.z - vec_1.z};
+  return v4(vec_0.x - vec_1.x, vec_0.y - vec_1.y, vec_0.z - vec_1.z, vec_0.z - vec_1.z);
 }
 
 INLINE v4 operator*(v4 vec_0, v4 vec_1) {
-  return (v4){vec_0.x * vec_1.x, vec_0.y * vec_1.y, vec_0.z * vec_1.z, vec_0.w * vec_1.w};
+  return v4(vec_0.x * vec_1.x, vec_0.y * vec_1.y, vec_0.z * vec_1.z, vec_0.w * vec_1.w);
 }
+
 INLINE v4 operator/(v4 vec_0, v4 vec_1) {
-  return (v4){vec_0.x / vec_1.x, vec_0.y / vec_1.y, vec_0.z / vec_1.z, vec_0.w / vec_1.w};
+  return v4(vec_0.x / vec_1.x, vec_0.y / vec_1.y, vec_0.z / vec_1.z, vec_0.w / vec_1.w);
 }
 
 INLINE f32 v4_length_squared(v4 vec) {

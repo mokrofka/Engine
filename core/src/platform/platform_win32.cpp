@@ -1,11 +1,9 @@
-#include "platform/platform.h"
+#include "platform.h"
 
 #include "memory.h"
 #include "logger.h"
-#include "asserts.h"
 
 #include <windows.h>
-#include <windowsx.h>
 
 struct Win32HandleInfo {
   HINSTANCE h_instance;
@@ -172,19 +170,19 @@ void platform_free(void* block, b8 aligned) {
   free(block);
 }
 
-void* platform_zero_memory(void* block, u64 size) {
+void* platform_zero_memory_(void* block, u64 size) {
   return memset(block, 0, size);
 }
 
-void* platform_copy_memory(void* dest, const void* source, u64 size) {
+void* platform_copy_memory_(void* dest, const void* source, u64 size) {
   return memcpy(dest, source, size);
 }
 
-void* platform_set_memory(void* dest, i32 value, u64 size) {
+void* platform_set_memory_(void* dest, i32 value, u64 size) {
   return memset(dest, value, size);
 }
 
-b8 platform_compare_memory(void* a, void* b, u64 size) {
+b8 platform_compare_memory_(void* a, void* b, u64 size) {
   return memcmp(a, b, size) ? 0 : 1;
 }
 
@@ -409,6 +407,10 @@ LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARA
   return DefWindowProcA(hwnd, msg, w_param, l_param);
 }
 
+
+
+//////////////////////////////////////////////////////////////////////////
+// File System
 b8 filesystem_file_size(String path) {
   DWORD attributes = GetFileAttributesA((char*)path.str);
   return (attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY));
@@ -521,4 +523,23 @@ b8 filesystem_write(FileHandle* handle, u64 size, const void* source) {
     return true;
   }
   return false;
+}
+
+
+
+//////////////////////////////////////////////////////////////////////////
+// Clock
+void clock_update(Clock *clock) {
+  if (clock->start_time != 0) {
+    clock->elapsed = platform_get_absolute_time() - clock->start_time;
+  }
+}
+
+void clock_start(Clock *clock) {
+  clock->start_time = platform_get_absolute_time();
+  clock->elapsed = 0;
+}
+
+void clock_stop(Clock *clock) {
+  clock->start_time = 0;
 }

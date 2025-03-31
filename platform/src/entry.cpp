@@ -1,7 +1,5 @@
 #include <entry.h>
 
-#include <memory.h>
-
 b8 load_game_lib(Application* app) {
   
   app->game_lib.dll_last_time_write = platform_get_last_write_time(app->game_lib.src_full_filename);

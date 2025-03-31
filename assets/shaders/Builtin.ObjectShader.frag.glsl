@@ -19,4 +19,5 @@ layout(location = 1) in struct dto {
 
 void main() {
   out_color = object_ubo.diffuse_colour * texture(diffuse_sampler, in_dto.tex_coord);
+  // out_color = object_ubo.diffuse_colour * texture(1, in_dto.tex_coord);
 }

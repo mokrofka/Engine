@@ -17,4 +17,3 @@ set_target_properties(game PROPERTIES
 )
 
 target_compile_definitions(game PRIVATE _DEBUG _CRT_SECURE_NO_WARNINGS)
-# target_compile_options(game PRIVATE -Wuninitialized -Wvarargs -fno-exceptions -fno-rtti)

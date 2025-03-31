@@ -1,9 +1,7 @@
 #include "vulkan_shader_utils.h"
 
 #include <strings.h>
-#include <logger.h>
-#include <memory.h>
-#include <platform/platform.h>
+#include <platform.h>
 
 b8 create_shader_module(
     VulkanContext* context, const char* name, const char* type_str,

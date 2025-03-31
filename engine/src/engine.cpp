@@ -5,10 +5,9 @@
 
 #include <logger.h>
 #include <memory.h>
-#include <platform/platform.h>
-#include <clock.h>
-#include "event.h"
-#include "input.h"
+#include <platform.h>
+#include <event.h>
+#include <input.h>
 
 struct EngineSystemStates {
   u64 event_system_memory_requirement;
@@ -40,14 +39,6 @@ struct EngineState {
 };
 
 internal EngineState* engine_state;
-
-b8 test_event(u16 code, void* sender, void* listener_inst, EventContext context) {
-  Info("event from engine");
-  Info("event from engine");
-  Info("event from engine");
-  
-  return true;
-}
 
 internal void engine_on_process_key(Keys key, b8 pressed);
 internal void engine_on_window_closed();
@@ -142,7 +133,6 @@ b8 engine_create(Application* game_inst) {
       return false;
     }
   }
-  
 
   if (!engine_state->game_inst->initialize(engine_state->game_inst)) {
     Fatal("Game failed to initialize.");

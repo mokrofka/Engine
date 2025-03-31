@@ -1,7 +1,6 @@
-// #include <renderer/vulkan/vulkan_types.inl>
-
-#include <platform/platform.h>
+#include <platform.h>
 #include <logger.h>
+#include <strings.h>
 
 #include <windows.h>
 
