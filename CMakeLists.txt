@@ -13,8 +13,8 @@ add_subdirectory(engine)
 add_subdirectory(game)
 add_subdirectory(platform)
 
-add_custom_target(
-    RunPostBuild ALL
-    COMMAND ${CMAKE_SOURCE_DIR}/post-build.bat
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-)
+# add_custom_target(
+#     RunPostBuild ALL
+#     COMMAND ${CMAKE_SOURCE_DIR}/post-build.bat
+#     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+# )

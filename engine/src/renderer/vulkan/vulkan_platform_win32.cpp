@@ -1,4 +1,4 @@
-#include <renderer/vulkan/vulkan_types.inl>
+// #include <renderer/vulkan/vulkan_types.inl>
 
 #include <platform/platform.h>
 #include <logger.h>
@@ -19,6 +19,14 @@ struct WindowPlatformState {
 void platform_get_required_extension_names(Arena* arena) {
   push_str_copy(arena, cstr("VK_KHR_win32_surface"));
 }
+
+struct VulkanContext {
+  struct Arena* arena;
+  
+  VkInstance instance;
+  VkAllocationCallbacks* allocator;
+  VkSurfaceKHR surface;
+};
 
 // Surface creation for Vulkan
 b8 platform_create_vulkan_surface(VulkanContext* context) {

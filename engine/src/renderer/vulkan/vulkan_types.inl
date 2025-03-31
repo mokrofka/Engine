@@ -186,6 +186,10 @@ struct VulkanObjectShader {
 struct VulkanContext {
   struct Arena* arena;
   
+  VkInstance instance;
+  VkAllocationCallbacks* allocator;
+  VkSurfaceKHR surface;
+  
   f32 frame_delta_time;
    
   // The framebuffer's current width.
@@ -201,10 +205,6 @@ struct VulkanContext {
   // The generation of the framebuffer when it was last created. Set to framebuffer_size_generation
   // when updated.
   u64 framebuffer_size_last_generation;
-  
-  VkInstance instance;
-  VkAllocationCallbacks* allocator;
-  VkSurfaceKHR surface;
 
 #if defined(_DEBUG)
   VkDebugUtilsMessengerEXT debug_messenger;
