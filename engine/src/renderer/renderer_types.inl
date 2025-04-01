@@ -2,6 +2,8 @@
 
 #include "defines.h"
 
+#include "resources/resources_types.h"
+
 #include <math/math_types.h>
 
 enum RendererBackendType {
@@ -36,8 +38,6 @@ struct RendererBackend {
   void* internal_context;
   u64 frame_number;
   
-  // Pointers to default textures
-  Texture* default_diffuse;
 
   b8 (*initialize)(struct RendererBackend* backend);
 
@@ -54,7 +54,7 @@ struct RendererBackend {
   void (*update_object)(GeometryRenderData data);
 
   void (*create_texture)(
-      const char* name, b8 auto_release, i32 width, i32 height, i32 channel_count,
+      const char* name, i32 width, i32 height, i32 channel_count,
       const u8* pixels, b8 has_transparency, struct Texture* texture);
   void (*destroy_texture)(struct Texture* texture);
 };

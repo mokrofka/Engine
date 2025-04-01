@@ -125,6 +125,10 @@ b8 cstr_equal(const char* str0, const char* str1) {
   return strcmp(str0, str1) == 0;
 }
 
+b8 cstr_equali(const char* str0, const char* str1) {
+  return _strcmpi(str0, str1) == 0;
+}
+
 String str8_substr(String str, Range range) {
   range.min = ClampTop(range.min, str.size);
   range.max = ClampTop(range.max, str.size);

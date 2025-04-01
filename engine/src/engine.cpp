@@ -3,6 +3,9 @@
 #include "application_type.h"
 #include "renderer/renderer_frontend.h"
 
+// system
+#include "systems/texture_system.h"
+
 #include <logger.h>
 #include <memory.h>
 #include <platform.h>
@@ -24,6 +27,9 @@ struct EngineSystemStates {
   
   u64 logging_system_memory_requirement;
   struct LoggingState* logging_system;
+  
+  u64 texture_system_memory_requirement;
+  struct TextureSystemState* texture_system;
 };
 
 struct EngineState {
@@ -134,6 +140,21 @@ b8 engine_create(Application* game_inst) {
     }
   }
 
+  // Texture system
+  {
+    TextureSystemConfig texture_sys_config = {
+      .max_texture_count = 65536,
+    };
+    u64* mem_required = &systems->texture_system_memory_requirement;
+    texture_system_initialize(mem_required, 0, texture_sys_config);
+    systems->texture_system = push_buffer(engine_state->arena, TextureSystemState, *mem_required);
+    if (!texture_system_initialize(mem_required, systems->texture_system, texture_sys_config)) {
+      Error("Failed to initialize renderer. Aborting application.");
+      return false;
+    }
+  }
+  
+  // Initialize the game
   if (!engine_state->game_inst->initialize(engine_state->game_inst)) {
     Fatal("Game failed to initialize.");
     return false;
@@ -201,6 +222,7 @@ b8 engine_run(Application* game_inst) {
   
   engine_state->is_running = false;
 
+  texture_system_shutdown(engine_state->systems.texture_system);
   renderer_shutdown();
   platform_window_destroy(engine_state->window);
 

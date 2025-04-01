@@ -62,9 +62,9 @@ void log_output(LogLevel level, const char* message, ...) {
       platform_console_write((char*)out_message, level);
     }
 
-    if (level == LOG_LEVEL_FATAL) {
-      debugBreak();
-    }
+    // if (level == LOG_LEVEL_FATAL) {
+    //   debugBreak();
+    // }
 
     // Queue a copy to be written to the log file
     append_to_log_file((char*)out_message);

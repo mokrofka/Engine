@@ -30,6 +30,7 @@ KAPI char* str_format(u8* buffer, const char* format, ...);
 KAPI String cstr(const char* c);
 KAPI String cstr_capped(void *cstr, void *cap);
 KAPI b8 cstr_equal(const char* str0, const char* str1);
+KAPI b8 cstr_equali(const char* str0, const char* str1);
 
 struct Temp;
 KAPI String push_str_cat(struct Arena* arena, String s1, String s2);
