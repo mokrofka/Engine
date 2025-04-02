@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 
 u32 range_size(Range r) {
   u32 c = ((r.max > r.min) ? (r.max - r.min) : 0);
@@ -73,7 +74,7 @@ String str_zero() {
   return result;
 }
 
-u8* str_format_v(u8* buffer, const char* format, char* va_listp) {
+u8* str_format_v(u8* buffer, const void* format, void* va_listp) {
   if (!format) {
     return 0;
   }
@@ -82,32 +83,32 @@ u8* str_format_v(u8* buffer, const char* format, char* va_listp) {
   // while finding the required buffer length.
   va_list list_copy;
 #ifdef _MSC_VER
-  list_copy = va_listp;
+  list_copy = (char*)va_listp;
 #elif defined(KPLATFORM_APPLE)
   list_copy = va_listp;
 #else
   va_copy(list_copy, va_listp);
 #endif
-  i32 length = vsnprintf(0, 0, format, list_copy);
+  i32 length = vsnprintf(0, 0, (char*)format, list_copy);
   va_end(list_copy);
-  vsnprintf((char*)buffer, length + 1, format, va_listp);
+  vsnprintf((char*)buffer, length + 1, (char*)format, (char*)va_listp);
   buffer[length] = 0;
   return buffer;
 }
 
-char* str_format(u8* buffer, const char* format, ...) {
+u8* str_format(u8* buffer, const void* format, ...) {
   if (!format) {
     return 0;
   }
 
   __builtin_va_list arg_ptr;
   va_start(arg_ptr, format);
-  char* result = (char*)str_format_v(buffer, format, arg_ptr);
+  u8* result = str_format_v(buffer, format, arg_ptr);
   va_end(arg_ptr);
   return result;
 }
 
-String cstr(const char* c) {
+String cstr(const void* c) {
   String result = {(u8*)c, cstr_length((u8*)c)};
   return result;
 }
@@ -121,12 +122,12 @@ String cstr_capped(void *cstr, void *cap) {
   return result;
 }
 
-b8 cstr_equal(const char* str0, const char* str1) {
-  return strcmp(str0, str1) == 0;
+b8 cstr_equal(const void* str0, const void* str1) {
+  return strcmp((char*)str0, (char*)str1) == 0;
 }
 
-b8 cstr_equali(const char* str0, const char* str1) {
-  return _strcmpi(str0, str1) == 0;
+b8 cstr_equali(const void* str0, const void* str1) {
+  return _strcmpi((char*)str0, (char*)str1) == 0;
 }
 
 String str8_substr(String str, Range range) {
@@ -245,4 +246,176 @@ String str_chop_last_dot(String string) {
     }
   }
   return (result);
+}
+
+String str_trim(String string) {
+  String result;
+  u8* s = string.str;
+  while (char_is_space(*s)) {
+    ++s;
+  }
+  result.str = s;
+  if (*s) {
+    u8* e = string.str + string.size-1;
+    while (char_is_space(*(--e)));
+    result.size = e - result.str;
+  }
+  
+  return result;
+}
+
+i32 str_index_of(String string, u8 c) {
+  if (!string.str) {
+    return -1;
+  }
+  if (string.size > 0) {
+    for (u32 i = 0; i < string.size; ++i) {
+      if (string.str[i] == c) {
+        return i;
+      }
+    }
+  }
+  
+  return -1;
+}
+
+b8 str_to_v4(const char* str, v4* out_vector) {
+  if (!str) {
+    return false;
+  }
+  
+  MemZeroStruct(out_vector);
+  i32 result = sscanf(str, "%f %f %f %f", &out_vector->x, &out_vector->y, &out_vector->z, &out_vector->w);
+  return result != -1;
+}
+
+b8 str_to_v3(const char* str, v3* out_vector) {
+  if (!str) {
+    return false;
+  }
+  
+  MemZeroStruct(out_vector);
+  i32 result = sscanf(str, "%f %f %f", &out_vector->x, &out_vector->y, &out_vector->z);
+  return result != -1;
+  
+}
+
+b8 str_to_v2(const char* str, v2* out_vector) {
+  if (!str) {
+    return false;
+  }
+  
+  MemZeroStruct(out_vector);
+  i32 result = sscanf(str, "%f %f", &out_vector->x, &out_vector->y);
+  return result != -1;
+
+}
+
+b8 str_to_f32(const char* str, f32* f) {
+  if (!str) {
+    return false;
+  }
+  
+  *f = 0;
+  i32 result = sscanf(str, "%f", f);
+  return result != -1;
+
+}
+
+b8 str_to_f64(const char* str, f64* f) {
+  if (!str) {
+    return false;
+  }
+  
+  *f = 0;
+  i32 result = sscanf(str, "%lf", f);
+  return result != -1;
+}
+
+b8 str_to_i8(const char* str, i8* i) {
+  if (!str) {
+    return false;
+  }
+  
+  *i = 0;
+  i32 result = sscanf(str, "%hhi", i);
+  return result != -1;
+}
+
+b8 str_to_i16(const char* str, i16* i) {
+  if (!str) {
+    return false;
+  }
+  
+  *i = 0;
+  i32 result = sscanf(str, "%hi", i);
+  return result != -1;
+}
+
+b8 str_to_i32(const char* str, i32* i) {
+  if (!str) {
+    return false;
+  }
+  
+  *i = 0;
+  i32 result = sscanf(str, "%i", i);
+  return result != -1;
+}
+
+b8 str_to_i64(const char* str, i64* i) {
+  if (!str) {
+    return false;
+  }
+  
+  *i = 0;
+  i32 result = sscanf(str, "%lli", i);
+  return result != -1;
+}
+
+b8 str_to_u8(const char* str, u8* i) {
+  if (!str) {
+    return false;
+  }
+  
+  *i = 0;
+  i32 result = sscanf(str, "%hhu", i);
+  return result != -1;
+}
+
+b8 str_to_u16(const char* str, u16* i) {
+  if (!str) {
+    return false;
+  }
+  
+  *i = 0;
+  i32 result = sscanf(str, "%hu", i);
+  return result != -1;
+}
+
+b8 str_to_u32(const char* str, u32* i) {
+  if (!str) {
+    return false;
+  }
+  
+  *i = 0;
+  i32 result = sscanf(str, "%u", i);
+  return result != -1;
+}
+
+b8 str_to_u64(const char* str, u64* i) {
+  if (!str) {
+    return false;
+  }
+  
+  *i = 0;
+  i32 result = sscanf(str, "%llu", i);
+  return result != -1;
+}
+
+b8 str_to_bool(const char* str, b8* b) {
+  if (!str) {
+    return false;
+  }
+  
+  return cstr_equal(str, "1") || cstr_equali(str, "true");
 }

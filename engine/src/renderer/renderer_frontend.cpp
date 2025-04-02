@@ -14,7 +14,6 @@
 #include <strings.h>
 #include <event.h>
 
-
 // TODO end temporary
 
 struct RendererSystemState {
@@ -166,10 +165,8 @@ void renderer_set_view(mat4 view) {
   state->view = view;
 }
 
-void renderer_create_texture(
-    const char* name, i32 width, i32 height, i32 channel_count,
-    const u8* pixels, b8 has_transparency, struct Texture* texture) {
-  state->backend.create_texture(name, width, height, channel_count, pixels, has_transparency, texture);
+void renderer_create_texture(const u8* pixels, struct Texture* texture) {
+  state->backend.create_texture(pixels, texture);
 }
 
 void renderer_destroy_texture(struct Texture* texture) {

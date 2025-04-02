@@ -15,9 +15,9 @@ struct WindowPlatformState {
   HWND hwnd;
 };
 
-void platform_get_required_extension_names(Arena* arena) {
-  push_str_copy(arena, cstr("VK_KHR_win32_surface"));
-}
+// void platform_get_required_extension_names(Arena* arena) {
+//   push_str_copy(arena, cstr("VK_KHR_win32_surface"));
+// }
 
 struct VulkanContext {
   struct Arena* arena;

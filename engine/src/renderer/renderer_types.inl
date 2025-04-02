@@ -53,9 +53,7 @@ struct RendererBackend {
 
   void (*update_object)(GeometryRenderData data);
 
-  void (*create_texture)(
-      const char* name, i32 width, i32 height, i32 channel_count,
-      const u8* pixels, b8 has_transparency, struct Texture* texture);
+  void (*create_texture)(const u8* pixels, struct Texture* texture);
   void (*destroy_texture)(struct Texture* texture);
 };
 

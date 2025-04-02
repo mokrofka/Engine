@@ -22,14 +22,15 @@ b8 create_shader_module(
   }
   
   {
+    Scratch scratch;
     Temp scretch = GetScratch(0, 0);
-
-    b8* file_buffer = 0;
-    if (!filesystem_read_file(scretch.arena, &handle, &file_buffer)) {
+    u64 file_size = filesystem_file_size(handle);
+    u8* file_buffer = push_buffer(scretch, u8, file_size);
+    if (!filesystem_read(handle, file_size, file_buffer)) {
       Error("Unable to binary read shader module: %s.", file_name);
       return false;
     }
-    shader_stages[stage_index].create_info.codeSize = handle.size;
+    shader_stages[stage_index].create_info.codeSize = file_size;
     shader_stages[stage_index].create_info.pCode = (u32*)file_buffer;
 
     filesystem_close(&handle);

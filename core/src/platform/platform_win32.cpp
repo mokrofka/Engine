@@ -411,14 +411,15 @@ LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARA
 
 //////////////////////////////////////////////////////////////////////////
 // File System
-b8 filesystem_file_size(String path) {
+b8 filesystem_file_exists(String path) {
   DWORD attributes = GetFileAttributesA((char*)path.str);
   return (attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY));
 }
 
-void filesystem_file_size(FileHandle* handle, const char *path) {
+u64 filesystem_file_size(FileHandle handle) {
   LARGE_INTEGER size;
-  GetFileSizeEx(handle->handle, &size);
+  GetFileSizeEx(handle.handle, &size);
+  return size.QuadPart;
 }
 
 b8 filesystem_open(const char* path, FileModes mode, FileHandle* handle) {
@@ -462,11 +463,11 @@ void filesystem_close(FileHandle* handle) {
   }
 }
 
-b8 fylesystem_read(FileHandle* handle, u64 size, void* dest) {
-  HANDLE win32_handle = handle->handle;
+b8 filesystem_read(FileHandle handle, u64 size, void* dest) {
+  HANDLE win32_handle = handle.handle;
   DWORD bytes_read;
 
-  if (handle->handle && dest) {
+  if (handle.handle && dest) {
     ReadFile(win32_handle, dest, size, &bytes_read, null);
     if (bytes_read != size) {
       return false;
@@ -488,26 +489,26 @@ b8 filesystem_read_file(FileHandle* handle, void* dest) {
     if (size.QuadPart != bytes_read) {
       return false;
     }
-    handle->size = bytes_read;
+    // handle->size = bytes_read;
     return true;
   }
   return false;
 }
 
-b8 filesystem_read_file(Arena* arena, FileHandle* handle, b8** dest) {
+b8 filesystem_read_file(Arena* arena, FileHandle* handle, void** dest) {
   HANDLE win32_handle = handle->handle;
   DWORD bytes_read;
 
   if (handle->handle) {
     LARGE_INTEGER size;
     GetFileSizeEx(handle->handle, &size);
-    *dest = push_buffer(arena, b8, size.QuadPart);
+    *dest = push_buffer(arena, void, size.QuadPart);
     
     ReadFile(win32_handle, *dest, size.QuadPart, &bytes_read, null);
     if (size.QuadPart != bytes_read) {
       return false;
     }
-    handle->size = bytes_read;
+    // handle->size = bytes_read;
     return true;
   }
   return false;

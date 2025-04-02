@@ -132,7 +132,7 @@ struct VulkanPipeline {
   VkPipelineLayout pipeline_layout;
 };
 
-#define OBJECT_SHADER_STAGE_COUNT 2
+#define MATERIAL_SHADER_STAGE_COUNT 2
 
 struct VulkanDescriptorState {
   // One per frame
@@ -140,22 +140,23 @@ struct VulkanDescriptorState {
   u32 ids[3];
 };
 
-#define VULKAN_OBJECT_SHADER_DESCRIPTOR_COUNT 2
+#define VULKAN_MATERIAL_SHADER_DESCRIPTOR_COUNT 2
+#define VULKAN_MATERIAL_SHADER_SAMPLER_COUNT 1
 
-struct VulkanMaterialShaderObjectState {
+struct VulkanMaterialShaderInstanceState {
   // Per frame
   VkDescriptorSet descriptor_sets[3];
   
   // Per descriptor
-  VulkanDescriptorState descriptor_states[VULKAN_OBJECT_SHADER_DESCRIPTOR_COUNT];
+  VulkanDescriptorState descriptor_states[VULKAN_MATERIAL_SHADER_DESCRIPTOR_COUNT ];
 };
 
 // Max number of objects
-#define VULKAN_OBJECT_MAX_OBJECT_COUNT 1024
+#define VULKAN_MAX_MATERIAL_COUNT 1024
 
 struct VulkanMaterialShader {
   // vertex, fragment
-  VulkanShaderStage stages[OBJECT_SHADER_STAGE_COUNT];
+  VulkanShaderStage stages[MATERIAL_SHADER_STAGE_COUNT];
   
   VkDescriptorPool global_descriptor_pool;
   VkDescriptorSetLayout global_descriptor_set_layout;
@@ -177,7 +178,7 @@ struct VulkanMaterialShader {
   u32 object_uniform_buffer_index;
   
   // TODO make dynamic
-  VulkanMaterialShaderObjectState object_states[VULKAN_OBJECT_MAX_OBJECT_COUNT];
+  VulkanMaterialShaderInstanceState object_states[VULKAN_MAX_MATERIAL_COUNT];
   
   VulkanPipeline pipeline;
 };

@@ -738,16 +738,11 @@ internal b8 create_buffers(VulkanContext* context) {
   return true;
 }
 
-void vulkan_renderer_create_texture(const char* name, i32 width, i32 height, i32 channel_count, const u8* pixels, b8 has_transparency, Texture* texture) {
-  texture->width = width;  
-  texture->height = height;  
-  texture->channel_count = channel_count;  
-  texture->generation = INVALID_ID;
-  
+void vulkan_renderer_create_texture(const u8* pixels, Texture* texture) {
   // Internal data creation
   texture->internal_data = push_struct(context->arena, VulkanTextureData);
   VulkanTextureData* data = (VulkanTextureData*)texture->internal_data;
-  VkDeviceSize image_size = width * height * channel_count;
+  VkDeviceSize image_size = texture->width * texture->height * texture->channel_count;
   
   // NOTE assumes 8 bits per channel
   VkFormat image_format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -765,8 +760,8 @@ void vulkan_renderer_create_texture(const char* name, i32 width, i32 height, i32
   vulkan_image_create(
     context, 
     VK_IMAGE_TYPE_2D, 
-    width, 
-    height, 
+    texture->width, 
+    texture->height, 
     image_format, 
     VK_IMAGE_TILING_OPTIMAL, 
     VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
@@ -829,7 +824,7 @@ void vulkan_renderer_create_texture(const char* name, i32 width, i32 height, i32
     Error("Error creating texture sampler: %s", vulkan_result_string(result, true));
     return;
   }
-  texture->has_transparency = has_transparency;
+  
   ++texture->generation;
 }
 

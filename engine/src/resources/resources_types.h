@@ -2,6 +2,8 @@
 
 #include "math/math_types.h"
 
+#define TEXTURE_NAME_MAX_LENGTH 512
+
 struct Texture {
   u32 id;
   u32 width;
@@ -9,5 +11,13 @@ struct Texture {
   u8 channel_count;
   b8 has_transparency;
   u32 generation;
+  char name[TEXTURE_NAME_MAX_LENGTH];
   void* internal_data;
 };
+
+enum TextureUse {
+  TEXTURE_USE_UNKNOWN = 0x00,
+  TEXTURE_USE_MAP_DIFFUSE = 0x01,
+};
+
+
