@@ -6,7 +6,7 @@
 
 #define DEFINE_KEY(name, code) KEY_##name = code
 
-b8 input_initialize(u64* memory_requirement, void* out_state);
+b8 input_initialize(Arena* arena);
 void input_shutdown();
 void input_update();
 
@@ -29,3 +29,4 @@ KAPI void input_get_previous_mouse_position(i32* x, i32* y);
 void input_process_button(MouseButtons button, b8 pressed);
 void input_process_mouse_move(i16 x, i16 y);
 void input_process_mouse_wheel(i8 z_delta);
+

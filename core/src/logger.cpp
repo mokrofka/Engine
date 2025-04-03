@@ -1,34 +1,31 @@
 #include "logger.h"
-#include "platform.h"
+#include "os.h"
 #include "memory.h"
 #include "strings.h"
 
 #include <stdarg.h>
 
 struct LoggerSystemState {
-  FileHandle log_file_handle;
+  OS_File log_file_handle;
 };
 
 global LoggerSystemState* state;
 
 internal void append_to_log_file(const char* message) {
-  if (state && state->log_file_handle.is_valid) {
+  if (state && state->log_file_handle.u64) {
     u64 length = cstr_length((u8*)message);
     u64 written = 0;
-    if (!filesystem_write(&state->log_file_handle, length, message)) {
+    if (!os_file_write(state->log_file_handle, length, message)) {
       Error("writing to console.log");
     }
   }
 }
 
-b8 logging_initialize(u64* memory_requirement, void* out_state) {
-  *memory_requirement = sizeof(LoggerSystemState);
-  if (out_state == 0) {
-    return true;
-  }
-  Assign(state, out_state);
+b8 logging_initialize(Arena* arena) {
+  state = push_struct(arena, LoggerSystemState);
   
-  if (!filesystem_open("console.log", FILE_MODE_WRITE, &state->log_file_handle)) {
+  state->log_file_handle = os_file_open(str_lit("console.log"), FILE_MODE_WRITE);
+  if (!state->log_file_handle.u64) {
     Error("Unable to open console.log for writing.");
     return false;
   }
@@ -43,11 +40,11 @@ void shutdown_logging() {
 void log_output(LogLevel level, const char* message, ...) {
   const char* level_strings[6] = {"[FATAL]: ", "[ERROR]: ", "[WARN]:  ", "[INFO]:  ", "[DEBUG]: ", "[TRACE]: "};
   b8 is_error = level < 2;
-  
+
   {
-    Temp scratch = GetScratch(0, 0);
-    u8* formatted = push_buffer(scratch, u8, 32000);
-    u8* out_message = push_buffer(scratch, u8, 32000);
+    Scratch scratch;
+    u8* formatted = push_buffer(scratch.arena, u8, 32000);
+    u8* out_message = push_buffer(scratch.arena, u8, 32000);
 
     __builtin_va_list arg_ptr;
     va_start(arg_ptr, message);
@@ -57,9 +54,9 @@ void log_output(LogLevel level, const char* message, ...) {
     str_format(out_message, "%s%s\n", level_strings[level], formatted);
 
     if (is_error) {
-      platform_console_write_error((char*)out_message, level);
+      os_console_write_error((char*)out_message, level);
     } else {
-      platform_console_write((char*)out_message, level);
+      os_console_write((char*)out_message, level);
     }
 
     // if (level == LOG_LEVEL_FATAL) {
@@ -68,7 +65,6 @@ void log_output(LogLevel level, const char* message, ...) {
 
     // Queue a copy to be written to the log file
     append_to_log_file((char*)out_message);
-    ReleaseScratch(scratch);
   }
 }
 

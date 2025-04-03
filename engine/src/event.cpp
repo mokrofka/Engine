@@ -33,12 +33,10 @@ struct EventSystemState {
 global EventSystemState* state;
 global const u64 memory_reserved = KB(10);
 
-b8 event_initialize(u64* memory_requirement, void* out_state) {
-  *memory_requirement = sizeof(EventSystemState) + memory_reserved;
-  if (out_state == 0) {
-    return true;
-  }
-  state = (EventSystemState*)out_state;
+b8 event_initialize(Arena* arena) {
+  u64 memory_requirement = sizeof(EventSystemState) + memory_reserved;
+  
+  state = push_buffer(arena, EventSystemState, memory_requirement);
   state->is_initialized = true;
   state->arena = (Arena*)&state->memory;
   state->arena->res = memory_reserved;

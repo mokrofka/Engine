@@ -65,16 +65,16 @@ typedef unsigned char uchar;
 #define MemberFromOffset(T,ptr,off) (T)((((U8 *)ptr)+(off)))
 #define CastFromMember(T,m,ptr)     (T*)(((U8*)ptr) - OffsetOf(T,m))
 
-#define MemZero(s,z)       zero_memory_(s,z)
+#define MemZero(s,z)       _memory_zero(s,z)
 #define MemZeroStruct(s)   MemZero((s),sizeof(*(s)))
 #define MemZeroArray(a)    MemZero((a),sizeof(a))
 #define MemZeroTyped(m,c)  MemZero((m),sizeof(*(m))*(c))
 
-#define MemCopy(d, s, c)         copy_memory_((d), (s), (c))
-#define MemCopyStruct(d, s)      copy_memory_((d), (s), sizeof(*(d)))
-#define MemCopyTyped(d, s, c)    copy_memory_((d), (s), sizeof(*(d)) * (c))
-#define MemSet(d, byte, c)       set_memory_((d), (byte), (c))
-#define MemCompare(a, b, size)   compare_memory_((a), (b), (size))
+#define MemCopy(d, s, c)         _memory_copy((d), (s), (c))
+#define MemCopyStruct(d, s)      _memory_copy((d), (s), sizeof(*(d)))
+#define MemCopyTyped(d, s, c)    _memory_copy((d), (s), sizeof(*(d)) * (c))
+#define MemSet(d, byte, c)       _memory_set((d), (byte), (c))
+#define MemCompare(a, b, size)   _memory_compare((a), (b), (size))
 
 #define U32_MAX 4294967295U
 #define U64_MAX 18446744073709551615ULL
@@ -88,7 +88,7 @@ typedef unsigned char uchar;
 #define Glue(A,B) A##B
 #define Stringify(S) #S
 
-#define Defer(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
+#define DeferLoop(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
 #define Assign(to, from) (to = (decltype(to))from)
 
 #ifdef KEXPORT
@@ -109,3 +109,8 @@ struct String {
   u8* str;
   u64 size;
 };
+struct Arena;
+
+#define str_lit(S) str((u8*)(S), sizeof(S) - 1)
+
+KAPI String str(u8* str, u64 size);

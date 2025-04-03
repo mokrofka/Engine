@@ -1,43 +1,22 @@
 #include "engine.h"
 
-#include "application_type.h"
-#include "renderer/renderer_frontend.h"
+#include "app_types.h"
+#include "render/r_frontend.h"
 
 // system
 #include "systems/texture_system.h"
 
 #include <logger.h>
 #include <memory.h>
-#include <platform.h>
+#include <os.h>
 #include <event.h>
 #include <input.h>
-
-struct EngineSystemStates {
-  u64 event_system_memory_requirement;
-  struct EventState* event_system;
-  
-  u64 input_system_memory_requirement;
-  struct InputState* input_system;
-  
-  u64 platform_system_memory_requirement;
-  struct PlatformState* platform_system;
-  
-  u64 renderer_system_memory_requirement;
-  struct RendererState* renderer_system;
-  
-  u64 logging_system_memory_requirement;
-  struct LoggingState* logging_system;
-  
-  u64 texture_system_memory_requirement;
-  struct TextureSystemState* texture_system;
-};
 
 struct EngineState {
   Application* game_inst;
   Arena* arena;
   b8 is_running;
   b8 is_suspended;
-  EngineSystemStates systems;
   Window* window;
 
   Clock clock;
@@ -62,98 +41,66 @@ b8 engine_create(Application* game_inst) {
   engine_state->game_inst = game_inst;
   
   engine_state->arena = arena_alloc(game_inst->arena, MB(400));
-
-  EngineSystemStates* systems = &engine_state->systems;
   
   // Platform system
-  {
-    u64* mem_required = &systems->platform_system_memory_requirement;
-    platform_system_startup(mem_required, 0);
-    systems->platform_system = push_buffer(engine_state->arena, PlatformState, *mem_required);
-    if (!platform_system_startup(mem_required, systems->platform_system)) {
-      Error("Failed to initialize platform layer");
-      return false;
-    }
+  if (!platform_system_startup(engine_state->arena)) {
+    Error("Failed to initialize platform layer");
+    return false;
   }
-  
+
   // Logging system
-  {
-    u64* mem_required = &systems->logging_system_memory_requirement;
-    logging_initialize(mem_required, 0);
-    systems->logging_system = push_buffer(engine_state->arena, LoggingState, *mem_required);
-    if (!logging_initialize(mem_required, systems->logging_system)) {
-      Error("Failed to initialize platform layer");
-      return false;
-    }
+  if (!logging_initialize(engine_state->arena)) {
+    Error("Failed to initialize platform layer");
+    return false;
   }
-  
+
   // Event system
-  {
-    u64* mem_required = &systems->event_system_memory_requirement;
-    event_initialize(mem_required, 0);
-    systems->event_system = push_buffer(engine_state->arena, EventState, *mem_required);
-    if (!event_initialize(mem_required, systems->event_system)) {
-      Error("Failed to initialize event system");
-      return false;
-    }
-    platform_register_process_key(engine_on_process_key);
-    platform_register_window_closed_callback(engine_on_window_closed);
-    platform_register_window_resized_callback(engine_on_window_resized);
-    
-    event_register(EVENT_CODE_APPLICATION_QUIT, 0, application_on_event);
-    event_register(EVENT_CODE_KEY_PRESSED, 0, application_on_key);
-    event_register(EVENT_CODE_KEY_RELEASED, 0, application_on_key);
-    event_register(EVENT_CODE_RESIZED, 0, application_on_resized);
+  if (!event_initialize(engine_state->arena)) {
+    Error("Failed to initialize event system");
+    return false;
   }
-  
+  os_register_process_key(engine_on_process_key);
+  os_register_window_closed_callback(engine_on_window_closed);
+  os_register_window_resized_callback(engine_on_window_resized);
+
+  event_register(EVENT_CODE_APPLICATION_QUIT, 0, application_on_event);
+  event_register(EVENT_CODE_KEY_PRESSED, 0, application_on_key);
+  event_register(EVENT_CODE_KEY_RELEASED, 0, application_on_key);
+  event_register(EVENT_CODE_RESIZED, 0, application_on_resized);
+
   // Input system
-  {
-    u64* mem_required = &systems->input_system_memory_requirement;
-    input_initialize(mem_required, 0);
-    systems->input_system = push_buffer(engine_state->arena, InputState, *mem_required);
-    if (!input_initialize(mem_required, systems->input_system)) {
-      Error("Failed to initialize input system");
-      return false;
-    }
+  if (!input_initialize(engine_state->arena)) {
+    Error("Failed to initialize input system");
+    return false;
   }
-  
+
   // Window creation
-  {
-    WindowConfig config = {
+  WindowConfig config = {
       .position_x = 100,
       .position_y = 100,
       .width = 680,
       .height = 480,
-      .name = game_inst->name
-    };
-    window_create(engine_state->window, config);
+      .name = game_inst->name};
+  if (!os_window_create(engine_state->window, config)) {
+    Error("Failed to create a window");
+    return false;
   }
-  
+
   // Renderer startup
-  {
-    u64* mem_required = &systems->renderer_system_memory_requirement;
-    renderer_initialize(mem_required, 0);
-    systems->renderer_system = push_buffer(engine_state->arena, RendererState, *mem_required);
-    if (!renderer_initialize(mem_required, systems->renderer_system)) {
-      Error("Failed to initialize renderer. Aborting application.");
-      return false;
-    }
+  if (!r_init(engine_state->arena)) {
+    Error("Failed to initialize renderer. Aborting application.");
+    return false;
   }
 
   // Texture system
-  {
-    TextureSystemConfig texture_sys_config = {
+  TextureSystemConfig texture_sys_config = {
       .max_texture_count = 65536,
-    };
-    u64* mem_required = &systems->texture_system_memory_requirement;
-    texture_system_initialize(mem_required, 0, texture_sys_config);
-    systems->texture_system = push_buffer(engine_state->arena, TextureSystemState, *mem_required);
-    if (!texture_system_initialize(mem_required, systems->texture_system, texture_sys_config)) {
-      Error("Failed to initialize renderer. Aborting application.");
-      return false;
-    }
+  };
+  if (!texture_system_initialize(engine_state->arena, texture_sys_config)) {
+    Error("Failed to initialize renderer. Aborting application.");
+    return false;
   }
-  
+
   // Initialize the game
   if (!engine_state->game_inst->initialize(engine_state->game_inst)) {
     Fatal("Game failed to initialize.");
@@ -175,7 +122,8 @@ b8 engine_run(Application* game_inst) {
   
   while (engine_state->is_running) {
     
-    if (!platform_pump_messages()) {
+    // if (!os::pump_messages()) {
+    if (!os_pump_messages()) {
       engine_state->is_running = false;
     }
 
@@ -184,7 +132,7 @@ b8 engine_run(Application* game_inst) {
       f64 current_time = engine_state->clock.elapsed;
       f64 delta = (current_time - engine_state->last_time);
       engine_state->game_inst->delta_time = delta;
-      f64 frame_start_time = platform_get_absolute_time();
+      f64 frame_start_time = os_get_absolute_time();
 
       check_dll_changes(game_inst);
       if (!engine_state->game_inst->update(engine_state->game_inst)) {
@@ -195,9 +143,9 @@ b8 engine_run(Application* game_inst) {
 
       RenderPacket packet;
       packet.delta_time = delta;
-      renderer_draw_frame(&packet);
+      r_draw_frame(&packet);
 
-      f64 frame_end_time = platform_get_absolute_time();
+      f64 frame_end_time = os_get_absolute_time();
       f64 frame_elapsed_time = frame_end_time - frame_start_time;
       running_time += frame_elapsed_time;
       f64 remaining_seconds = target_frame_seconds - frame_elapsed_time;
@@ -208,7 +156,7 @@ b8 engine_run(Application* game_inst) {
         // If there is time left, give it back to the OS.
         b8 limit_frames = true;
         if (remaining_ms > 0 && limit_frames) {
-          platform_sleep(remaining_ms - 1);
+          os_sleep(remaining_ms - 1);
         }
 
         ++frame_count;
@@ -222,9 +170,9 @@ b8 engine_run(Application* game_inst) {
   
   engine_state->is_running = false;
 
-  texture_system_shutdown(engine_state->systems.texture_system);
-  renderer_shutdown();
-  platform_window_destroy(engine_state->window);
+  texture_system_shutdown();
+  r_shutdown();
+  os_window_destroy(engine_state->window);
 
   event_unregister(EVENT_CODE_APPLICATION_QUIT, 0, application_on_event);
   event_unregister(EVENT_CODE_KEY_PRESSED, 0, application_on_key);
@@ -297,25 +245,26 @@ b8 application_on_resized(u16 code, void* sender, void* listener_inst, EventCont
   u16 height = context.data.u16[1];
   Debug("Window resize: %i, %i", width, height);
 
-  renderer_on_resized(width, height);
+  r_on_resized(width, height);
   return true;
 }
 
 void load_game_lib(Application* app) {
-  app->game_lib.dll_last_time_write = platform_get_last_write_time(app->game_lib.src_full_filename);
-  platform_copy_file(app->game_lib.src_full_filename, app->game_lib.temp_full_filename);
-  platform_dynamic_library_load(app->game_lib.temp_full_filename, &app->game_lib);
-  app->update = (b8(*)(Application*))platform_dynamic_library_load_function("application_update", &app->game_lib);
+  app->game_lib.last_time_write = os_file_last_write_time(app->game_lib.src_full_filename);
+  os_file_copy(app->game_lib.src_full_filename, app->game_lib.temp_full_filename);
+  // os_library_load(app->game_lib.temp_full_filename, &app->game_lib);
+  app->game_lib.handle = os_library_load(app->game_lib.temp_full_filename);
+  app->update = (b8(*)(Application*))os_library_load_function(str_lit("application_update"), app->game_lib);
 }
 
 void unload_game_lib(Application* app) {
-  platform_dynamic_library_unload(&app->game_lib);
+  os_library_unload(app->game_lib);
   app->update = 0;
 }
 
 internal void check_dll_changes(Application* app) {
-  u64 new_game_dll_write_time = platform_get_last_write_time(app->game_lib.src_full_filename);
-  b8 game_write = platform_compare_file_time(new_game_dll_write_time, app->game_lib.dll_last_time_write);
+  u64 new_game_dll_write_time = os_file_last_write_time(app->game_lib.src_full_filename);
+  b8 game_write = os_file_compare_time(new_game_dll_write_time, app->game_lib.last_time_write);
 
   if (game_write) {
     unload_game_lib(app);

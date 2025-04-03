@@ -21,7 +21,9 @@ enum LogLevel {
   LOG_LEVEL_TRACE = 5,
 };
 
-KAPI b8 logging_initialize(u64* memory_requirement, void* state);
+struct Arena;
+
+KAPI b8 logging_initialize(Arena* arena);
 void shutdown_logging();
 
 KAPI void log_output(LogLevel level, const char* message, ...);

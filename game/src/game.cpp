@@ -1,9 +1,9 @@
 #include "game.h"
 
-#include <application_type.h>
+#include <app_types.h>
 
 // HACK This should not be available outside the engine
-#include <renderer/renderer_frontend.h>
+#include <render/r_frontend.h>
 
 #include <event.h>
 
@@ -49,7 +49,7 @@ internal void camera_pitch(f32 amount) {
   state->camera_view_dirty = true;
 }
 
-b8 application_initialize(Application* game_inst) {
+b8 application_init(Application* game_inst) {
   game_inst->state = push_struct(game_inst->arena, GameState);
   state = (GameState*)game_inst->state;
   state->arena = arena_alloc(game_inst->arena, MB(400));
@@ -129,7 +129,7 @@ b8 application_update(Application* game_inst) {
   recalculate_view_matrix();
 
   // HACK This should not be available outside the engine
-  renderer_set_view(state->view);
+  r_set_view(state->view);
 
   return true;
 }

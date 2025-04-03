@@ -23,13 +23,10 @@ struct InputState {
 
 global InputState* state;
 
-b8 input_initialize(u64* memory_requirement, void* out_state) {
-  *memory_requirement = sizeof(InputState);
-  if (out_state == 0) {
-    return true;
-  }
-  state = (InputState*)out_state;
-  Info("Input subsystem initialized.");
+b8 input_initialize(Arena* arena) {
+  state = push_struct(arena, InputState);
+  // Info("Input subsystem initialized.");
+  log_output(LOG_LEVEL_INFO, "Input subsystem initialized.");
   return true;
 }
 

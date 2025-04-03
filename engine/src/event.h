@@ -23,10 +23,12 @@ struct EventContext {
   } data;
 };
 
+struct Arena;
+
 // Should return true if handled
 typedef b8 (*PFN_on_event)(u16 code, void* sender, void* listener_inst, EventContext data);
 
-b8 event_initialize(u64* memory_requirement, void* state);
+b8 event_initialize(Arena* arena);
 void event_shutdown();
 
 KAPI b8 event_register(u16 code, void* listener, PFN_on_event on_event);

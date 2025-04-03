@@ -1,6 +1,6 @@
 #include "maths.h"
 
-#include "platform.h"
+#include "os.h"
 
 #include <stdlib.h>
 #include <math.h>
@@ -29,7 +29,7 @@ f32 Sqrt(f32 x) {
 
 i32 random() {
   if (!rand_seeded) {
-    srand(u32(platform_get_absolute_time()));
+    srand(u32(os_get_absolute_time()));
     rand_seeded = true;
   }
   return rand();
@@ -37,7 +37,7 @@ i32 random() {
 
 i32 random_in_range(i32 min, i32 max) {
   if (!rand_seeded) {
-    srand(u32(platform_get_absolute_time()));
+    srand(u32(os_get_absolute_time()));
     rand_seeded = true;
   }
   return (rand() % (max - min + 1)) + min;

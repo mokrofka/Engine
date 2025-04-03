@@ -1,6 +1,6 @@
 #include "texture_system.h"
 
-#include "renderer/renderer_frontend.h"
+#include "render/r_frontend.h"
 
 #include <logger.h>
 #include <strings.h>
@@ -35,7 +35,7 @@ internal void destroy_default_textures(TextureSystemState* state);
 internal b8 load_texture(const char* texture_name, Texture* t);
 internal void destroy_texture(Texture* t);
 
-b8 texture_system_initialize(u64* memory_requirement, void* out_state, TextureSystemConfig config) {
+b8 texture_system_initialize(Arena* arena, TextureSystemConfig config) {
   if (config.max_texture_count == 0) {
     Fatal("texture_system_initialize - configl.max_texture_count must be > 0.");
     return false;
@@ -45,13 +45,9 @@ b8 texture_system_initialize(u64* memory_requirement, void* out_state, TextureSy
   u64 struct_requirement = sizeof(TextureSystemState);
   u64 array_requirement = sizeof(Texture) * config.max_texture_count;
   u64 hashtable_requirement = sizeof(TextureReference) * config.max_texture_count;
-  *memory_requirement = struct_requirement + array_requirement + hashtable_requirement;
+  u64 memory_requirement = struct_requirement + array_requirement + hashtable_requirement;
   
-  if (!out_state) {
-    return true;
-  }
-  
-  state = (TextureSystemState*)out_state;
+  state = push_buffer(arena, TextureSystemState, memory_requirement);
   state->config = config;
   
   // The array block is after the state. Already allocated, so just set the pointer
@@ -84,13 +80,13 @@ b8 texture_system_initialize(u64* memory_requirement, void* out_state, TextureSy
   return true;
 }
 
-void texture_system_shutdown(void* out_state) {
+void texture_system_shutdown() {
   if (state) {
     // Destroy all loaded textures
     for (u32 i = 0; i < state->config.max_texture_count; ++i) {
       Texture* t = &state->registered_textures[i];
       if (t->generation != INVALID_ID) {
-        renderer_destroy_texture(t);
+        r_destroy_texture(t);
       }
     }
   }
@@ -239,7 +235,7 @@ internal b8 create_default_textures(TextureSystemState) {
   state->default_texture.channel_count = 4;
   state->default_texture.generation = INVALID_ID;
   state->default_texture.has_transparency = false;
-  renderer_create_texture(pixels, &state->default_texture);
+  r_create_texture(pixels, &state->default_texture);
   // Manually set the texture generation to invalid since this is a default texture
   state->default_texture.generation = INVALID_ID;
   
@@ -302,7 +298,7 @@ internal b8 load_texture(const char* texture_name, Texture* t) {
     temp_texture.has_transparency = has_transparency;
     
     // Acquire internal texture resources and upload to GPU
-    renderer_create_texture(data, &temp_texture);
+    r_create_texture(data, &temp_texture);
   
     // Take a copy of the old texture
     Texture old = *t;
@@ -311,7 +307,7 @@ internal b8 load_texture(const char* texture_name, Texture* t) {
     *t = temp_texture;
     
     // Destroy the old texture
-    renderer_destroy_texture(&old);
+    r_destroy_texture(&old);
     
     if (current_generation == INVALID_ID) {
       t->generation = 0;
@@ -334,7 +330,7 @@ internal b8 load_texture(const char* texture_name, Texture* t) {
 
 internal void destroy_texture(Texture* t) {
   // Clean up back resources  
-  renderer_destroy_texture(t);
+  r_destroy_texture(t);
   
   MemZeroStruct(t);
   t->id = INVALID_ID;
