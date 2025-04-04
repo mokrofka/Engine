@@ -1,18 +1,16 @@
 #include "vk_material_shader.h"
 
 #include "render/vulkan/vk_shader_utils.h"
-#include "render//vulkan/vk_pipeline.h"
+#include "render/vulkan/vk_pipeline.h"
 #include "render/vulkan/vk_buffer.h"
-#include "res/res_types.h"
 
 #include "systems/texture_system.h"
 
 #include "maths.h"
-#include "logger.h"
 
 #define BUILTIN_SHADER_NAME_MATERIAL "Builtin.MaterialShader"
 
-b8 vulkan_material_shader_create(VK_Context* context, VK_MaterialShader* out_shader) {
+b8 vk_material_shader_create(VK_Context* context, VK_MaterialShader* out_shader) {
   char stage_type_strs[MATERIAL_SHADER_STAGE_COUNT][5] = {"vert", "frag"};
   VkShaderStageFlagBits stage_types[MATERIAL_SHADER_STAGE_COUNT] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
   
@@ -66,7 +64,7 @@ b8 vulkan_material_shader_create(VK_Context* context, VK_MaterialShader* out_sha
   layout_info.pBindings = bindings;
   VK_CHECK(vkCreateDescriptorSetLayout(context->device.logical_device, &layout_info, 0, &out_shader->object_descriptor_set_layout));
   
-  // Local/Object descriptor pool: Used for object-specific items like diffuse colour
+  // Local/Object descriptor pool: Used for object-specific items like diffuse color
   VkDescriptorPoolSize object_pool_sizes[2];
   // The first section will be used for uniform buffers
   object_pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -189,7 +187,7 @@ b8 vulkan_material_shader_create(VK_Context* context, VK_MaterialShader* out_sha
   return true;
 }
 
-void vulkan_material_shader_destroy(VK_Context* context, VK_MaterialShader* shader) {
+void vk_material_shader_destroy(VK_Context* context, VK_MaterialShader* shader) {
   VkDevice logical_device = context->device.logical_device;
   
   vkDestroyDescriptorPool(logical_device, shader->object_descriptor_pool, context->allocator);
@@ -215,14 +213,14 @@ void vulkan_material_shader_destroy(VK_Context* context, VK_MaterialShader* shad
   }
 }
 
-void vulkan_material_shader_use(VK_Context* context, VK_MaterialShader* shader) {
+void vk_material_shader_use(VK_Context* context, VK_MaterialShader* shader) {
   u32 image_index = context->image_index;
   VkPipelineBindPoint bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS;
   // NOTE suspicious command buffer pointer
   vk_pipeline_bind(&context->graphics_command_buffers[image_index], bind_point, &shader->pipeline);
 }
 
-void vulkan_material_shader_update_global_state(VK_Context* context, struct VK_MaterialShader* shader, f32 delta_time) {
+void vk_material_shader_update_global_state(VK_Context* context, VK_MaterialShader* shader, f32 delta_time) {
   u32 image_index = context->image_index;
   VkCommandBuffer command_buffer = context->graphics_command_buffers[image_index].handle;
   VkDescriptorSet global_descriptor = shader->global_descriptor_sets[image_index];
@@ -254,7 +252,7 @@ void vulkan_material_shader_update_global_state(VK_Context* context, struct VK_M
   vkUpdateDescriptorSets(context->device.logical_device, 1, &descriptor_write, 0, 0);
 }
 
-void vulkan_material_shader_update_object(VK_Context* context, VK_MaterialShader* shader, GeometryRenderData data) {
+void vk_material_shader_update_object(VK_Context* context, VK_MaterialShader* shader, GeometryRenderData data) {
   u32 image_index = context->image_index;
   VkCommandBuffer command_buffer = context->graphics_command_buffers[image_index].handle;
   
@@ -274,7 +272,7 @@ void vulkan_material_shader_update_object(VK_Context* context, VK_MaterialShader
   u32 offset = sizeof(ObjectUniformObject) * data.object_id;
   ObjectUniformObject obo;
   
-  // TODO get diffuse colour from a material
+  // TODO get diffuse color from a material
   local f32 accumulator = 0.0f;
   accumulator += context->frame_delta_time;
   f32 s = (Sin(accumulator) + 1.0f) / 2.0f;
@@ -359,7 +357,7 @@ void vulkan_material_shader_update_object(VK_Context* context, VK_MaterialShader
   
 }
 
-b8 vulkan_material_shader_acquire_resources(VK_Context* context, struct VK_MaterialShader* shader, u32* out_object_id) {
+b8 vk_material_shader_acquire_resources(VK_Context* context, VK_MaterialShader* shader, u32* out_object_id) {
   // TODO free list
   *out_object_id = shader->object_uniform_buffer_index;
   ++shader->object_uniform_buffer_index;
@@ -392,7 +390,7 @@ b8 vulkan_material_shader_acquire_resources(VK_Context* context, struct VK_Mater
   return true;
 }
 
-void vulkan_material_shader_release_resources(VK_Context* context, struct VK_MaterialShader* shader, u32 object_id) {
+void vk_material_shader_release_resources(VK_Context* context, VK_MaterialShader* shader, u32 object_id) {
   VK_MaterialShaderInstState* object_state = &shader->instance_states[object_id];
   
   const u32 descriptor_set_count = 3;

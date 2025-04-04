@@ -2,7 +2,7 @@
 
 #include <strings.h>
 
-struct VulkanPhysicalDeviceRequirements {
+struct VK_PhysicalDeviceRequirements {
   b8 graphics; 
   b8 present;
   b8 compute;
@@ -13,7 +13,7 @@ struct VulkanPhysicalDeviceRequirements {
   b8 discrete_gpu;
 };
 
-struct VulkanPhysicalDeviceQueueFamilyInfo {
+struct VK_PhysicalDeviceQueueFamilyInfo {
   u32 graphics_family_index;
   u32 present_family_index;
   u32 compute_family_index;
@@ -25,8 +25,8 @@ internal b8 physical_device_meets_requirements(
     VkPhysicalDevice device, VK_Context* context,
     const VkPhysicalDeviceProperties *properties,
     const VkPhysicalDeviceFeatures *features,
-    const VulkanPhysicalDeviceRequirements *requirements,
-    VulkanPhysicalDeviceQueueFamilyInfo *out_queue_family_info,
+    const VK_PhysicalDeviceRequirements *requirements,
+    VK_PhysicalDeviceQueueFamilyInfo *out_queue_family_info,
     VK_SwapchainSupportInfo *out_swapchain_support);
 
 b8 vk_device_create(VK_Context *context) 
@@ -182,7 +182,7 @@ void vk_device_destroy(VK_Context* context) {
 void vk_device_query_swapchain_support(
     VkPhysicalDevice physical_device,
     VK_Context* context,
-    VK_Swapchain SupportInfo* out_support_info) {
+    VK_SwapchainSupportInfo* out_support_info) {
 
   // Surface capabilities
   VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
@@ -277,7 +277,7 @@ internal b8 select_physical_device(VK_Context* context) {
     
     // TODO; There requirements should probably be drive by engine
     // configuration
-    VulkanPhysicalDeviceRequirements requirements = {};
+    VK_PhysicalDeviceRequirements requirements = {};
     requirements.graphics = true;
     requirements.present = true;
     requirements.transfer = true;
@@ -292,7 +292,7 @@ internal b8 select_physical_device(VK_Context* context) {
     // requirements.device_extension_names = darray_create(const char*);
     // darray_push(requirements.device_extension_names, &VK_KHR_SWAPCHAIN_EXTENSION_NAME);
     
-    VulkanPhysicalDeviceQueueFamilyInfo queue_info = {};
+    VK_PhysicalDeviceQueueFamilyInfo queue_info = {};
     b8 result = physical_device_meets_requirements(
         physical_devices[i],
         context,
@@ -375,9 +375,9 @@ internal b8 physical_device_meets_requirements(
     VkPhysicalDevice device, VK_Context* context,
     const VkPhysicalDeviceProperties* properties,
     const VkPhysicalDeviceFeatures* features,
-    const VulkanPhysicalDeviceRequirements* requirements,
-    VulkanPhysicalDeviceQueueFamilyInfo* out_queue_info,
-    VK_Swapchain SupportInfo* out_swapchain_support) {
+    const VK_PhysicalDeviceRequirements* requirements,
+    VK_PhysicalDeviceQueueFamilyInfo* out_queue_info,
+    VK_SwapchainSupportInfo* out_swapchain_support) {
 
   // Evalueate device properties to determina if it meets the needs of our application.
   out_queue_info->graphics_family_index = -1;  

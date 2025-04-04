@@ -144,7 +144,8 @@ void* vk_buffer_lock_memory(VK_Context* context, VK_Buffer* buffer, u64 offset, 
 }
 
 void vk_buffer_unlock_memory(VK_Context* context, VK_Buffer* buffer) {
-  vkUnmapMemory(context->device.logical_device, buffer->memory);
+  // vkUnmapMemory(context->device.logical_device, buffer->memory);
+  vkUnmapMemory(VK_DEVICE, buffer->memory);
 }
 
 void vk_buffer_load_data(VK_Context* context, VK_Buffer* buffer, u64 offset, u64 size, u32 flags, const void* data) {

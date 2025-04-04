@@ -1,6 +1,5 @@
 #include <os.h>
 #include <logger.h>
-#include <strings.h>
 
 #include <windows.h>
 

@@ -1,4 +1,4 @@
-#include "app_types.h"
+#include <app_types.h>
 
 #include <engine.h>
 
@@ -7,8 +7,6 @@
 #include <strings.h>
 
 extern b8 application_create(Application* out_app);
-
-extern b8 application_init(Application* app);
 
 int main() {
   Application app_inst = {};

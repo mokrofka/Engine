@@ -39,7 +39,7 @@ internal void clock_setup() {
   QueryPerformanceCounter(&start_time);
 }
 
-b8 platform_system_startup(Arena* arena) {
+b8 platform_init(Arena* arena) {
   u64 memory_requirement = sizeof(PlatformState)+sizeof(Window)+sizeof(WindowPlatformState);
   state = push_buffer(arena, PlatformState, memory_requirement);
   
@@ -176,29 +176,29 @@ b8 _platform_memory_compare(void* a, void* b, u64 size) {
   return memcmp(a, b, size) ? 0 : 1;
 }
 
-void os_console_write(const char* message, u8 colour) {
+void os_console_write(const char* message, u8 color) {
   HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
   // FATAL,ERROR,WARN,INFO,DEBUG,TRACE
   const u8 levels[6] = {64, 4, 6, 2, 1, 8};
-  SetConsoleTextAttribute(console_handle, levels[colour]);
+  SetConsoleTextAttribute(console_handle, levels[color]);
   OutputDebugStringA(message);
   u64 length = strlen(message);
   LPDWORD number_written = 0;
   WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), message, (DWORD)length, number_written, 0);
 }
 
-void os_console_write_error(const char* message, u8 colour) {
+void os_console_write_error(const char* message, u8 color) {
   HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
   // FATAL,ERROR,WARN,INFO,DEBUG,TRACE
   const u8 levels[6] = {64, 4, 6, 2, 1, 8};
-  SetConsoleTextAttribute(console_handle, levels[colour]);
+  SetConsoleTextAttribute(console_handle, levels[color]);
   OutputDebugStringA(message);
   u64 length = strlen(message);
   LPDWORD number_written = 0;
   WriteConsoleA(GetStdHandle(STD_ERROR_HANDLE), message, (DWORD)length, number_written, 0);
 }
 
-f64 os_get_absolute_time() {
+f64 os_now_seconds() {
   LARGE_INTEGER now_time;
   QueryPerformanceCounter(&now_time);
   return (f64)now_time.QuadPart * clock_frequency;
@@ -326,30 +326,30 @@ void os_file_close(OS_File handle) {
   }
 }
 
-b8 os_file_read(OS_File handle, u64 size, void* dest) {
+u64 os_file_read(OS_File handle, u64 size, void* dest) {
   HANDLE win32_handle = (HANDLE)handle.u64;
   DWORD bytes_read;
 
   if (handle.u64 && dest) {
     ReadFile(win32_handle, dest, size, &bytes_read, null);
     if (bytes_read != size) {
-      return false;
+      return 0;
     }
-    return true;
+    return bytes_read;
   }
-  return false;
+  return 0;
 }
 
-b8 os_file_write(OS_File handle, u64 size, const void* source) {
+u64 os_file_write(OS_File handle, u64 size, const void* source) {
   DWORD bytes_wrote;
   if (handle.u64) {
     WriteFile((HANDLE)handle.u64, source, size, &bytes_wrote, 0);
     if (size != bytes_wrote) {
-      return false;
+      return 0;
     }
-    return true;
+    return bytes_wrote;
   }
-  return false;
+  return 0;
 }
 
 void os_file_copy(String file, String new_file) {
@@ -372,7 +372,7 @@ u64 os_file_last_write_time(String filename) {
 
 b8 os_file_compare_time(u64 new_dll_write_time, u64 dll_last_write_time) {
   if (CompareFileTime((FILETIME*)&new_dll_write_time, (FILETIME*)&dll_last_write_time) != 0) {
-    return true;
+    return true; // is changed
   }
   return false;
 }
@@ -387,12 +387,12 @@ u64 os_EXE_filename(void* buffer) {
 // Clock
 void clock_update(Clock *clock) {
   if (clock->start_time != 0) {
-    clock->elapsed = os_get_absolute_time() - clock->start_time;
+    clock->elapsed = os_now_seconds() - clock->start_time;
   }
 }
 
 void clock_start(Clock *clock) {
-  clock->start_time = os_get_absolute_time();
+  clock->start_time = os_now_seconds();
   clock->elapsed = 0;
 }
 

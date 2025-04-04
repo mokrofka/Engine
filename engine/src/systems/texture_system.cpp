@@ -35,9 +35,9 @@ internal void destroy_default_textures(TextureSystemState* state);
 internal b8 load_texture(const char* texture_name, Texture* t);
 internal void destroy_texture(Texture* t);
 
-b8 texture_system_initialize(Arena* arena, TextureSystemConfig config) {
+b8 texture_system_init(Arena* arena, TextureSystemConfig config) {
   if (config.max_texture_count == 0) {
-    Fatal("texture_system_initialize - configl.max_texture_count must be > 0.");
+    Fatal("texture_system_init - configl.max_texture_count must be > 0.");
     return false;
   }
   

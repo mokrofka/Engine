@@ -10,7 +10,7 @@ struct Array {
 
 struct RegisteredEvent {
   void* listener;
-  PFN_on_event callback;
+  PFN_On_Event  callback;
 };
 
 struct EventCodeEntry {
@@ -33,7 +33,7 @@ struct EventSystemState {
 global EventSystemState* state;
 global const u64 memory_reserved = KB(10);
 
-b8 event_initialize(Arena* arena) {
+b8 event_init(Arena* arena) {
   u64 memory_requirement = sizeof(EventSystemState) + memory_reserved;
   
   state = push_buffer(arena, EventSystemState, memory_requirement);
@@ -43,17 +43,18 @@ b8 event_initialize(Arena* arena) {
   
   return true;
 }
+
 // void event_shutdown() {
 //   // Free the events arrays. And objects pointed to should be destroyed on their own.
 //   for(u16 i = 0; i < MAX_MESSAGE_CODES; ++i){
-//     if(state.registered[i].events != 0) {
-//       darray_destroy(state.registered[i].events);
-//       state.registered[i].events = 0;
+//     if(state->registered[i].events != 0) {
+//       // darray_destroy(state.registered[i].events);
+//       state->registered[i].events = 0;
 //     }
 //   }
 // }
 
-b8 event_register(u16 code, void* listener, PFN_on_event on_event) {
+b8 event_register(u16 code, void* listener, PFN_On_Event  on_event) {
   if (state->is_initialized == false) {
     return false;
   }
@@ -88,7 +89,7 @@ b8 event_register(u16 code, void* listener, PFN_on_event on_event) {
   return true;
 }
 
-b8 event_unregister(u16 code, void* listener, PFN_on_event on_event) {
+b8 event_unregister(u16 code, void* listener, PFN_On_Event on_event) {
   // On nothing is registered for the code, boot out.
   if (state->registered[code].array.pos == 0) {
     Warn("you're trying to unregister nothing!");

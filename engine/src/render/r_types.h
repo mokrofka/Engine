@@ -4,8 +4,6 @@
 
 #include "res/res_types.h"
 
-#include <math/math_types.h>
-
 enum R_BackendType {
   RENDERER_BACKENED_TYPE_VULKAN,
   RENDERER_BACKENED_TYPE_OPENGL,
@@ -34,22 +32,20 @@ struct GeometryRenderData {
 };
 
 struct R_Backend {
-  struct Arena* arena;
+  Arena* arena;
   void* internal_context;
   u64 frame_number;
   
 
   b8 (*initialize)(struct R_Backend* backend);
 
-  void (*shutdown)(struct R_Backend* backend);
+  void (*shutdown)();
   
-  void (*resized)(struct R_Backend* backend, u16 width, u16 height);
+  void (*resized)(u16 width, u16 height);
   
-  b8 (*begin_frame)(struct R_Backend* backend, f32 delta_time);
-  void (*update_global_state)(mat4 projection, mat4 view, v3 view_position, v4 ambient_colour, i32 mode);
-  b8 (*end_frame)(struct R_Backend* backend, f32 delta_time);
-  
-  b8 (*window_create)(struct R_Backend* backend, struct Window* window);
+  b8 (*begin_frame)(f32 delta_time);
+  void (*update_global_state)(mat4 projection, mat4 view, v3 view_position, v4 ambient_color, i32 mode);
+  b8 (*end_frame)(f32 delta_time);
 
   void (*update_object)(GeometryRenderData data);
 
@@ -57,6 +53,6 @@ struct R_Backend {
   void (*destroy_texture)(struct Texture* texture);
 };
 
-struct RenderPacket {
+struct R_Packet {
   f32 delta_time;
 };

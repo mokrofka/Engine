@@ -161,7 +161,7 @@ void temp_end(Temp temp) {
   temp.arena->pos = temp.pos;
 }
 
-void tctx_initialize(Arena* arena) {
+void tctx_init(Arena* arena) {
   tctx_thread_local.arenas[0] = arena_alloc(arena, MB(32));
   tctx_thread_local.arenas[1] = arena_alloc(arena, MB(32));
 }

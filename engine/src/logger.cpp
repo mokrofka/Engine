@@ -21,7 +21,7 @@ internal void append_to_log_file(const char* message) {
   }
 }
 
-b8 logging_initialize(Arena* arena) {
+b8 logging_init(Arena* arena) {
   state = push_struct(arena, LoggerSystemState);
   
   state->log_file_handle = os_file_open(str_lit("console.log"), FILE_MODE_WRITE);

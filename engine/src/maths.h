@@ -84,12 +84,6 @@ INLINE v2 operator-(v2 vec_0, v2 vec_1) {
       vec_0.y - vec_1.y);
 }
 
-INLINE v2 operator*(v2 vec_0, v2 vec_1) {
-  return v2(
-      vec_0.x * vec_1.x,
-      vec_0.y * vec_1.y);
-}
-
 INLINE v2 operator*(v2 vec, f32 scalar) {
   return v2(
       vec.x * scalar,
@@ -102,12 +96,6 @@ INLINE v2 operator*(f32 scalar, v2 vec) {
       vec.y * scalar);
 }
 
-INLINE v2 operator/(v2 vec_0, v2 vec_1) {
-  return v2(
-      vec_0.x / vec_1.x,
-      vec_0.y / vec_1.y);
-}
-
 INLINE v2 operator/(v2 vec, f32 scalar) {
   return v2(
       vec.x / scalar,
@@ -118,6 +106,30 @@ INLINE v2 operator/(f32 scalar, v2 vec) {
   return v2(
       vec.x / scalar,
       vec.y / scalar);
+}
+
+INLINE v2& operator+=(v2& vec_0, v2 vec_1) {
+  vec_0 = vec_0 + vec_1;
+  return vec_0;
+}
+
+INLINE v2& operator-=(v2& vec_0, v2 vec_1) {
+  vec_0 = vec_0 - vec_1;
+  return vec_0;
+}
+
+INLINE v2& operator*=(v2& vec, f32 scalar) {
+  vec = vec * scalar;
+  return vec;
+}
+
+INLINE v2& operator/=(v2& vec, f32 scalar) {
+  vec = vec / scalar;
+  return vec;
+}
+
+INLINE v2 operator-(const v2& vec) {
+    return v2(-vec.x, -vec.y);
 }
 
 INLINE f32 v2_length_squared(v2 vec) {
@@ -201,40 +213,44 @@ INLINE v3 operator-(v3 vec_0, v3 vec_1) {
   return v3(vec_0.x - vec_1.x, vec_0.y - vec_1.y, vec_0.z - vec_1.z);
 }
 
-INLINE v3 operator*(v3 vec_0, v3 vec_1) {
-  return v3(vec_0.x * vec_1.x, vec_0.y * vec_1.y, vec_0.z * vec_1.z);
-}
-
 INLINE v3 operator*(v3 vec, f32 scalar) {
-  return v3(
-      vec.x * scalar,
-      vec.y * scalar,
-      vec.z * scalar);
+  return v3(vec.x * scalar, vec.y * scalar, vec.z * scalar);
 }
 
 INLINE v3 operator*(f32 scalar, v3 vec) {
-  return v3(
-      vec.x * scalar,
-      vec.y * scalar,
-      vec.z * scalar);
-}
-
-INLINE v3 operator/(v3 vec_0, v3 vec_1) {
-  return v3(vec_0.x / vec_1.x, vec_0.y / vec_1.y, vec_0.z / vec_1.z);
+  return v3(vec.x * scalar, vec.y * scalar, vec.z * scalar);
 }
 
 INLINE v3 operator/(v3 vec, f32 scalar) {
-  return v3(
-      vec.x / scalar,
-      vec.y / scalar,
-      vec.z / scalar);
+  return v3(vec.x / scalar, vec.y / scalar, vec.z / scalar);
 }
 
 INLINE v3 operator/(f32 scalar, v3 vec) {
-  return v3(
-      vec.x / scalar,
-      vec.y / scalar,
-      vec.z / scalar);
+  return v3(vec.x / scalar, vec.y / scalar, vec.z / scalar);
+}
+
+INLINE v3& operator+=(v3& vec_0, v3 vec_1) {
+  vec_0 = vec_0 + vec_1;
+  return vec_0;
+}
+
+INLINE v3& operator-=(v3& vec_0, v3 vec_1) {
+  vec_0 = vec_0 - vec_1;
+  return vec_0;
+}
+
+INLINE v3& operator*=(v3& vec, f32 scalar) {
+  vec = vec * scalar;
+  return vec;
+}
+
+INLINE v3& operator/=(v3& vec, f32 scalar) {
+  vec = vec / scalar;
+  return vec;
+}
+
+INLINE v3 operator-(const v3& vec) {
+    return v3(-vec.x, -vec.y, -vec.z);
 }
 
 INLINE f32 v3_length_squared(v3 vec) {
@@ -319,12 +335,18 @@ INLINE v4 operator-(v4 vec_0, v4 vec_1) {
   return v4(vec_0.x - vec_1.x, vec_0.y - vec_1.y, vec_0.z - vec_1.z, vec_0.z - vec_1.z);
 }
 
-INLINE v4 operator*(v4 vec_0, v4 vec_1) {
-  return v4(vec_0.x * vec_1.x, vec_0.y * vec_1.y, vec_0.z * vec_1.z, vec_0.w * vec_1.w);
+INLINE v4& operator+=(v4& vec_0, v4 vec_1) {
+  vec_0 = vec_0 + vec_1;
+  return vec_0;
 }
 
-INLINE v4 operator/(v4 vec_0, v4 vec_1) {
-  return v4(vec_0.x / vec_1.x, vec_0.y / vec_1.y, vec_0.z / vec_1.z, vec_0.w / vec_1.w);
+INLINE v4& operator-=(v4& vec_0, v4 vec_1) {
+  vec_0 = vec_0 - vec_1;
+  return vec_0;
+}
+
+INLINE v4 operator-(const v4& vec) {
+    return v4(-vec.x, -vec.y, -vec.z, -vec.w);
 }
 
 INLINE f32 v4_length_squared(v4 vec) {
@@ -388,8 +410,9 @@ INLINE mat4 operator*(mat4 matrix_0, mat4 matrix_1) {
   return result;
 }
 
-inline void mat4::operator*=(mat4 mat) {
-  *this = mat * *this;
+INLINE mat4& operator*=(mat4& vec_0, mat4 vec_1) {
+  vec_0 = vec_1 * vec_0;
+  return vec_0;
 }
 
 INLINE mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far) {

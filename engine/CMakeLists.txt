@@ -12,7 +12,6 @@ target_include_directories(engine PRIVATE ${VULKAN_SDK}/Include)
 
 find_package(Vulkan REQUIRED)
 target_link_libraries(engine Vulkan::Vulkan)
-target_link_libraries(engine "${CMAKE_SOURCE_DIR}/bin/core.lib")
 
 target_compile_definitions(engine PRIVATE _DEBUG KEXPORT _CRT_SECURE_NO_WARNINGS)
 set_target_properties(engine PROPERTIES

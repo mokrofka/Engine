@@ -1,6 +1,6 @@
 #pragma once
 
-#include "render/r_types.inl"
+#include "render/r_types.h"
 
 struct TextureSystemConfig {
   u32 max_texture_count;
@@ -8,7 +8,7 @@ struct TextureSystemConfig {
 
 #define DEFAULT_TEXTURE_NAME "default"
 
-b8 texture_system_initialize(Arena* arena, TextureSystemConfig config);
+b8 texture_system_init(Arena* arena, TextureSystemConfig config);
 void texture_system_shutdown();
 
 Texture* texture_system_acquire(const char* name, b8 auto_release);

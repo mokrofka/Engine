@@ -12,12 +12,9 @@
 #include "vk_buffer.h"
 #include "vk_image.h"
 
-// Shaders
 #include "shaders/vk_material_shader.h"
 
-#include <logger.h>
 #include <strings.h>
-#include <memory.h>
 #include <os.h>
 #include <math/math_types.h>
 
@@ -33,10 +30,10 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
 
 internal i32 find_memory_index(u32 type_filter, u32 property_flags);
 
-internal void create_command_buffers(R_Backend* backend);
+internal void create_command_buffers();
 internal void 
-regenerate_framebuffers(R_Backend* backend, VK_Swapchain * swapchain, VK_RenderPass * renderpass);
-internal b8 recreate_swapchain(R_Backend* backedn);
+regenerate_framebuffers(VK_Swapchain* swapchain, VK_RenderPass * renderpass);
+internal b8 recreate_swapchain();
 internal b8 create_buffers(VK_Context* context);
 
 internal void upload_data_range(VK_Context* context, VkCommandPool pool, VkFence fence, VkQueue queue, VK_Buffer* buffer, u64 offset, u64 size, void* data) {
@@ -194,10 +191,10 @@ b8 vk_r_backend_init(R_Backend* backend) {
   
   // Swapchain framebuffers.
   context->swapchain.framebuffers = push_array(context->arena, VK_Framebuffer, context->swapchain.image_count);
-  regenerate_framebuffers(backend, &context->swapchain, &context->main_renderpass);
+  regenerate_framebuffers(&context->swapchain, &context->main_renderpass);
   
   // Create command buffers.
-  create_command_buffers(backend);
+  create_command_buffers();
   
   // Create sync objects.
   context->image_available_semaphores = push_array(context->arena, VkSemaphore,
@@ -222,7 +219,7 @@ b8 vk_r_backend_init(R_Backend* backend) {
     context->images_in_flight[i] = 0;
   }
 
-  if (!vulkan_material_shader_create(context, &context->material_shader)) {
+  if (!vk_material_shader_create(context, &context->material_shader)) {
     Error("Error loading built-in basic_lighting shader.");
     return false;
   }
@@ -259,7 +256,7 @@ b8 vk_r_backend_init(R_Backend* backend) {
   u32 indices[index_count] = {0,1,2, 0,3,1};
   
   u32 object_id = 0;
-  if (!vulkan_material_shader_acquire_resources(context, &context->material_shader, &object_id)) {
+  if (!vk_material_shader_acquire_resources(context, &context->material_shader, &object_id)) {
     Error("Failed to acquire shader resources.");
     return false;
   }
@@ -272,7 +269,7 @@ b8 vk_r_backend_init(R_Backend* backend) {
   return true;
 }
 
-void vk_r_backend_shutdown(R_Backend* backend) {
+void vk_r_backend_shutdown() {
   vkDeviceWaitIdle(context->device.logical_device);
   
   // Destroy in opposite order of creation
@@ -280,7 +277,7 @@ void vk_r_backend_shutdown(R_Backend* backend) {
   vk_buffer_destroy(context, &context->object_vertex_buffer);
   vk_buffer_destroy(context, &context->object_index_buffer);
   
-  vulkan_material_shader_destroy(context, &context->material_shader);
+  vk_material_shader_destroy(context, &context->material_shader);
   
   // Sync objects
   for (u8 i = 0; i < context->swapchain.max_frames_in_flight; ++i) {
@@ -345,7 +342,7 @@ void vk_r_backend_shutdown(R_Backend* backend) {
   vkDestroyInstance(context->instance, context->allocator);
 }
 
-void vk_r_backend_on_resize(R_Backend* backend, u16 width, u16 height) {
+void vk_r_backend_on_resize(u16 width, u16 height) {
   cached_framebuffer_width = width;
   cached_framebuffer_height = height;
   ++context->framebuffer_size_generation;
@@ -353,7 +350,7 @@ void vk_r_backend_on_resize(R_Backend* backend, u16 width, u16 height) {
   Info("Vulkan renderer backend->resized: w/h/gen %i/%i/%llu", width, height, context->framebuffer_size_generation);
 }
 
-b8 vk_r_backend_begin_frame(R_Backend* backend, f32 delta_time) {
+b8 vk_r_backend_begin_frame(f32 delta_time) {
   context->frame_delta_time = delta_time;
   VK_Device* device = &context->device;
   
@@ -377,7 +374,7 @@ b8 vk_r_backend_begin_frame(R_Backend* backend, f32 delta_time) {
     
     // If the swapcahin recreation failed (because, for example, the window was minimized),
     // boot out before unsetting the flag.
-    if (!recreate_swapchain(backend)) {
+    if (!recreate_swapchain()) {
       return false;
     }
     
@@ -443,21 +440,21 @@ b8 vk_r_backend_begin_frame(R_Backend* backend, f32 delta_time) {
   return true;
 }
 
-void vk_r_update_global_state(mat4 projection, mat4 view, v3 view_position, v4 ambient_colour, i32 mode) {
+void vk_r_update_global_state(mat4 projection, mat4 view, v3 view_position, v4 ambient_color, i32 mode) {
   VK_CommandBuffer* command_buffer = &context->graphics_command_buffers[context->image_index];
 
-  vulkan_material_shader_use(context, &context->material_shader);
+  vk_material_shader_use(context, &context->material_shader);
   
   context->material_shader.global_ubo.projection = projection;
   context->material_shader.global_ubo.view = view;
   
   // TODO other ubo properties
   
-  vulkan_material_shader_update_global_state(context, &context->material_shader, context->frame_delta_time);
+  vk_material_shader_update_global_state(context, &context->material_shader, context->frame_delta_time);
   
 }
 
-b8 vk_r_backend_end_frame(R_Backend* backend, f32 delta_time) {
+b8 vk_r_backend_end_frame(f32 delta_time) {
   
   VK_CommandBuffer* command_buffer = &context->graphics_command_buffers[context->image_index];
   
@@ -497,7 +494,7 @@ b8 vk_r_backend_end_frame(R_Backend* backend, f32 delta_time) {
   submit_info.pWaitSemaphores = &context->image_available_semaphores[context->current_frame];
 
   // Each semaphore waits on the corresponding pipeline stage to complete. 1:1 ratio.
-  // VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT prevents subsequent colour attachment
+  // VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT prevents subsequent color attachment
   // writes from executing until the semaphore signals (i.e. one frame is presented at a time)
   VkPipelineStageFlags flags[1] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
   submit_info.pWaitDstStageMask = flags;
@@ -530,10 +527,10 @@ b8 vk_r_backend_end_frame(R_Backend* backend, f32 delta_time) {
 void vk_r_update_object(GeometryRenderData data) {
   VK_CommandBuffer* command_buffer = &context->graphics_command_buffers[context->image_index];
   
-  vulkan_material_shader_update_object(context, &context->material_shader, data);
+  vk_material_shader_update_object(context, &context->material_shader, data);
   
   // TODO temporary test code
-  vulkan_material_shader_use(context, &context->material_shader);
+  vk_material_shader_use(context, &context->material_shader);
   
   // Bind vertex buffer at offset
   VkDeviceSize offsets[1] = {0};
@@ -585,7 +582,7 @@ internal i32 find_memory_index(u32 type_filter, u32 property_flags) {
   return -1;
 }
 
-internal void create_command_buffers(R_Backend* backend) {
+internal void create_command_buffers() {
   if (!context->graphics_command_buffers) {
     context->graphics_command_buffers = push_array(context->arena, VK_CommandBuffer, context->swapchain.image_count);
     for (u32 i = 0; i < context->swapchain.image_count; ++i) {
@@ -611,7 +608,7 @@ internal void create_command_buffers(R_Backend* backend) {
 }
 
 internal void 
-regenerate_framebuffers(R_Backend* backend, VK_Swapchain * swapchain, VK_RenderPass * renderpass) {
+regenerate_framebuffers(VK_Swapchain* swapchain, VK_RenderPass * renderpass) {
   for (u32 i = 0; i < swapchain->image_count; ++i) {
     // TODO: make this dynamic based on the currently configured attachments
     u32 attachment_count = 2;
@@ -630,7 +627,7 @@ regenerate_framebuffers(R_Backend* backend, VK_Swapchain * swapchain, VK_RenderP
   }
 }
 
-internal b8 recreate_swapchain(R_Backend* backend) {
+internal b8 recreate_swapchain() {
   // If already being recreated, do not try again.
   if (context->recreating_swapchain) {
     Debug("recreate_swapchain called when already recreating. Booting.");
@@ -693,9 +690,9 @@ internal b8 recreate_swapchain(R_Backend* backend) {
   context->main_renderpass.w = context->framebuffer_width;
   context->main_renderpass.h = context->framebuffer_height;
 
-  regenerate_framebuffers(backend, &context->swapchain, &context->main_renderpass);
+  regenerate_framebuffers(&context->swapchain, &context->main_renderpass);
 
-  create_command_buffers(backend);
+  create_command_buffers();
 
   // Clear the recreating flag.
   context->recreating_swapchain = false;

@@ -9,7 +9,6 @@ add_library(game SHARED ${SOURCES})
 target_include_directories(game PRIVATE ${CMAKE_SOURCE_DIR}/engine/src)
 target_include_directories(game PRIVATE ${CMAKE_SOURCE_DIR}/core/src)
 
-target_link_libraries(game "${CMAKE_SOURCE_DIR}/bin/core.lib")
 target_link_libraries(game "${CMAKE_SOURCE_DIR}/bin/engine.lib")
 
 set_target_properties(game PROPERTIES

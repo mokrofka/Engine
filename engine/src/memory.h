@@ -45,7 +45,7 @@ KAPI void* _arena_push(Scratch arena, u64 size, u64 align = DEFAULT_ALIGNMENT);
 KAPI Temp temp_begin(Arena* arena);
 KAPI void temp_end(Temp temp);
 
-KAPI void tctx_initialize(struct Arena* arena);
+KAPI void tctx_init(struct Arena* arena);
 KAPI Temp tctx_get_scratch(Arena** conflics, u32 counts);
 
 #define push_array(a, T, c) (T*)_arena_push(a, sizeof(T)*c, Max(8, alignof(T)))

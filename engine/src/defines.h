@@ -57,7 +57,8 @@ typedef unsigned char uchar;
 #define ReverseClamp(a,x,b) (((x)<(a))?(b):((b)<(x))?(a):(x))
 #define Wrap(a,x,b) ReverseClamp(a,x,b)
 
-#define ArrayCount(a) (sizeof(a) / sizeof((a)[0]))
+#define ArrayCount(arr) (sizeof(arr) / sizeof((arr)[0]))
+#define ElemSize(arr) (sizeof(arr[0]))
 #define IntFromPtr(ptr) ((u64)(ptr))
 
 #define Member(T,m)                 (((T*)0)->m)
@@ -89,7 +90,6 @@ typedef unsigned char uchar;
 #define Stringify(S) #S
 
 #define DeferLoop(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
-#define Assign(to, from) (to = (decltype(to))from)
 
 #ifdef KEXPORT
 #define KAPI __declspec(dllexport)
@@ -114,3 +114,5 @@ struct Arena;
 #define str_lit(S) str((u8*)(S), sizeof(S) - 1)
 
 KAPI String str(u8* str, u64 size);
+
+#define quick_sort(ptr, count, element_size, cmp_function) qsort((ptr), (count), (element_size), (int (*)(const void *, const void *))(cmp_function))

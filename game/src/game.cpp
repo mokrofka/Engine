@@ -73,7 +73,6 @@ b8 application_update(Application* game_inst) {
     EventContext context = {};
     event_fire(EVENT_CODE_DEBUG0, game_inst, context);
   }
-  // TODO end temp
   
   f32 rotation_speed = 2.0f;
   // HACK temp back to move camera around

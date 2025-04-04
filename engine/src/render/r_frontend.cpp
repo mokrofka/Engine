@@ -1,7 +1,6 @@
 #include "r_frontend.h"
 
 #include "r_backend.h"
-#include "res/res_types.h"
 
 #include "systems/texture_system.h"
 
@@ -33,7 +32,6 @@ struct RendererSystemState {
 
 // global R_Backend* backend;
 global RendererSystemState* state;
-global const u64 memory_reserved = MB(10);
 
 void create_texture(Texture* t) {
   MemZeroStruct(t);
@@ -64,19 +62,20 @@ b8 event_on_debug_event(u16 code, void* sender, void* listener_inst, EventContex
 // TODO end temp
 
 b8 r_init(Arena* arena) {
+  u64 memory_reserved = MB(10);
   u64 memory_requirement = memory_reserved+sizeof(RendererSystemState);
   
   state = push_buffer(arena, RendererSystemState, memory_requirement);
   state->arena = (Arena*)&state->memory;
   state->backend.arena = state->arena;
-  state->arena->res = MB(10);
+  state->arena->res = memory_reserved;
   
   // TODO temp
   event_register(EVENT_CODE_DEBUG0, state, event_on_debug_event);
   // TODO end temp
   
   // TODO make this configurable
-  renderer_backend_create(RENDERER_BACKENED_TYPE_VULKAN, &state->backend);
+  r_backend_create(RENDERER_BACKENED_TYPE_VULKAN, &state->backend);
   state->backend.frame_number = 0;
   
   if (!state->backend.initialize(&state->backend)) {
@@ -99,17 +98,17 @@ void r_shutdown() {
     // TODO temp
     event_unregister(EVENT_CODE_DEBUG0, state, event_on_debug_event);
     // TODO end temp
-    state->backend.shutdown(&state->backend);
+    state->backend.shutdown();
   }
   state = 0;
 }
 
-b8 renderer_begin_frame(f32 delta_time) {
-  return state->backend.begin_frame(&state->backend, delta_time);
+b8 r_begin_frame(f32 delta_time) {
+  return state->backend.begin_frame(delta_time);
 }
 
-b8 renderer_end_frame(f32 delta_time) {
-  b8 result = state->backend.end_frame(&state->backend, delta_time);
+b8 r_end_frame(f32 delta_time) {
+  b8 result = state->backend.end_frame(delta_time);
   ++state->backend.frame_number;
   return result;
 }
@@ -117,15 +116,15 @@ b8 renderer_end_frame(f32 delta_time) {
 void r_on_resized(u16 width, u16 height) {
   if (state) {
     state->projection = mat4_perspective(deg_to_rad(45.0f), width / (f32)height, state->near_clip, state->far_clip);
-    state->backend.resized(&state->backend, width, height);
+    state->backend.resized(width, height);
   } else {
     Warn("renderer backend does not exist to accept resize: %i %i", width, height);
   }
 }
 
-b8 r_draw_frame(RenderPacket* packet) {
+b8 r_draw_frame(R_Packet* packet) {
   // If the begin frame returned successfully, mid-frame operations may continue.
-  if (renderer_begin_frame(packet->delta_time)) {
+  if (r_begin_frame(packet->delta_time)) {
 
     state->backend.update_global_state(state->projection, state->view, v3_zero(), v4_one(), 0);
     
@@ -148,10 +147,10 @@ b8 r_draw_frame(RenderPacket* packet) {
     state->backend.update_object(data);
     
     // End the fram. If this fails, it is likely unrecovarble.
-    b8 result = renderer_end_frame(packet->delta_time);
+    b8 result = r_end_frame(packet->delta_time);
     
     if (!result) {
-      Error("renderer_end_frame failed. Application shutting down...");
+      Error("r_end_frame failed. Application shutting down...");
       return false;
     }
   }
@@ -163,7 +162,7 @@ void r_set_view(mat4 view) {
   state->view = view;
 }
 
-void r_create_texture(const u8* pixels, struct Texture* texture) {
+void r_create_texture(const u8* pixels, Texture* texture) {
   state->backend.create_texture(pixels, texture);
 }
 

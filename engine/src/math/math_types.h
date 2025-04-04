@@ -14,24 +14,6 @@ union v2 {
   };
   v2 () = default;
   v2(f32 x_, f32 y_) { x = x_, y = y_; }
-  v2(f32 x_) { x = x_, y = x_; }
-
-  inline void operator+=(v2 vec) {
-    x += vec.x; 
-    y += vec.y; 
-  }
-  inline void operator-=(v2 vec) {
-    x -= vec.x; 
-    y -= vec.y; 
-  }
-  inline void operator*=(f32 scalar) {
-    x *= scalar;
-    y *= scalar;
-  }
-  inline void operator/=(f32 scalar) {
-    x /= scalar;
-    y /= scalar;
-  }
 };
 
 union v2i {
@@ -63,30 +45,6 @@ union v3 {
   };
   v3 () = default;
   v3(f32 x_, f32 y_, f32 z_) { x = x_, y = y_, z = z_; }
-
-  inline void operator+=(v3 vec) {
-    x += vec.x; 
-    y += vec.y; 
-    z += vec.z; 
-  }
-  inline void operator-=(v3 vec) {
-    x -= vec.x; 
-    y -= vec.y; 
-    z -= vec.z; 
-  }
-  inline void operator*=(f32 scalar) {
-    x *= scalar;
-    y *= scalar;
-    z *= scalar;
-  }
-  inline void operator/=(f32 scalar) {
-    x /= scalar;
-    y /= scalar;
-    z /= scalar;
-  }
-  inline v3 operator-() {
-    return v3(-x,-y,-z);
-  }
 };
 
 union v4 {
@@ -107,18 +65,6 @@ union v4 {
   };
   v4 () = default;
   v4(f32 x_, f32 y_, f32 z_, f32 w_) { x = x_, y = y_, z = z_, w = w_; }
-  inline void operator+=(v4 vec) {
-    x += vec.x; 
-    y += vec.y; 
-    z += vec.z; 
-    w += vec.w; 
-  }
-  inline void operator-=(v4 vec) {
-    x -= vec.x; 
-    y -= vec.y; 
-    z -= vec.z; 
-    w -= vec.w; 
-  }
 };
 
 typedef v4 quat;
@@ -127,7 +73,6 @@ union mat4 {
   f32 data[16];
   
   v4 rows[4];
-  void operator*=(mat4 mat);
 };
 
 struct Vertex3D {

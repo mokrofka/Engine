@@ -23,7 +23,7 @@ enum LogLevel {
 
 struct Arena;
 
-KAPI b8 logging_initialize(Arena* arena);
+KAPI b8 logging_init(Arena* arena);
 void shutdown_logging();
 
 KAPI void log_output(LogLevel level, const char* message, ...);

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "render/r_types.inl"
+#include "render/r_types.h"
 
 #include <logger.h>
 #include <memory.h>
@@ -11,6 +11,7 @@
   {                             \
     Assert(expr == VK_SUCCESS); \
   }
+#define VK_DEVICE context->device.logical_device
 
 struct VK_Buffer {
   u64 size;

@@ -12,5 +12,4 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/bin)
 add_executable(app ${SOURCES})
 target_compile_definitions(app PRIVATE _DEBUG _CRT_SECURE_NO_WARNINGS)
 
-target_link_libraries(app "${CMAKE_SOURCE_DIR}/bin/core.lib")
 target_link_libraries(app "${CMAKE_SOURCE_DIR}/bin/engine.lib")
