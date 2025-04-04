@@ -1,6 +1,6 @@
 #include "vk_shader_utils.h"
 
-#include <strings.h>
+#include <str.h>
 #include <os.h>
 
 b8 create_shader_module(

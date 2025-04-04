@@ -1,6 +1,6 @@
 #include "vk_image.h"
 
-void vk_image_create(
+VK_Image vk_image_create(
   VK_Context* context,
   VkImageType image_type,
   u32 width,
@@ -10,12 +10,12 @@ void vk_image_create(
   VkImageUsageFlags usage,
   VkMemoryPropertyFlags memory_flags,
   b32 create_view,
-  VkImageAspectFlags view_aspect_flags,
-  VK_Image* out_image) {
+  VkImageAspectFlags view_aspect_flags) {
     
   // Copy params
-  out_image->width = width;
-  out_image->height = height;
+  VK_Image result = {};
+  result.width = width;
+  result.height = height;
 
   // Creation info.
   VkImageCreateInfo image_create_info = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
@@ -32,11 +32,11 @@ void vk_image_create(
   image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;         // TODO: Configurable sample count.
   image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // TODO: Configurable sharing mode.
 
-  VK_CHECK(vkCreateImage(vkdevice, &image_create_info, context->allocator, &out_image->handle));
+  VK_CHECK(vkCreateImage(vkdevice, &image_create_info, context->allocator, &result.handle));
 
   // Query memory requirements.
   VkMemoryRequirements memory_requirements;
-  vkGetImageMemoryRequirements(vkdevice, out_image->handle, &memory_requirements);
+  vkGetImageMemoryRequirements(vkdevice, result.handle, &memory_requirements);
 
   i32 memory_type = context->find_memory_index(memory_requirements.memoryTypeBits, memory_flags);
   if (memory_type == -1) {
@@ -47,16 +47,18 @@ void vk_image_create(
   VkMemoryAllocateInfo memory_allocate_info = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
   memory_allocate_info.allocationSize = memory_requirements.size;
   memory_allocate_info.memoryTypeIndex = memory_type;
-  VK_CHECK(vkAllocateMemory(vkdevice, &memory_allocate_info, context->allocator, &out_image->memory));
+  VK_CHECK(vkAllocateMemory(vkdevice, &memory_allocate_info, context->allocator, &result.memory));
 
   // Bind the memory
-  VK_CHECK(vkBindImageMemory(vkdevice, out_image->handle, out_image->memory, 0)); // TODO: configurable memory offset.
+  VK_CHECK(vkBindImageMemory(vkdevice, result.handle, result.memory, 0)); // TODO: configurable memory offset.
 
   // Create view
   if (create_view) {
-    out_image->view = 0;
-    vk_image_view_create(context, format, out_image, view_aspect_flags);
+    result.view = 0;
+    vk_image_view_create(context, format, &result, view_aspect_flags);
   }
+  
+  return result;
 }
 
 void vk_image_view_create(

@@ -1,7 +1,7 @@
 #include "logger.h"
 #include "os.h"
 #include "memory.h"
-#include "strings.h"
+#include "str.h"
 
 #include <stdarg.h>
 

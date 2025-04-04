@@ -1,6 +1,6 @@
 #include "vk_device.h"
 
-#include <strings.h>
+#include <str.h>
 
 struct VK_PhysicalDeviceRequirements {
   b8 graphics; 

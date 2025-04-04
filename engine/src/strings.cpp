@@ -1,4 +1,4 @@
-#include "strings.h"
+#include "str.h"
 
 #include "memory.h"
 

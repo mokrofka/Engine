@@ -268,9 +268,8 @@ void* os_get_window_handle() {
   return state->window->platform_state->hwnd;
 }
 
-void os_get_framebuffer_size(u32* width, u32* height) {
-  *width = state->window->width;
-  *height = state->window->height;
+v2i os_get_framebuffer_size() {
+  return v2i(state->window->width, state->window->height);
 }
 
 

@@ -2,6 +2,7 @@
 
 #include "input_types.h"
 #include "defines.h"
+#include "math/math_types.h"
 
 struct DynamicLibrary {
   void* handle;
@@ -89,7 +90,7 @@ KAPI void os_register_window_resized_callback(WindowResizedCallback callback);
 KAPI void os_window_destroy(Window* window);
 KAPI void* os_get_handle_info();
 KAPI void* os_get_window_handle();
-KAPI void os_get_framebuffer_size(u32* width, u32* height);
+KAPI v2i os_get_framebuffer_size();
 
 // files
 KAPI b8 os_file_path_exists(String path);

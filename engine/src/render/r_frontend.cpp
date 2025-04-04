@@ -10,7 +10,7 @@
 
 // TODO temporary
 
-#include <strings.h>
+#include <str.h>
 #include <event.h>
 
 // TODO end temporary

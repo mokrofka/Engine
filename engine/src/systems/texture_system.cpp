@@ -3,7 +3,7 @@
 #include "render/r_frontend.h"
 
 #include <logger.h>
-#include <strings.h>
+#include <str.h>
 #include <memory.h>
 #include <containers/hashtable.h>
 

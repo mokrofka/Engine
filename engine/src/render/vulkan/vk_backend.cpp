@@ -14,13 +14,14 @@
 
 #include "shaders/vk_material_shader.h"
 
-#include <strings.h>
+#include <str.h>
 #include <os.h>
 #include <math/math_types.h>
 
 global VK_Context* context;
-global u32 cached_framebuffer_width;
-global u32 cached_framebuffer_height;
+// global u32 cached_framebuffer_extent.x;
+// global u32 cached_framebuffer_extent.y;
+global v2i cached_framebuffer_extent ;
 
 VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
@@ -61,11 +62,11 @@ b8 vk_r_backend_init(R_Backend* backend) {
   // TODO: custom allocator.
   context->allocator = 0;
   
-  os_get_framebuffer_size(&cached_framebuffer_width, &cached_framebuffer_height);
-  context->framebuffer_width = (cached_framebuffer_width != 0) ? cached_framebuffer_width : 800;
-  context->framebuffer_height = (cached_framebuffer_height != 0) ? cached_framebuffer_height : 600;
-  cached_framebuffer_width = 0;
-  cached_framebuffer_height = 0;
+  cached_framebuffer_extent = os_get_framebuffer_size();
+  context->framebuffer_width = (cached_framebuffer_extent.x != 0) ? cached_framebuffer_extent.x : 800;
+  context->framebuffer_height = (cached_framebuffer_extent.y != 0) ? cached_framebuffer_extent.y : 600;
+  cached_framebuffer_extent.x = 0;
+  cached_framebuffer_extent.y = 0;
 
   VkApplicationInfo app_info = {VK_STRUCTURE_TYPE_APPLICATION_INFO};
   app_info.apiVersion = VK_API_VERSION_1_2;
@@ -342,8 +343,8 @@ void vk_r_backend_shutdown() {
 }
 
 void vk_r_backend_on_resize(u16 width, u16 height) {
-  cached_framebuffer_width = width;
-  cached_framebuffer_height = height;
+  cached_framebuffer_extent.x = width;
+  cached_framebuffer_extent.y = height;
   ++context->framebuffer_size_generation;
   
   Info("Vulkan renderer backend->resized: w/h/gen %i/%i/%llu", width, height, context->framebuffer_size_generation);
@@ -657,17 +658,17 @@ internal b8 recreate_swapchain() {
 
   vk_swapchain_recreate(
       context,
-      cached_framebuffer_width,
-      cached_framebuffer_height,
+      cached_framebuffer_extent.x,
+      cached_framebuffer_extent.y,
       &context->swapchain);
 
   // Sync the framebuffer size with the cached sizes.
-  context->framebuffer_width = cached_framebuffer_width;
-  context->framebuffer_height = cached_framebuffer_height;
+  context->framebuffer_width = cached_framebuffer_extent.x;
+  context->framebuffer_height = cached_framebuffer_extent.y;
   context->main_renderpass.w = context->framebuffer_width;
   context->main_renderpass.h = context->framebuffer_height;
-  cached_framebuffer_width = 0;
-  cached_framebuffer_height = 0;
+  cached_framebuffer_extent.x = 0;
+  cached_framebuffer_extent.y = 0;
 
   // Update framebuffer size generation.
   context->framebuffer_size_last_generation = context->framebuffer_size_generation;
@@ -751,7 +752,7 @@ void vk_r_create_texture(const u8* pixels, Texture* texture) {
   
   // Note Lots of assumptions, different texture types will require
   // different options here
-  vk_image_create(
+  data->image = vk_image_create(
     context, 
     VK_IMAGE_TYPE_2D, 
     texture->width, 
@@ -761,8 +762,7 @@ void vk_r_create_texture(const u8* pixels, Texture* texture) {
     VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     true,
-    VK_IMAGE_ASPECT_COLOR_BIT,
-    &data->image);
+    VK_IMAGE_ASPECT_COLOR_BIT);
   
   VK_CommandBuffer temp_buffer;
   VkCommandPool pool = context->device.graphics_command_pool;

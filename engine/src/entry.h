@@ -4,7 +4,7 @@
 
 #include <logger.h>
 #include <memory.h>
-#include <strings.h>
+#include <str.h>
 
 extern b8 application_create(Application* out_app);
 

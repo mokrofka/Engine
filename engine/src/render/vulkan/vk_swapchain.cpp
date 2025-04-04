@@ -210,7 +210,7 @@ void create(VK_Context* context, u32 width, u32 height, VK_Swapchain * swapchain
   }
 
   // Create depth image and its view.
-  vk_image_create(
+  swapchain->depth_attachment = vk_image_create(
       context,
       VK_IMAGE_TYPE_2D,
       swapchain_extent.width,
@@ -220,8 +220,7 @@ void create(VK_Context* context, u32 width, u32 height, VK_Swapchain * swapchain
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
       true,
-      VK_IMAGE_ASPECT_DEPTH_BIT,
-      &swapchain->depth_attachment);
+      VK_IMAGE_ASPECT_DEPTH_BIT);
 
   Info("Swapchain created successfully.");
 }
