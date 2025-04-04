@@ -36,7 +36,7 @@ b8 create_shader_module(
     os_file_close(handle);
 
     VK_CHECK(vkCreateShaderModule(
-        context->device.logical_device,
+        vkdevice,
         &shader_stages[stage_index].create_info,
         context->allocator,
         &shader_stages[stage_index].handle));

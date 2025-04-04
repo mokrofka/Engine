@@ -35,4 +35,4 @@ void vk_image_copy_from_buffer(
   VkBuffer buffer,
   VK_CommandBuffer* command_buffer);
 
-void vk_image_destroy(VK_Context* context, VK_Image * image);
+void vk_image_destroy(VK_Context* context, VK_Image* image);

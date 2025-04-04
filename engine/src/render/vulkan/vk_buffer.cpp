@@ -25,11 +25,11 @@ b8 vk_buffer_create(
   buffer_info.usage = usage;
   buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // NOTE only used in one queue
   
-  VK_CHECK(vkCreateBuffer(context->device.logical_device, &buffer_info, context->allocator, &buffer->handle));
+  VK_CHECK(vkCreateBuffer(vkdevice, &buffer_info, context->allocator, &buffer->handle));
 
   // Gather memory requirements
   VkMemoryRequirements requirements;
-  vkGetBufferMemoryRequirements(context->device.logical_device, buffer->handle, &requirements);
+  vkGetBufferMemoryRequirements(vkdevice, buffer->handle, &requirements);
   buffer->memory_index = context->find_memory_index(requirements.memoryTypeBits, buffer->memory_property_flags);
   if (buffer->memory_index == -1) {
     Error("Unable to create vulkan buffer because the required memory type index was not found.");
@@ -43,7 +43,7 @@ b8 vk_buffer_create(
   
   // Allocate the memory.
   VkResult result = vkAllocateMemory(
-    context->device.logical_device, 
+    vkdevice, 
     &allocate_info, 
     context->allocator, 
     &buffer->memory);
@@ -62,11 +62,11 @@ b8 vk_buffer_create(
 
 void vk_buffer_destroy(VK_Context* context, VK_Buffer* buffer) {
   if (buffer->memory) {
-    vkFreeMemory(context->device.logical_device, buffer->memory, context->allocator);
+    vkFreeMemory(vkdevice, buffer->memory, context->allocator);
     buffer->memory = 0;
   }
   if (buffer->handle) {
-    vkDestroyBuffer(context->device.logical_device, buffer->handle, context->allocator);
+    vkDestroyBuffer(vkdevice, buffer->handle, context->allocator);
     buffer->handle = 0;
   }
   buffer->size = 0;
@@ -88,11 +88,11 @@ b8 vk_buffer_resize(
   buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   
   VkBuffer new_buffer;
-  VK_CHECK(vkCreateBuffer(context->device.logical_device, &buffer_info, context->allocator, &new_buffer));
+  VK_CHECK(vkCreateBuffer(vkdevice, &buffer_info, context->allocator, &new_buffer));
   
   // Gather memory requirements
   VkMemoryRequirements requirements;
-  vkGetBufferMemoryRequirements(context->device.logical_device, new_buffer, &requirements);
+  vkGetBufferMemoryRequirements(vkdevice, new_buffer, &requirements);
   
   // Allocate memory info
   VkMemoryAllocateInfo allocate_info = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
@@ -101,28 +101,28 @@ b8 vk_buffer_resize(
   
   // Allocate the memory
   VkDeviceMemory new_memory;
-  VkResult result = vkAllocateMemory(context->device.logical_device, &allocate_info, context->allocator, &new_memory);
+  VkResult result = vkAllocateMemory(vkdevice, &allocate_info, context->allocator, &new_memory);
   if (result != VK_SUCCESS) {
     Error("Unable to resize vulkan buffer because the required memory allocation failed. Error: %i", result);
     return false;
   }
   
   // Bind the new buffer's memory
-  VK_CHECK(vkBindBufferMemory(context->device.logical_device, new_buffer, new_memory, 0));
+  VK_CHECK(vkBindBufferMemory(vkdevice, new_buffer, new_memory, 0));
   
   // Copy over the data
   vk_buffer_copy_to(context, pool, 0, queue, buffer->handle, 0, new_buffer, 0, buffer->size);
   
   // Make sure anything potentially using these if finished
-  vkDeviceWaitIdle(context->device.logical_device);
+  vkDeviceWaitIdle(vkdevice);
   
   // Destroy the old
   if (buffer->memory) {
-    vkFreeMemory(context->device.logical_device, buffer->memory, context->allocator);
+    vkFreeMemory(vkdevice, buffer->memory, context->allocator);
     buffer->memory = 0;
   }
   if (buffer->memory) {
-    vkDestroyBuffer(context->device.logical_device, buffer->handle, context->allocator);
+    vkDestroyBuffer(vkdevice, buffer->handle, context->allocator);
     buffer->handle = 0;
   }
   
@@ -134,25 +134,24 @@ b8 vk_buffer_resize(
 }
 
 void vk_buffer_bind(VK_Context* context, VK_Buffer* buffer, u64 offset) {
-  VK_CHECK(vkBindBufferMemory(context->device.logical_device, buffer->handle, buffer->memory, offset));
+  VK_CHECK(vkBindBufferMemory(vkdevice, buffer->handle, buffer->memory, offset));
 }
 
 void* vk_buffer_lock_memory(VK_Context* context, VK_Buffer* buffer, u64 offset, u64 size, u32 flags) {
   void* data;
-  VK_CHECK(vkMapMemory(context->device.logical_device, buffer->memory, offset, size, flags, &data));
+  VK_CHECK(vkMapMemory(vkdevice, buffer->memory, offset, size, flags, &data));
   return data;
 }
 
 void vk_buffer_unlock_memory(VK_Context* context, VK_Buffer* buffer) {
-  // vkUnmapMemory(context->device.logical_device, buffer->memory);
-  vkUnmapMemory(VK_DEVICE, buffer->memory);
+  vkUnmapMemory(vkdevice, buffer->memory);
 }
 
 void vk_buffer_load_data(VK_Context* context, VK_Buffer* buffer, u64 offset, u64 size, u32 flags, const void* data) {
   void* data_ptr;
-  VK_CHECK(vkMapMemory(context->device.logical_device, buffer->memory, offset, size, flags, &data_ptr));
+  VK_CHECK(vkMapMemory(vkdevice, buffer->memory, offset, size, flags, &data_ptr));
   MemCopy(data_ptr, data, size);
-  vkUnmapMemory(context->device.logical_device, buffer->memory);
+  vkUnmapMemory(vkdevice, buffer->memory);
 }
 
 void vk_buffer_copy_to(

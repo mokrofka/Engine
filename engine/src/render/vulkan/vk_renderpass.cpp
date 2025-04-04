@@ -105,7 +105,7 @@ void vk_renderpass_create(
   render_pass_create_info.flags = 0;
 
   VK_CHECK(vkCreateRenderPass(
-      context->device.logical_device,
+      vkdevice,
       &render_pass_create_info,
       context->allocator,
       &out_renderpass->handle));
@@ -113,7 +113,7 @@ void vk_renderpass_create(
 
 void vk_renderpass_destroy(VK_Context* context, VK_RenderPass * renderpass) {
   if (renderpass && renderpass->handle) {
-    vkDestroyRenderPass(context->device.logical_device, renderpass->handle, context->allocator);
+    vkDestroyRenderPass(vkdevice, renderpass->handle, context->allocator);
     renderpass->handle = 0;
   }
 }

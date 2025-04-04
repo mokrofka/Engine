@@ -1,6 +1,6 @@
 #pragma once
 
-#include "render/r_backend.h"
+#include "render/r_types.h"
 
 b8 vk_r_backend_init(R_Backend* backend);
 

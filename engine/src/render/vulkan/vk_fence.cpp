@@ -9,13 +9,13 @@ void vk_fence_create(VK_Context* context, b8 create_signaled, VK_Fence* out_fenc
     fence_create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
   }
 
-  VK_CHECK(vkCreateFence(context->device.logical_device, &fence_create_info,
+  VK_CHECK(vkCreateFence(vkdevice, &fence_create_info,
                          context->allocator, &out_fence->handle));
 }
 
 void vk_fence_destroy(VK_Context* context, VK_Fence* fence) {
   if (fence->handle) {
-    vkDestroyFence(context->device.logical_device, fence->handle, context->allocator);
+    vkDestroyFence(vkdevice, fence->handle, context->allocator);
     fence->handle = 0;
   }
   fence->is_signaled = false;
@@ -23,7 +23,7 @@ void vk_fence_destroy(VK_Context* context, VK_Fence* fence) {
 
 b8 vk_fence_wait(VK_Context* context, VK_Fence* fence, u64 timeout_ns) {
   if (!fence->is_signaled) {
-    VkResult result = vkWaitForFences(context->device.logical_device, 1, &fence->handle,
+    VkResult result = vkWaitForFences(vkdevice, 1, &fence->handle,
                                       true, timeout_ns);
     
     switch (result) {
@@ -57,7 +57,7 @@ b8 vk_fence_wait(VK_Context* context, VK_Fence* fence, u64 timeout_ns) {
 
 void vk_fence_reset(VK_Context* context, VK_Fence* fence) {
   if (fence->is_signaled) {
-    VK_CHECK(vkResetFences(context->device.logical_device, 1, &fence->handle));
+    VK_CHECK(vkResetFences(vkdevice, 1, &fence->handle));
     fence->is_signaled = false;
   }
 }

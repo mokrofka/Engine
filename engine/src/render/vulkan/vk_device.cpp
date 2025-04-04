@@ -29,8 +29,7 @@ internal b8 physical_device_meets_requirements(
     VK_PhysicalDeviceQueueFamilyInfo *out_queue_family_info,
     VK_SwapchainSupportInfo *out_swapchain_support);
 
-b8 vk_device_create(VK_Context *context) 
-{
+b8 vk_device_create(VK_Context *context) {
   if (!select_physical_device(context)) {
     return false;
   }
@@ -93,25 +92,25 @@ b8 vk_device_create(VK_Context *context)
     context->device.physical_device,
     &device_create_info,
     context->allocator,
-    &context->device.logical_device));
+    &vkdevice));
 
   Info("Logical device created.");
   
   // Get queues.
   vkGetDeviceQueue(
-    context->device.logical_device, 
+    vkdevice, 
     context->device.graphics_queue_index, 
     0, 
     &context->device.graphics_queue);
     
   vkGetDeviceQueue(
-    context->device.logical_device, 
+    vkdevice, 
     context->device.present_queue_index, 
     0, 
     &context->device.present_queue);
     
   vkGetDeviceQueue(
-    context->device.logical_device, 
+    vkdevice, 
     context->device.transfer_queue_index, 
     0, 
     &context->device.transfer_queue);
@@ -122,7 +121,7 @@ b8 vk_device_create(VK_Context *context)
   pool_create_info.queueFamilyIndex = context->device.graphics_queue_index;
   pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
   VK_CHECK(vkCreateCommandPool(
-    context->device.logical_device, 
+    vkdevice, 
     &pool_create_info, 
     context->allocator, 
     &context->device.graphics_command_pool));
@@ -140,15 +139,15 @@ void vk_device_destroy(VK_Context* context) {
   
   Info("Destroying command pools...");
   vkDestroyCommandPool(
-    context->device.logical_device, 
+    vkdevice, 
     context->device.graphics_command_pool, 
     context->allocator);
   
   // Destroy logical device
   Info("Destroying logical device...");
-  if (context->device.logical_device) {
-    vkDestroyDevice(context->device.logical_device, context->allocator);
-    context->device.logical_device = 0;
+  if (vkdevice) {
+    vkDestroyDevice(vkdevice, context->allocator);
+    vkdevice = 0;
   }
   
   // Physical device are not destroyed.

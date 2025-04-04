@@ -11,7 +11,7 @@
   {                             \
     Assert(expr == VK_SUCCESS); \
   }
-#define VK_DEVICE context->device.logical_device
+#define vkdevice context->device.logical_device
 
 struct VK_Buffer {
   u64 size;
@@ -95,7 +95,7 @@ struct VK_Swapchain  {
   VkImage* images;
   VkImageView* views;
   
-  VK_Image  depth_attachment;
+  VK_Image depth_attachment;
   
   // framebuffers used for on-screen rendering.
   VK_Framebuffer* framebuffers;
@@ -249,7 +249,7 @@ struct VK_Context {
   i32 (*find_memory_index)(u32 type_filter, u32 property_flags);
 };
 
-struct VulkanTextureData {
+struct VK_TextureData {
   VK_Image  image;
   VkSampler sampler;
 };

@@ -40,7 +40,7 @@ b8 vk_swapchain_acquire_next_image_index(
   u32* out_image_index) {
 
   VkResult result = vkAcquireNextImageKHR(
-      context->device.logical_device,
+      vkdevice,
       swapchain->handle,
       timeout_ns,
       image_available_semaphore,
@@ -172,21 +172,21 @@ void create(VK_Context* context, u32 width, u32 height, VK_Swapchain * swapchain
   swapchain_create_info.clipped = VK_TRUE;
   swapchain_create_info.oldSwapchain = 0;
   
-  VK_CHECK(vkCreateSwapchainKHR(context->device.logical_device, &swapchain_create_info, context->allocator, &swapchain->handle));
+  VK_CHECK(vkCreateSwapchainKHR(vkdevice, &swapchain_create_info, context->allocator, &swapchain->handle));
   
   // Start with a zero frame index.
   context->current_frame = 0;
   
   // Images
   swapchain->image_count = 0;
-  VK_CHECK(vkGetSwapchainImagesKHR(context->device.logical_device, swapchain->handle, &swapchain->image_count, 0));
+  VK_CHECK(vkGetSwapchainImagesKHR(vkdevice, swapchain->handle, &swapchain->image_count, 0));
   if (!swapchain->images) {
     swapchain->images = push_array(context->arena, VkImage, swapchain->image_count);
   }
   if (!swapchain->views) {
     swapchain->views = push_array(context->arena, VkImageView, swapchain->image_count);
   }
-  VK_CHECK(vkGetSwapchainImagesKHR(context->device.logical_device, swapchain->handle, &swapchain->image_count, swapchain->images));
+  VK_CHECK(vkGetSwapchainImagesKHR(vkdevice, swapchain->handle, &swapchain->image_count, swapchain->images));
 
   // Views
   for (i32 i = 0; i < swapchain->image_count; ++i) {
@@ -200,7 +200,7 @@ void create(VK_Context* context, u32 width, u32 height, VK_Swapchain * swapchain
     view_info.subresourceRange.baseArrayLayer = 0;
     view_info.subresourceRange.layerCount = 1;
 
-    VK_CHECK(vkCreateImageView(context->device.logical_device, &view_info, context->allocator, &swapchain->views[i]));
+    VK_CHECK(vkCreateImageView(vkdevice, &view_info, context->allocator, &swapchain->views[i]));
   }
 
   // Depth resources
@@ -227,14 +227,14 @@ void create(VK_Context* context, u32 width, u32 height, VK_Swapchain * swapchain
 }
 
 void destroy(VK_Context* context, VK_Swapchain * swapchain) {
-  vkDeviceWaitIdle(context->device.logical_device);
+  vkDeviceWaitIdle(vkdevice);
   vk_image_destroy(context, &swapchain->depth_attachment);
 
   // Only destroy the views, not the images, since those are owned by the swapchain and are thus
   // destroyed when it is.
   for (u32 i = 0; i < swapchain->image_count; ++i) {
-    vkDestroyImageView(context->device.logical_device, swapchain->views[i], context->allocator);
+    vkDestroyImageView(vkdevice, swapchain->views[i], context->allocator);
   }
 
-  vkDestroySwapchainKHR(context->device.logical_device, swapchain->handle, context->allocator);
+  vkDestroySwapchainKHR(vkdevice, swapchain->handle, context->allocator);
 }

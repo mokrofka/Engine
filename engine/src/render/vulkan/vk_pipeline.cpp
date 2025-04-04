@@ -120,7 +120,7 @@ b8 vk_graphics_pipeline_create(
   
   // Create the pipeline layout.
   VK_CHECK(vkCreatePipelineLayout(
-    context->device.logical_device, 
+    vkdevice, 
     &pipeline_layout_create_info, 
     context->allocator, 
     &pipeline->pipeline_layout));
@@ -148,7 +148,7 @@ b8 vk_graphics_pipeline_create(
   pipeline_create_info.basePipelineIndex = -1;
   
   VkResult result = vkCreateGraphicsPipelines(
-    context->device.logical_device, 
+    vkdevice, 
     VK_NULL_HANDLE, 
     1, 
     &pipeline_create_info, 
@@ -168,13 +168,13 @@ void vk_pipeline_destroy(VK_Context* context, VK_Pipeline* pipeline) {
   if (pipeline) {
     // Destroy pipeline
     if (pipeline->handle) {
-      vkDestroyPipeline(context->device.logical_device, pipeline->handle, context->allocator);
+      vkDestroyPipeline(vkdevice, pipeline->handle, context->allocator);
       pipeline->handle = 0;
     }
     
     // Destroy layotu
     if (pipeline->pipeline_layout) {
-      vkDestroyPipelineLayout(context->device.logical_device, pipeline->pipeline_layout, context->allocator);
+      vkDestroyPipelineLayout(vkdevice, pipeline->pipeline_layout, context->allocator);
       pipeline->pipeline_layout = 0;
     }
   }

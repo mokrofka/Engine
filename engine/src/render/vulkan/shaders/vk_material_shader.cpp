@@ -32,7 +32,7 @@ b8 vk_material_shader_create(VK_Context* context, VK_MaterialShader* out_shader)
   VkDescriptorSetLayoutCreateInfo global_layout_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
   global_layout_info.bindingCount = 1;
   global_layout_info.pBindings = &global_ubo_layout_binding;
-  VK_CHECK(vkCreateDescriptorSetLayout(context->device.logical_device, &global_layout_info, context->allocator, &out_shader->global_descriptor_set_layout));
+  VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &global_layout_info, context->allocator, &out_shader->global_descriptor_set_layout));
   
   // Global descriptor pool: Used for global items such as view/projection matrix
   VkDescriptorPoolSize global_pool_size;
@@ -43,7 +43,7 @@ b8 vk_material_shader_create(VK_Context* context, VK_MaterialShader* out_shader)
   global_pool_info.poolSizeCount = 1; // number of VkDescriptorPoolSize objects
   global_pool_info.pPoolSizes = &global_pool_size;
   global_pool_info.maxSets = context->swapchain.image_count;
-  VK_CHECK(vkCreateDescriptorPool(context->device.logical_device, &global_pool_info, context->allocator, &out_shader->global_descriptor_pool));
+  VK_CHECK(vkCreateDescriptorPool(vkdevice, &global_pool_info, context->allocator, &out_shader->global_descriptor_pool));
   
   // Local/Object Descriptors
   const u32 local_sample_count = 1;
@@ -62,7 +62,7 @@ b8 vk_material_shader_create(VK_Context* context, VK_MaterialShader* out_shader)
   VkDescriptorSetLayoutCreateInfo layout_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
   layout_info.bindingCount = VULKAN_MATERIAL_SHADER_DESCRIPTOR_COUNT ;
   layout_info.pBindings = bindings;
-  VK_CHECK(vkCreateDescriptorSetLayout(context->device.logical_device, &layout_info, 0, &out_shader->object_descriptor_set_layout));
+  VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &layout_info, 0, &out_shader->object_descriptor_set_layout));
   
   // Local/Object descriptor pool: Used for object-specific items like diffuse color
   VkDescriptorPoolSize object_pool_sizes[2];
@@ -79,7 +79,7 @@ b8 vk_material_shader_create(VK_Context* context, VK_MaterialShader* out_shader)
   object_pool_info.maxSets = VULKAN_MAX_MATERIAL_COUNT;
   
   // Create object descriptor pool
-  VK_CHECK(vkCreateDescriptorPool(context->device.logical_device, &object_pool_info, context->allocator, &out_shader->object_descriptor_pool));
+  VK_CHECK(vkCreateDescriptorPool(vkdevice, &object_pool_info, context->allocator, &out_shader->object_descriptor_pool));
   
   // Pipeline creation
   VkViewport viewport;
@@ -170,7 +170,7 @@ b8 vk_material_shader_create(VK_Context* context, VK_MaterialShader* out_shader)
   alloc_info.descriptorPool = out_shader->global_descriptor_pool;
   alloc_info.descriptorSetCount = 3;
   alloc_info.pSetLayouts = global_layouts;
-  VK_CHECK(vkAllocateDescriptorSets(context->device.logical_device, &alloc_info, out_shader->global_descriptor_sets));
+  VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, out_shader->global_descriptor_sets));
   
   // Create the object uniform buffer
   if (!vk_buffer_create(
@@ -188,7 +188,7 @@ b8 vk_material_shader_create(VK_Context* context, VK_MaterialShader* out_shader)
 }
 
 void vk_material_shader_destroy(VK_Context* context, VK_MaterialShader* shader) {
-  VkDevice logical_device = context->device.logical_device;
+  VkDevice logical_device = vkdevice;
   
   vkDestroyDescriptorPool(logical_device, shader->object_descriptor_pool, context->allocator);
   vkDestroyDescriptorSetLayout(logical_device, shader->object_descriptor_set_layout, context->allocator);
@@ -208,7 +208,7 @@ void vk_material_shader_destroy(VK_Context* context, VK_MaterialShader* shader) 
   
   // Destroy shader modules
   for (u32 i = 0; i < MATERIAL_SHADER_STAGE_COUNT; ++i) {
-    vkDestroyShaderModule(context->device.logical_device, shader->stages[i].handle, context->allocator);
+    vkDestroyShaderModule(vkdevice, shader->stages[i].handle, context->allocator);
     shader->stages[i].handle = 0;
   }
 }
@@ -249,7 +249,7 @@ void vk_material_shader_update_global_state(VK_Context* context, VK_MaterialShad
   descriptor_write.descriptorCount = 1;
   descriptor_write.pBufferInfo = &buffer_info;
   
-  vkUpdateDescriptorSets(context->device.logical_device, 1, &descriptor_write, 0, 0);
+  vkUpdateDescriptorSets(vkdevice, 1, &descriptor_write, 0, 0);
 }
 
 void vk_material_shader_update_object(VK_Context* context, VK_MaterialShader* shader, GeometryRenderData data) {
@@ -322,7 +322,7 @@ void vk_material_shader_update_object(VK_Context* context, VK_MaterialShader* sh
 
     // Check if the descriptor needs updating first
     if (t && (*descriptor_id != t->id || *descriptor_generation != t->generation || *descriptor_generation == INVALID_ID)) {
-      VulkanTextureData* internal_data = (VulkanTextureData*)t->internal_data;
+      VK_TextureData* internal_data = (VK_TextureData*)t->internal_data;
 
       // Assign view and sampler
       image_infos[sampler_index].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -349,7 +349,7 @@ void vk_material_shader_update_object(VK_Context* context, VK_MaterialShader* sh
   }
 
   if (descriptor_count > 0) {
-    vkUpdateDescriptorSets(context->device.logical_device, descriptor_count, descriptor_writes, 0, 0);
+    vkUpdateDescriptorSets(vkdevice, descriptor_count, descriptor_writes, 0, 0);
   }
   
   // Bind the descriptor set to be updated, or in case the shader changed
@@ -381,7 +381,7 @@ b8 vk_material_shader_acquire_resources(VK_Context* context, VK_MaterialShader* 
   alloc_info.descriptorPool = shader->object_descriptor_pool;
   alloc_info.descriptorSetCount = 3; // one per frame
   alloc_info.pSetLayouts = layouts;
-  VkResult result = vkAllocateDescriptorSets(context->device.logical_device, &alloc_info, object_state->descriptor_sets);
+  VkResult result = vkAllocateDescriptorSets(vkdevice, &alloc_info, object_state->descriptor_sets);
   if (result != VK_SUCCESS) {
     Error("Error allocating descriptor sets in shader!");
     return false;
@@ -395,7 +395,7 @@ void vk_material_shader_release_resources(VK_Context* context, VK_MaterialShader
   
   const u32 descriptor_set_count = 3;
   // Release object descriptor sets
-  VkResult result = vkFreeDescriptorSets(context->device.logical_device, shader->object_descriptor_pool, descriptor_set_count, object_state->descriptor_sets);
+  VkResult result = vkFreeDescriptorSets(vkdevice, shader->object_descriptor_pool, descriptor_set_count, object_state->descriptor_sets);
   if (result != VK_SUCCESS) {
     Error("Error freeing object shader descriptor sets!");
   }

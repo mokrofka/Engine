@@ -17,7 +17,7 @@ void vk_command_buffer_alloc(
 
   out_command_buffer->state = COMMAND_BUFFER_STATE_NOT_ALLOCATED;
   VK_CHECK(vkAllocateCommandBuffers(
-      context->device.logical_device,
+      vkdevice,
       &allocate_info,
       &out_command_buffer->handle));
 
@@ -29,7 +29,7 @@ void vk_command_buffer_free(
     VkCommandPool pool,
     VK_CommandBuffer* command_buffer) {
   vkFreeCommandBuffers(
-    context->device.logical_device,
+    vkdevice,
     pool,
     1,
     &command_buffer->handle);

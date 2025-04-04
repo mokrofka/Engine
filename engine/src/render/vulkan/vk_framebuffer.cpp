@@ -29,14 +29,14 @@ void vk_framebuffer_create(
   framebuffer_create_info.layers = 1;
   
   VK_CHECK(vkCreateFramebuffer(
-    context->device.logical_device, 
+    vkdevice, 
     &framebuffer_create_info, 
     context->allocator, 
     &out_framebuffer->handle));
 }
 
 void vk_framebuffer_destroy(VK_Context* context, VK_Framebuffer* framebuffer) {
-  vkDestroyFramebuffer(context->device.logical_device, framebuffer->handle, context->allocator);
+  vkDestroyFramebuffer(vkdevice, framebuffer->handle, context->allocator);
   if (framebuffer->attachments) {
      
   }

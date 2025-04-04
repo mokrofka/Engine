@@ -31,8 +31,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
 internal i32 find_memory_index(u32 type_filter, u32 property_flags);
 
 internal void create_command_buffers();
-internal void 
-regenerate_framebuffers(VK_Swapchain* swapchain, VK_RenderPass * renderpass);
+internal void regenerate_framebuffers(VK_Swapchain* swapchain, VK_RenderPass* renderpass);
 internal b8 recreate_swapchain();
 internal b8 create_buffers(VK_Context* context);
 
@@ -99,38 +98,38 @@ b8 vk_r_backend_init(R_Backend* backend) {
   const char* required_validation_layer_names[1];
   u32 required_validation_layer_count = ArrayCount(required_validation_layer_names);
 // If validation should be done, get a list of the required validation layert names
-// and make sure they exist. Validation layers should only be enabled on non-release builds. 
+// and make sure they exist. Validation layers should only be enabled on non-release builds.
 #if defined(_DEBUG)
-    Info("Validation layers enabled. Enumerating...");
-    // The list of validation layers required.
-    required_validation_layer_names[0] = "VK_LAYER_KHRONOS_validation";
-    
-    // Obtain a list of available validation layers
-    u32 available_layer_count = 0;
-    VK_CHECK(vkEnumerateInstanceLayerProperties(&available_layer_count, 0));
-    // VkLayerProperties* available_layers = darray_reserve(VkLayerProperties, available_layer_count);
-    VkLayerProperties* available_layers = push_array(context->arena, VkLayerProperties, available_layer_count);
-    VK_CHECK(vkEnumerateInstanceLayerProperties(&available_layer_count, available_layers));
-    
-    // Verify all required layers are available.
-    for (u32 i = 0; i < required_validation_layer_count; ++i) {
-        Info("Searching for layer: %s...", required_validation_layer_names[i]);
-        b8 found = false;
-        for (u32 j = 0; j < available_layer_count; ++j) {
-            if (cstr_equal(required_validation_layer_names[i], available_layers[j].layerName)) {
-                found = true;
-                Info("Found.");
-                break;
-            }
-        }
-        if (!found) {
-            Fatal("Required validation layer is missing: %s", required_validation_layer_names[i]);
-            return false;
-        }
+  Info("Validation layers enabled. Enumerating...");
+  // The list of validation layers required.
+  required_validation_layer_names[0] = "VK_LAYER_KHRONOS_validation";
+
+  // Obtain a list of available validation layers
+  u32 available_layer_count = 0;
+  VK_CHECK(vkEnumerateInstanceLayerProperties(&available_layer_count, 0));
+  // VkLayerProperties* available_layers = darray_reserve(VkLayerProperties, available_layer_count);
+  VkLayerProperties* available_layers = push_array(context->arena, VkLayerProperties, available_layer_count);
+  VK_CHECK(vkEnumerateInstanceLayerProperties(&available_layer_count, available_layers));
+
+  // Verify all required layers are available.
+  for (u32 i = 0; i < required_validation_layer_count; ++i) {
+    Info("Searching for layer: %s...", required_validation_layer_names[i]);
+    b8 found = false;
+    for (u32 j = 0; j < available_layer_count; ++j) {
+      if (cstr_equal(required_validation_layer_names[i], available_layers[j].layerName)) {
+        found = true;
+        Info("Found.");
+        break;
+      }
     }
-    Info("All required validation layers are present.");
+    if (!found) {
+      Fatal("Required validation layer is missing: %s", required_validation_layer_names[i]);
+      return false;
+    }
+  }
+  Info("All required validation layers are present.");
 #endif
-  
+
   create_info.enabledLayerCount = required_validation_layer_count;
   create_info.ppEnabledLayerNames = required_validation_layer_names;
   
@@ -206,9 +205,9 @@ b8 vk_r_backend_init(R_Backend* backend) {
 
   for (u8 i = 0; i < context->swapchain.max_frames_in_flight; ++i) {
     VkSemaphoreCreateInfo semaphore_create_info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-    vkCreateSemaphore(context->device.logical_device, &semaphore_create_info, context->allocator,
+    vkCreateSemaphore(vkdevice, &semaphore_create_info, context->allocator,
                       &context->image_available_semaphores[i]);
-    vkCreateSemaphore(context->device.logical_device, &semaphore_create_info, context->allocator,
+    vkCreateSemaphore(vkdevice, &semaphore_create_info, context->allocator,
                       &context->queue_complete_semaphores[i]);
     
     vk_fence_create(context, true, &context->in_flight_fences[i]);
@@ -270,7 +269,7 @@ b8 vk_r_backend_init(R_Backend* backend) {
 }
 
 void vk_r_backend_shutdown() {
-  vkDeviceWaitIdle(context->device.logical_device);
+  vkDeviceWaitIdle(vkdevice);
   
   // Destroy in opposite order of creation
   // buffers
@@ -282,12 +281,12 @@ void vk_r_backend_shutdown() {
   // Sync objects
   for (u8 i = 0; i < context->swapchain.max_frames_in_flight; ++i) {
     if (context->image_available_semaphores[i]) {
-      vkDestroySemaphore(context->device.logical_device,
+      vkDestroySemaphore(vkdevice,
                          context->image_available_semaphores[i],
                          context->allocator);
     }
     if (context->queue_complete_semaphores[i]) {
-      vkDestroySemaphore(context->device.logical_device,
+      vkDestroySemaphore(vkdevice,
                          context->queue_complete_semaphores[i],
                          context->allocator);
     }
@@ -589,7 +588,6 @@ internal void create_command_buffers() {
       MemZeroStruct(&context->graphics_command_buffers[i]);
     }
   }
-  
   for (u32 i = 0; i < context->swapchain.image_count; ++i) {
     if (context->graphics_command_buffers[i].handle) {
       vk_command_buffer_free(
@@ -607,8 +605,7 @@ internal void create_command_buffers() {
   Debug("Vulkan command buffers created.");
 }
 
-internal void 
-regenerate_framebuffers(VK_Swapchain* swapchain, VK_RenderPass * renderpass) {
+internal void regenerate_framebuffers(VK_Swapchain* swapchain, VK_RenderPass* renderpass) {
   for (u32 i = 0; i < swapchain->image_count; ++i) {
     // TODO: make this dynamic based on the currently configured attachments
     u32 attachment_count = 2;
@@ -644,7 +641,7 @@ internal b8 recreate_swapchain() {
   context->recreating_swapchain = true;
 
   // Wait for any operations to complete.
-  vkDeviceWaitIdle(context->device.logical_device);
+  vkDeviceWaitIdle(vkdevice);
 
   // Clear these out just in case.
   for (u32 i = 0; i < context->swapchain.image_count; ++i) {
@@ -737,8 +734,8 @@ internal b8 create_buffers(VK_Context* context) {
 
 void vk_r_create_texture(const u8* pixels, Texture* texture) {
   // Internal data creation
-  texture->internal_data = push_struct(context->arena, VulkanTextureData);
-  VulkanTextureData* data = (VulkanTextureData*)texture->internal_data;
+  texture->internal_data = push_struct(context->arena, VK_TextureData);
+  VK_TextureData* data = (VK_TextureData*)texture->internal_data;
   VkDeviceSize image_size = texture->width * texture->height * texture->channel_count;
   
   // NOTE assumes 8 bits per channel
@@ -816,7 +813,7 @@ void vk_r_create_texture(const u8* pixels, Texture* texture) {
   sampler_info.minLod = 0.0f;
   sampler_info.maxLod = 0.0f;
   
-  VkResult result = vkCreateSampler(context->device.logical_device, &sampler_info, context->allocator, &data->sampler);
+  VkResult result = vkCreateSampler(vkdevice, &sampler_info, context->allocator, &data->sampler);
   if (!vk_result_is_success(VK_SUCCESS)) {
     Error("Error creating texture sampler: %s", vk_result_string(result, true));
     return;
@@ -826,13 +823,13 @@ void vk_r_create_texture(const u8* pixels, Texture* texture) {
 }
 
 void vk_r_destroy_texture(Texture* texture) {
-  vkDeviceWaitIdle(context->device.logical_device);
+  vkDeviceWaitIdle(vkdevice);
   
-  VulkanTextureData* data = (VulkanTextureData*)texture->internal_data;
+  VK_TextureData* data = (VK_TextureData*)texture->internal_data;
   if (data) {
     vk_image_destroy(context, &data->image);
     MemZeroStruct(&data->image);
-    vkDestroySampler(context->device.logical_device, data->sampler, context->allocator);
+    vkDestroySampler(vkdevice, data->sampler, context->allocator);
     data->sampler = 0;
     // TODO free memory
   }
