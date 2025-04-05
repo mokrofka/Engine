@@ -1,9 +1,10 @@
+#include "vk_os.h"
+
 #include <os.h>
 #include <logger.h>
 
 #include <windows.h>
 
-#include <vulkan/vulkan.h>
 #include <vulkan/vulkan_win32.h>
 
 struct Win32HandleInfo {
@@ -26,8 +27,11 @@ struct VK_Context {
   VkSurfaceKHR surface;
 };
 
+extern VK_Context* context;
+
 // Surface creation for Vulkan
-b8 vk_os_create_surface(VK_Context* context) {
+VkSurfaceKHR vk_os_create_surface() {
+  VkSurfaceKHR surface = {};
   // Simply cold-cast to the known type.
   // InternalState* state = (InternalState*)plat_state->internal_state;
   HINSTANCE h_instance = (HINSTANCE)os_get_handle_info();
@@ -38,10 +42,10 @@ b8 vk_os_create_surface(VK_Context* context) {
   create_info.hwnd = hwnd;
 
   VkResult result = vkCreateWin32SurfaceKHR(context->instance, &create_info,
-                                            context->allocator, &context->surface);
+                                            context->allocator, &surface);
   if (result != VK_SUCCESS) {
     Fatal("Vulkan surface creation failed.");
-    return false;
+    return 0;
   }
-  return true;
+  return surface;
 }

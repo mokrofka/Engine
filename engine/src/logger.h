@@ -21,24 +21,23 @@ enum LogLevel {
   LOG_LEVEL_TRACE = 5,
 };
 
-struct Arena;
-
-KAPI b8 logging_init(Arena* arena);
+void logging_init(Arena* arena);
 void shutdown_logging();
 
-KAPI void log_output(LogLevel level, const char* message, ...);
+KAPI void _log_output(LogLevel level, const char* message, ...);
 
 // Logs a fatal-level message.
-#define Fatal(message, ...) log_output(LOG_LEVEL_FATAL, message, ##__VA_ARGS__)
+#define Fatal(message, ...) _log_output(LOG_LEVEL_FATAL, message, ##__VA_ARGS__)
 
 #ifndef KERROR
 // Logs an error-level message.
-#define Error(message, ...) log_output(LOG_LEVEL_ERROR, message, ##__VA_ARGS__)
+#  define Error(message, ...) _log_output(LOG_LEVEL_ERROR, message, ##__VA_ARGS__); \
+      Assert(false);
 #endif
 
 #if LOG_WARN_ENABLED == 1
 // Logs a warning-level message.
-#define Warn(message, ...) log_output(LOG_LEVEL_WARN, message, ##__VA_ARGS__)
+#define Warn(message, ...) _log_output(LOG_LEVEL_WARN, message, ##__VA_ARGS__)
 #else
 // Does nothing when LOG_WARN_ENABLED != 1
 #define Warn(message, ...);
@@ -46,7 +45,7 @@ KAPI void log_output(LogLevel level, const char* message, ...);
 
 #if LOG_INFO_ENABLED == 1
 // Logs a info-level message.
-#define Info(message, ...) log_output(LOG_LEVEL_INFO, message, ##__VA_ARGS__)
+#define Info(message, ...) _log_output(LOG_LEVEL_INFO, message, ##__VA_ARGS__)
 #else
 // Does nothing when LOG_INFO_ENABLED != 1
 #define Info(message, ...);
@@ -54,7 +53,7 @@ KAPI void log_output(LogLevel level, const char* message, ...);
 
 #if LOG_DEBUG_ENABLED == 1
 // Logs a debug-level message.
-#define Debug(message, ...) log_output(LOG_LEVEL_DEBUG, message, ##__VA_ARGS__)
+#define Debug(message, ...) _log_output(LOG_LEVEL_DEBUG, message, ##__VA_ARGS__)
 #else
 // Does nothing when LOG_DEBUG_ENABLED != 1
 #define Debug(message, ...);
@@ -62,7 +61,7 @@ KAPI void log_output(LogLevel level, const char* message, ...);
 
 #if LOG_TRACE_ENABLED == 1
 // Logs a trace-level message.
-#define Trace(message, ...) log_output(LOG_LEVEL_TRACE, message, ##__VA_ARGS__)
+#define Trace(message, ...) _log_output(LOG_LEVEL_TRACE, message, ##__VA_ARGS__)
 #else
 // Does nothing when LOG_TRACE_ENABLED != 1
 #define Trace(message, ...);

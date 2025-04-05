@@ -39,7 +39,7 @@ internal void clock_setup() {
   QueryPerformanceCounter(&start_time);
 }
 
-b8 platform_init(Arena* arena) {
+void platform_init(Arena* arena) {
   u64 memory_requirement = sizeof(PlatformState)+sizeof(Window)+sizeof(WindowPlatformState);
   state = push_buffer(arena, PlatformState, memory_requirement);
   
@@ -61,16 +61,11 @@ b8 platform_init(Arena* arena) {
   wc.hbrBackground = NULL;
   wc.lpszClassName = "kohi_window_class";
   
-  if (!RegisterClassA(&wc)) {
-    MessageBoxA(0, "Window registration failed", "Error", MB_ICONEXCLAMATION | MB_OK);
-    return false;
-  }
-  
-  return true;
+  RegisterClassA(&wc);
 }
 
-b8 os_window_create(Window* window, WindowConfig config) {
-  window = (Window*)((u8*)state + sizeof(PlatformState));
+void os_window_create(WindowConfig config) {
+  Window* window = (Window*)((u8*)state + sizeof(PlatformState));
   window->platform_state = (WindowPlatformState*)((u8*)window + sizeof(Window));
   state->window = window;
   state->window->width = config.width;
@@ -113,8 +108,7 @@ b8 os_window_create(Window* window, WindowConfig config) {
   if (handle == 0) {
     MessageBoxA(NULL, "window creating failed!", "Error!", MB_ICONEXCLAMATION | MB_OK);
     
-    Fatal("Window creating failed!");
-    return false;
+    Error("Window creating failed!");
   } else {
     window->platform_state->hwnd = handle;
   }
@@ -124,8 +118,6 @@ b8 os_window_create(Window* window, WindowConfig config) {
   // If initially minimmized, use SW_MINIMIZE : SW_SHOWMINNOACTIVE;
   // If initially minimmized, use SW_SHOWMAXIMIZED : SW_MAXIMIZE;
   ShowWindow(window->platform_state->hwnd, show_window_command_flags);
-  
-  return true;
 }
 
 void os_platform_shutdown() {
@@ -135,14 +127,12 @@ void os_platform_shutdown() {
   }
 }
 
-b8 os_pump_messages() {
+void os_pump_messages() {
   MSG message;
   while (PeekMessageA(&message, NULL, 0, 0, PM_REMOVE)) {
     TranslateMessage(&message);
     DispatchMessageA(&message);
   }
-  
-  return true;
 }
 
 #define BaseAddress (void*)TB(2)
@@ -253,7 +243,7 @@ void os_register_window_resized_callback(WindowResizedCallback callback) {
   state->window_resized_callback = callback;
 }
 
-void os_window_destroy(Window* window) {
+void os_window_destroy() {
   Trace("Destroying window...");
   DestroyWindow(state->window->platform_state->hwnd);
   state->window->platform_state->hwnd = 0;

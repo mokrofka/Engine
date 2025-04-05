@@ -232,7 +232,7 @@ String str_skip_last_slash(String string) {
       string.str = ptr;
     }
   }
-  return (string);
+  return string;
 }
 
 String str_chop_last_dot(String string) {
@@ -245,7 +245,7 @@ String str_chop_last_dot(String string) {
       break;
     }
   }
-  return (result);
+  return result;
 }
 
 String str_trim(String string) {

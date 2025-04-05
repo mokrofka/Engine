@@ -6,22 +6,13 @@
 #include <memory.h>
 #include <str.h>
 
-extern b8 application_create(Application* out_app);
+ void application_create(Application* out_app);
 
 int main() {
   Application app_inst = {};
-  if (!application_create(&app_inst)) {
-    Fatal("Failed to create application");
-    return 1;
-  }
+  application_create(&app_inst);
   
-  if (!engine_create(&app_inst)) {
-    Fatal("Failed to create engine");
-    return 1;
-  }
+  engine_create(&app_inst);
   
-  if (!engine_run(&app_inst)) {
-    Fatal("Application did not shutdown gracefully.");
-    return 1;
-  }
+  engine_run(&app_inst);
 }

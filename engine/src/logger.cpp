@@ -21,23 +21,20 @@ internal void append_to_log_file(const char* message) {
   }
 }
 
-b8 logging_init(Arena* arena) {
+void logging_init(Arena* arena) {
   state = push_struct(arena, LoggerSystemState);
   
   state->log_file_handle = os_file_open(str_lit("console.log"), FILE_MODE_WRITE);
   if (!state->log_file_handle.u64) {
     Error("Unable to open console.log for writing.");
-    return false;
   }
-  
-  return true;
 }
 
 void shutdown_logging() {
   // TODO: cleanup logging/write queued entries.
 }
 
-void log_output(LogLevel level, const char* message, ...) {
+void _log_output(LogLevel level, const char* message, ...) {
   const char* level_strings[6] = {"[FATAL]: ", "[ERROR]: ", "[WARN]:  ", "[INFO]:  ", "[DEBUG]: ", "[TRACE]: "};
   b8 is_error = level < 2;
 
@@ -70,6 +67,6 @@ void log_output(LogLevel level, const char* message, ...) {
 
 void 
 report_assertion_failure(const char* expression, const char* message, const char* file, i32 line) {
-    log_output(LOG_LEVEL_FATAL, "Assertion Failure: %s, message: '%s', in file: %s, "
+    _log_output(LOG_LEVEL_FATAL, "Assertion Failure: %s, message: '%s', in file: %s, "
                "line: %d\n", expression, message, file, line);
 }

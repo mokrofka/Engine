@@ -1,7 +1,6 @@
 #include <entry.h>
 
-b8 load_game_lib(Application* app) {
-  
+internal b8 load_game_lib(Application* app) {
   app->game_lib.last_time_write = os_file_last_write_time(app->game_lib.src_full_filename);
   os_file_copy(app->game_lib.src_full_filename, app->game_lib.temp_full_filename);
   
@@ -22,7 +21,7 @@ b8 load_game_lib(Application* app) {
   return true;
 }
   
-b8 application_create(Application* app) {
+void application_create(Application* app) {
   app->arena = arena_alloc(GB(1));
   tctx_init(app->arena);
   
@@ -39,8 +38,5 @@ b8 application_create(Application* app) {
 
   if (!load_game_lib(app)) {
     Error("Initial game lib load failed!");
-    return false;
   }
-
-  return true;
 }

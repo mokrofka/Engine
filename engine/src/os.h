@@ -56,11 +56,11 @@ using WindowClosedCallback = void (*)();
 using ProcessKeyCallback = void (*)(Keys key, b8 pressed);
 using WindowResizedCallback = void (*)(Window* window);
 
-KAPI b8 os_pump_messages();
+void os_pump_messages();
 
-KAPI b8 platform_init(Arena* arena);
-KAPI b8 os_window_create(Window* window, WindowConfig config);
-KAPI void os_platform_shutdown();
+void platform_init(Arena* arena);
+void os_window_create(WindowConfig config);
+void os_platform_shutdown();
 
 void* os_allocate(u64 size, b8 at_base);
 void* os_allocate(u64 size);
@@ -73,24 +73,24 @@ b8 _platform_memory_compare(void* a, void* b, u64 size);
 void os_console_write(const char* message, u8 color);
 void os_console_write_error(const char* message, u8 color);
 
-KAPI f64 os_now_seconds();
+f64 os_now_seconds();
 // Sleep on the thread for the provided ms. This blocks the main thread.
 // Should only be used for giving time back to the OS for unused update power.
 // Therefore it is not exported.
-KAPI void os_sleep(u64 ms);
+void os_sleep(u64 ms);
 
 KAPI void* os_library_load(String name);
 KAPI b8 os_library_unload(DynamicLibrary library);
 KAPI void* os_library_load_function(String name, DynamicLibrary library);
 
-KAPI void os_register_process_key(ProcessKeyCallback  callback);
-KAPI void os_register_window_closed_callback(WindowClosedCallback callback);
-KAPI void os_register_window_resized_callback(WindowResizedCallback callback);
+void os_register_process_key(ProcessKeyCallback  callback);
+void os_register_window_closed_callback(WindowClosedCallback callback);
+void os_register_window_resized_callback(WindowResizedCallback callback);
 
-KAPI void os_window_destroy(Window* window);
-KAPI void* os_get_handle_info();
-KAPI void* os_get_window_handle();
-KAPI v2i os_get_framebuffer_size();
+void os_window_destroy();
+void* os_get_handle_info();
+void* os_get_window_handle();
+v2i os_get_framebuffer_size();
 
 // files
 KAPI b8 os_file_path_exists(String path);

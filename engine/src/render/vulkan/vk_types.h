@@ -254,4 +254,4 @@ struct VK_TextureData {
   VkSampler sampler;
 };
 
-extern VK_Context state;
+extern VK_Context* context;

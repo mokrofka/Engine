@@ -20,19 +20,19 @@ struct VK_PhysicalDeviceQueueFamilyInfo {
   u32 transfer_family_index;
 };
 
-internal b8 select_physical_device(VK_Context* context);
+internal VkPhysicalDevice select_physical_device();
 internal b8 physical_device_meets_requirements(
-    VkPhysicalDevice device, VK_Context* context,
+    VkPhysicalDevice device,
     const VkPhysicalDeviceProperties *properties,
     const VkPhysicalDeviceFeatures *features,
     const VK_PhysicalDeviceRequirements *requirements,
     VK_PhysicalDeviceQueueFamilyInfo *out_queue_family_info,
     VK_SwapchainSupportInfo *out_swapchain_support);
 
-b8 vk_device_create(VK_Context *context) {
-  if (!select_physical_device(context)) {
-    return false;
-  }
+VK_Device vk_device_create() {
+  VK_Device device = {};
+  // device.physical_device = 
+  select_physical_device();
   
   Info("Creating logical device...");
   // NOTE: Do not create additional queues for shared indices.
@@ -127,10 +127,10 @@ b8 vk_device_create(VK_Context *context) {
     &context->device.graphics_command_pool));
   Info("Graphics command pool created.");
 
-  return true;
+  return device;
 }
 
-void vk_device_destroy(VK_Context* context) {
+void vk_device_destroy() {
   
   // Unset queues
   context->device.graphics_queue = 0;
@@ -180,7 +180,6 @@ void vk_device_destroy(VK_Context* context) {
 
 void vk_device_query_swapchain_support(
     VkPhysicalDevice physical_device,
-    VK_Context* context,
     VK_SwapchainSupportInfo* out_support_info) {
 
   // Surface capabilities
@@ -252,13 +251,9 @@ b8 vk_device_detect_depth_format(VK_Device* device) {
   return false;
 }
 
-internal b8 select_physical_device(VK_Context* context) {
+internal VkPhysicalDevice select_physical_device() {
   u32 physical_device_count = 0;
   VK_CHECK(vkEnumeratePhysicalDevices(context->instance, &physical_device_count, 0));
-  if (physical_device_count == 0) {
-    Fatal("No devices which support Vulkan were found.");
-    return false;
-  }
   
   const u32 max_device_count = 32;
   VkPhysicalDevice physical_devices[max_device_count];
@@ -272,7 +267,6 @@ internal b8 select_physical_device(VK_Context* context) {
     
     VkPhysicalDeviceMemoryProperties memory;
     vkGetPhysicalDeviceMemoryProperties(physical_devices[i], &memory);
-    
     
     // TODO; There requirements should probably be drive by engine
     // configuration
@@ -292,72 +286,69 @@ internal b8 select_physical_device(VK_Context* context) {
     // darray_push(requirements.device_extension_names, &VK_KHR_SWAPCHAIN_EXTENSION_NAME);
     
     VK_PhysicalDeviceQueueFamilyInfo queue_info = {};
-    b8 result = physical_device_meets_requirements(
+    physical_device_meets_requirements(
         physical_devices[i],
-        context,
         &properties,
         &features,
         &requirements,
         &queue_info,
         &context->device.swapchain_support);
-    
-    if (result) {
-      Info("Selected device: '%s'.", properties.deviceName);
-      // GPU type, etc.
-      switch (properties.deviceType) {
-        default:
-        case VK_PHYSICAL_DEVICE_TYPE_OTHER:
-          Info("GPU type is Unkown.");
-          break;
-        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
-          Info("GPU type is Integrated.");
-          break;
-        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
-          Info("GPU type is Descrete.");
-          break;
-        case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
-          Info("GPU type is Virtual.");
-          break;
-        case VK_PHYSICAL_DEVICE_TYPE_CPU:
-          Info("GPU type is CPU.");
-          break;
-      }
-      
-      Info(
+
+    Info("Selected device: '%s'.", properties.deviceName);
+    // GPU type, etc.
+    switch (properties.deviceType) {
+    default:
+    case VK_PHYSICAL_DEVICE_TYPE_OTHER:
+      Info("GPU type is Unkown.");
+      break;
+    case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+      Info("GPU type is Integrated.");
+      break;
+    case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+      Info("GPU type is Descrete.");
+      break;
+    case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+      Info("GPU type is Virtual.");
+      break;
+    case VK_PHYSICAL_DEVICE_TYPE_CPU:
+      Info("GPU type is CPU.");
+      break;
+    }
+
+    Info(
         "GPU Driver version: %i.%i.%i",
         VK_VERSION_MAJOR(properties.driverVersion),
         VK_VERSION_MINOR(properties.driverVersion),
         VK_VERSION_PATCH(properties.driverVersion));
-        
-      // Vulkan API version.
-      Info(
+
+    // Vulkan API version.
+    Info(
         "GPU API version: %i.%i.%i",
         VK_VERSION_MAJOR(properties.apiVersion),
         VK_VERSION_MINOR(properties.apiVersion),
         VK_VERSION_PATCH(properties.apiVersion));
 
-      // Memory information
-      for (i32 j = 0; j < memory.memoryHeapCount; ++j) {
-        f32 memory_size_gib = (((f32)memory.memoryHeaps[j].size) / 1024.0f / 1024.0f / 1024.0f);
-        if (memory.memoryHeaps[j].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) {
-          Info("Local GPU memory: %.2f GiB", memory_size_gib);
-        } else {
-          Info("Shared System memory: %.2f GiB", memory_size_gib);
-        }
+    // Memory information
+    for (i32 j = 0; j < memory.memoryHeapCount; ++j) {
+      f32 memory_size_gib = (((f32)memory.memoryHeaps[j].size) / 1024.0f / 1024.0f / 1024.0f);
+      if (memory.memoryHeaps[j].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) {
+        Info("Local GPU memory: %.2f GiB", memory_size_gib);
+      } else {
+        Info("Shared System memory: %.2f GiB", memory_size_gib);
       }
-
-      context->device.physical_device = physical_devices[i];
-      context->device.graphics_queue_index = queue_info.graphics_family_index;
-      context->device.present_queue_index = queue_info.present_family_index;
-      context->device.transfer_queue_index = queue_info.transfer_family_index;
-      // NOTE: set computer index here if needed.
-
-      // Keep a copy of properties, features and memory info for later use.
-      context->device.properties = properties;
-      context->device.features = features;
-      context->device.memory = memory;
-      break;
     }
+
+    context->device.physical_device = physical_devices[i];
+    context->device.graphics_queue_index = queue_info.graphics_family_index;
+    context->device.present_queue_index = queue_info.present_family_index;
+    context->device.transfer_queue_index = queue_info.transfer_family_index;
+    // NOTE: set computer index here if needed.
+
+    // Keep a copy of properties, features and memory info for later use.
+    context->device.properties = properties;
+    context->device.features = features;
+    context->device.memory = memory;
+    break;
   }
   
   // Ensure a device was selected
@@ -367,11 +358,11 @@ internal b8 select_physical_device(VK_Context* context) {
   }
   
   Info("Physical device selected.");
-  return true;
+  return 0;
 }
 
 internal b8 physical_device_meets_requirements(
-    VkPhysicalDevice device, VK_Context* context,
+    VkPhysicalDevice device,
     const VkPhysicalDeviceProperties* properties,
     const VkPhysicalDeviceFeatures* features,
     const VK_PhysicalDeviceRequirements* requirements,
@@ -457,7 +448,7 @@ internal b8 physical_device_meets_requirements(
     Trace("Compute Family Index: %i", out_queue_info->compute_family_index);
 
     // Query swapchain support.
-    vk_device_query_swapchain_support(device, context, out_swapchain_support);
+    vk_device_query_swapchain_support(device, out_swapchain_support);
 
     if (out_swapchain_support->format_count < 1 || out_swapchain_support->present_mode_count < 1) {
       Info("Required swapchain support not present, skipping device.");

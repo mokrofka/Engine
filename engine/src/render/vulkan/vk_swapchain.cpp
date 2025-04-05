@@ -121,7 +121,6 @@ void create(VK_Context* context, u32 width, u32 height, VK_Swapchain * swapchain
   // Requery swapchain support.
   vk_device_query_swapchain_support(
     context->device.physical_device, 
-    context, 
     &context->device.swapchain_support);
   
   // Swapchain extent

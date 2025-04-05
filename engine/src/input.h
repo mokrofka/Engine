@@ -6,7 +6,7 @@
 
 #define DEFINE_KEY(name, code) KEY_##name = code
 
-b8 input_init(Arena* arena);
+void input_init(Arena* arena);
 void input_shutdown();
 void input_update();
 

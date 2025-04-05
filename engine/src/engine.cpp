@@ -16,7 +16,6 @@ struct EngineState {
   Application* game_inst;
   b8 is_running;
   b8 is_suspended;
-  Window* window;
 
   Clock clock;
   f64 last_time;
@@ -41,23 +40,12 @@ b8 engine_create(Application* game_inst) {
   
   state->arena = arena_alloc(game_inst->arena, MB(400));
   
-  // Platform system
-  if (!platform_init(state->arena)) {
-    Error("Failed to initialize platform layer");
-    return false;
-  }
+  platform_init(state->arena);
 
-  // Logging system
-  if (!logging_init(state->arena)) {
-    Error("Failed to initialize platform layer");
-    return false;
-  }
+  logging_init(state->arena);
 
-  // Event system
-  if (!event_init(state->arena)) {
-    Error("Failed to initialize event system");
-    return false;
-  }
+  event_init(state->arena);
+    
   os_register_process_key(input_process_key);
   os_register_window_closed_callback(engine_on_window_closed);
   os_register_window_resized_callback(engine_on_window_resized);
@@ -67,44 +55,26 @@ b8 engine_create(Application* game_inst) {
   event_register(EVENT_CODE_KEY_RELEASED, 0, app_on_key);
   event_register(EVENT_CODE_RESIZED, 0, app_on_resized);
 
-  // Input system
-  if (!input_init(state->arena)) {
-    Error("Failed to initialize input system");
-    return false;
+  input_init(state->arena);
+
+  {
+    WindowConfig config = {
+        .position_x = 100,
+        .position_y = 100,
+        .width = 680,
+        .height = 480,
+        .name = game_inst->name};
+    os_window_create(config);
   }
 
-  // Window creation
-  WindowConfig config = {
-      .position_x = 100,
-      .position_y = 100,
-      .width = 680,
-      .height = 480,
-      .name = game_inst->name};
-  if (!os_window_create(state->window, config)) {
-    Error("Failed to create a window");
-    return false;
-  }
+  r_init(state->arena);
 
-  // Render startup
-  if (!r_init(state->arena)) {
-    Error("Failed to initialize render. Aborting application.");
-    return false;
-  }
-
-  // Texture system
   TextureSystemConfig texture_sys_config = {
       .max_texture_count = 65536,
   };
-  if (!texture_system_init(state->arena, texture_sys_config)) {
-    Error("Failed to initialize render. Aborting application.");
-    return false;
-  }
+  texture_system_init(state->arena, texture_sys_config);
 
-  // Initialize the game
-  if (!game_inst->init(game_inst)) {
-    Fatal("Game failed to initialize.");
-    return false;
-  }
+  game_inst->init(game_inst);
 
   return true;
 }
@@ -121,9 +91,7 @@ b8 engine_run(Application* game_inst) {
   
   while (state->is_running) {
     
-    if (!os_pump_messages()) {
-      state->is_running = false;
-    }
+    os_pump_messages();
 
     if (!state->is_suspended) {
       clock_update(&state->clock);
@@ -170,7 +138,7 @@ b8 engine_run(Application* game_inst) {
 
   texture_system_shutdown();
   r_shutdown();
-  os_window_destroy(state->window);
+  os_window_destroy();
 
   event_unregister(EVENT_CODE_APPLICATION_QUIT, 0, app_on_event);
   event_unregister(EVENT_CODE_KEY_PRESSED, 0, app_on_key);

@@ -23,11 +23,9 @@ struct InputState {
 
 global InputState* state;
 
-b8 input_init(Arena* arena) {
+void input_init(Arena* arena) {
   state = push_struct(arena, InputState);
-  // Info("Input subsystem initialized.");
-  log_output(LOG_LEVEL_INFO, "Input subsystem initialized.");
-  return true;
+  Info("Input subsystem initialized.");
 }
 
 void input_shutdown() {

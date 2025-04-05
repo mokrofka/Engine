@@ -162,14 +162,17 @@ b8 vk_r_backend_init(R_Backend* backend) {
   
   // Surface
   Debug("Creating Vulkan surface...");
-  if (!vk_os_create_surface(context)) {
+  context->surface = vk_os_create_surface();
+  if (!context->surface) {
     Error("Failed to create platform surface!");
     return false;
   }
   Debug("Vulkan surface created.");
 
   // Device creation
-  if (!vk_device_create(context)) {
+  // context->device = vk_device_create();
+  vk_device_create();
+  if (!context->device.physical_device) {
     Error("Failed to create device!");
     return false;
   }
@@ -322,7 +325,7 @@ void vk_r_backend_shutdown() {
   vk_swapchain_destroy(context, &context->swapchain);
   
   Debug("Destroying Vulkan device...");
-  vk_device_destroy(context);
+  vk_device_destroy();
   
   Debug("Destroying Vulkan surface...");
   if (context->surface) {
@@ -652,7 +655,6 @@ internal b8 recreate_swapchain() {
   // Requery support
   vk_device_query_swapchain_support(
       context->device.physical_device,
-      context,
       &context->device.swapchain_support);
   vk_device_detect_depth_format(&context->device);
 
