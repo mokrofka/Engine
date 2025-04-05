@@ -77,6 +77,8 @@ typedef unsigned char uchar;
 #define MemSet(d, byte, c)       _memory_set((d), (byte), (c))
 #define MemCompare(a, b, size)   _memory_compare((a), (b), (size))
 
+#define ReturnZeroStruct(s) MemZeroStruct(s); return *s;
+
 #define U32_MAX 4294967295U
 #define U64_MAX 18446744073709551615ULL
 

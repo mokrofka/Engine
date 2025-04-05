@@ -1,5 +1,4 @@
 #include "texture_system.h"
-
 #include "render/r_frontend.h"
 
 #include <logger.h>

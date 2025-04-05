@@ -14,14 +14,11 @@ struct WindowPlatformState {
 };
 
 struct PlatformState {
-  Win32HandleInfo handle;
+  HINSTANCE instance;
   Window* window;
-  // PlatformWindowClosedCallback window_closed_callback;
-  // PlatformWindowResizedCallback window_resized_callback;
-  // PlatformProcessKey process_key;
   WindowClosedCallback window_closed_callback;
   WindowResizedCallback window_resized_callback;
-  ProcessKeyCallback  process_key;
+  ProcessKeyCallback process_key;
 };
 
 global PlatformState* state;
@@ -40,22 +37,22 @@ internal void clock_setup() {
 }
 
 void platform_init(Arena* arena) {
-  u64 memory_requirement = sizeof(PlatformState)+sizeof(Window)+sizeof(WindowPlatformState);
+  u64 memory_requirement = sizeof(PlatformState)+sizeof(Window);
   state = push_buffer(arena, PlatformState, memory_requirement);
   
   // TODO
   SetCurrentDirectoryA("D:\\VS_Code\\Engine\\bin");
-  state->handle.h_instance = GetModuleHandleA(0);
+  state->instance = GetModuleHandleA(0);
 
   clock_setup();
   
-  HICON icon = LoadIcon(state->handle.h_instance, IDI_APPLICATION);
+  HICON icon = LoadIcon(state->instance, IDI_APPLICATION);
   WNDCLASSA wc = {};
   wc.style = CS_DBLCLKS;
   wc.lpfnWndProc = win32_process_message;
   wc.cbClsExtra = 0;
   wc.cbWndExtra = 0;
-  wc.hInstance = state->handle.h_instance;
+  wc.hInstance = state->instance;
   wc.hIcon = icon;
   wc.hCursor = LoadCursor(NULL, IDC_ARROW);
   wc.hbrBackground = NULL;
@@ -66,7 +63,6 @@ void platform_init(Arena* arena) {
 
 void os_window_create(WindowConfig config) {
   Window* window = (Window*)((u8*)state + sizeof(PlatformState));
-  window->platform_state = (WindowPlatformState*)((u8*)window + sizeof(Window));
   state->window = window;
   state->window->width = config.width;
   state->window->height = config.height;
@@ -103,27 +99,27 @@ void os_window_create(WindowConfig config) {
   HWND handle = CreateWindowExA(
       window_ex_style, "kohi_window_class", (char*)config.name.str,
       window_style, window_x, window_y, window_width, window_height,
-      0, 0, state->handle.h_instance, 0);
+      0, 0, state->instance, 0);
   
   if (handle == 0) {
     MessageBoxA(NULL, "window creating failed!", "Error!", MB_ICONEXCLAMATION | MB_OK);
     
     Error("Window creating failed!");
   } else {
-    window->platform_state->hwnd = handle;
+    window->hwnd = handle;
   }
   
   b32 should_activate = 1; // TODO: if the window should accept input, this should be false.
   i32 show_window_command_flags = should_activate ? SW_SHOW :SW_SHOWNOACTIVATE;
   // If initially minimmized, use SW_MINIMIZE : SW_SHOWMINNOACTIVE;
   // If initially minimmized, use SW_SHOWMAXIMIZED : SW_MAXIMIZE;
-  ShowWindow(window->platform_state->hwnd, show_window_command_flags);
+  ShowWindow((HWND)window->hwnd, show_window_command_flags);
 }
 
 void os_platform_shutdown() {
-  if (state->window->platform_state->hwnd) {
-    DestroyWindow(state->window->platform_state->hwnd);
-    state->window->platform_state->hwnd = 0;
+  if (state->window->hwnd) {
+    DestroyWindow((HWND)state->window->hwnd);
+    state->window->hwnd = 0;
   }
 }
 
@@ -133,6 +129,40 @@ void os_pump_messages() {
     TranslateMessage(&message);
     DispatchMessageA(&message);
   }
+}
+
+#include <vulkan/vulkan.h>
+#include <vulkan/vulkan_win32.h>
+
+struct VK_Context {
+  struct Arena* arena;
+  
+  VkInstance instance;
+  VkAllocationCallbacks* allocator;
+  VkSurfaceKHR surface;
+};
+
+extern VK_Context* context;
+
+// Surface creation for Vulkan
+void* vk_os_create_surface() {
+  VkSurfaceKHR surface = {};
+  // Simply cold-cast to the known type.
+  // InternalState* state = (InternalState*)plat_state->internal_state;
+  HINSTANCE h_instance = state->instance;
+  HWND hwnd = (HWND)state->window->hwnd;
+  
+  VkWin32SurfaceCreateInfoKHR create_info = {VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR};
+  create_info.hinstance = h_instance;
+  create_info.hwnd = hwnd;
+
+  VkResult result = vkCreateWin32SurfaceKHR(context->instance, &create_info,
+                                            context->allocator, &surface);
+  if (result != VK_SUCCESS) {
+    Fatal("Vulkan surface creation failed.");
+    return 0;
+  }
+  return surface;
 }
 
 #define BaseAddress (void*)TB(2)
@@ -245,17 +275,17 @@ void os_register_window_resized_callback(WindowResizedCallback callback) {
 
 void os_window_destroy() {
   Trace("Destroying window...");
-  DestroyWindow(state->window->platform_state->hwnd);
-  state->window->platform_state->hwnd = 0;
+  DestroyWindow((HWND)state->window->hwnd);
+  state->window->hwnd = 0;
   state->window = 0;
 }
 
 void* os_get_handle_info() {
-  return state->handle.h_instance;
+  return state->instance;
 }
 
 void* os_get_window_handle() {
-  return state->window->platform_state->hwnd;
+  return state->window->hwnd;
 }
 
 v2i os_get_framebuffer_size() {

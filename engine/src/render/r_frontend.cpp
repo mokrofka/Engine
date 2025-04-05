@@ -121,7 +121,7 @@ void r_on_resized(u16 width, u16 height) {
   }
 }
 
-b8 r_draw_frame(R_Packet* packet) {
+void r_draw_frame(R_Packet* packet) {
   // If the begin frame returned successfully, mid-frame operations may continue.
   if (r_begin_frame(packet->delta_time)) {
 
@@ -151,11 +151,8 @@ b8 r_draw_frame(R_Packet* packet) {
     
     if (!result) {
       Error("r_end_frame failed. Application shutting down...");
-      return false;
     }
   }
-  
-  return true;
 }
 
 void r_set_view(mat4 view) {

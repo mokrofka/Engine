@@ -1,7 +1,5 @@
 #include "vk_command_buffer.h"
 
-#include "memory.h"
-
 void vk_command_buffer_alloc(
     VK_Context* context,
     VkCommandPool pool,

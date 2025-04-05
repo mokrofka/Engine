@@ -1,5 +1,4 @@
 #pragma once
-
 #include "vk_types.h"
 
 b8 vk_buffer_create(

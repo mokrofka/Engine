@@ -1,7 +1,6 @@
 #pragma once
-
-#include "input_types.h"
 #include "defines.h"
+#include "input_types.h"
 #include "math/math_types.h"
 
 struct DynamicLibrary {
@@ -32,8 +31,7 @@ struct Window {
   b8 resizing;
   u16 frames_since_resize;
 
-  struct WindowPlatformState* platform_state;
-  void* render_state;
+  void* hwnd;
 };
 
 struct OS_File {
@@ -61,6 +59,7 @@ void os_pump_messages();
 void platform_init(Arena* arena);
 void os_window_create(WindowConfig config);
 void os_platform_shutdown();
+void* vk_os_create_surface();
 
 void* os_allocate(u64 size, b8 at_base);
 void* os_allocate(u64 size);

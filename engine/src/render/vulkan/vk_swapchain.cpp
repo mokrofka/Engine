@@ -3,37 +3,25 @@
 #include "vk_device.h"
 #include "vk_image.h"
 
-void create(VK_Context* context, u32 width, u32 height, VK_Swapchain * swapchain);
-void destroy(VK_Context* context, VK_Swapchain * swapchain);
+VK_Swapchain create(u32 width, u32 height);
+void destroy(VK_Swapchain* swapchain);
 
-void vk_swapchain_create(
-  VK_Context* context,
-  u32 width,
-  u32 height,
-  VK_Swapchain * out_swapchain) {
+VK_Swapchain vk_swapchain_create(u32 width, u32 height) {
   // Simply create a new one.
-  create(context, width, height, out_swapchain);
+  return create(width, height);
 }
 
-void vk_swapchain_recreate(
-  VK_Context* context,
-  u32 width,
-  u32 height,
-  VK_Swapchain * swapchain) {
-  // Destroy the old and create a new one.
-  destroy(context, swapchain);
-  create(context, width, height, swapchain);
+void vk_swapchain_recreate(u32 width, u32 height, VK_Swapchain* swapchain) {
+  destroy(swapchain);
+  *swapchain = create(width, height);
 }
 
-void vk_swapchain_destroy(
-  VK_Context* context,
-  VK_Swapchain * swapchain) {
-  destroy(context, swapchain);
+void vk_swapchain_destroy(VK_Swapchain* swapchain) {
+  destroy(swapchain);
 }
 
 b8 vk_swapchain_acquire_next_image_index(
-  VK_Context* context,
-  VK_Swapchain * swapchain,
+  VK_Swapchain* swapchain,
   u64 timeout_ns,
   VkSemaphore image_available_semaphore,
   VkFence fence,
@@ -49,7 +37,7 @@ b8 vk_swapchain_acquire_next_image_index(
   
   if (result == VK_ERROR_OUT_OF_DATE_KHR) {
     // Trigger swapchain recreation, then boot out of the render loop.
-    vk_swapchain_recreate(context, context->framebuffer_width, context->framebuffer_height, swapchain);
+    vk_swapchain_recreate(context->framebuffer_width, context->framebuffer_height, swapchain);
     return false;
   } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
     Fatal("Failed to acquire swapchain image!");
@@ -60,7 +48,6 @@ b8 vk_swapchain_acquire_next_image_index(
 }
 
 void vk_swapchain_present(
-  VK_Context* context,
   VK_Swapchain * swapchain,
   VkQueue graphics_queue,
   VkQueue present_queue,
@@ -80,7 +67,7 @@ void vk_swapchain_present(
   
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
     // Swapchain is out of date, suboptimal of a framebuffer resize has occured. Trigger swapchain recreation.
-    vk_swapchain_recreate(context, context->framebuffer_width, context->framebuffer_height, swapchain);
+    vk_swapchain_recreate(context->framebuffer_width, context->framebuffer_height, swapchain);
   } else if (result != VK_SUCCESS) {
     Fatal("Failed to acquire swapchain image!");
   }
@@ -89,7 +76,8 @@ void vk_swapchain_present(
   context->current_frame = (context->current_frame + 1) % swapchain->max_frames_in_flight;
 }
 
-void create(VK_Context* context, u32 width, u32 height, VK_Swapchain * swapchain) {
+VK_Swapchain create(u32 width, u32 height) {
+  VK_Swapchain swapchain = {};
   VkExtent2D swapchain_extent = {width, height};
   
   // Choose a swap surface format
@@ -99,14 +87,14 @@ void create(VK_Context* context, u32 width, u32 height, VK_Swapchain * swapchain
     // Preferred formats
     if (format.format == VK_FORMAT_B8G8R8A8_UNORM &&
         format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-      swapchain->image_format = format;
+      swapchain.image_format = format;
       found = true;
       break;
     }
   }
   
   if (!found) {
-    swapchain->image_format = context->device.swapchain_support.formats[0];
+    swapchain.image_format = context->device.swapchain_support.formats[0];
   }
   
   VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
@@ -119,9 +107,7 @@ void create(VK_Context* context, u32 width, u32 height, VK_Swapchain * swapchain
   }
   
   // Requery swapchain support.
-  vk_device_query_swapchain_support(
-    context->device.physical_device, 
-    &context->device.swapchain_support);
+  context->device.swapchain_support = vk_device_query_swapchain_support(context->device.physical_device);
   
   // Swapchain extent
   if (context->device.swapchain_support.capabilities.currentExtent.width != U32_MAX) {
@@ -140,13 +126,13 @@ void create(VK_Context* context, u32 width, u32 height, VK_Swapchain * swapchain
         image_count = context->device.swapchain_support.capabilities.maxImageCount;
   }
   
-  swapchain->max_frames_in_flight = image_count - 1;
+  swapchain.max_frames_in_flight = image_count - 1;
   
   VkSwapchainCreateInfoKHR swapchain_create_info = {VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
   swapchain_create_info.surface = context->surface;
   swapchain_create_info.minImageCount = image_count;
-  swapchain_create_info.imageFormat = swapchain->image_format.format;
-  swapchain_create_info.imageColorSpace = swapchain->image_format.colorSpace;
+  swapchain_create_info.imageFormat = swapchain.image_format.format;
+  swapchain_create_info.imageColorSpace = swapchain.image_format.colorSpace;
   swapchain_create_info.imageExtent = swapchain_extent;
   swapchain_create_info.imageArrayLayers = 1;
   swapchain_create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -171,35 +157,35 @@ void create(VK_Context* context, u32 width, u32 height, VK_Swapchain * swapchain
   swapchain_create_info.clipped = VK_TRUE;
   swapchain_create_info.oldSwapchain = 0;
   
-  VK_CHECK(vkCreateSwapchainKHR(vkdevice, &swapchain_create_info, context->allocator, &swapchain->handle));
+  VK_CHECK(vkCreateSwapchainKHR(vkdevice, &swapchain_create_info, context->allocator, &swapchain.handle));
   
   // Start with a zero frame index.
   context->current_frame = 0;
   
   // Images
-  swapchain->image_count = 0;
-  VK_CHECK(vkGetSwapchainImagesKHR(vkdevice, swapchain->handle, &swapchain->image_count, 0));
-  if (!swapchain->images) {
-    swapchain->images = push_array(context->arena, VkImage, swapchain->image_count);
+  swapchain.image_count = 0;
+  VK_CHECK(vkGetSwapchainImagesKHR(vkdevice, swapchain.handle, &swapchain.image_count, 0));
+  if (!swapchain.images) {
+    swapchain.images = push_array(context->arena, VkImage, swapchain.image_count);
   }
-  if (!swapchain->views) {
-    swapchain->views = push_array(context->arena, VkImageView, swapchain->image_count);
+  if (!swapchain.views) {
+    swapchain.views = push_array(context->arena, VkImageView, swapchain.image_count);
   }
-  VK_CHECK(vkGetSwapchainImagesKHR(vkdevice, swapchain->handle, &swapchain->image_count, swapchain->images));
+  VK_CHECK(vkGetSwapchainImagesKHR(vkdevice, swapchain.handle, &swapchain.image_count, swapchain.images));
 
   // Views
-  for (i32 i = 0; i < swapchain->image_count; ++i) {
+  for (i32 i = 0; i < swapchain.image_count; ++i) {
     VkImageViewCreateInfo view_info = {VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
-    view_info.image = swapchain->images[i];
+    view_info.image = swapchain.images[i];
     view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view_info.format = swapchain->image_format.format;
+    view_info.format = swapchain.image_format.format;
     view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     view_info.subresourceRange.baseMipLevel = 0;
     view_info.subresourceRange.levelCount = 1;
     view_info.subresourceRange.baseArrayLayer = 0;
     view_info.subresourceRange.layerCount = 1;
 
-    VK_CHECK(vkCreateImageView(vkdevice, &view_info, context->allocator, &swapchain->views[i]));
+    VK_CHECK(vkCreateImageView(vkdevice, &view_info, context->allocator, &swapchain.views[i]));
   }
 
   // Depth resources
@@ -209,7 +195,7 @@ void create(VK_Context* context, u32 width, u32 height, VK_Swapchain * swapchain
   }
 
   // Create depth image and its view.
-  swapchain->depth_attachment = vk_image_create(
+  swapchain.depth_attachment = vk_image_create(
       context,
       VK_IMAGE_TYPE_2D,
       swapchain_extent.width,
@@ -222,9 +208,10 @@ void create(VK_Context* context, u32 width, u32 height, VK_Swapchain * swapchain
       VK_IMAGE_ASPECT_DEPTH_BIT);
 
   Info("Swapchain created successfully.");
+  return swapchain;
 }
 
-void destroy(VK_Context* context, VK_Swapchain * swapchain) {
+void destroy(VK_Swapchain* swapchain) {
   vkDeviceWaitIdle(vkdevice);
   vk_image_destroy(context, &swapchain->depth_attachment);
 

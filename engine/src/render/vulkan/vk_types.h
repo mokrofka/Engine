@@ -84,7 +84,7 @@ struct VK_Framebuffer {
   VkFramebuffer handle;
   u32 attachment_count;
   VkImageView* attachments;
-  VK_RenderPass * renderpass;
+  VK_RenderPass* renderpass;
 };
 
 struct VK_Swapchain  {
@@ -98,7 +98,7 @@ struct VK_Swapchain  {
   VK_Image depth_attachment;
   
   // framebuffers used for on-screen rendering.
-  VK_Framebuffer* framebuffers;
+  VK_Framebuffer framebuffers[3];
 };
 
 enum VK_CommandBufferState {

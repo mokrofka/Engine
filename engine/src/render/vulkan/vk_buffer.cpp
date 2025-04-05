@@ -1,11 +1,5 @@
 #include "vk_buffer.h"
-
-#include "vk_device.h"
 #include "vk_command_buffer.h"
-#include "vk_utils.h"
-
-#include <logger.h>
-#include <memory.h>
 
 b8 vk_buffer_create(
   VK_Context* context,

@@ -1,5 +1,4 @@
 #pragma once
-
 #include "vk_types.h"
 
 void vk_fence_create(VK_Context* context, b8 create_signaled, VK_Fence* out_fence);

@@ -1,5 +1,4 @@
 #pragma once
-
 #include "vk_types.h"
 
 VK_Image vk_image_create(

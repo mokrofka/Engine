@@ -1,7 +1,5 @@
 #include "vk_backend.h"
-
 #include "vk_types.h"
-#include "vk_os.h"
 #include "vk_device.h"
 #include "vk_swapchain.h"
 #include "vk_renderpass.h"
@@ -14,11 +12,11 @@
 
 #include "shaders/vk_material_shader.h"
 
-#include <str.h>
-#include <os.h>
-#include <math/math_types.h>
+#include "str.h"
+#include "os.h"
+#include "math/math_types.h"
 
-global VK_Context* context;
+VK_Context* context;
 // global u32 cached_framebuffer_extent.x;
 // global u32 cached_framebuffer_extent.y;
 global v2i cached_framebuffer_extent ;
@@ -151,39 +149,31 @@ b8 vk_r_backend_init(R_Backend* backend) {
                                   VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
   debug_create_info.pfnUserCallback = vk_debug_callback;
 
-  PFN_vkCreateDebugUtilsMessengerEXT func =
-      (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-          context->instance, "vkCreateDebugUtilsMessengerEXT");
+  auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+      context->instance, "vkCreateDebugUtilsMessengerEXT");
 
   AssertMsg(func, "Failed to create debug messenger!");
   VK_CHECK(func(context->instance, &debug_create_info, context->allocator, &context->debug_messenger));
   Debug("Vulkan debugger created.");
 #endif
   
-  // Surface
   Debug("Creating Vulkan surface...");
-  context->surface = vk_os_create_surface();
+  context->surface = (VkSurfaceKHR)vk_os_create_surface();
   if (!context->surface) {
     Error("Failed to create platform surface!");
     return false;
   }
   Debug("Vulkan surface created.");
 
-  // Device creation
-  // context->device = vk_device_create();
-  vk_device_create();
+  context->device = vk_device_create();
   if (!context->device.physical_device) {
     Error("Failed to create device!");
     return false;
   }
-  
-  // Swapchain
-  vk_swapchain_create(
-      context,
-      context->framebuffer_width,
-      context->framebuffer_height,
-      &context->swapchain);
-  
+
+  context->swapchain = vk_swapchain_create(
+    context->framebuffer_width,
+    context->framebuffer_height);
   vk_renderpass_create(
     context, 
     &context->main_renderpass, 
@@ -192,14 +182,10 @@ b8 vk_r_backend_init(R_Backend* backend) {
     1.0f, 
     0);
   
-  // Swapchain framebuffers.
-  context->swapchain.framebuffers = push_array(context->arena, VK_Framebuffer, context->swapchain.image_count);
   regenerate_framebuffers(&context->swapchain, &context->main_renderpass);
   
-  // Create command buffers.
   create_command_buffers();
   
-  // Create sync objects.
   context->image_available_semaphores = push_array(context->arena, VkSemaphore,
                                                    context->swapchain.max_frames_in_flight);
   context->queue_complete_semaphores = push_array(context->arena, VkSemaphore,
@@ -322,7 +308,7 @@ void vk_r_backend_shutdown() {
   vk_renderpass_destroy(context, &context->main_renderpass);
   
   // Swapchain
-  vk_swapchain_destroy(context, &context->swapchain);
+  vk_swapchain_destroy(&context->swapchain);
   
   Debug("Destroying Vulkan device...");
   vk_device_destroy();
@@ -398,7 +384,6 @@ b8 vk_r_backend_begin_frame(f32 delta_time) {
   // Acquire the next image from the swap chain. Pass along the semaphore that should signaled when this completes.
   // This same semaphore will later be waited on by the queue submission to ensure this image is available.
   if (!vk_swapchain_acquire_next_image_index(
-    context, 
     &context->swapchain, 
     U64_MAX,
     context->image_available_semaphores[context->current_frame],
@@ -517,7 +502,6 @@ b8 vk_r_backend_end_frame(f32 delta_time) {
 
   // Give the image back to the swapchain.
   vk_swapchain_present(
-      context,
       &context->swapchain,
       context->device.graphics_queue,
       context->device.present_queue,
@@ -555,7 +539,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
   switch (message_severity) {
     default:
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-      Error(callback_data->pMessage);
+      _log_output(LOG_LEVEL_ERROR, callback_data->pMessage);
       break;
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
       Warn(callback_data->pMessage);
@@ -653,13 +637,15 @@ internal b8 recreate_swapchain() {
   }
 
   // Requery support
-  vk_device_query_swapchain_support(
-      context->device.physical_device,
-      &context->device.swapchain_support);
+  context->device.swapchain_support = vk_device_query_swapchain_support(context->device.physical_device);
   vk_device_detect_depth_format(&context->device);
 
+  // Framebuffers.
+  for (u32 i = 0; i < context->swapchain.image_count; ++i) {
+    vk_framebuffer_destroy(context, &context->swapchain.framebuffers[i]);
+  }
+
   vk_swapchain_recreate(
-      context,
       cached_framebuffer_extent.x,
       cached_framebuffer_extent.y,
       &context->swapchain);
@@ -678,11 +664,6 @@ internal b8 recreate_swapchain() {
   // cleanup swapchain
   for (u32 i = 0; i < context->swapchain.image_count; ++i) {
     vk_command_buffer_free(context, context->device.graphics_command_pool, &context->graphics_command_buffers[i]);
-  }
-
-  // Framebuffers.
-  for (u32 i = 0; i < context->swapchain.image_count; ++i) {
-    vk_framebuffer_destroy(context, &context->swapchain.framebuffers[i]);
   }
 
   context->main_renderpass.x = 0;
