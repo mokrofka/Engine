@@ -2,7 +2,6 @@
 #include "vk_command_buffer.h"
 
 b8 vk_buffer_create(
-  VK_Context* context,
   u64 size,
   VkBufferUsageFlagBits usage,
   u32 memory_property_flags,
@@ -48,13 +47,13 @@ b8 vk_buffer_create(
   }
   
   if (bind_on_create) {
-    vk_buffer_bind(context, buffer, 0);
+    vk_buffer_bind(buffer, 0);
   }
   
   return true;
 }
 
-void vk_buffer_destroy(VK_Context* context, VK_Buffer* buffer) {
+void vk_buffer_destroy(VK_Buffer* buffer) {
   if (buffer->memory) {
     vkFreeMemory(vkdevice, buffer->memory, context->allocator);
     buffer->memory = 0;
@@ -69,7 +68,6 @@ void vk_buffer_destroy(VK_Context* context, VK_Buffer* buffer) {
 }
 
 b8 vk_buffer_resize(
-  VK_Context* context,
   u64 new_size,
   VK_Buffer* buffer,
   VkQueue queue,
@@ -105,7 +103,7 @@ b8 vk_buffer_resize(
   VK_CHECK(vkBindBufferMemory(vkdevice, new_buffer, new_memory, 0));
   
   // Copy over the data
-  vk_buffer_copy_to(context, pool, 0, queue, buffer->handle, 0, new_buffer, 0, buffer->size);
+  vk_buffer_copy_to(pool, 0, queue, buffer->handle, 0, new_buffer, 0, buffer->size);
   
   // Make sure anything potentially using these if finished
   vkDeviceWaitIdle(vkdevice);
@@ -127,21 +125,21 @@ b8 vk_buffer_resize(
   return true;
 }
 
-void vk_buffer_bind(VK_Context* context, VK_Buffer* buffer, u64 offset) {
+void vk_buffer_bind(VK_Buffer* buffer, u64 offset) {
   VK_CHECK(vkBindBufferMemory(vkdevice, buffer->handle, buffer->memory, offset));
 }
 
-void* vk_buffer_lock_memory(VK_Context* context, VK_Buffer* buffer, u64 offset, u64 size, u32 flags) {
+void* vk_buffer_lock_memory(VK_Buffer* buffer, u64 offset, u64 size, u32 flags) {
   void* data;
   VK_CHECK(vkMapMemory(vkdevice, buffer->memory, offset, size, flags, &data));
   return data;
 }
 
-void vk_buffer_unlock_memory(VK_Context* context, VK_Buffer* buffer) {
+void vk_buffer_unlock_memory(VK_Buffer* buffer) {
   vkUnmapMemory(vkdevice, buffer->memory);
 }
 
-void vk_buffer_load_data(VK_Context* context, VK_Buffer* buffer, u64 offset, u64 size, u32 flags, const void* data) {
+void vk_buffer_load_data(VK_Buffer* buffer, u64 offset, u64 size, u32 flags, const void* data) {
   void* data_ptr;
   VK_CHECK(vkMapMemory(vkdevice, buffer->memory, offset, size, flags, &data_ptr));
   MemCopy(data_ptr, data, size);
@@ -149,7 +147,6 @@ void vk_buffer_load_data(VK_Context* context, VK_Buffer* buffer, u64 offset, u64
 }
 
 void vk_buffer_copy_to(
-    VK_Context* context,
     VkCommandPool pool,
     VkFence fence,
     VkQueue queue,
@@ -163,7 +160,7 @@ void vk_buffer_copy_to(
   
   // Create a one-time-use command buffer
   VK_CommandBuffer temp_command_buffer;
-  vk_command_buffer_alloc_and_begin_single_use(context, pool, &temp_command_buffer);
+  vk_command_buffer_alloc_and_begin_single_use(pool, &temp_command_buffer);
   
   // Prepare the copy command and add it to the command buffer
   VkBufferCopy copy_region;
@@ -174,5 +171,5 @@ void vk_buffer_copy_to(
   vkCmdCopyBuffer(temp_command_buffer.handle, source, dest, 1, &copy_region);
   
   // Submit the buffer for execution and wait for it to complete
-  vk_command_buffer_end_single_use(context, pool, &temp_command_buffer, queue);
+  vk_command_buffer_end_single_use(pool, &temp_command_buffer, queue);
 }

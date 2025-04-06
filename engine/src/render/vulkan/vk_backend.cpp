@@ -1,7 +1,6 @@
 #include "vk_backend.h"
 #include "vk_types.h"
 #include "vk_device.h"
-#include "vk_swapchain.h"
 #include "vk_renderpass.h"
 #include "vk_command_buffer.h"
 #include "vk_framebuffer.h"
@@ -38,16 +37,16 @@ internal void upload_data_range(VK_Context* context, VkCommandPool pool, VkFence
   // Create a host-visible stagin buffer to upload to. Mark it as the source or the transfer
   VkBufferUsageFlags flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
   VK_Buffer staging;
-  vk_buffer_create(context, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, flags, true, &staging);
+  vk_buffer_create(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, flags, true, &staging);
   
   // Load the data into the staging buffer
-  vk_buffer_load_data(context, &staging, 0, size, 0, data);
+  vk_buffer_load_data(&staging, 0, size, 0, data);
   
   // Perform the copy from staging to the device local buffer
-  vk_buffer_copy_to(context, pool, fence, queue, staging.handle, 0, buffer->handle, offset, size);
+  vk_buffer_copy_to(pool, fence, queue, staging.handle, 0, buffer->handle, offset, size);
   
   // Clean up the stagin buffer
-  vk_buffer_destroy(context, &staging);
+  vk_buffer_destroy(&staging);
 }
 
 b8 vk_r_backend_init(R_Backend* backend) {
@@ -171,9 +170,7 @@ b8 vk_r_backend_init(R_Backend* backend) {
     return false;
   }
 
-  context->swapchain = vk_swapchain_create(
-    context->framebuffer_width,
-    context->framebuffer_height);
+  context->swapchain.create(context->framebuffer_width, context->framebuffer_height);
   vk_renderpass_create(
     context, 
     &context->main_renderpass, 
@@ -263,8 +260,8 @@ void vk_r_backend_shutdown() {
   
   // Destroy in opposite order of creation
   // buffers
-  vk_buffer_destroy(context, &context->object_vertex_buffer);
-  vk_buffer_destroy(context, &context->object_index_buffer);
+  vk_buffer_destroy(&context->object_vertex_buffer);
+  vk_buffer_destroy(&context->object_index_buffer);
   
   vk_material_shader_destroy(context, &context->material_shader);
   
@@ -291,7 +288,6 @@ void vk_r_backend_shutdown() {
   for (u32 i = 0; i < context->swapchain.image_count; ++i) {
     if (context->graphics_command_buffers[i].handle) {
       vk_command_buffer_free(
-        context, 
         context->device.graphics_command_pool,
         &context->graphics_command_buffers[i]);
       context->graphics_command_buffers[i].handle = 0;
@@ -305,10 +301,11 @@ void vk_r_backend_shutdown() {
   }
   
   // Renderpass
-  vk_renderpass_destroy(context, &context->main_renderpass);
+  vk_renderpass_destroy(context, context->main_renderpass);
+  context->main_renderpass.handle = 0;
   
   // Swapchain
-  vk_swapchain_destroy(&context->swapchain);
+  context->swapchain.destroy();
   
   Debug("Destroying Vulkan device...");
   vk_device_destroy();
@@ -383,15 +380,19 @@ b8 vk_r_backend_begin_frame(f32 delta_time) {
   
   // Acquire the next image from the swap chain. Pass along the semaphore that should signaled when this completes.
   // This same semaphore will later be waited on by the queue submission to ensure this image is available.
-  if (!vk_swapchain_acquire_next_image_index(
-    &context->swapchain, 
-    U64_MAX,
-    context->image_available_semaphores[context->current_frame],
-    0,
-    &context->image_index)) {
+  if (!context->swapchain.acquire_next_image_index(
+          U64_MAX,
+          context->image_available_semaphores[context->current_frame],
+          0,
+          &context->image_index)) {
     return false;
   }
-  
+
+  // context->swapchain.acquire_next_image_index(
+  //         U64_MAX,
+  //         context->image_available_semaphores[context->current_frame],
+  //         0);
+
   // Begin recording commands.
   VK_CommandBuffer* command_buffer = &context->graphics_command_buffers[context->image_index];
   vkResetCommandBuffer(command_buffer->handle, 0); // TODO get rid of this
@@ -501,8 +502,7 @@ b8 vk_r_backend_end_frame(f32 delta_time) {
   // End queue submission
 
   // Give the image back to the swapchain.
-  vk_swapchain_present(
-      &context->swapchain,
+  context->swapchain.present(
       context->device.graphics_queue,
       context->device.present_queue,
       context->queue_complete_semaphores[context->current_frame],
@@ -579,13 +579,11 @@ internal void create_command_buffers() {
   for (u32 i = 0; i < context->swapchain.image_count; ++i) {
     if (context->graphics_command_buffers[i].handle) {
       vk_command_buffer_free(
-          context,
           context->device.graphics_command_pool,
           &context->graphics_command_buffers[i]);
     }
     MemZeroStruct(&context->graphics_command_buffers[i]);
     vk_command_buffer_alloc(
-      context, 
       context->device.graphics_command_pool, 
       true, 
       &context->graphics_command_buffers[i]);
@@ -645,10 +643,11 @@ internal b8 recreate_swapchain() {
     vk_framebuffer_destroy(context, &context->swapchain.framebuffers[i]);
   }
 
-  vk_swapchain_recreate(
-      cached_framebuffer_extent.x,
-      cached_framebuffer_extent.y,
-      &context->swapchain);
+  context->swapchain.recreate(cached_framebuffer_extent.x, cached_framebuffer_extent.y);
+  // vk_swapchain_recreate(
+  //     cached_framebuffer_extent.x,
+  //     cached_framebuffer_extent.y,
+  //     &context->swapchain);
 
   // Sync the framebuffer size with the cached sizes.
   context->framebuffer_width = cached_framebuffer_extent.x;
@@ -663,7 +662,7 @@ internal b8 recreate_swapchain() {
 
   // cleanup swapchain
   for (u32 i = 0; i < context->swapchain.image_count; ++i) {
-    vk_command_buffer_free(context, context->device.graphics_command_pool, &context->graphics_command_buffers[i]);
+    vk_command_buffer_free(context->device.graphics_command_pool, &context->graphics_command_buffers[i]);
   }
 
   context->main_renderpass.x = 0;
@@ -686,7 +685,6 @@ internal b8 create_buffers(VK_Context* context) {
   
   const u64 vertex_buffer_size = sizeof(Vertex3D) * MB(1);
   if (!vk_buffer_create(
-    context, 
     vertex_buffer_size,
     VkBufferUsageFlagBits(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT),
     u32(memory_property_flags),
@@ -701,7 +699,6 @@ internal b8 create_buffers(VK_Context* context) {
   
   const u64 index_buffer_size = sizeof(u32) * MB(1);
   if (!vk_buffer_create(
-    context, 
     vertex_buffer_size,
     VkBufferUsageFlagBits(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT),
     u32(memory_property_flags),
@@ -729,9 +726,9 @@ void vk_r_create_texture(const u8* pixels, Texture* texture) {
   VkBufferUsageFlagBits usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
   VkMemoryPropertyFlags memory_prop_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
   VK_Buffer staging;
-  vk_buffer_create(context, image_size, usage, memory_prop_flags, true, &staging);
+  vk_buffer_create(image_size, usage, memory_prop_flags, true, &staging);
   
-  vk_buffer_load_data(context, &staging, 0, image_size, 0, pixels);
+  vk_buffer_load_data(&staging, 0, image_size, 0, pixels);
   
   // Note Lots of assumptions, different texture types will require
   // different options here
@@ -750,7 +747,7 @@ void vk_r_create_texture(const u8* pixels, Texture* texture) {
   VK_CommandBuffer temp_buffer;
   VkCommandPool pool = context->device.graphics_command_pool;
   VkQueue queue = context->device.graphics_queue;
-  vk_command_buffer_alloc_and_begin_single_use(context, pool, &temp_buffer);
+  vk_command_buffer_alloc_and_begin_single_use(pool, &temp_buffer);
   
   // Transition the layout from whatever it is currently to optimal for receiving data
   vk_image_transition_layout(
@@ -773,9 +770,9 @@ void vk_r_create_texture(const u8* pixels, Texture* texture) {
     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   
-  vk_command_buffer_end_single_use(context, pool, &temp_buffer, queue);
+  vk_command_buffer_end_single_use(pool, &temp_buffer, queue);
   
-  vk_buffer_destroy(context, &staging);
+  vk_buffer_destroy(&staging);
 
   // Create a sampler for the texture
   VkSamplerCreateInfo sampler_info = {VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};

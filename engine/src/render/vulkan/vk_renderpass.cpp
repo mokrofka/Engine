@@ -111,11 +111,9 @@ void vk_renderpass_create(
       &out_renderpass->handle));
 }
 
-void vk_renderpass_destroy(VK_Context* context, VK_RenderPass * renderpass) {
-  if (renderpass && renderpass->handle) {
-    vkDestroyRenderPass(vkdevice, renderpass->handle, context->allocator);
-    renderpass->handle = 0;
-  }
+void vk_renderpass_destroy(VK_Context* context, VK_RenderPass renderpass) {
+  vkDestroyRenderPass(vkdevice, renderpass.handle, context->allocator);
+  // renderpass->handle = 0;
 }
 
 void vk_renderpass_begin(

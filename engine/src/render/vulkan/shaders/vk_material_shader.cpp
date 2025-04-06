@@ -150,7 +150,6 @@ b8 vk_material_shader_create(VK_Context* context, VK_MaterialShader* out_shader)
   
   // Create uniform buffer
   if (!vk_buffer_create(
-    context, 
     sizeof(GlobalUniformObject) * 3, 
     VkBufferUsageFlagBits(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
@@ -174,7 +173,6 @@ b8 vk_material_shader_create(VK_Context* context, VK_MaterialShader* out_shader)
   
   // Create the object uniform buffer
   if (!vk_buffer_create(
-    context, 
     sizeof(ObjectUniformObject), 
     VkBufferUsageFlagBits(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
@@ -194,8 +192,8 @@ void vk_material_shader_destroy(VK_Context* context, VK_MaterialShader* shader) 
   vkDestroyDescriptorSetLayout(logical_device, shader->object_descriptor_set_layout, context->allocator);
   
   // Destroy uniform buffer
-  vk_buffer_destroy(context, &shader->global_uniform_buffer);
-  vk_buffer_destroy(context, &shader->object_uniform_buffer);
+  vk_buffer_destroy(&shader->global_uniform_buffer);
+  vk_buffer_destroy(&shader->object_uniform_buffer);
   
   // Destroy pipeline
   vk_pipeline_destroy(context, &shader->pipeline);
@@ -233,7 +231,7 @@ void vk_material_shader_update_global_state(VK_Context* context, VK_MaterialShad
   u64 offset = 0;
 
   // Copy data to buffer
-  vk_buffer_load_data(context, &shader->global_uniform_buffer, offset, range, 0, &shader->global_ubo);
+  vk_buffer_load_data(&shader->global_uniform_buffer, offset, range, 0, &shader->global_ubo);
   
   VkDescriptorBufferInfo buffer_info;
   buffer_info.buffer = shader->global_uniform_buffer.handle;
@@ -279,7 +277,7 @@ void vk_material_shader_update_object(VK_Context* context, VK_MaterialShader* sh
   obo.diffuse_color = v4(s,s,s, 1.0f);
   
   // Load the data into the buffer
-  vk_buffer_load_data(context, &shader->object_uniform_buffer, offset, range, 0, &obo);
+  vk_buffer_load_data(&shader->object_uniform_buffer, offset, range, 0, &obo);
   
   // Only do this if the descriptor has not yet been updated
   if (object_state->descriptor_states[descriptor_index].generations[image_index] == INVALID_ID) {

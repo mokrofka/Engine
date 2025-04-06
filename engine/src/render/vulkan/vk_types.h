@@ -99,6 +99,24 @@ struct VK_Swapchain  {
   
   // framebuffers used for on-screen rendering.
   VK_Framebuffer framebuffers[3];
+
+  void create(u32 width, u32 height);
+
+  void recreate(u32 width, u32 height);
+
+  void destroy();
+
+  b8 acquire_next_image_index(
+      u64 timeout_ns,
+      VkSemaphore image_available_semaphore,
+      VkFence fence,
+      u32* out_image_index);
+
+  void present(
+      VkQueue graphics_queue,
+      VkQueue present_queue,
+      VkSemaphore render_complete_semaphore,
+      u32 present_image_index);
 };
 
 enum VK_CommandBufferState {
@@ -215,8 +233,8 @@ struct VK_Context {
 
   VK_Device device;
   
-  VK_Swapchain  swapchain;
-  VK_RenderPass  main_renderpass;
+  VK_Swapchain swapchain;
+  VK_RenderPass main_renderpass;
   
   VK_Buffer object_vertex_buffer;
   VK_Buffer object_index_buffer;

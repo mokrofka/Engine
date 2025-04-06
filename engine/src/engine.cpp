@@ -45,8 +45,8 @@ b8 engine_create(Application* game_inst) {
   logging_init(state->arena);
 
   event_init(state->arena);
-    
   os_register_process_key(input_process_key);
+  
   os_register_window_closed_callback(engine_on_window_closed);
   os_register_window_resized_callback(engine_on_window_resized);
 

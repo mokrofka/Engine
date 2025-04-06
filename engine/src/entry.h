@@ -6,7 +6,7 @@
 #include <memory.h>
 #include <str.h>
 
- void application_create(Application* out_app);
+void application_create(Application* out_app);
 
 int main() {
   Application app_inst = {};

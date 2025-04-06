@@ -1,7 +1,6 @@
 #include "vk_command_buffer.h"
 
 void vk_command_buffer_alloc(
-    VK_Context* context,
     VkCommandPool pool,
     b8 is_primary,
     VK_CommandBuffer* out_command_buffer) {
@@ -23,7 +22,6 @@ void vk_command_buffer_alloc(
 }
 
 void vk_command_buffer_free(
-    VK_Context* context,
     VkCommandPool pool,
     VK_CommandBuffer* command_buffer) {
   vkFreeCommandBuffers(
@@ -72,15 +70,13 @@ void vk_command_buffer_reset(VK_CommandBuffer* command_buffer) {
 }
 
 void vk_command_buffer_alloc_and_begin_single_use(
-  VK_Context* context,
   VkCommandPool pool,
   VK_CommandBuffer* out_command_buffer) {
-  vk_command_buffer_alloc(context, pool, true, out_command_buffer);
+  vk_command_buffer_alloc(pool, true, out_command_buffer);
   vk_command_buffer_begin(out_command_buffer, true, false, false);
 }
 
 void vk_command_buffer_end_single_use(
-  VK_Context* context,
   VkCommandPool pool,
   VK_CommandBuffer* command_buffer,
   VkQueue queue) {
@@ -98,5 +94,5 @@ void vk_command_buffer_end_single_use(
   VK_CHECK(vkQueueWaitIdle(queue));
   
   // Free the command buffer.
-  vk_command_buffer_free(context, pool, command_buffer);
+  vk_command_buffer_free(pool, command_buffer);
 }

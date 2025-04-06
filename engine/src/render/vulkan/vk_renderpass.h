@@ -10,7 +10,7 @@ void vk_renderpass_create(
     f32 depth,
     u32 stencil);
 
-void vk_renderpass_destroy(VK_Context* context, VK_RenderPass * renderpass);
+void vk_renderpass_destroy(VK_Context* context, VK_RenderPass renderpass);
 
 void vk_renderpass_begin(
     VK_CommandBuffer* command_buffer, 
