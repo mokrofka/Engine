@@ -1,65 +1,62 @@
 #include "vk_buffer.h"
 #include "vk_command_buffer.h"
 
-b8 vk_buffer_create(
+VK_Buffer vk_buffer_create(
   u64 size,
   VkBufferUsageFlagBits usage,
   u32 memory_property_flags,
-  b8 bind_on_create,
-  VK_Buffer* buffer) {
+  b8 bind_on_create) {
     
-  MemZeroStruct(buffer);
-  buffer->size = size;
-  buffer->usage = usage;
-  buffer->memory_property_flags = memory_property_flags;
+  VK_Buffer buffer = {};
+  buffer.size = size;
+  buffer.usage = usage;
+  buffer.memory_property_flags = memory_property_flags;
   
   VkBufferCreateInfo buffer_info = {VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
   buffer_info.size = size;
   buffer_info.usage = usage;
   buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // NOTE only used in one queue
   
-  VK_CHECK(vkCreateBuffer(vkdevice, &buffer_info, context->allocator, &buffer->handle));
+  VK_CHECK(vkCreateBuffer(vkdevice, &buffer_info, vk->allocator, &buffer.handle));
 
   // Gather memory requirements
   VkMemoryRequirements requirements;
-  vkGetBufferMemoryRequirements(vkdevice, buffer->handle, &requirements);
-  buffer->memory_index = context->find_memory_index(requirements.memoryTypeBits, buffer->memory_property_flags);
-  if (buffer->memory_index == -1) {
+  vkGetBufferMemoryRequirements(vkdevice, buffer.handle, &requirements);
+  buffer.memory_index = vk->find_memory_index(requirements.memoryTypeBits, buffer.memory_property_flags);
+  if (buffer.memory_index == -1) {
     Error("Unable to create vulkan buffer because the required memory type index was not found.");
-    return false;
   }
   
   // Allocate memory info
   VkMemoryAllocateInfo allocate_info = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
   allocate_info.allocationSize = requirements.size;
-  allocate_info.memoryTypeIndex = (u32)buffer->memory_index;
+  allocate_info.memoryTypeIndex = (u32)buffer.memory_index;
   
   // Allocate the memory.
   VkResult result = vkAllocateMemory(
     vkdevice, 
     &allocate_info, 
-    context->allocator, 
-    &buffer->memory);
+    vk->allocator, 
+    &buffer.memory);
     
   if (result != VK_SUCCESS) {
     Error("Unable to create vulkan buffer because the required memory allocation failed. Error: %i", result);
-    return false;
   }
   
   if (bind_on_create) {
-    vk_buffer_bind(buffer, 0);
+    vk_buffer_bind(&buffer, 0);
   }
   
-  return true;
+  return buffer;
 }
 
 void vk_buffer_destroy(VK_Buffer* buffer) {
   if (buffer->memory) {
-    vkFreeMemory(vkdevice, buffer->memory, context->allocator);
+    vkFreeMemory(vkdevice, buffer->memory, vk->allocator);
     buffer->memory = 0;
   }
   if (buffer->handle) {
-    vkDestroyBuffer(vkdevice, buffer->handle, context->allocator);
+    vkDestroyBuffer(vkdevice, buffer->handle, vk->allocator);
     buffer->handle = 0;
   }
   buffer->size = 0;
@@ -80,7 +77,7 @@ b8 vk_buffer_resize(
   buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   
   VkBuffer new_buffer;
-  VK_CHECK(vkCreateBuffer(vkdevice, &buffer_info, context->allocator, &new_buffer));
+  VK_CHECK(vkCreateBuffer(vkdevice, &buffer_info, vk->allocator, &new_buffer));
   
   // Gather memory requirements
   VkMemoryRequirements requirements;
@@ -93,7 +90,7 @@ b8 vk_buffer_resize(
   
   // Allocate the memory
   VkDeviceMemory new_memory;
-  VkResult result = vkAllocateMemory(vkdevice, &allocate_info, context->allocator, &new_memory);
+  VkResult result = vkAllocateMemory(vkdevice, &allocate_info, vk->allocator, &new_memory);
   if (result != VK_SUCCESS) {
     Error("Unable to resize vulkan buffer because the required memory allocation failed. Error: %i", result);
     return false;
@@ -110,11 +107,11 @@ b8 vk_buffer_resize(
   
   // Destroy the old
   if (buffer->memory) {
-    vkFreeMemory(vkdevice, buffer->memory, context->allocator);
+    vkFreeMemory(vkdevice, buffer->memory, vk->allocator);
     buffer->memory = 0;
   }
   if (buffer->memory) {
-    vkDestroyBuffer(vkdevice, buffer->handle, context->allocator);
+    vkDestroyBuffer(vkdevice, buffer->handle, vk->allocator);
     buffer->handle = 0;
   }
   
@@ -139,7 +136,7 @@ void vk_buffer_unlock_memory(VK_Buffer* buffer) {
   vkUnmapMemory(vkdevice, buffer->memory);
 }
 
-void vk_buffer_load_data(VK_Buffer* buffer, u64 offset, u64 size, u32 flags, const void* data) {
+void vk_buffer_load_data(VK_Buffer* buffer, u64 offset, u64 size, u32 flags, void* data) {
   void* data_ptr;
   VK_CHECK(vkMapMemory(vkdevice, buffer->memory, offset, size, flags, &data_ptr));
   MemCopy(data_ptr, data, size);
@@ -160,7 +157,7 @@ void vk_buffer_copy_to(
   
   // Create a one-time-use command buffer
   VK_CommandBuffer temp_command_buffer;
-  vk_command_buffer_alloc_and_begin_single_use(pool, &temp_command_buffer);
+  vk_cmd_alloc_and_begin_single_use(pool, &temp_command_buffer);
   
   // Prepare the copy command and add it to the command buffer
   VkBufferCopy copy_region;
@@ -171,5 +168,5 @@ void vk_buffer_copy_to(
   vkCmdCopyBuffer(temp_command_buffer.handle, source, dest, 1, &copy_region);
   
   // Submit the buffer for execution and wait for it to complete
-  vk_command_buffer_end_single_use(pool, &temp_command_buffer, queue);
+  vk_cmd_end_single_use(pool, &temp_command_buffer, queue);
 }

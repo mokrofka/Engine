@@ -1,7 +1,6 @@
 #include "vk_image.h"
 
 VK_Image vk_image_create(
-  VK_Context* context,
   VkImageType image_type,
   u32 width,
   u32 height,
@@ -32,13 +31,13 @@ VK_Image vk_image_create(
   image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;         // TODO: Configurable sample count.
   image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // TODO: Configurable sharing mode.
 
-  VK_CHECK(vkCreateImage(vkdevice, &image_create_info, context->allocator, &result.handle));
+  VK_CHECK(vkCreateImage(vkdevice, &image_create_info, vk->allocator, &result.handle));
 
   // Query memory requirements.
   VkMemoryRequirements memory_requirements;
   vkGetImageMemoryRequirements(vkdevice, result.handle, &memory_requirements);
 
-  i32 memory_type = context->find_memory_index(memory_requirements.memoryTypeBits, memory_flags);
+  i32 memory_type = vk->find_memory_index(memory_requirements.memoryTypeBits, memory_flags);
   if (memory_type == -1) {
     Error("Required memory type not found. Image not valid.");
   }
@@ -47,7 +46,7 @@ VK_Image vk_image_create(
   VkMemoryAllocateInfo memory_allocate_info = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
   memory_allocate_info.allocationSize = memory_requirements.size;
   memory_allocate_info.memoryTypeIndex = memory_type;
-  VK_CHECK(vkAllocateMemory(vkdevice, &memory_allocate_info, context->allocator, &result.memory));
+  VK_CHECK(vkAllocateMemory(vkdevice, &memory_allocate_info, vk->allocator, &result.memory));
 
   // Bind the memory
   VK_CHECK(vkBindImageMemory(vkdevice, result.handle, result.memory, 0)); // TODO: configurable memory offset.
@@ -55,16 +54,15 @@ VK_Image vk_image_create(
   // Create view
   if (create_view) {
     result.view = 0;
-    vk_image_view_create(context, format, &result, view_aspect_flags);
+    vk_image_view_create(format, &result, view_aspect_flags);
   }
   
   return result;
 }
 
 void vk_image_view_create(
-    VK_Context* context,
     VkFormat format,
-    VK_Image * image,
+    VK_Image* image,
     VkImageAspectFlags aspect_flags) {
   VkImageViewCreateInfo view_create_info = {VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
   view_create_info.image = image->handle;
@@ -78,21 +76,20 @@ void vk_image_view_create(
   view_create_info.subresourceRange.baseArrayLayer = 0;
   view_create_info.subresourceRange.layerCount = 1;
 
-  VK_CHECK(vkCreateImageView(vkdevice, &view_create_info, context->allocator, &image->view));
+  VK_CHECK(vkCreateImageView(vkdevice, &view_create_info, vk->allocator, &image->view));
 }
 
 void vk_image_transition_layout(
-  VK_Context* context,
   VK_CommandBuffer* command_buffer,
-  VK_Image * image,
+  VK_Image* image,
   VkFormat format,
   VkImageLayout old_layout,
   VkImageLayout new_layout) {
   VkImageMemoryBarrier barrier = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
   barrier.oldLayout = old_layout;
   barrier.newLayout = new_layout;
-  barrier.srcQueueFamilyIndex = context->device.graphics_queue_index;
-  barrier.dstQueueFamilyIndex = context->device.graphics_queue_index;
+  barrier.srcQueueFamilyIndex = vk->device.graphics_queue_index;
+  barrier.dstQueueFamilyIndex = vk->device.graphics_queue_index;
   barrier.image = image->handle;
   barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   barrier.subresourceRange.baseMipLevel = 0;
@@ -138,8 +135,7 @@ void vk_image_transition_layout(
 }
 
 void vk_image_copy_from_buffer(
-  VK_Context* context,
-  VK_Image * image,
+  VK_Image* image,
   VkBuffer buffer,
   VK_CommandBuffer* command_buffer) {
   // Region to copy
@@ -166,17 +162,17 @@ void vk_image_copy_from_buffer(
     &region);
 }
 
-void vk_image_destroy(VK_Context* context, VK_Image * image) {
+void vk_image_destroy(VK_Image* image) {
     if (image->view) {
-        vkDestroyImageView(vkdevice, image->view, context->allocator);
+        vkDestroyImageView(vkdevice, image->view, vk->allocator);
         image->view = 0;
     }
     if (image->memory) {
-        vkFreeMemory(vkdevice, image->memory, context->allocator);
+        vkFreeMemory(vkdevice, image->memory, vk->allocator);
         image->memory = 0;
     }
     if (image->handle) {
-        vkDestroyImage(vkdevice, image->handle, context->allocator);
+        vkDestroyImage(vkdevice, image->handle, vk->allocator);
         image->handle = 0;
     }
 }

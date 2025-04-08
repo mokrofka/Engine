@@ -11,13 +11,11 @@ struct LoggerSystemState {
 
 global LoggerSystemState* state;
 
-internal void append_to_log_file(const char* message) {
+internal void append_to_log_file(char* message) {
   if (state && state->log_file_handle.u64) {
     u64 length = cstr_length((u8*)message);
     u64 written = 0;
-    if (!os_file_write(state->log_file_handle, length, message)) {
-      Error("writing to console.log");
-    }
+    os_file_write(state->log_file_handle, length, message);
   }
 }
 
@@ -65,8 +63,7 @@ void _log_output(LogLevel level, const char* message, ...) {
   }
 }
 
-void 
-report_assertion_failure(const char* expression, const char* message, const char* file, i32 line) {
-    _log_output(LOG_LEVEL_FATAL, "Assertion Failure: %s, message: '%s', in file: %s, "
-               "line: %d\n", expression, message, file, line);
+void report_assertion_failure(const char* expression, const char* message, const char* file, i32 line) {
+  _log_output(LOG_LEVEL_FATAL, "Assertion Failure: %s, message: '%s', in file: %s, "
+              "line: %d\n", expression, message, file, line);
 }

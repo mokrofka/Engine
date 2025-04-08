@@ -1,7 +1,7 @@
 #pragma once
 #include "render/r_types.h"
 
-b8 vk_r_backend_init(R_Backend* backend);
+void vk_r_backend_init(R_Backend* backend);
 
 void vk_r_backend_shutdown();
 
@@ -13,5 +13,5 @@ b8 vk_r_backend_end_frame(f32 delta_time);
 
 void vk_r_update_object(GeometryRenderData data);
 
-void vk_r_create_texture(const u8* pixels, Texture* texture);
+void vk_r_create_texture(u8* pixels, Texture* texture);
 void vk_r_destroy_texture(Texture* texture);

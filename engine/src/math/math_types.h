@@ -79,3 +79,8 @@ struct Vertex3D {
   v3 position;
   v2 texcoord;
 };
+
+struct Rect {
+  u32 x, y;
+  u32 w, h;
+};

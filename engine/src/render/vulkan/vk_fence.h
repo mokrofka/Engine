@@ -1,10 +1,10 @@
 #pragma once
 #include "vk_types.h"
 
-void vk_fence_create(VK_Context* context, b8 create_signaled, VK_Fence* out_fence);
+VK_Fence vk_fence_create(b8 create_signaled);
 
-void vk_fence_destroy(VK_Context* context, VK_Fence* fence);
+void vk_fence_destroy(VK_Fence* fence);
 
-b8 vk_fence_wait(VK_Context* context, VK_Fence* fence, u64 timeout_ns);
+b8 vk_fence_wait(VK_Fence* fence, u64 timeout_ns);
 
-void vk_fence_reset(VK_Context* context, VK_Fence* fence);
+void vk_fence_reset(VK_Fence* fence);

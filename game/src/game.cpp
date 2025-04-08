@@ -49,7 +49,7 @@ internal void camera_pitch(f32 amount) {
   state->camera_view_dirty = true;
 }
 
-b8 application_init(Application* game_inst) {
+void application_init(Application* game_inst) {
   game_inst->state = push_struct(game_inst->arena, GameState);
   state = (GameState*)game_inst->state;
   state->arena = arena_alloc(game_inst->arena, MB(400));
@@ -57,16 +57,12 @@ b8 application_init(Application* game_inst) {
   state->camera_position = v3(0,0,30.0f);
   state->camera_euler = v3_zero();
   
-  state->view = mat4_translation(v3(0, 0, 30.0f));
   state->camera_view_dirty = true;
-  
-  return true;
 }
 
-b8 application_update(Application* game_inst) {
+void application_update(Application* game_inst) {
   state = (GameState*)game_inst->state;
   f32 delta_time = game_inst->delta_time;
-  
   // TODO temp
   if (input_is_key_up(KEY_T) && input_was_key_down(KEY_T)) {
     Debug("Swapping texture!");
@@ -129,14 +125,10 @@ b8 application_update(Application* game_inst) {
 
   // HACK This should not be available outside the engine
   r_set_view(state->view);
-
-  return true;
 }
 
-b8 application_render(struct Application* game_inst) {
-  return true;
+void application_render(struct Application* game_inst) {
 }
 
 void application_on_resize(struct Application* game_inst) {
-
 }

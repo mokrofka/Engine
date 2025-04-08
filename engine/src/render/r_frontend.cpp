@@ -40,14 +40,14 @@ void create_texture(Texture* t) {
 
 // TODO temp
 b8 event_on_debug_event(u16 code, void* sender, void* listener_inst, EventContext data) {
-  const char* names[3] = {
+  char* names[3] = {
     "cobblestone",
     "paving",
     "paving2"};
   local i8 choice = 2;
     
   // Save off the old name
-  const char* old_name = names[choice];
+  char* old_name = names[choice];
   
   ++choice;
   choice %= 3;
@@ -76,17 +76,13 @@ b8 r_init(Arena* arena) {
   
   // TODO make this configurable
   state->backend.frame_number = 0;
-  
-  if (!vk_r_backend_init(&state->backend)) {
-    Fatal("Renderer backend failed to initialize. Shutting down.");
-    return false;
-  }
+
+  vk_r_backend_init(&state->backend);
 
   state->near_clip = 0.1f;
   state->far_clip = 1000.0f;
   state->projection = mat4_perspective(deg_to_rad(45.0f), 1280 / 720.0f, state->near_clip, state->far_clip);
   
-  state->view = mat4_translation(v3(0, 0, -30.0f));
   state->view = mat4_inverse(state->view);
 
   return true;
@@ -113,12 +109,8 @@ b8 r_end_frame(f32 delta_time) {
 }
 
 void r_on_resized(u16 width, u16 height) {
-  if (state) {
-    state->projection = mat4_perspective(deg_to_rad(45.0f), width / (f32)height, state->near_clip, state->far_clip);
-    vk_r_backend_on_resize(width, height);
-  } else {
-    Warn("renderer backend does not exist to accept resize: %i %i", width, height);
-  }
+  state->projection = mat4_perspective(deg_to_rad(45.0f), width / (f32)height, state->near_clip, state->far_clip);
+  vk_r_backend_on_resize(width, height);
 }
 
 void r_draw_frame(R_Packet* packet) {
@@ -144,7 +136,6 @@ void r_draw_frame(R_Packet* packet) {
     
     data.textures[0] = state->test_diffuse;
     vk_r_update_object(data);
-
     
     // End the fram. If this fails, it is likely unrecovarble.
     b8 result = r_end_frame(packet->delta_time);
@@ -159,10 +150,10 @@ void r_set_view(mat4 view) {
   state->view = view;
 }
 
-void r_create_texture(const u8* pixels, Texture* texture) {
+void r_create_texture(u8* pixels, Texture* texture) {
   vk_r_create_texture(pixels, texture);
 }
 
-void r_destroy_texture(struct Texture* texture) {
+void r_destroy_texture(Texture* texture) {
   vk_r_destroy_texture(texture);
 }

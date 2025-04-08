@@ -74,7 +74,7 @@ String str_zero() {
   return result;
 }
 
-u8* str_format_v(u8* buffer, const void* format, void* va_listp) {
+u8* str_format_v(void* buffer, const void* format, void* va_listp) {
   if (!format) {
     return 0;
   }
@@ -92,11 +92,11 @@ u8* str_format_v(u8* buffer, const void* format, void* va_listp) {
   i32 length = vsnprintf(0, 0, (char*)format, list_copy);
   va_end(list_copy);
   vsnprintf((char*)buffer, length + 1, (char*)format, (char*)va_listp);
-  buffer[length] = 0;
-  return buffer;
+  ((u8*)(buffer))[length] = 0;
+  return (u8*)buffer;
 }
 
-u8* str_format(u8* buffer, const void* format, ...) {
+u8* str_format(void* buffer, const void* format, ...) {
   if (!format) {
     return 0;
   }

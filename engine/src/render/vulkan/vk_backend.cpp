@@ -3,10 +3,11 @@
 #include "vk_device.h"
 #include "vk_renderpass.h"
 #include "vk_command_buffer.h"
-#include "vk_framebuffer.h"
 #include "vk_fence.h"
 #include "vk_utils.h"
 #include "vk_buffer.h"
+#include "vk_swapchain.h"
+#include "vk_framebuffer.h"
 #include "vk_image.h"
 
 #include "shaders/vk_material_shader.h"
@@ -15,10 +16,8 @@
 #include "os.h"
 #include "math/math_types.h"
 
-VK_Context* context;
-// global u32 cached_framebuffer_extent.x;
-// global u32 cached_framebuffer_extent.y;
-global v2i cached_framebuffer_extent ;
+VK_Context* vk;
+global v2i cached_framebuffer_extent;
 
 VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
@@ -28,16 +27,14 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
 
 internal i32 find_memory_index(u32 type_filter, u32 property_flags);
 
-internal void create_command_buffers();
-internal void regenerate_framebuffers(VK_Swapchain* swapchain, VK_RenderPass* renderpass);
-internal b8 recreate_swapchain();
-internal b8 create_buffers(VK_Context* context);
+internal void regenerate_framebuffers(VK_Swapchain* swapchain, VK_RenderPass renderpass);
+internal b8 recreate_swapchain(VK_Swapchain* swapchain);
+internal b8 create_buffers(VK_Render* render);
 
-internal void upload_data_range(VK_Context* context, VkCommandPool pool, VkFence fence, VkQueue queue, VK_Buffer* buffer, u64 offset, u64 size, void* data) {
+internal void upload_data_range(VkCommandPool pool, VkFence fence, VkQueue queue, VK_Buffer* buffer, u64 offset, u64 size, void* data) {
   // Create a host-visible stagin buffer to upload to. Mark it as the source or the transfer
   VkBufferUsageFlags flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-  VK_Buffer staging;
-  vk_buffer_create(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, flags, true, &staging);
+  VK_Buffer staging = vk_buffer_create(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, flags, true);
   
   // Load the data into the staging buffer
   vk_buffer_load_data(&staging, 0, size, 0, data);
@@ -49,19 +46,19 @@ internal void upload_data_range(VK_Context* context, VkCommandPool pool, VkFence
   vk_buffer_destroy(&staging);
 }
 
-b8 vk_r_backend_init(R_Backend* backend) {
+void vk_r_backend_init(R_Backend* backend) {
   // Function pointer
   backend->internal_context = push_struct(backend->arena, VK_Context);
-  context = (VK_Context*)backend->internal_context;
-  context->arena = backend->arena;
-  context->find_memory_index = find_memory_index;
+  vk = (VK_Context*)backend->internal_context;
+  vk->arena = backend->arena;
+  vk->find_memory_index = find_memory_index;
   
   // TODO: custom allocator.
-  context->allocator = 0;
+  vk->allocator = 0;
   
   cached_framebuffer_extent = os_get_framebuffer_size();
-  context->framebuffer_width = (cached_framebuffer_extent.x != 0) ? cached_framebuffer_extent.x : 800;
-  context->framebuffer_height = (cached_framebuffer_extent.y != 0) ? cached_framebuffer_extent.y : 600;
+  vk->frame.width = (cached_framebuffer_extent.x != 0) ? cached_framebuffer_extent.x : 800;
+  vk->frame.height = (cached_framebuffer_extent.y != 0) ? cached_framebuffer_extent.y : 600;
   cached_framebuffer_extent.x = 0;
   cached_framebuffer_extent.y = 0;
 
@@ -76,7 +73,7 @@ b8 vk_r_backend_init(R_Backend* backend) {
   create_info.pApplicationInfo = &app_info;
   
   // Obtain a list of required extensions
-  const char* required_extensions[3]; 
+  char* required_extensions[3]; 
   required_extensions[0] = VK_KHR_SURFACE_EXTENSION_NAME;
   required_extensions[1] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
   required_extensions[2] = "VK_KHR_win32_surface";
@@ -106,7 +103,7 @@ b8 vk_r_backend_init(R_Backend* backend) {
   u32 available_layer_count = 0;
   VK_CHECK(vkEnumerateInstanceLayerProperties(&available_layer_count, 0));
   // VkLayerProperties* available_layers = darray_reserve(VkLayerProperties, available_layer_count);
-  VkLayerProperties* available_layers = push_array(context->arena, VkLayerProperties, available_layer_count);
+  VkLayerProperties* available_layers = push_array(vk->arena, VkLayerProperties, available_layer_count);
   VK_CHECK(vkEnumerateInstanceLayerProperties(&available_layer_count, available_layers));
 
   // Verify all required layers are available.
@@ -122,7 +119,6 @@ b8 vk_r_backend_init(R_Backend* backend) {
     }
     if (!found) {
       Fatal("Required validation layer is missing: %s", required_validation_layer_names[i]);
-      return false;
     }
   }
   Info("All required validation layers are present.");
@@ -131,7 +127,7 @@ b8 vk_r_backend_init(R_Backend* backend) {
   create_info.enabledLayerCount = required_validation_layer_count;
   create_info.ppEnabledLayerNames = required_validation_layer_names;
   
-  VK_CHECK(vkCreateInstance(&create_info, context->allocator, &context->instance));
+  VK_CHECK(vkCreateInstance(&create_info, vk->allocator, &vk->instance));
   Info("Vulkan insance created.");
 
   // Debugger
@@ -149,68 +145,55 @@ b8 vk_r_backend_init(R_Backend* backend) {
   debug_create_info.pfnUserCallback = vk_debug_callback;
 
   auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-      context->instance, "vkCreateDebugUtilsMessengerEXT");
+      vk->instance, "vkCreateDebugUtilsMessengerEXT");
 
   AssertMsg(func, "Failed to create debug messenger!");
-  VK_CHECK(func(context->instance, &debug_create_info, context->allocator, &context->debug_messenger));
+  VK_CHECK(func(vk->instance, &debug_create_info, vk->allocator, &vk->debug_messenger));
   Debug("Vulkan debugger created.");
 #endif
   
   Debug("Creating Vulkan surface...");
-  context->surface = (VkSurfaceKHR)vk_os_create_surface();
-  if (!context->surface) {
-    Error("Failed to create platform surface!");
-    return false;
-  }
+  vk->surface = (VkSurfaceKHR)vk_os_create_surface();
   Debug("Vulkan surface created.");
 
-  context->device = vk_device_create();
-  if (!context->device.physical_device) {
-    Error("Failed to create device!");
-    return false;
+  vk->device = vk_device_create();
+
+  vk->swapchain = vk_swapchain_create(vk->frame.width, vk->frame.height);
+  vk->renderpass = vk_renderpass_create(
+      {0, 0, vk->frame.width, vk->frame.height},
+      {0, 0, 0.2, 1.0},
+      1.0f,
+      0);
+
+  regenerate_framebuffers(&vk->swapchain, vk->renderpass);
+
+  for (u32 i = 0; i < vk->swapchain.image_count; ++i) {
+    vk->render.cmd[i] = vk_command_buffer_alloc(vk->device.gfx_cmd_pool, true);
   }
+  Debug("Vulkan command buffers created.");
 
-  context->swapchain.create(context->framebuffer_width, context->framebuffer_height);
-  vk_renderpass_create(
-    context, 
-    &context->main_renderpass, 
-    0, 0, context->framebuffer_width, context->framebuffer_height, 
-    0.0f, 0.0f, 0.2f, 1.0f, 
-    1.0f, 
-    0);
-  
-  regenerate_framebuffers(&context->swapchain, &context->main_renderpass);
-  
-  create_command_buffers();
-  
-  context->image_available_semaphores = push_array(context->arena, VkSemaphore,
-                                                   context->swapchain.max_frames_in_flight);
-  context->queue_complete_semaphores = push_array(context->arena, VkSemaphore,
-                                                   context->swapchain.max_frames_in_flight);
-  context->in_flight_fences = push_array(context->arena, VK_Fence,
-                                         context->swapchain.max_frames_in_flight);
+  vk->sync.image_available_semaphores = push_array(vk->arena, VkSemaphore,
+                                                   vk->swapchain.max_frames_in_flight);
+  vk->sync.queue_complete_semaphores = push_array(vk->arena, VkSemaphore,
+                                                  vk->swapchain.max_frames_in_flight);
+  vk->sync.in_flight_fences = push_array(vk->arena, VK_Fence,
+                                         vk->swapchain.max_frames_in_flight);
 
-  for (u8 i = 0; i < context->swapchain.max_frames_in_flight; ++i) {
+  for (u8 i = 0; i < vk->swapchain.max_frames_in_flight; ++i) {
     VkSemaphoreCreateInfo semaphore_create_info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-    vkCreateSemaphore(vkdevice, &semaphore_create_info, context->allocator,
-                      &context->image_available_semaphores[i]);
-    vkCreateSemaphore(vkdevice, &semaphore_create_info, context->allocator,
-                      &context->queue_complete_semaphores[i]);
-    
-    vk_fence_create(context, true, &context->in_flight_fences[i]);
+    vkCreateSemaphore(vkdevice, &semaphore_create_info, vk->allocator,
+                      &vk->sync.image_available_semaphores[i]);
+    vkCreateSemaphore(vkdevice, &semaphore_create_info, vk->allocator,
+                      &vk->sync.queue_complete_semaphores[i]);
+
+    vk->sync.in_flight_fences[i] = vk_fence_create(true);
   }
 
-  context->images_in_flight = push_array(context->arena, VK_Fence*, context->swapchain.image_count);
-  for (u32 i = 0; i < context->swapchain.image_count; ++i) {
-    context->images_in_flight[i] = 0;
-  }
+  vk->sync.images_in_flight = push_array(vk->arena, VK_Fence*, vk->swapchain.image_count);
 
-  if (!vk_material_shader_create(context, &context->material_shader)) {
-    Error("Error loading built-in basic_lighting shader.");
-    return false;
-  }
+  vk->render.material_shader = vk_material_shader_create(vk);
   
-  create_buffers(context);
+  create_buffers(&vk->render);
   
   // TODO temporary test code
   const u32 vert_count = 4;
@@ -242,17 +225,13 @@ b8 vk_r_backend_init(R_Backend* backend) {
   u32 indices[index_count] = {0,1,2, 0,3,1};
   
   u32 object_id = 0;
-  if (!vk_material_shader_acquire_resources(context, &context->material_shader, &object_id)) {
-    Error("Failed to acquire shader resources.");
-    return false;
-  }
+  vk_material_shader_acquire_resources(&vk->render.material_shader, &object_id);
   
-  upload_data_range(context, context->device.graphics_command_pool, 0, context->device.graphics_queue, &context->object_vertex_buffer, 0, sizeof(Vertex3D) * vert_count, verts);
-  upload_data_range(context, context->device.graphics_command_pool, 0, context->device.graphics_queue, &context->object_index_buffer, 0, sizeof(u32) * index_count, indices);
+  upload_data_range(vk->device.gfx_cmd_pool, 0, vk->device.graphics_queue, &vk->render.obj_vertex_buffer, 0, sizeof(Vertex3D)*vert_count, verts);
+  upload_data_range(vk->device.gfx_cmd_pool, 0, vk->device.graphics_queue, &vk->render.obj_index_buffer, 0, sizeof(u32)*index_count, indices);
   // TODO end temp code
 
   Info("Vulkan renderer initialized successfully.");
-  return true;
 }
 
 void vk_r_backend_shutdown() {
@@ -260,99 +239,82 @@ void vk_r_backend_shutdown() {
   
   // Destroy in opposite order of creation
   // buffers
-  vk_buffer_destroy(&context->object_vertex_buffer);
-  vk_buffer_destroy(&context->object_index_buffer);
+  vk_buffer_destroy(&vk->render.obj_vertex_buffer);
+  vk_buffer_destroy(&vk->render.obj_index_buffer);
   
-  vk_material_shader_destroy(context, &context->material_shader);
+  vk_material_shader_destroy(&vk->render.material_shader);
   
   // Sync objects
-  for (u8 i = 0; i < context->swapchain.max_frames_in_flight; ++i) {
-    if (context->image_available_semaphores[i]) {
+  for (u8 i = 0; i < vk->swapchain.max_frames_in_flight; ++i) {
+    if (vk->sync.image_available_semaphores[i]) {
       vkDestroySemaphore(vkdevice,
-                         context->image_available_semaphores[i],
-                         context->allocator);
+                         vk->sync.image_available_semaphores[i],
+                         vk->allocator);
     }
-    if (context->queue_complete_semaphores[i]) {
+    if (vk->sync.queue_complete_semaphores[i]) {
       vkDestroySemaphore(vkdevice,
-                         context->queue_complete_semaphores[i],
-                         context->allocator);
+                         vk->sync.queue_complete_semaphores[i],
+                         vk->allocator);
     }
-    vk_fence_destroy(context, &context->in_flight_fences[i]);
+    vk_fence_destroy(&vk->sync.in_flight_fences[i]);
   }
-  context->image_available_semaphores = 0;
-  context->queue_complete_semaphores = 0;
-  context->in_flight_fences = 0;
-  context->images_in_flight = 0;
+  vk->sync.image_available_semaphores = 0;
+  vk->sync.queue_complete_semaphores = 0;
+  vk->sync.in_flight_fences = 0;
+  vk->sync.images_in_flight = 0;
   
   // Command buffers
-  for (u32 i = 0; i < context->swapchain.image_count; ++i) {
-    if (context->graphics_command_buffers[i].handle) {
-      vk_command_buffer_free(
-        context->device.graphics_command_pool,
-        &context->graphics_command_buffers[i]);
-      context->graphics_command_buffers[i].handle = 0;
+  for (u32 i = 0; i < vk->swapchain.image_count; ++i) {
+    if (vk->render.cmd[i].handle) {
+      vk_cmd_free(
+        vk->device.gfx_cmd_pool,
+        &vk->render.cmd[i]);
+      vk->render.cmd[i].handle = 0;
     }
-  }
-  // darray_destroy(context->graphics_command_buffers); // TODO
-  context->graphics_command_buffers = 0;
-  
-  for (u32 i = 0; i < context->swapchain.image_count; ++i) {
-    vk_framebuffer_destroy(context, &context->swapchain.framebuffers[i]);
   }
   
   // Renderpass
-  vk_renderpass_destroy(context, context->main_renderpass);
-  context->main_renderpass.handle = 0;
+  vk_renderpass_destroy(vk->renderpass);
+  vk->renderpass.handle = 0;
   
   // Swapchain
-  context->swapchain.destroy();
+  vk_swapchain_destroy(&vk->swapchain);
   
   Debug("Destroying Vulkan device...");
   vk_device_destroy();
   
   Debug("Destroying Vulkan surface...");
-  if (context->surface) {
-    vkDestroySurfaceKHR(context->instance, context->surface, context->allocator);
-    context->surface = 0;
+  if (vk->surface) {
+    vkDestroySurfaceKHR(vk->instance, vk->surface, vk->allocator);
+    vk->surface = 0;
   }
   
   Debug("Destroying Vulkan debugger...");
-  if (context->debug_messenger) {
+  if (vk->debug_messenger) {
     PFN_vkDestroyDebugUtilsMessengerEXT func =
         (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-            context->instance, "vkDestroyDebugUtilsMessengerEXT");
-    func(context->instance, context->debug_messenger, context->allocator);
+            vk->instance, "vkDestroyDebugUtilsMessengerEXT");
+    func(vk->instance, vk->debug_messenger, vk->allocator);
   }
 
   Debug("Destroying Vulkan instance...");
-  vkDestroyInstance(context->instance, context->allocator);
+  vkDestroyInstance(vk->instance, vk->allocator);
 }
 
 void vk_r_backend_on_resize(u16 width, u16 height) {
   cached_framebuffer_extent.x = width;
   cached_framebuffer_extent.y = height;
-  ++context->framebuffer_size_generation;
+  ++vk->frame.size_generation;
   
-  Info("Vulkan renderer backend->resized: w/h/gen %i/%i/%llu", width, height, context->framebuffer_size_generation);
+  Info("Vulkan renderer backend->resized: w/h/gen %i/%i/%llu", width, height, vk->frame.size_generation);
 }
 
 b8 vk_r_backend_begin_frame(f32 delta_time) {
-  context->frame_delta_time = delta_time;
-  VK_Device* device = &context->device;
-  
-  // Check if recreating swap chain and boot out.
-  if (context->recreating_swapchain) {
-    VkResult result = vkDeviceWaitIdle(device->logical_device);
-    if (!vk_result_is_success(result)) {
-      Error("vk_r_backend_begin_frame vkDeviceWaitIdle (1) failed '%s'", vk_result_string(result, true));
-    }
-    Info("Recreating swapchain, booting.");
-    return false;
-  }
+  vk->frame.delta_time = delta_time;
   
   // Check if the framebuffer has been resized. If so, a new swapchain must be created.
-  if (context->framebuffer_size_generation != context->framebuffer_size_last_generation) {
-    VkResult result = vkDeviceWaitIdle(device->logical_device);
+  if (vk->frame.size_generation != vk->frame.size_last_generation) {
+    VkResult result = vkDeviceWaitIdle(vkdevice);
     if (!vk_result_is_success(result)) {
       Error("vk_r_backend_begin_frame vkDeviceWaitIdle (2) failed '%s'", vk_result_string(result, true));
       return false;
@@ -360,7 +322,7 @@ b8 vk_r_backend_begin_frame(f32 delta_time) {
     
     // If the swapcahin recreation failed (because, for example, the window was minimized),
     // boot out before unsetting the flag.
-    if (!recreate_swapchain()) {
+    if (!recreate_swapchain(&vk->swapchain)) {
       return false;
     }
     
@@ -369,118 +331,75 @@ b8 vk_r_backend_begin_frame(f32 delta_time) {
   }
 
   // Wait for the execution of the current frame to complete. The fence being free will allow this one to move on.
-  if (!vk_fence_wait(
-          context,
-          &context->in_flight_fences[context->current_frame],
-          U64_MAX)) {
+  if (!vk_fence_wait(&vk->sync.in_flight_fences[vk->frame.current_frame], U64_MAX)) {
     Warn("In-flight fence wait failure!");
     return false;
   }
-  
-  
+
   // Acquire the next image from the swap chain. Pass along the semaphore that should signaled when this completes.
   // This same semaphore will later be waited on by the queue submission to ensure this image is available.
-  if (!context->swapchain.acquire_next_image_index(
-          U64_MAX,
-          context->image_available_semaphores[context->current_frame],
-          0,
-          &context->image_index)) {
-    return false;
-  }
-
-  // context->swapchain.acquire_next_image_index(
-  //         U64_MAX,
-  //         context->image_available_semaphores[context->current_frame],
-  //         0);
+  vk->frame.image_index = vk_swapchain_acquire_next_image_index(vk->swapchain, U64_MAX, vk->sync.image_available_semaphores[vk->frame.current_frame], 0);
 
   // Begin recording commands.
-  VK_CommandBuffer* command_buffer = &context->graphics_command_buffers[context->image_index];
-  vkResetCommandBuffer(command_buffer->handle, 0); // TODO get rid of this
-  vk_command_buffer_reset(command_buffer);
-  vk_command_buffer_begin(command_buffer, false, false, false);
+  VK_CommandBuffer* cmd = &vk->render.cmd[vk->frame.image_index];
+  vk_cmd_begin(cmd, false, false, false);
   
   // Dynamic state
   VkViewport viewport;
   viewport.x = 0.0f;
-  viewport.y = (f32)context->framebuffer_height;
-  viewport.width = (f32)context->framebuffer_width;
-  viewport.height = -(f32)context->framebuffer_height;
+  viewport.y = vk->frame.height;
+  viewport.width = vk->frame.width;
+  viewport.height = -(f32)vk->frame.height;
   viewport.minDepth = 0.0f;
   viewport.maxDepth = 1.0f;
   
   // Scissor
   VkRect2D scissor;
   scissor.offset.x = scissor.offset.y = 0;
-  scissor.extent.width = context->framebuffer_width;
-  scissor.extent.height = context->framebuffer_height;
+  scissor.extent.width = vk->frame.width;
+  scissor.extent.height = vk->frame.height;
   
-  vkCmdSetViewport(command_buffer->handle, 0, 1, &viewport);
-  vkCmdSetScissor(command_buffer->handle, 0, 1, &scissor);
+  vkCmdSetViewport(cmd->handle, 0, 1, &viewport);
+  vkCmdSetScissor(cmd->handle, 0, 1, &scissor);
   
-  context->main_renderpass.w = context->framebuffer_width;
-  context->main_renderpass.h = context->framebuffer_height;
+  vk->renderpass.rect.w = vk->frame.width;
+  vk->renderpass.rect.h = vk->frame.height;
 
-  vk_renderpass_begin(
-      command_buffer,
-      &context->main_renderpass,
-      context->swapchain.framebuffers[context->image_index].handle);
-
+  vk_renderpass_begin(cmd, vk->renderpass, vk->swapchain.framebuffers[vk->frame.image_index]);
 
   return true;
 }
 
 void vk_r_update_global_state(mat4 projection, mat4 view, v3 view_position, v4 ambient_color, i32 mode) {
-  VK_CommandBuffer* command_buffer = &context->graphics_command_buffers[context->image_index];
+  VkCommandBuffer cmd = vk->render.cmd[vk->frame.image_index].handle;
 
-  vk_material_shader_use(context, &context->material_shader);
+  vk_material_shader_use(cmd, vk->render.material_shader);
   
-  context->material_shader.global_ubo.projection = projection;
-  context->material_shader.global_ubo.view = view;
+  vk->render.material_shader.global_ubo.projection = projection;
+  vk->render.material_shader.global_ubo.view = view;
   
-  // TODO other ubo properties
-  
-  vk_material_shader_update_global_state(context, &context->material_shader, context->frame_delta_time);
-  
+  vk_material_shader_update_global_state(cmd, &vk->render.material_shader, vk->frame.delta_time);
 }
 
 b8 vk_r_backend_end_frame(f32 delta_time) {
+  VK_CommandBuffer* cmd = &vk->render.cmd[vk->frame.image_index];
   
-  VK_CommandBuffer* command_buffer = &context->graphics_command_buffers[context->image_index];
+  vk_renderpass_end(cmd);
   
-  // End renderpass
-  vk_renderpass_end(command_buffer, &context->main_renderpass);
+  vk_cmd_end(cmd);
   
-  vk_command_buffer_end(command_buffer);
-  
-  // Make sure the previous frame is not using this image (i.e. its fence is being waited on)
-  if (context->images_in_flight[context->image_index] != VK_NULL_HANDLE) {
-    vk_fence_wait(
-      context, 
-      context->images_in_flight[context->image_index], 
-      U64_MAX);
-  }
-  
-  // Mark the image fence as in-use by this frame.
-  context->images_in_flight[context->image_index] = &context->in_flight_fences[context->current_frame];
-  
-  // Rest the fence for use on the next frame
-  vk_fence_reset(context, &context->in_flight_fences[context->current_frame]);
+  vk_fence_reset(&vk->sync.in_flight_fences[vk->frame.current_frame]);
 
-  // Submit the queue and wait for the operation to complete.
-  // Begin queue submission
   VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
   
-  // Command buffer(s) to be executed.
   submit_info.commandBufferCount = 1;
-  submit_info.pCommandBuffers = &command_buffer->handle;
+  submit_info.pCommandBuffers = &cmd->handle;
   
-  // The semaphore(s) to be signaled when the queue is complete.
   submit_info.signalSemaphoreCount = 1;
-  submit_info.pSignalSemaphores = &context->queue_complete_semaphores[context->current_frame];
+  submit_info.pSignalSemaphores = &vk->sync.queue_complete_semaphores[vk->frame.current_frame];
 
-  // Wait semaphore ensures that the operation cannot begin until the image is available.
   submit_info.waitSemaphoreCount = 1;
-  submit_info.pWaitSemaphores = &context->image_available_semaphores[context->current_frame];
+  submit_info.pWaitSemaphores = &vk->sync.image_available_semaphores[vk->frame.current_frame];
 
   // Each semaphore waits on the corresponding pipeline stage to complete. 1:1 ratio.
   // VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT prevents subsequent color attachment
@@ -489,45 +408,40 @@ b8 vk_r_backend_end_frame(f32 delta_time) {
   submit_info.pWaitDstStageMask = flags;
 
   VkResult result = vkQueueSubmit(
-      context->device.graphics_queue,
+      vk->device.graphics_queue,
       1,
       &submit_info,
-      context->in_flight_fences[context->current_frame].handle);
+      vk->sync.in_flight_fences[vk->frame.current_frame].handle);
   if (result != VK_SUCCESS) {
     Error("vkQueueSubmit failed with result: %s", vk_result_string(result, true));
     return false;
   }
 
-  vk_command_buffer_update_submitted(command_buffer);
-  // End queue submission
-
-  // Give the image back to the swapchain.
-  context->swapchain.present(
-      context->device.graphics_queue,
-      context->device.present_queue,
-      context->queue_complete_semaphores[context->current_frame],
-      context->image_index);
-
+  vk_swapchain_present(
+      &vk->swapchain, vk->device.graphics_queue,
+      vk->device.present_queue,
+      vk->sync.queue_complete_semaphores[vk->frame.current_frame],
+      vk->frame.image_index);
   return true;
 }
 
 void vk_r_update_object(GeometryRenderData data) {
-  VK_CommandBuffer* command_buffer = &context->graphics_command_buffers[context->image_index];
+  VkCommandBuffer cmd = vk->render.cmd[vk->frame.image_index].handle;
   
-  vk_material_shader_update_object(context, &context->material_shader, data);
+  vk_material_shader_update_object(cmd, &vk->render.material_shader, data);
   
   // TODO temporary test code
-  vk_material_shader_use(context, &context->material_shader);
+  vk_material_shader_use(cmd, vk->render.material_shader);
   
   // Bind vertex buffer at offset
   VkDeviceSize offsets[1] = {0};
-  vkCmdBindVertexBuffers(command_buffer->handle, 0, 1, &context->object_vertex_buffer.handle, (VkDeviceSize*)offsets);
+  vkCmdBindVertexBuffers(cmd, 0, 1, &vk->render.obj_vertex_buffer.handle, offsets);
   
   // Bind index buffer at offset
-  vkCmdBindIndexBuffer(command_buffer->handle, context->object_index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
+  vkCmdBindIndexBuffer(cmd, vk->render.obj_index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
   
   // Issue the draw
-  vkCmdDrawIndexed(command_buffer->handle, 6, 1, 0, 0, 0);
+  vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
   // TODO end temporary test code
 }
 
@@ -556,7 +470,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
 
 internal i32 find_memory_index(u32 type_filter, u32 property_flags) {
   VkPhysicalDeviceMemoryProperties memory_properties;
-  vkGetPhysicalDeviceMemoryProperties(context->device.physical_device, &memory_properties);
+  vkGetPhysicalDeviceMemoryProperties(vk->device.physical_device, &memory_properties);
 
   for (u32 i = 0; i < memory_properties.memoryTypeCount; ++i) {
     // Check each memory type to see if its bit is set to 1.
@@ -569,153 +483,98 @@ internal i32 find_memory_index(u32 type_filter, u32 property_flags) {
   return -1;
 }
 
-internal void create_command_buffers() {
-  if (!context->graphics_command_buffers) {
-    context->graphics_command_buffers = push_array(context->arena, VK_CommandBuffer, context->swapchain.image_count);
-    for (u32 i = 0; i < context->swapchain.image_count; ++i) {
-      MemZeroStruct(&context->graphics_command_buffers[i]);
-    }
-  }
-  for (u32 i = 0; i < context->swapchain.image_count; ++i) {
-    if (context->graphics_command_buffers[i].handle) {
-      vk_command_buffer_free(
-          context->device.graphics_command_pool,
-          &context->graphics_command_buffers[i]);
-    }
-    MemZeroStruct(&context->graphics_command_buffers[i]);
-    vk_command_buffer_alloc(
-      context->device.graphics_command_pool, 
-      true, 
-      &context->graphics_command_buffers[i]);
-  }
-  Debug("Vulkan command buffers created.");
-}
-
-internal void regenerate_framebuffers(VK_Swapchain* swapchain, VK_RenderPass* renderpass) {
+internal void regenerate_framebuffers(VK_Swapchain* swapchain, VK_RenderPass renderpass) {
   for (u32 i = 0; i < swapchain->image_count; ++i) {
     // TODO: make this dynamic based on the currently configured attachments
     u32 attachment_count = 2;
     VkImageView attachments[] = {
-      swapchain->views[i],
-      swapchain->depth_attachment.view};
-      
-    vk_framebuffer_create(
-      context, 
-      renderpass, 
-      context->framebuffer_width, 
-      context->framebuffer_height, 
-      attachment_count, 
-      attachments, 
-      &context->swapchain.framebuffers[i]);
+        swapchain->views[i],
+        swapchain->depth_attachment.view};
+        
+   swapchain->framebuffers[i] = vk_framebuffer_create(
+       renderpass,
+       vk->frame.width,
+       vk->frame.height,
+       attachment_count,
+       attachments);
   }
 }
 
-internal b8 recreate_swapchain() {
+internal b8 recreate_swapchain(VK_Swapchain* swapchain) {
   // If already being recreated, do not try again.
-  if (context->recreating_swapchain) {
+  if (vk->recreating_swapchain) {
     Debug("recreate_swapchain called when already recreating. Booting.");
     return false;
   }
 
   // Detect if the window is too small to be drawn to
-  if (context->framebuffer_width == 0 || context->framebuffer_height == 0) {
+  if (vk->frame.width == 0 || vk->frame.height == 0) {
     Debug("recreate_swapchain called when window is < 1 in a dimension. Booting.");
     return false;
   }
 
   // Mark as recreating if the dimensions are valid.
-  context->recreating_swapchain = true;
+  vk->recreating_swapchain = true;
 
   // Wait for any operations to complete.
   vkDeviceWaitIdle(vkdevice);
 
   // Clear these out just in case.
-  for (u32 i = 0; i < context->swapchain.image_count; ++i) {
-    context->images_in_flight[i] = 0;
+  for (u32 i = 0; i < swapchain->image_count; ++i) {
+    vk->sync.images_in_flight[i] = 0;
   }
 
-  // Requery support
-  context->device.swapchain_support = vk_device_query_swapchain_support(context->device.physical_device);
-  vk_device_detect_depth_format(&context->device);
-
-  // Framebuffers.
-  for (u32 i = 0; i < context->swapchain.image_count; ++i) {
-    vk_framebuffer_destroy(context, &context->swapchain.framebuffers[i]);
-  }
-
-  context->swapchain.recreate(cached_framebuffer_extent.x, cached_framebuffer_extent.y);
-  // vk_swapchain_recreate(
-  //     cached_framebuffer_extent.x,
-  //     cached_framebuffer_extent.y,
-  //     &context->swapchain);
+  vk_swapchain_recreate(swapchain, cached_framebuffer_extent.x, cached_framebuffer_extent.y);
 
   // Sync the framebuffer size with the cached sizes.
-  context->framebuffer_width = cached_framebuffer_extent.x;
-  context->framebuffer_height = cached_framebuffer_extent.y;
-  context->main_renderpass.w = context->framebuffer_width;
-  context->main_renderpass.h = context->framebuffer_height;
+  vk->frame.width = cached_framebuffer_extent.x;
+  vk->frame.height = cached_framebuffer_extent.y;
+  vk->renderpass.rect.w = vk->frame.width;
+  vk->renderpass.rect.h = vk->frame.height;
   cached_framebuffer_extent.x = 0;
   cached_framebuffer_extent.y = 0;
 
   // Update framebuffer size generation.
-  context->framebuffer_size_last_generation = context->framebuffer_size_generation;
+  vk->frame.size_last_generation = vk->frame.size_generation;
 
-  // cleanup swapchain
-  for (u32 i = 0; i < context->swapchain.image_count; ++i) {
-    vk_command_buffer_free(context->device.graphics_command_pool, &context->graphics_command_buffers[i]);
-  }
+  vk->renderpass.rect.x = 0;
+  vk->renderpass.rect.y = 0;
+  vk->renderpass.rect.w = vk->frame.width;
+  vk->renderpass.rect.h = vk->frame.height;
 
-  context->main_renderpass.x = 0;
-  context->main_renderpass.y = 0;
-  context->main_renderpass.w = context->framebuffer_width;
-  context->main_renderpass.h = context->framebuffer_height;
-
-  regenerate_framebuffers(&context->swapchain, &context->main_renderpass);
-
-  create_command_buffers();
+  regenerate_framebuffers(swapchain, vk->renderpass);
 
   // Clear the recreating flag.
-  context->recreating_swapchain = false;
+  vk->recreating_swapchain = false;
 
   return true;
 }
 
-internal b8 create_buffers(VK_Context* context) {
+internal b8 create_buffers(VK_Render* render) {
   VkMemoryPropertyFlagBits memory_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;   
   
   const u64 vertex_buffer_size = sizeof(Vertex3D) * MB(1);
-  if (!vk_buffer_create(
+  render->obj_vertex_buffer = vk_buffer_create(
     vertex_buffer_size,
     VkBufferUsageFlagBits(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT),
     u32(memory_property_flags),
-    true,
-    &context->object_vertex_buffer)) {
-    
-    Error("Error creating vertex buffer.");
-    return false;
-  }
-  
-  context->geometry_vertex_offset = 0;
+    true);
+  render->geometry_vertex_offset = 0;
   
   const u64 index_buffer_size = sizeof(u32) * MB(1);
-  if (!vk_buffer_create(
+  render->obj_index_buffer = vk_buffer_create(
     vertex_buffer_size,
     VkBufferUsageFlagBits(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT),
     u32(memory_property_flags),
-    true,
-    &context->object_index_buffer)) {
-    
-    Error("Error creating vertex buffer.");
-    return false;
-  }
-  context->geometry_index_offset = 0;
+    true);
+  render->geometry_index_offset = 0;
   
   return true;
 }
 
-void vk_r_create_texture(const u8* pixels, Texture* texture) {
+void vk_r_create_texture(u8* pixels, Texture* texture) {
   // Internal data creation
-  texture->internal_data = push_struct(context->arena, VK_TextureData);
+  texture->internal_data = push_struct(vk->arena, VK_TextureData);
   VK_TextureData* data = (VK_TextureData*)texture->internal_data;
   VkDeviceSize image_size = texture->width * texture->height * texture->channel_count;
   
@@ -725,15 +584,13 @@ void vk_r_create_texture(const u8* pixels, Texture* texture) {
   // Create a staging buffer and load data into it
   VkBufferUsageFlagBits usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
   VkMemoryPropertyFlags memory_prop_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-  VK_Buffer staging;
-  vk_buffer_create(image_size, usage, memory_prop_flags, true, &staging);
+  VK_Buffer staging = vk_buffer_create(image_size, usage, memory_prop_flags, true);
   
   vk_buffer_load_data(&staging, 0, image_size, 0, pixels);
   
   // Note Lots of assumptions, different texture types will require
   // different options here
   data->image = vk_image_create(
-    context, 
     VK_IMAGE_TYPE_2D, 
     texture->width, 
     texture->height, 
@@ -745,13 +602,12 @@ void vk_r_create_texture(const u8* pixels, Texture* texture) {
     VK_IMAGE_ASPECT_COLOR_BIT);
   
   VK_CommandBuffer temp_buffer;
-  VkCommandPool pool = context->device.graphics_command_pool;
-  VkQueue queue = context->device.graphics_queue;
-  vk_command_buffer_alloc_and_begin_single_use(pool, &temp_buffer);
+  VkCommandPool pool = vk->device.gfx_cmd_pool;
+  VkQueue queue = vk->device.graphics_queue;
+  vk_cmd_alloc_and_begin_single_use(pool, &temp_buffer);
   
   // Transition the layout from whatever it is currently to optimal for receiving data
   vk_image_transition_layout(
-    context, 
     &temp_buffer, 
     &data->image, 
     image_format, 
@@ -759,18 +615,17 @@ void vk_r_create_texture(const u8* pixels, Texture* texture) {
     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
   
   // Copy the data from the buffer
-  vk_image_copy_from_buffer(context, &data->image, staging.handle, &temp_buffer);
+  vk_image_copy_from_buffer(&data->image, staging.handle, &temp_buffer);
   
   // Copy the data from the buffer
   vk_image_transition_layout(
-    context, 
     &temp_buffer, 
     &data->image, 
     image_format, 
     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   
-  vk_command_buffer_end_single_use(pool, &temp_buffer, queue);
+  vk_cmd_end_single_use(pool, &temp_buffer, queue);
   
   vk_buffer_destroy(&staging);
 
@@ -793,7 +648,7 @@ void vk_r_create_texture(const u8* pixels, Texture* texture) {
   sampler_info.minLod = 0.0f;
   sampler_info.maxLod = 0.0f;
   
-  VkResult result = vkCreateSampler(vkdevice, &sampler_info, context->allocator, &data->sampler);
+  VkResult result = vkCreateSampler(vkdevice, &sampler_info, vk->allocator, &data->sampler);
   if (!vk_result_is_success(VK_SUCCESS)) {
     Error("Error creating texture sampler: %s", vk_result_string(result, true));
     return;
@@ -806,13 +661,11 @@ void vk_r_destroy_texture(Texture* texture) {
   vkDeviceWaitIdle(vkdevice);
   
   VK_TextureData* data = (VK_TextureData*)texture->internal_data;
-  if (data) {
-    vk_image_destroy(context, &data->image);
-    MemZeroStruct(&data->image);
-    vkDestroySampler(vkdevice, data->sampler, context->allocator);
-    data->sampler = 0;
-    // TODO free memory
-  }
-  
+  Assert(data);
+  vk_image_destroy(&data->image);
+  vkDestroySampler(vkdevice, data->sampler, vk->allocator);
+  MemZeroStruct(&data);
+  // TODO free memory
+
   MemZeroStruct(texture);
 }

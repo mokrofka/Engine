@@ -20,4 +20,19 @@ enum TextureUse {
   TEXTURE_USE_MAP_DIFFUSE = 0x01,
 };
 
+struct TextureMap {
+  Texture* texture;
+  TextureUse use;
+};
+
+#define MATERIAL_NAME_MAX_LENGTH 256
+
+struct Material {
+  u32 id;
+  u32 generation;
+  u32 internal_id;
+  char name[MATERIAL_NAME_MAX_LENGTH];
+  v4 diffuse_color;
+  TextureMap diffuse_map;
+};
 

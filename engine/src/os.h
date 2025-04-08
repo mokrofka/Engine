@@ -69,8 +69,8 @@ void* _platform_memory_copy(void* dest, const void* source, u64 size);
 void* _platform_memory_set(void* dest, i32 value, u64 size);
 b8 _platform_memory_compare(void* a, void* b, u64 size);
 
-void os_console_write(const char* message, u8 color);
-void os_console_write_error(const char* message, u8 color);
+void os_console_write(char* message, u8 color);
+void os_console_write_error(char* message, u8 color);
 
 f64 os_now_seconds();
 // Sleep on the thread for the provided ms. This blocks the main thread.
@@ -93,15 +93,15 @@ v2i os_get_framebuffer_size();
 
 // files
 KAPI b8 os_file_path_exists(String path);
-KAPI u64 os_file_size(OS_File handle);
+KAPI u64 os_file_size(OS_File file);
 KAPI OS_File os_file_open(String path, FileModes mode);
-KAPI void os_file_close(OS_File handle);
-KAPI u64 os_file_read(OS_File handle, u64 size, void* dest);
-KAPI u64 os_file_write(OS_File handle, u64 size, const void* source);
+KAPI void os_file_close(OS_File file);
+KAPI u64 os_file_read(OS_File file, u64 size, void* dest);
+KAPI u64 os_file_write(OS_File file, u64 size, void* source);
 KAPI void os_file_copy(String file, String new_file);
 KAPI u64 os_file_last_write_time(String filename);
 KAPI b8 os_file_compare_time(u64 new_dll_write_time, u64 dll_last_write_time);
-KAPI u64 os_EXE_filename(void* buffer);
+KAPI u64 os_exe_filename(void* buffer);
 
 
 // Updates the provided clock. Should be called just before checking elapsed time.

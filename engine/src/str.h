@@ -26,8 +26,8 @@ KAPI String str(u8* str, u64 size);
 KAPI String str_range(u8 *first, u8 *one_past_last);
 KAPI String str_zero();
 
-u8* str_format_v(u8* buffer, const void* format, void* va_listp);
-KAPI u8* str_format(u8* buffer, const void* format, ...);
+u8* str_format_v(void* buffer, const void* format, void* va_listp);
+KAPI u8* str_format(void* buffer, const void* format, ...);
 
 KAPI String cstr(const void* c);
 KAPI String cstr_capped(void* cstr, void* cap);

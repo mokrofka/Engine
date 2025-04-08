@@ -10,40 +10,39 @@
 
 #define BUILTIN_SHADER_NAME_MATERIAL "Builtin.MaterialShader"
 
-b8 vk_material_shader_create(VK_Context* context, VK_MaterialShader* out_shader) {
+VK_MaterialShader vk_material_shader_create(VK_Context* vk) {
+  VK_MaterialShader shader = {};
+
   char stage_type_strs[MATERIAL_SHADER_STAGE_COUNT][5] = {"vert", "frag"};
   VkShaderStageFlagBits stage_types[MATERIAL_SHADER_STAGE_COUNT] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
   
   for (u32 i = 0; i < MATERIAL_SHADER_STAGE_COUNT; ++i) {
-    if (!create_shader_module(context, BUILTIN_SHADER_NAME_MATERIAL, stage_type_strs[i], stage_types[i], i, out_shader->stages)) {
-      Error("Unable to create %s shader module for '%s'.", stage_type_strs[i], BUILTIN_SHADER_NAME_MATERIAL);
-      return false;
-    }
+    shader.stages[i] = shader_module_create(BUILTIN_SHADER_NAME_MATERIAL, stage_type_strs[i], stage_types[i]);
   }
   
   // Global Descriptors
-  VkDescriptorSetLayoutBinding global_ubo_layout_binding;
-  global_ubo_layout_binding.binding = 0;
-  global_ubo_layout_binding.descriptorCount = 1;
-  global_ubo_layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  global_ubo_layout_binding.pImmutableSamplers = 0;
-  global_ubo_layout_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+  VkDescriptorSetLayoutBinding g_ubo_layout_binding;
+  g_ubo_layout_binding.binding = 0;
+  g_ubo_layout_binding.descriptorCount = 1;
+  g_ubo_layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  g_ubo_layout_binding.pImmutableSamplers = 0;
+  g_ubo_layout_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
   
-  VkDescriptorSetLayoutCreateInfo global_layout_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-  global_layout_info.bindingCount = 1;
-  global_layout_info.pBindings = &global_ubo_layout_binding;
-  VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &global_layout_info, context->allocator, &out_shader->global_descriptor_set_layout));
+  VkDescriptorSetLayoutCreateInfo g_layout_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+  g_layout_info.bindingCount = 1;
+  g_layout_info.pBindings = &g_ubo_layout_binding;
+  VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &g_layout_info, vk->allocator, &shader.global_descriptor_set_layout));
   
   // Global descriptor pool: Used for global items such as view/projection matrix
-  VkDescriptorPoolSize global_pool_size;
-  global_pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  global_pool_size.descriptorCount = context->swapchain.image_count;
+  VkDescriptorPoolSize g_pool_size;
+  g_pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  g_pool_size.descriptorCount = vk->swapchain.image_count;
   
-  VkDescriptorPoolCreateInfo global_pool_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-  global_pool_info.poolSizeCount = 1; // number of VkDescriptorPoolSize objects
-  global_pool_info.pPoolSizes = &global_pool_size;
-  global_pool_info.maxSets = context->swapchain.image_count;
-  VK_CHECK(vkCreateDescriptorPool(vkdevice, &global_pool_info, context->allocator, &out_shader->global_descriptor_pool));
+  VkDescriptorPoolCreateInfo g_pool_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+  g_pool_info.poolSizeCount = 1; // number of VkDescriptorPoolSize objects
+  g_pool_info.pPoolSizes = &g_pool_size;
+  g_pool_info.maxSets = vk->swapchain.image_count;
+  VK_CHECK(vkCreateDescriptorPool(vkdevice, &g_pool_info, vk->allocator, &shader.global_descriptor_pool));
   
   // Local/Object Descriptors
   const u32 local_sample_count = 1;
@@ -62,39 +61,39 @@ b8 vk_material_shader_create(VK_Context* context, VK_MaterialShader* out_shader)
   VkDescriptorSetLayoutCreateInfo layout_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
   layout_info.bindingCount = VULKAN_MATERIAL_SHADER_DESCRIPTOR_COUNT ;
   layout_info.pBindings = bindings;
-  VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &layout_info, 0, &out_shader->object_descriptor_set_layout));
+  VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &layout_info, 0, &shader.obj_descriptor_set_layout));
   
   // Local/Object descriptor pool: Used for object-specific items like diffuse color
-  VkDescriptorPoolSize object_pool_sizes[2];
+  VkDescriptorPoolSize obj_pool_sizes[2];
   // The first section will be used for uniform buffers
-  object_pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  object_pool_sizes[0].descriptorCount = VULKAN_MAX_MATERIAL_COUNT;
+  obj_pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  obj_pool_sizes[0].descriptorCount = VULKAN_MAX_MATERIAL_COUNT;
   // The second section will be used for image samplers
-  object_pool_sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  object_pool_sizes[1].descriptorCount = local_sample_count * VULKAN_MAX_MATERIAL_COUNT;
+  obj_pool_sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  obj_pool_sizes[1].descriptorCount = local_sample_count * VULKAN_MAX_MATERIAL_COUNT;
   
-  VkDescriptorPoolCreateInfo object_pool_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-  object_pool_info.poolSizeCount = 2;
-  object_pool_info.pPoolSizes = object_pool_sizes;
-  object_pool_info.maxSets = VULKAN_MAX_MATERIAL_COUNT;
+  VkDescriptorPoolCreateInfo obj_pool_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+  obj_pool_info.poolSizeCount = 2;
+  obj_pool_info.pPoolSizes = obj_pool_sizes;
+  obj_pool_info.maxSets = VULKAN_MAX_MATERIAL_COUNT;
   
   // Create object descriptor pool
-  VK_CHECK(vkCreateDescriptorPool(vkdevice, &object_pool_info, context->allocator, &out_shader->object_descriptor_pool));
+  VK_CHECK(vkCreateDescriptorPool(vkdevice, &obj_pool_info, vk->allocator, &shader.obj_descriptor_pool));
   
   // Pipeline creation
   VkViewport viewport;
   viewport.x = 0.0f;
-  viewport.y = (f32)context->framebuffer_height;
-  viewport.width = (f32)context->framebuffer_width;
-  viewport.height = (f32)context->framebuffer_height;
+  viewport.y = (f32)vk->frame.height;
+  viewport.width = (f32)vk->frame.width;
+  viewport.height = (f32)vk->frame.height;
   viewport.minDepth = 0.0f;
   viewport.maxDepth = 1.0f;
 
   // Scissor
   VkRect2D scissor;
   scissor.offset.x = scissor.offset.y = 0;
-  scissor.extent.width = context->framebuffer_width;
-  scissor.extent.height = context->framebuffer_height;
+  scissor.extent.width = vk->frame.width;
+  scissor.extent.height = vk->frame.height;
   
   // Attributes
   u32 offset = 0;
@@ -120,111 +119,94 @@ b8 vk_material_shader_create(VK_Context* context, VK_MaterialShader* out_shader)
   // Descriptor set layouts
   const i32 descriptor_set_layout_count = 2;
   VkDescriptorSetLayout layouts[2] = {
-    out_shader->global_descriptor_set_layout,
-    out_shader->object_descriptor_set_layout};
+    shader.global_descriptor_set_layout,
+    shader.obj_descriptor_set_layout};
 
   // Stages
-  // NOTE Should match the number of shader->stages
+  // NOTE Should match the number of shader.stages
   VkPipelineShaderStageCreateInfo stage_create_infos[MATERIAL_SHADER_STAGE_COUNT] = {};
   for (u32 i = 0; i < MATERIAL_SHADER_STAGE_COUNT; ++i) {
-    stage_create_infos[i].sType = out_shader->stages[i].shader_state_create_info.sType;
-    stage_create_infos[i] = out_shader->stages[i].shader_state_create_info;
+    stage_create_infos[i].sType = shader.stages[i].shader_state_create_info.sType;
+    stage_create_infos[i] = shader.stages[i].shader_state_create_info;
   }
 
-  if (!vk_graphics_pipeline_create(
-          context,
-          &context->main_renderpass,
-          ATTRIBUTE_COUNT,
-          attribute_desriptions,
-          descriptor_set_layout_count,
-          layouts,
-          MATERIAL_SHADER_STAGE_COUNT,
-          stage_create_infos,
-          viewport,
-          scissor,
-          false,
-          &out_shader->pipeline)) {
-    Error("Failed to load graphics pipelien for object shader");
-    return false;
-  }
-  
+  shader.pipeline = vk_graphics_pipeline_create(
+      vk->renderpass,
+      ATTRIBUTE_COUNT,
+      attribute_desriptions,
+      descriptor_set_layout_count,
+      layouts,
+      MATERIAL_SHADER_STAGE_COUNT,
+      stage_create_infos,
+      viewport,
+      scissor,
+      false);
+
   // Create uniform buffer
-  if (!vk_buffer_create(
+  shader.global_uniform_buffer = vk_buffer_create(
     sizeof(GlobalUniformObject) * 3, 
     VkBufferUsageFlagBits(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
-    true, 
-    &out_shader->global_uniform_buffer)) {
-    Error("Vulkan buffer creation failed for object shader.");
-    return false;
-  }
+    true);
   
   // Allocate global descriptor sets
   VkDescriptorSetLayout global_layouts[3] = {
-    out_shader->global_descriptor_set_layout,
-    out_shader->global_descriptor_set_layout,
-    out_shader->global_descriptor_set_layout};
+    shader.global_descriptor_set_layout,
+    shader.global_descriptor_set_layout,
+    shader.global_descriptor_set_layout};
 
   VkDescriptorSetAllocateInfo alloc_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-  alloc_info.descriptorPool = out_shader->global_descriptor_pool;
+  alloc_info.descriptorPool = shader.global_descriptor_pool;
   alloc_info.descriptorSetCount = 3;
   alloc_info.pSetLayouts = global_layouts;
-  VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, out_shader->global_descriptor_sets));
+  VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, shader.global_descriptor_sets));
   
   // Create the object uniform buffer
-  if (!vk_buffer_create(
+  shader.obj_uniform_buffer = vk_buffer_create(
     sizeof(ObjectUniformObject), 
     VkBufferUsageFlagBits(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
-    true, 
-    &out_shader->object_uniform_buffer)) {
-    Error("Vulkan buffer creation failed for object shader.");
-    return false;
-  }
+    true);
 
-  return true;
+  return shader;
 }
 
-void vk_material_shader_destroy(VK_Context* context, VK_MaterialShader* shader) {
+void vk_material_shader_destroy(VK_MaterialShader* shader) {
   VkDevice logical_device = vkdevice;
   
-  vkDestroyDescriptorPool(logical_device, shader->object_descriptor_pool, context->allocator);
-  vkDestroyDescriptorSetLayout(logical_device, shader->object_descriptor_set_layout, context->allocator);
+  vkDestroyDescriptorPool(logical_device, shader->obj_descriptor_pool, vk->allocator);
+  vkDestroyDescriptorSetLayout(logical_device, shader->obj_descriptor_set_layout, vk->allocator);
   
   // Destroy uniform buffer
   vk_buffer_destroy(&shader->global_uniform_buffer);
-  vk_buffer_destroy(&shader->object_uniform_buffer);
+  vk_buffer_destroy(&shader->obj_uniform_buffer);
   
   // Destroy pipeline
-  vk_pipeline_destroy(context, &shader->pipeline);
+  vk_pipeline_destroy(shader->pipeline);
 
   // Destroy global descriptor pool
-  vkDestroyDescriptorPool(logical_device, shader->global_descriptor_pool, context->allocator);
+  vkDestroyDescriptorPool(logical_device, shader->global_descriptor_pool, vk->allocator);
   
   // Destroy global set layouts
-  vkDestroyDescriptorSetLayout(logical_device, shader->global_descriptor_set_layout, context->allocator);
+  vkDestroyDescriptorSetLayout(logical_device, shader->global_descriptor_set_layout, vk->allocator);
   
   // Destroy shader modules
   for (u32 i = 0; i < MATERIAL_SHADER_STAGE_COUNT; ++i) {
-    vkDestroyShaderModule(vkdevice, shader->stages[i].handle, context->allocator);
-    shader->stages[i].handle = 0;
+    vkDestroyShaderModule(vkdevice, shader->stages[i].handle, vk->allocator);
   }
 }
 
-void vk_material_shader_use(VK_Context* context, VK_MaterialShader* shader) {
-  u32 image_index = context->image_index;
+void vk_material_shader_use(VkCommandBuffer cmd, VK_MaterialShader shader) {
   VkPipelineBindPoint bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS;
-  // NOTE suspicious command buffer pointer
-  vk_pipeline_bind(&context->graphics_command_buffers[image_index], bind_point, &shader->pipeline);
+  vk_pipeline_bind(cmd, bind_point, shader.pipeline);
 }
 
-void vk_material_shader_update_global_state(VK_Context* context, VK_MaterialShader* shader, f32 delta_time) {
-  u32 image_index = context->image_index;
-  VkCommandBuffer command_buffer = context->graphics_command_buffers[image_index].handle;
+void vk_material_shader_update_global_state(VkCommandBuffer cmd, VK_MaterialShader* shader, f32 delta_time) {
+  u32 image_index = vk->frame.image_index;
   VkDescriptorSet global_descriptor = shader->global_descriptor_sets[image_index];
   
   // Bind the global descriptor set to be updated
-  vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shader->pipeline.pipeline_layout, 0, 1, &global_descriptor, 0, 0);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader->pipeline.pipeline_layout, 0, 1, &global_descriptor, 0, 0);
   
   // Configure the descriptors for the given index
   u32 range = sizeof(GlobalUniformObject);
@@ -250,11 +232,10 @@ void vk_material_shader_update_global_state(VK_Context* context, VK_MaterialShad
   vkUpdateDescriptorSets(vkdevice, 1, &descriptor_write, 0, 0);
 }
 
-void vk_material_shader_update_object(VK_Context* context, VK_MaterialShader* shader, GeometryRenderData data) {
-  u32 image_index = context->image_index;
-  VkCommandBuffer command_buffer = context->graphics_command_buffers[image_index].handle;
+void vk_material_shader_update_object(VkCommandBuffer cmd, VK_MaterialShader* shader, GeometryRenderData data) {
+  u32 image_index = vk->frame.image_index;
   
-  vkCmdPushConstants(command_buffer, shader->pipeline.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4), &data.model);
+  vkCmdPushConstants(cmd, shader->pipeline.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4), &data.model);
   
   // Obtain material data
   VK_MaterialShaderInstState* object_state = &shader->instance_states[data.object_id];
@@ -272,17 +253,17 @@ void vk_material_shader_update_object(VK_Context* context, VK_MaterialShader* sh
   
   // TODO get diffuse color from a material
   local f32 accumulator = 0.0f;
-  accumulator += context->frame_delta_time;
+  accumulator += vk->frame.delta_time;
   f32 s = (Sin(accumulator) + 1.0f) / 2.0f;
   obo.diffuse_color = v4(s,s,s, 1.0f);
   
   // Load the data into the buffer
-  vk_buffer_load_data(&shader->object_uniform_buffer, offset, range, 0, &obo);
+  vk_buffer_load_data(&shader->obj_uniform_buffer, offset, range, 0, &obo);
   
   // Only do this if the descriptor has not yet been updated
   if (object_state->descriptor_states[descriptor_index].generations[image_index] == INVALID_ID) {
     VkDescriptorBufferInfo buffer_info;
-    buffer_info.buffer = shader->object_uniform_buffer.handle;
+    buffer_info.buffer = shader->obj_uniform_buffer.handle;
     buffer_info.offset = offset;
     buffer_info.range = range;
     
@@ -351,14 +332,14 @@ void vk_material_shader_update_object(VK_Context* context, VK_MaterialShader* sh
   }
   
   // Bind the descriptor set to be updated, or in case the shader changed
-  vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shader->pipeline.pipeline_layout, 1, 1, &object_descriptor_set, 0, 0);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader->pipeline.pipeline_layout, 1, 1, &object_descriptor_set, 0, 0);
   
 }
 
-b8 vk_material_shader_acquire_resources(VK_Context* context, VK_MaterialShader* shader, u32* out_object_id) {
+void vk_material_shader_acquire_resources(VK_MaterialShader* shader, u32* out_object_id) {
   // TODO free list
-  *out_object_id = shader->object_uniform_buffer_index;
-  ++shader->object_uniform_buffer_index;
+  *out_object_id = shader->obj_uniform_buffer_index;
+  ++shader->obj_uniform_buffer_index;
   
   u32 object_id = *out_object_id;
   VK_MaterialShaderInstState* object_state = &shader->instance_states[object_id];
@@ -371,29 +352,26 @@ b8 vk_material_shader_acquire_resources(VK_Context* context, VK_MaterialShader* 
   
   // Allocate descriptor sets
   VkDescriptorSetLayout layouts[3] = {
-    shader->object_descriptor_set_layout,
-    shader->object_descriptor_set_layout,
-    shader->object_descriptor_set_layout};
+    shader->obj_descriptor_set_layout,
+    shader->obj_descriptor_set_layout,
+    shader->obj_descriptor_set_layout};
   
   VkDescriptorSetAllocateInfo alloc_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-  alloc_info.descriptorPool = shader->object_descriptor_pool;
+  alloc_info.descriptorPool = shader->obj_descriptor_pool;
   alloc_info.descriptorSetCount = 3; // one per frame
   alloc_info.pSetLayouts = layouts;
   VkResult result = vkAllocateDescriptorSets(vkdevice, &alloc_info, object_state->descriptor_sets);
   if (result != VK_SUCCESS) {
     Error("Error allocating descriptor sets in shader!");
-    return false;
   }
-  
-  return true;
 }
 
-void vk_material_shader_release_resources(VK_Context* context, VK_MaterialShader* shader, u32 object_id) {
+void vk_material_shader_release_resources(VK_Context* vk, VK_MaterialShader* shader, u32 object_id) {
   VK_MaterialShaderInstState* object_state = &shader->instance_states[object_id];
   
   const u32 descriptor_set_count = 3;
   // Release object descriptor sets
-  VkResult result = vkFreeDescriptorSets(vkdevice, shader->object_descriptor_pool, descriptor_set_count, object_state->descriptor_sets);
+  VkResult result = vkFreeDescriptorSets(vkdevice, shader->obj_descriptor_pool, descriptor_set_count, object_state->descriptor_sets);
   if (result != VK_SUCCESS) {
     Error("Error freeing object shader descriptor sets!");
   }

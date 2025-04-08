@@ -142,7 +142,7 @@ struct VK_Context {
   VkSurfaceKHR surface;
 };
 
-extern VK_Context* context;
+extern VK_Context* vk;
 
 // Surface creation for Vulkan
 void* vk_os_create_surface() {
@@ -156,10 +156,10 @@ void* vk_os_create_surface() {
   create_info.hinstance = h_instance;
   create_info.hwnd = hwnd;
 
-  VkResult result = vkCreateWin32SurfaceKHR(context->instance, &create_info,
-                                            context->allocator, &surface);
+  VkResult result = vkCreateWin32SurfaceKHR(vk->instance, &create_info,
+                                            vk->allocator, &surface);
   if (result != VK_SUCCESS) {
-    Fatal("Vulkan surface creation failed.");
+    Error("Vulkan surface creation failed.");
     return 0;
   }
   return surface;
@@ -196,7 +196,7 @@ b8 _platform_memory_compare(void* a, void* b, u64 size) {
   return memcmp(a, b, size) ? 0 : 1;
 }
 
-void os_console_write(const char* message, u8 color) {
+void os_console_write(char* message, u8 color) {
   HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
   // FATAL,ERROR,WARN,INFO,DEBUG,TRACE
   const u8 levels[6] = {64, 4, 6, 2, 1, 8};
@@ -207,7 +207,7 @@ void os_console_write(const char* message, u8 color) {
   WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), message, (DWORD)length, number_written, 0);
 }
 
-void os_console_write_error(const char* message, u8 color) {
+void os_console_write_error(char* message, u8 color) {
   HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
   // FATAL,ERROR,WARN,INFO,DEBUG,TRACE
   const u8 levels[6] = {64, 4, 6, 2, 1, 8};
@@ -302,9 +302,9 @@ b8 os_file_path_exists(String path) {
   return (attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY));
 }
 
-u64 os_file_size(OS_File handle) {
+u64 os_file_size(OS_File file) {
   LARGE_INTEGER size;
-  GetFileSizeEx((HANDLE)handle.u64, &size);
+  GetFileSizeEx((HANDLE)file.u64, &size);
   return size.QuadPart;
 }
 
@@ -318,7 +318,6 @@ OS_File os_file_open(String path, FileModes mode) {
   } else if ((mode & FILE_MODE_READ) != 0 && (mode & FILE_MODE_WRITE) == 0) {
     handle_permission |= GENERIC_READ;
     handle_creation |= OPEN_EXISTING;
-
   } else if ((mode & FILE_MODE_READ) == 0 && (mode & FILE_MODE_WRITE) != 0) {
     handle_permission |= GENERIC_WRITE;
     handle_creation |= CREATE_ALWAYS;
@@ -339,17 +338,16 @@ OS_File os_file_open(String path, FileModes mode) {
   return result;
 }
 
-void os_file_close(OS_File handle) {
-  if (handle.u64) {
-    CloseHandle((HANDLE)handle.u64);
-  }
+void os_file_close(OS_File file) {
+  AssertMsg(file.u64, "file is null");
+  CloseHandle((HANDLE)file.u64);
 }
 
-u64 os_file_read(OS_File handle, u64 size, void* dest) {
-  HANDLE win32_handle = (HANDLE)handle.u64;
+u64 os_file_read(OS_File file, u64 size, void* dest) {
+  HANDLE win32_handle = (HANDLE)file.u64;
   DWORD bytes_read;
 
-  if (handle.u64 && dest) {
+  if (file.u64 && dest) {
     ReadFile(win32_handle, dest, size, &bytes_read, null);
     if (bytes_read != size) {
       return 0;
@@ -359,16 +357,12 @@ u64 os_file_read(OS_File handle, u64 size, void* dest) {
   return 0;
 }
 
-u64 os_file_write(OS_File handle, u64 size, const void* source) {
+u64 os_file_write(OS_File file, u64 size, void* source) {
   DWORD bytes_wrote;
-  if (handle.u64) {
-    WriteFile((HANDLE)handle.u64, source, size, &bytes_wrote, 0);
-    if (size != bytes_wrote) {
-      return 0;
-    }
-    return bytes_wrote;
-  }
-  return 0;
+  AssertMsg(file.u64, "File handle is null");
+  WriteFile((HANDLE)file.u64, source, size, &bytes_wrote, 0);
+  AssertMsg(size == bytes_wrote, "Wrote not completely");
+  return bytes_wrote;
 }
 
 void os_file_copy(String file, String new_file) {
@@ -396,7 +390,7 @@ b8 os_file_compare_time(u64 new_dll_write_time, u64 dll_last_write_time) {
   return false;
 }
 
-u64 os_EXE_filename(void* buffer) {
+u64 os_exe_filename(void* buffer) {
   DWORD size = GetModuleFileNameA(0, (char*)buffer, 100);
   return size;
 }

@@ -106,6 +106,8 @@ typedef unsigned char uchar;
 #define INLINE static inline
 
 #define INVALID_ID 4294967295U
+#define Return(t) MemZeroStruct(&t); return t
+// #define IsValid(t) auto zero_struct = t; MemZeroStruct(&t); if (MemCompare(&t, &zero_struct, sizeof(t))) 
 
 struct String {
   u8* str;

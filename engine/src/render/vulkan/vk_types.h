@@ -11,7 +11,7 @@
   {                             \
     Assert(expr == VK_SUCCESS); \
   }
-#define vkdevice context->device.logical_device
+#define vkdevice vk->device.logical_device
 
 struct VK_Buffer {
   u64 size;
@@ -43,7 +43,7 @@ struct VK_Device {
   VkQueue present_queue;
   VkQueue transfer_queue;
   
-  VkCommandPool graphics_command_pool;
+  VkCommandPool gfx_cmd_pool;
   
   VkPhysicalDeviceProperties properties;
   VkPhysicalDeviceFeatures features;
@@ -71,8 +71,8 @@ enum VK_RenderPassState {
 
 struct VK_RenderPass  {
   VkRenderPass handle;
-  f32 x,y,w,h;
-  f32 r,g,b,a;
+  Rect rect;
+  v4 color;
   
   f32 depth;
   u32 stencil;
@@ -83,8 +83,7 @@ struct VK_RenderPass  {
 struct VK_Framebuffer {
   VkFramebuffer handle;
   u32 attachment_count;
-  VkImageView* attachments;
-  VK_RenderPass* renderpass;
+  VkImageView attachments[4]; // just to have enough
 };
 
 struct VK_Swapchain  {
@@ -92,31 +91,13 @@ struct VK_Swapchain  {
   u8 max_frames_in_flight;
   VkSwapchainKHR handle;
   u32 image_count;
-  VkImage* images;
-  VkImageView* views;
+  VkImage images[3];
+  VkImageView views[3];
   
   VK_Image depth_attachment;
   
   // framebuffers used for on-screen rendering.
   VK_Framebuffer framebuffers[3];
-
-  void create(u32 width, u32 height);
-
-  void recreate(u32 width, u32 height);
-
-  void destroy();
-
-  b8 acquire_next_image_index(
-      u64 timeout_ns,
-      VkSemaphore image_available_semaphore,
-      VkFence fence,
-      u32* out_image_index);
-
-  void present(
-      VkQueue graphics_queue,
-      VkQueue present_queue,
-      VkSemaphore render_complete_semaphore,
-      u32 present_image_index);
 };
 
 enum VK_CommandBufferState {
@@ -189,12 +170,12 @@ struct VK_MaterialShader {
   // Global uniform buffer
   VK_Buffer global_uniform_buffer;
   
-  VkDescriptorPool object_descriptor_pool;
-  VkDescriptorSetLayout object_descriptor_set_layout;
+  VkDescriptorPool obj_descriptor_pool;
+  VkDescriptorSetLayout obj_descriptor_set_layout;
   // Object uniform buffers
-  VK_Buffer object_uniform_buffer;
-  // TODO manage a free list of somd kind here instead
-  u32 object_uniform_buffer_index;
+  VK_Buffer obj_uniform_buffer;
+  // TODO manage a free list of some kind here instead
+  u32 obj_uniform_buffer_index;
   
   TextureUse sampler_uses[VULKAN_MATERIAL_SHADER_SAMPLER_COUNT];
   
@@ -204,72 +185,64 @@ struct VK_MaterialShader {
   VK_Pipeline pipeline;
 };
 
+struct VK_Frame {
+  f32 delta_time;
+  u32 width;
+  u32 height;
+  u64 size_generation;
+  u64 size_last_generation;
+
+  u32 image_index;
+  u32 current_frame;
+  b8 recreating_swapchain;
+};
+
+struct VK_SyncObj {
+  VkSemaphore* image_available_semaphores;
+  VkSemaphore* queue_complete_semaphores;
+  
+  u32 in_flight_fence_count;
+  VK_Fence* in_flight_fences;
+  VK_Fence** images_in_flight;
+};
+
+struct VK_Render {
+  VK_Buffer obj_vertex_buffer;
+  VK_Buffer obj_index_buffer;
+  u64 geometry_vertex_offset;
+  u64 geometry_index_offset;
+
+  VK_CommandBuffer cmd[3];
+  VK_MaterialShader material_shader;
+};
+
 struct VK_Context {
-  struct Arena* arena;
+  Arena* arena;
   
   VkInstance instance;
   VkAllocationCallbacks* allocator;
   VkSurfaceKHR surface;
   
-  f32 frame_delta_time;
-   
-  // The framebuffer's current width.
-  u32 framebuffer_width;
-  
-  // The framebuffer's current width.
-  u32 framebuffer_height;
-  
-  // Current generation of framebuffer size. If it does not match framebuffer_size_last_generation,
-  // a new one should be generated.
-  u64 framebuffer_size_generation;
-  
-  // The generation of the framebuffer when it was last created. Set to framebuffer_size_generation
-  // when updated.
-  u64 framebuffer_size_last_generation;
-
-#if defined(_DEBUG)
-  VkDebugUtilsMessengerEXT debug_messenger;
-#endif
+  VK_Frame frame;
+  VK_SyncObj sync;
+  VK_Render render;
 
   VK_Device device;
   
   VK_Swapchain swapchain;
-  VK_RenderPass main_renderpass;
-  
-  VK_Buffer object_vertex_buffer;
-  VK_Buffer object_index_buffer;
-  
-  // array
-  VK_CommandBuffer* graphics_command_buffers;
-  
-  // array
-  VkSemaphore* image_available_semaphores;
-  
-  // array
-  VkSemaphore* queue_complete_semaphores;
-  
-  u32 in_flight_fence_count;
-  VK_Fence* in_flight_fences;
-  
-  // Holds pointers to fences which exist and are owned elsewhere.
-  VK_Fence** images_in_flight;
-  
-  u32 image_index;
-  u32 current_frame;
+  VK_RenderPass renderpass;
   
   b8 recreating_swapchain;
   
-  VK_MaterialShader material_shader;
-  
-  u64 geometry_vertex_offset;
-  u64 geometry_index_offset;
-  
   i32 (*find_memory_index)(u32 type_filter, u32 property_flags);
+#if defined(_DEBUG)
+  VkDebugUtilsMessengerEXT debug_messenger;
+#endif
 };
 
 struct VK_TextureData {
-  VK_Image  image;
+  VK_Image image;
   VkSampler sampler;
 };
 
-extern VK_Context* context;
+extern VK_Context* vk;

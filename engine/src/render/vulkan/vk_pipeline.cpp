@@ -6,9 +6,8 @@
 #include <memory.h>
 #include <logger.h>
 
-b8 vk_graphics_pipeline_create(
-  VK_Context* context,
-  VK_RenderPass * renderpass,
+VK_Pipeline vk_graphics_pipeline_create(
+  VK_RenderPass renderpass,
   u32 attribute_count,
   VkVertexInputAttributeDescription* attributes,
   u32 descriptor_set_layout_count,
@@ -17,8 +16,8 @@ b8 vk_graphics_pipeline_create(
   VkPipelineShaderStageCreateInfo* stages,
   VkViewport viewport,
   VkRect2D scissor,
-  b8 is_wireframe,
-  VK_Pipeline* pipeline) {
+  b8 is_wireframe) {
+  VK_Pipeline pipeline = {};
 
   VkPipelineViewportStateCreateInfo viewport_state = {VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
   viewport_state.viewportCount = 1;
@@ -122,8 +121,8 @@ b8 vk_graphics_pipeline_create(
   VK_CHECK(vkCreatePipelineLayout(
     vkdevice, 
     &pipeline_layout_create_info, 
-    context->allocator, 
-    &pipeline->pipeline_layout));
+    vk->allocator, 
+    &pipeline.pipeline_layout));
 
   // Pipeline create
   VkGraphicsPipelineCreateInfo pipeline_create_info = {VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
@@ -140,9 +139,9 @@ b8 vk_graphics_pipeline_create(
   pipeline_create_info.pDynamicState = &dynamic_state_create_info;
   pipeline_create_info.pTessellationState = null;
   
-  pipeline_create_info.layout = pipeline->pipeline_layout;
+  pipeline_create_info.layout = pipeline.pipeline_layout;
   
-  pipeline_create_info.renderPass = renderpass->handle;
+  pipeline_create_info.renderPass = renderpass.handle;
   pipeline_create_info.subpass = 0;
   pipeline_create_info.basePipelineHandle = VK_NULL_HANDLE;
   pipeline_create_info.basePipelineIndex = -1;
@@ -152,34 +151,27 @@ b8 vk_graphics_pipeline_create(
     VK_NULL_HANDLE, 
     1, 
     &pipeline_create_info, 
-    context->allocator, 
-    &pipeline->handle);
+    vk->allocator, 
+    &pipeline.handle);
   
   if (vk_result_is_success(result)) {
     Debug("Graphics pipeline created!");
-    return true;
+    return pipeline;
   } 
   
   Error("vkCreateGraphicsPipelines failed with %s.", vk_result_string(result, true));
-  return false;
+  Return(pipeline);
 }
 
-void vk_pipeline_destroy(VK_Context* context, VK_Pipeline* pipeline) {
-  if (pipeline) {
-    // Destroy pipeline
-    if (pipeline->handle) {
-      vkDestroyPipeline(vkdevice, pipeline->handle, context->allocator);
-      pipeline->handle = 0;
-    }
-    
-    // Destroy layotu
-    if (pipeline->pipeline_layout) {
-      vkDestroyPipelineLayout(vkdevice, pipeline->pipeline_layout, context->allocator);
-      pipeline->pipeline_layout = 0;
-    }
+void vk_pipeline_destroy(VK_Pipeline pipeline) {
+  if (pipeline.handle && pipeline.pipeline_layout) {
+    vkDestroyPipeline(vkdevice, pipeline.handle, vk->allocator);
+    vkDestroyPipelineLayout(vkdevice, pipeline.pipeline_layout, vk->allocator);
+  } else {
+    Error("null pointers");
   }
 }
 
-void vk_pipeline_bind(VK_CommandBuffer* command_buffer, VkPipelineBindPoint bind_point, VK_Pipeline* pipeline) {
-  vkCmdBindPipeline(command_buffer->handle, bind_point, pipeline->handle);
+void vk_pipeline_bind(VkCommandBuffer cmd, VkPipelineBindPoint bind_point, VK_Pipeline pipeline) {
+  vkCmdBindPipeline(cmd, bind_point, pipeline.handle);
 }

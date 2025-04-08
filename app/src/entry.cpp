@@ -9,11 +9,11 @@ internal b8 load_game_lib(Application* app) {
     return false;
   }
   
-  app->update = (b8(*)(Application*))os_library_load_function(str_lit("application_update"), app->game_lib);
+  app->update = (void(*)(Application*))os_library_load_function(str_lit("application_update"), app->game_lib);
   if (!app->update) {
     return false;
   }
-  app->init = (b8(*)(Application*))os_library_load_function(str_lit("application_init"), app->game_lib);
+  app->init = (void(*)(Application*))os_library_load_function(str_lit("application_init"), app->game_lib);
   if (!app->init) {
     return false;
   }
@@ -26,7 +26,7 @@ void application_create(Application* app) {
   tctx_init(app->arena);
   
   u8 buffer[100] = {};
-  u32 file_size = os_EXE_filename(buffer);
+  u32 file_size = os_exe_filename(buffer);
   app->full_name = push_str_copy(app->arena, str(buffer, file_size));
   app->name = str_skip_last_slash(app->full_name);
   
@@ -37,6 +37,6 @@ void application_create(Application* app) {
       push_str_cat(app->arena, full_name_without_slash, cstr("game_temp.dll"));
 
   if (!load_game_lib(app)) {
-    Error("Initial game lib load failed!");
+    Error("Game lib load failed!");
   }
 }

@@ -101,18 +101,14 @@ b8 engine_run(Application* game_inst) {
       f64 frame_start_time = os_now_seconds();
 
       check_dll_changes(game_inst);
-      if (!state->game_inst->update(state->game_inst)) {
-        Fatal("Game update failed, shutting down.");
-        state->is_running = false;
-        break;
-      }
+      state->game_inst->update(state->game_inst);
 
       R_Packet packet;
       packet.delta_time = delta;
-      r_draw_frame(&packet);
 
       f64 frame_end_time = os_now_seconds();
       f64 frame_elapsed_time = frame_end_time - frame_start_time;
+      r_draw_frame(&packet);
       running_time += frame_elapsed_time;
       f64 remaining_seconds = target_frame_seconds - frame_elapsed_time;
 
@@ -216,7 +212,7 @@ internal void load_game_lib(Application* app) {
   os_file_copy(app->game_lib.src_full_filename, app->game_lib.temp_full_filename);
   // os_library_load(app->game_lib.temp_full_filename, &app->game_lib);
   app->game_lib.handle = os_library_load(app->game_lib.temp_full_filename);
-  app->update = (b8(*)(Application*))os_library_load_function(str_lit("application_update"), app->game_lib);
+  app->update = (void(*)(Application*))os_library_load_function(str_lit("application_update"), app->game_lib);
 }
 
 internal void unload_game_lib(Application* app) {
