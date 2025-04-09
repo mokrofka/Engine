@@ -287,13 +287,7 @@ internal b8 load_texture(char* texture_name, Texture* t) {
     r_create_texture(data, &temp_texture);
   
     // Take a copy of the old texture
-    Texture old = *t;
-    
-    // Assign the temp texture to the pointer
     *t = temp_texture;
-    
-    // Destroy the old texture
-    r_destroy_texture(&old);
     
     if (current_generation == INVALID_ID) {
       t->generation = 0;
