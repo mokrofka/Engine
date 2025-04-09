@@ -12,6 +12,6 @@ void vk_material_shader_update_global_state(VkCommandBuffer cmd, VK_MaterialShad
 
 void vk_material_shader_update_object(VkCommandBuffer cmd, VK_MaterialShader* shader, GeometryRenderData data);
 
-void vk_material_shader_acquire_resources(VK_MaterialShader* shader, u32* out_object_id);
-void vk_material_shader_release_resources(VK_Context* vk, VK_MaterialShader* shader, u32 object_id);
+void vk_material_shader_acquire_resources(VK_MaterialShader* shader, Material* material);
+void vk_material_shader_release_resources(VK_MaterialShader* shader, Material* material);
 

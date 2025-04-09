@@ -7,8 +7,10 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/bin)
 add_library(engine SHARED ${SOURCES})
 
 target_include_directories(engine PRIVATE ${CMAKE_SOURCE_DIR}/engine/src)
+target_include_directories(engine PRIVATE ${CMAKE_SOURCE_DIR}/core/src/containers)
 target_include_directories(engine PRIVATE ${CMAKE_SOURCE_DIR}/core/src)
 target_include_directories(engine PRIVATE ${VULKAN_SDK}/Include)
+
 
 find_package(Vulkan REQUIRED)
 target_link_libraries(engine Vulkan::Vulkan)

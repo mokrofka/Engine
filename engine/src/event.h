@@ -45,7 +45,6 @@ enum SystemEventCode {
    * u16 key_code = data.data.u16[0];
    */
   EVENT_CODE_KEY_PRESSED = 0x02,
-  Event_Code_Key_Pressed = 0x02,
 
   // Keyboard key released.
   /* context usage:

@@ -5,7 +5,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
-#include <ctype.h>
 
 u32 range_size(Range r) {
   u32 c = ((r.max > r.min) ? (r.max - r.min) : 0);
@@ -53,10 +52,10 @@ u8 char_to_correct_slash(u8 c) {
   return c;
 }
 
-u64 cstr_length(u8* c) {
-  u8* p = c;
+u64 cstr_length(void* c) {
+  u8* p = (u8*)c;
   for (; *p != 0; p += 1);
-  return p - c;
+  return p - (u8*)c;
 }
 
 String str(u8* str, u64 size) {
@@ -130,7 +129,27 @@ b8 cstr_equali(const void* str0, const void* str1) {
   return _strcmpi((char*)str0, (char*)str1) == 0;
 }
 
-String str8_substr(String str, Range range) {
+b8 str_equal(String str_0, String str_1) {
+  if (str_0.size != str_1.size) {
+    return 0;
+  }
+
+  for (size_t i = 0; i < str_0.size; ++i) {
+    if (str_0.str[i] != str_1.str[i]) {
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
+void str_copy(void* dest, String str) {
+  MemCopy(dest, str.str, str.size);
+  u8* c = (u8*)dest;
+  c[str.size] = 0;
+}
+
+String str_substr(String str, Range range) {
   range.min = ClampTop(range.min, str.size);
   range.max = ClampTop(range.max, str.size);
   str.str += range.min;
@@ -182,6 +201,7 @@ String push_str_copy(Arena* arena, String s) {
   return str;
 }
 
+// one/two/three -> one/two/
 String str_chop_last_segment(String string){
   if (string.size > 0){
     u8 *ptr = string.str + string.size - 1;
@@ -200,6 +220,7 @@ String str_chop_last_segment(String string){
   return string;
 }
 
+// one/two/three -> one/two
 String str_chop_last_slash(String string){
   if (string.size > 0){
     u8 *ptr = string.str + string.size - 1;
@@ -248,6 +269,50 @@ String str_chop_last_dot(String string) {
   return result;
 }
 
+// String str_read_line(StringCursor* cursor) {
+//   u8* line_start = cursor->at;
+
+//   while (cursor->at < cursor->end && *cursor->at != '\n' && *cursor->at != '\r') {
+//       cursor->at++;
+//   }
+
+//   size_t len = cursor->at - line_start;
+
+//   // Handle both \r\n or \n
+//   if (cursor->at < cursor->end && *cursor->at == '\r') cursor->at++;
+//   if (cursor->at < cursor->end && *cursor->at == '\n') cursor->at++;
+
+//   String result = { line_start, len };
+//   return result;
+// }
+String str_read_line(StringCursor* cursor) {
+  while (cursor->at < cursor->end) {
+    u8* line_start = cursor->at;
+
+    // Find end of line
+    while (cursor->at < cursor->end && *cursor->at != '\n' && *cursor->at != '\r') {
+      cursor->at++;
+    }
+
+    size_t len = cursor->at - line_start;
+
+    // Handle \r\n or \n
+    if (cursor->at < cursor->end && *cursor->at == '\r') cursor->at++;
+    if (cursor->at < cursor->end && *cursor->at == '\n') cursor->at++;
+
+    // If line is not empty, return it
+    if (len > 0) {
+      String result = {line_start, len};
+      return result;
+    }
+
+    // If line was empty, loop to read the next one
+  }
+
+  // If nothing left
+  String result = { 0, 0 };
+  return result;
+}
 String str_trim(String string) {
   String result;
   u8* s = string.str;
@@ -256,8 +321,11 @@ String str_trim(String string) {
   }
   result.str = s;
   if (*s) {
-    u8* e = string.str + string.size-1;
-    while (char_is_space(*(--e)));
+    // u8* e = string.str + string.size-1;
+    u8* e = string.str + string.size;
+    while (char_is_space(*(e-1))) {
+      --e;
+    }
     result.size = e - result.str;
   }
   
@@ -279,13 +347,14 @@ i32 str_index_of(String string, u8 c) {
   return -1;
 }
 
-b8 str_to_v4(const char* str, v4* out_vector) {
+b8 str_to_v4(void* str, v4* out_vector) {
+  char* s = (char*)str;
   if (!str) {
     return false;
   }
   
   MemZeroStruct(out_vector);
-  i32 result = sscanf(str, "%f %f %f %f", &out_vector->x, &out_vector->y, &out_vector->z, &out_vector->w);
+  i32 result = sscanf(s, "%f %f %f %f", &out_vector->x, &out_vector->y, &out_vector->z, &out_vector->w);
   return result != -1;
 }
 

@@ -224,11 +224,9 @@ void vk_r_backend_init(R_Backend* backend) {
   const u32 index_count = 6;
   u32 indices[index_count] = {0,1,2, 0,3,1};
   
-  u32 object_id = 0;
-  vk_material_shader_acquire_resources(&vk->render.material_shader, &object_id);
-  
   upload_data_range(vk->device.gfx_cmd_pool, 0, vk->device.graphics_queue, &vk->render.obj_vertex_buffer, 0, sizeof(Vertex3D)*vert_count, verts);
   upload_data_range(vk->device.gfx_cmd_pool, 0, vk->device.graphics_queue, &vk->render.obj_index_buffer, 0, sizeof(u32)*index_count, indices);
+  
   // TODO end temp code
 
   Info("Vulkan renderer initialized successfully.");
@@ -661,11 +659,34 @@ void vk_r_destroy_texture(Texture* texture) {
   vkDeviceWaitIdle(vkdevice);
   
   VK_TextureData* data = (VK_TextureData*)texture->internal_data;
-  Assert(data);
-  vk_image_destroy(&data->image);
-  vkDestroySampler(vkdevice, data->sampler, vk->allocator);
-  MemZeroStruct(&data);
-  // TODO free memory
+  if (data) {
+    vk_image_destroy(&data->image);
+    vkDestroySampler(vkdevice, data->sampler, vk->allocator);
+    MemZeroStruct(&data);
+    // TODO free memory
+  }
 
   MemZeroStruct(texture);
+}
+
+void vk_r_create_material(Material* material) {
+  if (material) {
+    vk_material_shader_acquire_resources(&vk->render.material_shader, material);
+    Trace("Render: Material created.");
+    return; 
+  }
+  
+  Error("vk_r_create_material called with null. Creation failed.");
+}
+
+void vk_r_destroy_material(Material* material) {
+  if (material) {
+    if (material->internal_id != INVALID_ID) {
+      vk_material_shader_release_resources(&vk->render.material_shader, material);
+    } else {
+      Warn("vk_r_destroy_material called with internal_id=INVALID_ID. Nothing was done");
+    }
+  } else {
+    Warn("vk_r_destroy_material called with null. Nothing was done.");
+  }
 }

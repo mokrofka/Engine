@@ -12,7 +12,7 @@ struct GlobalUniformObject {
   mat4 m_reserved1; // 64 bytes, reserved for future use
 };
 
-struct ObjectUniformObject {
+struct MaterialUniformObject  {
   v4 diffuse_color; // 16 bytes
   v4 v_reserved0;   // 16 bytes, reserved for future use
   v4 v_reserved1;   // 16 bytes, reserved for future use
@@ -20,9 +20,8 @@ struct ObjectUniformObject {
 };
 
 struct GeometryRenderData {
-  u32 object_id;
   mat4 model;
-  struct Texture* textures[16];
+  Material* material;
 };
 
 struct R_Backend {

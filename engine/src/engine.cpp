@@ -3,7 +3,8 @@
 #include "app_types.h"
 #include "render/r_frontend.h"
 
-#include "systems/texture_system.h"
+#include "sys/texture_system.h"
+#include "sys/material_system.h"
 
 #include <logger.h>
 #include <memory.h>
@@ -46,10 +47,8 @@ b8 engine_create(Application* game_inst) {
 
   event_init(state->arena);
   os_register_process_key(input_process_key);
-  
   os_register_window_closed_callback(engine_on_window_closed);
   os_register_window_resized_callback(engine_on_window_resized);
-
   event_register(EVENT_CODE_APPLICATION_QUIT, 0, app_on_event);
   event_register(EVENT_CODE_KEY_PRESSED, 0, app_on_key);
   event_register(EVENT_CODE_KEY_RELEASED, 0, app_on_key);
@@ -73,6 +72,11 @@ b8 engine_create(Application* game_inst) {
       .max_texture_count = 65536,
   };
   texture_system_init(state->arena, texture_sys_config);
+  
+  MaterialSystemConfig material_sys_config = {
+    .max_material_count = 4096,
+  };
+  material_system_init(state->arena, material_sys_config);
 
   game_inst->init(game_inst);
 
@@ -132,14 +136,15 @@ b8 engine_run(Application* game_inst) {
   
   state->is_running = false;
 
-  texture_system_shutdown();
-  r_shutdown();
-  os_window_destroy();
-
   event_unregister(EVENT_CODE_APPLICATION_QUIT, 0, app_on_event);
   event_unregister(EVENT_CODE_KEY_PRESSED, 0, app_on_key);
   event_unregister(EVENT_CODE_KEY_RELEASED, 0, app_on_key);
   event_unregister(EVENT_CODE_RESIZED, 0, app_on_resized);
+
+  material_system_shutdown();
+  texture_system_shutdown();
+  r_shutdown();
+  os_window_destroy();
   return true;
 }
 

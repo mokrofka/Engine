@@ -15,3 +15,6 @@ void vk_r_update_object(GeometryRenderData data);
 
 void vk_r_create_texture(u8* pixels, Texture* texture);
 void vk_r_destroy_texture(Texture* texture);
+
+void vk_r_create_material(Material* material);
+void vk_r_destroy_material(Material* material);

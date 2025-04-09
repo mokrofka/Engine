@@ -16,4 +16,7 @@ void r_draw_frame(R_Packet* packet);
 KAPI void r_set_view(mat4 view);
 
 void r_create_texture(u8* pixels, Texture* texture);
-void r_destroy_texture(struct Texture* texture);
+void r_destroy_texture(Texture* texture);
+
+void r_create_material(Material* material);
+void r_destroy_material(Material* material);

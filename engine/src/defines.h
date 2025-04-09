@@ -120,3 +120,12 @@ struct Arena;
 KAPI String str(u8* str, u64 size);
 
 #define quick_sort(ptr, count, element_size, cmp_function) qsort((ptr), (count), (element_size), (int (*)(const void *, const void *))(cmp_function))
+
+// extern i32 global_error;
+// static inline i32 has_error() {
+//   i32 copy = global_error;
+//   global_error = 0; 
+//   return copy;
+// }
+// #define IsError has_error()
+// #define SetError global_error = true

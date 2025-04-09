@@ -2,7 +2,8 @@
 
 #include "vulkan/vk_backend.h"
 
-#include "systems/texture_system.h"
+#include "sys/texture_system.h"
+#include "sys/material_system.h"
 
 #include <logger.h>
 #include <memory.h>
@@ -24,7 +25,7 @@ struct RendererSystemState {
   f32 far_clip;
   
   // TODO temporary
-  Texture* test_diffuse;
+  Material* test_material;
   // TODO end temporary
   
   void* memory;
@@ -53,7 +54,11 @@ b8 event_on_debug_event(u16 code, void* sender, void* listener_inst, EventContex
   choice %= 3;
   
   // Load up the new texture
-  state->test_diffuse = texture_system_acquire(names[choice], true);
+  state->test_material->diffuse_map.texture = texture_system_acquire(names[choice], true);
+  if (!state->test_material->diffuse_map.texture) {
+    Warn("event_on_debug_event no texture! using default");
+    state->test_material->diffuse_map.texture = texture_system_get_default_texture();
+  }
   
   // Release the old texture
   texture_system_release(old_name);
@@ -125,16 +130,26 @@ void r_draw_frame(R_Packet* packet) {
     // quat roation = quat_from_axis_angle(v3_forward(), angle, false);
     // mat4 model = quat_to_rotation_matrix(roation, v3_zero());
     GeometryRenderData data = {};
-    data.object_id = 0;
     data.model = model;
     
     // TODO temporary
-    // Grab the default if does not exist
-    if (!state->test_diffuse) {
-      state->test_diffuse = texture_system_get_default_texture(); 
+    // Create a default material if does not exist
+    if (!state->test_material) {
+      // Automatic config
+      state->test_material = material_system_acquire("test_material");
+      if (!state->test_material) {
+        Warn("Automatic material load failed, falling back to manual default material.");
+        // Manual config
+        MaterialConfig config;
+        MemCopy(config.name, "test_material", MATERIAL_NAME_MAX_LENGTH);
+        config.auto_release = false;
+        config.diffuse_color = v4_one(); // white
+        MemCopy(config.diffuse_map_name, DEFAULT_MATERIAL_NAME, MATERIAL_NAME_MAX_LENGTH);
+        state->test_material = material_system_acquire_from_config(config);
+      }
     }
     
-    data.textures[0] = state->test_diffuse;
+    data.material = state->test_material;
     vk_r_update_object(data);
     
     // End the fram. If this fails, it is likely unrecovarble.
@@ -156,4 +171,12 @@ void r_create_texture(u8* pixels, Texture* texture) {
 
 void r_destroy_texture(Texture* texture) {
   vk_r_destroy_texture(texture);
+}
+
+void r_create_material(Material* material) {
+  vk_r_create_material(material);
+}
+
+void r_destroy_material(Material* material) {
+  vk_r_destroy_material(material);
 }

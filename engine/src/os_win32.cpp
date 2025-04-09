@@ -4,6 +4,7 @@
 #include "logger.h"
 
 #include <windows.h>
+i32 global_error;
 
 struct Win32HandleInfo {
   HINSTANCE h_instance;

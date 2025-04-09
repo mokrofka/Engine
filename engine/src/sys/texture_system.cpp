@@ -21,7 +21,7 @@ struct TextureSystemState {
   Hashtable registered_texture_table;
 };
 
-struct TextureReference {
+struct TextureRef {
   u64 reference_count;
   u32 handle;
   b8 auto_release;
@@ -42,7 +42,7 @@ void texture_system_init(Arena* arena, TextureSystemConfig config) {
   // Block of memory will contain state struct, thenb block for array, then block for hashtable
   u64 struct_requirement = sizeof(TextureSystemState);
   u64 array_requirement = sizeof(Texture) * config.max_texture_count;
-  u64 hashtable_requirement = sizeof(TextureReference) * config.max_texture_count;
+  u64 hashtable_requirement = sizeof(TextureRef) * config.max_texture_count;
   u64 memory_requirement = struct_requirement + array_requirement + hashtable_requirement;
   
   state = push_buffer(arena, TextureSystemState, memory_requirement);
@@ -56,10 +56,10 @@ void texture_system_init(Arena* arena, TextureSystemConfig config) {
   void* hashtable_block = (u8*)array_block + array_requirement;
   
   // Create a hashtable for texture lookups
-  hashtable_create(sizeof(TextureReference), config.max_texture_count, hashtable_block, false, &state->registered_texture_table);
+  hashtable_create(sizeof(TextureRef), config.max_texture_count, hashtable_block, false, &state->registered_texture_table);
   
   // Fill the hashtable with invalid references to use as a default
-  TextureReference invalid_ref;
+  TextureRef invalid_ref;
   invalid_ref.auto_release = false;
   invalid_ref.handle = INVALID_ID; // Primary reason for needing default values
   invalid_ref.reference_count = 0;
@@ -99,7 +99,7 @@ Texture* texture_system_acquire(char* name, b8 auto_release) {
     return &state->default_texture;
   }
   
-  TextureReference ref;
+  TextureRef ref;
   hashtable_get(&state->registered_texture_table, name, &ref);
   // This can only be changed the firts time a texture is loaded
   if (ref.reference_count == 0) {
@@ -152,7 +152,7 @@ void texture_system_release(char* name) {
   if (cstr_equali(name, DEFAULT_TEXTURE_NAME)) {
     return;
   }
-  TextureReference ref;
+  TextureRef ref;
   hashtable_get(&state->registered_texture_table, name, &ref);
   if (ref.reference_count == 0) {
     Warn("Tried to release non-existent texture: '%s'", name);
@@ -285,9 +285,6 @@ internal b8 load_texture(char* texture_name, Texture* t) {
     
     // Acquire internal texture resources and upload to GPU
     r_create_texture(data, &temp_texture);
-  
-    // Take a copy of the old texture
-    *t = temp_texture;
     
     if (current_generation == INVALID_ID) {
       t->generation = 0;

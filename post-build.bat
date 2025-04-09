@@ -14,7 +14,7 @@
  
 @REM  echo "Copying assets..."
 @REM  echo xcopy "assets" "bin\assets" /h /i /c /k /e /r /y
-@REM  xcopy "assets" "bin\assets" /h /i /c /k /e /r /y
+ xcopy "assets" "bin\assets" /h /i /c /k /e /r /y
  
  echo "Done."
 
