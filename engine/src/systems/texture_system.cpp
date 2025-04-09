@@ -295,6 +295,15 @@ internal b8 load_texture(char* texture_name, Texture* t) {
       t->generation = current_generation + 1;
     }
     
+    // Take a copy of the old texture
+    Texture old = *t;
+    
+    // Assign the temp texture to the pointer
+    *t = temp_texture;
+    
+    // Destroy the old texture
+    r_destroy_texture(&old);
+    
     // Clean up data
     stbi_image_free(data);
     return true;
