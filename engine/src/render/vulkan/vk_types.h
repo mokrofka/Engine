@@ -140,19 +140,32 @@ struct VK_DescriptorState {
   u32 ids[3];
 };
 
-#define VULKAN_MATERIAL_SHADER_DESCRIPTOR_COUNT 2
-#define VULKAN_MATERIAL_SHADER_SAMPLER_COUNT 1
+#define VK_MATERIAL_SHADER_DESCRIPTOR_COUNT  2
+#define VK_MATERIAL_SHADER_SAMPLER_COUNT 1
 
 struct VK_MaterialShaderInstState {
   // Per frame
   VkDescriptorSet descriptor_sets[3];
   
   // Per descriptor
-  VK_DescriptorState descriptor_states[VULKAN_MATERIAL_SHADER_DESCRIPTOR_COUNT];
+  VK_DescriptorState descriptor_states[VK_MATERIAL_SHADER_DESCRIPTOR_COUNT ];
 };
 
-// Max number of objects
-#define VULKAN_MAX_MATERIAL_COUNT 1024
+// Max number of material instances
+#define VK_MAX_MATERIAL_COUNT 1024
+
+#define VK_MAX_GEOMETRY_COUNT 4096
+
+struct VK_GeometryData {
+  u32 id;
+  u32 generation;
+  u32 vertex_count;
+  u32 vertex_size;
+  u32 vertex_buffer_offset;
+  u32 index_count;
+  u32 index_size;
+  u32 index_buffer_offset;
+};
 
 struct VK_MaterialShader {
   // vertex, fragment
@@ -177,10 +190,10 @@ struct VK_MaterialShader {
   // TODO manage a free list of some kind here instead
   u32 obj_uniform_buffer_index;
   
-  TextureUse sampler_uses[VULKAN_MATERIAL_SHADER_SAMPLER_COUNT];
+  TextureUse sampler_uses[VK_MATERIAL_SHADER_SAMPLER_COUNT];
   
   // TODO make dynamic
-  VK_MaterialShaderInstState instance_states[VULKAN_MAX_MATERIAL_COUNT];
+  VK_MaterialShaderInstState instance_states[VK_MAX_MATERIAL_COUNT];
   
   VK_Pipeline pipeline;
 };
@@ -214,6 +227,8 @@ struct VK_Render {
 
   VK_CommandBuffer cmd[3];
   VK_MaterialShader material_shader;
+  
+  VK_GeometryData geometries[VK_MAX_GEOMETRY_COUNT];
 };
 
 struct VK_Context {

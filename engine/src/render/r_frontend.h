@@ -20,3 +20,6 @@ void r_destroy_texture(Texture* texture);
 
 void r_create_material(Material* material);
 void r_destroy_material(Material* material);
+
+void r_create_geometry(Geometry* geometry, u32 vertex_count, Vertex3D* vertices, u32 index_count, u32* indices);
+void r_destroy_geometry(Geometry* geometry);

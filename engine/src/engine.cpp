@@ -5,12 +5,18 @@
 
 #include "sys/texture_system.h"
 #include "sys/material_system.h"
+#include "sys/geometry_sys.h"
 
-#include <logger.h>
-#include <memory.h>
-#include <os.h>
-#include <event.h>
-#include <input.h>
+#include "logger.h"
+#include "memory.h"
+#include "os.h"
+#include "event.h"
+#include "input.h"
+#include "str.h"
+
+// TODO temp
+#include "maths.h"
+// end
 
 struct EngineState {
   Arena* arena;
@@ -20,6 +26,10 @@ struct EngineState {
 
   Clock clock;
   f64 last_time;
+  
+  // TODO temp
+  Geometry* test_geometry;
+  // end
 };
 
 global EngineState* state;
@@ -33,6 +43,33 @@ internal b8 app_on_key(u16 code, void* sender, void* listener_inst, EventContext
 internal b8 app_on_resized(u16 code, void* sender, void* listener_inst, EventContext context);
 
 internal void check_dll_changes(Application* app);
+
+// TODO temp
+b8 event_on_debug_event(u16 code, void* sender, void* listener_inst, EventContext data) {
+  char* names[3] = {
+    "cobblestone",
+    "paving",
+    "paving2"};
+  local i8 choice = 2;
+    
+  // Save off the old name
+  char* old_name = names[choice];
+  
+  ++choice;
+  choice %= 3;
+  
+  // Load up the new texture
+  state->test_geometry->material->diffuse_map.texture = texture_system_acquire(names[choice], true);
+  if (!state->test_geometry->material->diffuse_map.texture) {
+    Warn("event_on_debug_event no texture! using default");
+    state->test_geometry->material->diffuse_map.texture = texture_system_get_default_texture();
+  }
+  
+  // Release the old texture
+  texture_system_release(old_name);
+  return true;
+}
+// TODO end temp
 
 b8 engine_create(Application* game_inst) {
   game_inst->engine_state = push_struct(game_inst->arena, EngineState);
@@ -53,6 +90,9 @@ b8 engine_create(Application* game_inst) {
   event_register(EVENT_CODE_KEY_PRESSED, 0, app_on_key);
   event_register(EVENT_CODE_KEY_RELEASED, 0, app_on_key);
   event_register(EVENT_CODE_RESIZED, 0, app_on_resized);
+  // TODO temp
+  event_register(EVENT_CODE_DEBUG0, 0, event_on_debug_event);
+  // end
 
   input_init(state->arena);
 
@@ -77,6 +117,18 @@ b8 engine_create(Application* game_inst) {
     .max_material_count = 4096,
   };
   material_system_init(state->arena, material_sys_config);
+  
+  GeometrySysConfig geometry_sys_config = {
+    .max_geometry_count = 4096,
+  };
+  geometry_sys_init(state->arena, geometry_sys_config);
+
+  GeometryConfig g_config = geometry_sys_generate_plane_config(10.0f, 5.0f, 5, 5, 5.0f, 2.0f, "test geometry", "test_material");
+  state->test_geometry = geometry_sys_acquire_from_config(g_config, true);
+
+  // TODO temp
+  // state->test_geometry = geometry_sys_get_default();
+  // TODO end
 
   game_inst->init(game_inst);
 
@@ -107,12 +159,23 @@ b8 engine_run(Application* game_inst) {
       check_dll_changes(game_inst);
       state->game_inst->update(state->game_inst);
 
+      // TODO refactor packet creation
       R_Packet packet;
       packet.delta_time = delta;
+      
+      // TODO temp
+      GeometryRenderData test_render;
+      test_render.geometry = state->test_geometry;
+      test_render.model = mat4_identity();
+      
+      packet.geometry_count = 1;
+      packet.geometries = &test_render;
+      // TODO end
+
+      r_draw_frame(&packet);
 
       f64 frame_end_time = os_now_seconds();
       f64 frame_elapsed_time = frame_end_time - frame_start_time;
-      r_draw_frame(&packet);
       running_time += frame_elapsed_time;
       f64 remaining_seconds = target_frame_seconds - frame_elapsed_time;
 
@@ -140,7 +203,11 @@ b8 engine_run(Application* game_inst) {
   event_unregister(EVENT_CODE_KEY_PRESSED, 0, app_on_key);
   event_unregister(EVENT_CODE_KEY_RELEASED, 0, app_on_key);
   event_unregister(EVENT_CODE_RESIZED, 0, app_on_resized);
+  // TODO temp
+  event_unregister(EVENT_CODE_DEBUG0, 0, event_on_debug_event);
+  // TODO end
 
+  geometry_sys_shutdown();
   material_system_shutdown();
   texture_system_shutdown();
   r_shutdown();

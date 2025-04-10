@@ -105,7 +105,7 @@ void* _arena_push(Arena* arena, u64 size, u64 align) {
 		return buffer;
 	}
 	// Return NULL if the arena is out of memory (or handle differently)
-  Fatal("Arena is out of memory!");
+  Error("Arena is out of memory!");
   Assert(true);
   return 0;
 }

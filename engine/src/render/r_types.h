@@ -21,7 +21,7 @@ struct MaterialUniformObject  {
 
 struct GeometryRenderData {
   mat4 model;
-  Material* material;
+  Geometry* geometry;
 };
 
 struct R_Backend {
@@ -32,4 +32,7 @@ struct R_Backend {
 
 struct R_Packet {
   f32 delta_time;
+  
+  u32 geometry_count;
+  GeometryRenderData* geometries;
 };

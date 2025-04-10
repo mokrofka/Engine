@@ -162,7 +162,7 @@ Material* material_system_acquire_from_config(MaterialConfig config) {
   return 0;
 }
 
-void material_system_release(const char* name) {
+void material_sys_release(char* name) {
   // Ignore release requests for the default material.
   if (cstr_equali(name, DEFAULT_MATERIAL_NAME)) {
     return;
@@ -190,6 +190,10 @@ void material_system_release(const char* name) {
 
   // Update the entry.
   hashtable_set(&state->registered_material_table, name, &ref);
+}
+
+Material* material_sys_get_default() {
+  return &state->default_material;
 }
 
 internal void load_material(MaterialConfig config, Material* m) {

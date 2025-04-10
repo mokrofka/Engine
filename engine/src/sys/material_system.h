@@ -21,4 +21,6 @@ void material_system_shutdown();
 
 Material* material_system_acquire(char* name);
 Material* material_system_acquire_from_config(MaterialConfig);
-void material_system_release(char* name);
+void material_sys_release(char* name);
+
+Material* material_sys_get_default();

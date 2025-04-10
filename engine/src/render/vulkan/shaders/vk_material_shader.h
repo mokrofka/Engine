@@ -10,7 +10,8 @@ void vk_material_shader_use(VkCommandBuffer cmd, VK_MaterialShader shader);
 
 void vk_material_shader_update_global_state(VkCommandBuffer cmd, VK_MaterialShader* shader, f32 delta_time);
 
-void vk_material_shader_update_object(VkCommandBuffer cmd, VK_MaterialShader* shader, GeometryRenderData data);
+void vk_material_shader_set_model(VkCommandBuffer cmd, VK_MaterialShader* shader, mat4 model);
+void vk_material_shader_apply_material(VkCommandBuffer cmd, VK_MaterialShader* shader, Material* data);
 
 void vk_material_shader_acquire_resources(VK_MaterialShader* shader, Material* material);
 void vk_material_shader_release_resources(VK_MaterialShader* shader, Material* material);
