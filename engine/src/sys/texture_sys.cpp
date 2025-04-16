@@ -1,10 +1,6 @@
-#include "texture_system.h"
-#include "render/r_frontend.h"
+#include "texture_sys.h"
 
-#include <logger.h>
-#include <str.h>
-#include <memory.h>
-#include <containers/hashtable.h>
+#include "render/r_frontend.h"
 
 // TODO resource loader
 #define STB_IMAGE_IMPLEMENTATION
@@ -31,7 +27,7 @@ global TextureSystemState* state;
 
 internal void create_default_textures();
 internal void destroy_default_textures(TextureSystemState* state);
-internal b8 load_texture(char* texture_name, Texture* t);
+internal b8 load_texture(String texture_name, Texture* t);
 internal void destroy_texture(Texture* t);
 
 void texture_system_init(Arena* arena, TextureSystemConfig config) {
@@ -49,7 +45,7 @@ void texture_system_init(Arena* arena, TextureSystemConfig config) {
   state->config = config;
   
   // The array block is after the state. Already allocated, so just set the pointer
-  void* array_block = state + struct_requirement;
+  void* array_block = (u8*)state + struct_requirement;
   state->registered_textures = (Texture*)array_block;
   
   // Hashtable block is after array
@@ -92,9 +88,9 @@ void texture_system_shutdown() {
   state = 0;
 }
 
-Texture* texture_system_acquire(char* name, b8 auto_release) {
+Texture* texture_system_acquire(String name, b8 auto_release) {
   // Return default texture, but warn about it since this should be returned via get_default_texture(); 
-  if (cstr_equali(name, DEFAULT_TEXTURE_NAME)) {
+  if (str_matchi(name, str_lit(DEFAULT_TEXTURE_NAME))) {
     Warn("texture_system_acquire called for default texture. Use texture_system_get_default_texture for texture 'default'.");
     return &state->default_texture;
   }
@@ -147,9 +143,10 @@ Texture* texture_system_acquire(char* name, b8 auto_release) {
   return 0;
 }
 
-void texture_system_release(char* name) {
+void texture_system_release(String name) {
+  Scratch scratch;
   // Ignore release requests for the default texture.
-  if (cstr_equali(name, DEFAULT_TEXTURE_NAME)) {
+  if (str_matchi(name, str_lit(DEFAULT_TEXTURE_NAME))) {
     return;
   }
   TextureRef ref;
@@ -161,8 +158,7 @@ void texture_system_release(char* name) {
 
   // Take a copy of the name since it will be wiped out by destroy,
   // (as passed in name is generally a pointer to the actual texture's name)
-  char name_copy[TEXTURE_NAME_MAX_LENGTH];
-  MemCopy(name_copy, name, TEXTURE_NAME_MAX_LENGTH);
+  String name_copy = push_str_copy(scratch, name);
 
   --ref.reference_count;
   if (ref.reference_count == 0 && ref.auto_release) {
@@ -234,25 +230,24 @@ internal void destroy_default_textures(TextureSystemState* state) {
   destroy_texture(&state->default_texture);
 }
 
-internal b8 load_texture(char* texture_name, Texture* t) {
+internal b8 load_texture(String texture_name, Texture* t) {
+  Scratch scratch;
   // TODO Should e able to be loaced anywhere 
-  const char* format_str = "assets/textures/%s.%s";
-  const i32 required_channel_count = 4;
+  char* format_str = "assets/textures/%s.%s";
+  i32 required_channel_count = 4;
   stbi_set_flip_vertically_on_load(true);
-  u8 full_file_path[512];
-  
   // TODO try different extensions
-  str_format(full_file_path, format_str, texture_name, "png");
+  String file_path = push_strf(scratch, format_str, texture_name.str, "png");
   
   // Use a temporary texture to load into
   Texture temp_texture;
 
   u8* data = stbi_load(
-      (char*)full_file_path,
-      (i32*)&temp_texture.width,
-      (i32*)&temp_texture.height,
-      (i32*)&temp_texture.channel_count,
-      required_channel_count);
+    (char*)file_path.str,
+    (i32*)&temp_texture.width,
+    (i32*)&temp_texture.height,
+    (i32*)&temp_texture.channel_count,
+    required_channel_count);
 
   temp_texture.channel_count = required_channel_count; 
   
@@ -272,14 +267,14 @@ internal b8 load_texture(char* texture_name, Texture* t) {
     }
     
     if (stbi_failure_reason()) {
-      Warn("load_texture() failed to load file '%s': %s", full_file_path, stbi_failure_reason());
+      Warn("load_texture() failed to load file '%s': %s", file_path, stbi_failure_reason());
       // Clear the error so the next load doesn't fail
       stbi__err(0, 0);
       return false;
     }
     
     // Take a copy of the name
-    MemCopy(temp_texture.name, texture_name, TEXTURE_NAME_MAX_LENGTH);
+    str_copy(temp_texture.name, texture_name);
     temp_texture.generation = INVALID_ID;
     temp_texture.has_transparency = has_transparency;
     
@@ -306,7 +301,7 @@ internal b8 load_texture(char* texture_name, Texture* t) {
     return true;
   } else {
     if (stbi_failure_reason()) {
-      Warn("load_texture() failed to load file '%s': %s", full_file_path, stbi_failure_reason());
+      Warn("load_texture() failed to load file '%s': %s", file_path, stbi_failure_reason());
       // Clear the error so the next load doesn't fail
       stbi__err(0, 0);
     }

@@ -12,7 +12,7 @@ target_include_directories(game PRIVATE ${CMAKE_SOURCE_DIR}/core/src)
 target_link_libraries(game "${CMAKE_SOURCE_DIR}/bin/engine.lib")
 
 set_target_properties(game PROPERTIES
-    ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/bin #output binaries .lib import
+  ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/bin #output binaries .lib import
 )
 
 target_compile_definitions(game PRIVATE _DEBUG _CRT_SECURE_NO_WARNINGS)

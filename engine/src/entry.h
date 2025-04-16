@@ -1,10 +1,8 @@
+#pragma once
+#include "lib.h"
+
 #include <app_types.h>
-
 #include <engine.h>
-
-#include <logger.h>
-#include <memory.h>
-#include <str.h>
 
 void application_create(Application* out_app);
 

@@ -1,6 +1,5 @@
 #pragma once
-
-#include "math/math_types.h"
+#include "lib.h"
 
 #define TEXTURE_NAME_MAX_LENGTH 512
 

@@ -1,5 +1,4 @@
 #pragma once
-
 #include "defines.h"
 
 #define LOG_WARN_ENABLED 1
@@ -31,8 +30,7 @@ KAPI void _log_output(LogLevel level, const char* message, ...);
 
 #ifndef KERROR
 // Logs an error-level message.
-#  define Error(message, ...) _log_output(LOG_LEVEL_ERROR, message, ##__VA_ARGS__); \
-      Assert(false);
+#define Error(message, ...) _log_output(LOG_LEVEL_ERROR, message, ##__VA_ARGS__);
 #endif
 
 #if LOG_WARN_ENABLED == 1
@@ -82,39 +80,39 @@ KAPI void _log_output(LogLevel level, const char* message, ...);
 KAPI void
 report_assertion_failure(const char* expression, const char* message, const char* file, i32 line);
 
-#define Assert(expr)                                                \
-    {                                                                \
-        if (expr) {                                                  \
-        } else {                                                     \
-            report_assertion_failure(#expr, "", __FILE__, __LINE__); \
-            debugBreak();                                            \
-        }                                                            \
-    }
+#define Assert(expr)                                           \
+  {                                                            \
+    if (expr) {                                                \
+    } else {                                                   \
+      report_assertion_failure(#expr, "", __FILE__, __LINE__); \
+      debugBreak();                                            \
+    }                                                          \
+  }
 
-#define AssertMsg(expr, message)                                        \
-    {                                                                     \
-        if (expr) {                                                       \
-        } else {                                                          \
-            report_assertion_failure(#expr, message, __FILE__, __LINE__); \
-            debugBreak();                                                 \
-        }                                                                 \
-    }
+#define AssertMsg(expr, message)                                    \
+  {                                                                 \
+    if (expr) {                                                     \
+    } else {                                                        \
+      report_assertion_failure(#expr, message, __FILE__, __LINE__); \
+      debugBreak();                                                 \
+    }                                                               \
+  }
 
 #ifdef _DEBUG
-#define KASSERT_DEBUG(expr)                                          \
-    {                                                                \
-        if (expr) {                                                  \
-        } else {                                                     \
-            report_assertion_failure(#expr, "", __FILE__, __LINE__); \
-            debugBreak();                                            \
-        }                                                            \
-    }
+#define KASSERT_DEBUG(expr)                                    \
+  {                                                            \
+    if (expr) {                                                \
+    } else {                                                   \
+      report_assertion_failure(#expr, "", __FILE__, __LINE__); \
+      debugBreak();                                            \
+    }                                                          \
+  }
 #else
   #define KASSERT_DEBUG(expr) // does nothing at all
 #endif
 
 #else
-  #define KASSERT(expr)               // Does nothing at all
-  #define KASSERT_MSG(expr, message)  // Does nothing at all
-  #define KASSERT_DEBUG(expr)         // Does nothing at all
+  #define KASSERT(expr)              // Does nothing at all
+  #define KASSERT_MSG(expr, message) // Does nothing at all
+  #define KASSERT_DEBUG(expr)        // Does nothing at all
 #endif

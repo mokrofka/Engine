@@ -1,9 +1,7 @@
 #pragma once
+#include "lib.h"
 
 #include "render/r_types.h"
-
-#include <logger.h>
-#include <memory.h>
 
 #include <vulkan/vulkan.h>
 
@@ -179,7 +177,6 @@ struct VK_MaterialShader {
   
   // Global uniform object
   GlobalUniformObject global_ubo;
-  
   // Global uniform buffer
   VK_Buffer global_uniform_buffer;
   
@@ -216,7 +213,6 @@ struct VK_SyncObj {
   
   u32 in_flight_fence_count;
   VK_Fence* in_flight_fences;
-  VK_Fence** images_in_flight;
 };
 
 struct VK_Render {

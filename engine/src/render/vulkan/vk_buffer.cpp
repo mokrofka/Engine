@@ -1,15 +1,10 @@
 #include "vk_buffer.h"
 #include "vk_command_buffer.h"
 
-VK_Buffer vk_buffer_create(
-  u64 size,
-  VkBufferUsageFlagBits usage,
-  u32 memory_property_flags,
-  b8 bind_on_create) {
-    
+VK_Buffer vk_buffer_create(u64 size, u32 usage, u32 memory_property_flags, b8 bind_on_create) {
   VK_Buffer buffer = {};
   buffer.size = size;
-  buffer.usage = usage;
+  buffer.usage = (VkBufferUsageFlagBits)usage;
   buffer.memory_property_flags = memory_property_flags;
   
   VkBufferCreateInfo buffer_info = {VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
@@ -33,12 +28,7 @@ VK_Buffer vk_buffer_create(
   allocate_info.memoryTypeIndex = (u32)buffer.memory_index;
   
   // Allocate the memory.
-  VkResult result = vkAllocateMemory(
-    vkdevice, 
-    &allocate_info, 
-    vk->allocator, 
-    &buffer.memory);
-    
+  VkResult result = vkAllocateMemory(vkdevice, &allocate_info, vk->allocator, &buffer.memory);
   if (result != VK_SUCCESS) {
     Error("Unable to create vulkan buffer because the required memory allocation failed. Error: %i", result);
   }

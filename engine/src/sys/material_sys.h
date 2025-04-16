@@ -1,5 +1,5 @@
 #pragma once
-#include "defines.h"
+#include "lib.h"
 
 #include "res/res_types.h"
 
@@ -21,6 +21,6 @@ void material_system_shutdown();
 
 Material* material_system_acquire(char* name);
 Material* material_system_acquire_from_config(MaterialConfig);
-void material_sys_release(char* name);
+void material_sys_release(String name);
 
 Material* material_sys_get_default();

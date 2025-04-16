@@ -1,20 +1,29 @@
 #pragma once
-
 #include "defines.h"
-#include "math/math_types.h"
+#include "math_types.h"
 
-#define K_PI 3.14159265358979323846f
-#define K_PI_2 2.0f * K_PI
-#define K_HALF_PI 0.5f * K_PI
-#define K_QUARTER_PI 0.25f * K_PI
-#define K_ONE_OVER_PI 1.0f / K_PI
-#define K_ONE_OVER_TWO_PI 1.0f / K_PI_2
-#define K_SQRT_TWO 1.41421356237309504880f
-#define K_SQRT_THREE 1.73205080756887729352f
-#define K_SQRT_ONE_OVER_TWO 0.70710678118654752440f
-#define K_SQRT_ONE_OVER_THREE 0.57735026918962576450f
-#define K_DEG2RAD_MULTIPLIER K_PI / 180.0f
-#define K_RAD2DEG_MULTIPLIER 180.0f / K_PI
+#include <math.h>
+
+#define PI 3.14159265358979323846f
+#define PI_2 2.0f * PI
+#define HALF_PI 0.5f * PI
+#define QUARTER_PI 0.25f * PI
+#define ONE_OVER_PI 1.0f / PI
+#define ONE_OVER_TWO_PI 1.0f / K_PI_2
+#define SQRT_TWO 1.41421356237309504880f
+#define SQRT_THREE 1.73205080756887729352f
+#define SQRT_ONE_OVER_TWO 0.70710678118654752440f
+#define SQRT_ONE_OVER_THREE 0.57735026918962576450f
+#define DEG2RAD_MULTIPLIER PI / 180.0f
+#define RAD2DEG_MULTIPLIER 180.0f / PI
+#define FLOAT_EPSILON 1e-5
+
+#define machine_epsilon = 1.1920929e-7f;
+#define Pi = 3.14159265359f;
+#define Tau = 6.28318530718f;
+#define euler = 2.71828182846f;
+#define gold_big = 1.61803398875f;
+#define gold_small = 0.61803398875f;
 
 // The multiplier to convert seconds to milliseconds.
 #define K_SEC_TO_MS_MULTIPLIER 1000.0f
@@ -28,137 +37,183 @@
 // Smallest positive number where 1.0 + FLOAT_EPSILON != 0
 #define K_FLOAT_EPSILON 1.192092896e-07f
 
-KAPI f32 Sin(f32 x);
-KAPI f32 Cos(f32 x);
-KAPI f32 Tan(f32 x);
-KAPI f32 Acos(f32 x);
-KAPI f32 Sqrt(f32 x);
-
-INLINE b8 is_power_of_2(u64 value) {
-    return (value != 0) && ((value & (value - 1)) == 0);
+Inline f32 Sin(f32 x) {
+  return sinf(x);
 }
 
-KAPI i32 random();
-KAPI i32 random_in_range(i32 min, i32 max);
+Inline f32 Cos(f32 x) {
+  return cosf(x);
+}
 
-KAPI f32 frandom();
-KAPI f32 frandom_in_range(f32 min, f32 max);
+Inline f32 Tan(f32 x) {
+  return tanf(x);
+}
+
+Inline f32 Acos(f32 x) {
+  return acosf(x);
+}
+
+Inline f32 Sqrt(f32 x) {
+  return sqrtf(x);
+}
+
+Inline u32 xorshift32(u32* seed) {
+  u32 x = *seed;
+  x ^= x << 13;
+  x ^= x >> 17;
+  x ^= x << 5;
+  return *seed = x;
+}
+
+global u32 g_seed = 1;
+Inline u32 random() {
+  u32 x = xorshift32(&g_seed);
+  return x;
+}
+
+Inline u32 random_in_range(u32 min, u32 max) {
+  u32 x = xorshift32(&g_seed);
+  return (x % (max - min + 1)) + min;
+}
+
+Inline i32 srandom() {
+  u32 x = xorshift32(&g_seed);
+  return x;
+}
+
+Inline i32 srandom_in_range(i32 min, i32 max) {
+  u32 x = xorshift32(&g_seed);
+  return min + (i32)(x % (u32)(max - min + 1));
+}
+
+Inline f32 frandom() {
+  return (f32)random() / (f32)U32_MAX;
+}
+
+Inline f32 frandom_in_range(f32 min, f32 max) {
+  return min + ((f32)random() / ((f32)U32_MAX / (max - min)));
+}
+
+Inline b8 is_power_of_2(u64 value) {
+  return (value != 0) && ((value & (value - 1)) == 0);
+}
+
 
 
 // Vector_2
 
 
-INLINE v2 v2_zero() {
+Inline v2 v2_zero() {
   return v2(0.0f, 0.0f);
 }
 
-INLINE v2 v2_one() {
+Inline v2 v2_one() {
   return v2(1.0f, 1.0f);
 }
 
-INLINE v2 v2_up() {
+Inline v2 v2_up() {
   return v2(0.0f, 1.0f);
 }
 
-INLINE v2 v2_down() {
+Inline v2 v2_down() {
   return v2(0.0f, -1.0f);
 }
 
-INLINE v2 v2_left() {
+Inline v2 v2_left() {
   return v2(-1.0f, 0.0f);
 }
 
-INLINE v2 v2_right() {
+Inline v2 v2_right() {
   return v2(1.0f, 0.0f);
 }
 
-INLINE v2 operator+(v2 vec_0, v2 vec_1) {
+Inline v2 operator+(v2 vec_0, v2 vec_1) {
   return v2(
       vec_0.x + vec_1.x,
       vec_0.y + vec_1.y);
 }
 
-INLINE v2 operator-(v2 vec_0, v2 vec_1) {
+Inline v2 operator-(v2 vec_0, v2 vec_1) {
   return v2(
       vec_0.x - vec_1.x,
       vec_0.y - vec_1.y);
 }
 
-INLINE v2 operator*(v2 vec, f32 scalar) {
+Inline v2 operator*(v2 vec, f32 scalar) {
   return v2(
       vec.x * scalar,
       vec.y * scalar);
 }
 
-INLINE v2 operator*(f32 scalar, v2 vec) {
+Inline v2 operator*(f32 scalar, v2 vec) {
   return v2(
       vec.x * scalar,
       vec.y * scalar);
 }
 
-INLINE v2 operator/(v2 vec, f32 scalar) {
+Inline v2 operator/(v2 vec, f32 scalar) {
   return v2(
       vec.x / scalar,
       vec.y / scalar);
 }
 
-INLINE v2 operator/(f32 scalar, v2 vec) {
+Inline v2 operator/(f32 scalar, v2 vec) {
   return v2(
       vec.x / scalar,
       vec.y / scalar);
 }
 
-INLINE v2& operator+=(v2& vec_0, v2 vec_1) {
+Inline v2& operator+=(v2& vec_0, v2 vec_1) {
   vec_0 = vec_0 + vec_1;
   return vec_0;
 }
 
-INLINE v2& operator-=(v2& vec_0, v2 vec_1) {
+Inline v2& operator-=(v2& vec_0, v2 vec_1) {
   vec_0 = vec_0 - vec_1;
   return vec_0;
 }
 
-INLINE v2& operator*=(v2& vec, f32 scalar) {
+Inline v2& operator*=(v2& vec, f32 scalar) {
   vec = vec * scalar;
   return vec;
 }
 
-INLINE v2& operator/=(v2& vec, f32 scalar) {
+Inline v2& operator/=(v2& vec, f32 scalar) {
   vec = vec / scalar;
   return vec;
 }
 
-INLINE v2 operator-(const v2& vec) {
+Inline v2 operator-(const v2& vec) {
     return v2(-vec.x, -vec.y);
 }
 
-INLINE f32 v2_length_squared(v2 vec) {
+Inline f32 v2_length_squared(v2 vec) {
   return Sqr(vec.x) + Sqr(vec.y);
 }
 
-INLINE f32 v2_length(v2 vec) {
+Inline f32 v2_length(v2 vec) {
   return Sqrt(v2_length_squared(vec));
 }
 
-INLINE void v2_normalize(v2* vec) {
+Inline void v2_normalize(v2* vec) {
   f32 length = v2_length(*vec);
   vec->x /= length;
   vec->y /= length;
 }
 
-INLINE v2 v2_normal(v2 vec) {
+Inline v2 v2_normal(v2 vec) {
   f32 length = v2_length(vec);
   vec.x /= length;
   vec.y /= length;
   return vec;
 }
 
-INLINE b8 v2_compare(v2 vec_0, v2 vec_1, f32 tolerance) {
+Inline b8 v2_compare(v2 vec_0, v2 vec_1, f32 tolerance) {
   return Abs(vec_0.x - vec_1.x) <= tolerance &&
          Abs(vec_0.y - vec_1.y) <= tolerance;
 }
 
-INLINE f32 v2_distance(v2 vec_0, v2 vec_1) {
+Inline f32 v2_distance(v2 vec_0, v2 vec_1) {
   v2 d = v2(
     vec_0.x - vec_1.x,
     vec_0.y - vec_1.y);
@@ -169,106 +224,108 @@ INLINE f32 v2_distance(v2 vec_0, v2 vec_1) {
 // Vector_3
 
 
-INLINE v4 v3_to_v4(v3 vec, f32 w) {
+Inline v4 v3_to_v4(v3 vec, f32 w) {
   return v4(vec.x, vec.y, vec.z, w);
 }
 
-INLINE v3 v3_zero() {
-  return v3(0.0f, 0.0f, 0.0f);
+__forceinline v3 v3_zero() {
+// Inline v3 v3_zero() {
+  return (v3){0.0f, 0.0f, 0.0f};
+  // return v3(0.0f, 0.0f, 0.0f);
 }
 
-INLINE v3 v3_one() {
+Inline v3 v3_one() {
   return v3(1.0f, 1.0f, 1.0f);
 }
 
-INLINE v3 v3_up() {
+Inline v3 v3_up() {
   return v3(0.0f, 1.0f, 0.0f);
 }
 
-INLINE v3 v3_down() {
+Inline v3 v3_down() {
   return v3(0.0f, -1.0f, 0.0f);
 }
 
-INLINE v3 v3_left() {
+Inline v3 v3_left() {
   return v3(-1.0f, 0.0f, 0.0f);
 }
 
-INLINE v3 v3_right() {
+Inline v3 v3_right() {
   return v3(1.0f, 0.0f, 0.0f);
 }
 
-INLINE v3 v3_forward() {
+Inline v3 v3_forward() {
   return v3(0.0f, 0.0f, -1.0f);
 }
 
-INLINE v3 v3_back() {
+Inline v3 v3_back() {
   return v3(0.0f, 0.0f, 1.0f);
 }
 
-INLINE v3 operator+(v3 vec_0, v3 vec_1) {
+Inline v3 operator+(v3 vec_0, v3 vec_1) {
   return v3(vec_0.x + vec_1.x, vec_0.y + vec_1.y, vec_0.z + vec_1.z);
 }
 
-INLINE v3 operator-(v3 vec_0, v3 vec_1) {
+Inline v3 operator-(v3 vec_0, v3 vec_1) {
   return v3(vec_0.x - vec_1.x, vec_0.y - vec_1.y, vec_0.z - vec_1.z);
 }
 
-INLINE v3 operator*(v3 vec, f32 scalar) {
+Inline v3 operator*(v3 vec, f32 scalar) {
   return v3(vec.x * scalar, vec.y * scalar, vec.z * scalar);
 }
 
-INLINE v3 operator*(f32 scalar, v3 vec) {
+Inline v3 operator*(f32 scalar, v3 vec) {
   return v3(vec.x * scalar, vec.y * scalar, vec.z * scalar);
 }
 
-INLINE v3 operator/(v3 vec, f32 scalar) {
+Inline v3 operator/(v3 vec, f32 scalar) {
   return v3(vec.x / scalar, vec.y / scalar, vec.z / scalar);
 }
 
-INLINE v3 operator/(f32 scalar, v3 vec) {
+Inline v3 operator/(f32 scalar, v3 vec) {
   return v3(vec.x / scalar, vec.y / scalar, vec.z / scalar);
 }
 
-INLINE v3& operator+=(v3& vec_0, v3 vec_1) {
+Inline v3& operator+=(v3& vec_0, v3 vec_1) {
   vec_0 = vec_0 + vec_1;
   return vec_0;
 }
 
-INLINE v3& operator-=(v3& vec_0, v3 vec_1) {
+Inline v3& operator-=(v3& vec_0, v3 vec_1) {
   vec_0 = vec_0 - vec_1;
   return vec_0;
 }
 
-INLINE v3& operator*=(v3& vec, f32 scalar) {
+Inline v3& operator*=(v3& vec, f32 scalar) {
   vec = vec * scalar;
   return vec;
 }
 
-INLINE v3& operator/=(v3& vec, f32 scalar) {
+Inline v3& operator/=(v3& vec, f32 scalar) {
   vec = vec / scalar;
   return vec;
 }
 
-INLINE v3 operator-(const v3& vec) {
+Inline v3 operator-(const v3& vec) {
     return v3(-vec.x, -vec.y, -vec.z);
 }
 
-INLINE f32 v3_length_squared(v3 vec) {
+Inline f32 v3_length_squared(v3 vec) {
   return Sqr(vec.x) + Sqr(vec.y) + Sqr(vec.z);
 }
 
-INLINE f32 v3_length(v3 vec) {
+Inline f32 v3_length(v3 vec) {
   return Sqrt(v3_length_squared(vec));
 }
 
-INLINE void v3_normalize(v3* vec) {
+Inline void v3_normalize(v3* vec) {
   f32 length = v3_length(*vec);
   vec->x /= length;
   vec->y /= length;
   vec->z /= length;
 }
 
-INLINE v3 v3_normal(v3 vec) {
+Inline v3 v3_normal(v3 vec) {
   f32 length = v3_length(vec);
   vec.x /= length;
   vec.y /= length;
@@ -276,34 +333,33 @@ INLINE v3 v3_normal(v3 vec) {
   return vec;
 }
 
-INLINE b8 v3_compare(v3 vec_0, v3 vec_1, f32 tolerance) {
+Inline b8 v3_compare(v3 vec_0, v3 vec_1, f32 tolerance) {
   return Abs(vec_0.x - vec_1.x) <= tolerance &&
          Abs(vec_0.y - vec_1.y) <= tolerance &&
          Abs(vec_0.z - vec_1.z) <= tolerance;
 }
 
-internal const f32 tolerance = 1e-5;
-INLINE b8 operator==(v3 vec_0, v3 vec_1) {
-  return Abs(vec_0.x - vec_1.x) <= tolerance &&
-         Abs(vec_0.y - vec_1.y) <= tolerance &&
-         Abs(vec_0.z - vec_1.z) <= tolerance;
+Inline b8 operator==(v3 vec_0, v3 vec_1) {
+  return Abs(vec_0.x - vec_1.x) <= FLOAT_EPSILON &&
+         Abs(vec_0.y - vec_1.y) <= FLOAT_EPSILON &&
+         Abs(vec_0.z - vec_1.z) <= FLOAT_EPSILON;
 }
-INLINE b8 operator!=(v3 vec_0, v3 vec_1) {
-  return !(Abs(vec_0.x - vec_1.x) <= tolerance &&
-           Abs(vec_0.y - vec_1.y) <= tolerance &&
-           Abs(vec_0.z - vec_1.z) <= tolerance);
+Inline b8 operator!=(v3 vec_0, v3 vec_1) {
+  return !(Abs(vec_0.x - vec_1.x) <= FLOAT_EPSILON &&
+           Abs(vec_0.y - vec_1.y) <= FLOAT_EPSILON &&
+           Abs(vec_0.z - vec_1.z) <= FLOAT_EPSILON);
 }
 
-INLINE f32 v3_distance(v3 vec_0, v3 vec_1) {
+Inline f32 v3_distance(v3 vec_0, v3 vec_1) {
   v3 d = v3(vec_0.x - vec_1.x, vec_0.y - vec_1.y, vec_0.z - vec_1.z);
   return v3_length(d);
 }
 
-INLINE f32 v3_dot(v3 vec_0, v3 vec_1) {
+Inline f32 v3_dot(v3 vec_0, v3 vec_1) {
   return vec_0.x * vec_1.x + vec_0.y * vec_1.y + vec_0.z * vec_1.z;
 }
 
-INLINE v3 v3_cross(v3 vec_0, v3 vec_1) {
+Inline v3 v3_cross(v3 vec_0, v3 vec_1) {
   return v3(
     vec_0.y * vec_1.z - vec_0.z * vec_1.y,
     vec_0.z * vec_1.x - vec_0.x * vec_1.z,
@@ -315,56 +371,56 @@ INLINE v3 v3_cross(v3 vec_0, v3 vec_1) {
 // Vector_4
 
 
-INLINE v3 v4_to_v3(v4 vec) {
+Inline v3 v4_to_v3(v4 vec) {
   return v3(vec.x, vec.y, vec.z);
 }
 
-INLINE v4 v4_zero() {
+Inline v4 v4_zero() {
   return v4(0.0f, 0.0f, 0.0f, 0.0f);
 }
 
-INLINE v4 v4_one() {
+Inline v4 v4_one() {
   return v4(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
-INLINE v4 operator+(v4 vec_0, v4 vec_1) {
+Inline v4 operator+(v4 vec_0, v4 vec_1) {
   return v4(vec_0.x + vec_1.x, vec_0.y + vec_1.y, vec_0.z + vec_1.z, vec_0.z + vec_1.z);
 }
 
-INLINE v4 operator-(v4 vec_0, v4 vec_1) {
+Inline v4 operator-(v4 vec_0, v4 vec_1) {
   return v4(vec_0.x - vec_1.x, vec_0.y - vec_1.y, vec_0.z - vec_1.z, vec_0.z - vec_1.z);
 }
 
-INLINE v4& operator+=(v4& vec_0, v4 vec_1) {
+Inline v4& operator+=(v4& vec_0, v4 vec_1) {
   vec_0 = vec_0 + vec_1;
   return vec_0;
 }
 
-INLINE v4& operator-=(v4& vec_0, v4 vec_1) {
+Inline v4& operator-=(v4& vec_0, v4 vec_1) {
   vec_0 = vec_0 - vec_1;
   return vec_0;
 }
 
-INLINE v4 operator-(const v4& vec) {
+Inline v4 operator-(const v4& vec) {
     return v4(-vec.x, -vec.y, -vec.z, -vec.w);
 }
 
-INLINE f32 v4_length_squared(v4 vec) {
+Inline f32 v4_length_squared(v4 vec) {
   return Sqr(vec.x) + Sqr(vec.y) + Sqr(vec.z) + Sqr(vec.w);
 }
 
-INLINE f32 v4_length(v4 vec) {
+Inline f32 v4_length(v4 vec) {
   return Sqrt(v4_length_squared(vec));
 }
 
-INLINE void v4_normalize(v4* vec) {
+Inline void v4_normalize(v4* vec) {
   f32 length = v4_length(*vec);
   vec->x /= length;
   vec->y /= length;
   vec->z /= length;
 }
 
-INLINE v4 v4_normal(v4 vec) {
+Inline v4 v4_normal(v4 vec) {
   f32 length = v4_length(vec);
   vec.x /= length;
   vec.y /= length;
@@ -373,7 +429,7 @@ INLINE v4 v4_normal(v4 vec) {
   return vec;
 }
 
-INLINE f32 v4_dot_f32(
+Inline f32 v4_dot_f32(
     f32 a0, f32 a1, f32 a2, f32 a3,
     f32 b0, f32 b1, f32 b2, f32 b3) {
   f32 p = a0 * b0 +
@@ -387,7 +443,7 @@ INLINE f32 v4_dot_f32(
 // Matrix4
 
 
-INLINE mat4 mat4_identity() {
+Inline mat4 mat4_identity() {
   mat4 matrix = {
     1,0,0,0,
     0,1,0,0,
@@ -396,7 +452,7 @@ INLINE mat4 mat4_identity() {
   return matrix;
 }
 
-INLINE mat4 operator*(mat4 matrix_0, mat4 matrix_1) {
+Inline mat4 operator*(mat4 matrix_0, mat4 matrix_1) {
   mat4 result = {};
   for (i32 row = 0; row < 4; ++row) {
     for (i32 col = 0; col < 4; ++col) {
@@ -410,12 +466,12 @@ INLINE mat4 operator*(mat4 matrix_0, mat4 matrix_1) {
   return result;
 }
 
-INLINE mat4& operator*=(mat4& vec_0, mat4 vec_1) {
+Inline mat4& operator*=(mat4& vec_0, mat4 vec_1) {
   vec_0 = vec_1 * vec_0;
   return vec_0;
 }
 
-INLINE mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far) {
+Inline mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far) {
   mat4 mat = {};
   mat.data[0*4 + 0] = 2.0f / (right - left);
   mat.data[1*4 + 1] = 2.0f / (bottom - top);
@@ -428,7 +484,7 @@ INLINE mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near
   return mat;
 }
 
-INLINE mat4 mat4_perspective1(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far) {
+Inline mat4 mat4_perspective1(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far) {
   mat4 mat = {};
   mat.data[0*4 + 0] = 1.0f / (Tan(fov_radians/2.0f) * aspect_ratio);
   mat.data[1*4 + 1] = 1.0f / Tan(fov_radians/2.0f);
@@ -439,7 +495,7 @@ INLINE mat4 mat4_perspective1(f32 fov_radians, f32 aspect_ratio, f32 near, f32 f
   return mat;
 }
 
-INLINE mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far) {
+Inline mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far) {
   mat4 mat = {};
   mat.data[0*4 + 0] = 1.0f / (Tan(fov_radians / 2.0f) * aspect_ratio);
   mat.data[1*4 + 1] = 1.0f / Tan(fov_radians / 2.0f);
@@ -450,7 +506,7 @@ INLINE mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 fa
   return mat;
 }
 
-INLINE mat4 mat4_look_at(v3 position, v3 target, v3 up) {
+Inline mat4 mat4_look_at(v3 position, v3 target, v3 up) {
   v3 z = v3_normal(target - position);
   v3 x = v3_normal(v3_cross(up, z));
   v3 y = v3_cross(z, x);
@@ -465,7 +521,7 @@ INLINE mat4 mat4_look_at(v3 position, v3 target, v3 up) {
   return camera_view;
 }
 
-INLINE mat4 mat4_transposed(mat4 matrix) {
+Inline mat4 mat4_transposed(mat4 matrix) {
   mat4 out_matrix = mat4_identity();
   out_matrix.data[0] = matrix.data[0];
   out_matrix.data[1] = matrix.data[4];
@@ -486,7 +542,7 @@ INLINE mat4 mat4_transposed(mat4 matrix) {
   return out_matrix;
 }
 
-INLINE mat4 mat4_inverse(mat4 matrix) {
+Inline mat4 mat4_inverse(mat4 matrix) {
   const f32* m = matrix.data;
 
   f32 t0 = m[10] * m[15];
@@ -544,7 +600,7 @@ INLINE mat4 mat4_inverse(mat4 matrix) {
   return out_matrix;
 }
 
-INLINE mat4 mat4_translation(v3 position) {
+Inline mat4 mat4_translation(v3 position) {
   mat4 mat = {
       1,          0,          0,          0,
       0,          1,          0,          0,
@@ -553,7 +609,7 @@ INLINE mat4 mat4_translation(v3 position) {
   return mat;
 }
 
-INLINE mat4 mat4_scale(v3 scale) {
+Inline mat4 mat4_scale(v3 scale) {
   mat4 mat = {
     scale.x,0,      0,      0,
     0,      scale.y,0,      0,
@@ -562,7 +618,7 @@ INLINE mat4 mat4_scale(v3 scale) {
   return mat;
 }
 
-INLINE mat4 mat4_euler_x(f32 angle_radians) {
+Inline mat4 mat4_euler_x(f32 angle_radians) {
   f32 cos = Cos(angle_radians);
   f32 sin = Sin(angle_radians);
   mat4 mat = {
@@ -574,7 +630,7 @@ INLINE mat4 mat4_euler_x(f32 angle_radians) {
   return mat;
 }
 
-INLINE mat4 mat4_euler_y(f32 angle_radians) {
+Inline mat4 mat4_euler_y(f32 angle_radians) {
   f32 cos = Cos(angle_radians);
   f32 sin = Sin(angle_radians);
   mat4 mat = {
@@ -586,7 +642,7 @@ INLINE mat4 mat4_euler_y(f32 angle_radians) {
   return mat;
 }
 
-INLINE mat4 mat4_euler_z(f32 angle_radians) {
+Inline mat4 mat4_euler_z(f32 angle_radians) {
   f32 cos = Cos(angle_radians);
   f32 sin = Sin(angle_radians);
   mat4 mat = {
@@ -598,7 +654,7 @@ INLINE mat4 mat4_euler_z(f32 angle_radians) {
   return mat;
 }
 
-INLINE mat4 mat4_euler_xyz(f32 x_radians, f32 y_radians, f32 z_radians) {
+Inline mat4 mat4_euler_xyz(f32 x_radians, f32 y_radians, f32 z_radians) {
   mat4 rx = mat4_euler_x(x_radians);
   mat4 ry = mat4_euler_y(y_radians);
   mat4 rz = mat4_euler_z(z_radians);
@@ -606,7 +662,7 @@ INLINE mat4 mat4_euler_xyz(f32 x_radians, f32 y_radians, f32 z_radians) {
   return mat;
 }
 
-INLINE v3 mat4_forward(mat4 matrix) {
+Inline v3 mat4_forward(mat4 matrix) {
   v3 forward;
   forward.x = -matrix.data[2];
   forward.y = -matrix.data[6];
@@ -615,7 +671,7 @@ INLINE v3 mat4_forward(mat4 matrix) {
   return forward;
 }
 
-INLINE v3 mat4_backward(mat4 matrix) {
+Inline v3 mat4_backward(mat4 matrix) {
   v3 backward;
   backward.x = matrix.data[2];
   backward.y = matrix.data[6];
@@ -624,7 +680,7 @@ INLINE v3 mat4_backward(mat4 matrix) {
   return backward;
 }
 
-INLINE v3 mat4_up(mat4 matrix) {
+Inline v3 mat4_up(mat4 matrix) {
   v3 up;
   up.x = matrix.data[1];
   up.y = matrix.data[5];
@@ -633,7 +689,7 @@ INLINE v3 mat4_up(mat4 matrix) {
   return up;
 }
 
-INLINE v3 mat4_down(mat4 matrix) {
+Inline v3 mat4_down(mat4 matrix) {
   v3 down;
   down.x = -matrix.data[1];
   down.y = -matrix.data[5];
@@ -642,7 +698,7 @@ INLINE v3 mat4_down(mat4 matrix) {
   return down;
 }
 
-INLINE v3 mat4_left(mat4 matrix) {
+Inline v3 mat4_left(mat4 matrix) {
   v3 right;
   right.x = -matrix.data[0];
   right.y = -matrix.data[4];
@@ -651,7 +707,7 @@ INLINE v3 mat4_left(mat4 matrix) {
   return right;
 }
 
-INLINE v3 mat4_right(mat4 matrix) {
+Inline v3 mat4_right(mat4 matrix) {
   v3 left;
   left.x = matrix.data[0];
   left.y = matrix.data[4];
@@ -660,11 +716,11 @@ INLINE v3 mat4_right(mat4 matrix) {
   return left;
 }
 
-INLINE quat quat_identity() {
+Inline quat quat_identity() {
   return (quat){0, 0, 0, 1.0f};
 }
 
-INLINE f32 quat_normal(quat q) {
+Inline f32 quat_normal(quat q) {
   return Sqrt(
       q.x * q.x +
       q.y * q.y +
@@ -672,7 +728,7 @@ INLINE f32 quat_normal(quat q) {
       q.w * q.w);
 }
 
-INLINE quat quat_normalize(quat q) {
+Inline quat quat_normalize(quat q) {
   f32 normal = quat_normal(q);
   return (quat){
       q.x / normal,
@@ -681,7 +737,7 @@ INLINE quat quat_normalize(quat q) {
       q.w / normal};
 }
 
-INLINE quat quat_conjugate(quat q) {
+Inline quat quat_conjugate(quat q) {
   return (quat){
       -q.x,
       -q.y,
@@ -689,11 +745,11 @@ INLINE quat quat_conjugate(quat q) {
       q.w};
 }
 
-INLINE quat quat_inverse(quat q) {
+Inline quat quat_inverse(quat q) {
   return quat_normalize(quat_conjugate(q));
 }
 
-INLINE quat quat_mul(quat q_0, quat q_1) {
+Inline quat quat_mul(quat q_0, quat q_1) {
   quat out_quaternion;
 
   out_quaternion.x = q_0.x * q_1.w +
@@ -719,14 +775,14 @@ INLINE quat quat_mul(quat q_0, quat q_1) {
   return out_quaternion;
 }
 
-INLINE f32 quat_dot(quat q_0, quat q_1) {
+Inline f32 quat_dot(quat q_0, quat q_1) {
   return q_0.x * q_1.x +
          q_0.y * q_1.y +
          q_0.z * q_1.z +
          q_0.w * q_1.w;
 }
 
-INLINE mat4 quat_to_mat4(quat q) {
+Inline mat4 quat_to_mat4(quat q) {
   mat4 out_matrix = mat4_identity();
 
   // https://stackoverflow.com/questions/1556260/convert-quaternion-rotation-to-rotation-matrix
@@ -749,7 +805,7 @@ INLINE mat4 quat_to_mat4(quat q) {
 }
 
  // Calculates a rotation matrix based on the quaternion and the passed in center point.
-INLINE mat4 quat_to_rotation_matrix(quat q, v3 center) {
+Inline mat4 quat_to_rotation_matrix(quat q, v3 center) {
   mat4 out_matrix;
 
   f32* o = out_matrix.data;
@@ -775,7 +831,7 @@ INLINE mat4 quat_to_rotation_matrix(quat q, v3 center) {
   return out_matrix;
 }
 
-INLINE quat quat_from_axis_angle(v3 axis, f32 angle, b8 normalize) {
+Inline quat quat_from_axis_angle(v3 axis, f32 angle, b8 normalize) {
   const f32 half_angle = 0.5f * angle;
   f32 s = Sin(half_angle);
   f32 c = Cos(half_angle);
@@ -787,7 +843,7 @@ INLINE quat quat_from_axis_angle(v3 axis, f32 angle, b8 normalize) {
   return q;
 }
 
-INLINE quat quat_slerp(quat q_0, quat q_1, f32 percentage) {
+Inline quat quat_slerp(quat q_0, quat q_1, f32 percentage) {
   quat out_quaternion;
   // Source: https://en.wikipedia.org/wiki/Slerp
   // Only unit quaternions are valid rotations.
@@ -839,22 +895,10 @@ INLINE quat quat_slerp(quat q_0, quat q_1, f32 percentage) {
       (v0.w * s0) + (v1.w * s1)};
 }
 
- /**
-  * @brief Converts provided degrees to radians.
-  * 
-  * @param degrees The degrees to be converted.
-  * @return The amount in radians.
-  */
-INLINE f32 deg_to_rad(f32 degrees) {
-  return degrees * K_DEG2RAD_MULTIPLIER;
+Inline f32 deg_to_rad(f32 degrees) {
+  return degrees * DEG2RAD_MULTIPLIER;
 }
 
- /**
-  * @brief Converts provided radians to degrees.
-  * 
-  * @param radians The radians to be converted.
-  * @return The amount in degrees.
-  */
-INLINE f32 rad_to_deg(f32 radians) {
-  return radians * K_RAD2DEG_MULTIPLIER;
+Inline f32 rad_to_deg(f32 radians) {
+  return radians * RAD2DEG_MULTIPLIER;
 }

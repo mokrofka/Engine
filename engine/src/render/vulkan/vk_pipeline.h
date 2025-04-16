@@ -1,5 +1,4 @@
 #pragma once
-
 #include "vk_types.h"
 
 VK_Pipeline vk_graphics_pipeline_create(

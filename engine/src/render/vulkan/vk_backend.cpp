@@ -12,14 +12,9 @@
 
 #include "shaders/vk_material_shader.h"
 
-#include "str.h"
-#include "os.h"
-#include "math/math_types.h"
-
-#include "sys/material_system.h"
+#include "sys/material_sys.h"
 
 VK_Context* vk;
-global v2i cached_framebuffer_extent;
 
 VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
@@ -55,19 +50,16 @@ void free_data_range(VK_Buffer* buffer, u64 offset, u64 size) {
 
 void vk_r_backend_init(R_Backend* backend) {
   // Function pointer
-  backend->internal_context = push_struct(backend->arena, VK_Context);
-  vk = (VK_Context*)backend->internal_context;
+  vk = push_struct(backend->arena, VK_Context);
   vk->arena = backend->arena;
   vk->find_memory_index = find_memory_index;
   
   // TODO: custom allocator.
   vk->allocator = 0;
   
-  cached_framebuffer_extent = os_get_framebuffer_size();
-  vk->frame.width = (cached_framebuffer_extent.x != 0) ? cached_framebuffer_extent.x : 800;
-  vk->frame.height = (cached_framebuffer_extent.y != 0) ? cached_framebuffer_extent.y : 600;
-  cached_framebuffer_extent.x = 0;
-  cached_framebuffer_extent.y = 0;
+  v2i framebuffer_extent = os_get_framebuffer_size();
+  vk->frame.width =  framebuffer_extent.x;
+  vk->frame.height = framebuffer_extent.y;
 
   VkApplicationInfo app_info = {VK_STRUCTURE_TYPE_APPLICATION_INFO};
   app_info.apiVersion = VK_API_VERSION_1_2;
@@ -118,7 +110,7 @@ void vk_r_backend_init(R_Backend* backend) {
     Info("Searching for layer: %s...", required_validation_layer_names[i]);
     b8 found = false;
     for (u32 j = 0; j < available_layer_count; ++j) {
-      if (cstr_equal(required_validation_layer_names[i], available_layers[j].layerName)) {
+      if (cstr_match(required_validation_layer_names[i], available_layers[j].layerName)) {
         found = true;
         Info("Found.");
         break;
@@ -151,8 +143,8 @@ void vk_r_backend_init(R_Backend* backend) {
                                   VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
   debug_create_info.pfnUserCallback = vk_debug_callback;
 
-  auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-      vk->instance, "vkCreateDebugUtilsMessengerEXT");
+  PFN_vkCreateDebugUtilsMessengerEXT func;
+  Assign(func, vkGetInstanceProcAddr(vk->instance, "vkCreateDebugUtilsMessengerEXT"));
 
   AssertMsg(func, "Failed to create debug messenger!");
   VK_CHECK(func(vk->instance, &debug_create_info, vk->allocator, &vk->debug_messenger));
@@ -196,8 +188,6 @@ void vk_r_backend_init(R_Backend* backend) {
     vk->sync.in_flight_fences[i] = vk_fence_create(true);
   }
 
-  vk->sync.images_in_flight = push_array(vk->arena, VK_Fence*, vk->swapchain.image_count);
-
   vk->render.material_shader = vk_material_shader_create(vk);
   
   create_buffers(&vk->render);
@@ -236,7 +226,6 @@ void vk_r_backend_shutdown() {
   vk->sync.image_available_semaphores = 0;
   vk->sync.queue_complete_semaphores = 0;
   vk->sync.in_flight_fences = 0;
-  vk->sync.images_in_flight = 0;
   
   // Command buffers
   for (u32 i = 0; i < vk->swapchain.image_count; ++i) {
@@ -277,8 +266,10 @@ void vk_r_backend_shutdown() {
 }
 
 void vk_r_backend_on_resize(u16 width, u16 height) {
-  cached_framebuffer_extent.x = width;
-  cached_framebuffer_extent.y = height;
+  // cached_framebuffer_extent.x = width;
+  // cached_framebuffer_extent.y = height;
+  vk->frame.width = width;
+  vk->frame.height = height;
   ++vk->frame.size_generation;
   
   Info("Vulkan renderer backend->resized: w/h/gen %i/%i/%llu", width, height, vk->frame.size_generation);
@@ -471,23 +462,10 @@ internal b8 recreate_swapchain(VK_Swapchain* swapchain) {
   // Mark as recreating if the dimensions are valid.
   vk->recreating_swapchain = true;
 
-  // Wait for any operations to complete.
-  vkDeviceWaitIdle(vkdevice);
+  vk_swapchain_recreate(swapchain, vk->frame.width, vk->frame.height);
 
-  // Clear these out just in case.
-  for (u32 i = 0; i < swapchain->image_count; ++i) {
-    vk->sync.images_in_flight[i] = 0;
-  }
-
-  vk_swapchain_recreate(swapchain, cached_framebuffer_extent.x, cached_framebuffer_extent.y);
-
-  // Sync the framebuffer size with the cached sizes.
-  vk->frame.width = cached_framebuffer_extent.x;
-  vk->frame.height = cached_framebuffer_extent.y;
   vk->renderpass.rect.w = vk->frame.width;
   vk->renderpass.rect.h = vk->frame.height;
-  cached_framebuffer_extent.x = 0;
-  cached_framebuffer_extent.y = 0;
 
   // Update framebuffer size generation.
   vk->frame.size_last_generation = vk->frame.size_generation;
@@ -627,13 +605,9 @@ void vk_r_destroy_texture(Texture* texture) {
 }
 
 void vk_r_create_material(Material* material) {
-  if (material) {
-    vk_material_shader_acquire_resources(&vk->render.material_shader, material);
-    Trace("Render: Material created.");
-    return; 
-  }
-  
-  Error("vk_r_create_material called with null. Creation failed.");
+  Assert(material);
+  vk_material_shader_acquire_resources(&vk->render.material_shader, material);
+  Trace("Render: Material created.");
 }
 
 void vk_r_destroy_material(Material* material) {
@@ -742,7 +716,6 @@ void vk_r_destroy_geometry(Geometry* geometry) {
 }
 
 void vk_r_draw_geometry(GeometryRenderData data) {
-  
   if (data.geometry && data.geometry->internal_id == INVALID_ID) {
     return;
   }

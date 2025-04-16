@@ -1,5 +1,4 @@
 #version 450
-// #extension GL_ARB_seperate_shader_objects : enable
 
 layout(location = 0) out vec4 out_color;
 
@@ -19,5 +18,4 @@ layout(location = 1) in struct dto {
 
 void main() {
   out_color = object_ubo.diffuse_color * texture(diffuse_sampler, in_dto.tex_coord);
-  // out_color =  texture(diffuse_sampler, in_dto.tex_coord);
 }

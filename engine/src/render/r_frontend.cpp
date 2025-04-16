@@ -2,16 +2,11 @@
 
 #include "vulkan/vk_backend.h"
 
-#include "sys/texture_system.h"
-#include "sys/material_system.h"
-
-#include <logger.h>
-#include <memory.h>
-#include <maths.h>
+#include "sys/texture_sys.h"
+#include "sys/material_sys.h"
 
 // TODO temporary
 
-#include <str.h>
 #include <event.h>
 
 // TODO end temporary
@@ -23,7 +18,6 @@ struct RendererSystemState {
   mat4 view;
   f32 near_clip;
   f32 far_clip;
-  void* memory;
 };
 
 // global R_Backend* backend;
@@ -35,13 +29,13 @@ void create_texture(Texture* t) {
 }
 
 b8 r_init(Arena* arena) {
-  u64 memory_reserved = MB(10);
-  u64 memory_requirement = memory_reserved+sizeof(RendererSystemState);
+  u64 memory_requirement = sizeof(RendererSystemState);
   
   state = push_buffer(arena, RendererSystemState, memory_requirement);
-  state->arena = (Arena*)&state->memory;
+  
+  u64 mem_reserved = MB(1);
+  state->arena = arena_alloc(arena, mem_reserved);
   state->backend.arena = state->arena;
-  state->arena->res = memory_reserved;
   
   // TODO make this configurable
   state->backend.frame_number = 0;

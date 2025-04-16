@@ -1,5 +1,4 @@
 #pragma once
-
 #include "vk_types.h"
 
 VK_RenderPass vk_renderpass_create(Rect rect, v4 color, f32 depth, u32 stencil);

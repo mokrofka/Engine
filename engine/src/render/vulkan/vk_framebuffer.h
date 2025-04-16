@@ -1,5 +1,4 @@
 #pragma once
-
 #include "vk_types.h"
 
 VK_Framebuffer vk_framebuffer_create(

@@ -1,6 +1,5 @@
 #pragma once
-
-#include "defines.h"
+#include "lib.h"
 
 #include "res/res_types.h"
 
@@ -26,7 +25,6 @@ struct GeometryRenderData {
 
 struct R_Backend {
   Arena* arena;
-  void* internal_context;
   u64 frame_number;
 };
 

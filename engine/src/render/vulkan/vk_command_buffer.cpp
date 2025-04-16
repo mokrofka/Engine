@@ -10,10 +10,7 @@ VK_CommandBuffer vk_command_buffer_alloc(VkCommandPool pool, b8 is_primary) {
   allocate_info.pNext = 0;
 
   command_buffer.state = COMMAND_BUFFER_STATE_NOT_ALLOCATED;
-  VK_CHECK(vkAllocateCommandBuffers(
-      vkdevice,
-      &allocate_info,
-      &command_buffer.handle));
+  VK_CHECK(vkAllocateCommandBuffers(vkdevice, &allocate_info, &command_buffer.handle));
 
   command_buffer.state = COMMAND_BUFFER_STATE_READY;
   return command_buffer;

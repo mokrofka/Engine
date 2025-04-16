@@ -1,10 +1,6 @@
 #include "vk_pipeline.h"
+
 #include "vk_utils.h"
-
-#include <math/math_types.h>
-
-#include <memory.h>
-#include <logger.h>
 
 VK_Pipeline vk_graphics_pipeline_create(
   VK_RenderPass renderpass,
@@ -31,7 +27,8 @@ VK_Pipeline vk_graphics_pipeline_create(
   rasterizer_create_info.rasterizerDiscardEnable = VK_FALSE;
   rasterizer_create_info.polygonMode = is_wireframe ? VK_POLYGON_MODE_LINE : VK_POLYGON_MODE_FILL;
   rasterizer_create_info.lineWidth = 1.0f;
-  rasterizer_create_info.cullMode = VK_CULL_MODE_BACK_BIT;
+  rasterizer_create_info.cullMode = VK_CULL_MODE_NONE;
+  // rasterizer_create_info.cullMode = VK_CULL_MODE_BACK_BIT;
   rasterizer_create_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
   rasterizer_create_info.depthBiasEnable = VK_FALSE;
   rasterizer_create_info.depthBiasConstantFactor = 0.0f;
@@ -118,11 +115,7 @@ VK_Pipeline vk_graphics_pipeline_create(
   pipeline_layout_create_info.pSetLayouts = descriptor_set_layouts;
   
   // Create the pipeline layout.
-  VK_CHECK(vkCreatePipelineLayout(
-    vkdevice, 
-    &pipeline_layout_create_info, 
-    vk->allocator, 
-    &pipeline.pipeline_layout));
+  VK_CHECK(vkCreatePipelineLayout(vkdevice, &pipeline_layout_create_info, vk->allocator, &pipeline.pipeline_layout));
 
   // Pipeline create
   VkGraphicsPipelineCreateInfo pipeline_create_info = {VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
@@ -160,7 +153,7 @@ VK_Pipeline vk_graphics_pipeline_create(
   } 
   
   Error("vkCreateGraphicsPipelines failed with %s.", vk_result_string(result, true));
-  Return(pipeline);
+  VK_Pipeline p = {}; return p;
 }
 
 void vk_pipeline_destroy(VK_Pipeline pipeline) {

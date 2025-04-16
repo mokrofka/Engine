@@ -92,11 +92,7 @@ VK_RenderPass vk_renderpass_create(Rect rect, v4 color, f32 depth, u32 stencil) 
   render_pass_create_info.pNext = 0;
   render_pass_create_info.flags = 0;
 
-  VK_CHECK(vkCreateRenderPass(
-      vkdevice,
-      &render_pass_create_info,
-      vk->allocator,
-      &renderpass.handle));
+  VK_CHECK(vkCreateRenderPass(vkdevice, &render_pass_create_info, vk->allocator, &renderpass.handle));
   return renderpass;
 }
 

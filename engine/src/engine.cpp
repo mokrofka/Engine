@@ -3,20 +3,12 @@
 #include "app_types.h"
 #include "render/r_frontend.h"
 
-#include "sys/texture_system.h"
-#include "sys/material_system.h"
+#include "sys/texture_sys.h"
+#include "sys/material_sys.h"
 #include "sys/geometry_sys.h"
 
-#include "logger.h"
-#include "memory.h"
-#include "os.h"
 #include "event.h"
 #include "input.h"
-#include "str.h"
-
-// TODO temp
-#include "maths.h"
-// end
 
 struct EngineState {
   Arena* arena;
@@ -34,26 +26,34 @@ struct EngineState {
 
 global EngineState* state;
 
-internal void engine_on_process_key(Keys key, b8 pressed);
 internal void engine_on_window_closed();
 internal void engine_on_window_resized(Window* window);
 
-internal b8 app_on_event(u16 code, void* sender, void* listener_inst, EventContext context);
-internal b8 app_on_key(u16 code, void* sender, void* listener_inst, EventContext context);
-internal b8 app_on_resized(u16 code, void* sender, void* listener_inst, EventContext context);
+internal b32 app_on_event(u32 code, void* sender, void* listener_inst, EventContext context);
+internal b32 app_on_key(u32 code, void* sender, void* listener_inst, EventContext context);
+internal b32 app_on_resized(u32 code, void* sender, void* listener_inst, EventContext context);
 
 internal void check_dll_changes(Application* app);
 
 // TODO temp
-b8 event_on_debug_event(u16 code, void* sender, void* listener_inst, EventContext data) {
-  char* names[3] = {
-    "cobblestone",
-    "paving",
-    "paving2"};
+b32 event_on_debug_event(u32 code, void* sender, void* listener_inst, EventContext data) {
+  Scratch scratch;
+  // char* names[3] = {
+  //   "cobblestone",
+  //   "paving",
+  //   "paving2"};
+  String names[] = {
+    str_lit("cobblestone"),
+    str_lit("paving"),
+    str_lit("paving2"),
+  };
   local i8 choice = 2;
+  push_str_copy(scratch, str_lit("cobblestone"));
+  push_str_copy(scratch, str_lit("paving"));
+  push_str_copy(scratch, str_lit("paving2"));
     
   // Save off the old name
-  char* old_name = names[choice];
+  String old_name = names[choice];
   
   ++choice;
   choice %= 3;
@@ -71,8 +71,9 @@ b8 event_on_debug_event(u16 code, void* sender, void* listener_inst, EventContex
 }
 // TODO end temp
 
-b8 engine_create(Application* game_inst) {
+void engine_create(Application* game_inst) {
   game_inst->engine_state = push_struct(game_inst->arena, EngineState);
+  
   state = (EngineState*)game_inst->engine_state;
   state->game_inst = game_inst;
   
@@ -83,9 +84,11 @@ b8 engine_create(Application* game_inst) {
   logging_init(state->arena);
 
   event_init(state->arena);
+  
   os_register_process_key(input_process_key);
   os_register_window_closed_callback(engine_on_window_closed);
   os_register_window_resized_callback(engine_on_window_resized);
+  
   event_register(EVENT_CODE_APPLICATION_QUIT, 0, app_on_event);
   event_register(EVENT_CODE_KEY_PRESSED, 0, app_on_key);
   event_register(EVENT_CODE_KEY_RELEASED, 0, app_on_key);
@@ -98,44 +101,53 @@ b8 engine_create(Application* game_inst) {
 
   {
     WindowConfig config = {
-        .position_x = 100,
-        .position_y = 100,
-        .width = 680,
-        .height = 480,
-        .name = game_inst->name};
+      .position_x = 100,
+      .position_y = 100,
+      .width = 680,
+      .height = 480,
+      .name = game_inst->name};
     os_window_create(config);
   }
 
-  r_init(state->arena);
+  {
+    r_init(state->arena);
+  }
 
-  TextureSystemConfig texture_sys_config = {
-      .max_texture_count = 65536,
-  };
-  texture_system_init(state->arena, texture_sys_config);
-  
-  MaterialSystemConfig material_sys_config = {
-    .max_material_count = 4096,
-  };
-  material_system_init(state->arena, material_sys_config);
-  
-  GeometrySysConfig geometry_sys_config = {
-    .max_geometry_count = 4096,
-  };
-  geometry_sys_init(state->arena, geometry_sys_config);
+  {
+    TextureSystemConfig texture_sys_config = {
+        .max_texture_count = 65536,
+    };
+    texture_system_init(state->arena, texture_sys_config);
+  }
 
-  GeometryConfig g_config = geometry_sys_generate_plane_config(10.0f, 5.0f, 5, 5, 5.0f, 2.0f, "test geometry", "test_material");
-  state->test_geometry = geometry_sys_acquire_from_config(g_config, true);
+  {
+    MaterialSystemConfig material_sys_config = {
+        .max_material_count = 4096,
+    };
+    material_system_init(state->arena, material_sys_config);
+  }
+
+  {
+    GeometrySysConfig geometry_sys_config = {
+      .max_geometry_count = 4096,
+    };
+    geometry_sys_init(state->arena, geometry_sys_config);
+  }
+
+  {
+    GeometryConfig config = geometry_sys_generate_plane_config(10.0f, 5.0f, 5, 5, 5.0f, 2.0f, "test geometry", "test_material");
+    state->test_geometry = geometry_sys_acquire_from_config(config, true);
+  }
 
   // TODO temp
   // state->test_geometry = geometry_sys_get_default();
   // TODO end
 
   game_inst->init(game_inst);
-
-  return true;
 }
 
-b8 engine_run(Application* game_inst) {
+void engine_run(Application* game_inst) {
+  os_show_window();
   state->is_running = true;
   
   clock_start(&state->clock);
@@ -173,7 +185,7 @@ b8 engine_run(Application* game_inst) {
       // TODO end
 
       r_draw_frame(&packet);
-
+      
       f64 frame_end_time = os_now_seconds();
       f64 frame_elapsed_time = frame_end_time - frame_start_time;
       running_time += frame_elapsed_time;
@@ -208,11 +220,9 @@ b8 engine_run(Application* game_inst) {
   // TODO end
 
   geometry_sys_shutdown();
-  material_system_shutdown();
-  texture_system_shutdown();
+  material_system_shutdown(); texture_system_shutdown();
   r_shutdown();
   os_window_destroy();
-  return true;
 }
 
 internal void engine_on_window_closed() {
@@ -234,11 +244,11 @@ internal void engine_on_window_resized(Window* window) {
     EventContext context = {0};
     context.data.u16[0] = window->width;
     context.data.u16[1] = window->height;
-    event_fire(EVENT_CODE_RESIZED, (Window*)window, context);
+    event_fire(EVENT_CODE_RESIZED, window, context);
   }
 }
 
-internal b8 app_on_event(u16 code, void* sender, void* listener_inst, EventContext context) {
+internal b32 app_on_event(u32 code, void* sender, void* listener_inst, EventContext context) {
   switch (code) {
     case EVENT_CODE_APPLICATION_QUIT: {
       Info("EVENT_CORE_APPLICATION_QUIT received, shutting down.\n");
@@ -250,7 +260,7 @@ internal b8 app_on_event(u16 code, void* sender, void* listener_inst, EventConte
   return false;
 }
 
-internal b8 app_on_key(u16 code, void* sender, void* listener_inst, EventContext context) {
+internal b32 app_on_key(u32 code, void* sender, void* listener_inst, EventContext context) {
   if (code == EVENT_CODE_KEY_PRESSED) {
     u16 key_code = context.data.u16[0];
     if (key_code == KEY_ESCAPE) {
@@ -270,7 +280,7 @@ internal b8 app_on_key(u16 code, void* sender, void* listener_inst, EventContext
   return false;
 }
 
-internal b8 app_on_resized(u16 code, void* sender, void* listener_inst, EventContext context) {
+internal b32 app_on_resized(u32 code, void* sender, void* listener_inst, EventContext context) {
   u16 width = context.data.u16[0];
   u16 height = context.data.u16[1];
   Debug("Window resize: %i, %i", width, height);
@@ -280,24 +290,20 @@ internal b8 app_on_resized(u16 code, void* sender, void* listener_inst, EventCon
 }
 
 internal void load_game_lib(Application* app) {
-  app->game_lib.last_time_write = os_file_last_write_time(app->game_lib.src_full_filename);
-  os_file_copy(app->game_lib.src_full_filename, app->game_lib.temp_full_filename);
-  // os_library_load(app->game_lib.temp_full_filename, &app->game_lib);
-  app->game_lib.handle = os_library_load(app->game_lib.temp_full_filename);
-  app->update = (void(*)(Application*))os_library_load_function(str_lit("application_update"), app->game_lib);
-}
-
-internal void unload_game_lib(Application* app) {
-  os_library_unload(app->game_lib);
-  app->update = 0;
+  FileProperties props = os_properties_from_file_path(app->lib_file_path);
+  app->modified = props.modified;
+  os_copy_file_path(app->lib_temp_filepath, app->lib_file_path);
+  app->lib = os_lib_open(app->lib_temp_filepath);
+  app->update = (void(*)(Application*))os_lib_get_proc(app->lib, str_lit("application_update"));
 }
 
 internal void check_dll_changes(Application* app) {
-  u64 new_game_dll_write_time = os_file_last_write_time(app->game_lib.src_full_filename);
-  b8 game_write = os_file_compare_time(new_game_dll_write_time, app->game_lib.last_time_write);
+  FileProperties props = os_properties_from_file_path(app->lib_file_path);
+  u64 new_write_time = props.modified;
+  b32 game_modified = os_file_compare_time(new_write_time, app->modified);
 
-  if (game_write) {
-    unload_game_lib(app);
+  if (game_modified) {
+    os_lib_close(app->lib);
     load_game_lib(app);
   }
 }

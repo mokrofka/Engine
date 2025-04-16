@@ -1,7 +1,5 @@
 #pragma once
 
-#include "defines.h"
-
 /**
  * @brief Represents available mouse buttons.
  */

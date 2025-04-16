@@ -1,10 +1,7 @@
 #include "geometry_sys.h"
 
-#include "logger.h"
-#include "memory.h"
-#include "str.h"
-#include "sys/material_system.h"
 #include "render/r_frontend.h"
+#include "sys/material_sys.h"
 
 struct GeometryRef {
   u64 reference_count;
@@ -32,17 +29,17 @@ void geometry_sys_init(Arena* arena, GeometrySysConfig config) {
 
   // Block of memory will contain state structure, then block for array, then block for hashtable.
   u64 struct_requirement = sizeof(GeometrySysState);
-  u64 array_requirement = sizeof(Geometry) * config.max_geometry_count;
-  u64 mem_reserved = MB(1);
-  u64 mem_requirement = struct_requirement + array_requirement + mem_reserved;
+  u64 array_requirement = sizeof(GeometryRef) * config.max_geometry_count;
+  u64 mem_requirement = struct_requirement + array_requirement;
   state = push_buffer(arena, GeometrySysState, mem_requirement);
-  state->arena = (Arena*)((u8*)state + mem_requirement); // TODO memory alignment
-  state->arena->res = mem_reserved;
+  
+  u64 mem_reserved = MB(1);
+  state->arena = arena_alloc(arena, mem_reserved);
   
   state->config = config;
 
   // The array block is after the state. Already allocated, so just set the pointer.
-  void* array_block = state + struct_requirement;
+  void* array_block = (u8*)state + struct_requirement;
   state->registered_geometries = (GeometryRef*)array_block;
 
   // Invalidate all geometries in the array.
@@ -158,7 +155,7 @@ void destroy_geometry(Geometry* g) {
 
   // Release the material.
   if (g->material && cstr_length(g->material->name) > 0) {
-    material_sys_release(g->material->name);
+    material_sys_release(str_cstr(g->material->name));
     g->material = 0;
   }
 }

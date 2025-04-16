@@ -1,6 +1,5 @@
 #pragma once
-
-#include "defines.h"
+#include "lib.h"
 
 struct EventContext {
   // 128 bytes
@@ -23,16 +22,14 @@ struct EventContext {
   } data;
 };
 
-struct Arena;
-
 // Should return true if handled
-using PFN_On_Event  = b8(*)(u16 code, void* sender, void* listener_inst, EventContext data);
+using PFN_On_Event = b32 (*)(u32 code, void* sender, void* listener_inst, EventContext data);
 
-b8 event_init(Arena* arena);
+void event_init(Arena* arena);
 
-KAPI b8 event_register(u16 code, void* listener, PFN_On_Event  on_event);
-KAPI b8 event_unregister(u16 code, void* listener, PFN_On_Event  on_event);
-KAPI b8 event_fire(u16 code, void* sender, EventContext on_event);
+KAPI b32 event_register(u32 code, void* listener, PFN_On_Event on_event);
+KAPI b32 event_unregister(u32 code, void* listener, PFN_On_Event on_event);
+KAPI b32 event_fire(u32 code, void* sender, EventContext on_event);
 
 // System the application down on the next frame 255
 enum SystemEventCode {

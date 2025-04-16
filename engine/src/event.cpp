@@ -1,8 +1,5 @@
 #include "event.h"
 
-#include <logger.h>
-#include <memory.h>
-
 struct Array {
   u32 res;
   u32 pos;
@@ -27,21 +24,17 @@ struct EventSystemState {
   // Lookup table for event codes.
   b8 is_initialized;
   EventCodeEntry registered[MAX_MESSAGE_CODES];
-  void* memory;
 };
 
 global EventSystemState* state;
 
-b8 event_init(Arena* arena) {
+void event_init(Arena* arena) {
   u64 memory_reserved = KB(10);
-  u64 memory_requirement = sizeof(EventSystemState) + memory_reserved;
+  u64 memory_requirement = sizeof(EventSystemState);
   
   state = push_buffer(arena, EventSystemState, memory_requirement);
   state->is_initialized = true;
-  state->arena = (Arena*)&state->memory;
-  state->arena->res = memory_reserved;
-  
-  return true;
+  state->arena = arena_alloc(arena, memory_reserved);
 }
 
 // void event_shutdown() {
@@ -54,15 +47,15 @@ b8 event_init(Arena* arena) {
 //   }
 // }
 
-b8 event_register(u16 code, void* listener, PFN_On_Event  on_event) {
+b32 event_register(u32 code, void* listener, PFN_On_Event on_event) {
   if (state->is_initialized == false) {
     return false;
   }
   
   if (state->registered[code].events == 0) {
     // state->registered[code].events = push_array(state->arena, RegisteredEvent, 4);
-    state->registered[code].events = push_array(state->arena, RegisteredEvent, 4);
-    state->registered[code].array = {.res = 4, .pos = 0};
+    state->registered[code].events = push_array(state->arena, RegisteredEvent, 5);
+    state->registered[code].array = {.res = 5, .pos = 0};
   }
   
   u64 register_count = state->registered[code].array.pos;
@@ -89,7 +82,7 @@ b8 event_register(u16 code, void* listener, PFN_On_Event  on_event) {
   return true;
 }
 
-b8 event_unregister(u16 code, void* listener, PFN_On_Event on_event) {
+b32 event_unregister(u32 code, void* listener, PFN_On_Event on_event) {
   // On nothing is registered for the code, boot out.
   if (state->registered[code].array.pos == 0) {
     Warn("you're trying to unregister nothing!");
@@ -110,7 +103,7 @@ b8 event_unregister(u16 code, void* listener, PFN_On_Event on_event) {
   return false;
 }
 
-b8 event_fire(u16 code, void* sender, EventContext context) {
+b32 event_fire(u32 code, void* sender, EventContext context) {
   if (state->is_initialized == false) {
     return false;
   }

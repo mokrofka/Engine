@@ -7,4 +7,4 @@ void vk_device_destroy();
 
 VK_SwapchainSupportInfo vk_device_query_swapchain_support(VkPhysicalDevice physical_device);
 
-b8 vk_device_detect_depth_format(VK_Device* device);
+void vk_device_detect_depth_format(VK_Device* device);

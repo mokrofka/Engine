@@ -1,5 +1,4 @@
 #pragma once
-
 #include "defines.h"
 
 union v2 {
@@ -13,7 +12,7 @@ union v2 {
     };
   };
   v2 () = default;
-  v2(f32 x_, f32 y_) { x = x_, y = y_; }
+  Inline v2(f32 x_, f32 y_) { x = x_, y = y_; }
 };
 
 union v2i {
@@ -27,7 +26,7 @@ union v2i {
     };
   };
   v2i () = default;
-  v2i(i32 x_, i32 y_) { x = x_, y = y_; }
+  Inline v2i(i32 x_, i32 y_) { x = x_, y = y_; }
 };
 
 union v3 {
@@ -44,7 +43,7 @@ union v3 {
     };
   };
   v3 () = default;
-  v3(f32 x_, f32 y_, f32 z_) { x = x_, y = y_, z = z_; }
+  Inline v3(f32 x_, f32 y_, f32 z_) { x = x_, y = y_, z = z_; }
 };
 
 union v4 {
@@ -57,14 +56,14 @@ union v4 {
       f32 y,g,v;
     };
     union {
-      f32 z,b,p;
+      f32 z,b;
     };
     union {
-      f32 w,a,q;
+      f32 w,a;
     };
   };
   v4 () = default;
-  v4(f32 x_, f32 y_, f32 z_, f32 w_) { x = x_, y = y_, z = z_, w = w_; }
+  Inline v4(f32 x_, f32 y_, f32 z_, f32 w_) { x = x_, y = y_, z = z_, w = w_; }
 };
 
 typedef v4 quat;
@@ -83,4 +82,11 @@ struct Vertex3D {
 struct Rect {
   u32 x, y;
   u32 w, h;
+};
+
+enum Axis{
+  Axis_X,
+  Axis_Y,
+  Axis_Z,
+  Axis_W
 };

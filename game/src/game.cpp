@@ -6,14 +6,10 @@
 #include <render/r_frontend.h>
 
 #include <event.h>
-
-#include <logger.h>
-#include <memory.h>
 #include <input.h>
-#include <maths.h>
 
 struct GameState {
-  struct Arena* arena;
+  Arena* arena;
   
   mat4 view;
   v3 camera_position;
@@ -51,17 +47,31 @@ internal void camera_pitch(f32 amount) {
 
 void application_init(Application* game_inst) {
   game_inst->state = push_struct(game_inst->arena, GameState);
-  state = (GameState*)game_inst->state;
+  Assign(state, game_inst->state);
   state->arena = arena_alloc(game_inst->arena, MB(400));
   
   state->camera_position = v3(0,0,30.0f);
   state->camera_euler = v3_zero();
   
   state->camera_view_dirty = true;
+  
+  Scratch scratch;
+  u8* buff = push_buffer(scratch, u8, KB(1));
+  FreeList fl;
+  free_list_init(fl, buff, KB(1));
+  
+  u32 size = 256;
+  void* data1 = free_list_alloc(fl, 1, 8);
+  void* data2 = free_list_alloc(fl, 1, 8);
+  void* data3 = free_list_alloc(fl, 1, 8);
+  
+  // free_list_free(&fl, data1);
+  // free_list_free(&fl, data2);
+  // free_list_free(&fl, data3);
 }
 
 void application_update(Application* game_inst) {
-  state = (GameState*)game_inst->state;
+  Assign(state, game_inst->state);
   f32 delta_time = game_inst->delta_time;
   // TODO temp
   if (input_is_key_up(KEY_T) && input_was_key_down(KEY_T)) {
@@ -71,6 +81,7 @@ void application_update(Application* game_inst) {
   }
   
   f32 rotation_speed = 2.0f;
+
   // HACK temp back to move camera around
   if (input_is_key_down(KEY_A) || input_is_key_down(KEY_LEFT)) {
     camera_yaw(rotation_speed * game_inst->delta_time);

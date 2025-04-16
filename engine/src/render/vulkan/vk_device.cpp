@@ -1,7 +1,5 @@
 #include "vk_device.h"
 
-#include "str.h"
-
 struct VK_PhysicalDeviceRequirements {
   b8 graphics; 
   b8 present;
@@ -71,6 +69,7 @@ VK_Device vk_device_create() {
   // TODO: should be config driven
   VkPhysicalDeviceFeatures device_features = {};
   device_features.samplerAnisotropy = VK_TRUE; // Request anistrophy
+  device_features.fillModeNonSolid = VK_TRUE; // Request wireframe
   
   VkDeviceCreateInfo device_create_info = {VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
   device_create_info.queueCreateInfoCount = index_count;
@@ -117,11 +116,7 @@ VK_Device vk_device_create() {
   VkCommandPoolCreateInfo pool_create_info = {VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
   pool_create_info.queueFamilyIndex = device.graphics_queue_index;
   pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-  VK_CHECK(vkCreateCommandPool(
-    device.logical_device, 
-    &pool_create_info, 
-    vk->allocator, 
-    &device.gfx_cmd_pool));
+  VK_CHECK(vkCreateCommandPool(device.logical_device, &pool_create_info, vk->allocator, &device.gfx_cmd_pool));
   Info("Graphics command pool created.");
 
   return device;
@@ -184,7 +179,6 @@ VK_SwapchainSupportInfo vk_device_query_swapchain_support(VkPhysicalDevice physi
     0));
   if (result.format_count != 0) {
     if (!result.formats) {
-      // TODO: free memory
       result.formats = push_array(vk->arena, VkSurfaceFormatKHR, result.format_count);
     }
     VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(
@@ -202,7 +196,6 @@ VK_SwapchainSupportInfo vk_device_query_swapchain_support(VkPhysicalDevice physi
     0));
   if (result.present_mode_count != 0) {
     if (!result.present_modes) {
-      // TODO: free memory
       result.present_modes = push_array(vk->arena, VkPresentModeKHR, result.present_mode_count);
     }
     VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(
@@ -215,7 +208,7 @@ VK_SwapchainSupportInfo vk_device_query_swapchain_support(VkPhysicalDevice physi
   return result;
 }
 
-b8 vk_device_detect_depth_format(VK_Device* device) {
+void vk_device_detect_depth_format(VK_Device* device) {
   // Format candidates
   const u64 candidate_count = 3;
   VkFormat candidates[3] = {
@@ -230,14 +223,14 @@ b8 vk_device_detect_depth_format(VK_Device* device) {
 
     if ((properties.linearTilingFeatures & flags) == flags) {
       device->depth_format = candidates[i];
-      return true;
+      return;
     } else if ((properties.optimalTilingFeatures & flags) == flags) {
       device->depth_format = candidates[i];
-      return true;
+      return;
     }
   }
 
-  return false;
+  AssertMsg(false, "Failed to find a supported format!");
 }
 
 internal VK_Device select_physical_device() {
@@ -276,11 +269,11 @@ internal VK_Device select_physical_device() {
     // darray_push(requirements.device_extension_names, &VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
     VK_PhysicalDeviceQueueFamilyInfo queue_info = physical_device_meets_requirements(
-        physical_devices[i],
-        properties,
-        features,
-        requirements,
-        &device.swapchain_support);
+      physical_devices[i],
+      properties,
+      features,
+      requirements,
+      &device.swapchain_support);
 
     Info("Selected device: '%s'.", properties.deviceName);
     // GPU type, etc.
@@ -339,9 +332,7 @@ internal VK_Device select_physical_device() {
   }
   
   // Ensure a device was selected
-  if (!device.physical_device) {
-    Error("No physical devices were found which meet the requirements.");
-  }
+  AssertMsg(device.physical_device, "No physical devices were found which meet the requirements.");
   
   Info("Physical device selected.");
   return device;
@@ -433,10 +424,10 @@ internal VK_PhysicalDeviceQueueFamilyInfo physical_device_meets_requirements(
 
     // Query swapchain support.
     *out_swapchain_support = vk_device_query_swapchain_support(device);
-    if (out_swapchain_support->format_count < 1 || out_swapchain_support->present_mode_count < 1) {
-      Error("Required swapchain support not present, skipping device.");
-    }
+    AssertMsg(!(out_swapchain_support->format_count < 1) || !(out_swapchain_support->present_mode_count < 1),
+              "Required swapchain support not present, skipping device.");
 
+    #define ScratchP Scratch*
     // Device extensions.
     {
       Scratch scratch;
@@ -445,7 +436,7 @@ internal VK_PhysicalDeviceQueueFamilyInfo physical_device_meets_requirements(
         VkExtensionProperties* available_extensions = 0;
         VK_CHECK(vkEnumerateDeviceExtensionProperties(device, 0, &available_extension_count, 0))
         if (available_extension_count != 0) {
-          available_extensions = push_array(scratch, VkExtensionProperties, available_extension_count);
+          available_extensions = push_array(scratch.arena, VkExtensionProperties, available_extension_count);
           VK_CHECK(vkEnumerateDeviceExtensionProperties(device, 0, &available_extension_count, available_extensions));
         }
 
@@ -453,28 +444,23 @@ internal VK_PhysicalDeviceQueueFamilyInfo physical_device_meets_requirements(
         for (i32 i = 0; i < required_extension_cunt; ++i) {
           b8 found = false;
           for (u32 j = 0; j < available_extension_count; ++j) {
-            if (cstr_equal(requirements.device_extension_names[i], available_extensions[j].extensionName)) {
+            if (cstr_match(requirements.device_extension_names[i], available_extensions[j].extensionName)) {
               found = true;
               break;
             }
           }
 
-          if (!found) {
-            Error("Required extension not found: '%s', skipping device.", requirements.device_extension_names);
-          }
+          Assert(found);
         }
       }
     }    
 
-    // Sample anisotropy
-    if (requirements.sampler_anisotropy && !features.samplerAnisotropy) {
-      Error("Device does not support sampleAnisotropy, skipping.");
-    }
+    Assert(requirements.sampler_anisotropy && features.samplerAnisotropy);
     
     // Device meets all requirements.
     return queue_info;
   }
   
-  Error("Device doesn't have needed queues.");
-  ReturnZeroStruct(&queue_info);
+  AssertMsg(false, "Device doesn't have needed queues.");
+  VK_PhysicalDeviceQueueFamilyInfo r = {}; return r;
 }

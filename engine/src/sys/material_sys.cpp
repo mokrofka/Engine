@@ -1,17 +1,7 @@
-#include "material_system.h"
+#include "material_sys.h"
 
-#include "containers/hashtable.h"
 #include "render/r_frontend.h"
-#include "sys/texture_system.h"
-
-#include "logger.h"
-#include "str.h"
-#include "memory.h"
-#include "maths.h"
-
-// TODO temp resource system
-#include "os.h"
-// end temp
+#include "sys/texture_sys.h"
 
 struct MaterialSystemState {
   MaterialSystemConfig config;
@@ -33,7 +23,7 @@ global MaterialSystemState* state;
 internal void create_default_material();
 internal void load_material(MaterialConfig config, Material* m);
 internal void destroy_material(Material* m);
-internal void load_configuration_file(char* path, MaterialConfig* out_config);
+internal MaterialConfig load_configuration_file(String path);
 
 void material_system_init(Arena* arena, MaterialSystemConfig config) {
   AssertMsg(config.max_material_count != 0, "material_system_initialize - config.max_material_count must be > 0.");
@@ -89,17 +79,16 @@ void material_system_shutdown() {
 }
 
 Material* material_system_acquire(char* name) {
+  Scratch scratch;
   // Load the given material configuration from disk.
-  MaterialConfig config;
 
   // Load file from disk
   // TODO: Should be able to be located anywhere.
   char* format_str = "assets/materials/%s.%s";
-  char full_file_path[512];
 
   // TODO: try different extensions
-  str_format(full_file_path, format_str, name, "kmt");
-  load_configuration_file(full_file_path, &config);
+  String file_path = push_strf(scratch.arena, format_str, name, "kmt");
+  MaterialConfig config = load_configuration_file(file_path);
 
   // Now acquire from loaded config.
   return material_system_acquire_from_config(config);
@@ -107,12 +96,12 @@ Material* material_system_acquire(char* name) {
 
 Material* material_system_acquire_from_config(MaterialConfig config) {
   // Return default material.
-  if (cstr_equali(config.name, DEFAULT_MATERIAL_NAME)) {
+  if (cstr_matchi(config.name, DEFAULT_MATERIAL_NAME)) {
     return &state->default_material;
   }
 
   MaterialRef ref;
-  hashtable_get(&state->registered_material_table, config.name, &ref);
+  hashtable_get(&state->registered_material_table, str_cstr(config.name), &ref);
   // This can only be changed the first time a material is loaded.
   if (ref.reference_count == 0) {
     ref.auto_release = config.auto_release;
@@ -154,7 +143,7 @@ Material* material_system_acquire_from_config(MaterialConfig config) {
   }
 
   // Update the entry.
-  hashtable_set(&state->registered_material_table, config.name, &ref);
+  hashtable_set(&state->registered_material_table, str_cstr(config.name), &ref);
   return &state->registered_materials[ref.handle];
 
   // NOTE: This would only happen in the event something went wrong with the state.
@@ -162,9 +151,9 @@ Material* material_system_acquire_from_config(MaterialConfig config) {
   return 0;
 }
 
-void material_sys_release(char* name) {
+void material_sys_release(String name) {
   // Ignore release requests for the default material.
-  if (cstr_equali(name, DEFAULT_MATERIAL_NAME)) {
+  if (str_matchi(name, str_lit(DEFAULT_MATERIAL_NAME))) {
     return;
   }
   MaterialRef ref;
@@ -208,7 +197,7 @@ internal void load_material(MaterialConfig config, Material* m) {
   // Diffuse map
   if (cstr_length(config.diffuse_map_name) > 0) {
     m->diffuse_map.use = TEXTURE_USE_MAP_DIFFUSE;
-    m->diffuse_map.texture = texture_system_acquire(config.diffuse_map_name, true);
+    m->diffuse_map.texture = texture_system_acquire(str_cstr(config.diffuse_map_name), true);
     if (!m->diffuse_map.texture) {
       Warn("Unable to load texture '%s' for material '%s', using default.", config.diffuse_map_name, m->name);
       m->diffuse_map.texture = texture_system_get_default_texture();
@@ -230,7 +219,7 @@ internal void destroy_material(Material* m) {
 
   // Release texture references.
   if (m->diffuse_map.texture) {
-    texture_system_release(m->diffuse_map.texture->name);
+    texture_system_release(str_cstr(m->diffuse_map.texture->name));
   }
 
   // Release renderer resources.
@@ -255,11 +244,14 @@ internal void create_default_material() {
   r_create_material(&state->default_material);
 }
 
-internal void load_configuration_file(char* path, MaterialConfig* out_config) {
+internal MaterialConfig load_configuration_file(String path) {
   Scratch scratch;
-  OS_File f = os_file_open(cstr(path), FILE_MODE_READ);
+  MaterialConfig out_config = {};
+  OS_Handle f = os_file_open(path, OS_AccessFlag_Read);
   if (!f.u64) {
     Error("load_configuration_file - unable to open material file for reading: '%s'.", path);
+    MemCopy(out_config.name, DEFAULT_MATERIAL_NAME, MATERIAL_NAME_MAX_LENGTH);
+    return out_config;
   }
   u64 file_size = os_file_size(f);
   u8* buffer = push_buffer(scratch.arena, u8, file_size);
@@ -301,18 +293,18 @@ internal void load_configuration_file(char* path, MaterialConfig* out_config) {
     String trimmed_value = str_trim(value);
 
     // Process the variable.
-    if (str_equal(trimmed_var_name, str_lit("version"))) {
+    if (str_match(trimmed_var_name, str_lit("version"))) {
       // TODO: version
     // } else if (str_equal(trimmed_var_name, str_lit("name"))) {
-    } else if (str_equal(trimmed_var_name, str_lit("name"))) {
-      str_copy(out_config->name, trimmed_value);
-    } else if (str_equal(trimmed_var_name, str_lit("diffuse_map_name"))) {
-      str_copy(out_config->diffuse_map_name, trimmed_value);
-    } else if (str_equal(trimmed_var_name, str_lit("diffuse_color"))) {
+    } else if (str_match(trimmed_var_name, str_lit("name"))) {
+      str_copy(out_config.name, trimmed_value);
+    } else if (str_match(trimmed_var_name, str_lit("diffuse_map_name"))) {
+      str_copy(out_config.diffuse_map_name, trimmed_value);
+    } else if (str_match(trimmed_var_name, str_lit("diffuse_color"))) {
       // Parse the colour
-      if (!str_to_v4(trimmed_value.str, &out_config->diffuse_color)) {
+      if (!str_to_v4(trimmed_value.str, &out_config.diffuse_color)) {
         Warn("Error parsing diffuse_colour in file '%s'. Using default of white instead.", path);
-        out_config->diffuse_color = v4_one(); // white
+        out_config.diffuse_color = v4_one(); // white
       }
     }
 
@@ -320,11 +312,12 @@ internal void load_configuration_file(char* path, MaterialConfig* out_config) {
 
     line_number++;
   }
-  if (out_config->name[0] == 0) {
+  if (out_config.name[0] == 0) {
     Error("material doesn't have name");
   }
-  if (out_config->diffuse_map_name[0] == 0) {
+  if (out_config.diffuse_map_name[0] == 0) {
     Error("material doesn't have diffuse_map_name");
   }
   os_file_close(f);
+  return out_config;
 }

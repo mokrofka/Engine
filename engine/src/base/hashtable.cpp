@@ -1,16 +1,13 @@
-#include "hashtable.h"
+#include "lib.h"
 
-#include "memory.h"
-#include "logger.h"
-
-u64 hash_name(const char* name, u32 element_count) {
+u64 hash_name(String name, u32 element_count) {
   // A multipler to use when generating a hash. Prime to hopefully avoid collisions
-  local const u64 multiplier = 97;
+  #define multiplier 97
   
-  const u8* us;
+  u8* us = name.str;
   u64 hash = 0;
   
-  for (us = (const u8*)name; *us; ++us) {
+  for (i32 i = 0; i < name.size; ++i, ++us) {
     hash = hash * multiplier + *us;
   }
   
@@ -20,7 +17,7 @@ u64 hash_name(const char* name, u32 element_count) {
   return hash;
 }
 
-void hashtable_create(u64 element_size, u32 element_count, void* memory, b8 is_pointer_type, Hashtable* hashtable) {
+void hashtable_create(u64 element_size, u32 element_count, void* memory, b32 is_pointer_type, Hashtable* hashtable) {
   AssertMsg(memory && hashtable, "hashtable_create failed! Pointer to memory and out_hashtable are required");
   AssertMsg(element_count && element_size, "element_size and element_count must be a positive non-zero value");
   
@@ -36,32 +33,32 @@ void hashtable_destroy(Hashtable* table) {
   MemZeroStruct(table);
 }
 
-void hashtable_set(Hashtable* table, const char* name, void* value) {
-  AssertMsg(table && name && value, "hashtable_set requires table, name and value to exist.")
+void hashtable_set(Hashtable* table, String name, void* value) {
+  AssertMsg(table && name.str && value, "hashtable_set requires table, name and value to exist.")
   AssertMsg(!table->is_pointer_type, "hashtable_set should not be used with tables that have pointer to types. Use hashtable_ptr instead.");
   
   u64 hash = hash_name(name, table->element_count);
   MemCopy(table->memory + (table->element_size*hash), value, table->element_size);
 }
 
-void hashtable_set_ptr(Hashtable* table, const char* name, void** value) {
-  AssertMsg(table && name, "hashtable_set requires table and name to exist.");
+void hashtable_set_ptr(Hashtable* table, String name, void** value) {
+  AssertMsg(table && name.str, "hashtable_set requires table and name to exist.");
   AssertMsg(!table->is_pointer_type, "hashtable_set should not be used with tables that have pointer to types. Use hashtable_ptr instead.");
   
   u64 hash = hash_name(name, table->element_count);
   ((void**)table->memory)[hash] = value ? *value : 0;
 }
 
-void hashtable_get(Hashtable* table, const char* name, void* out_value) {
-  AssertMsg(table && name && out_value, "hashtable_set requires table, name and out_value to exist.");
+void hashtable_get(Hashtable* table, String name, void* out_value) {
+  AssertMsg(table && name.str && out_value, "hashtable_set requires table, name and out_value to exist.");
   AssertMsg(!table->is_pointer_type, "hashtable_set should not be used with tables that have pointer to types. Use hashtable_ptr instead.");
   
   u64 hash = hash_name(name, table->element_count);
   MemCopy(out_value, table->memory + (table->element_size * hash), table->element_size);
 }
 
-void hashtable_get_ptr(Hashtable* table, const char* name, void** out_value) {
-  AssertMsg(table && name && out_value, "hashtable_set requires table, name and out_value to exist.");
+void hashtable_get_ptr(Hashtable* table, String name, void** out_value) {
+  AssertMsg(table && name.str && out_value, "hashtable_set requires table, name and out_value to exist.");
   AssertMsg(!table->is_pointer_type, "hashtable_set should not be used with tables that have pointer to types. Use hashtable_ptr instead.");
   
   u64 hash = hash_name(name, table->element_count);

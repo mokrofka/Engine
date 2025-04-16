@@ -4,9 +4,7 @@
 #include "render/vulkan/vk_pipeline.h"
 #include "render/vulkan/vk_buffer.h"
 
-#include "sys/texture_system.h"
-
-#include "maths.h"
+#include "sys/texture_sys.h"
 
 #define BUILTIN_SHADER_NAME_MATERIAL "Builtin.MaterialShader"
 
@@ -15,17 +13,16 @@ VK_MaterialShader vk_material_shader_create(VK_Context* vk) {
 
   char stage_type_strs[MATERIAL_SHADER_STAGE_COUNT][5] = {"vert", "frag"};
   VkShaderStageFlagBits stage_types[MATERIAL_SHADER_STAGE_COUNT] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
-  
-  for (u32 i = 0; i < MATERIAL_SHADER_STAGE_COUNT; ++i) {
+
+  Loop (i, MATERIAL_SHADER_STAGE_COUNT) {
     shader.stages[i] = shader_module_create(BUILTIN_SHADER_NAME_MATERIAL, stage_type_strs[i], stage_types[i]);
   }
   
   // Global Descriptors
-  VkDescriptorSetLayoutBinding g_ubo_layout_binding;
+  VkDescriptorSetLayoutBinding g_ubo_layout_binding = {};
   g_ubo_layout_binding.binding = 0;
   g_ubo_layout_binding.descriptorCount = 1;
   g_ubo_layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  g_ubo_layout_binding.pImmutableSamplers = 0;
   g_ubo_layout_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
   
   VkDescriptorSetLayoutCreateInfo g_layout_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
@@ -34,12 +31,12 @@ VK_MaterialShader vk_material_shader_create(VK_Context* vk) {
   VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &g_layout_info, vk->allocator, &shader.global_descriptor_set_layout));
   
   // Global descriptor pool: Used for global items such as view/projection matrix
-  VkDescriptorPoolSize g_pool_size;
+  VkDescriptorPoolSize g_pool_size = {};
   g_pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  g_pool_size.descriptorCount = vk->swapchain.image_count;
-  
+  g_pool_size.descriptorCount = 3;
+
   VkDescriptorPoolCreateInfo g_pool_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-  g_pool_info.poolSizeCount = 1; // number of VkDescriptorPoolSize objects
+  g_pool_info.poolSizeCount = 1;
   g_pool_info.pPoolSizes = &g_pool_size;
   g_pool_info.maxSets = vk->swapchain.image_count;
   VK_CHECK(vkCreateDescriptorPool(vkdevice, &g_pool_info, vk->allocator, &shader.global_descriptor_pool));
@@ -48,22 +45,23 @@ VK_MaterialShader vk_material_shader_create(VK_Context* vk) {
   
   // Local/Object Descriptors
   const u32 local_sample_count = 1;
-  VkDescriptorType descriptor_types[VK_MATERIAL_SHADER_DESCRIPTOR_COUNT  ] = {
-      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         // Binding 0 - uniform buffer
-      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, // Binding 1 - Diffuse sampler layout.
+  VkDescriptorType descriptor_types[VK_MATERIAL_SHADER_DESCRIPTOR_COUNT] = {
+    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         // Binding 0 - uniform buffer
+    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, // Binding 1 - Diffuse sampler layout.
   };
-  VkDescriptorSetLayoutBinding bindings[VK_MATERIAL_SHADER_DESCRIPTOR_COUNT  ] = {};
-  for (u32 i = 0; i < VK_MATERIAL_SHADER_DESCRIPTOR_COUNT  ; ++i) {
+  
+  VkDescriptorSetLayoutBinding bindings[VK_MATERIAL_SHADER_DESCRIPTOR_COUNT] = {};
+  Loop (i, VK_MATERIAL_SHADER_DESCRIPTOR_COUNT) {
     bindings[i].binding = i;
     bindings[i].descriptorCount = 1;
     bindings[i].descriptorType = descriptor_types[i];
     bindings[i].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
   }
-  
+
   VkDescriptorSetLayoutCreateInfo layout_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-  layout_info.bindingCount = VK_MATERIAL_SHADER_DESCRIPTOR_COUNT  ;
+  layout_info.bindingCount = VK_MATERIAL_SHADER_DESCRIPTOR_COUNT;
   layout_info.pBindings = bindings;
-  VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &layout_info, 0, &shader.obj_descriptor_set_layout));
+  VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &layout_info, vk->allocator, &shader.obj_descriptor_set_layout));
   
   // Local/Object descriptor pool: Used for object-specific items like diffuse color
   VkDescriptorPoolSize obj_pool_sizes[2];
@@ -104,14 +102,14 @@ VK_MaterialShader vk_material_shader_create(VK_Context* vk) {
   VkVertexInputAttributeDescription attribute_desriptions[ATTRIBUTE_COUNT];
   // Position, texcoord
   VkFormat formats[ATTRIBUTE_COUNT] = {
-    VK_FORMAT_R32G32B32_SFLOAT,
-    VK_FORMAT_R32G32_SFLOAT
+    VK_FORMAT_R32G32B32_SFLOAT, // v3
+    VK_FORMAT_R32G32_SFLOAT     // v2
   };
   u64 sizes[ATTRIBUTE_COUNT] = {
     sizeof(v3),
     sizeof(v2)
   };
-  for (u32 i = 0; i < ATTRIBUTE_COUNT; ++i) {
+  Loop (i, ATTRIBUTE_COUNT) {
     attribute_desriptions[i].binding = 0;  // binding index - should match binding desc
     attribute_desriptions[i].location = i; // attrib location
     attribute_desriptions[i].format = formats[i];
@@ -128,27 +126,27 @@ VK_MaterialShader vk_material_shader_create(VK_Context* vk) {
   // Stages
   // NOTE Should match the number of shader.stages
   VkPipelineShaderStageCreateInfo stage_create_infos[MATERIAL_SHADER_STAGE_COUNT] = {};
-  for (u32 i = 0; i < MATERIAL_SHADER_STAGE_COUNT; ++i) {
-    stage_create_infos[i].sType = shader.stages[i].shader_state_create_info.sType;
+  Loop (i, MATERIAL_SHADER_STAGE_COUNT) {
+    // stage_create_infos[i].sType = shader.stages[i].shader_state_create_info.sType;
     stage_create_infos[i] = shader.stages[i].shader_state_create_info;
   }
 
   shader.pipeline = vk_graphics_pipeline_create(
-      vk->renderpass,
-      ATTRIBUTE_COUNT,
-      attribute_desriptions,
-      descriptor_set_layout_count,
-      layouts,
-      MATERIAL_SHADER_STAGE_COUNT,
-      stage_create_infos,
-      viewport,
-      scissor,
-      false);
+    vk->renderpass,
+    ATTRIBUTE_COUNT,
+    attribute_desriptions,
+    descriptor_set_layout_count,
+    layouts,
+    MATERIAL_SHADER_STAGE_COUNT,
+    stage_create_infos,
+    viewport,
+    scissor,
+    true);
 
   // Create uniform buffer
   shader.global_uniform_buffer = vk_buffer_create(
     sizeof(GlobalUniformObject),
-    VkBufferUsageFlagBits(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
+    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
     true);
   
@@ -167,7 +165,7 @@ VK_MaterialShader vk_material_shader_create(VK_Context* vk) {
   // Create the object uniform buffer
   shader.obj_uniform_buffer = vk_buffer_create(
     sizeof(MaterialUniformObject) * VK_MAX_MATERIAL_COUNT,
-    VkBufferUsageFlagBits(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
+    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
     true);
 
@@ -225,7 +223,7 @@ void vk_material_shader_update_global_state(VkCommandBuffer cmd, VK_MaterialShad
   
   // Update descriptor sets
   VkWriteDescriptorSet descriptor_write = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-  descriptor_write.dstSet = shader->global_descriptor_sets[image_index];
+  descriptor_write.dstSet = global_descriptor;
   descriptor_write.dstBinding = 0;
   descriptor_write.dstArrayElement = 0;
   descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -236,10 +234,9 @@ void vk_material_shader_update_global_state(VkCommandBuffer cmd, VK_MaterialShad
 }
 
 void vk_material_shader_set_model(VkCommandBuffer cmd, VK_MaterialShader* shader, mat4 model) {
-  if (shader) {
-    u32 image_index = vk->frame.image_index;
-    vkCmdPushConstants(cmd, shader->pipeline.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4), &model);
-  }
+  Assert(shader);
+  u32 image_index = vk->frame.image_index;
+  vkCmdPushConstants(cmd, shader->pipeline.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4), &model);
 }
 
 void vk_material_shader_apply_material(VkCommandBuffer cmd, VK_MaterialShader* shader, Material* material) {

@@ -1,12 +1,8 @@
 #pragma once
 #include "vk_types.h"
 
-VK_Buffer vk_buffer_create(
-  u64 size,
-  VkBufferUsageFlagBits usage,
-  u32 memory_property_flags,
-  b8 bind_on_create);
-  
+VK_Buffer vk_buffer_create(u64 size, u32 usage, u32 memory_property_flags, b8 bind_on_create);
+
 void vk_buffer_destroy(VK_Buffer* buffer);
 
 b8 vk_buffer_resize(

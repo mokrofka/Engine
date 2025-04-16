@@ -1,8 +1,6 @@
-#include "os.h"
+#include "lib.h"
 
-#include "memory.h"
-#include "logger.h"
-
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 i32 global_error;
 
@@ -84,6 +82,7 @@ void os_window_create(WindowConfig config) {
   window_style |= WS_MAXIMIZEBOX;
   window_style |= WS_MINIMIZEBOX;
   window_style |= WS_THICKFRAME;
+  window_style |= WS_OVERLAPPEDWINDOW;
   
   // Obtain the size of the border.
   RECT border_rect = {0, 0, 0, 0};
@@ -98,10 +97,10 @@ void os_window_create(WindowConfig config) {
   window_height += border_rect.bottom - border_rect.top;
 
   HWND handle = CreateWindowExA(
-      window_ex_style, "kohi_window_class", (char*)config.name.str,
-      window_style, window_x, window_y, window_width, window_height,
-      0, 0, state->instance, 0);
-  
+    window_ex_style, "kohi_window_class", (char*)config.name.str,
+    window_style, window_x, window_y, window_width, window_height,
+    0, 0, state->instance, 0);
+
   if (handle == 0) {
     MessageBoxA(NULL, "window creating failed!", "Error!", MB_ICONEXCLAMATION | MB_OK);
     
@@ -114,7 +113,7 @@ void os_window_create(WindowConfig config) {
   i32 show_window_command_flags = should_activate ? SW_SHOW :SW_SHOWNOACTIVATE;
   // If initially minimmized, use SW_MINIMIZE : SW_SHOWMINNOACTIVE;
   // If initially minimmized, use SW_SHOWMAXIMIZED : SW_MAXIMIZE;
-  ShowWindow((HWND)window->hwnd, show_window_command_flags);
+  // ShowWindow((HWND)window->hwnd, show_window_command_flags);
 }
 
 void os_platform_shutdown() {
@@ -136,7 +135,7 @@ void os_pump_messages() {
 #include <vulkan/vulkan_win32.h>
 
 struct VK_Context {
-  struct Arena* arena;
+  Arena* arena;
   
   VkInstance instance;
   VkAllocationCallbacks* allocator;
@@ -167,7 +166,7 @@ void* vk_os_create_surface() {
 }
 
 #define BaseAddress (void*)TB(2)
-void* os_allocate(u64 size, b8 at_base) {
+void* os_allocate(u64 size, b32 at_base) {
   return VirtualAlloc(BaseAddress, size, MEM_RESERVE | MEM_COMMIT,
                       PAGE_READWRITE);
 }
@@ -177,89 +176,58 @@ void* allocate(u64 size) {
                       PAGE_READWRITE);
 }
 
-void os_free(void* block, b8 aligned) {
+void os_free(void* block, b32 aligned) {
   VirtualFree(block, 0, 0);
 }
 
-void* _platform_memory_zero(void* block, u64 size) {
-  return memset(block, 0, size);
-}
+// void* _platform_memory_zero(void* block, u64 size) {
+//   return memset(block, 0, size);
+// }
 
-void* _platform_memory_copy(void* dest, const void* source, u64 size) {
-  return memcpy(dest, source, size);
-}
+// void* _platform_memory_copy(void* dest, const void* source, u64 size) {
+//   return memcpy(dest, source, size);
+// }
 
-void* _platform_memory_set(void* dest, i32 value, u64 size) {
-  return memset(dest, value, size);
-}
+// void* _platform_memory_set(void* dest, i32 value, u64 size) {
+//   return memset(dest, value, size);
+// }
 
-b8 _platform_memory_compare(void* a, void* b, u64 size) {
-  return memcmp(a, b, size) ? 0 : 1;
-}
+// b8 _platform_memory_compare(void* a, void* b, u64 size) {
+//   return memcmp(a, b, size) ? 0 : 1;
+// }
 
-void os_console_write(char* message, u8 color) {
+void os_console_write(String message, u32 color) {
   HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
   // FATAL,ERROR,WARN,INFO,DEBUG,TRACE
-  const u8 levels[6] = {64, 4, 6, 2, 1, 8};
+  u32 levels[6] = {64, 4, 6, 2, 1, 8};
   SetConsoleTextAttribute(console_handle, levels[color]);
-  OutputDebugStringA(message);
-  u64 length = strlen(message);
+  OutputDebugStringA((char*)message.str);
   LPDWORD number_written = 0;
-  WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), message, (DWORD)length, number_written, 0);
+  WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), message.str, message.size, number_written, 0);
 }
 
-void os_console_write_error(char* message, u8 color) {
+void os_console_write_error(String message, u32 color) {
   HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
   // FATAL,ERROR,WARN,INFO,DEBUG,TRACE
-  const u8 levels[6] = {64, 4, 6, 2, 1, 8};
+  u32 levels[6] = {64, 4, 6, 2, 1, 8};
   SetConsoleTextAttribute(console_handle, levels[color]);
-  OutputDebugStringA(message);
-  u64 length = strlen(message);
+  OutputDebugStringA((char*)message.str);
   LPDWORD number_written = 0;
-  WriteConsoleA(GetStdHandle(STD_ERROR_HANDLE), message, (DWORD)length, number_written, 0);
+  WriteConsoleA(GetStdHandle(STD_ERROR_HANDLE), message.str, message.size, number_written, 0);
 }
 
-f64 os_now_seconds() {
+void os_message_box(String message) {
+  MessageBox(null, (char*)message.str, "My App", MB_OK);
+}
+
+f32 os_now_seconds() {
   LARGE_INTEGER now_time;
   QueryPerformanceCounter(&now_time);
-  return (f64)now_time.QuadPart * clock_frequency;
+  return (f32)now_time.QuadPart * clock_frequency;
 }
 
 void os_sleep(u64 ms) {
   Sleep(ms);
-}
-
-void* os_library_load(String name) {
-  HMODULE library = LoadLibraryA((char*)name.str);
-  if (!library) {
-    AssertMsg(false, "Didn't load library");
-  }
-
-  return (void*)library;
-}
-
-b8 os_library_unload(DynamicLibrary library) {
-  if (!library.handle) {
-    return false;
-  }
-  BOOL result = FreeLibrary((HMODULE)library.handle);
-  if (result == 0) {
-    return false;
-  }
-  return true;
-}
-
-void* os_library_load_function(String name, DynamicLibrary library) {
-  if (!name.str || !library.handle) {
-    return 0;
-  }
-
-  FARPROC f_addr = GetProcAddress((HMODULE)library.handle, (char*)name.str);
-  if (!f_addr) {
-    AssertMsg(false, "Didn't load function");
-  }
-
-  return (void*)f_addr;
 }
 
 void os_register_process_key(ProcessKeyCallback  callback) {
@@ -297,29 +265,18 @@ v2i os_get_framebuffer_size() {
 
 //////////////////////////////////////////////////////////////////////////
 // file
-  
-b8 os_file_path_exists(String path) {
-  DWORD attributes = GetFileAttributesA((char*)path.str);
-  return (attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY));
-}
 
-u64 os_file_size(OS_File file) {
-  LARGE_INTEGER size;
-  GetFileSizeEx((HANDLE)file.u64, &size);
-  return size.QuadPart;
-}
-
-OS_File os_file_open(String path, FileModes mode) {
-  OS_File result = {};
+OS_Handle os_file_open(String path, OS_AccessFlags mode) {
+  OS_Handle result = {};
   DWORD handle_permission = 0;
   DWORD handle_creation = 0;
 
-  if ((mode & FILE_MODE_READ) != 0 && (mode & FILE_MODE_WRITE) != 0) {
+  if ((mode & OS_AccessFlag_Read) != 0 && (mode & OS_AccessFlag_Write) != 0) {
     handle_permission |= GENERIC_READ | GENERIC_WRITE;
-  } else if ((mode & FILE_MODE_READ) != 0 && (mode & FILE_MODE_WRITE) == 0) {
+  } else if ((mode & OS_AccessFlag_Read) != 0 && (mode & OS_AccessFlag_Write) == 0) {
     handle_permission |= GENERIC_READ;
     handle_creation |= OPEN_EXISTING;
-  } else if ((mode & FILE_MODE_READ) == 0 && (mode & FILE_MODE_WRITE) != 0) {
+  } else if ((mode & OS_AccessFlag_Read) == 0 && (mode & OS_AccessFlag_Write) != 0) {
     handle_permission |= GENERIC_WRITE;
     handle_creation |= CREATE_ALWAYS;
   } else {
@@ -330,72 +287,108 @@ OS_File os_file_open(String path, FileModes mode) {
   HANDLE win32_handle = CreateFileA((char*)path.str, handle_permission,
                                      FILE_SHARE_READ, 0, handle_creation, 0, null);
   if (win32_handle == INVALID_HANDLE_VALUE) {
-    Error("Error opening file: '%s", path);
     return result;
   }
-  
   result.u64 = (u64)win32_handle;
 
   return result;
 }
-
-void os_file_close(OS_File file) {
-  AssertMsg(file.u64, "file is null");
+  
+void os_file_close(OS_Handle file) {
   CloseHandle((HANDLE)file.u64);
 }
 
-u64 os_file_read(OS_File file, u64 size, void* dest) {
+u64 os_file_read(OS_Handle file, u64 size, void* out_data) {
   HANDLE win32_handle = (HANDLE)file.u64;
   DWORD bytes_read;
-
-  if (file.u64 && dest) {
-    ReadFile(win32_handle, dest, size, &bytes_read, null);
-    if (bytes_read != size) {
-      return 0;
-    }
-    return bytes_read;
-  }
-  return 0;
+  if (file.u64 == 0) { return 0; }
+  ReadFile(win32_handle, out_data, size, &bytes_read, null);
+  if (bytes_read != size) { return 0; }
+  return bytes_read;
 }
 
-u64 os_file_write(OS_File file, u64 size, void* source) {
+u64 os_file_write(OS_Handle file, u64 size, void* data) {
   DWORD bytes_wrote;
-  AssertMsg(file.u64, "File handle is null");
-  WriteFile((HANDLE)file.u64, source, size, &bytes_wrote, 0);
-  AssertMsg(size == bytes_wrote, "Wrote not completely");
+  if (file.u64 == 0) { return 0; };
+  WriteFile((HANDLE)file.u64, data, size, &bytes_wrote, 0);
   return bytes_wrote;
 }
 
-void os_file_copy(String file, String new_file) {
-  CopyFile((char*)file.str, (char*)new_file.str, false);
-}
-
-u64 os_file_last_write_time(String filename) {
-  FILETIME last_write_time = {};
-
-  WIN32_FILE_ATTRIBUTE_DATA Data;
-  if (GetFileAttributesEx((char*)filename.str, GetFileExInfoStandard, &Data)) {
-    last_write_time = Data.ftLastWriteTime;
-  }
-
-  u64 result;
-  MemCopyStruct(&result, &last_write_time);
-
+u64 os_file_size(OS_Handle file) {
+  u32 hsize;
+  u32 lsize = GetFileSize((HANDLE)file.u64, (LPDWORD)&hsize);
+  u64 result = Compose64Bit(hsize, lsize);
   return result;
 }
 
-b8 os_file_compare_time(u64 new_dll_write_time, u64 dll_last_write_time) {
-  if (CompareFileTime((FILETIME*)&new_dll_write_time, (FILETIME*)&dll_last_write_time) != 0) {
+FileProperties os_properties_from_file(OS_Handle file) {
+  if(!file.u64) { FileProperties r = {0}; return r; }
+  FileProperties props = {};
+  BY_HANDLE_FILE_INFORMATION info;
+  HANDLE handle = (HANDLE)file.u64;
+  b32 info_good = GetFileInformationByHandle(handle, &info);
+  if (info_good) {
+    props.size = Compose64Bit(info.nFileSizeHigh, info.nFileSizeLow);
+    props.modified = Compose64Bit(info.ftLastWriteTime.dwHighDateTime, info.ftLastWriteTime.dwLowDateTime);
+    props.created = Compose64Bit(info.ftCreationTime.dwHighDateTime, info.ftCreationTime.dwLowDateTime);
+    props.flags = info.dwFileAttributes;
+  }
+  return props;
+}
+
+FileProperties os_properties_from_file_path(String path) {
+  FileProperties props = {};
+
+  WIN32_FILE_ATTRIBUTE_DATA info;
+  b32 success = GetFileAttributesExA((char*)path.str, GetFileExInfoStandard, &info);
+  if (success) {
+    props.size = Compose64Bit(info.nFileSizeHigh, info.nFileSizeLow);
+    props.modified = Compose64Bit(info.ftLastWriteTime.dwHighDateTime, info.ftLastWriteTime.dwLowDateTime);
+    props.created = Compose64Bit(info.ftCreationTime.dwHighDateTime, info.ftCreationTime.dwLowDateTime);
+    props.flags = info.dwFileAttributes;
+  }
+  return props;
+}
+
+b32 os_copy_file_path(String dst, String src) {
+  b32 result = CopyFile((char*)src.str, (char*)dst.str, false);
+  return result;
+}
+
+b32 os_file_path_exists(String path) {
+  DWORD attributes = GetFileAttributesA((char*)path.str);
+  return (attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY));
+}
+
+String os_exe_filename(Arena* arena) {
+  u8* buff = push_buffer(arena, u8, 512);
+  DWORD size = GetModuleFileNameA(0, (char*)buff, 512);
+  return str(buff, size);
+}
+
+b32 os_file_compare_time(u64 new_write_time, u64 last_write_time) {
+  if (CompareFileTime((FILETIME*)&new_write_time, (FILETIME*)&last_write_time) != 0) {
     return true; // is changed
   }
   return false;
 }
 
-u64 os_exe_filename(void* buffer) {
-  DWORD size = GetModuleFileNameA(0, (char*)buffer, 100);
-  return size;
+OS_Handle os_lib_open(String path) {
+  HMODULE mod = LoadLibraryA((char*)path.str);
+  OS_Handle result = { (u64)mod };
+  return result;
 }
 
+void os_lib_close(OS_Handle lib) {
+  HMODULE mod = (HMODULE)lib.u64;
+  FreeLibrary(mod);
+}
+
+PROC os_lib_get_proc(OS_Handle lib, String name) {
+  HMODULE mod = (HMODULE)lib.u64;
+  PROC result = GetProcAddress(mod, (char*)name.str);
+  return result;
+}
 
 //////////////////////////////////////////////////////////////////////////
 // Clock
@@ -414,6 +407,8 @@ void clock_stop(Clock *clock) {
   clock->start_time = 0;
 }
 
+///////////////////////////////////////////////////////////////////////////
+// Win proc
 internal LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARAM l_param) {
   switch (msg) {
     case WM_ERASEBKGND: {
@@ -488,4 +483,8 @@ internal LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_par
   }
   
   return DefWindowProcA(hwnd, msg, w_param, l_param);
+}
+
+void os_show_window() {
+  ShowWindow((HWND)state->window->hwnd, SW_SHOW);
 }

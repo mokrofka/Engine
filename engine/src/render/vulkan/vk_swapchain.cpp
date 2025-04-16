@@ -1,3 +1,5 @@
+#include "vk_swapchain.h"
+
 #include "vk_device.h"
 #include "vk_image.h"
 #include "vk_framebuffer.h"
@@ -169,9 +171,7 @@ internal VK_Swapchain create(u32 width, u32 height) {
   }
 
   // Depth resources
-  if (!vk_device_detect_depth_format(&vk->device)) {
-    Error("Failed to find a supported format!");
-  }
+  vk_device_detect_depth_format(&vk->device);
 
   // Create depth image and its view.
   swapchain.depth_attachment = vk_image_create(
