@@ -46,10 +46,6 @@ struct OS_Handle {
   u64 u64;
 };
 
-struct OS_File {
-  u64 u64;
-};
-
 enum OS_AccessFlags {
   OS_AccessFlag_Read = Bit(0),
   OS_AccessFlag_Write = Bit(1),
@@ -72,7 +68,6 @@ void os_platform_shutdown();
 void* vk_os_create_surface();
 
 void* os_allocate(u64 size, b32 at_base);
-void* os_allocate(u64 size);
 void os_free(void* block, b32 aligned);
 
 void os_console_write(String message, u32 color);
@@ -90,26 +85,37 @@ void* os_get_handle_info();
 void* os_get_window_handle();
 v2i os_get_framebuffer_size();
 
+//////////////////////////////////////////////////////////////////////////
+// Memory
+
+void* os_reserve(u64 size);
+b32 os_commit(void* ptr, u64 size);
+void os_decommit(void* ptr, u64 size);
+void os_release(void* ptr, u64 size);
+
+void* os_reserve_large(u64 size);
+b32 os_commit_large(void* ptr, u64 size);
+
 // files
-KAPI OS_Handle      os_file_open(String path, OS_AccessFlags flags);
-KAPI void           os_file_close(OS_Handle file);
-KAPI u64            os_file_read(OS_Handle file, u64 size, void *out_data);
-KAPI u64            os_file_write(OS_Handle file, u64 size, void *data);
-KAPI u64            os_file_size(OS_Handle file);
-KAPI FileProperties os_properties_from_file(OS_Handle file);
-KAPI FileProperties os_properties_from_file_path(String path);
-KAPI b32            os_copy_file_path(String dst, String src);
-KAPI b32            os_file_path_exists(String path);
-KAPI String         os_exe_filename(Arena* arena);
-KAPI b32            os_file_compare_time(u64 new_write_time, u64 last_write_time);
+OS_Handle      os_file_open(String path, OS_AccessFlags flags);
+void           os_file_close(OS_Handle file);
+u64            os_file_read(OS_Handle file, u64 size, void *out_data);
+u64            os_file_write(OS_Handle file, u64 size, void *data);
+u64            os_file_size(OS_Handle file);
+FileProperties os_properties_from_file(OS_Handle file);
+FileProperties os_properties_from_file_path(String path);
+b32            os_copy_file_path(String dst, String src);
+b32            os_file_path_exists(String path);
+String         os_exe_filename(Arena* arena);
+b32            os_file_compare_time(u64 new_write_time, u64 last_write_time);
 
 using PROC = i64(*)();
-KAPI OS_Handle os_lib_open(String path);
-KAPI void      os_lib_close(OS_Handle lib);
-KAPI PROC      os_lib_get_proc(OS_Handle lib, String name);
+OS_Handle os_lib_open(String path);
+void      os_lib_close(OS_Handle lib);
+PROC      os_lib_get_proc(OS_Handle lib, String name);
 
-KAPI void clock_update(Clock* clock);
-KAPI void clock_start(Clock* clock);
-KAPI void clock_stop(Clock* clock);
+void clock_update(Clock* clock);
+void clock_start(Clock* clock);
+void clock_stop(Clock* clock);
 
 void os_show_window();

@@ -1,6 +1,6 @@
 #include "game.h"
 
-#include <app_types.h>
+#include <engine.h>
 
 // HACK This should not be available outside the engine
 #include <render/r_frontend.h>
@@ -45,7 +45,9 @@ internal void camera_pitch(f32 amount) {
   state->camera_view_dirty = true;
 }
 
-void application_init(Application* game_inst) {
+void application_init(App* game_inst) {
+  Arena arean;
+  
   game_inst->state = push_struct(game_inst->arena, GameState);
   Assign(state, game_inst->state);
   state->arena = arena_alloc(game_inst->arena, MB(400));
@@ -57,20 +59,19 @@ void application_init(Application* game_inst) {
   
   Scratch scratch;
   u8* buff = push_buffer(scratch, u8, KB(1));
-  FreeList fl;
-  free_list_init(fl, buff, KB(1));
+  // FreeList fl;
+  // free_list_init(fl, buff, KB(1));
   
-  u32 size = 256;
-  void* data1 = free_list_alloc(fl, 1, 8);
-  void* data2 = free_list_alloc(fl, 1, 8);
-  void* data3 = free_list_alloc(fl, 1, 8);
+  // void* data1 = free_list_alloc(fl, 1, 8);
+  // void* data2 = free_list_alloc(fl, 1, 8);
+  // void* data3 = free_list_alloc(fl, 1, 8);
   
   // free_list_free(&fl, data1);
   // free_list_free(&fl, data2);
   // free_list_free(&fl, data3);
 }
 
-void application_update(Application* game_inst) {
+void application_update(App* game_inst) {
   Assign(state, game_inst->state);
   f32 delta_time = game_inst->delta_time;
   // TODO temp
@@ -138,8 +139,8 @@ void application_update(Application* game_inst) {
   r_set_view(state->view);
 }
 
-void application_render(struct Application* game_inst) {
+void application_render(struct App* game_inst) {
 }
 
-void application_on_resize(struct Application* game_inst) {
+void application_on_resize(struct App* game_inst) {
 }

@@ -39,24 +39,23 @@ struct Scratch {
   Inline ~Scratch() { arena->pos = pos; };
 };
 
-KAPI Arena* arena_alloc(Arena *a, u64 size = MB(1), u64 align = DEFAULT_ALIGNMENT);
+KAPI Arena* arena_alloc(Arena *a, u64 size = MB(1), u64 align = 8);
 KAPI Arena* arena_alloc(u64 size = MB(1));
 
 Inline u64 arena_pos(Arena* arena) { return ARENA_HEADER + arena->pos; };
 Inline void arena_clear(Arena* arena) { arena->pos = 0; };
 
-KAPI void* _arena_push(Arena* arena, u64 size, u64 align = DEFAULT_ALIGNMENT);
+KAPI void* _arena_push(Arena* arena, u64 size, u64 align = 8);
 
 Inline Temp temp_begin(Arena* arena) { return Temp{arena, arena->pos}; };
 Inline void temp_end(Temp temp) { temp.arena->pos = temp.pos; }
 
-KAPI void tctx_init(Arena* arena);
+void tctx_init(Arena* arena);
 KAPI Temp tctx_get_scratch(Arena** conflics, u32 counts);
-KAPI Scratch tctx_get_scratch_test(Arena** conflics, u32 counts);
 
 #define push_array(a, T, c) (T*)_arena_push(a, sizeof(T)*c, Max(8, alignof(T)))
 #define push_struct(a, T) (T*)_arena_push(a, sizeof(T), Max(8, alignof(T)))
-#define push_buffer(a, T, c) (T*)_arena_push(a, c, 8)
+#define push_buffer(a, T, c, ...) (T*)_arena_push(a, c, ## __VA_ARGS__)
   
 #define GetScratch(conflicts, count) (tctx_get_scratch((conflicts), (count)))
 #define ReleaseScratch(scratch) temp_end(scratch)
@@ -75,18 +74,18 @@ struct PoolFreeNode {
 struct Pool {
 	u64 chunk_count;
 	u64 chunk_size;
-  u8* buff;
+  u8* data;
 
 	PoolFreeNode *head;
 };
 
-KAPI void* _pool_alloc(Pool* p);
+KAPI void* _pool_alloc(Pool& p);
 
-KAPI Pool* pool_init(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignment = DEFAULT_ALIGNMENT);
-KAPI void pool_free(Pool* p, void* ptr);
-KAPI void pool_free_all(Pool* pool);
+KAPI Pool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignment = DEFAULT_ALIGNMENT);
+KAPI void pool_free(Pool& p, void* ptr);
+KAPI void pool_free_all(Pool& pool);
 
-#define pool_alloc(p, T) (T*)_pool_alloc(p)
+#define pool_alloc(p, T) (T*)_pool_push(p)
 
 // Free list
 
@@ -115,7 +114,8 @@ struct FreeList {
   PlacementPolicy policy;
 };
 
-KAPI void free_list_free_all(FreeList& fl);
-KAPI void free_list_init(FreeList& fl, void* data, u64 size);
-KAPI void* free_list_alloc(FreeList& fl, u64 size, u64 alignment);
+KAPI void* _free_list_alloc(FreeList& fl, u64 size, u64 alignment);
+
+KAPI FreeList push_free_list(Arena* arena, u64 size);
 KAPI void* free_list_free(FreeList& fl, void* ptr);
+KAPI void free_list_free_all(FreeList& fl);

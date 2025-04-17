@@ -200,8 +200,8 @@ Inline String str8_chop(String str, u64 amt) {
 ////////////////////////////////
 // String Formatting & Copying
 
-KAPI String push_str_cat(Arena* arena, String s1, String s2);
-KAPI String push_str_copy(Arena *arena, String s);
+String push_str_cat(Arena* arena, String s1, String s2);
+String push_str_copy(Arena *arena, String s);
 String push_strfv(Arena* arena, const void* format, void* argc);
 String push_strf(Arena* arena, const void* format, ...);
 
@@ -240,7 +240,7 @@ b32 str_to_bool(const char* str, b8* f);
 ////////////////////////////////
 // String Path Helpers
 
-KAPI String str_chop_after_last_slash(String string);
-KAPI String str_chop_last_slash(String string);
-KAPI String str_skip_last_slash(String string);
-KAPI String str_chop_last_dot(String string);
+String str_chop_after_last_slash(String string);
+String str_chop_last_slash(String string);
+String str_skip_last_slash(String string);
+String str_chop_last_dot(String string);

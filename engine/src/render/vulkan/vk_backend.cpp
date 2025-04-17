@@ -230,9 +230,7 @@ void vk_r_backend_shutdown() {
   // Command buffers
   for (u32 i = 0; i < vk->swapchain.image_count; ++i) {
     if (vk->render.cmd[i].handle) {
-      vk_cmd_free(
-        vk->device.gfx_cmd_pool,
-        &vk->render.cmd[i]);
+      vk_cmd_free(vk->device.gfx_cmd_pool, &vk->render.cmd[i]);
       vk->render.cmd[i].handle = 0;
     }
   }
@@ -374,20 +372,20 @@ b8 vk_r_backend_end_frame(f32 delta_time) {
   submit_info.pWaitDstStageMask = flags;
 
   VkResult result = vkQueueSubmit(
-      vk->device.graphics_queue,
-      1,
-      &submit_info,
-      vk->sync.in_flight_fences[vk->frame.current_frame].handle);
+    vk->device.graphics_queue,
+    1,
+    &submit_info,
+    vk->sync.in_flight_fences[vk->frame.current_frame].handle);
   if (result != VK_SUCCESS) {
     Error("vkQueueSubmit failed with result: %s", vk_result_string(result, true));
     return false;
   }
 
   vk_swapchain_present(
-      &vk->swapchain, vk->device.graphics_queue,
-      vk->device.present_queue,
-      vk->sync.queue_complete_semaphores[vk->frame.current_frame],
-      vk->frame.image_index);
+    &vk->swapchain, vk->device.graphics_queue,
+    vk->device.present_queue,
+    vk->sync.queue_complete_semaphores[vk->frame.current_frame],
+    vk->frame.image_index);
   return true;
 }
 

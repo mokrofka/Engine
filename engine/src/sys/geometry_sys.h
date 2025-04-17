@@ -29,4 +29,4 @@ void geometry_sys_release(Geometry* geometry);
 
 Geometry* geometry_sys_get_default();
 
-GeometryConfig geometry_sys_generate_plane_config(f32 width, f32 height, u32 x_segment_count, u32 y_segment, f32 tile_x, f32 tile_y, char* name, char* material_name);
+GeometryConfig geometry_sys_generate_plane_config(f32 width, f32 height, u32 x_segment_count, u32 y_segment, f32 tile_x, f32 tile_y, String name, String material_name);

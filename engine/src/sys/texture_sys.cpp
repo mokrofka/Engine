@@ -35,24 +35,11 @@ void texture_system_init(Arena* arena, TextureSystemConfig config) {
     Error("texture_system_init - configl.max_texture_count must be > 0.");
   }
   
-  // Block of memory will contain state struct, thenb block for array, then block for hashtable
-  u64 struct_requirement = sizeof(TextureSystemState);
-  u64 array_requirement = sizeof(Texture) * config.max_texture_count;
-  u64 hashtable_requirement = sizeof(TextureRef) * config.max_texture_count;
-  u64 memory_requirement = struct_requirement + array_requirement + hashtable_requirement;
+  state = push_struct(arena, TextureSystemState);
+  state->registered_textures = push_array(arena, Texture, config.max_texture_count);
+  state->registered_texture_table = hashtable_create(arena, sizeof(TextureRef), config.max_texture_count, false);
   
-  state = push_buffer(arena, TextureSystemState, memory_requirement);
   state->config = config;
-  
-  // The array block is after the state. Already allocated, so just set the pointer
-  void* array_block = (u8*)state + struct_requirement;
-  state->registered_textures = (Texture*)array_block;
-  
-  // Hashtable block is after array
-  void* hashtable_block = (u8*)array_block + array_requirement;
-  
-  // Create a hashtable for texture lookups
-  hashtable_create(sizeof(TextureRef), config.max_texture_count, hashtable_block, false, &state->registered_texture_table);
   
   // Fill the hashtable with invalid references to use as a default
   TextureRef invalid_ref;

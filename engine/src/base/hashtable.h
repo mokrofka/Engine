@@ -5,10 +5,10 @@ struct Hashtable {
   u32 element_size;
   u32 element_count;
   b8 is_pointer_type;
-  u8* memory;
+  u8* data;
 };
 
-KAPI void hashtable_create(u64 element_size, u32 element_count, void* memory, b32 is_pointer_type, Hashtable* hashtable);
+Hashtable hashtable_create(Arena* arena, u64 element_size, u32 element_count, b32 is_pointer_type);
 
 KAPI void hashtable_destroy(Hashtable* table);
 

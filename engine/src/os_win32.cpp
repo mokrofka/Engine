@@ -171,30 +171,9 @@ void* os_allocate(u64 size, b32 at_base) {
                       PAGE_READWRITE);
 }
 
-void* allocate(u64 size) {
-  return VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT,
-                      PAGE_READWRITE);
-}
-
 void os_free(void* block, b32 aligned) {
   VirtualFree(block, 0, 0);
 }
-
-// void* _platform_memory_zero(void* block, u64 size) {
-//   return memset(block, 0, size);
-// }
-
-// void* _platform_memory_copy(void* dest, const void* source, u64 size) {
-//   return memcpy(dest, source, size);
-// }
-
-// void* _platform_memory_set(void* dest, i32 value, u64 size) {
-//   return memset(dest, value, size);
-// }
-
-// b8 _platform_memory_compare(void* a, void* b, u64 size) {
-//   return memcmp(a, b, size) ? 0 : 1;
-// }
 
 void os_console_write(String message, u32 color) {
   HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -261,7 +240,36 @@ v2i os_get_framebuffer_size() {
   return v2i(state->window->width, state->window->height);
 }
 
+//////////////////////////////////////////////////////////////////////////
+// Memory
 
+void* os_reserve(u64 size) {
+  void* result = VirtualAlloc(0, size, MEM_RESERVE, PAGE_READWRITE);
+  return result;
+}
+
+b32 os_commit(void* ptr, u64 size) {
+  b32 result = (VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE) != 0);
+  return result;
+}
+
+void os_decommit(void* ptr, u64 size) {
+  VirtualFree(ptr, size, MEM_DECOMMIT);
+}
+
+void os_release(void* ptr, u64 size) {
+  VirtualFree(ptr, 0, MEM_RELEASE);
+}
+
+void* os_reserve_large(u64 size) {
+  // we commit on reserve because windows
+  void* result = VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT | MEM_LARGE_PAGES, PAGE_READWRITE);
+  return result;
+}
+
+b32 os_commit_large(void* ptr, u64 size) {
+  return 1;
+}
 
 //////////////////////////////////////////////////////////////////////////
 // file

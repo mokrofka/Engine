@@ -120,22 +120,10 @@ struct String {
   u8* str;
   u64 size;
 };
+
 struct Arena;
 
-#define str_lit(S) str((u8*)(S), sizeof(S) - 1)
-
-KAPI String str(u8* str, u64 size);
-
 #define quick_sort(ptr, count, element_size, cmp_function) qsort((ptr), (count), (element_size), (int (*)(const void *, const void *))(cmp_function))
-
-// KAPI extern i32 global_error;
-// static inline i32 _has_error() {
-//   i32 copy = global_error;
-//   global_error = 0; 
-//   return copy;
-// }
-// #define IsError if (_has_error())
-// #define SetError global_error = true
 
 //- rjf: doubly-linked-lists
 #define DLLInsert_NPZ(nil,f,l,p,n,next,prev) (CheckNil(nil,f) ? \

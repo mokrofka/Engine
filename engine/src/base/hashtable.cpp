@@ -17,15 +17,16 @@ u64 hash_name(String name, u32 element_count) {
   return hash;
 }
 
-void hashtable_create(u64 element_size, u32 element_count, void* memory, b32 is_pointer_type, Hashtable* hashtable) {
-  AssertMsg(memory && hashtable, "hashtable_create failed! Pointer to memory and out_hashtable are required");
+Hashtable hashtable_create(Arena* arena, u64 element_size, u32 element_count, b32 is_pointer_type) {
   AssertMsg(element_count && element_size, "element_size and element_count must be a positive non-zero value");
+  Hashtable hashtable;
   
-  hashtable->memory = (u8*)memory;
-  hashtable->element_size = element_size;
-  hashtable->element_count = element_count;
-  hashtable->is_pointer_type = is_pointer_type;
-  MemZero(hashtable->memory, element_size * element_count);
+  hashtable.data = push_buffer(arena, u8, element_size * element_count);
+  hashtable.element_size = element_size;
+  hashtable.element_count = element_count;
+  hashtable.is_pointer_type = is_pointer_type;
+  MemZero(hashtable.data, element_size * element_count);
+  return hashtable;
 }
 
 void hashtable_destroy(Hashtable* table) {
@@ -38,7 +39,7 @@ void hashtable_set(Hashtable* table, String name, void* value) {
   AssertMsg(!table->is_pointer_type, "hashtable_set should not be used with tables that have pointer to types. Use hashtable_ptr instead.");
   
   u64 hash = hash_name(name, table->element_count);
-  MemCopy(table->memory + (table->element_size*hash), value, table->element_size);
+  MemCopy(table->data + (table->element_size*hash), value, table->element_size);
 }
 
 void hashtable_set_ptr(Hashtable* table, String name, void** value) {
@@ -46,7 +47,7 @@ void hashtable_set_ptr(Hashtable* table, String name, void** value) {
   AssertMsg(!table->is_pointer_type, "hashtable_set should not be used with tables that have pointer to types. Use hashtable_ptr instead.");
   
   u64 hash = hash_name(name, table->element_count);
-  ((void**)table->memory)[hash] = value ? *value : 0;
+  ((void**)table->data)[hash] = value ? *value : 0;
 }
 
 void hashtable_get(Hashtable* table, String name, void* out_value) {
@@ -54,7 +55,7 @@ void hashtable_get(Hashtable* table, String name, void* out_value) {
   AssertMsg(!table->is_pointer_type, "hashtable_set should not be used with tables that have pointer to types. Use hashtable_ptr instead.");
   
   u64 hash = hash_name(name, table->element_count);
-  MemCopy(out_value, table->memory + (table->element_size * hash), table->element_size);
+  MemCopy(out_value, table->data + (table->element_size * hash), table->element_size);
 }
 
 void hashtable_get_ptr(Hashtable* table, String name, void** out_value) {
@@ -62,7 +63,7 @@ void hashtable_get_ptr(Hashtable* table, String name, void** out_value) {
   AssertMsg(!table->is_pointer_type, "hashtable_set should not be used with tables that have pointer to types. Use hashtable_ptr instead.");
   
   u64 hash = hash_name(name, table->element_count);
-  *out_value = ((void**)table->memory)[hash];
+  *out_value = ((void**)table->data)[hash];
 }
 
 void hashtable_fill(Hashtable* table, void* value) {
@@ -70,6 +71,6 @@ void hashtable_fill(Hashtable* table, void* value) {
   AssertMsg(!table->is_pointer_type, "hashtable_set should not be used with tables that have pointer to types. Use hashtable_ptr instead.");
 
   for (u32 i = 0; i < table->element_count; ++i) {
-    MemCopy(table->memory + (table->element_size * i), value, table->element_size);
+    MemCopy(table->data + (table->element_size * i), value, table->element_size);
   }
 }

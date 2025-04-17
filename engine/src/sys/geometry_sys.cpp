@@ -26,21 +26,12 @@ void geometry_sys_init(Arena* arena, GeometrySysConfig config) {
   if (config.max_geometry_count == 0) {
     Error("geometry_system_initialize - config.max_geometry_count must be > 0.");
   }
-
-  // Block of memory will contain state structure, then block for array, then block for hashtable.
-  u64 struct_requirement = sizeof(GeometrySysState);
-  u64 array_requirement = sizeof(GeometryRef) * config.max_geometry_count;
-  u64 mem_requirement = struct_requirement + array_requirement;
-  state = push_buffer(arena, GeometrySysState, mem_requirement);
   
+  state = push_struct(arena, GeometrySysState);
   u64 mem_reserved = MB(1);
   state->arena = arena_alloc(arena, mem_reserved);
-  
+  state->registered_geometries = push_array(arena, GeometryRef, config.max_geometry_count);
   state->config = config;
-
-  // The array block is after the state. Already allocated, so just set the pointer.
-  void* array_block = (u8*)state + struct_requirement;
-  state->registered_geometries = (GeometryRef*)array_block;
 
   // Invalidate all geometries in the array.
   u32 count = state->config.max_geometry_count;
@@ -194,7 +185,7 @@ void create_default_geometry() {
   state->default_geometry.material = material_sys_get_default();
 }
 
-GeometryConfig geometry_sys_generate_plane_config(f32 width, f32 height, u32 x_segment_count, u32 y_segment_count, f32 tile_x, f32 tile_y, char* name, char* material_name) {
+GeometryConfig geometry_sys_generate_plane_config(f32 width, f32 height, u32 x_segment_count, u32 y_segment_count, f32 tile_x, f32 tile_y, String name, String material_name) {
   if (width == 0) {
     Warn("Width must be nonzero. Defaulting to one.");
     width = 1.0f;
@@ -284,14 +275,14 @@ GeometryConfig geometry_sys_generate_plane_config(f32 width, f32 height, u32 x_s
     }
   }
 
-  if (name && cstr_length(name) > 0) {
-    MemCopy(config.name, name, GEOMETRY_NAME_MAX_LENGTH);
+  if (name.str && name.size > 0) {
+    MemCopy(config.name, name.str, GEOMETRY_NAME_MAX_LENGTH);
   } else {
     MemCopy(config.name, DEFAULT_GEOMETRY_NAME, GEOMETRY_NAME_MAX_LENGTH);
   }
 
-  if (material_name && cstr_length(material_name) > 0) {
-    MemCopy(config.material_name, material_name, MATERIAL_NAME_MAX_LENGTH);
+  if (material_name.str && material_name.size > 0) {
+    MemCopy(config.material_name, material_name.str, MATERIAL_NAME_MAX_LENGTH);
   } else {
     MemCopy(config.material_name, DEFAULT_MATERIAL_NAME, MATERIAL_NAME_MAX_LENGTH);
   }

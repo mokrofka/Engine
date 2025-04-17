@@ -28,24 +28,10 @@ internal MaterialConfig load_configuration_file(String path);
 void material_system_init(Arena* arena, MaterialSystemConfig config) {
   AssertMsg(config.max_material_count != 0, "material_system_initialize - config.max_material_count must be > 0.");
 
-  // Block of memory will contain state structure, then block for array, then block for hashtable.
-  u64 struct_requirement = sizeof(MaterialSystemState);
-  u64 array_requirement = sizeof(Material) * config.max_material_count;
-  u64 hashtable_requirement = sizeof(MaterialRef) * config.max_material_count;
-  u64 memory_requirement = struct_requirement + array_requirement + hashtable_requirement;
-
-  state = push_buffer(arena, MaterialSystemState, memory_requirement);
+  state = push_struct(arena, MaterialSystemState);
+  state->registered_materials = push_array(arena, Material, config.max_material_count);
+  state->registered_material_table = hashtable_create(arena, sizeof(MaterialRef), config.max_material_count, false);
   state->config = config;
-
-  // The array block is after the state. Already allocated, so just set the pointer.
-  void* array_block = state + struct_requirement;
-  state->registered_materials = (Material*)array_block;
-
-  // Hashtable block is after array.
-  void* hashtable_block = (u8*)array_block + array_requirement;
-
-  // Create a hashtable for material lookups.
-  hashtable_create(sizeof(MaterialRef), config.max_material_count, hashtable_block, false, &state->registered_material_table);
 
   // Fill the hashtable with invalid references to use as a default.
   MaterialRef invalid_ref;

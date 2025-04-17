@@ -1,6 +1,5 @@
 #include "engine.h"
 
-#include "app_types.h"
 #include "render/r_frontend.h"
 
 #include "sys/texture_sys.h"
@@ -12,7 +11,7 @@
 
 struct EngineState {
   Arena* arena;
-  Application* game_inst;
+  App* game_inst;
   b8 is_running;
   b8 is_suspended;
 
@@ -33,15 +32,13 @@ internal b32 app_on_event(u32 code, void* sender, void* listener_inst, EventCont
 internal b32 app_on_key(u32 code, void* sender, void* listener_inst, EventContext context);
 internal b32 app_on_resized(u32 code, void* sender, void* listener_inst, EventContext context);
 
-internal void check_dll_changes(Application* app);
+internal void check_dll_changes(App* app);
+internal void application_create(App* app);
+internal void load_game_lib_init(App* app);
 
 // TODO temp
 b32 event_on_debug_event(u32 code, void* sender, void* listener_inst, EventContext data) {
   Scratch scratch;
-  // char* names[3] = {
-  //   "cobblestone",
-  //   "paving",
-  //   "paving2"};
   String names[] = {
     str_lit("cobblestone"),
     str_lit("paving"),
@@ -71,33 +68,42 @@ b32 event_on_debug_event(u32 code, void* sender, void* listener_inst, EventConte
 }
 // TODO end temp
 
-void engine_create(Application* game_inst) {
+void engine_create(App* game_inst) {
+  application_create(game_inst);
+  
   game_inst->engine_state = push_struct(game_inst->arena, EngineState);
   
-  state = (EngineState*)game_inst->engine_state;
+  Assign(state, game_inst->engine_state);
   state->game_inst = game_inst;
-  
   state->arena = arena_alloc(game_inst->arena, MB(400));
-  
-  platform_init(state->arena);
 
-  logging_init(state->arena);
+  {
+    platform_init(state->arena);
+  }
 
-  event_init(state->arena);
-  
-  os_register_process_key(input_process_key);
-  os_register_window_closed_callback(engine_on_window_closed);
-  os_register_window_resized_callback(engine_on_window_resized);
-  
-  event_register(EVENT_CODE_APPLICATION_QUIT, 0, app_on_event);
-  event_register(EVENT_CODE_KEY_PRESSED, 0, app_on_key);
-  event_register(EVENT_CODE_KEY_RELEASED, 0, app_on_key);
-  event_register(EVENT_CODE_RESIZED, 0, app_on_resized);
-  // TODO temp
-  event_register(EVENT_CODE_DEBUG0, 0, event_on_debug_event);
-  // end
+  {
+    logging_init(state->arena);
+  }
 
-  input_init(state->arena);
+  {
+    event_init(state->arena);
+    
+    os_register_process_key(input_process_key);
+    os_register_window_closed_callback(engine_on_window_closed);
+    os_register_window_resized_callback(engine_on_window_resized);
+    
+    event_register(EVENT_CODE_APPLICATION_QUIT, 0, app_on_event);
+    event_register(EVENT_CODE_KEY_PRESSED, 0, app_on_key);
+    event_register(EVENT_CODE_KEY_RELEASED, 0, app_on_key);
+    event_register(EVENT_CODE_RESIZED, 0, app_on_resized);
+    // TODO temp
+    event_register(EVENT_CODE_DEBUG0, 0, event_on_debug_event);
+    // end
+  }
+
+  {
+    input_init(state->arena);
+  }
 
   {
     WindowConfig config = {
@@ -135,7 +141,7 @@ void engine_create(Application* game_inst) {
   }
 
   {
-    GeometryConfig config = geometry_sys_generate_plane_config(10.0f, 5.0f, 5, 5, 5.0f, 2.0f, "test geometry", "test_material");
+    GeometryConfig config = geometry_sys_generate_plane_config(10.0f, 5.0f, 5, 5, 5.0f, 2.0f, str_lit("test geometry"), str_lit("test_material"));
     state->test_geometry = geometry_sys_acquire_from_config(config, true);
   }
 
@@ -146,7 +152,7 @@ void engine_create(Application* game_inst) {
   game_inst->init(game_inst);
 }
 
-void engine_run(Application* game_inst) {
+void engine_run(App* game_inst) {
   os_show_window();
   state->is_running = true;
   
@@ -289,15 +295,15 @@ internal b32 app_on_resized(u32 code, void* sender, void* listener_inst, EventCo
   return true;
 }
 
-internal void load_game_lib(Application* app) {
+internal void load_game_lib(App* app) {
   FileProperties props = os_properties_from_file_path(app->lib_file_path);
   app->modified = props.modified;
-  os_copy_file_path(app->lib_temp_filepath, app->lib_file_path);
-  app->lib = os_lib_open(app->lib_temp_filepath);
-  app->update = (void(*)(Application*))os_lib_get_proc(app->lib, str_lit("application_update"));
+  os_copy_file_path(app->lib_temp_file_path, app->lib_file_path);
+  app->lib = os_lib_open(app->lib_temp_file_path);
+  GetProcAddr(app->update, app->lib, str_lit("application_update"));
 }
 
-internal void check_dll_changes(Application* app) {
+internal void check_dll_changes(App* app) {
   FileProperties props = os_properties_from_file_path(app->lib_file_path);
   u64 new_write_time = props.modified;
   b32 game_modified = os_file_compare_time(new_write_time, app->modified);
@@ -308,3 +314,31 @@ internal void check_dll_changes(Application* app) {
   }
 }
 
+internal void load_game_lib_init(App* app) {
+  FileProperties file_props = os_properties_from_file_path(app->lib_file_path);
+
+  app->modified = file_props.modified;
+  os_copy_file_path(app->lib_temp_file_path, app->lib_file_path);
+  
+  app->lib = os_lib_open(str_lit("game_temp.dll"));
+  GetProcAddr(app->update, app->lib, str_lit("application_update"));
+  GetProcAddr(app->init, app->lib, str_lit("application_init"));
+  
+  Assert(app->lib.u64 && app->init && app->update);
+}
+
+internal void application_create(App* app) {
+  app->arena = arena_alloc(GB(1));
+  tctx_init(app->arena);
+  Scratch scratch;
+  
+  String filepath = os_exe_filename(scratch);
+  app->file_path = push_str_copy(app->arena, filepath);
+  app->name = str_skip_last_slash(app->file_path);
+  
+  String file_directory = str_chop_after_last_slash(app->file_path);
+  app->lib_file_path = push_str_cat(app->arena, file_directory, str_cstr("game.dll"));
+  app->lib_temp_file_path = push_str_cat(app->arena, file_directory, str_cstr("game_temp.dll"));
+
+  load_game_lib_init(app);
+}

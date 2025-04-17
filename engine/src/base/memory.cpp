@@ -160,43 +160,35 @@ u64 align_forward_size(u64 ptr, u64 align) {
 ///////////////////////////////////////////////////////////////////////////////////////
 // Pool
 
-Pool* pool_init(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignment) {
+Pool push_pool(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignment) {
+  Pool p;
 
   // Align chunk size up to the required chunk_alignment
   chunk_size = align_forward_size(chunk_size, chunk_alignment);
-
-  u8* header = push_buffer(arena, u8, POOL_HEADER);
   
   u64 init_start = u64((u8*)arena + arena_pos(arena));
   u64 start = align_forward_uintptr(init_start, (u64)chunk_alignment);
-  u64 check = chunk_count;
-  check -= (u64)(start - init_start);
-  u64 gap = (u64)(start - init_start);
   
-  arena->pos += gap;
-  u8* buff = push_buffer(arena, u8, chunk_count*chunk_size);
+  u8* data = push_buffer(arena, u8, chunk_count*chunk_size, chunk_alignment);
   
   // Assert that the parameters passed are valid
   Assert(chunk_size >= sizeof(PoolFreeNode) &&
          "Chunk size is too small");
-  Assert(check >= chunk_size &&
-         "Backing buffer length is smaller than the chunk size");
 
   // Store the adjusted parameters
-  Pool* pool = (Pool*)header;
-  pool->buff = buff;
-  pool->chunk_count = chunk_count;
-  pool->chunk_size = chunk_size;
-  pool->head = null; // Free List Head
+  p.data = data;
+  p.chunk_count = chunk_count;
+  p.chunk_size = chunk_size;
+  p.head = null; // Free List Head
 
   // Set up the free list for free chunks
-  pool_free_all(pool);
-  return pool;
+  pool_free_all(p);
+  return p;
 }
 
-void* _pool_alloc(Pool* p) {
+void* _pool_alloc(Pool& p) {
   // Get latest free node
-  PoolFreeNode* node = p->head;
+  PoolFreeNode* node = p.head;
 
   if (node == null) {
     Assert(0 && "Pool allocator has no free memory");
@@ -204,18 +196,18 @@ void* _pool_alloc(Pool* p) {
   }
 
   // Pop free node
-  p->head = p->head->next;
+  p.head = p.head->next;
 
   // Zero memory by default
-  // return MemSet(node, 0, p->chunk_size);
+  // return MemSet(node, 0, p.chunk_size);
   return node;
 }
 
-void pool_free(Pool *p, void *ptr) {
+void pool_free(Pool& p, void *ptr) {
 	PoolFreeNode *node;
 
-	void *start = p->buff;
-	void *end = &(p->buff)[p->chunk_count*p->chunk_size];
+	void *start = p.data;
+	void *end = &(p.data)[p.chunk_count*p.chunk_size];
 
 	if (ptr == null) {
 		// Ignore null pointers
@@ -229,18 +221,18 @@ void pool_free(Pool *p, void *ptr) {
 
 	// Push free node
 	node = (PoolFreeNode *)ptr;
-	node->next = p->head;
-	p->head = node;
+	node->next = p.head;
+	p.head = node;
 }
 
-void pool_free_all(Pool *pool) {
+void pool_free_all(Pool& p) {
 	// Set all chunks to be free
-  Loop (i, pool->chunk_count) {
-		void* ptr = &pool->buff[i * pool->chunk_size];
+  Loop (i, p.chunk_count) {
+		void* ptr = &p.data[i * p.chunk_size];
 		PoolFreeNode *node = (PoolFreeNode*)ptr;
 		// Push free node onto thte free list
-		node->next = pool->head;
-		pool->head = node;
+		node->next = p.head;
+		p.head = node;
 	}
 }
 
