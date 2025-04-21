@@ -2,16 +2,18 @@
 
 #include "defines.h"
 
-KAPI void* _memory_zero(void* block, u64 size);
-KAPI void* _memory_copy(void* dest, const void* source, u64 size);
-KAPI void* _memory_set(void* dest, i32 value, u64 size);
-KAPI b32   _memory_match(void* a, void* b, u64 size);
+KAPI void _memory_zero(void* block, u64 size);
+KAPI void _memory_copy(void* dest, const void* source, u64 size);
+KAPI void _memory_set(void* dest, i32 value, u64 size);
+KAPI b32  _memory_match(void* a, void* b, u64 size);
 
+///////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////
 // Arena
 
 #define DEFAULT_ALIGNMENT (sizeof(void*))
 #define ARENA_HEADER sizeof(Arena)
-#define POOL_HEADER sizeof(Pool)
 
 struct Arena {
   u64 res;
@@ -40,7 +42,6 @@ struct Scratch {
 };
 
 KAPI Arena* arena_alloc(Arena *a, u64 size = MB(1), u64 align = 8);
-KAPI Arena* arena_alloc(u64 size = MB(1));
 
 Inline u64 arena_pos(Arena* arena) { return ARENA_HEADER + arena->pos; };
 Inline void arena_clear(Arena* arena) { arena->pos = 0; };
@@ -65,6 +66,9 @@ Inline Scratch::Scratch(Arena** conflics, u32 counts) {
   *this = *(Scratch*)&temp;
 }
 
+///////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////
 // Pool
 
 struct PoolFreeNode {
@@ -79,17 +83,20 @@ struct Pool {
 	PoolFreeNode *head;
 };
 
-KAPI void* _pool_alloc(Pool& p);
+KAPI u8* pool_alloc(Pool& p);
 
 KAPI Pool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignment = DEFAULT_ALIGNMENT);
 KAPI void pool_free(Pool& p, void* ptr);
 KAPI void pool_free_all(Pool& pool);
 
-#define pool_alloc(p, T) (T*)_pool_push(p)
+#define PoolAlloc(p, a) *((u8**)(&(a))) = (u8*)pool_alloc(p)
 
+///////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////
 // Free list
 
-struct free_list_allocation_Header {
+struct FreeListAllocationHeader {
   u64 block_size;
   u64 padding;
 };
@@ -106,7 +113,7 @@ enum PlacementPolicy {
 };
 
 struct FreeList {
-  void* data;
+  u8* data;
   u64 size;
   u64 used;
 
@@ -114,8 +121,32 @@ struct FreeList {
   PlacementPolicy policy;
 };
 
-KAPI void* _free_list_alloc(FreeList& fl, u64 size, u64 alignment);
+KAPI u8* free_list_alloc(FreeList& fl, u64 size, u64 alignment = 8);
 
-KAPI FreeList push_free_list(Arena* arena, u64 size);
+KAPI FreeList free_list_create(Arena* arena, u64 size);
 KAPI void* free_list_free(FreeList& fl, void* ptr);
 KAPI void free_list_free_all(FreeList& fl);
+
+#define FreeListAlloc(p, a, size) *((u8**)(&(a))) = (u8*)free_list_alloc(p, size)
+
+///////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////
+// Global Allocator
+
+KAPI void global_allocator_init();
+KAPI u8* global_alloc(u64 size);
+
+#define Global_Alloc(a,size) *((u8**)(&(a))) = (u8*)global_alloc(size)
+
+KAPI void global_free(void* ptr);
+
+///////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////
+// Ring Buffer
+
+internal u64 ring_write(u8 *ring_base, u64 ring_size, u64 ring_pos, void *src_data, u64 src_data_size);
+internal u64 ring_read(u8 *ring_base, u64 ring_size, u64 ring_pos, void *dst_data, u64 read_size);
+#define ring_write_struct(ring_base, ring_size, ring_pos, ptr) ring_write((ring_base), (ring_size), (ring_pos), (ptr), sizeof(*(ptr)))
+#define ring_read_struct(ring_base, ring_size, ring_pos, ptr) ring_read((ring_base), (ring_size), (ring_pos), (ptr), sizeof(*(ptr)))

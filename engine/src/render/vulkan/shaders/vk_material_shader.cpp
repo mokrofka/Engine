@@ -6,12 +6,13 @@
 
 #include "sys/texture_sys.h"
 
-#define BUILTIN_SHADER_NAME_MATERIAL "Builtin.MaterialShader"
+#define BUILTIN_SHADER_NAME_MATERIAL "Builtin.MaterialShader"_
 
 VK_MaterialShader vk_material_shader_create(VK_Context* vk) {
   VK_MaterialShader shader = {};
 
-  char stage_type_strs[MATERIAL_SHADER_STAGE_COUNT][5] = {"vert", "frag"};
+  // char stage_type_strs[MATERIAL_SHADER_STAGE_COUNT][5] = {"vert", "frag"};
+  String stage_type_strs[MATERIAL_SHADER_STAGE_COUNT] = { "vert"_, "frag"_, };
   VkShaderStageFlagBits stage_types[MATERIAL_SHADER_STAGE_COUNT] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
 
   Loop (i, MATERIAL_SHADER_STAGE_COUNT) {
@@ -192,7 +193,7 @@ void vk_material_shader_destroy(VK_MaterialShader* shader) {
   vkDestroyDescriptorSetLayout(logical_device, shader->global_descriptor_set_layout, vk->allocator);
   
   // Destroy shader modules
-  for (u32 i = 0; i < MATERIAL_SHADER_STAGE_COUNT; ++i) {
+  Loop (i, MATERIAL_SHADER_STAGE_COUNT) {
     vkDestroyShaderModule(vkdevice, shader->stages[i].handle, vk->allocator);
   }
 }
@@ -291,9 +292,9 @@ void vk_material_shader_apply_material(VkCommandBuffer cmd, VK_MaterialShader* s
     ++descriptor_index;
 
     // Samplers
-    const u32 sampler_count = 1;
+    u32 sampler_count = 1;
     VkDescriptorImageInfo image_infos[1];
-    for (u32 sampler_index = 0; sampler_index < sampler_count; ++sampler_index) {
+    Loop (sampler_index, sampler_count) {
       TextureUse use = shader->sampler_uses[sampler_index];
       Texture* t = null;
       switch (use) {
@@ -301,7 +302,7 @@ void vk_material_shader_apply_material(VkCommandBuffer cmd, VK_MaterialShader* s
         t = material->diffuse_map.texture;
       } break;
       default:
-        Error("Unable to bind sample to unknown use.");
+        Error("Unable to bind sample to unknown use"_);
         return;
       }
       u32* descriptor_generation = &object_state->descriptor_states[descriptor_index].generations[image_index];
@@ -358,8 +359,8 @@ void vk_material_shader_acquire_resources(VK_MaterialShader* shader, Material* m
   ++shader->obj_uniform_buffer_index;
   
   VK_MaterialShaderInstState* object_state = &shader->instance_states[material->internal_id];
-  for (u32 i = 0; i < VK_MATERIAL_SHADER_DESCRIPTOR_COUNT  ; ++i) {
-    for (u32 j = 0; j < 3; ++j) {
+  Loop (i, VK_MATERIAL_SHADER_DESCRIPTOR_COUNT) {
+    Loop (j, 3) {
       object_state->descriptor_states[i].generations[j] = INVALID_ID;
       object_state->descriptor_states[i].ids[j] = INVALID_ID;
     }
@@ -377,7 +378,7 @@ void vk_material_shader_acquire_resources(VK_MaterialShader* shader, Material* m
   alloc_info.pSetLayouts = layouts;
   VkResult result = vkAllocateDescriptorSets(vkdevice, &alloc_info, object_state->descriptor_sets);
   if (result != VK_SUCCESS) {
-    Error("Error allocating descriptor sets in shader!");
+    Error("Error allocating descriptor sets in shader"_);
   }
 }
 
@@ -392,11 +393,11 @@ void vk_material_shader_release_resources(VK_MaterialShader* shader, Material* m
   // Release object descriptor sets
   VkResult result = vkFreeDescriptorSets(vkdevice, shader->obj_descriptor_pool, descriptor_set_count, inst_state->descriptor_sets);
   if (result != VK_SUCCESS) {
-    Error("Error freeing object shader descriptor sets!");
+    Error("Error freeing object shader descriptor sets"_);
   }
   
-  for (u32 i = 0; i < VK_MATERIAL_SHADER_DESCRIPTOR_COUNT  ; ++i) {
-    for (u32 j = 0; j < 3; ++j) {
+  Loop (i, VK_MATERIAL_SHADER_DESCRIPTOR_COUNT) {
+    Loop (j, 3) {
       inst_state->descriptor_states[i].generations[j] = INVALID_ID;
       inst_state->descriptor_states[i].ids[j] = INVALID_ID;
     }

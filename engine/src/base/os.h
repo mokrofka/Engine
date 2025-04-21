@@ -67,7 +67,7 @@ void os_window_create(WindowConfig config);
 void os_platform_shutdown();
 void* vk_os_create_surface();
 
-void* os_allocate(u64 size, b32 at_base);
+Arena* os_main_arena_allocate(u64 size);
 void os_free(void* block, b32 aligned);
 
 void os_console_write(String message, u32 color);

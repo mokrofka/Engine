@@ -27,12 +27,12 @@ global TextureSystemState* state;
 
 internal void create_default_textures();
 internal void destroy_default_textures(TextureSystemState* state);
-internal b8 load_texture(String texture_name, Texture* t);
+internal b32 load_texture(String texture_name, Texture* t);
 internal void destroy_texture(Texture* t);
 
 void texture_system_init(Arena* arena, TextureSystemConfig config) {
   if (config.max_texture_count == 0) {
-    Error("texture_system_init - configl.max_texture_count must be > 0.");
+    Error("texture_system_init - configl.max_texture_count must be > 0"_);
   }
   
   state = push_struct(arena, TextureSystemState);
@@ -50,11 +50,11 @@ void texture_system_init(Arena* arena, TextureSystemConfig config) {
   
   // Invalidate all textures in the array
   u32 count = state->config.max_texture_count;
-  for (u32 i = 0; i < count; ++i) {
+  Loop (i, count) {
     state->registered_textures[i].id = INVALID_ID;
     state->registered_textures[i].generation = INVALID_ID;
   }
-  
+
   // Create default textures for use in the system
   create_default_textures();
 }
@@ -62,7 +62,7 @@ void texture_system_init(Arena* arena, TextureSystemConfig config) {
 void texture_system_shutdown() {
   if (state) {
     // Destroy all loaded textures
-    for (u32 i = 0; i < state->config.max_texture_count; ++i) {
+    Loop (i, state->config.max_texture_count) {
       Texture* t = &state->registered_textures[i];
       if (t->generation != INVALID_ID) {
         r_destroy_texture(t);
@@ -77,7 +77,7 @@ void texture_system_shutdown() {
 
 Texture* texture_system_acquire(String name, b8 auto_release) {
   // Return default texture, but warn about it since this should be returned via get_default_texture(); 
-  if (str_matchi(name, str_lit(DEFAULT_TEXTURE_NAME))) {
+  if (str_matchi(name, DEFAULT_TEXTURE_NAME)) {
     Warn("texture_system_acquire called for default texture. Use texture_system_get_default_texture for texture 'default'.");
     return &state->default_texture;
   }
@@ -93,7 +93,7 @@ Texture* texture_system_acquire(String name, b8 auto_release) {
     // This means no texture exists here.Find a free index first
     u32 count = state->config.max_texture_count;
     Texture* t = 0;
-    for (u32 i = 0; i < count; ++i) {
+    Loop (i, count) {
       if (state->registered_textures[i].id == INVALID_ID) {
         // A free slot has been found. Use its index as the handle
         ref.handle = i;
@@ -116,9 +116,9 @@ Texture* texture_system_acquire(String name, b8 auto_release) {
 
     // Also use the handle as the texture id
     t->id = ref.handle;
-    Trace("Texture '%s' does not yet exist. Created, and ref_count is now %i.", name, ref.reference_count);
+    Trace("Texture '%s' does not yet exist. Created, and ref_count is now %i.", name.str, ref.reference_count);
   } else {
-    Trace("Texture '%s' already exists, ref_count increased to %i.", name, ref.reference_count);
+    Trace("Texture '%s' already exists, ref_count increased to %i.", name.str, ref.reference_count);
   }
 
   // Update the entry
@@ -126,14 +126,14 @@ Texture* texture_system_acquire(String name, b8 auto_release) {
   return &state->registered_textures[ref.handle];
 
   // NOTE: This would only happen in the event something went wrong with the state
-  Error("texture_system_acquire failed to acquire texture '%s'. Null pointer will be returned", name);
+  Error("texture_system_acquire failed to acquire texture '%s'. Null pointer will be returned", name.str);
   return 0;
 }
 
 void texture_system_release(String name) {
   Scratch scratch;
   // Ignore release requests for the default texture.
-  if (str_matchi(name, str_lit(DEFAULT_TEXTURE_NAME))) {
+  if (str_matchi(name, DEFAULT_TEXTURE_NAME)) {
     return;
   }
   TextureRef ref;
@@ -184,8 +184,8 @@ internal void create_default_textures() {
   MemSet(pixels, 255, sizeof(u8) * pixel_count * channels);
 
   // Each pixel.
-  for (u64 row = 0; row < tex_dimension; ++row) {
-    for (u64 col = 0; col < tex_dimension; ++col) {
+  Loop (row, tex_dimension) {
+    Loop (col, tex_dimension) {
       u64 index = (row * tex_dimension) + col;
       u64 index_bpp = index * channels;
       if (row % 2) {
@@ -202,7 +202,7 @@ internal void create_default_textures() {
     }
   }
 
-  MemCopy(state->default_texture.name, DEFAULT_TEXTURE_NAME, TEXTURE_NAME_MAX_LENGTH);
+  str_copy(state->default_texture.name, DEFAULT_TEXTURE_NAME);
   state->default_texture.width = tex_dimension;
   state->default_texture.height = tex_dimension;
   state->default_texture.channel_count = 4;
@@ -217,20 +217,21 @@ internal void destroy_default_textures(TextureSystemState* state) {
   destroy_texture(&state->default_texture);
 }
 
-internal b8 load_texture(String texture_name, Texture* t) {
+internal b32 load_texture(String texture_name, Texture* t) {
   Scratch scratch;
   // TODO Should e able to be loaced anywhere 
   char* format_str = "assets/textures/%s.%s";
   i32 required_channel_count = 4;
   stbi_set_flip_vertically_on_load(true);
   // TODO try different extensions
-  String file_path = push_strf(scratch, format_str, texture_name.str, "png");
+  String file_path = push_strf(scratch, format_str, texture_name, "png"_);
   
   // Use a temporary texture to load into
   Texture temp_texture;
-
+  
+  String c_path = push_str_copy(scratch, file_path);
   u8* data = stbi_load(
-    (char*)file_path.str,
+    (char*)c_path.str,
     (i32*)&temp_texture.width,
     (i32*)&temp_texture.height,
     (i32*)&temp_texture.channel_count,
@@ -245,7 +246,7 @@ internal b8 load_texture(String texture_name, Texture* t) {
     u64 total_size = temp_texture.width * temp_texture.height * required_channel_count;
     // Check for transparency
     b32 has_transparency = false;
-    for (u64 i = 0; i < total_size; ++i) {
+    Loop (i, total_size) {
       u8 a = data[i + 3];
       if (a < 255) {
         has_transparency = true;
@@ -254,7 +255,7 @@ internal b8 load_texture(String texture_name, Texture* t) {
     }
     
     if (stbi_failure_reason()) {
-      Warn("load_texture() failed to load file '%s': %s", file_path, stbi_failure_reason());
+      Warn("load_texture() failed to load file '%s': %s", file_path, str_cstr(stbi_failure_reason()));
       // Clear the error so the next load doesn't fail
       stbi__err(0, 0);
       return false;
@@ -288,7 +289,7 @@ internal b8 load_texture(String texture_name, Texture* t) {
     return true;
   } else {
     if (stbi_failure_reason()) {
-      Warn("load_texture() failed to load file '%s': %s", file_path, stbi_failure_reason());
+      Warn("load_texture() failed to load file '%s': %s", file_path, str_cstr(stbi_failure_reason()));
       // Clear the error so the next load doesn't fail
       stbi__err(0, 0);
     }

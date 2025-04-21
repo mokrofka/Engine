@@ -38,7 +38,7 @@ VK_Image vk_image_create(
   vkGetImageMemoryRequirements(vkdevice, result.handle, &memory_requirements);
 
   i32 memory_type = vk->find_memory_index(memory_requirements.memoryTypeBits, memory_flags);
-  AssertMsg(memory_type != -1, "Required memory type not found. Image not valid.");
+  Assert(memory_type != -1 && "Required memory type not found. Image not valid");
 
   // Allocate memory
   VkMemoryAllocateInfo memory_allocate_info = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
@@ -119,7 +119,7 @@ void vk_image_transition_layout(
     // The fragment stage.
     dest_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
   } else {
-    Fatal("unsupported layout transition!");
+    Fatal("unsupported layout transition"_);
     return;
   }
 

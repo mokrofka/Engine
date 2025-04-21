@@ -30,20 +30,20 @@ b8 vk_fence_wait(VK_Fence* fence, u64 timeout_ns) {
         fence->is_signaled = true;
       } return true;
       case VK_TIMEOUT: {
-        Warn("vk_fence_wait - Timed out");
+        Warn("vk_fence_wait - Timed out"_);
       } break;
       case VK_ERROR_DEVICE_LOST: {
-        Warn("vk_fence_wait - VK_ERROR_DEVICE_LOST.");
+        Warn("vk_fence_wait - VK_ERROR_DEVICE_LOST"_);
       } break;
       case VK_ERROR_OUT_OF_HOST_MEMORY: {
-        Warn("vk_fence_wait - VK_ERROR_OUT_OF_HOST_MEMORY.");
+        Warn("vk_fence_wait - VK_ERROR_OUT_OF_HOST_MEMORY"_);
       } break;
       case VK_ERROR_OUT_OF_DEVICE_MEMORY: {
-        Warn("vk_fence_wait - VK_ERROR_OUT_OF_DEVICE_MEMORY.");
+        Warn("vk_fence_wait - VK_ERROR_OUT_OF_DEVICE_MEMORY"_);
       } break;
       
       default: {
-        Error("vk_fence_wait - An unknown error has occured.");
+        Error("vk_fence_wait - An unknown error has occured"_);
       } break;
     }
   } else {

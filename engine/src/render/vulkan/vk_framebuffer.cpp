@@ -5,7 +5,7 @@ VK_Framebuffer vk_framebuffer_create(
     u32 width, u32 height, u32 attachment_count,
     VkImageView* attachments) {
   VK_Framebuffer framebuffer = {};
-  for (u32 i = 0; i < attachment_count; ++i) {
+  Loop (i, attachment_count) {
     framebuffer.attachments[i] = attachments[i];
   }
 
@@ -31,7 +31,7 @@ VK_Framebuffer vk_framebuffer_create(
 
 void vk_framebuffer_destroy(VK_Framebuffer* frambuffer) {
   if (!frambuffer->handle) {
-    Error("You don't have frame buffer handle");
+    Error("You don't have frame buffer handle"_);
   }
   vkDestroyFramebuffer(vkdevice, frambuffer->handle, vk->allocator);
   MemZeroStruct(frambuffer);

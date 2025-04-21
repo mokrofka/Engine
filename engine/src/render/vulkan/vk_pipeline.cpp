@@ -148,7 +148,7 @@ VK_Pipeline vk_graphics_pipeline_create(
     &pipeline.handle);
   
   if (vk_result_is_success(result)) {
-    Debug("Graphics pipeline created!");
+    Debug("Graphics pipeline created"_);
     return pipeline;
   } 
   
@@ -161,7 +161,7 @@ void vk_pipeline_destroy(VK_Pipeline pipeline) {
     vkDestroyPipeline(vkdevice, pipeline.handle, vk->allocator);
     vkDestroyPipelineLayout(vkdevice, pipeline.pipeline_layout, vk->allocator);
   } else {
-    Error("null pointers");
+    Error("null pointers"_);
   }
 }
 

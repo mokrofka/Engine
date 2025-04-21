@@ -45,30 +45,36 @@ internal void camera_pitch(f32 amount) {
   state->camera_view_dirty = true;
 }
 
+#include "test.h"
 void application_init(App* game_inst) {
-  Arena arean;
+  test();
+  Scratch scratch;
   
   game_inst->state = push_struct(game_inst->arena, GameState);
   Assign(state, game_inst->state);
-  state->arena = arena_alloc(game_inst->arena, MB(400));
+  state->arena = arena_alloc(game_inst->arena, MB(50));
   
   state->camera_position = v3(0,0,30.0f);
   state->camera_euler = v3_zero();
   
   state->camera_view_dirty = true;
   
-  Scratch scratch;
   u8* buff = push_buffer(scratch, u8, KB(1));
-  // FreeList fl;
-  // free_list_init(fl, buff, KB(1));
+  FreeList fl = free_list_create(scratch, KB(1));
   
-  // void* data1 = free_list_alloc(fl, 1, 8);
+  void* data1 = free_list_alloc(fl, 1, 8);
   // void* data2 = free_list_alloc(fl, 1, 8);
   // void* data3 = free_list_alloc(fl, 1, 8);
   
   // free_list_free(&fl, data1);
   // free_list_free(&fl, data2);
   // free_list_free(&fl, data3);
+  Pool p = pool_create(scratch, 100, 8);
+  u8* data = pool_alloc(p);
+  u8* new_data = free_list_alloc(fl, 100);
+  
+  
+  
 }
 
 void application_update(App* game_inst) {

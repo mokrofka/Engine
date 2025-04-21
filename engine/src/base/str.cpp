@@ -6,6 +6,215 @@
 ////////////////////////////////
 // C-String Measurement, Functions
 
+internal u32 write_uint(u8* dest, u32 value) {
+  u8 temp[10];
+  u32 count = 0;
+  do {
+    temp[count++] = '0' + (value % 10);
+    value /= 10;
+  } while (value);
+  for (u32 i = 0; i < count; ++i) {
+    dest[i] = temp[count - i - 1];
+  }
+  return count;
+}
+
+internal u32 write_int(u8* dest, i32 value) {
+  u32 count = 0;
+  if (value < 0) {
+    dest[count++] = '-';
+    value = -value;
+  }
+  return count + write_uint(dest + count, value);
+}
+
+internal u32 write_float(u8* dest, float value, u32 precision) {
+  // Handle special cases
+  if (value != value) { // NaN check
+    const char* nan_str = "NaN";
+    for (u32 i = 0; nan_str[i] != '\0'; i++) {
+      dest[i] = nan_str[i];
+    }
+    return 3; // "NaN" is 3 characters long
+  }
+  if (value == 0.0f) { // Zero check
+    dest[0] = '0';
+    dest[1] = '\0';
+    return 1;
+  }
+
+  // Handle negative values
+  u32 len = 0;
+  if (value < 0.0f) {
+    dest[len++] = '-';
+    value = -value;
+  }
+
+  // Process the integer part
+  u32 integer_part = (u32)value;
+  value -= integer_part;                      // Remove the integer part
+  len += write_int(dest + len, integer_part); // Reuse write_int for integer part
+
+  // Process the fractional part
+  if (precision > 0) {
+    dest[len++] = '.';
+    // value *= (float)(10 ^ precision); // Shift decimal point
+    value *= (float)pow(10, precision); // Shift decimal point correctly
+    u32 frac_part = (u32)value;
+    len += write_int(dest + len, frac_part); // Reuse write_int for fractional part
+  }
+
+  return len;
+}
+
+internal u32 write_string(u8* dest, String val) {
+  u32 len = 0;
+  for (u64 i = 0; i < val.size; ++i) {
+    dest[len++] = val.str[i]; // Copy each character from the String to the buffer
+  }
+  return len;  // Return the number of characters written
+}
+
+internal u32 uint_length(u32 value) {
+  u32 count = 0;
+  do {
+    ++count;
+    value /= 10;
+  } while (value);
+  return count;
+}
+
+internal u32 int_length(i32 value) {
+  u32 count = 0;
+  if (value < 0) {
+    ++count;
+    value = -value;
+  }
+  return count + uint_length(value);
+}
+
+u32 float_length(float value, u32 precision) {
+  u32 len = 0;
+  if (value < 0.0f) {
+    ++len;
+    value = -value;
+  }
+  
+  // Process the integer part
+  u32 integer_part = (u32)value;
+  value -= integer_part;                      // Remove the integer part
+  len += int_length(integer_part); // Reuse write_int for integer part
+
+  // Process the fractional part
+  if (precision > 0) {
+    ++len;
+    value *= (f32)pow(10, precision); // Shift decimal point correctly
+    u32 frac_part = (u32)value;
+    len += int_length(frac_part); // Reuse write_int for fractional part
+  }
+
+  return len;
+}
+
+u32 my_vsnprintf(void* buffer, u32 buffer_size, const void* format, void* argc_) {
+  va_list argc = (char*)argc_;
+  
+  u8* buff = (u8*)buffer;
+  u8* fmt = (u8*)format;
+  u32 written = 0;
+  if (buffer_size == 0) {
+    u32 length = {};
+    u8* p = (u8*)fmt;
+    for (; *p != 0; p += 1) {
+      if (*p == '%') {
+        ++p;
+        switch (*p) {
+          case 'i': {
+            i32 val = va_arg(argc, i32);
+            length += int_length(val);
+          } break;
+          case 'u': {
+            u32 val = va_arg(argc, u32);
+            length += int_length(val);
+          } break;
+          case 'f': {
+            f32 val = va_arg(argc, f64);
+            length += float_length(val, 6);
+          } break;
+          case 's': {
+            String val = va_arg(argc, String);
+            length += val.size;
+          } break;
+          case '.': {
+            ++p; // skip .
+            u32 precision = *fmt - '0';
+            
+            ++p; // skip number
+            f32 val = va_arg(argc, f64);
+            length += float_length(val, precision);
+            ++length; // plus .
+            // ++p; // don't skip because of for
+          } break;
+        }
+      } else {
+        ++length;
+      }
+    }
+    return length;
+  }
+  else {
+    while (written < buffer_size) {
+      if (*fmt == '%') {
+        ++fmt;
+        switch (*fmt) {
+          case 'i': {
+            i32 val = va_arg(argc, i32);
+            u32 len = write_int(buff + written, val);
+            ++fmt;
+            written += len;
+          } break;
+          case 'u': {
+            u32 val = va_arg(argc, u32);
+            u32 len = write_uint(buff + written, val);
+            ++fmt;
+            written += len;
+          } break;
+          case 'f': {
+            f32 val = va_arg(argc, f64);
+            u32 len = write_float(buff + written, val, 6);
+            ++fmt;
+            written += len;
+          } break;
+          case 's': {
+            String val = va_arg(argc, String);
+            u32 len = write_string(buff + written, val);
+            ++fmt;
+            written += len;
+          } break;
+          case '.': {
+            ++fmt; // skip .
+            u32 precision = *fmt - '0';
+            
+            f32 val = va_arg(argc, f64);
+            u32 len = write_float(buff + written, val, precision);
+            ++fmt; // skip number
+            ++fmt; // skip f
+            written += len;
+          } break;
+          
+        }
+      } else {
+        buff[written++] = *fmt++;
+      };
+    }
+  }
+  
+  return written;
+}
+
+////////////////////////////////
+// C-String Measurement, Functions
+
 b32 _strcmpi(const void* str0, const void* str1) {
   u8* str_a = (u8*)str0;
   u8* str_b = (u8*)str1;
@@ -121,13 +330,14 @@ String push_str_copy(Arena* arena, String s) {
 }
 
 String push_strfv(Arena* arena, const void* format, void* argc) {
-  va_list argc_copy;
-  argc_copy = (char*)argc;
-  u64 need_bytes = vsnprintf(0, 0, (char*)format, argc_copy) + 1;
+  va_list argc_copy = (va_list)argc;
+  // u64 need_bytes = vsnprintf(0, 0, (char*)format, argc_copy) + 1;
+  u64 need_bytes = my_vsnprintf(0, 0, format, argc);
   va_end(argc_copy);
   
-  u8* buffer = push_buffer(arena, u8, KB(1));
-  u64 final_size = vsnprintf((char*)buffer, need_bytes, (char*)format, argc_copy);
+  u8* buffer = push_buffer(arena, u8, need_bytes);
+  // u64 final_size = vsnprintf((char*)buffer, need_bytes, (char*)format, argc_copy);
+  u64 final_size = my_vsnprintf(buffer, need_bytes, format, argc_copy);
   
   String result = {buffer, final_size};
   return result;
@@ -143,11 +353,6 @@ String push_strf(Arena* arena, const void* format, ...) {
 
 ////////////////////////////////
 // String some random stuff
-void str_copy(void* dest, String str) {
-  MemCopy(dest, str.str, str.size);
-  u8* c = (u8*)dest;
-  c[str.size] = 0;
-}
 
 String str_read_line(StringCursor* cursor) {
   while (cursor->at < cursor->end) {
@@ -369,4 +574,10 @@ String str_chop_last_dot(String string) {
     }
   }
   return result;
+}
+
+
+void str_copy(String64& dest, String str) {
+  MemCopy(dest.str, str.str, str.size);
+  dest.size = str.size;
 }

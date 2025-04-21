@@ -6,10 +6,10 @@
 struct StaticMeshData;
 struct PlatformState;
 
-b8 r_init(Arena* arena);
+void r_init(Arena* arena);
 void r_shutdown();
 
-void r_on_resized(u16 width, u16 height);
+void r_on_resized(u32 width, u32 height);
 
 void r_draw_frame(R_Packet* packet);
 

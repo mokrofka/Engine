@@ -104,7 +104,7 @@ void os_window_create(WindowConfig config) {
   if (handle == 0) {
     MessageBoxA(NULL, "window creating failed!", "Error!", MB_ICONEXCLAMATION | MB_OK);
     
-    Error("Window creating failed!");
+    Error("Window creating failed"_);
   } else {
     window->hwnd = handle;
   }
@@ -159,16 +159,18 @@ void* vk_os_create_surface() {
   VkResult result = vkCreateWin32SurfaceKHR(vk->instance, &create_info,
                                             vk->allocator, &surface);
   if (result != VK_SUCCESS) {
-    Error("Vulkan surface creation failed.");
+    Error("Vulkan surface creation failed"_);
     return 0;
   }
   return surface;
 }
 
 #define BaseAddress (void*)TB(2)
-void* os_allocate(u64 size, b32 at_base) {
-  return VirtualAlloc(BaseAddress, size, MEM_RESERVE | MEM_COMMIT,
-                      PAGE_READWRITE);
+Arena* os_main_arena_allocate(u64 size) {
+  Arena* arena = (Arena*)VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+  arena->pos = 0;
+  arena->res = size;
+  return arena;
 }
 
 void os_free(void* block, b32 aligned) {
@@ -222,7 +224,7 @@ void os_register_window_resized_callback(WindowResizedCallback callback) {
 }
 
 void os_window_destroy() {
-  Trace("Destroying window...");
+  Trace("Destroying window..."_);
   DestroyWindow((HWND)state->window->hwnd);
   state->window->hwnd = 0;
   state->window = 0;
@@ -242,6 +244,11 @@ v2i os_get_framebuffer_size() {
 
 //////////////////////////////////////////////////////////////////////////
 // Memory
+#define PAGE_SIZE 4096
+
+void* align_address(void* addr) {
+  return (void*)((uintptr_t)addr & ~(PAGE_SIZE - 1));
+}
 
 void* os_reserve(u64 size) {
   void* result = VirtualAlloc(0, size, MEM_RESERVE, PAGE_READWRITE);
@@ -250,6 +257,7 @@ void* os_reserve(u64 size) {
 
 b32 os_commit(void* ptr, u64 size) {
   b32 result = (VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE) != 0);
+  VirtualProtect(ptr, size, PAGE_READWRITE, 0);
   return result;
 }
 
@@ -275,6 +283,8 @@ b32 os_commit_large(void* ptr, u64 size) {
 // file
 
 OS_Handle os_file_open(String path, OS_AccessFlags mode) {
+  Scratch scratch;
+  String path_ = push_str_copy(scratch, path);
   OS_Handle result = {};
   DWORD handle_permission = 0;
   DWORD handle_creation = 0;
@@ -292,7 +302,7 @@ OS_Handle os_file_open(String path, OS_AccessFlags mode) {
     return result;
   }
   
-  HANDLE win32_handle = CreateFileA((char*)path.str, handle_permission,
+  HANDLE win32_handle = CreateFileA((char*)path_.str, handle_permission,
                                      FILE_SHARE_READ, 0, handle_creation, 0, null);
   if (win32_handle == INVALID_HANDLE_VALUE) {
     return result;

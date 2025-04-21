@@ -64,8 +64,8 @@ typedef unsigned char uchar;
 
 #define Member(T,m)                 (((T*)0)->m)
 #define OffsetOf(T,m)               IntFromPtr(&Member(T,m))
-#define MemberFromOffset(T,ptr,off) (T)((((U8 *)ptr)+(off)))
-#define CastFromMember(T,m,ptr)     (T*)(((U8*)ptr) - OffsetOf(T,m))
+#define MemberFromOffset(T,ptr,off) (T)((((u8 *)ptr)+(off)))
+#define CastFromMember(T,m,ptr)     (T*)(((u8*)ptr) - OffsetOf(T,m))
 
 #define MemZero(s,z)       _memory_zero(s,z)
 #define MemZeroStruct(s)   MemZero((s),sizeof(*(s)))
@@ -93,6 +93,7 @@ typedef unsigned char uchar;
 
 #define DeferLoop(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
 #define Loop(i, c) for (int i = 0; i < c; ++i)
+#define Func(a) struct a { static
 
 #define GetProcAddr(v,m,s) (*(PROC*)(&(v))) = os_lib_get_proc(m, s)
 #define Assign(a,b) *((u8**)(&(a))) = (u8*)b
@@ -178,3 +179,4 @@ CheckNil(nil,p) ? \
 //- rjf: singly-linked, singly-headed list helpers
 #define SLLStackPush(f,n) SLLStackPush_N(f,n,next)
 #define SLLStackPop(f) SLLStackPop_N(f,next)
+

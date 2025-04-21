@@ -57,7 +57,7 @@ void vk_swapchain_present(
     //   swapchain->framebuffers[i] = swapchain_copy.framebuffers[i];
     // }
   } else if (result != VK_SUCCESS) {
-    Fatal("Failed to acquire swapchain image!");
+    Fatal("Failed to acquire swapchain image"_);
   }
   
   // Increment (and loop) the index
@@ -69,8 +69,8 @@ internal VK_Swapchain create(u32 width, u32 height) {
   VkExtent2D swapchain_extent = {width, height};
   
   // Choose a swap surface format
-  b8 found = false;
-  for (i32 i = 0; i < vk->device.swapchain_support.format_count; ++i) {
+  b32 found = false;
+  Loop (i, vk->device.swapchain_support.format_count) {
     VkSurfaceFormatKHR format = vk->device.swapchain_support.formats[i];
     // Preferred formats
     if (format.format == VK_FORMAT_B8G8R8A8_UNORM &&
@@ -86,7 +86,7 @@ internal VK_Swapchain create(u32 width, u32 height) {
   }
   
   VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
-  for (i32 i = 0; i < vk->device.swapchain_support.present_mode_count; ++i) {
+  Loop (i, vk->device.swapchain_support.present_mode_count) {
     VkPresentModeKHR mode = vk->device.swapchain_support.present_modes[i];
     if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
       present_mode = mode;
@@ -156,7 +156,7 @@ internal VK_Swapchain create(u32 width, u32 height) {
   VK_CHECK(vkGetSwapchainImagesKHR(vkdevice, swapchain.handle, &swapchain.image_count, swapchain.images));
 
   // Views
-  for (i32 i = 0; i < swapchain.image_count; ++i) {
+  Loop (i, swapchain.image_count) {
     VkImageViewCreateInfo view_info = {VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
     view_info.image = swapchain.images[i];
     view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -185,18 +185,18 @@ internal VK_Swapchain create(u32 width, u32 height) {
       true,
       VK_IMAGE_ASPECT_DEPTH_BIT);
 
-  Info("Swapchain created successfully.");
+  Info("Swapchain created successfully"_);
   return swapchain;
 }
 
 internal void destroy(VK_Swapchain* swapchain) {
-  for (u32 i = 0; i < vk->swapchain.image_count; ++i) {
+  Loop (i, vk->swapchain.image_count) {
     vk_framebuffer_destroy(&swapchain->framebuffers[i]);
   }
   vkDeviceWaitIdle(vkdevice);
   vk_image_destroy(&swapchain->depth_attachment);
 
-  for (u32 i = 0; i < swapchain->image_count; ++i) {
+  Loop (i, swapchain->image_count) {
     vkDestroyImageView(vkdevice, swapchain->views[i], vk->allocator);
   }
 

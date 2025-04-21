@@ -454,8 +454,8 @@ Inline mat4 mat4_identity() {
 
 Inline mat4 operator*(mat4 matrix_0, mat4 matrix_1) {
   mat4 result = {};
-  for (i32 row = 0; row < 4; ++row) {
-    for (i32 col = 0; col < 4; ++col) {
+  Loop (row, 4) {
+    Loop (col, 4) {
       result.data[row * 4 + col] =
           matrix_1.data[row * 4 + 0] * matrix_0.data[0 * 4 + col] +
           matrix_1.data[row * 4 + 1] * matrix_0.data[1 * 4 + col] +

@@ -28,7 +28,7 @@ void create_texture(Texture* t) {
   t->generation = INVALID_ID;
 }
 
-b8 r_init(Arena* arena) {
+void r_init(Arena* arena) {
   u64 memory_requirement = sizeof(RendererSystemState);
   
   state = push_buffer(arena, RendererSystemState, memory_requirement);
@@ -47,8 +47,6 @@ b8 r_init(Arena* arena) {
   state->projection = mat4_perspective(deg_to_rad(45.0f), 1280 / 720.0f, state->near_clip, state->far_clip);
   
   state->view = mat4_inverse(state->view);
-
-  return true;
 }
 
 void r_shutdown() {
@@ -56,17 +54,17 @@ void r_shutdown() {
   state = 0;
 }
 
-b8 r_begin_frame(f32 delta_time) {
+b32 r_begin_frame(f32 delta_time) {
   return vk_r_backend_begin_frame(delta_time);
 }
 
-b8 r_end_frame(f32 delta_time) {
-  b8 result = vk_r_backend_end_frame(delta_time);
+b32 r_end_frame(f32 delta_time) {
+  b32 result = vk_r_backend_end_frame(delta_time);
   ++state->backend.frame_number;
   return result;
 }
 
-void r_on_resized(u16 width, u16 height) {
+void r_on_resized(u32 width, u32 height) {
   state->projection = mat4_perspective(deg_to_rad(45.0f), width / (f32)height, state->near_clip, state->far_clip);
   vk_r_backend_on_resize(width, height);
 }
@@ -78,15 +76,15 @@ void r_draw_frame(R_Packet* packet) {
     vk_r_update_global_state(state->projection, state->view, v3_zero(), v4_one(), 0);
     
     u32 count = packet->geometry_count;
-    for (u32 i = 0; i < count; ++i) {
+    Loop (i, count) {
       vk_r_draw_geometry(packet->geometries[i]);
     }
     
     // End the fram. If this fails, it is likely unrecovarble.
-    b8 result = r_end_frame(packet->delta_time);
+    b32 result = r_end_frame(packet->delta_time);
     
     if (!result) {
-      Error("r_end_frame failed. Application shutting down...");
+      Error("r_end_frame failed. Application shutting down..."_);
     }
   }
 }

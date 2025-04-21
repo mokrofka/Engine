@@ -40,15 +40,15 @@ internal void load_game_lib_init(App* app);
 b32 event_on_debug_event(u32 code, void* sender, void* listener_inst, EventContext data) {
   Scratch scratch;
   String names[] = {
-    str_lit("cobblestone"),
-    str_lit("paving"),
-    str_lit("paving2"),
+    "cobblestone"_,
+    "paving"_,
+    "paving2"_,
   };
   local i8 choice = 2;
-  push_str_copy(scratch, str_lit("cobblestone"));
-  push_str_copy(scratch, str_lit("paving"));
-  push_str_copy(scratch, str_lit("paving2"));
-    
+  push_str_copy(scratch, "cobblestone"_);
+  push_str_copy(scratch, "paving"_);
+  push_str_copy(scratch, "paving2"_);
+  
   // Save off the old name
   String old_name = names[choice];
   
@@ -58,7 +58,7 @@ b32 event_on_debug_event(u32 code, void* sender, void* listener_inst, EventConte
   // Load up the new texture
   state->test_geometry->material->diffuse_map.texture = texture_system_acquire(names[choice], true);
   if (!state->test_geometry->material->diffuse_map.texture) {
-    Warn("event_on_debug_event no texture! using default");
+    Warn("event_on_debug_event no texture! using default"_);
     state->test_geometry->material->diffuse_map.texture = texture_system_get_default_texture();
   }
   
@@ -68,14 +68,19 @@ b32 event_on_debug_event(u32 code, void* sender, void* listener_inst, EventConte
 }
 // TODO end temp
 
+b32 foo() {
+  return false; 
+}
+
 void engine_create(App* game_inst) {
+  global_allocator_init();
   application_create(game_inst);
   
   game_inst->engine_state = push_struct(game_inst->arena, EngineState);
   
   Assign(state, game_inst->engine_state);
   state->game_inst = game_inst;
-  state->arena = arena_alloc(game_inst->arena, MB(400));
+  state->arena = arena_alloc(game_inst->arena, MB(50));
 
   {
     platform_init(state->arena);
@@ -84,6 +89,7 @@ void engine_create(App* game_inst) {
   {
     logging_init(state->arena);
   }
+  Info("hello %s \n\n", "hello"_);
 
   {
     event_init(state->arena);
@@ -141,7 +147,7 @@ void engine_create(App* game_inst) {
   }
 
   {
-    GeometryConfig config = geometry_sys_generate_plane_config(10.0f, 5.0f, 5, 5, 5.0f, 2.0f, str_lit("test geometry"), str_lit("test_material"));
+    GeometryConfig config = geometry_sys_generate_plane_config(10.0f, 5.0f, 5, 5, 5.0f, 2.0f, "test geometry"_, "test_material"_);
     state->test_geometry = geometry_sys_acquire_from_config(config, true);
   }
 
@@ -287,8 +293,8 @@ internal b32 app_on_key(u32 code, void* sender, void* listener_inst, EventContex
 }
 
 internal b32 app_on_resized(u32 code, void* sender, void* listener_inst, EventContext context) {
-  u16 width = context.data.u16[0];
-  u16 height = context.data.u16[1];
+  u32 width = context.data.u16[0];
+  u32 height = context.data.u16[1];
   Debug("Window resize: %i, %i", width, height);
 
   r_on_resized(width, height);
@@ -300,7 +306,7 @@ internal void load_game_lib(App* app) {
   app->modified = props.modified;
   os_copy_file_path(app->lib_temp_file_path, app->lib_file_path);
   app->lib = os_lib_open(app->lib_temp_file_path);
-  GetProcAddr(app->update, app->lib, str_lit("application_update"));
+  GetProcAddr(app->update, app->lib, ("application_update"_));
 }
 
 internal void check_dll_changes(App* app) {
@@ -320,15 +326,15 @@ internal void load_game_lib_init(App* app) {
   app->modified = file_props.modified;
   os_copy_file_path(app->lib_temp_file_path, app->lib_file_path);
   
-  app->lib = os_lib_open(str_lit("game_temp.dll"));
-  GetProcAddr(app->update, app->lib, str_lit("application_update"));
-  GetProcAddr(app->init, app->lib, str_lit("application_init"));
+  app->lib = os_lib_open(("game_temp.dll"_));
+  GetProcAddr(app->update, app->lib, ("application_update"_));
+  GetProcAddr(app->init, app->lib, ("application_init"_));
   
   Assert(app->lib.u64 && app->init && app->update);
 }
 
 internal void application_create(App* app) {
-  app->arena = arena_alloc(GB(1));
+  app->arena = os_main_arena_allocate(MB(200));
   tctx_init(app->arena);
   Scratch scratch;
   
@@ -337,8 +343,8 @@ internal void application_create(App* app) {
   app->name = str_skip_last_slash(app->file_path);
   
   String file_directory = str_chop_after_last_slash(app->file_path);
-  app->lib_file_path = push_str_cat(app->arena, file_directory, str_cstr("game.dll"));
-  app->lib_temp_file_path = push_str_cat(app->arena, file_directory, str_cstr("game_temp.dll"));
+  app->lib_file_path = push_str_cat(app->arena, file_directory, "game.dll"_);
+  app->lib_temp_file_path = push_str_cat(app->arena, file_directory, "game_temp.dll"_);
 
   load_game_lib_init(app);
 }

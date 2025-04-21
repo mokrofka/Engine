@@ -7,7 +7,7 @@ struct TextureSystemConfig {
   u32 max_texture_count;
 };
 
-#define DEFAULT_TEXTURE_NAME "default"
+#define DEFAULT_TEXTURE_NAME "default"_
 
 void texture_system_init(Arena* arena, TextureSystemConfig config);
 void texture_system_shutdown();

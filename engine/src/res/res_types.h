@@ -1,8 +1,6 @@
 #pragma once
 #include "lib.h"
 
-#define TEXTURE_NAME_MAX_LENGTH 512
-
 struct Texture {
   u32 id;
   u32 width;
@@ -10,7 +8,7 @@ struct Texture {
   u8 channel_count;
   b8 has_transparency;
   u32 generation;
-  char name[TEXTURE_NAME_MAX_LENGTH];
+  String64 name;
   void* internal_data;
 };
 
@@ -24,23 +22,19 @@ struct TextureMap {
   TextureUse use;
 };
 
-#define MATERIAL_NAME_MAX_LENGTH 256
-
 struct Material {
   u32 id;
   u32 generation;
   u32 internal_id;
-  char name[MATERIAL_NAME_MAX_LENGTH];
+  String64 name;
   v4 diffuse_color;
   TextureMap diffuse_map;
 };
-
-#define GEOMETRY_NAME_MAX_LENGTH 256
 
 struct Geometry {
   u32 id;
   u32 internal_id;
   u32 generation;
-  char name[GEOMETRY_NAME_MAX_LENGTH];
+  String64 name;
   Material* material;
 };

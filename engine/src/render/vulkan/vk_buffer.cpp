@@ -19,7 +19,7 @@ VK_Buffer vk_buffer_create(u64 size, u32 usage, u32 memory_property_flags, b8 bi
   vkGetBufferMemoryRequirements(vkdevice, buffer.handle, &requirements);
   buffer.memory_index = vk->find_memory_index(requirements.memoryTypeBits, buffer.memory_property_flags);
   if (buffer.memory_index == -1) {
-    Error("Unable to create vulkan buffer because the required memory type index was not found.");
+    Error("Unable to create vulkan buffer because the required memory type index was not found"_);
   }
   
   // Allocate memory info

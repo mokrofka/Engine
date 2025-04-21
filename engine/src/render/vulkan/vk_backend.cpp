@@ -78,9 +78,9 @@ void vk_r_backend_init(R_Backend* backend) {
   required_extensions[2] = "VK_KHR_win32_surface";
 #if defined(_DEBUG)
   
-  Debug("Required extensions:");
-  for (u32 i = 0; i < ArrayCount(required_extensions); ++i) {
-    Debug(required_extensions[i]);
+  Debug("Required extensions:"_);
+  Loop (i, ArrayCount(required_extensions)) {
+    Debug(str_cstr(required_extensions[i]));
   }
 #endif
 
@@ -89,12 +89,12 @@ void vk_r_backend_init(R_Backend* backend) {
   
   // Validation layers
   // const char** required_validation_layer_names = 0;
-  const char* required_validation_layer_names[1];
+  char* required_validation_layer_names[1];
   u32 required_validation_layer_count = ArrayCount(required_validation_layer_names);
 // If validation should be done, get a list of the required validation layert names
 // and make sure they exist. Validation layers should only be enabled on non-release builds.
 #if defined(_DEBUG)
-  Info("Validation layers enabled. Enumerating...");
+  Info("Validation layers enabled. Enumerating..."_);
   // The list of validation layers required.
   required_validation_layer_names[0] = "VK_LAYER_KHRONOS_validation";
 
@@ -106,32 +106,32 @@ void vk_r_backend_init(R_Backend* backend) {
   VK_CHECK(vkEnumerateInstanceLayerProperties(&available_layer_count, available_layers));
 
   // Verify all required layers are available.
-  for (u32 i = 0; i < required_validation_layer_count; ++i) {
-    Info("Searching for layer: %s...", required_validation_layer_names[i]);
-    b8 found = false;
-    for (u32 j = 0; j < available_layer_count; ++j) {
+  Loop (i, required_validation_layer_count) {
+    Info("Searching for layer: %s...", str_cstr(required_validation_layer_names[i]));
+    b32 found = false;
+    Loop (j, available_layer_count) {
       if (cstr_match(required_validation_layer_names[i], available_layers[j].layerName)) {
         found = true;
-        Info("Found.");
+        Info("Found"_);
         break;
       }
     }
     if (!found) {
-      Fatal("Required validation layer is missing: %s", required_validation_layer_names[i]);
+      Fatal("Required validation layer is missing: %s", str_cstr(required_validation_layer_names[i]));
     }
   }
-  Info("All required validation layers are present.");
+  Info("All required validation layers are present"_);
 #endif
 
   create_info.enabledLayerCount = required_validation_layer_count;
   create_info.ppEnabledLayerNames = required_validation_layer_names;
   
   VK_CHECK(vkCreateInstance(&create_info, vk->allocator, &vk->instance));
-  Info("Vulkan insance created.");
+  Info("Vulkan insance created"_);
 
   // Debugger
 #if defined(_DEBUG)
-  Debug("Creating Vulkan debugger...");
+  Debug("Creating Vulkan debugger..."_);
   u32 log_severity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
                      VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
                      VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT;  //|
@@ -146,14 +146,14 @@ void vk_r_backend_init(R_Backend* backend) {
   PFN_vkCreateDebugUtilsMessengerEXT func;
   Assign(func, vkGetInstanceProcAddr(vk->instance, "vkCreateDebugUtilsMessengerEXT"));
 
-  AssertMsg(func, "Failed to create debug messenger!");
+  Assert(func && "Failed to create debug messenger");
   VK_CHECK(func(vk->instance, &debug_create_info, vk->allocator, &vk->debug_messenger));
-  Debug("Vulkan debugger created.");
+  Debug("Vulkan debugger created"_);
 #endif
   
-  Debug("Creating Vulkan surface...");
+  Debug("Creating Vulkan surface..."_);
   vk->surface = (VkSurfaceKHR)vk_os_create_surface();
-  Debug("Vulkan surface created.");
+  Debug("Vulkan surface created"_);
 
   vk->device = vk_device_create();
 
@@ -166,10 +166,10 @@ void vk_r_backend_init(R_Backend* backend) {
 
   regenerate_framebuffers(&vk->swapchain, vk->renderpass);
 
-  for (u32 i = 0; i < vk->swapchain.image_count; ++i) {
+  Loop (i, vk->swapchain.image_count) {
     vk->render.cmd[i] = vk_command_buffer_alloc(vk->device.gfx_cmd_pool, true);
   }
-  Debug("Vulkan command buffers created.");
+  Debug("Vulkan command buffers created"_);
 
   vk->sync.image_available_semaphores = push_array(vk->arena, VkSemaphore,
                                                    vk->swapchain.max_frames_in_flight);
@@ -178,7 +178,7 @@ void vk_r_backend_init(R_Backend* backend) {
   vk->sync.in_flight_fences = push_array(vk->arena, VK_Fence,
                                          vk->swapchain.max_frames_in_flight);
 
-  for (u8 i = 0; i < vk->swapchain.max_frames_in_flight; ++i) {
+  Loop (i, vk->swapchain.max_frames_in_flight) {
     VkSemaphoreCreateInfo semaphore_create_info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
     vkCreateSemaphore(vkdevice, &semaphore_create_info, vk->allocator,
                       &vk->sync.image_available_semaphores[i]);
@@ -192,11 +192,12 @@ void vk_r_backend_init(R_Backend* backend) {
   
   create_buffers(&vk->render);
   
-  for (u32 i = 0; i < VK_MAX_GEOMETRY_COUNT; ++i) {
+  Loop (i, VK_MAX_GEOMETRY_COUNT) {
     vk->render.geometries[i].id = INVALID_ID;
   }
   
-  Info("Vulkan renderer initialized successfully.");
+  // Info("Vulkan renderer initialized successfully.");
+  Info("Vulkan renderer initialized successfully"_);
 }
 
 void vk_r_backend_shutdown() {
@@ -210,7 +211,7 @@ void vk_r_backend_shutdown() {
   vk_material_shader_destroy(&vk->render.material_shader);
   
   // Sync objects
-  for (u8 i = 0; i < vk->swapchain.max_frames_in_flight; ++i) {
+  Loop (i, vk->swapchain.max_frames_in_flight) {
     if (vk->sync.image_available_semaphores[i]) {
       vkDestroySemaphore(vkdevice,
                          vk->sync.image_available_semaphores[i],
@@ -228,7 +229,7 @@ void vk_r_backend_shutdown() {
   vk->sync.in_flight_fences = 0;
   
   // Command buffers
-  for (u32 i = 0; i < vk->swapchain.image_count; ++i) {
+  Loop (i, vk->swapchain.image_count) {
     if (vk->render.cmd[i].handle) {
       vk_cmd_free(vk->device.gfx_cmd_pool, &vk->render.cmd[i]);
       vk->render.cmd[i].handle = 0;
@@ -242,16 +243,16 @@ void vk_r_backend_shutdown() {
   // Swapchain
   vk_swapchain_destroy(&vk->swapchain);
   
-  Debug("Destroying Vulkan device...");
+  Debug("Destroying Vulkan device..."_);
   vk_device_destroy();
   
-  Debug("Destroying Vulkan surface...");
+  Debug("Destroying Vulkan surface..."_);
   if (vk->surface) {
     vkDestroySurfaceKHR(vk->instance, vk->surface, vk->allocator);
     vk->surface = 0;
   }
   
-  Debug("Destroying Vulkan debugger...");
+  Debug("Destroying Vulkan debugger..."_);
   if (vk->debug_messenger) {
     PFN_vkDestroyDebugUtilsMessengerEXT func =
         (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
@@ -259,7 +260,7 @@ void vk_r_backend_shutdown() {
     func(vk->instance, vk->debug_messenger, vk->allocator);
   }
 
-  Debug("Destroying Vulkan instance...");
+  Debug("Destroying Vulkan instance..."_);
   vkDestroyInstance(vk->instance, vk->allocator);
 }
 
@@ -270,7 +271,7 @@ void vk_r_backend_on_resize(u16 width, u16 height) {
   vk->frame.height = height;
   ++vk->frame.size_generation;
   
-  Info("Vulkan renderer backend->resized: w/h/gen %i/%i/%llu", width, height, vk->frame.size_generation);
+  Info("Vulkan renderer backend->resized: w/h/gen %i/%i/%i", width, height, vk->frame.size_generation);
 }
 
 b8 vk_r_backend_begin_frame(f32 delta_time) {
@@ -290,13 +291,13 @@ b8 vk_r_backend_begin_frame(f32 delta_time) {
       return false;
     }
     
-    Info("Resized, booting.");
+    Info("Resized, booting"_);
     return false;
   }
 
   // Wait for the execution of the current frame to complete. The fence being free will allow this one to move on.
   if (!vk_fence_wait(&vk->sync.in_flight_fences[vk->frame.current_frame], U64_MAX)) {
-    Warn("In-flight fence wait failure!");
+    Warn("In-flight fence wait failure"_);
     return false;
   }
 
@@ -396,17 +397,17 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     void* user_data) {
   switch (message_severity) {
     default:
-    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-      _log_output(LOG_LEVEL_ERROR, callback_data->pMessage);
-      break;
+    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: {
+      Error(str_cstr(callback_data->pMessage))
+    } break;
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-      Warn(callback_data->pMessage);
+      Warn(str_cstr(callback_data->pMessage));
       break;
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
-      Info(callback_data->pMessage);
+      Info(str_cstr(callback_data->pMessage));
       break;
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
-      Trace(callback_data->pMessage);
+      Trace(str_cstr(callback_data->pMessage));
       break;
     }
   return VK_FALSE;
@@ -416,19 +417,19 @@ internal i32 find_memory_index(u32 type_filter, u32 property_flags) {
   VkPhysicalDeviceMemoryProperties memory_properties;
   vkGetPhysicalDeviceMemoryProperties(vk->device.physical_device, &memory_properties);
 
-  for (u32 i = 0; i < memory_properties.memoryTypeCount; ++i) {
+  Loop (i, memory_properties.memoryTypeCount) {
     // Check each memory type to see if its bit is set to 1.
     if (type_filter & (1 << i) && (memory_properties.memoryTypes[i].propertyFlags & property_flags) == property_flags) {
       return i;
     }
   }
 
-  Warn("Unable to find suitable memory type!");
+  Warn("Unable to find suitable memory type"_);
   return -1;
 }
 
 internal void regenerate_framebuffers(VK_Swapchain* swapchain, VK_RenderPass renderpass) {
-  for (u32 i = 0; i < swapchain->image_count; ++i) {
+  Loop (i, swapchain->image_count) {
     // TODO: make this dynamic based on the currently configured attachments
     u32 attachment_count = 2;
     VkImageView attachments[] = {
@@ -447,13 +448,13 @@ internal void regenerate_framebuffers(VK_Swapchain* swapchain, VK_RenderPass ren
 internal b8 recreate_swapchain(VK_Swapchain* swapchain) {
   // If already being recreated, do not try again.
   if (vk->recreating_swapchain) {
-    Debug("recreate_swapchain called when already recreating. Booting.");
+    Debug("recreate_swapchain called when already recreating. Booting"_);
     return false;
   }
 
   // Detect if the window is too small to be drawn to
   if (vk->frame.width == 0 || vk->frame.height == 0) {
-    Debug("recreate_swapchain called when window is < 1 in a dimension. Booting.");
+    Debug("recreate_swapchain called when window is < 1 in a dimension. Booting"_);
     return false;
   }
 
@@ -605,7 +606,7 @@ void vk_r_destroy_texture(Texture* texture) {
 void vk_r_create_material(Material* material) {
   Assert(material);
   vk_material_shader_acquire_resources(&vk->render.material_shader, material);
-  Trace("Render: Material created.");
+  Trace("Render: Material created"_);
 }
 
 void vk_r_destroy_material(Material* material) {
@@ -613,10 +614,10 @@ void vk_r_destroy_material(Material* material) {
     if (material->internal_id != INVALID_ID) {
       vk_material_shader_release_resources(&vk->render.material_shader, material);
     } else {
-      Warn("vk_r_destroy_material called with internal_id=INVALID_ID. Nothing was done");
+      Warn("vk_r_destroy_material called with internal_id=INVALID_ID. Nothing was done"_);
     }
   } else {
-    Warn("vk_r_destroy_material called with null. Nothing was done.");
+    Warn("vk_r_destroy_material called with null. Nothing was done"_);
   }
 }
 
@@ -626,7 +627,7 @@ void vk_r_create_geometry(Geometry* geometry, u32 vertex_count, Vertex3D* vertic
   }
 
   // Check if this is a re-upload. If it is, need to free old data afterward.
-  b8 is_reupload = geometry->internal_id != INVALID_ID;
+  b32 is_reupload = geometry->internal_id != INVALID_ID;
   VK_GeometryData old_range;
 
   VK_GeometryData* internal_data = 0;
@@ -641,7 +642,7 @@ void vk_r_create_geometry(Geometry* geometry, u32 vertex_count, Vertex3D* vertic
     old_range.vertex_count = internal_data->vertex_count;
     old_range.vertex_size = internal_data->vertex_size;
   } else {
-    for (u32 i = 0; i < VK_MAX_GEOMETRY_COUNT; ++i) {
+    Loop (i, VK_MAX_GEOMETRY_COUNT) {
       if (vk->render.geometries[i].id == INVALID_ID) {
         // Found a free index.
         geometry->internal_id = i;
@@ -652,7 +653,7 @@ void vk_r_create_geometry(Geometry* geometry, u32 vertex_count, Vertex3D* vertic
     }
   }
   if (!internal_data) {
-    Error("vulkan_renderer_create_geometry failed to find a free index for a new geometry upload. Adjust config to allow for more.");
+    Error("vulkan_renderer_create_geometry failed to find a free index for a new geometry upload. Adjust config to allow for more"_);
   }
 
   VkCommandPool pool = vk->device.gfx_cmd_pool;

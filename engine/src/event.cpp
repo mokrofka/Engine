@@ -29,7 +29,7 @@ struct EventSystemState {
 global EventSystemState* state;
 
 void event_init(Arena* arena) {
-  u64 memory_reserved = KB(10);
+  u64 memory_reserved = KB(5);
   u64 memory_requirement = sizeof(EventSystemState);
   
   state = push_buffer(arena, EventSystemState, memory_requirement);
@@ -59,9 +59,9 @@ b32 event_register(u32 code, void* listener, PFN_On_Event on_event) {
   }
   
   u64 register_count = state->registered[code].array.pos;
-  for (u64 i = 0; i < register_count; ++i) {
+  Loop (i, register_count) {
     if(state->registered[code].events[i].listener == listener) {
-      Warn("You're registering the same event!");
+      Warn("You're registering the same event!"_);
       return false;
     }
   }
@@ -85,12 +85,12 @@ b32 event_register(u32 code, void* listener, PFN_On_Event on_event) {
 b32 event_unregister(u32 code, void* listener, PFN_On_Event on_event) {
   // On nothing is registered for the code, boot out.
   if (state->registered[code].array.pos == 0) {
-    Warn("you're trying to unregister nothing!");
+    Warn("you're trying to unregister nothing!"_);
     return false;
   }
   
   u64 register_count = state->registered[code].array.pos;
-  for (u64 i = 0; i < register_count; ++i) {
+  Loop (i, register_count) {
     RegisteredEvent e = state->registered[code].events[i];
     if (e.listener == listener && e.callback == on_event) {
       state->registered[code].events[i] = state->registered[code].events[register_count-1];
@@ -114,7 +114,7 @@ b32 event_fire(u32 code, void* sender, EventContext context) {
   }
   
   u64 register_count = state->registered[code].array.pos;
-  for (u64 i = 0; i < register_count; ++i) {
+  Loop (i, register_count) {
     RegisteredEvent e = state->registered[code].events[i];
     if (e.callback(code, sender, e.listener, context)) {
       // Message has been handled, do not send to other listeners.
