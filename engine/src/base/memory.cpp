@@ -5,6 +5,14 @@
 #include "str.h"
 #include <string.h>
 
+#define ZERO_MEMORY 1
+
+#ifdef ZERO_MEMORY
+  #define ClearMemory(ptr, size) MemZero(ptr, size)
+#else
+  #define ClearMemory(ptr, size)
+#endif
+
 global thread_local TCTX tctx_thread_local;
 
 void _memory_zero(void* block, u64 size) {
@@ -62,15 +70,13 @@ u64 calc_padding_with_header(u64 ptr, u64 alignment, u64 header_size) {
   return padding;
 }
 
-internal u64 align_forward(u64 ptr, u64 align) {
+internal u64 align_forward(PtrInt ptr, u64 align) {
 	u64 p, a, modulo;
   
-	if (!is_power_of_two(align)) {
-    Error("isn't power of two"_);
-  }
+  Assert(is_power_of_two(align));
 
 	p = ptr;
-	a = (u64)align;
+	a = align;
 	// Same as (p % a) but faster as 'a' is a power of two
 	modulo = p & (a-1);
 
@@ -87,29 +93,30 @@ internal u64 align_forward(u64 ptr, u64 align) {
 ///////////////////////////////////////////////////////////////////////////////////////
 // Arena
 
-Arena* arena_alloc(Arena *arena, u64 size, u64 align) {
-	// Align 'curr_offset' forward to the specified alignment
-	u64 curr_ptr = (u64)arena + ARENA_HEADER + arena->pos;
-	u64 offset = align_forward(curr_ptr, align);
-  u64 temp = (u64)arena + ARENA_HEADER;
+Arena* arena_alloc(Arena* arena, u64 size, u64 align) {
+  // Align 'curr_offset' forward to the specified alignment
+  PtrInt curr_ptr = (PtrInt)arena + ARENA_HEADER + arena->pos;
+  u64 offset = align_forward(curr_ptr, align);
+  PtrInt temp = (PtrInt)arena + ARENA_HEADER;
 	offset -= temp; // Change to relative offset
 
 	// Check to see if the backing memory has space left
   Assert(offset+size > arena->pos && "Arena is out of memory");
+  u64 copy = offset;
+  copy /= MB(1);
   
-  Arena* ptr = (Arena*)((u8*)((u64)arena + ARENA_HEADER) + offset);
+  Arena* ptr = (Arena*)(((PtrInt)arena + ARENA_HEADER) + offset);
   ptr->pos = 0;
   ptr->res = size;
   arena->pos = offset+size;
 
-  // Zero new memory by default
-  // MemZero((u8*)(ptr) + ARENA_HEADER, size);
+  ClearMemory((u8*)ptr+ARENA_HEADER, size);
   return ptr;
 }
 
 void* _arena_push(Arena* arena, u64 size, u64 align) {
   // Align 'curr_offset' forward to the specified alignment
-  u64 curr_ptr = (u64)arena + ARENA_HEADER + arena->pos;
+  PtrInt curr_ptr = (PtrInt)arena + ARENA_HEADER + arena->pos;
   u64 offset = align_forward(curr_ptr, align);
   u64 temp = (u64)arena + ARENA_HEADER;
 	offset -= temp; // Change to relative offset
@@ -117,12 +124,11 @@ void* _arena_push(Arena* arena, u64 size, u64 align) {
   Assert(offset+size > arena->pos && "Arena is out of memory");
   
 	// Check to see if the backing memory has space left
-  u8* buffer = (u8*)((u64)arena + ARENA_HEADER) + offset;
+  u8* buffer = (u8*)((PtrInt)arena + ARENA_HEADER) + offset;
   arena->pos = offset+size;
 
-  // MemZero(buffer, size);
+  // ClearMemory(buffer, size);
   return buffer;
-	// Return null if the arena is out of memory (or handle differently)
 }
 
 void tctx_init(Arena* arena) {
@@ -465,7 +471,7 @@ struct SegPool {
 
 struct MemCtx {
   u8* start;
-  SegPool pools[28];
+  SegPool pools[32];
 };
 
 global MemCtx mem_ctx;
@@ -474,7 +480,7 @@ global MemCtx mem_ctx;
 #define MIN_CHUNKS_PER_COMMIT 32
 
 internal void pool_commit(SegPool& p, u64 commit_size) {
-  u8* end_pool = (u8*)(p.chunk_size * p.chunk_count + (u64)p.data);
+  u8* end_pool = (u8*)(p.chunk_size * p.chunk_count + (PtrInt)p.data);
   os_commit(end_pool, commit_size);
 }
 
@@ -575,7 +581,7 @@ void global_allocator_init() {
   u64 offset = 0;
   u64 offset_num = GB(10);
   
-  u32 pow_num = 1;
+  u64 pow_num = 1;
   Loop (i, ArrayCount(mem_ctx.pools)) {
     mem_ctx.pools[i].data = (u8*)mem_ctx.start + offset;
     mem_ctx.pools[i].chunk_size = 8 * pow_num;
@@ -584,8 +590,7 @@ void global_allocator_init() {
   };
 }
 
-
-u64 ring_write(u8 *ring_base, u64 ring_size, u64 ring_pos, void *src_data, u64 src_data_size) {
+u64 ring_write(u8* ring_base, u64 ring_size, u64 ring_pos, void* src_data, u64 src_data_size) {
   Assert(src_data_size <= ring_size);
   
   u64 ring_off = ring_pos % ring_size;

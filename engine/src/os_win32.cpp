@@ -165,7 +165,6 @@ void* vk_os_create_surface() {
   return surface;
 }
 
-#define BaseAddress (void*)TB(2)
 Arena* os_main_arena_allocate(u64 size) {
   Arena* arena = (Arena*)VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
   arena->pos = 0;
@@ -257,7 +256,6 @@ void* os_reserve(u64 size) {
 
 b32 os_commit(void* ptr, u64 size) {
   b32 result = (VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE) != 0);
-  VirtualProtect(ptr, size, PAGE_READWRITE, 0);
   return result;
 }
 

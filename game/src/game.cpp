@@ -46,13 +46,15 @@ internal void camera_pitch(f32 amount) {
 }
 
 #include "test.h"
-void application_init(App* game_inst) {
+void application_init(App* app) {
   test();
   Scratch scratch;
+  Arena* arena = arena_alloc(scratch, 16);
+  push_buffer(arena, u8, 128);
   
-  game_inst->state = push_struct(game_inst->arena, GameState);
-  Assign(state, game_inst->state);
-  state->arena = arena_alloc(game_inst->arena, MB(50));
+  app->state = push_struct(app->arena, GameState);
+  Assign(state, app->state);
+  state->arena = arena_alloc(app->arena, GameSize);
   
   state->camera_position = v3(0,0,30.0f);
   state->camera_euler = v3_zero();
@@ -77,30 +79,30 @@ void application_init(App* game_inst) {
   
 }
 
-void application_update(App* game_inst) {
-  Assign(state, game_inst->state);
-  f32 delta_time = game_inst->delta_time;
+void application_update(App* app) {
+  Assign(state, app->state);
+  f32 delta_time = app->delta_time;
   // TODO temp
   if (input_is_key_up(KEY_T) && input_was_key_down(KEY_T)) {
     Debug("Swapping texture!");
     EventContext context = {};
-    event_fire(EVENT_CODE_DEBUG0, game_inst, context);
+    event_fire(EVENT_CODE_DEBUG0, app, context);
   }
   
   f32 rotation_speed = 2.0f;
 
   // HACK temp back to move camera around
   if (input_is_key_down(KEY_A) || input_is_key_down(KEY_LEFT)) {
-    camera_yaw(rotation_speed * game_inst->delta_time);
+    camera_yaw(rotation_speed * app->delta_time);
   }
   if (input_is_key_down(KEY_D) || input_is_key_down(KEY_RIGHT)) {
-    camera_yaw(-rotation_speed * game_inst->delta_time);
+    camera_yaw(-rotation_speed * app->delta_time);
   }
   if (input_is_key_down(KEY_UP)) {
-    camera_pitch(rotation_speed * game_inst->delta_time);
+    camera_pitch(rotation_speed * app->delta_time);
   }
   if (input_is_key_down(KEY_DOWN)) {
-    camera_pitch(-rotation_speed * game_inst->delta_time);
+    camera_pitch(-rotation_speed * app->delta_time);
   }
   
   f32 temp_move_speed = 50.0f;
@@ -145,8 +147,8 @@ void application_update(App* game_inst) {
   r_set_view(state->view);
 }
 
-void application_render(struct App* game_inst) {
+void application_render(struct App* app) {
 }
 
-void application_on_resize(struct App* game_inst) {
+void application_on_resize(struct App* app) {
 }

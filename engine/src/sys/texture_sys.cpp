@@ -157,9 +157,9 @@ void texture_system_release(String name) {
     // Reset the reference.
     ref.handle = INVALID_ID;
     ref.auto_release = false;
-    Trace("Released texture '%s'., Texture unloaded because reference count=0 and auto_release=true.", name_copy);
+    Trace("Released texture '%s'., Texture unloaded because reference count=0 and auto_release=true", name_copy);
   } else {
-    Trace("Released texture '%s', now has a reference count of '%i' (auto_release=%s).", name_copy, ref.reference_count, ref.auto_release ? "true" : "false");
+    Trace("Released texture '%s', now has a reference count of '%i' (auto_release=%s)", name_copy, ref.reference_count, ref.auto_release ? "true"_ : "false"_);
   }
 
   // Update the entry.
@@ -176,7 +176,7 @@ Texture* texture_system_get_default_texture() {
 internal void create_default_textures() {
   // NOTE: Create default texture, a 256x256 blue/white checkerboard pattern.
   // This is done in code to eliminate asset dependencies.
-  Trace("Creating default texture...");
+  Trace("Creating default texture..."_);
   const u32 tex_dimension = 256;
   const u32 channels = 4;
   const u32 pixel_count = tex_dimension * tex_dimension;

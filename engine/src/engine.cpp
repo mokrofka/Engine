@@ -11,7 +11,7 @@
 
 struct EngineState {
   Arena* arena;
-  App* game_inst;
+  App* app;
   b8 is_running;
   b8 is_suspended;
 
@@ -33,7 +33,7 @@ internal b32 app_on_key(u32 code, void* sender, void* listener_inst, EventContex
 internal b32 app_on_resized(u32 code, void* sender, void* listener_inst, EventContext context);
 
 internal void check_dll_changes(App* app);
-internal void application_create(App* app);
+internal void app_create(App* app);
 internal void load_game_lib_init(App* app);
 
 // TODO temp
@@ -68,19 +68,15 @@ b32 event_on_debug_event(u32 code, void* sender, void* listener_inst, EventConte
 }
 // TODO end temp
 
-b32 foo() {
-  return false; 
-}
-
-void engine_create(App* game_inst) {
+void engine_create(App* app) {
   global_allocator_init();
-  application_create(game_inst);
+  app_create(app);
   
-  game_inst->engine_state = push_struct(game_inst->arena, EngineState);
+  app->engine_state = push_struct(app->arena, EngineState);
   
-  Assign(state, game_inst->engine_state);
-  state->game_inst = game_inst;
-  state->arena = arena_alloc(game_inst->arena, MB(50));
+  Assign(state, app->engine_state);
+  state->app = app;
+  state->arena = arena_alloc(app->arena, EngineSize);
 
   {
     platform_init(state->arena);
@@ -117,7 +113,7 @@ void engine_create(App* game_inst) {
       .position_y = 100,
       .width = 680,
       .height = 480,
-      .name = game_inst->name};
+      .name = app->name};
     os_window_create(config);
   }
 
@@ -155,10 +151,10 @@ void engine_create(App* game_inst) {
   // state->test_geometry = geometry_sys_get_default();
   // TODO end
 
-  game_inst->init(game_inst);
+  app->init(app);
 }
 
-void engine_run(App* game_inst) {
+void engine_run(App* app) {
   os_show_window();
   state->is_running = true;
   
@@ -177,11 +173,11 @@ void engine_run(App* game_inst) {
       clock_update(&state->clock);
       f64 current_time = state->clock.elapsed;
       f64 delta = (current_time - state->last_time);
-      state->game_inst->delta_time = delta;
+      state->app->delta_time = delta;
       f64 frame_start_time = os_now_seconds();
 
-      check_dll_changes(game_inst);
-      state->game_inst->update(state->game_inst);
+      check_dll_changes(app);
+      state->app->update(state->app);
 
       // TODO refactor packet creation
       R_Packet packet;
@@ -333,8 +329,10 @@ internal void load_game_lib_init(App* app) {
   Assert(app->lib.u64 && app->init && app->update);
 }
 
-internal void application_create(App* app) {
-  app->arena = os_main_arena_allocate(MB(200));
+internal void app_create(App* app) {
+  Global_Alloc(app->arena, AppSize);
+  app->arena->res = AppSize;
+
   tctx_init(app->arena);
   Scratch scratch;
   

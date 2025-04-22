@@ -57,7 +57,7 @@ KAPI Temp tctx_get_scratch(Arena** conflics, u32 counts);
 #define push_array(a, T, c) (T*)_arena_push(a, sizeof(T)*c, Max(8, alignof(T)))
 #define push_struct(a, T) (T*)_arena_push(a, sizeof(T), Max(8, alignof(T)))
 #define push_buffer(a, T, c, ...) (T*)_arena_push(a, c, ## __VA_ARGS__)
-  
+
 #define GetScratch(conflicts, count) (tctx_get_scratch((conflicts), (count)))
 #define ReleaseScratch(scratch) temp_end(scratch)
 
