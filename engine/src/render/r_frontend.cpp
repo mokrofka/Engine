@@ -29,9 +29,7 @@ void create_texture(Texture* t) {
 }
 
 void r_init(Arena* arena) {
-  u64 memory_requirement = sizeof(RendererSystemState);
-  
-  state = push_buffer(arena, RendererSystemState, memory_requirement);
+  state = push_struct(arena, RendererSystemState);
   
   u64 mem_reserved = MB(1);
   state->arena = arena_alloc(arena, mem_reserved);

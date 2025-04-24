@@ -36,8 +36,7 @@ internal void clock_setup() {
 }
 
 void platform_init(Arena* arena) {
-  u64 memory_requirement = sizeof(PlatformState)+sizeof(Window);
-  state = push_buffer(arena, PlatformState, memory_requirement);
+  state = push_struct(arena, PlatformState);
   
   // TODO
   SetCurrentDirectoryA("D:\\VS_Code\\Engine\\bin");
@@ -60,8 +59,9 @@ void platform_init(Arena* arena) {
   RegisterClassA(&wc);
 }
 
-void os_window_create(WindowConfig config) {
-  Window* window = (Window*)((u8*)state + sizeof(PlatformState));
+void os_window_create(Arena* arena, WindowConfig config) {
+  Window* window = push_struct(arena, Window);
+
   state->window = window;
   state->window->width = config.width;
   state->window->height = config.height;
@@ -254,9 +254,8 @@ void* os_reserve(u64 size) {
   return result;
 }
 
-b32 os_commit(void* ptr, u64 size) {
-  b32 result = (VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE) != 0);
-  return result;
+void os_commit(void* ptr, u64 size) {
+  VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE);
 }
 
 void os_decommit(void* ptr, u64 size) {

@@ -63,7 +63,7 @@ using WindowResizedCallback = void (*)(Window* window);
 void os_pump_messages();
 
 void platform_init(Arena* arena);
-void os_window_create(WindowConfig config);
+void os_window_create(Arena* arena, WindowConfig config);
 void os_platform_shutdown();
 void* vk_os_create_surface();
 
@@ -89,7 +89,7 @@ v2i os_get_framebuffer_size();
 // Memory
 
 void* os_reserve(u64 size);
-b32 os_commit(void* ptr, u64 size);
+void os_commit(void* ptr, u64 size);
 void os_decommit(void* ptr, u64 size);
 void os_release(void* ptr, u64 size);
 

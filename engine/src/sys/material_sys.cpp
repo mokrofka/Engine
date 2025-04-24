@@ -281,7 +281,6 @@ internal MaterialConfig load_configuration_file(String path) {
     // Process the variable.
     if (str_match(trimmed_var_name, "version"_)) {
       // TODO: version
-    // } else if (str_equal(trimmed_var_name, "name"_)) {
     } else if (str_match(trimmed_var_name, "name"_)) {
       str_copy(out_config.name, trimmed_value);
     } else if (str_match(trimmed_var_name, "diffuse_map_name"_)) {

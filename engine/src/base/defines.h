@@ -73,7 +73,10 @@ typedef u64 PtrInt;
 #define MemCopyStruct(d, s)      _memory_copy((d), (s), sizeof(*(d)))
 #define MemCopyTyped(d, s, c)    _memory_copy((d), (s), sizeof(*(d)) * (c))
 #define MemSet(d, byte, c)       _memory_set((d), (byte), (c))
+
 #define MemMatch(a, b, size)     _memory_match((a), (b), (size))
+#define MemMatchStruct(a,b)      MemMatch((a),(b),sizeof(*(a)))
+#define MemMatchArray(a,b)       MemMatch((a),(b),sizeof(a))
 
 #define U32_MAX 4294967295u
 #define U64_MAX 18446744073709551615ull

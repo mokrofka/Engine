@@ -114,7 +114,7 @@ void engine_create(App* app) {
       .width = 680,
       .height = 480,
       .name = app->name};
-    os_window_create(config);
+    os_window_create(state->arena, config);
   }
 
   {

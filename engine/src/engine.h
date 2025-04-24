@@ -1,10 +1,10 @@
 #pragma once
 #include "lib.h"
 
-#define AppSize            MB(128ull)
-#define GameSize           MB(1ull)
-#define ScratchArenasSize (MB(16ull) * 2)
-#define EngineSize        (AppSize - GameSize - ScratchArenasSize)
+#define AppSize            (MB(128))
+#define GameSize           MB(1)
+#define ScratchArenasSize (MB(16) * 2)
+#define EngineSize        (AppSize - GameSize - ScratchArenasSize - KB(10))
 
 struct App {
   Arena* arena;

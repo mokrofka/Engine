@@ -30,9 +30,7 @@ global EventSystemState* state;
 
 void event_init(Arena* arena) {
   u64 memory_reserved = KB(5);
-  u64 memory_requirement = sizeof(EventSystemState);
-  
-  state = push_buffer(arena, EventSystemState, memory_requirement);
+  state = push_struct(arena, EventSystemState);
   state->is_initialized = true;
   state->arena = arena_alloc(arena, memory_reserved);
 }
