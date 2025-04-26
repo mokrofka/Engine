@@ -1,0 +1,39 @@
+[INFO]:  hello hello 
+
+
+[INFO]:  Input subsystem initialized.
+[DEBUG]: Required extensions:
+[DEBUG]: VK_KHR_surface
+[DEBUG]: VK_EXT_debug_utils
+[DEBUG]: VK_KHR_win32_surface
+[INFO]:  Validation layers enabled. Enumerating...
+[INFO]:  Searching for layer: VK_LAYER_KHRONOS_validation...
+[INFO]:  Found
+[INFO]:  All required validation layers are present
+[INFO]:  Vulkan insance created
+[DEBUG]: Creating Vulkan debugger...
+[DEBUG]: Vulkan debugger created
+[DEBUG]: Creating Vulkan surface...
+[DEBUG]: Vulkan surface created
+[INFO]:  Graphics | Present | Computer | Transfer | Name
+[INFO]:         1 |       1 |        1 |        1 | Intel(R) Iris(R) Xe Graphics
+[INFO]:  Device meets queue requirements
+[TRACE]: Grahics Family Index: 0
+[TRACE]: Present Family Index: 0
+[TRACE]: Transfer Family Index: 0
+[TRACE]: Compute Family Index: 0
+[INFO]:  Selected device: 'Intel(R) Iris(R) Xe Graphics'
+[INFO]:  GPU type is Integrated
+[INFO]:  GPU Driver version: 0.405.1237
+[INFO]:  GPU API version: 1.3.275
+[INFO]:  Local GPU memory: 7.86 GiB
+[INFO]:  Physical device selected
+[INFO]:  Creating logical device...
+[INFO]:  Inserted device layer "VK_LAYER_KHRONOS_validation" (C:\VulkanSDK\1.3.283.0\Bin\.\VkLayer_khronos_validation.dll)
+[INFO]:  Inserted device layer "VK_LAYER_OBS_HOOK" (C:\ProgramData\obs-studio-hook\.\graphics-hook64.dll)
+[INFO]:         Using "Intel(R) Iris(R) Xe Graphics" with driver: "C:\Windows\System32\DriverStore\FileRepository\iigd_dch.inf_amd64_1baad0041739883d\.\igvk64.dll"
+[INFO]:  Logical device created
+[INFO]:  Queues obtained
+[INFO]:  Graphics command pool created
+[INFO]:  Swapchain created successfully
+[DEBUG]: Vulkan command buffers created
