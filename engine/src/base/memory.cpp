@@ -125,8 +125,8 @@ void* _arena_push(Arena* arena, u64 size, u64 align) {
 }
 
 void tctx_init(Arena* arena) {
-  tctx_thread_local.arenas[0] = arena_alloc(arena, MB(16));
-  tctx_thread_local.arenas[1] = arena_alloc(arena, MB(16));
+  tctx_thread_local.arenas[0] = arena_alloc(arena, MB(8));
+  tctx_thread_local.arenas[1] = arena_alloc(arena, MB(8));
 }
 
 Temp tctx_get_scratch(Arena** conflics, u32 counts) {
@@ -475,13 +475,13 @@ internal void segregated_pool_free(SegPool& p, void* ptr) {
   Assert((start <= ptr && ptr < end) && "Memory is out of bounds of the buffer in this pool");
 
 	PoolFreeNode* node = (PoolFreeNode*)ptr;
-  Assert(!(start <= node->next && ptr < end) && "Memomy chunk is already free");
+  // Assert(!(start <= node->next && ptr < end) && "Memomy chunk is already free");
 	node->next = p.head;
 	p.head = node;
   --p.used;
 }
 
-u8* global_alloc(u64 size) {
+u8* mem_alloc(u64 size) {
   // Minimum size is 8 bytes
   u64 base_size = 8;
 
@@ -496,7 +496,7 @@ u8* global_alloc(u64 size) {
   return null;
 }
 
-void global_free(void* ptr) {
+void mem_free(void* ptr) {
   u64 offset_num = GB(10);
   u8* base = mem_ctx.start;
 

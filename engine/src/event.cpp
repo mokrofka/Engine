@@ -29,10 +29,9 @@ struct EventSystemState {
 global EventSystemState* state;
 
 void event_init(Arena* arena) {
-  u64 memory_reserved = KB(5);
   state = push_struct(arena, EventSystemState);
   state->is_initialized = true;
-  state->arena = arena_alloc(arena, memory_reserved);
+  state->arena = arena_alloc(arena, KB(1));
 }
 
 // void event_shutdown() {

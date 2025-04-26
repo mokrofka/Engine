@@ -93,6 +93,8 @@ typedef u64 PtrInt;
 
 #define DeferLoop(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
 #define Loop(i, c) for (int i = 0; i < c; ++i)
+#define LoopC(i, c) for (int i = 0, _end = (c); i < _end; ++i)
+
 #define Func(a) struct a { static
 
 #define GetProcAddr(v,m,s) (*(PROC*)(&(v))) = os_lib_get_proc(m, s)
@@ -120,6 +122,12 @@ typedef u64 PtrInt;
 struct String {
   u8* str;
   u64 size;
+  Inline operator bool() {
+    return size;
+  }
+  Inline operator char*() {
+    return (char*)str;
+  }
 };
 
 struct Arena;

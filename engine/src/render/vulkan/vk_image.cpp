@@ -1,16 +1,15 @@
 #include "vk_image.h"
 
 VK_Image vk_image_create(
-  VkImageType image_type,
-  u32 width,
-  u32 height,
-  VkFormat format,
-  VkImageTiling tiling,
-  VkImageUsageFlags usage,
-  VkMemoryPropertyFlags memory_flags,
-  b32 create_view,
-  VkImageAspectFlags view_aspect_flags) {
-    
+    VkImageType image_type,
+    u32 width,
+    u32 height,
+    VkFormat format,
+    VkImageTiling tiling,
+    VkImageUsageFlags usage,
+    VkMemoryPropertyFlags memory_flags,
+    b32 create_view,
+    VkImageAspectFlags view_aspect_flags) {
   // Copy params
   VK_Image result = {};
   result.width = width;
@@ -37,7 +36,7 @@ VK_Image vk_image_create(
   VkMemoryRequirements memory_requirements;
   vkGetImageMemoryRequirements(vkdevice, result.handle, &memory_requirements);
 
-  i32 memory_type = vk->find_memory_index(memory_requirements.memoryTypeBits, memory_flags);
+  i32 memory_type = vk_find_memory_index(memory_requirements.memoryTypeBits, memory_flags);
   Assert(memory_type != -1 && "Required memory type not found. Image not valid");
 
   // Allocate memory
@@ -58,10 +57,7 @@ VK_Image vk_image_create(
   return result;
 }
 
-void vk_image_view_create(
-    VkFormat format,
-    VK_Image* image,
-    VkImageAspectFlags aspect_flags) {
+void vk_image_view_create(VkFormat format, VK_Image* image, VkImageAspectFlags aspect_flags) {
   VkImageViewCreateInfo view_create_info = {VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
   view_create_info.image = image->handle;
   view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D; // TODO: Make configurable.
@@ -78,11 +74,11 @@ void vk_image_view_create(
 }
 
 void vk_image_transition_layout(
-  VK_CommandBuffer* command_buffer,
-  VK_Image* image,
-  VkFormat format,
-  VkImageLayout old_layout,
-  VkImageLayout new_layout) {
+    VK_Cmd* command_buffer,
+    VK_Image* image,
+    VkFormat format,
+    VkImageLayout old_layout,
+    VkImageLayout new_layout) {
   VkImageMemoryBarrier barrier = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
   barrier.oldLayout = old_layout;
   barrier.newLayout = new_layout;
@@ -132,10 +128,7 @@ void vk_image_transition_layout(
       1, &barrier);
 }
 
-void vk_image_copy_from_buffer(
-  VK_Image* image,
-  VkBuffer buffer,
-  VK_CommandBuffer* command_buffer) {
+void vk_image_copy_from_buffer(VK_Image* image, VkBuffer buffer, VK_Cmd* command_buffer) {
   // Region to copy
   VkBufferImageCopy region = {};
   region.bufferOffset = 0;

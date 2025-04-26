@@ -168,7 +168,18 @@ void run_advanced_free_list_tests() {
   printf("======== All advanced tests passed ✅ ========\n");
 }
 
+#include "ui.h"
+#include <stdio.h>
+
+// #include <math.h>
+
 void test() {
-  // run_free_list_tests();
-  // run_advanced_free_list_tests();
+  sin(1);
+  i32 val = 10;
+  i32 count;
+  i32 what_value;
+  check(&val);
+
+  
+  i32 a = 1;
 }

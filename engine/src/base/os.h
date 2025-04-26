@@ -65,7 +65,7 @@ void os_pump_messages();
 void platform_init(Arena* arena);
 void os_window_create(Arena* arena, WindowConfig config);
 void os_platform_shutdown();
-void* vk_os_create_surface();
+void* os_vk_create_surface();
 
 Arena* os_main_arena_allocate(u64 size);
 void os_free(void* block, b32 aligned);

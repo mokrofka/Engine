@@ -36,6 +36,9 @@ struct String64 {
   Inline operator String() {
     return String{str, size};
   }
+  Inline operator bool() {
+    return size;
+  }
 };
 
 Inline u32 range_size(Range r) {
@@ -140,6 +143,7 @@ String push_strf(Arena* arena, const void* fmt, ...);
 // String some random stuff
 void str_copy(String64& dest, String str);
 String str_read_line(StringCursor* cursor);
+String new_str_read_line(StringCursor* cursor);
 String str_trim(String string);
 i32 str_index_of(String str, u8 c);
 

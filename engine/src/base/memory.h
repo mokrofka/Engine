@@ -33,9 +33,7 @@ struct Scratch {
   Arena* arena;
   u64 pos;
   
-  Inline operator Arena*() {
-    return this->arena;
-  }
+  Inline operator Arena*() { return this->arena; }
 
   Inline Scratch(Arena** conflics = null, u32 counts = 0);
   Inline ~Scratch() { arena->pos = pos; };
@@ -138,11 +136,12 @@ KAPI void free_list_free_all(FreeList& fl);
 // Global Allocator
 
 KAPI void global_allocator_init();
-KAPI u8* global_alloc(u64 size);
+KAPI u8* mem_alloc(u64 size);
 
-#define Global_Alloc(a,size) *((u8**)(&(a))) = (u8*)global_alloc(size)
+#define MemAlloc(a,size) *((u8**)(&(a))) = (u8*)mem_alloc(size)
+#define mem_alloc_struct(T) (T*)mem_alloc(sizeof(T))
 
-KAPI void global_free(void* ptr);
+KAPI void mem_free(void* ptr);
 
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////

@@ -38,8 +38,6 @@ internal void clock_setup() {
 void platform_init(Arena* arena) {
   state = push_struct(arena, PlatformState);
   
-  // TODO
-  SetCurrentDirectoryA("D:\\VS_Code\\Engine\\bin");
   state->instance = GetModuleHandleA(0);
 
   clock_setup();
@@ -145,7 +143,7 @@ struct VK_Context {
 extern VK_Context* vk;
 
 // Surface creation for Vulkan
-void* vk_os_create_surface() {
+void* os_vk_create_surface() {
   VkSurfaceKHR surface = {};
   // Simply cold-cast to the known type.
   // InternalState* state = (InternalState*)plat_state->internal_state;
@@ -244,10 +242,6 @@ v2i os_get_framebuffer_size() {
 //////////////////////////////////////////////////////////////////////////
 // Memory
 #define PAGE_SIZE 4096
-
-void* align_address(void* addr) {
-  return (void*)((uintptr_t)addr & ~(PAGE_SIZE - 1));
-}
 
 void* os_reserve(u64 size) {
   void* result = VirtualAlloc(0, size, MEM_RESERVE, PAGE_READWRITE);

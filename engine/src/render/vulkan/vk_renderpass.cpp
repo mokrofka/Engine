@@ -1,11 +1,14 @@
 #include "vk_renderpass.h"
 
-VK_RenderPass vk_renderpass_create(Rect rect, v4 color, f32 depth, u32 stencil) {
-  VK_RenderPass renderpass = {
-    .rect = rect,
-    .color = color,
+VK_Renderpass vk_renderpass_create(Rect rect, v4 color, f32 depth, u32 stencil, u32 clear_flags, b32 has_prev_pass, b32 has_next_pass) {
+  VK_Renderpass renderpass = {
+    .render_area = rect,
+    .clear_color = color,
     .depth = depth,
-    .stencil = stencil
+    .stencil = stencil,
+    .clear_flags = (u8)clear_flags,
+    .has_prev_pass = (b8)has_prev_pass,
+    .has_next_pass = (b8)has_next_pass
   };
   
   // Main subpass
@@ -13,22 +16,26 @@ VK_RenderPass vk_renderpass_create(Rect rect, v4 color, f32 depth, u32 stencil) 
   subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
   
   // Attachments TODO: make this configutable
-  const u32 attachment_description_count = 2;
-  VkAttachmentDescription attachment_descriptions[attachment_description_count];
+  u32 attachment_description_count = 0;
+  VkAttachmentDescription attachment_descriptions[2];
   
   // Color attachment
+  b32 do_clear_color = (renderpass.clear_flags & RenderpassClearFlag_ColorBuffer) != 0;
   VkAttachmentDescription color_attachment;
   color_attachment.format = vk->swapchain.image_format.format; // TODO: configurable
   color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-  color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+  color_attachment.loadOp = do_clear_color ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_CLEAR;
   color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
   color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
   color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;     // Do not expect any particular layout before render pass starts.
-  color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // Transitioned to after the render pass
+  // If coming from a previous pass, should already be VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL. Otherwise undefined.
+  color_attachment.initialLayout = has_prev_pass ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
+  
+  // If going to another pass, use VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL. Otherwise VK_IMAGE_LAYOUT_PRESENT_SRC_KHR.
+  color_attachment.finalLayout = has_next_pass ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;  // Transitioned to after the render pass
   color_attachment.flags = 0;
   
-  attachment_descriptions[0] = color_attachment;
+  attachment_descriptions[attachment_description_count++] = color_attachment;
   
   VkAttachmentReference color_attachment_reference;
   color_attachment_reference.attachment = 0; // Attachment description array index
@@ -38,27 +45,33 @@ VK_RenderPass vk_renderpass_create(Rect rect, v4 color, f32 depth, u32 stencil) 
   subpass.pColorAttachments = &color_attachment_reference;
 
   // Depth attachment, if there is one
-  VkAttachmentDescription depth_attachment = {};
-  depth_attachment.format = vk->device.depth_format;
-  depth_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-  depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  depth_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  depth_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  depth_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  depth_attachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+  b32 do_clear_depth = (renderpass.clear_flags & RenderpassClearFlag_DepthBuffer) != 0;
 
-  attachment_descriptions[1] = depth_attachment;
+  if (do_clear_color) {
+    VkAttachmentDescription depth_attachment = {};
+    depth_attachment.format = vk->device.depth_format;
+    depth_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    depth_attachment.loadOp = do_clear_depth ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+    depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depth_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depth_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depth_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depth_attachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-  // Depth attachment reference
-  VkAttachmentReference depth_attachment_reference;
-  depth_attachment_reference.attachment = 1;
-  depth_attachment_reference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    attachment_descriptions[attachment_description_count++] = depth_attachment;
 
-  // TODO: other attachment types (input, resolve, preserve)
+    // Depth attachment reference
+    VkAttachmentReference depth_attachment_reference;
+    depth_attachment_reference.attachment = 1;
+    depth_attachment_reference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-  // Depth stencil data.
-  subpass.pDepthStencilAttachment = &depth_attachment_reference;
+    // TODO: other attachment types (input, resolve, preserve)
+
+    // Depth stencil data.
+    subpass.pDepthStencilAttachment = &depth_attachment_reference;
+  } else {
+    subpass.pDepthStencilAttachment = 0;
+  }
 
   // Input from a shader
   subpass.inputAttachmentCount = 0;
@@ -96,35 +109,49 @@ VK_RenderPass vk_renderpass_create(Rect rect, v4 color, f32 depth, u32 stencil) 
   return renderpass;
 }
 
-void vk_renderpass_destroy(VK_RenderPass renderpass) {
+void vk_renderpass_destroy(VK_Renderpass renderpass) {
   vkDestroyRenderPass(vkdevice, renderpass.handle, vk->allocator);
 }
 
-void vk_renderpass_begin(VK_CommandBuffer* command_buffer, VK_RenderPass renderpass, VK_Framebuffer frame_buffer) {
+void vk_renderpass_begin(VK_Cmd* command_buffer, VK_Renderpass renderpass, VkFramebuffer frame_buffer) {
   VkRenderPassBeginInfo begin_info = {VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
   begin_info.renderPass = renderpass.handle;
-  begin_info.framebuffer = frame_buffer.handle;
-  begin_info.renderArea.offset.x = renderpass.rect.x;
-  begin_info.renderArea.offset.y = renderpass.rect.y;
-  begin_info.renderArea.extent.width = renderpass.rect.w;
-  begin_info.renderArea.extent.height = renderpass.rect.h;
+  begin_info.framebuffer = frame_buffer;
+  begin_info.renderArea.offset.x = renderpass.render_area.x;
+  begin_info.renderArea.offset.y = renderpass.render_area.y;
+  begin_info.renderArea.extent.width = renderpass.render_area.w;
+  begin_info.renderArea.extent.height = renderpass.render_area.h;
+  
+  begin_info.clearValueCount = 0;
+  begin_info.pClearValues = 0;
 
   VkClearValue clear_values[2] = {};
-  clear_values[0].color.float32[0] = renderpass.color.r;
-  clear_values[0].color.float32[1] = renderpass.color.g;
-  clear_values[0].color.float32[2] = renderpass.color.b;
-  clear_values[0].color.float32[3] = renderpass.color.a;
-  clear_values[1].depthStencil.depth = renderpass.depth;
-  clear_values[1].depthStencil.stencil = renderpass.stencil;
+  b32 do_clear_color = (renderpass.clear_flags & RenderpassClearFlag_ColorBuffer) != 0;
+  if (do_clear_color) {
+    clear_values[begin_info.clearValueCount++].color = {
+      renderpass.clear_color.x,
+      renderpass.clear_color.y,
+      renderpass.clear_color.z,
+      renderpass.clear_color.w,
+    };
+  }
   
-  begin_info.clearValueCount = 2;
-  begin_info.pClearValues = clear_values;
+  b32 do_clear_depth = (renderpass.clear_flags & RenderpassClearFlag_DepthBuffer) != 0;
+  b32 do_clear_stencil = (renderpass.clear_flags & RenderpassClearFlag_StencilBuffer) != 0;
+  if (do_clear_depth) {
+    clear_values[begin_info.clearValueCount++].depthStencil = {
+      renderpass.depth,
+      do_clear_stencil ? renderpass.stencil : 0,
+    };
+  }
+  
+  begin_info.pClearValues = begin_info.clearValueCount > 0 ? clear_values : 0;
   
   vkCmdBeginRenderPass(command_buffer->handle, &begin_info, VK_SUBPASS_CONTENTS_INLINE);
-  command_buffer->state = COMMAND_BUFFER_STATE_IN_RENDER_PASS;
+  command_buffer->state = VK_CmdState_InRenderPass;
 }
 
-void vk_renderpass_end(VK_CommandBuffer* command_buffer) {
+void vk_renderpass_end(VK_Cmd* command_buffer) {
   vkCmdEndRenderPass(command_buffer->handle);
-  command_buffer->state = COMMAND_BUFFER_STATE_RECORDING;
+  command_buffer->state = VK_CmdState_Recording;
 }
