@@ -2,9 +2,7 @@
 
 #include "render/r_frontend.h"
 
-// TODO resource loader
-#define STB_IMAGE_IMPLEMENTATION
-#include "vendor/stb_image.h"
+#include "sys/res_sys.h"
 
 struct TextureSystemState {
   TextureSystemConfig config;
@@ -31,9 +29,7 @@ internal b32 load_texture(String texture_name, Texture* t);
 internal void destroy_texture(Texture* t);
 
 void texture_system_init(Arena* arena, TextureSystemConfig config) {
-  if (config.max_texture_count == 0) {
-    Error("texture_system_init - configl.max_texture_count must be > 0"_);
-  }
+  Assert(config.max_texture_count > 0);
   
   state = push_struct(arena, TextureSystemState);
   state->registered_textures = push_array(arena, Texture, config.max_texture_count);
@@ -77,7 +73,7 @@ void texture_system_shutdown() {
 
 Texture* texture_system_acquire(String name, b8 auto_release) {
   // Return default texture, but warn about it since this should be returned via get_default_texture(); 
-  if (str_matchi(name, DEFAULT_TEXTURE_NAME)) {
+  if (str_matchi(name, DefaultTextureName)) {
     Warn("texture_system_acquire called for default texture. Use texture_system_get_default_texture for texture 'default'.");
     return &state->default_texture;
   }
@@ -133,7 +129,7 @@ Texture* texture_system_acquire(String name, b8 auto_release) {
 void texture_system_release(String name) {
   Scratch scratch;
   // Ignore release requests for the default texture.
-  if (str_matchi(name, DEFAULT_TEXTURE_NAME)) {
+  if (str_matchi(name, DefaultTextureName)) {
     return;
   }
   TextureRef ref;
@@ -202,7 +198,7 @@ internal void create_default_textures() {
     }
   }
 
-  str_copy(state->default_texture.name, DEFAULT_TEXTURE_NAME);
+  str_copy(state->default_texture.name64, DefaultTextureName);
   state->default_texture.width = tex_dimension;
   state->default_texture.height = tex_dimension;
   state->default_texture.channel_count = 4;
@@ -218,83 +214,61 @@ internal void destroy_default_textures(TextureSystemState* state) {
 }
 
 internal b32 load_texture(String texture_name, Texture* t) {
-  Scratch scratch;
-  // TODO Should e able to be loaced anywhere 
-  char* format_str = "assets/textures/%s.%s";
-  i32 required_channel_count = 4;
-  stbi_set_flip_vertically_on_load(true);
-  // TODO try different extensions
-  String file_path = push_strf(scratch, format_str, texture_name, "png"_);
-  
-  // Use a temporary texture to load into
-  Texture temp_texture;
-  
-  String c_path = push_str_copy(scratch, file_path);
-  u8* data = stbi_load(
-    (char*)c_path.str,
-    (i32*)&temp_texture.width,
-    (i32*)&temp_texture.height,
-    (i32*)&temp_texture.channel_count,
-    required_channel_count);
-
-  temp_texture.channel_count = required_channel_count; 
-  
-  if (data) {
-    u32 current_generation = t->generation;
-    t->generation = INVALID_ID;
-    
-    u64 total_size = temp_texture.width * temp_texture.height * required_channel_count;
-    // Check for transparency
-    b32 has_transparency = false;
-    Loop (i, total_size) {
-      u8 a = data[i + 3];
-      if (a < 255) {
-        has_transparency = true;
-        break;
-      }
-    }
-    
-    if (stbi_failure_reason()) {
-      Warn("load_texture() failed to load file '%s': %s", file_path, str_cstr(stbi_failure_reason()));
-      // Clear the error so the next load doesn't fail
-      stbi__err(0, 0);
-      return false;
-    }
-    
-    // Take a copy of the name
-    str_copy(temp_texture.name, texture_name);
-    temp_texture.generation = INVALID_ID;
-    temp_texture.has_transparency = has_transparency;
-    
-    // Acquire internal texture resources and upload to GPU
-    r_create_texture(data, &temp_texture);
-    
-    if (current_generation == INVALID_ID) {
-      t->generation = 0;
-    } else {
-      t->generation = current_generation + 1;
-    }
-    
-    // Take a copy of the old texture
-    Texture old = *t;
-    
-    // Assign the temp texture to the pointer
-    *t = temp_texture;
-    
-    // Destroy the old texture
-    r_destroy_texture(&old);
-    
-    // Clean up data
-    stbi_image_free(data);
-    return true;
-  } else {
-    if (stbi_failure_reason()) {
-      Warn("load_texture() failed to load file '%s': %s", file_path, str_cstr(stbi_failure_reason()));
-      // Clear the error so the next load doesn't fail
-      stbi__err(0, 0);
-    }
+  Res img_res;
+  if (!res_sys_load(texture_name, ResType_Image, &img_res)) {
+    Error("Failed to load image resource for texture '%s'", texture_name);
     return false;
   }
+  ImageResData* res_data;
+  Assign(res_data, img_res.data);
+
+  // Use a temporary texture to load into
+  Texture temp_texture = {
+    .width = res_data->width,
+    .height = res_data->height,
+    .channel_count = res_data->channel_count
+  };
+
+  u32 current_generation = t->generation;
+  t->generation = INVALID_ID;
+
+  u64 total_size = temp_texture.width * temp_texture.height * temp_texture.channel_count;
+  // Check for transparency
+  b32 has_transparency = false;
+  Loop(i, total_size) {
+    u8 a = res_data->pixels[i + 3];
+    if (a < 255) {
+      has_transparency = true;
+      break;
+    }
+  }
+
+  // Take a copy of the name
+  str_copy(temp_texture.name64, texture_name);
+  temp_texture.generation = INVALID_ID;
+  temp_texture.has_transparency = has_transparency;
+
+  // Acquire internal texture resources and upload to GPU
+  r_create_texture(res_data->pixels, &temp_texture);
+
+  if (current_generation == INVALID_ID) {
+    t->generation = 0;
+  } else {
+    t->generation = current_generation + 1;
+  }
+
+  // Take a copy of the old texture
+  Texture old = *t;
+
+  // Assign the temp texture to the pointer
+  *t = temp_texture;
+
+  // Destroy the old texture
+  r_destroy_texture(&old);
+
+  // Clean up data
+  res_sys_unload(&img_res);
+  return true;
 }
 
 internal void destroy_texture(Texture* t) {

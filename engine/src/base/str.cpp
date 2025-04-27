@@ -354,20 +354,49 @@ String push_strf(Arena* arena, const void* format, ...) {
 ////////////////////////////////
 // String some random stuff
 
+// String str_read_line(StringCursor* cursor) {
+//   while (cursor->at < cursor->end) {
+//     u8* line_start = cursor->at;
+
+//     // Find end of line
+//     while (cursor->at < cursor->end && *cursor->at != '\n' && *cursor->at != '\r') {
+//       cursor->at++;
+//     }
+
+//     u64 len = cursor->at - line_start;
+
+//     // Handle \r\n or \n
+//     if (cursor->at < cursor->end && *cursor->at == '\r') cursor->at++;
+//     if (cursor->at < cursor->end && *cursor->at == '\n') cursor->at++;
+
+//     // If line is not empty, return it
+//     if (len > 0) {
+//       String result = {line_start, len};
+//       return result;
+//     }
+
+//     // If line was empty, loop to read the next one
+//   }
+
+//   // If nothing left
+//   String result = { 0, 0 };
+//   return result;
+// }
+
+// should be little different on linux
 String str_read_line(StringCursor* cursor) {
   while (cursor->at < cursor->end) {
     u8* line_start = cursor->at;
 
     // Find end of line
-    while (cursor->at < cursor->end && *cursor->at != '\n' && *cursor->at != '\r') {
+    while (cursor->at < cursor->end && *cursor->at != '\r') {
       cursor->at++;
     }
 
     u64 len = cursor->at - line_start;
 
     // Handle \r\n or \n
-    if (cursor->at < cursor->end && *cursor->at == '\r') cursor->at++;
-    if (cursor->at < cursor->end && *cursor->at == '\n') cursor->at++;
+    cursor->at += 2;
 
     // If line is not empty, return it
     if (len > 0) {
@@ -402,11 +431,8 @@ String str_trim(String string) {
 }
 
 i32 str_index_of(String string, u8 c) {
-  if (!string.str) {
-    return -1;
-  }
-  if (string.size > 0) {
-    for (u32 i = 0; i < string.size; ++i) {
+  if (string) {
+    Loop (i, string.size) {
       if (string.str[i] == c) {
         return i;
       }

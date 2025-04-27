@@ -128,8 +128,8 @@ void create_geometry(GeometryConfig config, Geometry* g) {
     // g->internal_id = INVALID_ID;
 
   // Acquire the material
-  if (config.material_name.size > 0) {
-    g->material = material_system_acquire(config.material_name);
+  if (config.material_name64.size > 0) {
+    g->material = material_system_acquire(config.material_name64);
     if (!g->material) {
       g->material = material_sys_get_default();
     }
@@ -142,11 +142,11 @@ void destroy_geometry(Geometry* g) {
   g->generation = INVALID_ID;
   g->id = INVALID_ID;
   
-  g->name.size = 0;
+  g->name64.size = 0;
 
   // Release the material.
-  if (g->material && g->material->name.size > 0) {
-    material_sys_release(g->material->name);
+  if (g->material && g->material->name64.size > 0) {
+    material_sys_release(g->material->name64);
     g->material = 0;
   }
 }
@@ -275,15 +275,15 @@ GeometryConfig geometry_sys_generate_plane_config(f32 width, f32 height, u32 x_s
   }
 
   if (name.str && name.size > 0) {
-    str_copy(config.name, name);
+    str_copy(config.name64, name);
   } else {
-    str_copy(config.name, DEFAULT_GEOMETRY_NAME);
+    str_copy(config.name64, DefaultGeometryName);
   }
 
   if (material_name.str && material_name.size > 0) {
-    str_copy(config.material_name, material_name);
+    str_copy(config.material_name64, material_name);
   } else {
-    str_copy(config.material_name, DEFAULT_MATERIAL_NAME);
+    str_copy(config.material_name64, DefaultMaterialName);
   }
 
   return config;

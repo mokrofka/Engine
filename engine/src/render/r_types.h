@@ -3,24 +3,14 @@
 
 #include "res/res_types.h"
 
-// TODO make it gpu specific
-struct GlobalUniformObject {
-  mat4 projection;  // 64 bytes
-  mat4 view;        // 64 bytes
-  mat4 m_reserved0; // 64 bytes, reserved for future use
-  mat4 m_reserved1; // 64 bytes, reserved for future use
-};
-
-struct MaterialUniformObject  {
-  v4 diffuse_color; // 16 bytes
-  v4 v_reserved0;   // 16 bytes, reserved for future use
-  v4 v_reserved1;   // 16 bytes, reserved for future use
-  v4 v_reserved2;   // 16 bytes, reserved for future use
-};
-
 struct GeometryRenderData {
   mat4 model;
   Geometry* geometry;
+};
+
+enum BuiltinRenderpass {
+  BuiltinRenderpass_World = 0x01,
+  BuiltinRenderpass_UI = 0x02,
 };
 
 struct R_Backend {
@@ -33,4 +23,7 @@ struct R_Packet {
   
   u32 geometry_count;
   GeometryRenderData* geometries;
+
+  u32 ui_geometry_count;
+  GeometryRenderData* ui_geometries;
 };

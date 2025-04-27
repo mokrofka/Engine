@@ -2,6 +2,7 @@
 
 #include "render/r_frontend.h"
 #include "sys/texture_sys.h"
+#include "sys/res_sys.h"
 
 struct MaterialSystemState {
   MaterialSystemConfig config;
@@ -23,7 +24,6 @@ global MaterialSystemState* state;
 internal void create_default_material();
 internal void load_material(MaterialConfig config, Material* m);
 internal void destroy_material(Material* m);
-internal MaterialConfig load_configuration_file(String path);
 
 void material_system_init(Arena* arena, MaterialSystemConfig config) {
   Assert(config.max_material_count != 0 && "material_system_initialize - config.max_material_count must be > 0");
@@ -65,31 +65,33 @@ void material_system_shutdown() {
 
 Material* material_system_acquire(String name) {
   Scratch scratch;
-  // Load the given material configuration from disk.
-
-  // Load file from disk
-  // TODO: Should be able to be located anywhere.
-  char* format_str = "assets/materials/%s.%s";
-
-  // TODO: try different extensions
-  String64 string = {};
-  // str_copy(string, name);
-  String file_path = push_strf(scratch.arena, format_str, name, "kmt"_);
-  // String file_path = push_strf(scratch.arena, format_str, string, "kmt");
-  MaterialConfig config = load_configuration_file(file_path);
-
-  // Now acquire from loaded config.
-  return material_system_acquire_from_config(config);
+  Res material_resource;
+  if (!res_sys_load(name, ResType_Material, &material_resource)) {
+    Error("Failed to load material resource, returning null");
+    return 0;
+  }
+  
+  Material* m = 0;
+  if (material_resource.data) {
+    m = material_system_acquire_from_config(*(MaterialConfig*)material_resource.data);
+  }
+  
+  // Clean up
+  if (!m) {
+    Error("Failed to load material resource, returning null");
+  }
+  
+  return m;
 }
 
 Material* material_system_acquire_from_config(MaterialConfig config) {
   // Return default material.
-  if (str_matchi(config.name, DEFAULT_MATERIAL_NAME)) {
+  if (str_matchi(config.name64, DefaultMaterialName)) {
     return &state->default_material;
   }
 
   MaterialRef ref;
-  hashtable_get(&state->registered_material_table, config.name, &ref);
+  hashtable_get(&state->registered_material_table, config.name64, &ref);
   // This can only be changed the first time a material is loaded.
   if (ref.reference_count == 0) {
     ref.auto_release = config.auto_release;
@@ -125,23 +127,23 @@ Material* material_system_acquire_from_config(MaterialConfig config) {
 
     // Also use the handle as the material id.
     m->id = ref.handle;
-    Trace("Material '%s' does not yet exist. Created, and ref_count is now %i", (String)config.name, ref.reference_count);
+    Trace("Material '%s' does not yet exist. Created, and ref_count is now %i", (String)config.name64, ref.reference_count);
   } else {
-    Trace("Material '%s' already exists, ref_count increased to %i", config.name, ref.reference_count);
+    Trace("Material '%s' already exists, ref_count increased to %i", config.name64, ref.reference_count);
   }
 
   // Update the entry.
-  hashtable_set(&state->registered_material_table, config.name, &ref);
+  hashtable_set(&state->registered_material_table, config.name64, &ref);
   return &state->registered_materials[ref.handle];
 
   // NOTE: This would only happen in the event something went wrong with the state.
-  Error("material_system_acquire_from_config failed to acquire material '%s'. Null pointer will be returned", config.name);
+  Error("material_system_acquire_from_config failed to acquire material '%s'. Null pointer will be returned", config.name64);
   return 0;
 }
 
 void material_sys_release(String name) {
   // Ignore release requests for the default material.
-  if (str_matchi(name, DEFAULT_MATERIAL_NAME)) {
+  if (str_matchi(name, DefaultMaterialName)) {
     return;
   }
   MaterialRef ref;
@@ -175,22 +177,22 @@ Material* material_sys_get_default() {
 
 internal void load_material(MaterialConfig config, Material* m) {
   // name
-  str_copy(m->name, config.name);
+  str_copy(m->name64, config.name64);
 
   // Diffuse colour
   m->diffuse_color = config.diffuse_color;
 
   // Diffuse map
-  if (config.diffuse_map_name.size > 0) {
-    m->diffuse_map.use = TEXTURE_USE_MAP_DIFFUSE;
-    m->diffuse_map.texture = texture_system_acquire(config.diffuse_map_name, true);
+  if (config.diffuse_map_name64.size > 0) {
+    m->diffuse_map.use = TextureUse_MapDiffuse ;
+    m->diffuse_map.texture = texture_system_acquire(config.diffuse_map_name64, true);
     if (!m->diffuse_map.texture) {
-      Warn("Unable to load texture '%s' for material '%s', using default", (String)config.diffuse_map_name, (String)m->name);
+      Warn("Unable to load texture '%s' for material '%s', using default", (String)config.diffuse_map_name64, (String)m->name64);
       m->diffuse_map.texture = texture_system_get_default_texture();
     }
   } else {
     // NOTE: Only set for clarity, as call to kzero_memory above does this already.
-    m->diffuse_map.use = TEXTURE_USE_UNKNOWN;
+    m->diffuse_map.use = TextureUse_Unknown;
     m->diffuse_map.texture = 0;
   }
 
@@ -201,11 +203,11 @@ internal void load_material(MaterialConfig config, Material* m) {
 }
 
 internal void destroy_material(Material* m) {
-  Trace("Destroying material '%s'...", (String)m->name);
+  Trace("Destroying material '%s'...", (String)m->name64);
 
   // Release texture references.
   if (m->diffuse_map.texture) {
-    texture_system_release(m->diffuse_map.texture->name);
+    texture_system_release(m->diffuse_map.texture->name64);
   }
 
   // Release renderer resources.
@@ -221,88 +223,10 @@ internal void destroy_material(Material* m) {
 internal void create_default_material() {
   state->default_material.id = INVALID_ID;
   state->default_material.generation = INVALID_ID;
-  str_copy(state->default_material.name, DEFAULT_MATERIAL_NAME);
+  str_copy(state->default_material.name64, DefaultMaterialName);
   state->default_material.diffuse_color = v4_one(); // white
-  state->default_material.diffuse_map.use = TEXTURE_USE_MAP_DIFFUSE;
+  state->default_material.diffuse_map.use = TextureUse_MapDiffuse ;
   state->default_material.diffuse_map.texture = texture_system_get_default_texture();
 
   r_create_material(&state->default_material);
-}
-
-internal MaterialConfig load_configuration_file(String path) {
-  Scratch scratch;
-  
-  MaterialConfig out_config = {};
-  OS_Handle f = os_file_open(path, OS_AccessFlag_Read);
-  if (!f.u64) {
-    Error("load_configuration_file - unable to open material file for reading: '%s'.", path);
-    str_copy(out_config.name, DEFAULT_MATERIAL_NAME);
-    return out_config;
-  }
-  u64 file_size = os_file_size(f);
-  u8* buffer = push_buffer(scratch.arena, u8, file_size);
-  os_file_read(f, file_size, buffer);
-
-  // Read each line of the file.
-  u64 line_length = 0;
-  u32 line_number = 1;
-  // while (filesystem_read_line(&f, 511, &p, &line_length)) {
-  StringCursor cur = {buffer, buffer+file_size};
-  while (cur.at < cur.end) {
-    String line = str_read_line(&cur);
-    
-    // Trim the string.
-    String trimmed = str_trim(line);
-
-    // Get the trimmed length.
-    line_length = trimmed.size;
-
-    // Skip blank lines and comments.
-    if (line_length < 1 || trimmed.str[0] == '#') {
-      line_number++;
-      continue;
-    }
-
-    // Split into var/value
-    i32 equal_index = str_index_of(trimmed, '=');
-    if (equal_index == -1) {
-      Warn("Potential formatting issue found in file '%s': '=' token not found. Skipping line %ui.", path, line_number);
-      ++line_number;
-      continue;
-    }
-
-    String var_name = str_substr(trimmed, {0, equal_index});
-    String trimmed_var_name = str_trim(var_name);
-
-    // String value = str_mid(raw_value, trimmed, equal_index + 1, -1); // Read the rest of the line
-    String value = str_substr(trimmed, {equal_index+1, (i32)trimmed.size});
-    String trimmed_value = str_trim(value);
-
-    // Process the variable.
-    if (str_match(trimmed_var_name, "version"_)) {
-      // TODO: version
-    } else if (str_match(trimmed_var_name, "name"_)) {
-      str_copy(out_config.name, trimmed_value);
-    } else if (str_match(trimmed_var_name, "diffuse_map_name"_)) {
-      str_copy(out_config.diffuse_map_name, trimmed_value);
-    } else if (str_match(trimmed_var_name, "diffuse_color"_)) {
-      // Parse the colour
-      if (!str_to_v4(trimmed_value.str, &out_config.diffuse_color)) {
-        Warn("Error parsing diffuse_colour in file '%s'. Using default of white instead.", path.str);
-        out_config.diffuse_color = v4_one(); // white
-      }
-    }
-
-    // TODO: more fields.
-
-    ++line_number;
-  }
-  if (out_config.name.size == 0) {
-    Error("material doesn't have name");
-  }
-  if (out_config.diffuse_map_name.size == 0) {
-    Error("material doesn't have diffuse_map_name");
-  }
-  os_file_close(f);
-  return out_config;
 }

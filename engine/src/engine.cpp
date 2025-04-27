@@ -5,9 +5,11 @@
 #include "sys/texture_sys.h"
 #include "sys/material_sys.h"
 #include "sys/geometry_sys.h"
+#include "sys/res_sys.h"
 
 #include "event.h"
 #include "input.h"
+#include "ui.h"
 
 struct EngineState {
   Arena* arena;
@@ -45,9 +47,6 @@ b32 event_on_debug_event(u32 code, void* sender, void* listener_inst, EventConte
     "paving2"_,
   };
   local i8 choice = 2;
-  push_str_copy(scratch, "cobblestone"_);
-  push_str_copy(scratch, "paving"_);
-  push_str_copy(scratch, "paving2"_);
   
   // Save off the old name
   String old_name = names[choice];
@@ -68,6 +67,7 @@ b32 event_on_debug_event(u32 code, void* sender, void* listener_inst, EventConte
 }
 // TODO end temp
 
+#include "test.h"
 void engine_create(App* app) {
   global_allocator_init();
   app_create(app);
@@ -79,13 +79,21 @@ void engine_create(App* app) {
   state->arena = arena_alloc(app->arena, EngineSize);
 
   {
-    platform_init(state->arena);
-  }
-
-  {
     logging_init(state->arena);
   }
-  Info("hello %s \n\n", "hello"_);
+  test();
+
+  {
+    platform_init(state->arena);
+  }
+  
+  {
+    ResSysConfig res_sys_cfg = {
+      .max_loader_count = 32,
+      .asset_base_path = "../assets"_
+    };
+    res_sys_init(state->arena, res_sys_cfg);
+  }
 
   {
     event_init(state->arena);
@@ -120,6 +128,10 @@ void engine_create(App* app) {
   {
     r_init(state->arena);
   }
+  
+  // {
+    ui_init(state->arena);
+  // }
 
   {
     TextureSystemConfig texture_sys_config = {
@@ -190,6 +202,9 @@ void engine_run(App* app) {
       
       packet.geometry_count = 1;
       packet.geometries = &test_render;
+      
+      packet.ui_geometry_count = 0;
+      packet.ui_geometries = 0;
       // TODO end
 
       r_draw_frame(&packet);
@@ -230,6 +245,7 @@ void engine_run(App* app) {
   geometry_sys_shutdown();
   material_system_shutdown(); texture_system_shutdown();
   r_shutdown();
+  res_sys_shutdown();
   os_window_destroy();
 }
 
@@ -330,9 +346,8 @@ internal void load_game_lib_init(App* app) {
 }
 
 internal void app_create(App* app) {
-  Global_Alloc(app->arena, AppSize);
+  MemAlloc(app->arena, AppSize);
   app->arena->res = AppSize;
-
   tctx_init(app->arena);
   Scratch scratch;
   

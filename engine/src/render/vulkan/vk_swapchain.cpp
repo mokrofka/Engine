@@ -2,18 +2,19 @@
 
 #include "vk_device.h"
 #include "vk_image.h"
-#include "vk_framebuffer.h"
 
-internal VK_Swapchain create(u32 width, u32 height);
+internal VK_Swapchain create(u32 width, u32 height, b32 reuse);
 internal void destroy(VK_Swapchain* swapchain);
 
 VK_Swapchain vk_swapchain_create(u32 width, u32 height) {
-  return create(width, height);
+  vk->old_swapchain = push_struct(vk->arena, VK_Swapchain);
+  return create(width, height, false);
 }
 
 void vk_swapchain_recreate(VK_Swapchain* swapchain, u32 width, u32 height) {
-  destroy(swapchain);
-  *swapchain = create(width, height);
+  *vk->old_swapchain = *swapchain;
+  *swapchain = create(width, height, true);
+  destroy(vk->old_swapchain);
 }
 
 void vk_swapchain_destroy(VK_Swapchain* swapchain) {
@@ -49,7 +50,7 @@ void vk_swapchain_present(
   VkResult result = vkQueuePresentKHR(present_queue, &present_info);
   
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-    // I didn't get the point of this!
+    // NOTE I didn't get the point of this:
     // Swapchain is out of date, suboptimal of a framebuffer resize has occured. Trigger swapchain recreation.
     // VK_Swapchain swapchain_copy = *swapchain;
     // *swapchain = vk_swapchain_recreate(vk->frame.width, vk->frame.height, *swapchain);
@@ -64,7 +65,7 @@ void vk_swapchain_present(
   vk->frame.current_frame = (vk->frame.current_frame + 1) % swapchain->max_frames_in_flight;
 }
 
-internal VK_Swapchain create(u32 width, u32 height) {
+internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
   VK_Swapchain swapchain = {};
   VkExtent2D swapchain_extent = {width, height};
   
@@ -86,16 +87,17 @@ internal VK_Swapchain create(u32 width, u32 height) {
   }
   
   VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
-  Loop (i, vk->device.swapchain_support.present_mode_count) {
-    VkPresentModeKHR mode = vk->device.swapchain_support.present_modes[i];
-    if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
-      present_mode = mode;
-      break;
-    }
-  }
+  // TODO configurable
+  // Loop (i, vk->device.swapchain_support.present_mode_count) {
+  //   VkPresentModeKHR mode = vk->device.swapchain_support.present_modes[i];
+  //   if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
+  //     present_mode = mode;
+  //     break;
+  //   }
+  // }
   
   // Requery swapchain support.
-  vk->device.swapchain_support = vk_device_query_swapchain_support(vk->device.physical_device);
+  vk_device_query_swapchain_support(vk->device.physical_device, &vk->device.swapchain_support);
   
   // Swapchain extent
   if (vk->device.swapchain_support.capabilities.currentExtent.width != U32_MAX) {
@@ -143,7 +145,7 @@ internal VK_Swapchain create(u32 width, u32 height) {
   swapchain_create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
   swapchain_create_info.presentMode = present_mode;
   swapchain_create_info.clipped = VK_TRUE;
-  swapchain_create_info.oldSwapchain = 0;
+  swapchain_create_info.oldSwapchain = reuse ? vk->old_swapchain->handle : 0;
   
   VK_CHECK(vkCreateSwapchainKHR(vkdevice, &swapchain_create_info, vk->allocator, &swapchain.handle));
   
@@ -190,9 +192,6 @@ internal VK_Swapchain create(u32 width, u32 height) {
 }
 
 internal void destroy(VK_Swapchain* swapchain) {
-  Loop (i, vk->swapchain.image_count) {
-    vk_framebuffer_destroy(&swapchain->framebuffers[i]);
-  }
   vkDeviceWaitIdle(vkdevice);
   vk_image_destroy(&swapchain->depth_attachment);
 

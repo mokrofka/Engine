@@ -1,7 +1,7 @@
 #include "vk_command_buffer.h"
 
-VK_CommandBuffer vk_command_buffer_alloc(VkCommandPool pool, b8 is_primary) {
-  VK_CommandBuffer command_buffer = {};
+VK_Cmd vk_cmd_alloc(VkCommandPool pool, b32 is_primary) {
+  VK_Cmd command_buffer = {};
   
   VkCommandBufferAllocateInfo allocate_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
   allocate_info.commandPool = pool;
@@ -9,28 +9,22 @@ VK_CommandBuffer vk_command_buffer_alloc(VkCommandPool pool, b8 is_primary) {
   allocate_info.commandBufferCount = 1;
   allocate_info.pNext = 0;
 
-  command_buffer.state = COMMAND_BUFFER_STATE_NOT_ALLOCATED;
+  command_buffer.state = VK_CmdState_NotAllocated;
   VK_CHECK(vkAllocateCommandBuffers(vkdevice, &allocate_info, &command_buffer.handle));
-
-  command_buffer.state = COMMAND_BUFFER_STATE_READY;
+  command_buffer.state = VK_CmdState_Ready;
   return command_buffer;
 }
 
-void vk_cmd_free(VkCommandPool pool, VK_CommandBuffer* command_buffer) {
+void vk_cmd_free(VkCommandPool pool, VK_Cmd* command_buffer) {
   vkFreeCommandBuffers(vkdevice, pool, 1, &command_buffer->handle);
 
   command_buffer->handle = 0;
-  command_buffer->state = COMMAND_BUFFER_STATE_NOT_ALLOCATED;
+  command_buffer->state = VK_CmdState_NotAllocated;
 }
 
-void vk_cmd_begin(
-  VK_CommandBuffer* command_buffer,
-  b8 is_single_use,
-  b8 is_renderpass_continue,
-  b8 is_simultaneous_use) {
-  
+void vk_cmd_begin(VK_Cmd* cmd, b32 is_single_use, b32 is_renderpass_continue, b32 is_simultaneous_use) {
+
   VkCommandBufferBeginInfo begin_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
-  begin_info.flags = 0;
   if (is_single_use) {
     begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
   }
@@ -41,29 +35,29 @@ void vk_cmd_begin(
     begin_info.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
   }
   
-  VK_CHECK(vkBeginCommandBuffer(command_buffer->handle, &begin_info));
-  command_buffer->state = COMMAND_BUFFER_STATE_RECORDING;
+  VK_CHECK(vkBeginCommandBuffer(cmd->handle, &begin_info));
+  cmd->state = VK_CmdState_Recording;
 }
 
-void vk_cmd_end(VK_CommandBuffer* command_buffer) {
-  VK_CHECK(vkEndCommandBuffer(command_buffer->handle));
-  command_buffer->state = COMMAND_BUFFER_STATE_RECORDING_ENDED;
+void vk_cmd_end(VK_Cmd* cmd) {
+  VK_CHECK(vkEndCommandBuffer(cmd->handle));
+  cmd->state = VK_CmdState_RecordingEnded;
 }
 
-void vk_cmd_update_submitted(VK_CommandBuffer* command_buffer) {
-  command_buffer->state = COMMAND_BUFFER_STATE_SUBMITTED;
+void vk_cmd_update_submitted(VK_Cmd* cmd) {
+  cmd->state = VK_CmdState_Submitted;
 }
 
-void vk_cmd_reset(VK_CommandBuffer* command_buffer) {
-  command_buffer->state = COMMAND_BUFFER_STATE_READY;
+void vk_cmd_reset(VK_Cmd* cmd) {
+  cmd->state = VK_CmdState_Ready;
 }
 
-void vk_cmd_alloc_and_begin_single_use(VkCommandPool pool, VK_CommandBuffer* out_command_buffer) {
-  *out_command_buffer = vk_command_buffer_alloc(pool, true);
-  vk_cmd_begin(out_command_buffer, true, false, false);
+void vk_cmd_alloc_and_begin_single_use(VkCommandPool pool, VK_Cmd* out_cmd) {
+  *out_cmd = vk_cmd_alloc(pool, true);
+  vk_cmd_begin(out_cmd, true, false, false);
 }
 
-void vk_cmd_end_single_use(VkCommandPool pool, VK_CommandBuffer* command_buffer, VkQueue queue) {
+void vk_cmd_end_single_use(VkCommandPool pool, VK_Cmd* command_buffer, VkQueue queue) {
 
   // End the command buffer.
   vk_cmd_end(command_buffer);

@@ -12,12 +12,11 @@
 #define vkdevice vk->device.logical_device
 
 struct VK_Buffer {
-  u64 size;
   VkBuffer handle;
-  VkBufferUsageFlagBits usage;
-  b8 is_locked;
   VkDeviceMemory memory;
-  i32 memory_index;
+  u64 size;
+  u32 usage;
+  u32 memory_index;
   u32 memory_property_flags;
 };
 
@@ -41,7 +40,7 @@ struct VK_Device {
   VkQueue present_queue;
   VkQueue transfer_queue;
   
-  VkCommandPool gfx_cmd_pool;
+  VkCommandPool graphics_cmd_pool;
   
   VkPhysicalDeviceProperties properties;
   VkPhysicalDeviceFeatures features;
@@ -54,40 +53,38 @@ struct VK_Image  {
   VkImage handle;
   VkDeviceMemory memory;
   VkImageView view;
-  u32 width;
   u32 height;
+  u32 width;
 };
 
-enum VK_RenderPassState {
-  READY,
-  RECORDING,
-  IN_RENDER_PASS,
-  RECORDING_ENDED,
-  SUBMITTED,
-  NOT_ALLOCATED
+typedef u32 VK_RenderPassState;
+enum {
+  VK_RenderPassState_Ready,
+  VK_RenderPassState_Recording,
+  VK_RenderPassState_InRenderPass,
+  VK_RenderPassState_RecordingEnded,
+  VK_RenderPassState_Submitted,
+  VK_RenderPassState_NotAllocated
 };
 
-struct VK_RenderPass  {
+struct VK_Renderpass  {
   VkRenderPass handle;
-  Rect rect;
-  v4 color;
-  
+  Rect render_area;
+  v4 clear_color;
   f32 depth;
   u32 stencil;
   
+  u8 clear_flags;
+  b8 has_prev_pass;
+  b8 has_next_pass;
+
   VK_RenderPassState state;
 };
 
-struct VK_Framebuffer {
-  VkFramebuffer handle;
-  u32 attachment_count;
-  VkImageView attachments[4]; // just to have enough
-};
-
 struct VK_Swapchain  {
-  VkSurfaceFormatKHR image_format;  
-  u8 max_frames_in_flight;
   VkSwapchainKHR handle;
+  VkSurfaceFormatKHR image_format;  
+  u32 max_frames_in_flight;
   u32 image_count;
   VkImage images[3];
   VkImageView views[3];
@@ -95,28 +92,25 @@ struct VK_Swapchain  {
   VK_Image depth_attachment;
   
   // framebuffers used for on-screen rendering.
-  VK_Framebuffer framebuffers[3];
+  VkFramebuffer framebuffers[3];
+  
+  VK_Swapchain* old_swapchain;
 };
 
-enum VK_CommandBufferState {
-  COMMAND_BUFFER_STATE_READY,
-  COMMAND_BUFFER_STATE_RECORDING,
-  COMMAND_BUFFER_STATE_IN_RENDER_PASS,
-  COMMAND_BUFFER_STATE_RECORDING_ENDED,
-  COMMAND_BUFFER_STATE_SUBMITTED,
-  COMMAND_BUFFER_STATE_NOT_ALLOCATED,
+typedef u32 VK_CommandBufferState;
+enum {
+  VK_CmdState_Ready,
+  VK_CmdState_Recording,
+  VK_CmdState_InRenderPass,
+  VK_CmdState_RecordingEnded,
+  VK_CmdState_Submitted,
+  VK_CmdState_NotAllocated,
 };
 
-struct VK_CommandBuffer { 
+struct VK_Cmd { 
   VkCommandBuffer handle;
   
-  // Command buffer state.
   VK_CommandBufferState state;
-};
-
-struct VK_Fence {
-  VkFence handle;
-  b8 is_signaled;
 };
 
 struct VK_ShaderStage {
@@ -130,7 +124,7 @@ struct VK_Pipeline {
   VkPipelineLayout pipeline_layout;
 };
 
-#define MATERIAL_SHADER_STAGE_COUNT 2
+#define MaterialShaderStageCount 2
 
 struct VK_DescriptorState {
   // One per frame
@@ -138,21 +132,21 @@ struct VK_DescriptorState {
   u32 ids[3];
 };
 
-#define VK_MATERIAL_SHADER_DESCRIPTOR_COUNT  2
-#define VK_MATERIAL_SHADER_SAMPLER_COUNT 1
+#define MaterialShaderDescriptorCount 2
+#define MaterialShaderSamplerCount 1
 
 struct VK_MaterialShaderInstState {
   // Per frame
   VkDescriptorSet descriptor_sets[3];
   
   // Per descriptor
-  VK_DescriptorState descriptor_states[VK_MATERIAL_SHADER_DESCRIPTOR_COUNT ];
+  VK_DescriptorState descriptor_states[MaterialShaderDescriptorCount];
 };
 
 // Max number of material instances
-#define VK_MAX_MATERIAL_COUNT 1024
+#define MaxMaterialCount 1024
 
-#define VK_MAX_GEOMETRY_COUNT 4096
+#define MaxGeometryCount 4096
 
 struct VK_GeometryData {
   u32 id;
@@ -165,9 +159,23 @@ struct VK_GeometryData {
   u32 index_buffer_offset;
 };
 
+struct VK_MaterialShaderGlobalUbo {
+  mat4 projection;  // 64 bytes
+  mat4 view;        // 64 bytes
+  mat4 m_reserved0; // 64 bytes, reserved for future use
+  mat4 m_reserved1; // 64 bytes, reserved for future use
+};
+
+struct VK_MaterialShaderInstUbo  {
+  v4 diffuse_color; // 16 bytes
+  v4 v_reserved0;   // 16 bytes, reserved for future use
+  v4 v_reserved1;   // 16 bytes, reserved for future use
+  v4 v_reserved2;   // 16 bytes, reserved for future use
+};
+
 struct VK_MaterialShader {
   // vertex, fragment
-  VK_ShaderStage stages[MATERIAL_SHADER_STAGE_COUNT];
+  VK_ShaderStage stages[MaterialShaderStageCount];
   
   VkDescriptorPool global_descriptor_pool;
   VkDescriptorSetLayout global_descriptor_set_layout;
@@ -176,7 +184,7 @@ struct VK_MaterialShader {
   VkDescriptorSet global_descriptor_sets[3];
   
   // Global uniform object
-  GlobalUniformObject global_ubo;
+  VK_MaterialShaderGlobalUbo global_ubo;
   // Global uniform buffer
   VK_Buffer global_uniform_buffer;
   
@@ -187,10 +195,10 @@ struct VK_MaterialShader {
   // TODO manage a free list of some kind here instead
   u32 obj_uniform_buffer_index;
   
-  TextureUse sampler_uses[VK_MATERIAL_SHADER_SAMPLER_COUNT];
+  TextureUse sampler_uses[MaterialShaderSamplerCount];
   
   // TODO make dynamic
-  VK_MaterialShaderInstState instance_states[VK_MAX_MATERIAL_COUNT];
+  VK_MaterialShaderInstState instance_states[MaxMaterialCount];
   
   VK_Pipeline pipeline;
 };
@@ -212,7 +220,69 @@ struct VK_SyncObj {
   VkSemaphore* queue_complete_semaphores;
   
   u32 in_flight_fence_count;
-  VK_Fence* in_flight_fences;
+  VkFence in_flight_fences[2];
+};
+
+#define UI_ShaderStageCount 2
+#define VK_UIShaderDescriptorCount 2
+#define VK_UIShaderSamplerCount 1
+
+// Max number of ui control instances
+// TODO: make configurable
+#define VK_MaxUICount 1024
+
+struct VK_UIShaderInstState {
+  // Per frame
+  VkDescriptorSet descriptor_sets[3];
+
+  // Per descriptor
+  VK_DescriptorState descriptor_states[VK_UIShaderDescriptorCount];
+};
+
+struct VK_UIShaderGlobalUbo {
+  mat4 projection;  // 64 bytes
+  mat4 view;        // 64 bytes
+  mat4 m_reserved0; // 64 bytes, reserved for future use
+  mat4 m_reserved1; // 64 bytes, reserved for future use
+};
+
+struct VK_UIShaderInstUbo {
+  v4 diffuse_color; // 16 bytes
+  v4 v_reserved0;   // 16 bytes, reserved for future use
+  v4 v_reserved1;   // 16 bytes, reserved for future use
+  v4 v_reserved2;   // 16 bytes, reserved for future use
+};
+
+struct VK_UIShader {
+  // vertex, fragment
+  VK_ShaderStage stages[UI_ShaderStageCount];
+
+  VkDescriptorPool global_descriptor_pool;
+  VkDescriptorSetLayout global_descriptor_set_layout;
+
+  // One descriptor set per frame - max 3 for triple-buffering.
+  VkDescriptorSet global_descriptor_sets[3];
+
+  // Global uniform object.
+  VK_MaterialShaderGlobalUbo global_ubo;
+
+  // Global uniform buffer.
+  VK_Buffer global_uniform_buffer;
+
+  VkDescriptorPool obj_descriptor_pool;
+  VkDescriptorSetLayout obj_descriptor_set_layout;
+  // Object uniform buffers.
+  VK_Buffer obj_uniform_buffer;
+  // TODO: manage a free list of some kind here instead.
+  u32 obj_uniform_buffer_index;
+
+  TextureUse sampler_uses[VK_UIShaderSamplerCount];
+
+  // TODO: make dynamic
+  VK_UIShaderInstState instance_states[VK_MaxUICount];
+
+  VK_Pipeline pipeline;
+
 };
 
 struct VK_Render {
@@ -221,10 +291,11 @@ struct VK_Render {
   u64 geometry_vertex_offset;
   u64 geometry_index_offset;
 
-  VK_CommandBuffer cmd[3];
+  VK_Cmd cmds[3];
   VK_MaterialShader material_shader;
+  VK_UIShader ui_shader;
   
-  VK_GeometryData geometries[VK_MAX_GEOMETRY_COUNT];
+  VK_GeometryData geometries[MaxGeometryCount];
 };
 
 struct VK_Context {
@@ -241,12 +312,15 @@ struct VK_Context {
   VK_Device device;
   
   VK_Swapchain swapchain;
-  VK_RenderPass renderpass;
+  VK_Swapchain* old_swapchain;
+  VK_Renderpass main_renderpass;
+  VK_Renderpass ui_renderpass;
   
   b8 recreating_swapchain;
   
-  i32 (*find_memory_index)(u32 type_filter, u32 property_flags);
-#if defined(_DEBUG)
+  VkFramebuffer world_framebuffers[3];
+  
+#if _DEBUG
   VkDebugUtilsMessengerEXT debug_messenger;
 #endif
 };
@@ -257,3 +331,18 @@ struct VK_TextureData {
 };
 
 extern VK_Context* vk;
+
+Inline i32 vk_find_memory_index(u32 type_filter, u32 property_flags) {
+  VkPhysicalDeviceMemoryProperties memory_properties;
+  vkGetPhysicalDeviceMemoryProperties(vk->device.physical_device, &memory_properties);
+
+  Loop (i, memory_properties.memoryTypeCount) {
+    // Check each memory type to see if its bit is set to 1.
+    if (type_filter & (1 << i) && (memory_properties.memoryTypes[i].propertyFlags & property_flags) == property_flags) {
+      return i;
+    }
+  }
+
+  Assert(!"Unable to find suitable memory type");
+  return -1;
+}

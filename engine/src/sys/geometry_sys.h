@@ -12,11 +12,11 @@ struct GeometryConfig {
   Vertex3D* vertices;
   u32 index_count;
   u32* indices;
-  String64 name;
-  String64 material_name;
+  String64 name64;
+  String64 material_name64;
 };
 
-#define DEFAULT_GEOMETRY_NAME "default"_
+#define DefaultGeometryName "default"_
 
 void geometry_sys_init(Arena* arena, GeometrySysConfig config);
 void geometry_sys_shutdown();
