@@ -1,5 +1,7 @@
 #include "material_loader.h"
 
+#include "loader_utils.h"
+
 b32 material_loader_load(ResLoader* self, String name, Res* out_res) {
   Scratch scratch;
   Assert(self && name && out_res);
@@ -10,6 +12,7 @@ b32 material_loader_load(ResLoader* self, String name, Res* out_res) {
 
   MaterialConfig* res_data = mem_alloc_struct(MaterialConfig);
   // Set some defaults.
+  res_data->type = MaterialType_World;
   res_data->auto_release = true;
   res_data->diffuse_color = v4_one(); // white.
   res_data->diffuse_map_name64.size = 0;
@@ -56,16 +59,21 @@ b32 material_loader_load(ResLoader* self, String name, Res* out_res) {
     String trimmed_value = str_trim(value);
 
     // Process the variable.
-    if (str_match(trimmed_var_name, "version"_)) {
+    if (str_matchi(trimmed_var_name, "version"_)) {
       // TODO: version
-    } else if (str_match(trimmed_var_name, "name"_)) {
+    } else if (str_matchi(trimmed_var_name, "name"_)) {
       str_copy(res_data->name64, trimmed_value);
-    } else if (str_match(trimmed_var_name, "diffuse_map_name"_)) {
+    } else if (str_matchi(trimmed_var_name, "diffuse_map_name"_)) {
       str_copy(res_data->diffuse_map_name64, trimmed_value);
-    } else if (str_match(trimmed_var_name, "diffuse_color"_)) {
+    } else if (str_matchi(trimmed_var_name, "diffuse_color"_)) {
       // Parse the colour
       if (!str_to_v4(trimmed_value.str, &res_data->diffuse_color)) {
         Warn("Error parsing diffuse_colour in file '%s'. Using default of white instead.", file_path);
+      }
+    } else if (str_matchi(trimmed_value, "type"_)) {
+      // TODO other material types
+      if (str_matchi(trimmed_value, "ui"_)) {
+        res_data->type = MaterialType_UI;
       }
     }
 
@@ -83,12 +91,7 @@ b32 material_loader_load(ResLoader* self, String name, Res* out_res) {
 }
 
 void material_loader_unload(ResLoader* self, Res* res) {
-  Assert(self && res);
-
-  mem_free(res->data);
-  res->data = 0;
-  res->data_size = 0;
-  res->loader_id = INVALID_ID;
+  res_unload(self, res);
 }
 
 ResLoader material_res_loader_create() {

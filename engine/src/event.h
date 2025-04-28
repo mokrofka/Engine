@@ -34,57 +34,56 @@ KAPI b32 event_fire(u32 code, void* sender, EventContext on_event);
 // System the application down on the next frame 255
 enum SystemEventCode {
   // Shuts the application down on the next frame.
-  EVENT_CODE_APPLICATION_QUIT = 0x01,
-  Event_Code_AppLication_Quit = 0x01,
+  EventCode_ApplicationQuit = 0x01,
 
   // Keyboard key pressed.
   /* context usage:
    * u16 key_code = data.data.u16[0];
    */
-  EVENT_CODE_KEY_PRESSED = 0x02,
+  EventCode_KeyPressed = 0x02,
 
   // Keyboard key released.
   /* context usage:
    * u16 key_code = data.data.u16[0];
    */
-  EVENT_CODE_KEY_RELEASED = 0x03,
+  EventCode_KeyReleased = 0x03,
 
   // Mouse button pressed.
   /* context usage:
    * u16 key_code = data.data.u16[0];
    */
-  EVENT_CODE_BUTTON_PRESSED = 0x04,
+  EventCode_ButtonPressed  = 0x04,
 
   // Mouse button released.
   /* context usage:
    * u16 key_code = data.data.u16[0];
    */
-  EVENT_CODE_BUTTON_RELEASED = 0x05,
+  EventCode_ButtonReleased = 0x05,
 
   // Mouse moved.
   /* context usage:
    * u16 x = data.data.u16[0];
    * u16 y = data.data.u16[1];
    */
-  EVENT_CODE_MOUSE_MOVED = 0x06,
+  EventCode_MouseMoved = 0x06,
 
   /* context usage:
    * u8 z_delta = data.data.u8[0];
    */
-  EVENT_CODE_MOUSE_WHEEL = 0x07,
+  EventCode_MouseWheel = 0x07,
   
   // Resized/resolution changed from the OS.
   /* context usage:
    * u16 x = data.data.u16[0];
    * u16 y = data.data.u16[1];
    */
-  EVENT_CODE_RESIZED = 0x08,
+  EventCode_Resized = 0x08,
   
-  EVENT_CODE_DEBUG0 = 0x10,
-  EVENT_CODE_DEBUG1 = 0x11,
-  EVENT_CODE_DEBUG2 = 0x12,
-  EVENT_CODE_DEBUG3 = 0x13,
-  EVENT_CODE_DEBUG4 = 0x14,
+  EventCode_Debug0 = 0x10,
+  EventCode_Debug1 = 0x11,
+  EventCode_Debug2 = 0x12,
+  EventCode_Debug3 = 0x13,
+  EventCode_Debug4 = 0x14,
 
-  MAX_EVENT_CODE = 0xFF
+  EventCode_COUNT = 0xFF
 };

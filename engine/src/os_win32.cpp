@@ -1,8 +1,9 @@
+#include "ui/imgui/imgui_impl_win32.h"
 #include "lib.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-i32 global_error;
+#include <windowsx.h>
 
 struct Win32HandleInfo {
   HINSTANCE h_instance;
@@ -18,6 +19,7 @@ struct PlatformState {
   WindowClosedCallback window_closed_callback;
   WindowResizedCallback window_resized_callback;
   ProcessKeyCallback process_key;
+  ProcessMouseMoveCallback process_mouse_move;
 };
 
 global PlatformState* state;
@@ -163,6 +165,26 @@ void* os_vk_create_surface() {
   return surface;
 }
 
+i32 os_imgui_create_VkSurface(void* vp, u64 vk_inst, const void* vk_allocators, u64* out_vk_surface) {
+  VkInstance instance = (VkInstance)vk_inst;
+
+  // Create Vulkan surface for the viewport (on Windows, you'd use vkCreateWin32SurfaceKHR)
+  VkWin32SurfaceCreateInfoKHR surface_info = {};
+  surface_info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+  surface_info.hwnd = (HWND)((ImGuiViewport*)vp)->PlatformHandle; // Handle to the window or viewport
+  surface_info.hinstance = GetModuleHandle(nullptr);
+
+  VkSurfaceKHR surface;
+  VkResult result = vkCreateWin32SurfaceKHR(instance, &surface_info, nullptr, &surface);
+
+  if (result != VK_SUCCESS) {
+    return -1; // Surface creation failed
+  }
+
+  *out_vk_surface = (ImU64)surface; // Store the Vulkan surface in the out_vk_surface pointer
+  return 0;                         // Success
+}
+
 Arena* os_main_arena_allocate(u64 size) {
   Arena* arena = (Arena*)VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
   arena->pos = 0;
@@ -210,6 +232,10 @@ void os_sleep(u64 ms) {
 
 void os_register_process_key(ProcessKeyCallback  callback) {
   state->process_key = callback;
+}
+
+void os_register_process_mouse_move(ProcessMouseMoveCallback callback) {
+  state->process_mouse_move = callback;
 }
 
 void os_register_window_closed_callback(WindowClosedCallback callback) {
@@ -418,21 +444,24 @@ void clock_stop(Clock *clock) {
 
 ///////////////////////////////////////////////////////////////////////////
 // Win proc
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 internal LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARAM l_param) {
+  ImGui_ImplWin32_WndProcHandler(hwnd, msg, w_param, l_param);
+  
   switch (msg) {
     case WM_ERASEBKGND: {
       // Notfy the OS that erasing will be handled by the application to prevent flicker.
       return 1;
     }
-    case WM_PAINT: {
-      PAINTSTRUCT ps;
-      HDC hdc = BeginPaint(hwnd, &ps);
-      RECT rect;
-      GetClientRect(hwnd, &rect);
-      FillRect(hdc, &rect, (HBRUSH)GetStockObject(BLACK_BRUSH)); // Fill window with black
-      EndPaint(hwnd, &ps);
-      return 0;
-    } break;
+    // case WM_PAINT: {
+    //   PAINTSTRUCT ps;
+    //   HDC hdc = BeginPaint(hwnd, &ps);
+    //   RECT rect;
+    //   GetClientRect(hwnd, &rect);
+    //   FillRect(hdc, &rect, (HBRUSH)GetStockObject(BLACK_BRUSH)); // Fill window with black
+    //   EndPaint(hwnd, &ps);
+    //   return 0;
+    // } break;
     case WM_CLOSE: {
       state->window_closed_callback();
       return true;
@@ -457,16 +486,24 @@ internal LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_par
         state->window_resized_callback(state->window);
       }
     } break;
+    
+    case WM_MOUSEMOVE: // within client area
+    case WM_NCMOUSEMOVE: { // within non-client area
+      u32 x = GET_X_LPARAM(l_param);
+      u32 y = GET_Y_LPARAM(l_param);
+      
+      state->process_mouse_move(x, y);
+    } break;
     case WM_KEYDOWN:
     case WM_SYSKEYDOWN:
     case WM_KEYUP:
     case WM_SYSKEYUP: {
       // Key pressed/released
-      b8 pressed = (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN);
+      b32 pressed = (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN);
       Keys key = (Keys)(u16)w_param;
       
       // shift alt ctrl
-      b8 is_extended = (HIWORD(l_param) & KF_EXTENDED) == KF_EXTENDED;
+      b32 is_extended = (HIWORD(l_param) & KF_EXTENDED) == KF_EXTENDED;
       // Keypress only determines if _any_ alt/ctrl/shift key is pressed. Determine which one if so.
       if (w_param == VK_MENU) {
         key = is_extended ? KEY_RALT : KEY_LALT;

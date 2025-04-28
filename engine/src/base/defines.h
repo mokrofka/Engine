@@ -64,17 +64,23 @@ typedef u64 PtrInt;
 #define MemberFromOffset(T,ptr,off) (T)((((u8 *)ptr)+(off)))
 #define CastFromMember(T,m,ptr)     (T*)(((u8*)ptr) - OffsetOf(T,m))
 
-#define MemZero(s,z)       _memory_zero(s,z)
+// yea, I don't want to include <string.h>
+#define MemZero(d,s)       __builtin_memset(d,0,s)
 #define MemZeroStruct(s)   MemZero((s),sizeof(*(s)))
 #define MemZeroArray(a)    MemZero((a),sizeof(a))
 #define MemZeroTyped(m,c)  MemZero((m),sizeof(*(m))*(c))
 
-#define MemCopy(d, s, c)         _memory_copy((d), (s), (c))
-#define MemCopyStruct(d, s)      _memory_copy((d), (s), sizeof(*(d)))
-#define MemCopyTyped(d, s, c)    _memory_copy((d), (s), sizeof(*(d)) * (c))
-#define MemSet(d, byte, c)       _memory_set((d), (byte), (c))
+// #define MemCopy(d, s, c)         _memory_copy((d), (s), (c))
+// #define MemCopyStruct(d, s)      _memory_copy((d), (s), sizeof(*(d)))
+// #define MemCopyTyped(d, s, c)    _memory_copy((d), (s), sizeof(*(d)) * (c))
+// #define MemSet(d, byte, c)       _memory_set((d), (byte), (c))
 
-#define MemMatch(a, b, size)     _memory_match((a), (b), (size))
+#define MemCopy(d, s, c)         __builtin_memcpy((d), (s), (c))
+#define MemCopyStruct(d, s)      MemCopy((d), (s), sizeof(*(d)))
+#define MemCopyTyped(d, s, c)    MemCopy((d), (s), sizeof(*(d)) * (c))
+#define MemSet(d, byte, c)       __builtin_memset((d), (byte), (c))
+
+#define MemMatch(a, b, size)     __builtin_memcmp((a), (b), (size))
 #define MemMatchStruct(a,b)      MemMatch((a),(b),sizeof(*(a)))
 #define MemMatchArray(a,b)       MemMatch((a),(b),sizeof(a))
 

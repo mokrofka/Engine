@@ -1,27 +1,126 @@
 #include "ui/imgui/imgui.h"
+#include "ui/imgui/imgui_impl_win32.h"
+#include "ui/imgui/imgui_impl_vulkan.h"
 #include "ui.h"
 
-#include "ui/imgui/imgui_impl_vulkan.h"
-#include "render/vulkan/vk_utils.h"
+#include "render/vulkan/vk_types.h"
+#include "render/vulkan/vk_command_buffer.h"
 
-void imgui_init(Arena* arena) {
-  IMGUI_CHECKVERSION();
-  ImGui::CreateContext();
-  ImGuiIO io = ImGui::GetIO();
-  ImGui::StyleColorsDark();
+struct UIState {
+  VkDescriptorPool imgui_pool;
+};
+
+global UIState state;
+
+void alloc_resource() {
+  VkDescriptorPoolSize pool_sizes[] = {
+    {VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
+    {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
+    {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
+    {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
+    {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
+    {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
+    {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
+    {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
+    {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
+    {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
+    {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}};
+
+  VkDescriptorPoolCreateInfo pool_info = {};
+  pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+  pool_info.poolSizeCount = ArrayCount(pool_sizes);
+  pool_info.pPoolSizes = pool_sizes;
+  pool_info.maxSets = 1000;
+  pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+
+  VkResult result = vkCreateDescriptorPool(vkdevice, &pool_info, null, &state.imgui_pool);
+}
+
+void imgui_init() {
   
-  Scratch scratch;
-  ImGui_ImplVulkan_InitInfo init_info = {};
-  vk_imgui_init(&init_info);
+  ImGui::CreateContext();
+  ImGuiIO& io = ImGui::GetIO();
+  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;   
+  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+  io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+  
+  ImGui_ImplWin32_Init(os_get_window_handle());
+
+  alloc_resource();
+  ImGui_ImplVulkan_InitInfo init_info = {
+    .Instance = vk->instance,
+    .PhysicalDevice = vk->device.physical_device,
+    .Device = vk->device.logical_device,
+    .QueueFamily = vk->device.graphics_queue_index,
+    .Queue = vk->device.graphics_queue,
+    .DescriptorPool = state.imgui_pool,
+    .RenderPass = vk->ui_renderpass.handle,
+    .MinImageCount = vk->swapchain.max_frames_in_flight,
+    .ImageCount = vk->swapchain.image_count,
+    .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
+  };
+
+  ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+  Assign(platform_io.Platform_CreateVkSurface, os_imgui_create_VkSurface);
+  ImGui_ImplVulkan_Init(&init_info);
+  
+  VK_Cmd cmd = vk_cmd_alloc_and_begin_single_use(vk->device.graphics_cmd_pool);
+  ImGui_ImplVulkan_CreateFontsTexture();
+  vk_cmd_end_single_use(vk->device.graphics_cmd_pool, &cmd, vk->device.graphics_queue);
+  ImGui_ImplVulkan_DestroyFontsTexture(); // destroy staging/temp resources
+  
 }
 
-void ui_init(Arena* arena) {
-
-}
-
-#include <stdio.h>
-void check(i32* val) {
-  LoopC (i, *val) {
-    *val += 10;
+void imgui_configure() {
+  
+  ImGuiIO& io = ImGui::GetIO();
+  ImGuiStyle& style = ImGui::GetStyle();
+  if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+    style.WindowRounding = 0.0f;
+    style.Colors[ImGuiCol_WindowBg].w = 1.0f;
   }
+
+}
+
+void ui_init() {
+  imgui_init();
+  imgui_configure();
+}
+
+void ui_shutdown() {
+  ImGui_ImplVulkan_Shutdown();
+  ImGui_ImplWin32_Shutdown();
+  ImGui::DestroyContext();
+  vkDestroyDescriptorPool(vkdevice, state.imgui_pool, 0);
+}
+
+void ui_begin_frame() {
+  ImGui_ImplVulkan_NewFrame();
+  ImGui_ImplWin32_NewFrame();
+  ImGui::NewFrame();
+}
+
+void ui_end_frame() {
+  ImGui::Render();
+  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk->render.cmds[vk->frame.image_index].handle);
+  
+  ImGuiIO& io = ImGui::GetIO();
+  if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+    ImGui::UpdatePlatformWindows();
+    ImGui::RenderPlatformWindowsDefault();
+  }
+}
+
+void ui_test() {
+  ImGui::Begin("Test");
+  ImGui::Text("Hello world");
+  ImGui::End();
+  ImGui::ShowDemoWindow();
+  
+  
+  if (ImGui::Begin("hello")) {
+  
+  } ImGui::End();
+  
+  
 }

@@ -1,4 +1,5 @@
 #include "binary_loader.h"
+#include "loader_utils.h"
 
 b32 binary_loader_load(ResLoader* self, String name, Res* out_res) {
   Scratch scratch;
@@ -40,11 +41,7 @@ b32 binary_loader_load(ResLoader* self, String name, Res* out_res) {
 }
 
 void binary_loader_unload(ResLoader* self, Res* res) {
-  Assert(self && res);
-  mem_free(res->data);
-  res->data = 0;
-  res->data_size = 0;
-  res->loader_id = INVALID_ID;
+  res_unload(self, res);
 }
 
 ResLoader binary_res_loader_create() {

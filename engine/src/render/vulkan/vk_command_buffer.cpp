@@ -52,9 +52,10 @@ void vk_cmd_reset(VK_Cmd* cmd) {
   cmd->state = VK_CmdState_Ready;
 }
 
-void vk_cmd_alloc_and_begin_single_use(VkCommandPool pool, VK_Cmd* out_cmd) {
-  *out_cmd = vk_cmd_alloc(pool, true);
-  vk_cmd_begin(out_cmd, true, false, false);
+VK_Cmd vk_cmd_alloc_and_begin_single_use(VkCommandPool pool) {
+  VK_Cmd out_cmd = vk_cmd_alloc(pool, true);
+  vk_cmd_begin(&out_cmd, true, false, false);
+  return out_cmd;
 }
 
 void vk_cmd_end_single_use(VkCommandPool pool, VK_Cmd* command_buffer, VkQueue queue) {

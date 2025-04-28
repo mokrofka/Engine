@@ -11,6 +11,8 @@
 
 // TODO end temporary
 
+#include "ui.h"
+
 struct RendererSystemState {
   Arena* arena;
   R_Backend backend;
@@ -50,7 +52,8 @@ void r_init(Arena* arena) {
   state->view = mat4_inverse(state->view);
   
   // UI projection/view
-  state->ui_projection = mat4_orthographic(0.0f, 1280.0f, 720.0f, 0.0f, -100.0f, 100.0f); // Intentionally flipped on y axis
+  // state->ui_projection = mat4_orthographic(0.0f, 1280.0f, 720.0f, 0.0f, -100.0f, 100.0f); // Intentionally flipped on y axis
+  state->ui_projection = mat4_orthographic(0.0f, 1280.0f, 0.0f, 720.0f, -100.0f, 100.0f); // Intentionally flipped on y axis
   state->ui_view = mat4_inverse(mat4_identity());
 }
 
@@ -85,6 +88,9 @@ void r_draw_frame(R_Packet* packet) {
 
       vk_r_update_global_world_state(state->projection, state->view, v3_zero(), v4_one(), 0);
       
+      // ui_begin_frame();
+      // ui_test();
+      // ui_end_frame();
       // Draw geometries
       u32 count = packet->geometry_count;
       Loop (i, count) {
@@ -101,9 +107,14 @@ void r_draw_frame(R_Packet* packet) {
       
       // Draw geometries
       u32 count = packet->ui_geometry_count;
-      Loop (i, count) {
-        vk_r_draw_geometry(packet->ui_geometries[i]);
-      }
+      // Loop (i, count) {
+      //   vk_r_draw_geometry(packet->ui_geometries[i]);
+      // }
+      
+      ui_begin_frame();
+      ui_test();
+      ui_end_frame();
+      
       vk_r_end_renderpass(BuiltinRenderpass_UI);
     }
     
@@ -138,8 +149,8 @@ void r_destroy_material(Material* material) {
   vk_r_destroy_material(material);
 }
 
-void r_create_geometry(Geometry* geometry, u32 vertex_count, Vertex3D* vertices, u32 index_count, u32* indices) {
-  vk_r_create_geometry(geometry, vertex_count, vertices, index_count, indices);
+void r_create_geometry(Geometry* geometry, u32 vertex_size, u32 vertex_count, void* vertices, u32 index_size, u32 index_count, void* indices) {
+  vk_r_create_geometry(geometry, vertex_size, vertex_count, vertices, index_size, index_count, indices);
 }
 
 void r_destroy_geometry(Geometry* geometry) {

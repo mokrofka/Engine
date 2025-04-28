@@ -57,8 +57,9 @@ struct Clock {
 };
 
 using WindowClosedCallback = void (*)();
-using ProcessKeyCallback = void (*)(Keys key, b32 pressed);
 using WindowResizedCallback = void (*)(Window* window);
+using ProcessKeyCallback = void (*)(Keys key, b32 pressed);
+using ProcessMouseMoveCallback = void (*)(u32 x, u32 y);
 
 void os_pump_messages();
 
@@ -66,6 +67,7 @@ void platform_init(Arena* arena);
 void os_window_create(Arena* arena, WindowConfig config);
 void os_platform_shutdown();
 void* os_vk_create_surface();
+i32 os_imgui_create_VkSurface(void* vp, u64 vk_inst, const void* vk_allocators, u64* out_vk_surface);
 
 Arena* os_main_arena_allocate(u64 size);
 void os_free(void* block, b32 aligned);
@@ -77,6 +79,7 @@ f32 os_now_seconds();
 void os_sleep(u64 ms);
 
 void os_register_process_key(ProcessKeyCallback  callback);
+void os_register_process_mouse_move(ProcessMouseMoveCallback callback);
 void os_register_window_closed_callback(WindowClosedCallback callback);
 void os_register_window_resized_callback(WindowResizedCallback callback);
 

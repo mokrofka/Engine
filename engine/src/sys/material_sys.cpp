@@ -178,6 +178,9 @@ Material* material_sys_get_default() {
 internal void load_material(MaterialConfig config, Material* m) {
   // name
   str_copy(m->name64, config.name64);
+  
+  // Type
+  m->type = config.type;
 
   // Diffuse colour
   m->diffuse_color = config.diffuse_color;

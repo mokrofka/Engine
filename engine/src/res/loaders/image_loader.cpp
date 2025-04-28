@@ -1,5 +1,7 @@
 #include "image_loader.h"
 
+#include "loader_utils.h"
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "vendor/stb_image.h"
 
@@ -61,13 +63,8 @@ b32 image_loader_load(ResLoader* self, String name, Res* out_res) {
   return true;
 }
 
-void image_loader_unload(ResLoader* self, Res* resource) {
-  Assert(self && resource && resource->data);
-
-  mem_free(resource->data);
-  resource->data = 0;
-  resource->data_size = 0;
-  resource->loader_id = INVALID_ID;
+void image_loader_unload(ResLoader* self, Res* res) {
+  res_unload(self, res);
 }
 
 ResLoader image_resource_loader_create() {

@@ -12,7 +12,7 @@ struct TextureSystemConfig {
 void texture_system_init(Arena* arena, TextureSystemConfig config);
 void texture_system_shutdown();
 
-Texture* texture_system_acquire(String name, b8 auto_release);
+Texture* texture_system_acquire(String name, b32 auto_release);
 void texture_system_release(String name);
 
 Texture* texture_system_get_default_texture();

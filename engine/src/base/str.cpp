@@ -145,6 +145,9 @@ u32 my_vsnprintf(void* buffer, u32 buffer_size, const void* format, void* argc_)
             String val = va_arg(argc, String);
             length += val.size;
           } break;
+          case 'c': {
+            length += 1;
+          } break;
           case '.': {
             ++p; // skip .
             u32 precision = *fmt - '0';
@@ -190,6 +193,12 @@ u32 my_vsnprintf(void* buffer, u32 buffer_size, const void* format, void* argc_)
             u32 len = write_string(buff + written, val);
             ++fmt;
             written += len;
+          } break;
+          case 'c': {
+            char val = va_arg(argc, i32);
+            buff[written] = val;
+            ++fmt;
+            written += 1;
           } break;
           case '.': {
             ++fmt; // skip .

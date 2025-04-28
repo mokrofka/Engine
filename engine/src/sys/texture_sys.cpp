@@ -71,7 +71,7 @@ void texture_system_shutdown() {
   state = 0;
 }
 
-Texture* texture_system_acquire(String name, b8 auto_release) {
+Texture* texture_system_acquire(String name, b32 auto_release) {
   // Return default texture, but warn about it since this should be returned via get_default_texture(); 
   if (str_matchi(name, DefaultTextureName)) {
     Warn("texture_system_acquire called for default texture. Use texture_system_get_default_texture for texture 'default'.");
@@ -112,9 +112,9 @@ Texture* texture_system_acquire(String name, b8 auto_release) {
 
     // Also use the handle as the texture id
     t->id = ref.handle;
-    Trace("Texture '%s' does not yet exist. Created, and ref_count is now %i.", name.str, ref.reference_count);
+    Trace("Texture '%s' does not yet exist. Created, and ref_count is now %i.", name, ref.reference_count);
   } else {
-    Trace("Texture '%s' already exists, ref_count increased to %i.", name.str, ref.reference_count);
+    Trace("Texture '%s' already exists, ref_count increased to %i.", name, ref.reference_count);
   }
 
   // Update the entry

@@ -2,20 +2,6 @@
 #include <cstdio>
 #include <cstdlib>
 
-struct Time {
-  f32 start;
-  f32 end;
-  f32 elapsed;
-  Time() {
-    start = os_now_seconds();
-  }
-  ~Time() {
-    end = os_now_seconds();
-    elapsed = end - start;
-    Info("time took: %f", elapsed);
-  }
-};
-
 void run_free_list_tests() {
   Scratch scratch;
   FreeList fl = free_list_create(scratch, KB(128));
@@ -168,18 +154,21 @@ void run_advanced_free_list_tests() {
   printf("======== All advanced tests passed ✅ ========\n");
 }
 
-#include "ui.h"
-#include <stdio.h>
+struct Time {
+  f32 start;
+  f32 end;
+  f32 elapsed;
+  Time() {
+    start = os_now_seconds();
+  }
+  ~Time() {
+    end = os_now_seconds();
+    elapsed = end - start;
+    Info("time took: %f", elapsed);
+  }
+};
 
-// #include <math.h>
-
+#include "test1.h"
 void test() {
-  sin(1);
-  i32 val = 10;
-  i32 count;
-  i32 what_value;
-  check(&val);
-
   
-  i32 a = 1;
 }

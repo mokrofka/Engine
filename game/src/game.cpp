@@ -67,7 +67,7 @@ void application_update(App* app) {
   if (input_is_key_up(KEY_T) && input_was_key_down(KEY_T)) {
     Debug("Swapping texture!");
     EventContext context = {};
-    event_fire(EVENT_CODE_DEBUG0, app, context);
+    event_fire(EventCode_Debug0, app, context);
   }
   
   f32 rotation_speed = 2.0f;
@@ -86,17 +86,8 @@ void application_update(App* app) {
     camera_pitch(-rotation_speed * app->delta_time);
   }
   
-  f32 temp_move_speed = 5.0f;
+  f32 temp_move_speed = 50.0f;
   v3 velocity = v3_zero();
-  v3 postion1(1,2,3);
-  v3 postion2(1,2,3);
-  v3 postion3 = postion1 + postion2;
-  postion3 *= 10;
-  String str1;
-  str1.str = (u8*)"hello";
-  Scratch scratch;
-  String new_string = push_str_copy(scratch, str1);
-  Info("%s", new_string);
   
   if (input_is_key_down(KEY_W)) {
     v3 forward = mat4_forward(state->view);

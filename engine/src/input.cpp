@@ -63,7 +63,7 @@ void input_process_key(Keys key, b32 pressed) {
     // Fire off an event for immediate processing.
     EventContext context;
     context.data.u16[0] = key;
-    event_fire(pressed ? EVENT_CODE_KEY_PRESSED : EVENT_CODE_KEY_RELEASED, 0, context);
+    event_fire(pressed ? EventCode_KeyPressed : EventCode_KeyReleased, 0, context);
   }
 }
 
@@ -75,7 +75,7 @@ void input_process_button(MouseButtons button, b32 pressed) {
     // Fire the event.
     EventContext context;
     context.data.u16[0] = button;
-    event_fire(pressed ? EVENT_CODE_BUTTON_PRESSED : EVENT_CODE_BUTTON_RELEASED, 0, context);
+    event_fire(pressed ? EventCode_ButtonPressed  : EventCode_ButtonReleased, 0, context);
   }
 }
 
@@ -83,7 +83,7 @@ void input_process_mouse_move(u32 x, u32 y) {
   // Only process if actually different.
   if (state->mouse_current.x != x || state->mouse_current.y != y) {
     // NOTE: Enable this if debugging.
-    // KDEBUG("Mouse pos: %i, %i!", x, y);
+    // Debug("Mouse pos: %i, %i!", x, y);
     
     state->mouse_current.x = x;
     state->mouse_current.y = y;
@@ -92,7 +92,7 @@ void input_process_mouse_move(u32 x, u32 y) {
     EventContext context;
     context.data.u16[0] = x;
     context.data.u16[1] = y;
-    event_fire(EVENT_CODE_MOUSE_MOVED, 0, context);
+    event_fire(EventCode_MouseMoved, 0, context);
   }
 }
 
@@ -101,7 +101,7 @@ void input_process_mouse_wheel(i32 z_delta) {
   // Fire the event.
   EventContext context;
   context.data.u8[0] = z_delta;
-  event_fire(EVENT_CODE_MOUSE_WHEEL, 0, context);
+  event_fire(EventCode_MouseWheel, 0, context);
 }
 
 // keyboard input

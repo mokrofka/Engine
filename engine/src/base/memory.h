@@ -1,6 +1,7 @@
 #pragma once
 
 #include "defines.h"
+#include "string.h"
 
 KAPI void _memory_zero(void* block, u64 size);
 KAPI void _memory_copy(void* dest, const void* source, u64 size);

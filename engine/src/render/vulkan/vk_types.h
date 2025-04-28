@@ -152,10 +152,10 @@ struct VK_GeometryData {
   u32 id;
   u32 generation;
   u32 vertex_count;
-  u32 vertex_size;
+  u32 vertex_element_size;
   u32 vertex_buffer_offset;
   u32 index_count;
-  u32 index_size;
+  u32 index_element_size;
   u32 index_buffer_offset;
 };
 

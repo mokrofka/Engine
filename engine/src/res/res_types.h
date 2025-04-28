@@ -46,8 +46,14 @@ struct TextureMap {
   TextureUse use;
 };
 
+enum MaterialType {
+  MaterialType_World,
+  MaterialType_UI,
+};
+
 struct MaterialConfig {
   String64 name64;
+  MaterialType type;
   b8 auto_release;
   v4 diffuse_color;
   String64 diffuse_map_name64;
@@ -57,6 +63,7 @@ struct Material {
   u32 id;
   u32 generation;
   u32 internal_id;
+  MaterialType type;
   String64 name64;
   v4 diffuse_color;
   TextureMap diffuse_map;

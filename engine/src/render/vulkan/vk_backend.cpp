@@ -170,6 +170,7 @@ void vk_r_backend_init(R_Backend* backend) {
     true, false
     );
 
+  // Regenerate swapchain and world framebuffers
   regenerate_framebuffers();
 
   Loop (i, vk->swapchain.image_count) {
@@ -525,12 +526,12 @@ internal b32 recreate_swapchain(VK_Swapchain* swapchain) {
   // Mark as recreating if the dimensions are valid.
   vk->recreating_swapchain = true;
 
-  vk_swapchain_recreate(swapchain, vk->frame.width, vk->frame.height);
-
   Loop (i, vk->swapchain.image_count) {
     vkDestroyFramebuffer(vkdevice, vk->world_framebuffers[i], vk->allocator);
-    vkDestroyFramebuffer(vkdevice, swapchain->framebuffers[i], vk->allocator);
+    vkDestroyFramebuffer(vkdevice, vk->swapchain.framebuffers[i], vk->allocator);
   }
+
+  vk_swapchain_recreate(swapchain, vk->frame.width, vk->frame.height);
   
   vk->main_renderpass.render_area.w = vk->frame.width;
   vk->main_renderpass.render_area.h = vk->frame.height;
@@ -602,10 +603,9 @@ void vk_r_create_texture(u8* pixels, Texture* texture) {
     true,
     VK_IMAGE_ASPECT_COLOR_BIT);
   
-  VK_Cmd temp_buffer;
   VkCommandPool pool = vk->device.graphics_cmd_pool;
   VkQueue queue = vk->device.graphics_queue;
-  vk_cmd_alloc_and_begin_single_use(pool, &temp_buffer);
+  VK_Cmd temp_buffer = vk_cmd_alloc_and_begin_single_use(pool);
   
   // Transition the layout from whatever it is currently to optimal for receiving data
   vk_image_transition_layout(
@@ -674,14 +674,33 @@ void vk_r_destroy_texture(Texture* texture) {
 
 void vk_r_create_material(Material* material) {
   Assert(material);
-  vk_material_shader_acquire_resources(&vk->render.material_shader, material);
+  switch (material->type) {
+    case MaterialType_World: {
+      vk_material_shader_acquire_resources(&vk->render.material_shader, material);
+    } break;
+    case MaterialType_UI: {
+      vk_ui_shader_acquire_resources(&vk->render.ui_shader, material);
+    } break;
+    default:
+      Error("vk_r_create_material - unknown material type"_);
+      return;
+  }
   Trace("Render: Material created"_);
 }
 
 void vk_r_destroy_material(Material* material) {
   if (material) {
     if (material->internal_id != INVALID_ID) {
-      vk_material_shader_release_resources(&vk->render.material_shader, material);
+      switch (material->type) {
+        case MaterialType_World: {
+          vk_material_shader_release_resources(&vk->render.material_shader, material);
+        } break;
+        case MaterialType_UI: {
+          vk_ui_shader_release_resources(&vk->render.ui_shader, material); } break;
+        default:
+          Error("vk_r_destroy_material - unknown material type"_);
+          return;
+      }
     } else {
       Warn("vk_r_destroy_material called with internal_id=INVALID_ID. Nothing was done"_);
     }
@@ -690,10 +709,8 @@ void vk_r_destroy_material(Material* material) {
   }
 }
 
-void vk_r_create_geometry(Geometry* geometry, u32 vertex_count, Vertex3D* vertices, u32 index_count, u32* indices) {
-  if (!vertex_count || !vertices) {
-    Error("vulkan_renderer_create_geometry requires vertex data, and none was supplied. vertex_count=%d, vertices=%p", vertex_count, vertices);
-  }
+void vk_r_create_geometry(Geometry* geometry, u32 vertex_size, u32 vertex_count, void* vertices, u32 index_size, u32 index_count, void* indices) {
+  Assert(vertex_count && vertices);
 
   // Check if this is a re-upload. If it is, need to free old data afterward.
   b32 is_reupload = geometry->internal_id != INVALID_ID;
@@ -706,10 +723,10 @@ void vk_r_create_geometry(Geometry* geometry, u32 vertex_count, Vertex3D* vertic
     // Take a copy of the old range.
     old_range.index_buffer_offset = internal_data->index_buffer_offset;
     old_range.index_count = internal_data->index_count;
-    old_range.index_size = internal_data->index_size;
+    old_range.index_element_size = internal_data->index_element_size;
     old_range.vertex_buffer_offset = internal_data->vertex_buffer_offset;
     old_range.vertex_count = internal_data->vertex_count;
-    old_range.vertex_size = internal_data->vertex_size;
+    old_range.vertex_element_size = internal_data->vertex_element_size;
   } else {
     Loop (i, MaxGeometryCount) {
       if (vk->render.geometries[i].id == INVALID_ID) {
@@ -731,34 +748,36 @@ void vk_r_create_geometry(Geometry* geometry, u32 vertex_count, Vertex3D* vertic
   // Vertex data.
   internal_data->vertex_buffer_offset = vk->render.geometry_vertex_offset;
   internal_data->vertex_count = vertex_count;
-  internal_data->vertex_size = sizeof(Vertex3D) * vertex_count;
-  upload_data_range(pool, 0, queue, &vk->render.obj_vertex_buffer, internal_data->vertex_buffer_offset, internal_data->vertex_size, vertices);
+  internal_data->vertex_element_size = sizeof(Vertex3D);
+  u32 total_size = vertex_count * vertex_size;
+  upload_data_range(pool, 0, queue, &vk->render.obj_vertex_buffer, internal_data->vertex_buffer_offset, total_size, vertices);
   // TODO: should maintain a free list instead of this.
-  vk->render.geometry_vertex_offset += internal_data->vertex_size;
+  vk->render.geometry_vertex_offset += total_size;
 
   // Index data, if applicable
   if (index_count && indices) {
     internal_data->index_buffer_offset = vk->render.geometry_index_offset;
     internal_data->index_count = index_count;
-    internal_data->index_size = sizeof(u32) * index_count;
-    upload_data_range(pool, 0, queue, &vk->render.obj_index_buffer, internal_data->index_buffer_offset, internal_data->index_size, indices);
+    internal_data->index_element_size = sizeof(u32);
+    total_size = index_count * index_size;
+    upload_data_range(pool, 0, queue, &vk->render.obj_index_buffer, internal_data->index_buffer_offset, total_size, indices);
     // TODO: should maintain a free list instead of this.
-    vk->render.geometry_index_offset += internal_data->index_size;
+    vk->render.geometry_index_offset += total_size;
   }
 
   if (internal_data->generation == INVALID_ID) {
     internal_data->generation = 0;
   } else {
-    internal_data->generation++;
+    ++internal_data->generation;
   }
 
   if (is_reupload) {
     // Free vertex data
-    free_data_range(&vk->render.obj_vertex_buffer, old_range.vertex_buffer_offset, old_range.vertex_size);
+    free_data_range(&vk->render.obj_vertex_buffer, old_range.vertex_buffer_offset, old_range.vertex_element_size * old_range.vertex_count);
 
     // Free index data, if applicable
-    if (old_range.index_size > 0) {
-      free_data_range(&vk->render.obj_index_buffer, old_range.index_buffer_offset, old_range.index_size);
+    if (old_range.index_element_size > 0) {
+      free_data_range(&vk->render.obj_index_buffer, old_range.index_buffer_offset, old_range.index_element_size * old_range.index_count);
     }
   }
 }
@@ -769,11 +788,11 @@ void vk_r_destroy_geometry(Geometry* geometry) {
     VK_GeometryData* internal_data = &vk->render.geometries[geometry->internal_id];
 
     // Free vertex data
-    free_data_range(&vk->render.obj_vertex_buffer, internal_data->vertex_buffer_offset, internal_data->vertex_size);
+    free_data_range(&vk->render.obj_vertex_buffer, internal_data->vertex_buffer_offset, internal_data->vertex_element_size * internal_data->vertex_count);
 
     // Free index data, if applicable
-    if (internal_data->index_size > 0) {
-      free_data_range(&vk->render.obj_index_buffer, internal_data->index_buffer_offset, internal_data->index_size);
+    if (internal_data->index_element_size > 0) {
+      free_data_range(&vk->render.obj_index_buffer, internal_data->index_buffer_offset, internal_data->index_element_size * internal_data->index_count);
     }
 
     // Clean up data.
@@ -791,18 +810,25 @@ void vk_r_draw_geometry(GeometryRenderData data) {
   VK_GeometryData* buffer_data = &vk->render.geometries[data.geometry->internal_id];
   VkCommandBuffer cmd = vk->render.cmds[vk->frame.image_index].handle;
   
-  // TODO check if this is actually needed
-  vk_material_shader_use(&vk->render.material_shader);
-  
-  vk_material_shader_set_model(&vk->render.material_shader, data.model);
-  
   Material* m = 0;
   if (data.geometry->material) {
     m = data.geometry->material;
   } else {
     m = material_sys_get_default(); 
   }
-  vk_material_shader_apply_material(&vk->render.material_shader, data.geometry->material);
+  
+  switch (m->type) {
+    case MaterialType_World: {
+      vk_material_shader_set_model(&vk->render.material_shader, data.model);
+      vk_material_shader_apply_material(&vk->render.material_shader, m);
+    } break;
+    case MaterialType_UI: {
+      vk_ui_shader_set_model(&vk->render.ui_shader, data.model);
+      vk_ui_shader_apply_material(&vk->render.ui_shader, m);
+    } break;
+      default:
+        Error("vk_r_draw_geometry - unknown material type %i", m->type);
+  }
 
   // Bind vertex buffer at offset
   VkDeviceSize offsets[1] = {buffer_data->vertex_buffer_offset};
