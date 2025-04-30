@@ -25,7 +25,7 @@ global TextureSystemState* state;
 
 internal void create_default_textures();
 internal void destroy_default_textures(TextureSystemState* state);
-internal b32 load_texture(String texture_name, Texture* t);
+internal Texture load_texture(String texture_name);
 internal void destroy_texture(Texture* t);
 
 void texture_system_init(Arena* arena, TextureSystemConfig config) {
@@ -98,14 +98,15 @@ Texture* texture_system_acquire(String name, b32 auto_release) {
       };
     }
 
-    // Make sure an empty slot was acturally found
+    // Check overflow
     if (!t || ref.handle == INVALID_ID) {
       Fatal("texture_system_acquire - Texture system cannot hold anymore textures. Adjust configuration to allow more.");
       return 0;
     }
 
     // Create new texture
-    if (!load_texture(name, t)) {
+    *t = load_texture(name);
+    if (!t->internal_data) {
       Error("Failed to load texture '%s'.", name);
       return 0;
     }
@@ -198,13 +199,13 @@ internal void create_default_textures() {
     }
   }
 
-  str_copy(state->default_texture.name64, DefaultTextureName);
+  str_copy(state->default_texture.file_path64, DefaultTextureName);
   state->default_texture.width = tex_dimension;
   state->default_texture.height = tex_dimension;
   state->default_texture.channel_count = 4;
   state->default_texture.generation = INVALID_ID;
   state->default_texture.has_transparency = false;
-  r_create_texture(pixels, &state->default_texture);
+  state->default_texture.internal_data = r_create_texture(pixels, state->default_texture.width, state->default_texture.height, state->default_texture.channel_count);
   // Manually set the texture generation to invalid since this is a default texture
   state->default_texture.generation = INVALID_ID;
 }
@@ -213,67 +214,36 @@ internal void destroy_default_textures(TextureSystemState* state) {
   destroy_texture(&state->default_texture);
 }
 
-internal b32 load_texture(String texture_name, Texture* t) {
-  Res img_res;
-  if (!res_sys_load(texture_name, ResType_Image, &img_res)) {
-    Error("Failed to load image resource for texture '%s'", texture_name);
-    return false;
+internal Texture load_texture(String texture_name) {
+  Texture texture = res_load_texture(texture_name);
+  if (!texture.data) {
+    goto error;
   }
-  ImageResData* res_data;
-  Assign(res_data, img_res.data);
 
-  // Use a temporary texture to load into
-  Texture temp_texture = {
-    .width = res_data->width,
-    .height = res_data->height,
-    .channel_count = res_data->channel_count
-  };
-
-  u32 current_generation = t->generation;
-  t->generation = INVALID_ID;
-
-  u64 total_size = temp_texture.width * temp_texture.height * temp_texture.channel_count;
+  u64 total_size = texture.width * texture.height * texture.channel_count;
   // Check for transparency
   b32 has_transparency = false;
-  Loop(i, total_size) {
-    u8 a = res_data->pixels[i + 3];
+  Loop (i, total_size) {
+    u8 a = texture.data[i + 3];
     if (a < 255) {
       has_transparency = true;
       break;
     }
   }
 
-  // Take a copy of the name
-  str_copy(temp_texture.name64, texture_name);
-  temp_texture.generation = INVALID_ID;
-  temp_texture.has_transparency = has_transparency;
+  texture.generation = INVALID_ID;
+  texture.has_transparency = has_transparency;
 
-  // Acquire internal texture resources and upload to GPU
-  r_create_texture(res_data->pixels, &temp_texture);
-
-  if (current_generation == INVALID_ID) {
-    t->generation = 0;
-  } else {
-    t->generation = current_generation + 1;
-  }
-
-  // Take a copy of the old texture
-  Texture old = *t;
-
-  // Assign the temp texture to the pointer
-  *t = temp_texture;
-
-  // Destroy the old texture
-  r_destroy_texture(&old);
-
-  // Clean up data
-  res_sys_unload(&img_res);
-  return true;
+  texture.internal_data = r_create_texture(texture.data, texture.width, texture.height, texture.channel_count);
+  
+  error:
+  return texture;
 }
 
 internal void destroy_texture(Texture* t) {
   // Clean up back resources  
   r_destroy_texture(t);
+  res_unload_texture(t->data);
   
   MemZeroStruct(t);
   t->id = INVALID_ID;

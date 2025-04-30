@@ -65,16 +65,14 @@ void material_system_shutdown() {
 
 Material* material_system_acquire(String name) {
   Scratch scratch;
-  Res material_resource;
-  if (!res_sys_load(name, ResType_Material, &material_resource)) {
+  // Res material_resource;
+  MaterialConfig material_cfg = res_load_material_config(name);
+  if (!material_cfg.name64) {
     Error("Failed to load material resource, returning null");
     return 0;
   }
   
-  Material* m = 0;
-  if (material_resource.data) {
-    m = material_system_acquire_from_config(*(MaterialConfig*)material_resource.data);
-  }
+  Material* m = material_system_acquire_from_config(material_cfg);
   
   // Clean up
   if (!m) {
@@ -210,7 +208,7 @@ internal void destroy_material(Material* m) {
 
   // Release texture references.
   if (m->diffuse_map.texture) {
-    texture_system_release(m->diffuse_map.texture->name64);
+    texture_system_release(m->diffuse_map.texture->file_path64);
   }
 
   // Release renderer resources.

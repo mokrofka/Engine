@@ -56,10 +56,6 @@ VK_Device vk_device_create() {
     queue_create_infos[i].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     queue_create_infos[i].queueFamilyIndex = indices[i];
     queue_create_infos[i].queueCount = 1;
-    // TODO: Enable this for a future enhancement.
-    // if (indices[i] == vk->device.graphics_queue_index) {
-    //   queue_create_infos[i].queueCount = 2;
-    // }
     queue_create_infos[i].flags = 0;
     queue_create_infos[i].pNext = 0;
     f32 queue_priority = 1.0f;

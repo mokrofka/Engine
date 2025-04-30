@@ -1,3 +1,5 @@
+
+#include "vendor/imgui/imgui.h"
 #include "game.h"
 
 #include <engine.h>
@@ -127,6 +129,23 @@ void application_update(App* app) {
   // HACK This should not be available outside the engine
   r_set_view(state->view);
 }
+
+#define gui(begin) DeferLoop(begin, ImGui::End())
+
+#include "network.h"
+// void application_update(App* app) {
+//   // Begin the main window (with no extra options like fullscreen, padding, etc.)
+
+//   const ImGuiViewport* viewport = ImGui::GetMainViewport();
+//   ImGui::SetNextWindowPos(viewport->WorkPos);
+//   ImGui::SetNextWindowSize(viewport->WorkSize);
+//   ImGui::SetNextWindowViewport(viewport->ID);
+//   gui(ImGui::Begin("DockSpace", NULL, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
+//     ImGui::DockSpace(ImGui::GetID("MyDockSpace"), ImVec2(0.0f, 0.0f), 0);
+//   }
+  
+//   ImGui::ShowDemoWindow();
+// }
 
 void application_render(struct App* app) {
 }

@@ -4,7 +4,6 @@
 #include "res/res_types.h"
 
 struct ResSysConfig {
-  u32 max_loader_count;
   // The relative base path for assets
   String asset_base_path;
 };
@@ -14,18 +13,28 @@ struct ResLoader {
   ResType type;
   String64 custom_type64;
   String64 type_path64;
-  b32 (*load)(ResLoader* self, String name, Res* out_res);
+  b32 (*load)(Arena* arena, ResLoader* self, String name, Res* out_res);
   void (*unload)(ResLoader* self, Res* res);
 };
 
 void res_sys_init(Arena* arena, ResSysConfig config);
 void res_sys_shutdown();
 
-KAPI b32 res_sys_register_loader(ResLoader loader);
+void res_sys_register_loader(ResLoader loader);
 
-KAPI b32 res_sys_load(String name, ResType type, Res* out_res);
-KAPI b32 res_sys_load_custom(String name, String custom_type, Res* out_res);
+b32 res_sys_load(String name, ResType type, Res* out_res);
+b32 res_sys_load(Arena* arena, String name, ResType type, Res* out_res);
+b32 res_sys_load_custom(String name, String custom_type, Res* out_res);
 
-KAPI void res_sys_unload(Res* res);
+void res_sys_unload(Res* res);
 
-KAPI String res_sys_base_path();
+String res_sys_base_path();
+
+//////////////////////////////////////////////////////////
+// Loaders
+
+BinaryRes res_load_binary(Arena* arena, String filepath);
+Texture res_load_texture(String filepath);
+void res_unload_texture(void* data);
+MaterialConfig res_load_material_config(String filepath);
+

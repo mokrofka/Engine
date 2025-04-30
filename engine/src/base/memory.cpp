@@ -124,6 +124,15 @@ void* _arena_push(Arena* arena, u64 size, u64 align) {
   return buffer;
 }
 
+void _arena_move(Arena* arena, u64 size, u64 align) {
+  PtrInt curr_ptr = (PtrInt)arena + ARENA_HEADER + arena->pos;
+  u64 offset = align_forward(curr_ptr, align);
+  u64 temp = (u64)arena + ARENA_HEADER;
+	offset -= temp; // Change to relative offset
+  Assert(offset+size <= arena->res && "Arena is out of memory");
+  arena->pos = offset+size;
+}
+
 void tctx_init(Arena* arena) {
   tctx_thread_local.arenas[0] = arena_alloc(arena, MB(8));
   tctx_thread_local.arenas[1] = arena_alloc(arena, MB(8));

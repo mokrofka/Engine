@@ -22,6 +22,7 @@ struct RendererSystemState {
   mat4 ui_view;
   f32 near_clip;
   f32 far_clip;
+  b8 do_render_frame;
 };
 
 global RendererSystemState* state;
@@ -112,7 +113,6 @@ void r_draw_frame(R_Packet* packet) {
       // }
       
       ui_begin_frame();
-      ui_test();
       ui_end_frame();
       
       vk_r_end_renderpass(BuiltinRenderpass_UI);
@@ -129,12 +129,45 @@ void r_draw_frame(R_Packet* packet) {
   }
 }
 
+void r_begin_draw_frame(R_Packet* packet) {
+  // If the begin frame returned successfully, mid-frame operations may continue.
+  vk_r_backend_begin_frame(packet->delta_time);
+
+  // World renderpass
+  {
+    vk_r_begin_renderpass(BuiltinRenderpass_World);
+
+    vk_r_update_global_world_state(state->projection, state->view, v3_zero(), v4_one(), 0);
+
+    // ui_begin_frame();
+    // ui_test();
+    // ui_end_frame();
+    // Draw geometries
+    u32 count = packet->geometry_count;
+    Loop(i, count) {
+      vk_r_draw_geometry(packet->geometries[i]);
+    }
+    vk_r_end_renderpass(BuiltinRenderpass_World);
+  }
+
+  ui_begin_frame();
+  vk_r_begin_renderpass(BuiltinRenderpass_UI);
+}
+
+void r_end_draw_frame(R_Packet* packet) {
+  ui_end_frame();
+  vk_r_end_renderpass(BuiltinRenderpass_UI);
+
+  // End the fram. If this fails, it is likely unrecovarble.
+  vk_r_backend_end_frame(packet->delta_time);
+}
+
 void r_set_view(mat4 view) {
   state->view = view;
 }
 
-void r_create_texture(u8* pixels, Texture* texture) {
-  vk_r_create_texture(pixels, texture);
+void* r_create_texture(u8* pixels, u32 width, u32 height, u32 channel_count) {
+  return vk_r_create_texture(pixels, width, height, channel_count);
 }
 
 void r_destroy_texture(Texture* texture) {

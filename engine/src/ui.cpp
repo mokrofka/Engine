@@ -1,6 +1,6 @@
-#include "ui/imgui/imgui.h"
-#include "ui/imgui/imgui_impl_win32.h"
-#include "ui/imgui/imgui_impl_vulkan.h"
+#include "vendor/imgui/imgui.h"
+#include "vendor/imgui/imgui_impl_win32.h"
+#include "vendor/imgui/imgui_impl_vulkan.h"
 #include "ui.h"
 
 #include "render/vulkan/vk_types.h"
@@ -8,6 +8,7 @@
 
 struct UIState {
   VkDescriptorPool imgui_pool;
+  ImFont* font;
 };
 
 global UIState state;
@@ -37,7 +38,6 @@ void alloc_resource() {
 }
 
 void imgui_init() {
-  
   ImGui::CreateContext();
   ImGuiIO& io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;   
@@ -71,20 +71,8 @@ void imgui_init() {
   
 }
 
-void imgui_configure() {
-  
-  ImGuiIO& io = ImGui::GetIO();
-  ImGuiStyle& style = ImGui::GetStyle();
-  if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-    style.WindowRounding = 0.0f;
-    style.Colors[ImGuiCol_WindowBg].w = 1.0f;
-  }
-
-}
-
 void ui_init() {
   imgui_init();
-  imgui_configure();
 }
 
 void ui_shutdown() {
@@ -98,29 +86,14 @@ void ui_begin_frame() {
   ImGui_ImplVulkan_NewFrame();
   ImGui_ImplWin32_NewFrame();
   ImGui::NewFrame();
+  ImGui::PushFont(state.font);
 }
 
 void ui_end_frame() {
+  ImGui::PopFont();
   ImGui::Render();
   ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk->render.cmds[vk->frame.image_index].handle);
   
-  ImGuiIO& io = ImGui::GetIO();
-  if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-    ImGui::UpdatePlatformWindows();
-    ImGui::RenderPlatformWindowsDefault();
-  }
-}
-
-void ui_test() {
-  ImGui::Begin("Test");
-  ImGui::Text("Hello world");
-  ImGui::End();
-  ImGui::ShowDemoWindow();
-  
-  
-  if (ImGui::Begin("hello")) {
-  
-  } ImGui::End();
-  
-  
+  ImGui::UpdatePlatformWindows();
+  ImGui::RenderPlatformWindowsDefault();
 }

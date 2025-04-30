@@ -10,6 +10,7 @@
 #include "event.h"
 #include "input.h"
 #include "ui.h"
+#include "network.h"
 
 struct EngineState {
   Arena* arena;
@@ -18,7 +19,7 @@ struct EngineState {
   b8 is_suspended;
 
   Clock clock;
-  f64 last_time;
+  f32 last_time;
   
   // TODO temp
   Geometry* test_geometry;
@@ -68,7 +69,6 @@ b32 event_on_debug_event(u32 code, void* sender, void* listener_inst, EventConte
 }
 // TODO end temp
 
-#include "test.h"
 void engine_create(App* app) {
   global_allocator_init();
   app_create(app);
@@ -86,11 +86,13 @@ void engine_create(App* app) {
   {
     platform_init(state->arena);
   }
-  test();
+  
+  {
+    network_init(state->arena);
+  }
   
   {
     ResSysConfig res_sys_cfg = {
-      .max_loader_count = 32,
       .asset_base_path = "../assets"_
     };
     res_sys_init(state->arena, res_sys_cfg);
@@ -116,7 +118,7 @@ void engine_create(App* app) {
   {
     input_init(state->arena);
   }
-
+  
   {
     WindowConfig config = {
       .position_x = 100,
@@ -137,7 +139,7 @@ void engine_create(App* app) {
 
   {
     TextureSystemConfig texture_sys_config = {
-        .max_texture_count = 65536,
+      .max_texture_count = 65536,
     };
     texture_system_init(state->arena, texture_sys_config);
   }
@@ -230,7 +232,6 @@ void engine_run(App* app) {
       f64 frame_start_time = os_now_seconds();
 
       check_dll_changes(app);
-      state->app->update(state->app);
 
       // TODO refactor packet creation
       R_Packet packet;
@@ -251,7 +252,12 @@ void engine_run(App* app) {
       packet.ui_geometries = &test_ui_render;
       // TODO end
 
-      r_draw_frame(&packet);
+      // r_draw_frame(&packet);
+      r_begin_draw_frame(&packet);
+
+      state->app->update(state->app);
+      
+      r_end_draw_frame(&packet);
       
       f64 frame_end_time = os_now_seconds();
       f64 frame_elapsed_time = frame_end_time - frame_start_time;

@@ -1,7 +1,7 @@
 #include "logger.h"
 #include "os.h"
 #include "memory.h"
-#include "str.h"
+#include "strings.h"
 
 #include <stdarg.h>
 
@@ -18,8 +18,8 @@ internal void append_to_log_file(String message) {
 void logging_init(Arena* arena) {
   state = push_struct(arena, LoggerSystemState);
   
-  state->log_file_handle = os_file_open("console.log"_, OS_AccessFlag_Write);
-  Assert(state->log_file_handle.u64);
+  // state->log_file_handle = os_file_open("console.log"_, OS_AccessFlag_Write);
+  // Assert(state->log_file_handle.u64);
 }
 
 void shutdown_logging() {
@@ -40,7 +40,7 @@ void _log_output(LogLevel level, String message) {
   }
 
   // Queue a copy to be written to the log file
-  append_to_log_file(out_message);
+  // append_to_log_file(out_message);
 }
 
 void _log_output(LogLevel level, const void* fmt, ...) {
@@ -62,5 +62,5 @@ void _log_output(LogLevel level, const void* fmt, ...) {
   }
 
   // Queue a copy to be written to the log file
-  append_to_log_file(out_message);
+  // append_to_log_file(out_message);
 }

@@ -18,11 +18,31 @@ struct Res {
   u8* data;
 };
 
-struct ImageResData {
+struct BinaryRes {
+  String64 file_path64;
+  u64 size;
+  u8* data;
+};
+
+struct TextureRes {
+  String64 file_path64;
   u8 channel_count;
   u32 width;
   u32 height;
   u8* pixels;
+};
+
+enum MaterialType {
+  MaterialType_World,
+  MaterialType_UI,
+};
+
+struct MaterialRes {
+  String64 name64;
+  String64 diffuse_map_name64;
+  MaterialType type;
+  b8 auto_release;
+  v4 diffuse_color;
 };
 
 struct Texture {
@@ -32,7 +52,8 @@ struct Texture {
   u8 channel_count;
   b8 has_transparency;
   u32 generation;
-  String64 name64;
+  String64 file_path64;
+  u8* data;
   void* internal_data;
 };
 
@@ -44,11 +65,6 @@ enum TextureUse {
 struct TextureMap {
   Texture* texture;
   TextureUse use;
-};
-
-enum MaterialType {
-  MaterialType_World,
-  MaterialType_UI,
 };
 
 struct MaterialConfig {

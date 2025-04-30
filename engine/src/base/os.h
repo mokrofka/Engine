@@ -69,13 +69,12 @@ void os_platform_shutdown();
 void* os_vk_create_surface();
 i32 os_imgui_create_VkSurface(void* vp, u64 vk_inst, const void* vk_allocators, u64* out_vk_surface);
 
-Arena* os_main_arena_allocate(u64 size);
-void os_free(void* block, b32 aligned);
+// Arena* os_main_arena_allocate(u64 size);
 
 void os_console_write(String message, u32 color);
 void os_console_write_error(String message, u32 color);
 
-f32 os_now_seconds();
+KAPI f32 os_now_seconds();
 void os_sleep(u64 ms);
 
 void os_register_process_key(ProcessKeyCallback  callback);

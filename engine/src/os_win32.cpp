@@ -1,9 +1,14 @@
-#include "ui/imgui/imgui_impl_win32.h"
-#include "lib.h"
+#include "vendor/imgui/imgui_impl_win32.h"
 
 #define WIN32_LEAN_AND_MEAN
+#include "base/os.h"
 #include <windows.h>
 #include <windowsx.h>
+
+#include "base/memory.h"
+#include "base/strings.h"
+#include "base/logger.h"
+
 
 struct Win32HandleInfo {
   HINSTANCE h_instance;
@@ -44,18 +49,11 @@ void platform_init(Arena* arena) {
 
   clock_setup();
   
-  HICON icon = LoadIcon(state->instance, IDI_APPLICATION);
   WNDCLASSA wc = {};
-  wc.style = CS_DBLCLKS;
   wc.lpfnWndProc = win32_process_message;
-  wc.cbClsExtra = 0;
-  wc.cbWndExtra = 0;
   wc.hInstance = state->instance;
-  wc.hIcon = icon;
-  wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-  wc.hbrBackground = NULL;
-  wc.lpszClassName = "kohi_window_class";
-  
+  wc.lpszClassName = "class";
+
   RegisterClassA(&wc);
 }
 
@@ -87,7 +85,7 @@ void os_window_create(Arena* arena, WindowConfig config) {
   // Obtain the size of the border.
   RECT border_rect = {0, 0, 0, 0};
   AdjustWindowRectEx(&border_rect, window_style, 0, window_ex_style);
-  
+
   // In this cae, the border rectangle is negative.
   window_x += border_rect.left;
   window_y += border_rect.top;
@@ -97,7 +95,7 @@ void os_window_create(Arena* arena, WindowConfig config) {
   window_height += border_rect.bottom - border_rect.top;
 
   HWND handle = CreateWindowExA(
-    window_ex_style, "kohi_window_class", (char*)config.name.str,
+    window_ex_style, "class", (char*)config.name.str,
     window_style, window_x, window_y, window_width, window_height,
     0, 0, state->instance, 0);
 
@@ -108,12 +106,6 @@ void os_window_create(Arena* arena, WindowConfig config) {
   } else {
     window->hwnd = handle;
   }
-  
-  b32 should_activate = 1; // TODO: if the window should accept input, this should be false.
-  i32 show_window_command_flags = should_activate ? SW_SHOW :SW_SHOWNOACTIVATE;
-  // If initially minimmized, use SW_MINIMIZE : SW_SHOWMINNOACTIVE;
-  // If initially minimmized, use SW_SHOWMAXIMIZED : SW_MAXIMIZE;
-  // ShowWindow((HWND)window->hwnd, show_window_command_flags);
 }
 
 void os_platform_shutdown() {
@@ -185,16 +177,12 @@ i32 os_imgui_create_VkSurface(void* vp, u64 vk_inst, const void* vk_allocators, 
   return 0;                         // Success
 }
 
-Arena* os_main_arena_allocate(u64 size) {
-  Arena* arena = (Arena*)VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-  arena->pos = 0;
-  arena->res = size;
-  return arena;
-}
-
-void os_free(void* block, b32 aligned) {
-  VirtualFree(block, 0, 0);
-}
+// Arena* os_main_arena_allocate(u64 size) {
+//   Arena* arena = (Arena*)VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+//   arena->pos = 0;
+//   arena->res = size;
+//   return arena;
+// }
 
 void os_console_write(String message, u32 color) {
   HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -533,4 +521,85 @@ internal LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_par
 
 void os_show_window() {
   ShowWindow((HWND)state->window->hwnd, SW_SHOW);
+}
+
+///////////////////////////////////////////////////////////////////////////
+// Network
+
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#include "winsock2.h"
+#pragma comment(lib, "ws2_32.lib")
+
+struct NetworkState {
+  WSAData ws;
+  SOCKET s;
+  SOCKADDR_IN sa;
+};
+
+global NetworkState* net;
+
+void network_init(Arena* arena) {
+  net = push_struct(arena, NetworkState);
+  WSAStartup(MAKEWORD(2,2), &net->ws);
+  
+  net->s = socket(AF_INET, SOCK_STREAM, 0);
+  
+  net->sa.sin_family = AF_INET;
+  net->sa.sin_port = htons(1234);
+}
+
+void run_server() {
+  if (bind(net->s, (struct sockaddr*)&net->sa, sizeof(net->sa)) == SOCKET_ERROR) {
+    Error("Bind failed: %d", WSAGetLastError());
+    return;
+  }
+  
+  if (listen(net->s, 100) == SOCKET_ERROR) {
+    Error("Listen failed: %d", WSAGetLastError());
+    return;
+  }
+  
+  Info("Server is listening...");
+  
+  SOCKET client_socket;
+  SOCKADDR_IN client_addr;
+  i32 client_addr_size = sizeof(client_addr);
+  
+  u8 arr[20] = {};
+  
+  while ((client_socket = accept(net->s, (struct sockaddr*)&client_addr, &client_addr_size)) != INVALID_SOCKET) {
+    Info("Client connected!");
+    // Handle the client connection here
+    
+    while (recv(client_socket, (char*)arr, sizeof(arr), 0) > 0) {
+      Info("Server read: %s", str_cstr(arr));
+      
+      u8 to_client[] = "hello client!";
+      send(client_socket, (char*)to_client, sizeof(to_client), 0);
+    }
+  }
+  
+  // If accept() fails, print the error
+  Error("Accept failed: %d", WSAGetLastError());
+}
+
+void connect_to_server() {
+  net->sa.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
+
+  if (connect(net->s, (struct sockaddr*)&net->sa, sizeof(net->sa)) == SOCKET_ERROR) {
+    Error("Connect failed: %d", WSAGetLastError());
+    return;
+  }
+  
+  Info("Connected to server!");
+  
+  u8 arr[20] = "hello server!";
+  send(net->s, (char*)arr, cstr_length(arr), 0);
+  MemZeroArray(arr);
+  recv(net->s, (char*)arr, sizeof(arr), 0);
+  Info("%s", str_cstr(arr));
+  
+  os_sleep(3000);
+  
+  closesocket(net->s);
 }

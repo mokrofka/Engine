@@ -88,7 +88,6 @@ void vk_r_backend_init(R_Backend* backend) {
 #if defined(_DEBUG)
   Info("Validation layers enabled. Enumerating..."_);
   required_validation_layer_names[0] = "VK_LAYER_KHRONOS_validation";
-  ++required_validation_layer_count;
   
   u32 available_layer_count = 0;
   VK_CHECK(vkEnumerateInstanceLayerProperties(&available_layer_count, 0));
@@ -97,7 +96,7 @@ void vk_r_backend_init(R_Backend* backend) {
   VK_CHECK(vkEnumerateInstanceLayerProperties(&available_layer_count, available_layers));
 
   // Verify all required layers are available.
-  Loop (i, required_validation_layer_count) {
+  Loop (i, ArrayCount(required_validation_layer_names)) {
     Info("Searching for layer: %s...", str_cstr(required_validation_layer_names[i]));
     b32 found = false;
     Loop (j, available_layer_count) {
@@ -143,7 +142,7 @@ void vk_r_backend_init(R_Backend* backend) {
 #endif
   
   Debug("Creating Vulkan surface..."_);
-  vk->surface = (VkSurfaceKHR)os_vk_create_surface();
+  Assign(vk->surface, os_vk_create_surface());
   Debug("Vulkan surface created"_);
 
   vk->device = vk_device_create();
@@ -157,18 +156,16 @@ void vk_r_backend_init(R_Backend* backend) {
     1.0f,
     0,
     RenderpassClearFlag_ColorBuffer | RenderpassClearFlag_DepthBuffer | RenderpassClearFlag_StencilBuffer,
-    false, true
-    );
+    false, true);
     
   // UI renderpass
   vk->ui_renderpass = vk_renderpass_create(
     Rect{0, 0, vk->frame.width, vk->frame.height},
-    v4{0.0f, 0.0f, 0.0f, 0.0f},
+    v4{0, 0, 0, 0},
     1.0f,
     0,
     RenderpassClearFlag_None,
-    true, false
-    );
+    true, false);
 
   // Regenerate swapchain and world framebuffers
   regenerate_framebuffers();
@@ -266,7 +263,7 @@ void vk_r_backend_shutdown() {
   vkDestroyInstance(vk->instance, vk->allocator);
 }
 
-void vk_r_backend_on_resize(u16 width, u16 height) {
+void vk_r_backend_on_resize(u32 width, u32 height) {
   // cached_framebuffer_extent.x = width;
   // cached_framebuffer_extent.y = height;
   vk->frame.width = width;
@@ -294,7 +291,7 @@ b32 vk_r_backend_begin_frame(f32 delta_time) {
     }
     
     Info("Resized, booting"_);
-    return false;
+    // return false; // NOTE I'm not sure that you need to skip a frame
   }
 
   // Wait for the execution of the current frame to complete. The fence being free will allow this one to move on.
@@ -332,6 +329,8 @@ b32 vk_r_backend_begin_frame(f32 delta_time) {
   
   vk->main_renderpass.render_area.w = vk->frame.width;
   vk->main_renderpass.render_area.h = vk->frame.height;
+  vk->ui_renderpass.render_area.w = vk->frame.width;
+  vk->ui_renderpass.render_area.h = vk->frame.height;
 
   return true;
 }
@@ -482,7 +481,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
 
 internal void regenerate_framebuffers() {
   Loop (i, vk->swapchain.image_count) {
-    VkImageView world_attachments[2] = {vk->swapchain.views[i], vk->swapchain.depth_attachment.view};
+    VkImageView world_attachments[] = {vk->swapchain.views[i], vk->swapchain.depth_attachment.view};
     VkFramebufferCreateInfo framebuffer_info = {
       .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
       .renderPass = vk->main_renderpass.handle,
@@ -495,7 +494,7 @@ internal void regenerate_framebuffers() {
 
     VK_CHECK(vkCreateFramebuffer(vkdevice, &framebuffer_info, vk->allocator, &vk->world_framebuffers[i]));
     
-    VkImageView ui_attachments[1] = {vk->swapchain.views[i]};
+    VkImageView ui_attachments[] = {vk->swapchain.views[i]};
     VkFramebufferCreateInfo sc_framebuffer_info = {
       .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
       .renderPass = vk->ui_renderpass.handle,
@@ -574,11 +573,11 @@ internal void create_buffers(VK_Render* render) {
   render->geometry_index_offset = 0;
 }
 
-void vk_r_create_texture(u8* pixels, Texture* texture) {
+void* vk_r_create_texture(u8* pixels, u32 width, u32 height, u32 channel_count) {
   // Internal data creation
-  texture->internal_data = push_struct(vk->arena, VK_TextureData);
-  VK_TextureData* data = (VK_TextureData*)texture->internal_data;
-  VkDeviceSize image_size = texture->width * texture->height * texture->channel_count;
+  // TODO free memory
+  VK_TextureData* data = push_struct(vk->arena, VK_TextureData);
+  VkDeviceSize image_size = width * height * channel_count;
   
   // NOTE assumes 8 bits per channel
   VkFormat image_format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -594,8 +593,8 @@ void vk_r_create_texture(u8* pixels, Texture* texture) {
   // different options here
   data->image = vk_image_create(
     VK_IMAGE_TYPE_2D, 
-    texture->width, 
-    texture->height, 
+    width, 
+    height, 
     image_format, 
     VK_IMAGE_TILING_OPTIMAL, 
     VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
@@ -652,10 +651,10 @@ void vk_r_create_texture(u8* pixels, Texture* texture) {
   VkResult result = vkCreateSampler(vkdevice, &sampler_info, vk->allocator, &data->sampler);
   if (!vk_result_is_success(VK_SUCCESS)) {
     Error("Error creating texture sampler: %s", vk_result_string(result, true));
-    return;
+    return data;
   }
   
-  ++texture->generation;
+  return data;
 }
 
 void vk_r_destroy_texture(Texture* texture) {
@@ -665,11 +664,8 @@ void vk_r_destroy_texture(Texture* texture) {
   if (data) {
     vk_image_destroy(&data->image);
     vkDestroySampler(vkdevice, data->sampler, vk->allocator);
-    MemZeroStruct(&data);
     // TODO free memory
   }
-
-  MemZeroStruct(texture);
 }
 
 void vk_r_create_material(Material* material) {
