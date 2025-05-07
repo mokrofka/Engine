@@ -26,14 +26,13 @@ internal VK_PhysicalDeviceQueueFamilyInfo physical_device_meets_requirements(
     VK_PhysicalDeviceRequirements requirements,
     VK_SwapchainSupportInfo* out_swapchain_support);
 
-VK_Device vk_device_create() {
-  VK_Device device;
-  select_physical_device(&device);
+void vk_device_create() {
+  select_physical_device(&vk->device);
   
   Info("Creating logical device..."_);
   // NOTE: Do not create additional queues for shared indices.
-  b32 present_shares_graphics_queue = device.graphics_queue_index == device.present_queue_index;
-  b32 transfer_shares_graphics_queue = device.graphics_queue_index == device.transfer_queue_index;
+  b32 present_shares_graphics_queue = vk->device.graphics_queue_index == vk->device.present_queue_index;
+  b32 transfer_shares_graphics_queue = vk->device.graphics_queue_index == vk->device.transfer_queue_index;
   u32 index_count = 1;
   if (!present_shares_graphics_queue) {
     ++index_count;
@@ -43,12 +42,12 @@ VK_Device vk_device_create() {
   }
   u32 indices[32];
   u32 index = 0;
-  indices[index++] = device.graphics_queue_index;
+  indices[index++] = vk->device.graphics_queue_index;
   if (!present_shares_graphics_queue) {
-    indices[index++] = device.present_queue_index;
+    indices[index++] = vk->device.present_queue_index;
   }
   if (!transfer_shares_graphics_queue) {
-    indices[index++] = device.transfer_queue_index;
+    indices[index++] = vk->device.transfer_queue_index;
   }
   
   VkDeviceQueueCreateInfo queue_create_infos[32];
@@ -83,25 +82,23 @@ VK_Device vk_device_create() {
   device_create_info.ppEnabledLayerNames = 0;
   
   // Create the device.
-  VK_CHECK(vkCreateDevice(device.physical_device, &device_create_info, vk->allocator, &device.logical_device));
+  VK_CHECK(vkCreateDevice(vk->device.physical_device, &device_create_info, vk->allocator, &vk->device.logical_device));
 
   Info("Logical device created"_);
   
   // Get queues.
-  vkGetDeviceQueue(device.logical_device, device.graphics_queue_index, 0, &device.graphics_queue);
-  vkGetDeviceQueue(device.logical_device, device.present_queue_index, 0, &device.present_queue);
-  vkGetDeviceQueue(device.logical_device, device.transfer_queue_index, 0, &device.transfer_queue);
+  vkGetDeviceQueue(vk->device.logical_device, vk->device.graphics_queue_index, 0, &vk->device.graphics_queue);
+  vkGetDeviceQueue(vk->device.logical_device, vk->device.present_queue_index, 0, &vk->device.present_queue);
+  vkGetDeviceQueue(vk->device.logical_device, vk->device.transfer_queue_index, 0, &vk->device.transfer_queue);
   
   Info("Queues obtained"_);
   
   // Create command pool for graphics queue.
   VkCommandPoolCreateInfo pool_create_info = {VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-  pool_create_info.queueFamilyIndex = device.graphics_queue_index;
+  pool_create_info.queueFamilyIndex = vk->device.graphics_queue_index;
   pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-  VK_CHECK(vkCreateCommandPool(device.logical_device, &pool_create_info, vk->allocator, &device.graphics_cmd_pool));
+  VK_CHECK(vkCreateCommandPool(vk->device.logical_device, &pool_create_info, vk->allocator, &vk->device.graphics_cmd_pool));
   Info("Graphics command pool created"_);
-
-  return device;
 }
 
 void vk_device_destroy() {
@@ -164,7 +161,7 @@ VK_SwapchainSupportInfo* vk_device_query_swapchain_support(VkPhysicalDevice phys
 
 void vk_device_detect_depth_format(VK_Device* device) {
   // Format candidates
-  u64 candidate_count = 3;
+  u32 candidate_count = 3;
   VkFormat candidates[3] = {
     VK_FORMAT_D32_SFLOAT,
     VK_FORMAT_D32_SFLOAT_S8_UINT,

@@ -59,7 +59,7 @@ internal u32 write_float(u8* dest, float value, u32 precision) {
   if (precision > 0) {
     dest[len++] = '.';
     // value *= (float)(10 ^ precision); // Shift decimal point
-    value *= (float)pow(10, precision); // Shift decimal point correctly
+    value *= (float)Pow(10, precision); // Shift decimal point correctly
     u32 frac_part = (u32)value;
     len += write_int(dest + len, frac_part); // Reuse write_int for fractional part
   }
@@ -69,7 +69,7 @@ internal u32 write_float(u8* dest, float value, u32 precision) {
 
 internal u32 write_string(u8* dest, String val) {
   u32 len = 0;
-  for (u64 i = 0; i < val.size; ++i) {
+  Loop (i, val.size) {
     dest[len++] = val.str[i]; // Copy each character from the String to the buffer
   }
   return len;  // Return the number of characters written
@@ -108,7 +108,7 @@ u32 float_length(float value, u32 precision) {
   // Process the fractional part
   if (precision > 0) {
     ++len;
-    value *= (f32)pow(10, precision); // Shift decimal point correctly
+    value *= (f32)Pow(10, precision); // Shift decimal point correctly
     u32 frac_part = (u32)value;
     len += int_length(frac_part); // Reuse write_int for fractional part
   }
@@ -251,7 +251,7 @@ String str_cstr_capped(const void *str_cstr, const void *cap) {
   u8* ptr = (u8*)str_cstr;
   u8* opl = (u8*)cap;
   for (;ptr < opl && *ptr != 0; ptr += 1);
-  u64 size = (u64)(ptr - (u8*)str_cstr);
+  u32 size = (u32)(ptr - (u8*)str_cstr);
   String result = str((u8*)str_cstr, size);
   return result;
 }
@@ -279,17 +279,16 @@ String lower_from_str(Arena *arena, String str) {
 // String Matching
 
 b32 str_match(String str0, String str1) {
-  b32 result = false;
-  if (str0.size == str1.size) {
-    result = true;
-    Loop (i, str0.size) {
-      if (str0.str[i] != str1.str[i]) {
-        result = false;
-        break;
-      }
-    }
+  if (str0.size != str1.size) return false;
+  u8* a = str0.str;
+  u8* b = str1.str;
+  Loop(i, str0.size) {
+    if (*a != *b) return false;
+    ++a;
+    ++b;
   }
-  return result;
+
+  return true;
 }
 
 b32 str_matchi(String str0, String str1) {
@@ -340,13 +339,11 @@ String push_str_copy(Arena* arena, String s) {
 
 String push_strfv(Arena* arena, const void* format, void* argc) {
   va_list argc_copy = (va_list)argc;
-  // u64 need_bytes = vsnprintf(0, 0, (char*)format, argc_copy) + 1;
-  u64 need_bytes = my_vsnprintf(0, 0, format, argc);
+  u32 need_bytes = my_vsnprintf(0, 0, format, argc);
   va_end(argc_copy);
   
   u8* buffer = push_buffer(arena, u8, need_bytes);
-  // u64 final_size = vsnprintf((char*)buffer, need_bytes, (char*)format, argc_copy);
-  u64 final_size = my_vsnprintf(buffer, need_bytes, format, argc_copy);
+  u32 final_size = my_vsnprintf(buffer, need_bytes, format, argc_copy);
   
   String result = {buffer, final_size};
   return result;
@@ -402,7 +399,7 @@ String str_read_line(StringCursor* cursor) {
       cursor->at++;
     }
 
-    u64 len = cursor->at - line_start;
+    u32 len = cursor->at - line_start;
 
     // Handle \r\n or \n
     cursor->at += 2;
@@ -554,7 +551,7 @@ String str_chop_after_last_slash(String string){
       }
     }
     if (ptr >= string.str) {
-      string.size = (u64)(ptr - string.str) + 1;
+      string.size = (u32)(ptr - string.str) + 1;
     } else {
       string.size = 0;
     }
@@ -572,7 +569,7 @@ String str_chop_last_slash(String string) {
       }
     }
     if (ptr >= string.str) {
-      string.size = (u64)(ptr - string.str);
+      string.size = (u32)(ptr - string.str);
     } else {
       string.size = 0;
     }
@@ -591,7 +588,7 @@ String str_skip_last_slash(String string) {
     }
     if (ptr >= string.str) {
       ptr += 1;
-      string.size = (u64)(string.str + string.size - ptr);
+      string.size = (u32)(string.str + string.size - ptr);
       string.str = ptr;
     }
   }
@@ -600,7 +597,7 @@ String str_skip_last_slash(String string) {
 
 String str_chop_last_dot(String string) {
   String result = string;
-  u64 p = string.size;
+  u32 p = string.size;
   for (; p > 0;) {
     p -= 1;
     if (string.str[p] == '.') {

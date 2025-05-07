@@ -2,7 +2,7 @@
 #include "vk_types.h"
 
 VK_Pipeline vk_graphics_pipeline_create(
-    VK_Renderpass renderpass,
+    VK_Renderpass* renderpass,
     u32 stride,
     u32 attribute_count,
     VkVertexInputAttributeDescription* attributes,

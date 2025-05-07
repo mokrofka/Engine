@@ -11,7 +11,7 @@ b32 binary_loader_load(Arena* arena, ResLoader* self, String name, Res* out_res)
   str_copy(out_res->file_path64, file_path);
 
   OS_Handle f = os_file_open(file_path, OS_AccessFlag_Read);
-  if (!f.u64) {
+  if (!f) {
     Error("binary_loader_load - unable to open file for binary reading: '%s'", file_path);
     return false;
   }
@@ -60,14 +60,14 @@ ResLoader binary_res_loader_create() {
   return loader;
 }
 
-BinaryRes res_load_binary(Arena* arena, String filepath) {
+Binary res_load_binary(Arena* arena, String filepath) {
   Scratch scratch(&arena, 1);
-  BinaryRes binary = {};
+  Binary binary = {};
 
   String file_path = push_strf(scratch, "%s/%s", res_sys_base_path(), filepath);
 
   OS_Handle f = os_file_open(file_path, OS_AccessFlag_Read);
-  if (!f.u64) {
+  if (!f) {
     Error("binary_loader_load - unable to open file for binary reading: '%s'", file_path);
     goto error;
   }

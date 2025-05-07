@@ -132,7 +132,7 @@ void vk_buffer_copy_to(
   vkQueueWaitIdle(queue);
   
   // Create a one-time-use command buffer
-  VK_Cmd temp_cmd = vk_cmd_alloc_and_begin_single_use(pool);
+  VK_CommandBuffer temp_cmd = vk_cmd_alloc_and_begin_single_use(pool);
   
   // Prepare the copy command and add it to the command buffer
   VkBufferCopy copy_region;

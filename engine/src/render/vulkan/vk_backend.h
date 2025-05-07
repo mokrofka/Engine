@@ -25,3 +25,16 @@ void vk_r_destroy_material(Material* material);
 
 void vk_r_create_geometry(Geometry* geometry, u32 vertex_size, u32 vertex_count, void* vertices, u32 index_size, u32 index_count, void* indices);
 void vk_r_destroy_geometry(Geometry* geometry);
+
+void vk_r_shader_create(struct Shader* s, u32 renderpass_id, u32 stage_count, String* stage_filenames, ShaderStage* stages);
+void vk_r_shader_destroy(struct Shader* shader);
+
+void vk_r_shader_initialize(struct Shader* shader);
+void vk_r_shader_use(struct Shader* shader);
+void vk_r_shader_bind_globals(struct Shader* s);
+void vk_r_shader_bind_instance(struct Shader* s, u32 instance_id);
+void vk_r_shader_apply_globals(struct Shader* s);
+void vk_r_shader_apply_instance(struct Shader* s);
+void vk_r_shader_acquire_instance_resources(struct Shader* s, u32* out_instance_id);
+void vk_r_shader_release_instance_resources(struct Shader* s, u32 instance_id);
+void vk_r_set_uniform(struct Shader* frontend_shader, struct ShaderUniform* uniform, const void* value);

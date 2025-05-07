@@ -1,6 +1,10 @@
 #pragma once
 #include "lib.h"
 
+struct EventSysConfig {
+  u32 mem_reserve;
+};
+
 struct EventContext {
   // 128 bytes
   union {
@@ -25,7 +29,7 @@ struct EventContext {
 // Should return true if handled
 using PFN_On_Event = b32 (*)(u32 code, void* sender, void* listener_inst, EventContext data);
 
-void event_init(Arena* arena);
+void event_init(Arena* arena, EventSysConfig config);
 
 KAPI b32 event_register(u32 code, void* listener, PFN_On_Event on_event);
 KAPI b32 event_unregister(u32 code, void* listener, PFN_On_Event on_event);

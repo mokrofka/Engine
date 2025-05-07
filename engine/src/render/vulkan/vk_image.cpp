@@ -74,7 +74,7 @@ void vk_image_view_create(VkFormat format, VK_Image* image, VkImageAspectFlags a
 }
 
 void vk_image_transition_layout(
-    VK_Cmd* command_buffer,
+    VK_CommandBuffer* command_buffer,
     VK_Image* image,
     VkFormat format,
     VkImageLayout old_layout,
@@ -128,7 +128,7 @@ void vk_image_transition_layout(
       1, &barrier);
 }
 
-void vk_image_copy_from_buffer(VK_Image* image, VkBuffer buffer, VK_Cmd* command_buffer) {
+void vk_image_copy_from_buffer(VK_Image* image, VkBuffer buffer, VK_CommandBuffer* command_buffer) {
   // Region to copy
   VkBufferImageCopy region = {};
   region.bufferOffset = 0;

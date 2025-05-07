@@ -14,10 +14,13 @@
 struct VK_Buffer {
   VkBuffer handle;
   VkDeviceMemory memory;
+  FreeList freelist;
   u64 size;
-  u32 usage;
+  u64 usage;
   u32 memory_index;
   u32 memory_property_flags;
+  b8 is_locked;
+  b8 has_freelist;
 };
 
 struct VK_SwapchainSupportInfo {
@@ -53,12 +56,11 @@ struct VK_Image  {
   VkImage handle;
   VkDeviceMemory memory;
   VkImageView view;
-  u32 height;
-  u32 width;
+  u16 height;
+  u16 width;
 };
 
-typedef u32 VK_RenderPassState;
-enum {
+enum VK_RenderPassState {
   VK_RenderPassState_Ready,
   VK_RenderPassState_Recording,
   VK_RenderPassState_InRenderPass,
@@ -79,6 +81,7 @@ struct VK_Renderpass  {
   b8 has_next_pass;
 
   VK_RenderPassState state;
+  u32 id;
 };
 
 struct VK_Swapchain  {
@@ -93,12 +96,9 @@ struct VK_Swapchain  {
   
   // framebuffers used for on-screen rendering.
   VkFramebuffer framebuffers[3];
-  
-  VK_Swapchain* old_swapchain;
 };
 
-typedef u32 VK_CommandBufferState;
-enum {
+enum VK_CmdState {
   VK_CmdState_Ready,
   VK_CmdState_Recording,
   VK_CmdState_InRenderPass,
@@ -107,10 +107,10 @@ enum {
   VK_CmdState_NotAllocated,
 };
 
-struct VK_Cmd { 
+struct VK_CommandBuffer { 
   VkCommandBuffer handle;
   
-  VK_CommandBufferState state;
+  VK_CmdState state;
 };
 
 struct VK_ShaderStage {
@@ -207,8 +207,8 @@ struct VK_Frame {
   f32 delta_time;
   u32 width;
   u32 height;
-  u64 size_generation;
-  u64 size_last_generation;
+  u32 size_generation;
+  u32 size_last_generation;
 
   u32 image_index;
   u32 current_frame;
@@ -282,7 +282,6 @@ struct VK_UIShader {
   VK_UIShaderInstState instance_states[VK_MaxUICount];
 
   VK_Pipeline pipeline;
-
 };
 
 struct VK_Render {
@@ -291,14 +290,14 @@ struct VK_Render {
   u64 geometry_vertex_offset;
   u64 geometry_index_offset;
 
-  VK_Cmd cmds[3];
+  VK_CommandBuffer cmds[3];
   VK_MaterialShader material_shader;
   VK_UIShader ui_shader;
   
   VK_GeometryData geometries[MaxGeometryCount];
 };
 
-struct VK_Context {
+struct VK {
   Arena* arena;
   
   VkInstance instance;
@@ -312,9 +311,12 @@ struct VK_Context {
   VK_Device device;
   
   VK_Swapchain swapchain;
-  VK_Swapchain* old_swapchain;
-  VK_Renderpass main_renderpass;
-  VK_Renderpass ui_renderpass;
+  VK_Swapchain old_swapchain;
+  
+  #define RenderpassCount 2
+  u32 main_renderpass_id;
+  u32 ui_renderpass_id;
+  VK_Renderpass renderpasses[RenderpassCount];
   
   b8 recreating_swapchain;
   
@@ -330,9 +332,9 @@ struct VK_TextureData {
   VkSampler sampler;
 };
 
-extern VK_Context* vk;
+extern VK* vk;
 
-Inline i32 vk_find_memory_index(u32 type_filter, u32 property_flags) {
+INLINE i32 vk_find_memory_index(u32 type_filter, u32 property_flags) {
   VkPhysicalDeviceMemoryProperties memory_properties;
   vkGetPhysicalDeviceMemoryProperties(vk->device.physical_device, &memory_properties);
 
@@ -346,3 +348,7 @@ Inline i32 vk_find_memory_index(u32 type_filter, u32 property_flags) {
   Assert(!"Unable to find suitable memory type");
   return -1;
 }
+
+VK_Renderpass* vk_get_renderpass(u32 id);
+VkSemaphore vk_get_current_image_available_semaphore();
+VkSemaphore vk_get_current_queue_complete_semaphore();

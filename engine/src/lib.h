@@ -6,3 +6,4 @@
 #include "base/maths.h"
 #include "base/os.h"
 #include "base/hashtable.h"
+#include "base/darray.h"

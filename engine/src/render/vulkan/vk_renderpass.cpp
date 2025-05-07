@@ -1,15 +1,26 @@
 #include "vk_renderpass.h"
 
-VK_Renderpass vk_renderpass_create(Rect rect, v4 color, f32 depth, u32 stencil, u32 clear_flags, b32 has_prev_pass, b32 has_next_pass) {
-  VK_Renderpass renderpass = {
-    .render_area = rect,
-    .clear_color = color,
-    .depth = depth,
-    .stencil = stencil,
-    .clear_flags = (u8)clear_flags,
-    .has_prev_pass = (b8)has_prev_pass,
-    .has_next_pass = (b8)has_next_pass
-  };
+u32 vk_renderpass_create(Rect rect, v4 color, f32 depth, u32 stencil, u32 clear_flags, b32 has_prev_pass, b32 has_next_pass) {
+  VK_Renderpass* renderpass = null;
+  i32 i;
+  for (i = 0; i < 2; ++i) {
+    if (!vk->renderpasses[i].handle) {
+      renderpass = &vk->renderpasses[i];
+      
+      *renderpass = {
+        .render_area = rect,
+        .clear_color = color,
+        .depth = depth,
+        .stencil = stencil,
+        .clear_flags = (u8)clear_flags,
+        .has_prev_pass = (b8)has_prev_pass,
+        .has_next_pass = (b8)has_next_pass,
+        .id = (u32)i
+      };
+      break;
+    }
+  }
+
   
   // Main subpass
   VkSubpassDescription subpass = {};
@@ -20,7 +31,7 @@ VK_Renderpass vk_renderpass_create(Rect rect, v4 color, f32 depth, u32 stencil, 
   VkAttachmentDescription attachment_descriptions[2];
   
   // Color attachment
-  b32 do_clear_color = (renderpass.clear_flags & RenderpassClearFlag_ColorBuffer) != 0;
+  b32 do_clear_color = (renderpass->clear_flags & RenderpassClearFlag_ColorBuffer) != 0;
   VkAttachmentDescription color_attachment;
   color_attachment.format = vk->swapchain.image_format.format; // TODO: configurable
   color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -45,7 +56,7 @@ VK_Renderpass vk_renderpass_create(Rect rect, v4 color, f32 depth, u32 stencil, 
   subpass.pColorAttachments = &color_attachment_reference;
 
   // Depth attachment, if there is one
-  b32 do_clear_depth = (renderpass.clear_flags & RenderpassClearFlag_DepthBuffer) != 0;
+  b32 do_clear_depth = (renderpass->clear_flags & RenderpassClearFlag_DepthBuffer) != 0;
 
   if (do_clear_color) {
     VkAttachmentDescription depth_attachment = {};
@@ -105,43 +116,45 @@ VK_Renderpass vk_renderpass_create(Rect rect, v4 color, f32 depth, u32 stencil, 
   render_pass_create_info.pNext = 0;
   render_pass_create_info.flags = 0;
 
-  VK_CHECK(vkCreateRenderPass(vkdevice, &render_pass_create_info, vk->allocator, &renderpass.handle));
-  return renderpass;
+  VK_CHECK(vkCreateRenderPass(vkdevice, &render_pass_create_info, vk->allocator, &renderpass->handle));
+  return renderpass->id;
 }
 
-void vk_renderpass_destroy(VK_Renderpass renderpass) {
-  vkDestroyRenderPass(vkdevice, renderpass.handle, vk->allocator);
+void vk_renderpass_destroy(u32 id) {
+  VK_Renderpass* renderpass = vk_get_renderpass(id);
+  vkDestroyRenderPass(vkdevice, renderpass->handle, vk->allocator);
+  vk->renderpasses[id].handle = 0;
 }
 
-void vk_renderpass_begin(VK_Cmd* command_buffer, VK_Renderpass renderpass, VkFramebuffer frame_buffer) {
+void vk_renderpass_begin(VK_CommandBuffer* command_buffer, VK_Renderpass* renderpass, VkFramebuffer frame_buffer) {
   VkRenderPassBeginInfo begin_info = {VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
-  begin_info.renderPass = renderpass.handle;
+  begin_info.renderPass = renderpass->handle;
   begin_info.framebuffer = frame_buffer;
-  begin_info.renderArea.offset.x = renderpass.render_area.x;
-  begin_info.renderArea.offset.y = renderpass.render_area.y;
-  begin_info.renderArea.extent.width = renderpass.render_area.w;
-  begin_info.renderArea.extent.height = renderpass.render_area.h;
+  begin_info.renderArea.offset.x = renderpass->render_area.x;
+  begin_info.renderArea.offset.y = renderpass->render_area.y;
+  begin_info.renderArea.extent.width = renderpass->render_area.w;
+  begin_info.renderArea.extent.height = renderpass->render_area.h;
   
   begin_info.clearValueCount = 0;
   begin_info.pClearValues = 0;
 
   VkClearValue clear_values[2] = {};
-  b32 do_clear_color = (renderpass.clear_flags & RenderpassClearFlag_ColorBuffer) != 0;
+  b32 do_clear_color = (renderpass->clear_flags & RenderpassClearFlag_ColorBuffer) != 0;
   if (do_clear_color) {
     clear_values[begin_info.clearValueCount++].color = {
-      renderpass.clear_color.x,
-      renderpass.clear_color.y,
-      renderpass.clear_color.z,
-      renderpass.clear_color.w,
+      renderpass->clear_color.x,
+      renderpass->clear_color.y,
+      renderpass->clear_color.z,
+      renderpass->clear_color.w,
     };
   }
   
-  b32 do_clear_depth = (renderpass.clear_flags & RenderpassClearFlag_DepthBuffer) != 0;
-  b32 do_clear_stencil = (renderpass.clear_flags & RenderpassClearFlag_StencilBuffer) != 0;
+  b32 do_clear_depth = (renderpass->clear_flags & RenderpassClearFlag_DepthBuffer) != 0;
+  b32 do_clear_stencil = (renderpass->clear_flags & RenderpassClearFlag_StencilBuffer) != 0;
   if (do_clear_depth) {
     clear_values[begin_info.clearValueCount++].depthStencil = {
-      renderpass.depth,
-      do_clear_stencil ? renderpass.stencil : 0,
+      renderpass->depth,
+      do_clear_stencil ? renderpass->stencil : 0,
     };
   }
   
@@ -151,7 +164,11 @@ void vk_renderpass_begin(VK_Cmd* command_buffer, VK_Renderpass renderpass, VkFra
   command_buffer->state = VK_CmdState_InRenderPass;
 }
 
-void vk_renderpass_end(VK_Cmd* command_buffer) {
+void vk_renderpass_end(VK_CommandBuffer* command_buffer) {
   vkCmdEndRenderPass(command_buffer->handle);
   command_buffer->state = VK_CmdState_Recording;
+}
+
+VK_Renderpass* vk_get_renderpass(u32 id) {
+  return &vk->renderpasses[id];
 }

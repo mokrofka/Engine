@@ -2,54 +2,25 @@
 
 #include "os.h"
 #include "logger.h"
-#include <string.h>
-
-#define ZERO_MEMORY 1
-
-#ifdef ZERO_MEMORY
-  #define ClearMemory(ptr, size) MemZero(ptr, size)
-#else
-  #define ClearMemory(ptr, size)
-#endif
 
 global thread_local TCTX tctx_thread_local;
-
-void _memory_zero(void* block, u64 size) {
-  memset(block, 0, size);
-}
-
-void _memory_copy(void* dest, const void* source, u64 size) {
-  memcpy(dest, source, size);
-}
-
-void _memory_set(void* dest, i32 value, u64 size) {
-  memset(dest, value, size);
-}
-
-b32 _memory_match(void* a, void* b, u64 size) {
-  return memcmp(a, b, size) ? 0 : 1;
-}
 
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
 // Utils
 
-internal b32 is_power_of_two(u64 x) {
-	return (x & (x-1)) == 0;
-}
-
 u64 calc_padding_with_header(PtrInt ptr, u64 alignment, u64 header_size) {
-  Assert(is_power_of_two(alignment));
+  Assert(IsPow2OrZero(alignment));
 
-  u64 p = ptr;
+  PtrInt p = ptr;
   u64 a = alignment;
   u64 modulo = p & (a - 1); // (p % a) as it assumes alignment is a power of two
 
   u64 padding = 0;
   u64 needed_space = 0;
 
-  if (modulo != 0) { // Same logic as 'align_forward'
+  if (modulo != 0) { // Same logic as 'AlignPow2'
     padding = a - modulo;
   }
 
@@ -67,33 +38,15 @@ u64 calc_padding_with_header(PtrInt ptr, u64 alignment, u64 header_size) {
   return padding;
 }
 
-internal u64 align_forward(PtrInt ptr, u64 align) {
-	u64 p, a, modulo;
-  
-  Assert(is_power_of_two(align));
-
-	p = ptr;
-	a = align;
-	// Same as (p % a) but faster as 'a' is a power of two
-	modulo = p & (a-1);
-
-	if (modulo != 0) {
-		// If 'p' address is not aligned, push the address to the
-		// next value which is aligned
-		p += a - modulo;
-	}
-	return p;
-}
-
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
 // Arena
 
+// TODO check this with different int size
 Arena* arena_alloc(Arena* arena, u64 size, u64 align) {
-  // Align 'curr_offset' forward to the specified alignment
   PtrInt curr_ptr = (PtrInt)arena + ARENA_HEADER + arena->pos;
-  PtrInt offset = align_forward(curr_ptr, align);
+  PtrInt offset = AlignPow2(curr_ptr, align);
   PtrInt temp = (PtrInt)arena + ARENA_HEADER;
 	offset -= temp; // Change to relative offset
 
@@ -111,8 +64,8 @@ Arena* arena_alloc(Arena* arena, u64 size, u64 align) {
 void* _arena_push(Arena* arena, u64 size, u64 align) {
   // Align 'curr_offset' forward to the specified alignment
   PtrInt curr_ptr = (PtrInt)arena + ARENA_HEADER + arena->pos;
-  u64 offset = align_forward(curr_ptr, align);
-  u64 temp = (u64)arena + ARENA_HEADER;
+  u64 offset = AlignPow2(curr_ptr, align);
+  u64 temp = (PtrInt)arena + ARENA_HEADER;
 	offset -= temp; // Change to relative offset
 
   Assert(offset+size <= arena->res && "Arena is out of memory");
@@ -126,8 +79,8 @@ void* _arena_push(Arena* arena, u64 size, u64 align) {
 
 void _arena_move(Arena* arena, u64 size, u64 align) {
   PtrInt curr_ptr = (PtrInt)arena + ARENA_HEADER + arena->pos;
-  u64 offset = align_forward(curr_ptr, align);
-  u64 temp = (u64)arena + ARENA_HEADER;
+  u64 offset = AlignPow2(curr_ptr, align);
+  u64 temp = (PtrInt)arena + ARENA_HEADER;
 	offset -= temp; // Change to relative offset
   Assert(offset+size <= arena->res && "Arena is out of memory");
   arena->pos = offset+size;
@@ -138,7 +91,7 @@ void tctx_init(Arena* arena) {
   tctx_thread_local.arenas[1] = arena_alloc(arena, MB(8));
 }
 
-Temp tctx_get_scratch(Arena** conflics, u32 counts) {
+Temp tctx_get_scratch(Arena** conflics, u64 counts) {
   TCTX* tctx = &tctx_thread_local;
   
   Loop (i, ArrayCount(tctx->arenas)) {
@@ -153,37 +106,7 @@ Temp tctx_get_scratch(Arena** conflics, u32 counts) {
       return temp_begin(tctx->arenas[i]);
     }
   }
-  Temp temp = {null, 0};
-
-  return temp;
-}
-
-u64 align_forward_uintptr(PtrInt ptr, u64 align) {
-	u64 a, p, modulo;
-
-	Assert(is_power_of_two(align));
-
-	a = align;
-	p = ptr;
-	modulo = p & (a-1);
-	if (modulo != 0) {
-		p += a - modulo;
-	}
-	return p;
-}
-
-u64 align_forward_size(u64 ptr, u64 align) {
-	u64 a, p, modulo;
-
-	Assert(is_power_of_two((u64)align));
-
-	a = align;
-	p = ptr;
-	modulo = p & (a-1);
-	if (modulo != 0) {
-		p += a - modulo;
-	}
-	return p;
+  return {};
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -195,10 +118,10 @@ Pool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignm
   Pool p;
 
   // Align chunk size up to the required chunk_alignment
-  chunk_size = align_forward_size(chunk_size, chunk_alignment);
+  chunk_size = AlignPow2(chunk_size, chunk_alignment);
   
   PtrInt init_start = (PtrInt)arena + arena_pos(arena);
-  PtrInt start = align_forward_uintptr(init_start, chunk_alignment);
+  PtrInt start = AlignPow2(init_start, chunk_alignment);
   
   u8* data = push_buffer(arena, u8, chunk_count*chunk_size, chunk_alignment);
   
@@ -238,7 +161,7 @@ void pool_free(Pool& p, void *ptr) {
   Assert((start <= ptr && ptr < end) && "Memory is out of bounds of the buffer in this pool");
 
 	// Push free node
-	node = (PoolFreeNode *)ptr;
+  node = (PoolFreeNode*)ptr;
 
   Assert(!(start <= node->next && ptr < end) && "Memomy chunk is already free");
 	node->next = p.head;
@@ -493,16 +416,16 @@ internal void segregated_pool_free(SegPool& p, void* ptr) {
 u8* mem_alloc(u64 size) {
   // Minimum size is 8 bytes
   u64 base_size = 8;
+  u8* mem = 0;
 
   Loop (i, ArrayCount(mem_ctx.pools)) {
     if (size <= base_size << i) {
-      return (u8*)segregated_pool_alloc(mem_ctx.pools[i]);
+      mem = (u8*)segregated_pool_alloc(mem_ctx.pools[i]);
+      break;
     }
   }
 
-  // Too large for any of our pools
-  Assert(0 && "Too large for any of our pools");
-  return null;
+  return mem;
 }
 
 void mem_free(void* ptr) {
@@ -543,7 +466,7 @@ void global_allocator_init() {
 
 u64 ring_write(u8* ring_base, u64 ring_size, u64 ring_pos, void* src_data, u64 src_data_size) {
   Assert(src_data_size <= ring_size);
-  
+
   u64 ring_off = ring_pos % ring_size;
   u64 bytes_before_split = ring_size - ring_off;
   u64 pre_split_bytes = Min(bytes_before_split, src_data_size);
@@ -555,9 +478,9 @@ u64 ring_write(u8* ring_base, u64 ring_size, u64 ring_pos, void* src_data, u64 s
   return src_data_size;
 }
 
-u64 ring_read(u8 *ring_base, u64 ring_size, u64 ring_pos, void *dst_data, u64 read_size) {
+u64 ring_read(u8* ring_base, u64 ring_size, u64 ring_pos, void* dst_data, u64 read_size) {
   Assert(read_size <= ring_size);
-  
+
   u64 ring_off = ring_pos % ring_size;
   u64 bytes_before_split = ring_size - ring_off;
   u64 pre_split_bytes = Min(bytes_before_split, read_size);

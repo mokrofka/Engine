@@ -1,14 +1,9 @@
-#include "vendor/imgui/imgui_impl_win32.h"
-
 #define WIN32_LEAN_AND_MEAN
 #include "base/os.h"
 #include <windows.h>
 #include <windowsx.h>
 
-#include "base/memory.h"
-#include "base/strings.h"
-#include "base/logger.h"
-
+#include "lib.h"
 
 struct Win32HandleInfo {
   HINSTANCE h_instance;
@@ -126,63 +121,13 @@ void os_pump_messages() {
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_win32.h>
 
-struct VK_Context {
+struct VK {
   Arena* arena;
   
   VkInstance instance;
   VkAllocationCallbacks* allocator;
   VkSurfaceKHR surface;
 };
-
-extern VK_Context* vk;
-
-// Surface creation for Vulkan
-void* os_vk_create_surface() {
-  VkSurfaceKHR surface = {};
-  // Simply cold-cast to the known type.
-  // InternalState* state = (InternalState*)plat_state->internal_state;
-  HINSTANCE h_instance = state->instance;
-  HWND hwnd = (HWND)state->window->hwnd;
-  
-  VkWin32SurfaceCreateInfoKHR create_info = {VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR};
-  create_info.hinstance = h_instance;
-  create_info.hwnd = hwnd;
-
-  VkResult result = vkCreateWin32SurfaceKHR(vk->instance, &create_info,
-                                            vk->allocator, &surface);
-  if (result != VK_SUCCESS) {
-    Error("Vulkan surface creation failed"_);
-    return 0;
-  }
-  return surface;
-}
-
-i32 os_imgui_create_VkSurface(void* vp, u64 vk_inst, const void* vk_allocators, u64* out_vk_surface) {
-  VkInstance instance = (VkInstance)vk_inst;
-
-  // Create Vulkan surface for the viewport (on Windows, you'd use vkCreateWin32SurfaceKHR)
-  VkWin32SurfaceCreateInfoKHR surface_info = {};
-  surface_info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-  surface_info.hwnd = (HWND)((ImGuiViewport*)vp)->PlatformHandle; // Handle to the window or viewport
-  surface_info.hinstance = GetModuleHandle(nullptr);
-
-  VkSurfaceKHR surface;
-  VkResult result = vkCreateWin32SurfaceKHR(instance, &surface_info, nullptr, &surface);
-
-  if (result != VK_SUCCESS) {
-    return -1; // Surface creation failed
-  }
-
-  *out_vk_surface = (ImU64)surface; // Store the Vulkan surface in the out_vk_surface pointer
-  return 0;                         // Success
-}
-
-// Arena* os_main_arena_allocate(u64 size) {
-//   Arena* arena = (Arena*)VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-//   arena->pos = 0;
-//   arena->res = size;
-//   return arena;
-// }
 
 void os_console_write(String message, u32 color) {
   HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -289,7 +234,7 @@ b32 os_commit_large(void* ptr, u64 size) {
 
 OS_Handle os_file_open(String path, OS_AccessFlags mode) {
   Scratch scratch;
-  String path_ = push_str_copy(scratch, path);
+  String path_c = push_str_copy(scratch, path);
   OS_Handle result = {};
   DWORD handle_permission = 0;
   DWORD handle_creation = 0;
@@ -307,24 +252,24 @@ OS_Handle os_file_open(String path, OS_AccessFlags mode) {
     return result;
   }
   
-  HANDLE win32_handle = CreateFileA((char*)path_.str, handle_permission,
+  HANDLE win32_handle = CreateFileA((char*)path_c.str, handle_permission,
                                      FILE_SHARE_READ, 0, handle_creation, 0, null);
   if (win32_handle == INVALID_HANDLE_VALUE) {
     return result;
   }
-  result.u64 = (u64)win32_handle;
+  result = (PtrInt)win32_handle;
 
   return result;
 }
   
 void os_file_close(OS_Handle file) {
-  CloseHandle((HANDLE)file.u64);
+  CloseHandle((HANDLE)file);
 }
 
 u64 os_file_read(OS_Handle file, u64 size, void* out_data) {
-  HANDLE win32_handle = (HANDLE)file.u64;
+  HANDLE win32_handle = (HANDLE)file;
   DWORD bytes_read;
-  if (file.u64 == 0) { return 0; }
+  if (file == 0) { return 0; }
   ReadFile(win32_handle, out_data, size, &bytes_read, null);
   if (bytes_read != size) { return 0; }
   return bytes_read;
@@ -332,23 +277,23 @@ u64 os_file_read(OS_Handle file, u64 size, void* out_data) {
 
 u64 os_file_write(OS_Handle file, u64 size, void* data) {
   DWORD bytes_wrote;
-  if (file.u64 == 0) { return 0; };
-  WriteFile((HANDLE)file.u64, data, size, &bytes_wrote, 0);
+  if (file == 0) { return 0; };
+  WriteFile((HANDLE)file, data, size, &bytes_wrote, 0);
   return bytes_wrote;
 }
 
 u64 os_file_size(OS_Handle file) {
   u32 hsize;
-  u32 lsize = GetFileSize((HANDLE)file.u64, (LPDWORD)&hsize);
+  u32 lsize = GetFileSize((HANDLE)file, (LPDWORD)&hsize);
   u64 result = Compose64Bit(hsize, lsize);
   return result;
 }
 
 FileProperties os_properties_from_file(OS_Handle file) {
-  if(!file.u64) { FileProperties r = {0}; return r; }
+  if(!file) { FileProperties r = {0}; return r; }
   FileProperties props = {};
   BY_HANDLE_FILE_INFORMATION info;
-  HANDLE handle = (HANDLE)file.u64;
+  HANDLE handle = (HANDLE)file;
   b32 info_good = GetFileInformationByHandle(handle, &info);
   if (info_good) {
     props.size = Compose64Bit(info.nFileSizeHigh, info.nFileSizeLow);
@@ -403,13 +348,13 @@ OS_Handle os_lib_open(String path) {
 }
 
 void os_lib_close(OS_Handle lib) {
-  HMODULE mod = (HMODULE)lib.u64;
+  HMODULE mod = (HMODULE)lib;
   FreeLibrary(mod);
 }
 
-PROC os_lib_get_proc(OS_Handle lib, String name) {
-  HMODULE mod = (HMODULE)lib.u64;
-  PROC result = GetProcAddress(mod, (char*)name.str);
+VoidProc* os_lib_get_proc(OS_Handle lib, String name) {
+  HMODULE mod = (HMODULE)lib;
+  VoidProc* result = (VoidProc*)GetProcAddress(mod, (char*)name.str);
   return result;
 }
 
@@ -432,7 +377,7 @@ void clock_stop(Clock *clock) {
 
 ///////////////////////////////////////////////////////////////////////////
 // Win proc
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 internal LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARAM l_param) {
   ImGui_ImplWin32_WndProcHandler(hwnd, msg, w_param, l_param);
   
@@ -441,15 +386,8 @@ internal LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_par
       // Notfy the OS that erasing will be handled by the application to prevent flicker.
       return 1;
     }
-    // case WM_PAINT: {
-    //   PAINTSTRUCT ps;
-    //   HDC hdc = BeginPaint(hwnd, &ps);
-    //   RECT rect;
-    //   GetClientRect(hwnd, &rect);
-    //   FillRect(hdc, &rect, (HBRUSH)GetStockObject(BLACK_BRUSH)); // Fill window with black
-    //   EndPaint(hwnd, &ps);
-    //   return 0;
-    // } break;
+    case WM_PAINT: {
+    } break;
     case WM_CLOSE: {
       state->window_closed_callback();
       return true;
@@ -525,81 +463,4 @@ void os_show_window() {
 
 ///////////////////////////////////////////////////////////////////////////
 // Network
-
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
-#include "winsock2.h"
-#pragma comment(lib, "ws2_32.lib")
-
-struct NetworkState {
-  WSAData ws;
-  SOCKET s;
-  SOCKADDR_IN sa;
-};
-
-global NetworkState* net;
-
-void network_init(Arena* arena) {
-  net = push_struct(arena, NetworkState);
-  WSAStartup(MAKEWORD(2,2), &net->ws);
-  
-  net->s = socket(AF_INET, SOCK_STREAM, 0);
-  
-  net->sa.sin_family = AF_INET;
-  net->sa.sin_port = htons(1234);
-}
-
-void run_server() {
-  if (bind(net->s, (struct sockaddr*)&net->sa, sizeof(net->sa)) == SOCKET_ERROR) {
-    Error("Bind failed: %d", WSAGetLastError());
-    return;
-  }
-  
-  if (listen(net->s, 100) == SOCKET_ERROR) {
-    Error("Listen failed: %d", WSAGetLastError());
-    return;
-  }
-  
-  Info("Server is listening...");
-  
-  SOCKET client_socket;
-  SOCKADDR_IN client_addr;
-  i32 client_addr_size = sizeof(client_addr);
-  
-  u8 arr[20] = {};
-  
-  while ((client_socket = accept(net->s, (struct sockaddr*)&client_addr, &client_addr_size)) != INVALID_SOCKET) {
-    Info("Client connected!");
-    // Handle the client connection here
-    
-    while (recv(client_socket, (char*)arr, sizeof(arr), 0) > 0) {
-      Info("Server read: %s", str_cstr(arr));
-      
-      u8 to_client[] = "hello client!";
-      send(client_socket, (char*)to_client, sizeof(to_client), 0);
-    }
-  }
-  
-  // If accept() fails, print the error
-  Error("Accept failed: %d", WSAGetLastError());
-}
-
-void connect_to_server() {
-  net->sa.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
-
-  if (connect(net->s, (struct sockaddr*)&net->sa, sizeof(net->sa)) == SOCKET_ERROR) {
-    Error("Connect failed: %d", WSAGetLastError());
-    return;
-  }
-  
-  Info("Connected to server!");
-  
-  u8 arr[20] = "hello server!";
-  send(net->s, (char*)arr, cstr_length(arr), 0);
-  MemZeroArray(arr);
-  recv(net->s, (char*)arr, sizeof(arr), 0);
-  Info("%s", str_cstr(arr));
-  
-  os_sleep(3000);
-  
-  closesocket(net->s);
-}
+#include "network_cpp.h"

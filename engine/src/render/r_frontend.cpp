@@ -2,19 +2,11 @@
 
 #include "vulkan/vk_backend.h"
 
-#include "sys/texture_sys.h"
-#include "sys/material_sys.h"
-
-// TODO temporary
-
-#include "event.h"
-
-// TODO end temporary
-
 #include "ui.h"
 
 struct RendererSystemState {
   Arena* arena;
+  R_Config config;
   R_Backend backend;
   mat4 projection;
   mat4 view;
@@ -32,10 +24,11 @@ void create_texture(Texture* t) {
   t->generation = INVALID_ID;
 }
 
-void r_init(Arena* arena) {
+void r_init(Arena* arena, R_Config config) {
   state = push_struct(arena, RendererSystemState);
+  state->config = config;
   
-  state->arena = arena_alloc(arena, MB(1));
+  state->arena = arena_alloc(arena, config.mem_reserve);
   state->backend.arena = state->arena;
   
   // TODO make this configurable
@@ -88,10 +81,6 @@ void r_draw_frame(R_Packet* packet) {
       vk_r_begin_renderpass(BuiltinRenderpass_World);
 
       vk_r_update_global_world_state(state->projection, state->view, v3_zero(), v4_one(), 0);
-      
-      // ui_begin_frame();
-      // ui_test();
-      // ui_end_frame();
       // Draw geometries
       u32 count = packet->geometry_count;
       Loop (i, count) {
@@ -188,4 +177,61 @@ void r_create_geometry(Geometry* geometry, u32 vertex_size, u32 vertex_count, vo
 
 void r_destroy_geometry(Geometry* geometry) {
   vk_r_destroy_geometry(geometry);
+}
+
+u32 r_renderpass_id(String name) {
+  // TODO: HACK: Need dynamic renderpasses instead of hardcoding them.
+  if (str_matchi("Renderpass.Builtin.World"_, name)) {
+    return BuiltinRenderpass_World;
+  } else if (str_matchi("Renderpass.Builtin.UI"_, name)) {
+    return BuiltinRenderpass_UI;
+  }
+
+  Error("No renderpass named '%s'", name);
+  Assert(false);
+  return 0;
+}
+
+void r_shader_create(struct Shader* s, u32 renderpass_id, u32 stage_count, String* stage_filenames, ShaderStage* stages) {
+  vk_r_shader_create(s, renderpass_id, stage_count, stage_filenames, stages);
+}
+
+void r_shader_destroy(Shader* s) {
+  vk_r_shader_destroy(s);
+}
+
+void r_shader_initialize(Shader* s) {
+  vk_r_shader_initialize(s);
+}
+
+void r_shader_use(Shader* s) {
+  vk_r_shader_use(s);
+}
+
+void r_shader_bind_globals(Shader* s) {
+  vk_r_shader_bind_globals(s);
+}
+
+void r_shader_bind_instance(Shader* s, u32 instance_id) {
+  vk_r_shader_bind_instance(s, instance_id);
+}
+
+void r_shader_apply_globals(Shader* s) {
+  vk_r_shader_apply_globals(s);
+}
+
+void r_shader_apply_instance(Shader* s) {
+  vk_r_shader_apply_instance(s);
+}
+
+void r_shader_acquire_instance_resources(Shader* s, u32* out_instance_id) {
+  vk_r_shader_acquire_instance_resources(s, out_instance_id);
+}
+
+void r_shader_release_instance_resources(Shader* s, u32 instance_id) {
+  vk_r_shader_release_instance_resources(s, instance_id);
+}
+
+void r_set_uniform(Shader* s, shader_uniform* uniform, const void* value) {
+  // vk_r_set_uniform(s, uniform, value);
 }

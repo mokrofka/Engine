@@ -131,7 +131,7 @@ VK_MaterialShader vk_material_shader_create() {
   }
 
   shader.pipeline = vk_graphics_pipeline_create(
-    vk->main_renderpass,
+    vk_get_renderpass(vk->main_renderpass_id),
     sizeof(Vertex3D),
     ATTRIBUTE_COUNT,
     attribute_desriptions,

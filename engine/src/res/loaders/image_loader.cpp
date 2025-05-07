@@ -2,7 +2,6 @@
 
 #include "loader_utils.h"
 
-#define STB_IMAGE_IMPLEMENTATION
 #include "vendor/stb_image.h"
 
 b32 image_loader_load(Arena* arena, ResLoader* self, String name, Res* out_res) {
@@ -23,24 +22,11 @@ b32 image_loader_load(Arena* arena, ResLoader* self, String name, Res* out_res) 
   // TODO: extend this to make it configurable.
   String file_path_c = push_str_copy(scratch, file_path);
   u8* data = stbi_load(
-    file_path_c,
+    (char*)file_path_c.str,
     &width,
     &height,
     &channel_count,
     required_channel_count);
-
-  // Check for a failure reason. If there is one, abort, clear memory if allocated, return false.
-  const char* fail_reason = stbi_failure_reason();
-  if (fail_reason) {
-    Error("Image resource loader failed to load file '%s': %s", file_path, fail_reason);
-    // Clear the error so the next load doesn't fail.
-    stbi__err(0, 0);
-
-    if (data) {
-      stbi_image_free(data);
-    }
-    return false;
-  }
 
   if (!data) {
     Error("Image resource loader failed to load file '%s'", file_path);
@@ -50,15 +36,15 @@ b32 image_loader_load(Arena* arena, ResLoader* self, String name, Res* out_res) 
   str_copy(out_res->file_path64, file_path);
 
   // TODO: Should be using an allocator here.
-  TextureRes* res_data = mem_alloc_struct(TextureRes);
-  res_data->pixels = data;
-  res_data->width = width;
-  res_data->height = height;
-  res_data->channel_count = required_channel_count;
+  // TextureRes* res_data = mem_alloc_struct(TextureRes);
+  // res_data->pixels = data;
+  // res_data->width = width;
+  // res_data->height = height;
+  // res_data->channel_count = required_channel_count;
 
-  Assign(out_res->data, res_data);
-  out_res->data_size = sizeof(TextureRes);
-  str_copy(out_res->name64, name);
+  // Assign(out_res->data, res_data);
+  // out_res->data_size = sizeof(TextureRes);
+  // str_copy(out_res->name64, name);
 
   return true;
 }
@@ -91,7 +77,7 @@ Texture res_load_texture(String filepath) {
   String file_path_c = push_str_copy(scratch, file_path);
 
   u8* data = stbi_load(
-    file_path_c,
+    (char*)file_path_c.str,
     (i32*)&texture.width,
     (i32*)&texture.height,
     (i32*)&texture.channel_count,

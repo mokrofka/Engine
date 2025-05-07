@@ -1,7 +1,7 @@
 #include "vk_command_buffer.h"
 
-VK_Cmd vk_cmd_alloc(VkCommandPool pool, b32 is_primary) {
-  VK_Cmd command_buffer = {};
+VK_CommandBuffer vk_cmd_alloc(VkCommandPool pool, b32 is_primary) {
+  VK_CommandBuffer command_buffer = {};
   
   VkCommandBufferAllocateInfo allocate_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
   allocate_info.commandPool = pool;
@@ -15,14 +15,14 @@ VK_Cmd vk_cmd_alloc(VkCommandPool pool, b32 is_primary) {
   return command_buffer;
 }
 
-void vk_cmd_free(VkCommandPool pool, VK_Cmd* command_buffer) {
+void vk_cmd_free(VkCommandPool pool, VK_CommandBuffer* command_buffer) {
   vkFreeCommandBuffers(vkdevice, pool, 1, &command_buffer->handle);
 
   command_buffer->handle = 0;
   command_buffer->state = VK_CmdState_NotAllocated;
 }
 
-void vk_cmd_begin(VK_Cmd* cmd, b32 is_single_use, b32 is_renderpass_continue, b32 is_simultaneous_use) {
+void vk_cmd_begin(VK_CommandBuffer* cmd, b32 is_single_use, b32 is_renderpass_continue, b32 is_simultaneous_use) {
 
   VkCommandBufferBeginInfo begin_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
   if (is_single_use) {
@@ -39,26 +39,26 @@ void vk_cmd_begin(VK_Cmd* cmd, b32 is_single_use, b32 is_renderpass_continue, b3
   cmd->state = VK_CmdState_Recording;
 }
 
-void vk_cmd_end(VK_Cmd* cmd) {
+void vk_cmd_end(VK_CommandBuffer* cmd) {
   VK_CHECK(vkEndCommandBuffer(cmd->handle));
   cmd->state = VK_CmdState_RecordingEnded;
 }
 
-void vk_cmd_update_submitted(VK_Cmd* cmd) {
+void vk_cmd_update_submitted(VK_CommandBuffer* cmd) {
   cmd->state = VK_CmdState_Submitted;
 }
 
-void vk_cmd_reset(VK_Cmd* cmd) {
+void vk_cmd_reset(VK_CommandBuffer* cmd) {
   cmd->state = VK_CmdState_Ready;
 }
 
-VK_Cmd vk_cmd_alloc_and_begin_single_use(VkCommandPool pool) {
-  VK_Cmd out_cmd = vk_cmd_alloc(pool, true);
+VK_CommandBuffer vk_cmd_alloc_and_begin_single_use(VkCommandPool pool) {
+  VK_CommandBuffer out_cmd = vk_cmd_alloc(pool, true);
   vk_cmd_begin(&out_cmd, true, false, false);
   return out_cmd;
 }
 
-void vk_cmd_end_single_use(VkCommandPool pool, VK_Cmd* command_buffer, VkQueue queue) {
+void vk_cmd_end_single_use(VkCommandPool pool, VK_CommandBuffer* command_buffer, VkQueue queue) {
 
   // End the command buffer.
   vk_cmd_end(command_buffer);

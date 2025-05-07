@@ -18,9 +18,9 @@ u64 hash_name(String name, u32 element_count) {
   return hash;
 }
 
-Hashtable hashtable_create(Arena* arena, u64 element_size, u32 element_count, b32 is_pointer_type) {
+HashMap hashmap_create(Arena* arena, u32 element_size, u32 element_count, b32 is_pointer_type) {
   Assert(element_count && element_size && "element_size and element_count must be a positive non-zero value");
-  Hashtable hashtable;
+  HashMap hashtable;
   
   hashtable.data = push_buffer(arena, u8, element_size * element_count);
   hashtable.element_size = element_size;
@@ -30,12 +30,12 @@ Hashtable hashtable_create(Arena* arena, u64 element_size, u32 element_count, b3
   return hashtable;
 }
 
-void hashtable_destroy(Hashtable* table) {
+void hashmap_destroy(HashMap* table) {
   Assert(table);
   MemZeroStruct(table);
 }
 
-void hashtable_set(Hashtable* table, String name, void* value) {
+void hashmap_set(HashMap* table, String name, void* value) {
   Assert(table && name.str && value);
   Assert(!table->is_pointer_type);
 
@@ -43,7 +43,7 @@ void hashtable_set(Hashtable* table, String name, void* value) {
   MemCopy(table->data + (table->element_size*hash), value, table->element_size);
 }
 
-void hashtable_set_ptr(Hashtable* table, String name, void** value) {
+void hashmap_set_ptr(HashMap* table, String name, void** value) {
   Assert(table && name.str);
   Assert(!table->is_pointer_type);
   
@@ -51,7 +51,7 @@ void hashtable_set_ptr(Hashtable* table, String name, void** value) {
   ((void**)table->data)[hash] = value ? *value : 0;
 }
 
-void hashtable_get(Hashtable* table, String name, void* out_value) {
+void hashmap_get(HashMap* table, String name, void* out_value) {
   Assert(table && name.str && out_value);
   Assert(!table->is_pointer_type);
   
@@ -59,7 +59,7 @@ void hashtable_get(Hashtable* table, String name, void* out_value) {
   MemCopy(out_value, table->data + (table->element_size * hash), table->element_size);
 }
 
-void hashtable_get_ptr(Hashtable* table, String name, void** out_value) {
+void hashmap_get_ptr(HashMap* table, String name, void** out_value) {
   Assert(table && name.str && out_value);
   Assert(!table->is_pointer_type);
   
@@ -67,7 +67,7 @@ void hashtable_get_ptr(Hashtable* table, String name, void** out_value) {
   *out_value = ((void**)table->data)[hash];
 }
 
-void hashtable_fill(Hashtable* table, void* value) {
+void hashmap_fill(HashMap* table, void* value) {
   Assert(table || value);
   Assert(!table->is_pointer_type);
 

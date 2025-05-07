@@ -15,12 +15,12 @@ VK_Image vk_image_create(
 void vk_image_view_create(VkFormat format, VK_Image* image, VkImageAspectFlags);
 
 void vk_image_transition_layout(
-    VK_Cmd* command_buffer,
+    VK_CommandBuffer* command_buffer,
     VK_Image* image,
     VkFormat format,
     VkImageLayout old_layout,
     VkImageLayout new_layout);
 
-void vk_image_copy_from_buffer(VK_Image* image, VkBuffer buffer, VK_Cmd* command_buffer);
+void vk_image_copy_from_buffer(VK_Image* image, VkBuffer buffer, VK_CommandBuffer* command_buffer);
 
 void vk_image_destroy(VK_Image* image);

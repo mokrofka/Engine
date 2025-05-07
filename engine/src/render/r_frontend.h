@@ -3,10 +3,11 @@
 
 #include "r_types.h"
 
-struct StaticMeshData;
-struct PlatformState;
+struct R_Config {
+  u32 mem_reserve;
+};
 
-void r_init(Arena* arena);
+void r_init(Arena* arena, R_Config config);
 void r_shutdown();
 
 void r_on_resized(u32 width, u32 height);
@@ -26,3 +27,17 @@ void r_destroy_material(Material* material);
 
 void r_create_geometry(Geometry* geometry, u32 vertex_size, u32 vertex_count, void* vertices, u32 index_size, u32 index_count, void* indices);
 void r_destroy_geometry(Geometry* geometry);
+
+u32 r_renderpass_id(String name);
+void r_shader_create(struct Shader* s, u32 renderpass_id, u32 stage_count, String* stage_filenames, ShaderStage* stages);
+void r_shader_destroy(Shader* s);
+
+void r_shader_initialize(struct Shader* shader);
+void r_shader_use(struct Shader* shader);
+void r_shader_bind_globals(struct Shader* s);
+void r_shader_bind_instance(struct Shader* s, u32 instance_id);
+void r_shader_apply_globals(struct Shader* s);
+void r_shader_apply_instance(struct Shader* s);
+void r_shader_acquire_instance_resources(struct Shader* s, u32* out_instance_id);
+void r_shader_release_instance_resources(struct Shader* s, u32 instance_id);
+void r_set_uniform(struct Shader* frontend_shader, struct shader_uniform* uniform, const void* value);

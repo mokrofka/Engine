@@ -12,18 +12,18 @@ struct ResSysState {
 
 global ResSysState* state;
 
-b32 load(String name, ResLoader* loader, Res* out_res);
-b32 load(Arena* arena, String name, ResLoader* loader, Res* out_res);
+internal b32 load(String name, ResLoader* loader, Res* out_res);
+internal b32 load(Arena* arena, String name, ResLoader* loader, Res* out_res);
 
 void res_sys_init(Arena* arena, ResSysConfig config) {
   state = push_struct(arena, ResSysState);
   state->config = config;
   state->registered_loaders = push_array(arena, ResLoader, 0);
   
-  // NOTE Auto-register known loader types here
-  res_sys_register_loader(binary_res_loader_create());
-  res_sys_register_loader(image_resource_loader_create());
-  res_sys_register_loader(material_res_loader_create());
+  // // NOTE Auto-register known loader types here
+  // res_sys_register_loader(binary_res_loader_create());
+  // res_sys_register_loader(image_resource_loader_create());
+  // res_sys_register_loader(material_res_loader_create());
   arena_move_array(arena, ResLoader, state->max_loader_count);
   
   Info("Resource system initialized with base path '%s'", config.asset_base_path);
@@ -104,14 +104,14 @@ String res_sys_base_path() {
   return state->config.asset_base_path;
 }
 
-b32 load(String name, ResLoader* loader, Res* out_res) {
+internal b32 load(String name, ResLoader* loader, Res* out_res) {
   Assert(name && loader && loader->load && out_res);
 
   out_res->loader_id = loader->id;
   return loader->load(null, loader, name, out_res);
 }
 
-b32 load(Arena* arena, String name, ResLoader* loader, Res* out_res) {
+internal b32 load(Arena* arena, String name, ResLoader* loader, Res* out_res) {
   Assert(name && loader && loader->load && out_res);
 
   out_res->loader_id = loader->id;

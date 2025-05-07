@@ -12,7 +12,7 @@ union v2 {
     };
   };
   v2 () = default;
-  Inline v2(f32 x_, f32 y_) { x = x_, y = y_; }
+  INLINE v2(f32 x_, f32 y_) { x = x_, y = y_; }
 };
 
 union v2i {
@@ -26,7 +26,7 @@ union v2i {
     };
   };
   v2i () = default;
-  Inline v2i(i32 x_, i32 y_) { x = x_, y = y_; }
+  INLINE v2i(i32 x_, i32 y_) { x = x_, y = y_; }
 };
 
 union v3 {
@@ -43,7 +43,7 @@ union v3 {
     };
   };
   v3 () = default;
-  Inline v3(f32 x_, f32 y_, f32 z_) { x = x_, y = y_, z = z_; }
+  INLINE v3(f32 x_, f32 y_, f32 z_) { x = x_, y = y_, z = z_; }
 };
 
 union v4 {
@@ -63,7 +63,7 @@ union v4 {
     };
   };
   v4 () = default;
-  Inline v4(f32 x_, f32 y_, f32 z_, f32 w_) { x = x_, y = y_, z = z_, w = w_; }
+  INLINE v4(f32 x_, f32 y_, f32 z_, f32 w_) { x = x_, y = y_, z = z_, w = w_; }
 };
 
 typedef v4 quat;

@@ -6,11 +6,14 @@
 #include "sys/material_sys.h"
 #include "sys/geometry_sys.h"
 #include "sys/res_sys.h"
+#include "sys/shader_sys.h"
 
 #include "event.h"
 #include "input.h"
 #include "ui.h"
 #include "network.h"
+
+void test();
 
 struct EngineState {
   Arena* arena;
@@ -90,6 +93,7 @@ void engine_create(App* app) {
   {
     network_init(state->arena);
   }
+  test();
   
   {
     ResSysConfig res_sys_cfg = {
@@ -99,7 +103,10 @@ void engine_create(App* app) {
   }
 
   {
-    event_init(state->arena);
+    EventSysConfig config = {
+      .mem_reserve = KB(1)
+    };
+    event_init(state->arena, config);
     
     os_register_process_key(input_process_key);
     os_register_process_mouse_move(input_process_mouse_move);
@@ -128,9 +135,23 @@ void engine_create(App* app) {
       .name = app->name};
     os_window_create(state->arena, config);
   }
+  
+  {
+    ShaderSysConfig config = {
+      .mem_reserve = MB(1),
+      .shader_count_max = 1024,
+      .uniform_count_max = 128,
+      .global_textures_max = 31,
+      .instance_textures_max = 31
+    };
+    shader_sys_init(state->arena, config);
+  }
 
   {
-    r_init(state->arena);
+    R_Config config = {
+      .mem_reserve = MB(1)
+    };
+    r_init(state->arena, config);
   }
   
   {
@@ -265,7 +286,7 @@ void engine_run(App* app) {
       f64 remaining_seconds = target_frame_seconds - frame_elapsed_time;
 
       if (remaining_seconds > 0) {
-        u64 remaining_ms = (remaining_seconds * 1000);
+        u32 remaining_ms = (remaining_seconds * 1000);
 
         // If there is time left, give it back to the OS.
         b32 limit_frames = true;
@@ -296,7 +317,7 @@ void engine_run(App* app) {
   material_system_shutdown(); texture_system_shutdown();
   ui_shutdown();
   r_shutdown();
-  res_sys_shutdown();
+  // res_sys_shutdown();
   os_window_destroy();
 }
 
@@ -369,7 +390,7 @@ internal void load_game_lib(App* app) {
   app->modified = props.modified;
   os_copy_file_path(app->lib_temp_file_path, app->lib_file_path);
   app->lib = os_lib_open(app->lib_temp_file_path);
-  GetProcAddr(app->update, app->lib, ("application_update"_));
+  GetProcAddr(app->update, app->lib, "application_update"_);
 }
 
 internal void check_dll_changes(App* app) {
@@ -393,7 +414,7 @@ internal void load_game_lib_init(App* app) {
   GetProcAddr(app->update, app->lib, ("application_update"_));
   GetProcAddr(app->init, app->lib, ("application_init"_));
   
-  Assert(app->lib.u64 && app->init && app->update);
+  Assert(app->lib && app->init && app->update);
 }
 
 internal void app_create(App* app) {

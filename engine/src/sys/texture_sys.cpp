@@ -12,7 +12,7 @@ struct TextureSystemState {
   Texture* registered_textures;
   
   // Hashtable for texture lookups
-  Hashtable registered_texture_table;
+  HashMap registered_texture_table;
 };
 
 struct TextureRef {
@@ -33,7 +33,7 @@ void texture_system_init(Arena* arena, TextureSystemConfig config) {
   
   state = push_struct(arena, TextureSystemState);
   state->registered_textures = push_array(arena, Texture, config.max_texture_count);
-  state->registered_texture_table = hashtable_create(arena, sizeof(TextureRef), config.max_texture_count, false);
+  state->registered_texture_table = hashmap_create(arena, sizeof(TextureRef), config.max_texture_count, false);
   
   state->config = config;
   
@@ -42,7 +42,7 @@ void texture_system_init(Arena* arena, TextureSystemConfig config) {
   invalid_ref.auto_release = false;
   invalid_ref.handle = INVALID_ID; // Primary reason for needing default values
   invalid_ref.reference_count = 0;
-  hashtable_fill(&state->registered_texture_table, &invalid_ref);
+  hashmap_fill(&state->registered_texture_table, &invalid_ref);
   
   // Invalidate all textures in the array
   u32 count = state->config.max_texture_count;
@@ -79,7 +79,7 @@ Texture* texture_system_acquire(String name, b32 auto_release) {
   }
   
   TextureRef ref;
-  hashtable_get(&state->registered_texture_table, name, &ref);
+  hashmap_get(&state->registered_texture_table, name, &ref);
   // This can only be changed the firts time a texture is loaded
   if (ref.reference_count == 0) {
     ref.auto_release = auto_release;
@@ -119,7 +119,7 @@ Texture* texture_system_acquire(String name, b32 auto_release) {
   }
 
   // Update the entry
-  hashtable_set(&state->registered_texture_table, name, &ref);
+  hashmap_set(&state->registered_texture_table, name, &ref);
   return &state->registered_textures[ref.handle];
 
   // NOTE: This would only happen in the event something went wrong with the state
@@ -134,7 +134,7 @@ void texture_system_release(String name) {
     return;
   }
   TextureRef ref;
-  hashtable_get(&state->registered_texture_table, name, &ref);
+  hashmap_get(&state->registered_texture_table, name, &ref);
   if (ref.reference_count == 0) {
     Warn("Tried to release non-existent texture: '%s'", name);
     return;
@@ -160,7 +160,7 @@ void texture_system_release(String name) {
   }
 
   // Update the entry.
-  hashtable_set(&state->registered_texture_table, name_copy, &ref);
+  hashmap_set(&state->registered_texture_table, name_copy, &ref);
 }
 
 Texture* texture_system_get_default_texture() {

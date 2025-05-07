@@ -3,7 +3,7 @@
 #include "vk_utils.h"
 
 VK_Pipeline vk_graphics_pipeline_create(
-    VK_Renderpass renderpass,
+    VK_Renderpass* renderpass,
     u32 stride,
     u32 attribute_count,
     VkVertexInputAttributeDescription* attributes,
@@ -138,7 +138,7 @@ VK_Pipeline vk_graphics_pipeline_create(
   
   pipeline_create_info.layout = pipeline.pipeline_layout;
   
-  pipeline_create_info.renderPass = renderpass.handle;
+  pipeline_create_info.renderPass = renderpass->handle;
   pipeline_create_info.subpass = 0;
   pipeline_create_info.basePipelineHandle = VK_NULL_HANDLE;
   pipeline_create_info.basePipelineIndex = -1;

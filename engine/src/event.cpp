@@ -21,17 +21,18 @@ struct EventCodeEntry {
 // State structure
 struct EventSystemState {
   Arena* arena;
-  // Lookup table for event codes.
+  EventSysConfig config;
   b8 is_initialized;
   EventCodeEntry registered[MAX_MESSAGE_CODES];
 };
 
 global EventSystemState* state;
 
-void event_init(Arena* arena) {
+void event_init(Arena* arena, EventSysConfig config) {
   state = push_struct(arena, EventSystemState);
   state->is_initialized = true;
-  state->arena = arena_alloc(arena, KB(1));
+  state->arena = arena_alloc(arena, config.mem_reserve);
+  state->config = config;
 }
 
 // void event_shutdown() {
@@ -55,7 +56,7 @@ b32 event_register(u32 code, void* listener, PFN_On_Event on_event) {
     state->registered[code].array = {.res = 5, .pos = 0};
   }
   
-  u64 register_count = state->registered[code].array.pos;
+  u32 register_count = state->registered[code].array.pos;
   Loop (i, register_count) {
     if(state->registered[code].events[i].listener == listener) {
       Warn("You're registering the same event!"_);
@@ -86,7 +87,7 @@ b32 event_unregister(u32 code, void* listener, PFN_On_Event on_event) {
     return false;
   }
   
-  u64 register_count = state->registered[code].array.pos;
+  u32 register_count = state->registered[code].array.pos;
   Loop (i, register_count) {
     RegisteredEvent e = state->registered[code].events[i];
     if (e.listener == listener && e.callback == on_event) {
@@ -110,7 +111,7 @@ b32 event_fire(u32 code, void* sender, EventContext context) {
     return false;
   }
   
-  u64 register_count = state->registered[code].array.pos;
+  u32 register_count = state->registered[code].array.pos;
   Loop (i, register_count) {
     RegisteredEvent e = state->registered[code].events[i];
     if (e.callback(code, sender, e.listener, context)) {

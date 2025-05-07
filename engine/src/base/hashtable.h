@@ -1,24 +1,24 @@
 #pragma once
 #include "defines.h"
 
-struct Hashtable {
+struct HashMap {
   u32 element_size;
   u32 element_count;
   b8 is_pointer_type;
   u8* data;
 };
 
-Hashtable hashtable_create(Arena* arena, u64 element_size, u32 element_count, b32 is_pointer_type);
+HashMap hashmap_create(Arena* arena, u32 element_size, u32 element_count, b32 is_pointer_type);
 
-KAPI void hashtable_destroy(Hashtable* table);
+KAPI void hashmap_destroy(HashMap* table);
 
-KAPI void hashtable_set(Hashtable* table, String name, void* value);
+KAPI void hashmap_set(HashMap* table, String name, void* value);
 
-KAPI void hashtable_set_ptr(Hashtable* table, String name, void** value);
+KAPI void hashmap_set_ptr(HashMap* table, String name, void** value);
 
-KAPI void hashtable_get(Hashtable* table, String name, void* out_value);
+KAPI void hashmap_get(HashMap* table, String name, void* out_value);
 
-KAPI void hashtable_get_ptr(Hashtable* table, String name, void** out_value);
+KAPI void hashmap_get_ptr(HashMap* table, String name, void** out_value);
 
-KAPI void hashtable_fill(Hashtable* table, void* value);
+KAPI void hashmap_fill(HashMap* table, void* value);
 

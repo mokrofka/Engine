@@ -130,7 +130,7 @@ VK_UIShader vk_ui_shader_create() {
   }
 
   shader.pipeline = vk_graphics_pipeline_create(
-    vk->ui_renderpass,
+    vk_get_renderpass(vk->ui_renderpass_id),
     sizeof(Vertex2D),
     ATTRIBUTE_COUNT,
     attribute_desriptions,

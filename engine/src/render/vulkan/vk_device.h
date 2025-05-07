@@ -1,7 +1,7 @@
 #pragma once
 #include "vk_types.h"
 
-VK_Device vk_device_create();
+void vk_device_create();
 
 void vk_device_destroy();
 

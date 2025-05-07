@@ -23,7 +23,7 @@ struct App {
   OS_Handle lib;
   String lib_file_path;
   String lib_temp_file_path;
-  u64 modified;
+  DenseTime modified;
 };
 
 KAPI void engine_create(struct App* game_inst);

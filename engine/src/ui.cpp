@@ -37,6 +37,8 @@ void alloc_resource() {
   VkResult result = vkCreateDescriptorPool(vkdevice, &pool_info, null, &state.imgui_pool);
 }
 
+i32 imgui_surface_create(void* vp, u64 vk_inst, const void* vk_allocators, u64* out_vk_surface);
+
 void imgui_init() {
   ImGui::CreateContext();
   ImGuiIO& io = ImGui::GetIO();
@@ -54,21 +56,20 @@ void imgui_init() {
     .QueueFamily = vk->device.graphics_queue_index,
     .Queue = vk->device.graphics_queue,
     .DescriptorPool = state.imgui_pool,
-    .RenderPass = vk->ui_renderpass.handle,
+    .RenderPass = vk_get_renderpass(vk->ui_renderpass_id)->handle,
     .MinImageCount = vk->swapchain.max_frames_in_flight,
     .ImageCount = vk->swapchain.image_count,
     .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
   };
 
   ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
-  Assign(platform_io.Platform_CreateVkSurface, os_imgui_create_VkSurface);
+  Assign(platform_io.Platform_CreateVkSurface, imgui_surface_create);
   ImGui_ImplVulkan_Init(&init_info);
   
-  VK_Cmd cmd = vk_cmd_alloc_and_begin_single_use(vk->device.graphics_cmd_pool);
+  VK_CommandBuffer cmd = vk_cmd_alloc_and_begin_single_use(vk->device.graphics_cmd_pool);
   ImGui_ImplVulkan_CreateFontsTexture();
   vk_cmd_end_single_use(vk->device.graphics_cmd_pool, &cmd, vk->device.graphics_queue);
   ImGui_ImplVulkan_DestroyFontsTexture(); // destroy staging/temp resources
-  
 }
 
 void ui_init() {

@@ -42,13 +42,11 @@ struct OS_FileInfo
   FileProperties props;
 };
 
-struct OS_Handle {
-  u64 u64;
-};
+typedef PtrInt OS_Handle;
 
 enum OS_AccessFlags {
   OS_AccessFlag_Read = Bit(0),
-  OS_AccessFlag_Write = Bit(1),
+  OS_AccessFlag_Write = Bit(1)
 };
 
 struct Clock {
@@ -66,10 +64,6 @@ void os_pump_messages();
 void platform_init(Arena* arena);
 void os_window_create(Arena* arena, WindowConfig config);
 void os_platform_shutdown();
-void* os_vk_create_surface();
-i32 os_imgui_create_VkSurface(void* vp, u64 vk_inst, const void* vk_allocators, u64* out_vk_surface);
-
-// Arena* os_main_arena_allocate(u64 size);
 
 void os_console_write(String message, u32 color);
 void os_console_write_error(String message, u32 color);
@@ -98,6 +92,7 @@ void os_release(void* ptr, u64 size);
 void* os_reserve_large(u64 size);
 b32 os_commit_large(void* ptr, u64 size);
 
+//////////////////////////////////////////////////////////////////////////
 // files
 OS_Handle      os_file_open(String path, OS_AccessFlags flags);
 void           os_file_close(OS_Handle file);
@@ -111,10 +106,9 @@ b32            os_file_path_exists(String path);
 String         os_exe_filename(Arena* arena);
 b32            os_file_compare_time(u64 new_write_time, u64 last_write_time);
 
-using PROC = i64(*)();
 OS_Handle os_lib_open(String path);
 void      os_lib_close(OS_Handle lib);
-PROC      os_lib_get_proc(OS_Handle lib, String name);
+VoidProc* os_lib_get_proc(OS_Handle lib, String name);
 
 void clock_update(Clock* clock);
 void clock_start(Clock* clock);

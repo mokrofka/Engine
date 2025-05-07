@@ -19,7 +19,7 @@ b32 material_loader_load(Arena* arena, ResLoader* self, String name, Res* out_re
   str_copy(res_data->name64, name);
   
   OS_Handle f = os_file_open(file_path, OS_AccessFlag_Read);
-  if (!f.u64) {
+  if (!f) {
     Error("material_loader_load - unable to open material file for reading: '%s'", file_path);
     return false;
   }
@@ -112,7 +112,7 @@ MaterialConfig res_load_material_config(String filepath) {
   String file_path = push_strf(scratch, "%s/%s/%s%s", res_sys_base_path(), "materials"_, filepath, ".kmt"_);
   
   OS_Handle f = os_file_open(file_path, OS_AccessFlag_Read);
-  if (!f.u64) {
+  if (!f) {
     Error("material_loader_load - unable to open material file for reading: '%s'", file_path);
     goto error;
   }

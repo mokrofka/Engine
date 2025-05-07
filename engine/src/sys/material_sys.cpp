@@ -10,7 +10,7 @@ struct MaterialSystemState {
   
   Material* registered_materials;
   
-  Hashtable registered_material_table;
+  HashMap registered_material_table;
 };
 
 struct MaterialRef {
@@ -30,7 +30,7 @@ void material_system_init(Arena* arena, MaterialSystemConfig config) {
 
   state = push_struct(arena, MaterialSystemState);
   state->registered_materials = push_array(arena, Material, config.max_material_count);
-  state->registered_material_table = hashtable_create(arena, sizeof(MaterialRef), config.max_material_count, false);
+  state->registered_material_table = hashmap_create(arena, sizeof(MaterialRef), config.max_material_count, false);
   state->config = config;
 
   // Fill the hashtable with invalid references to use as a default.
@@ -38,7 +38,7 @@ void material_system_init(Arena* arena, MaterialSystemConfig config) {
   invalid_ref.auto_release = false;
   invalid_ref.handle = INVALID_ID; // Primary reason for needing default values.
   invalid_ref.reference_count = 0;
-  hashtable_fill(&state->registered_material_table, &invalid_ref);
+  hashmap_fill(&state->registered_material_table, &invalid_ref);
 
   // Invalidate all materials in the array.
   Loop (i, state->config.max_material_count) {
@@ -89,7 +89,7 @@ Material* material_system_acquire_from_config(MaterialConfig config) {
   }
 
   MaterialRef ref;
-  hashtable_get(&state->registered_material_table, config.name64, &ref);
+  hashmap_get(&state->registered_material_table, config.name64, &ref);
   // This can only be changed the first time a material is loaded.
   if (ref.reference_count == 0) {
     ref.auto_release = config.auto_release;
@@ -131,7 +131,7 @@ Material* material_system_acquire_from_config(MaterialConfig config) {
   }
 
   // Update the entry.
-  hashtable_set(&state->registered_material_table, config.name64, &ref);
+  hashmap_set(&state->registered_material_table, config.name64, &ref);
   return &state->registered_materials[ref.handle];
 
   // NOTE: This would only happen in the event something went wrong with the state.
@@ -145,7 +145,7 @@ void material_sys_release(String name) {
     return;
   }
   MaterialRef ref;
-  hashtable_get(&state->registered_material_table, name, &ref);
+  hashmap_get(&state->registered_material_table, name, &ref);
   if (ref.reference_count == 0) {
     Warn("Tried to release non-existent material: '%s'", name);
     return;
@@ -166,7 +166,7 @@ void material_sys_release(String name) {
   }
 
   // Update the entry.
-  hashtable_set(&state->registered_material_table, name, &ref);
+  hashmap_set(&state->registered_material_table, name, &ref);
 }
 
 Material* material_sys_get_default() {

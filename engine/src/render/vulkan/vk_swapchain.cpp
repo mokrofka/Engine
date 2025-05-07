@@ -6,15 +6,15 @@
 internal VK_Swapchain create(u32 width, u32 height, b32 reuse);
 internal void destroy(VK_Swapchain* swapchain);
 
-VK_Swapchain vk_swapchain_create(u32 width, u32 height) {
-  vk->old_swapchain = push_struct(vk->arena, VK_Swapchain);
-  return create(width, height, false);
+void vk_swapchain_create(u32 width, u32 height) {
+  // vk->old_swapchain = push_struct(vk->arena, VK_Swapchain);
+  vk->swapchain = create(width, height, false);
 }
 
 void vk_swapchain_recreate(VK_Swapchain* swapchain, u32 width, u32 height) {
-  *vk->old_swapchain = *swapchain;
+  vk->old_swapchain = *swapchain;
   *swapchain = create(width, height, true);
-  destroy(vk->old_swapchain);
+  destroy(&vk->old_swapchain);
 }
 
 void vk_swapchain_destroy(VK_Swapchain* swapchain) {
@@ -22,19 +22,17 @@ void vk_swapchain_destroy(VK_Swapchain* swapchain) {
 }
 
 u32 vk_swapchain_acquire_next_image_index(
-    VK_Swapchain swapchain,
-    u64 timeout_ns,
+    VK_Swapchain* swapchain,
     VkSemaphore image_available_semaphore,
     VkFence fence) {
   u32 image_index;
-  vkAcquireNextImageKHR(vkdevice, swapchain.handle, timeout_ns,
+  vkAcquireNextImageKHR(vkdevice, swapchain->handle, U64_MAX,
                         image_available_semaphore, fence, &image_index);
   return image_index;
 }
 
 void vk_swapchain_present(
     VK_Swapchain* swapchain,
-    VkQueue graphics_queue,
     VkQueue present_queue,
     VkSemaphore render_complete_semaphore,
     u32 present_image_index) {
@@ -47,22 +45,21 @@ void vk_swapchain_present(
   present_info.pImageIndices = &present_image_index;
   present_info.pResults = 0;
   
-  VkResult result = vkQueuePresentKHR(present_queue, &present_info);
-  
-  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-    // NOTE I didn't get the point of this:
-    // Swapchain is out of date, suboptimal of a framebuffer resize has occured. Trigger swapchain recreation.
-    // VK_Swapchain swapchain_copy = *swapchain;
-    // *swapchain = vk_swapchain_recreate(vk->frame.width, vk->frame.height, *swapchain);
-    // for (i32 i = 0; i < 3; ++i) {
-    //   swapchain->framebuffers[i] = swapchain_copy.framebuffers[i];
-    // }
-  } else if (result != VK_SUCCESS) {
-    Fatal("Failed to acquire swapchain image"_);
-  }
+  vkQueuePresentKHR(present_queue, &present_info);
   
   // Increment (and loop) the index
   vk->frame.current_frame = (vk->frame.current_frame + 1) % swapchain->max_frames_in_flight;
+}
+
+internal void destroy(VK_Swapchain* swapchain) {
+  vkDeviceWaitIdle(vkdevice);
+  vk_image_destroy(&swapchain->depth_attachment);
+
+  Loop (i, swapchain->image_count) {
+    vkDestroyImageView(vkdevice, swapchain->views[i], vk->allocator);
+  }
+
+  vkDestroySwapchainKHR(vkdevice, swapchain->handle, vk->allocator);
 }
 
 internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
@@ -145,7 +142,7 @@ internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
   swapchain_create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
   swapchain_create_info.presentMode = present_mode;
   swapchain_create_info.clipped = VK_TRUE;
-  swapchain_create_info.oldSwapchain = reuse ? vk->old_swapchain->handle : 0;
+  swapchain_create_info.oldSwapchain = reuse ? vk->old_swapchain.handle : 0;
   
   VK_CHECK(vkCreateSwapchainKHR(vkdevice, &swapchain_create_info, vk->allocator, &swapchain.handle));
   
@@ -191,13 +188,47 @@ internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
   return swapchain;
 }
 
-internal void destroy(VK_Swapchain* swapchain) {
-  vkDeviceWaitIdle(vkdevice);
-  vk_image_destroy(&swapchain->depth_attachment);
+typedef void* HINSTANCE;
+typedef void* HWND;
+typedef void* HANDLE;
+typedef wchar_t* LPCWSTR;
+typedef u32 DWORD;
+typedef void* LPVOID;
+typedef b32 BOOL;
+typedef void* HMONITOR;
+struct SECURITY_ATTRIBUTES {
+  DWORD nLength;
+  LPVOID lpSecurityDescriptor;
+  BOOL bInheritHandle;
+};
 
-  Loop (i, swapchain->image_count) {
-    vkDestroyImageView(vkdevice, swapchain->views[i], vk->allocator);
-  }
+#include <vulkan/vulkan_win32.h>
+void vk_surface_create() {
+  HINSTANCE h_instance = os_get_handle_info();
+  HWND hwnd = os_get_window_handle();
+  
+  VkWin32SurfaceCreateInfoKHR create_info = {VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR};
+  create_info.hinstance = h_instance;
+  create_info.hwnd = hwnd;
 
-  vkDestroySwapchainKHR(vkdevice, swapchain->handle, vk->allocator);
+  vkCreateWin32SurfaceKHR(vk->instance, &create_info, vk->allocator, &vk->surface);
+}
+
+i32 imgui_surface_create(void* vp, u64 vk_inst, const void* vk_allocators, u64* out_vk_surface) {
+  VkInstance instance; Assign(instance, vk_inst);
+  
+  HINSTANCE h_instance = os_get_handle_info();
+  HWND hwnd = os_get_window_handle();
+
+  // Create Vulkan surface for the viewport (on Windows, you'd use vkCreateWin32SurfaceKHR)
+  VkWin32SurfaceCreateInfoKHR surface_info = {};
+  surface_info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+  surface_info.hwnd = vp;
+  surface_info.hinstance = h_instance;
+
+  VkSurfaceKHR surface;
+  vkCreateWin32SurfaceKHR(instance, &surface_info, nullptr, &surface);
+
+  *out_vk_surface = (u64)surface; // Store the Vulkan surface in the out_vk_surface pointer
+  return 0;                       // Success
 }

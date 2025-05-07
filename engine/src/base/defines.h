@@ -14,19 +14,19 @@ typedef float  f32;
 typedef double f64;
 
 typedef char  b8;
-typedef short b16;
 typedef int   b32;
 
 typedef unsigned char uchar;
 typedef u64 PtrInt;
+typedef void VoidProc(void);
 
 #define null 0
 
-#define Swap(A, B) \
+#define Swap(a, b) \
   {                \
-    auto temp = A; \
-    A = B;         \
-    B = temp;      \
+    auto temp = a; \
+    a = b;         \
+    b = temp;      \
   }
 
 #define internal static
@@ -41,39 +41,30 @@ typedef u64 PtrInt;
 #define Million(n)    ((n)*1000000)
 #define Billion(n)    ((n)*1000000000)
 
-#define Min(A,B) (((A)<(B))?(A):(B))
-#define Max(A,B) (((A)>(B))?(A):(B))
+#define Min(a,b) (((a)<(b))?(a):(b))
+#define Max(a,b) (((a)>(b))?(a):(b))
 #define Max3(a, b, c) Max(Max(a, b), c)
 #define Min3(a, b, c) Min(Min(a, b), c)
 
-#define ClampTop(A,X) Min(A,X)
-#define ClampBot(X,B) Max(X,B)
-#define Clamp(A,X,B) (((X)<(A))?(A):((X)>(B))?(B):(X))
-
+#define ClampTop(a,x) Min(a,x)
+#define ClampBot(x,b) Max(x,b)
+#define Clamp(a,x,b) (((x)<(a))?(a):((x)>(b))?(b):(x))
 #define ReverseClamp(a,x,b) (((x)<(a))?(b):((b)<(x))?(a):(x))
 #define Wrap(a,x,b) ReverseClamp(a,x,b)
 
-#define CeilIntDiv(a,b) (((a) + (b) - 1)/(b))
-#define ArrayCount(arr) (sizeof(arr) / sizeof((arr)[0]))
-#define ArrSize(arr) (sizeof(arr) / sizeof((arr)[0]))
-#define ElemSize(arr) (sizeof(arr[0]))
-#define IntFromPtr(ptr) ((u64)(ptr))
+#define ArrayCount(a) (sizeof(a) / sizeof((a)[0]))
+#define ElemSize(a) (sizeof(a[0]))
+#define IntFromPtr(a) ((u64)(a))
 
 #define Member(T,m)                 (((T*)0)->m)
 #define OffsetOf(T,m)               IntFromPtr(&Member(T,m))
 #define MemberFromOffset(T,ptr,off) (T)((((u8 *)ptr)+(off)))
 #define CastFromMember(T,m,ptr)     (T*)(((u8*)ptr) - OffsetOf(T,m))
 
-// yea, I don't want to include <string.h>
 #define MemZero(d,s)       __builtin_memset(d,0,s)
-#define MemZeroStruct(s)   MemZero((s),sizeof(*(s)))
+#define MemZeroStruct(a)   MemZero((a),sizeof(*(a)))
 #define MemZeroArray(a)    MemZero((a),sizeof(a))
-#define MemZeroTyped(m,c)  MemZero((m),sizeof(*(m))*(c))
-
-// #define MemCopy(d, s, c)         _memory_copy((d), (s), (c))
-// #define MemCopyStruct(d, s)      _memory_copy((d), (s), sizeof(*(d)))
-// #define MemCopyTyped(d, s, c)    _memory_copy((d), (s), sizeof(*(d)) * (c))
-// #define MemSet(d, byte, c)       _memory_set((d), (byte), (c))
+#define MemZeroTyped(d,c)  MemZero((d),sizeof(*(d))*(c))
 
 #define MemCopy(d, s, c)         __builtin_memcpy((d), (s), (c))
 #define MemCopyStruct(d, s)      MemCopy((d), (s), sizeof(*(d)))
@@ -84,15 +75,21 @@ typedef u64 PtrInt;
 #define MemMatchStruct(a,b)      MemMatch((a),(b),sizeof(*(a)))
 #define MemMatchArray(a,b)       MemMatch((a),(b),sizeof(a))
 
-#define U32_MAX 4294967295u
-#define U64_MAX 18446744073709551615ull
+#define AlignPow2(x,b)     (((x) + (b) - 1)&(~((b) - 1)))
+#define AlignDownPow2(x,b) ((x)&(~((b) - 1)))
+#define AlignPadPow2(x,b)  ((0-(x)) & ((b) - 1))
+#define IsPow2(x)          ((x)!=0 && ((x)&((x)-1))==0)
+#define IsPow2OrZero(x)    ((((x) - 1)&(x)) == 0)
 
 #define Sqr(x) ((x)*(x))
 #define Sign(x) ((x) < 0 ? -1 : (x) > 0 ? 1 : 0)
 #define Abs(x) ((x) < 0 ? -(x) : (x))
 #define Compose64Bit(a,b)  (((u64)a << 32) | (u64)b)
-
+#define CeilIntDiv(a,b) (((a) + (b) - 1)/(b))
 #define Bit(x) (1 << (x))
+#define IsBetween(lower, x, upper) (((lower) <= (x)) && ((x) <= (upper)))
+#define Assign(a,b) *((void**)(&(a))) = (void*)(b)
+#define GetProcAddr(x,l,s) Assign((x), os_lib_get_proc((l), (s)))
 
 #define Glue(A,B) A##B
 #define Stringify(S) #S
@@ -102,9 +99,6 @@ typedef u64 PtrInt;
 #define LoopC(i, c) for (int i = 0, _end = (c); i < _end; ++i)
 
 #define Func(a) struct a { static
-
-#define GetProcAddr(v,m,s) (*(PROC*)(&(v))) = os_lib_get_proc(m, s)
-#define Assign(a,b) *((u8**)(&(a))) = (u8*)b
 
 #ifdef KEXPORT
   #define KAPI __declspec(dllexport)
@@ -117,28 +111,42 @@ typedef u64 PtrInt;
 #define C_LINKAGE_END }
 #define C_LINKAGE extern "C"
 
-#define Inline __forceinline
+#define INLINE __forceinline
 
-#define INVALID_ID 4294967295U
+#define U64_MAX 18446744073709551615ull
+#define U32_MAX 4294967295u
+#define U16_MAX 65535
+#define U8_MAX  255
 
-//- rjf: linked list macro helpers
-#define CheckNil(nil,p) ((p) == 0 || (p) == nil)
-#define SetNil(nil,p) ((p) = nil)
+#define INVALID_ID     U32_MAX
+#define INVALID_ID_U16 U16_MAX
+#define INVALID_ID_U8  U8_MAX
+
+#define ZERO_MEMORY
+#ifdef ZERO_MEMORY
+  #define ClearMemory(ptr, size) MemZero(ptr, size)
+#else
+  #define ClearMemory(ptr, size)
+#endif
 
 struct String {
   u8* str;
-  u64 size;
-  Inline operator bool() {
+  u32 size;
+  INLINE operator bool() {
     return size;
   }
-  Inline operator char*() {
-    return (char*)str;
-  }
+  // INLINE operator char*() {
+  //   return (char*)str;
+  // }
 };
 
 struct Arena;
 
 #define quick_sort(ptr, count, element_size, cmp_function) qsort((ptr), (count), (element_size), (int (*)(const void *, const void *))(cmp_function))
+
+//- rjf: linked list macro helpers
+#define CheckNil(nil,p) ((p) == 0 || (p) == nil)
+#define SetNil(nil,p) ((p) = nil)
 
 //- rjf: doubly-linked-lists
 #define DLLInsert_NPZ(nil,f,l,p,n,next,prev) (CheckNil(nil,f) ? \

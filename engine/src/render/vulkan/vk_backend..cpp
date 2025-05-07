@@ -13,7 +13,7 @@
 
 #include "sys/material_sys.h"
 
-VK_Context* vk;
+VK* vk;
 
 VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
@@ -21,7 +21,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
     void* user_data);
 
-internal void regenerate_framebuffers();
+internal void framebuffers_create();
 internal b32 recreate_swapchain(VK_Swapchain* swapchain);
 internal void create_buffers(VK_Render* render);
 
@@ -45,13 +45,7 @@ void free_data_range(VK_Buffer* buffer, u64 offset, u64 size) {
   // TODO update free list with this range being free
 }
 
-void vk_r_backend_init(R_Backend* backend) {
-  vk = push_struct(backend->arena, VK_Context);
-  vk->arena = backend->arena;
-  
-  // TODO: custom allocator.
-  vk->allocator = 0;
-  
+void instance_create() {
   v2i framebuffer_extent = os_get_framebuffer_size();
   vk->frame.width =  framebuffer_extent.x;
   vk->frame.height = framebuffer_extent.y;
@@ -140,17 +134,23 @@ void vk_r_backend_init(R_Backend* backend) {
   VK_CHECK(func(vk->instance, &debug_create_info, vk->allocator, &vk->debug_messenger));
   Debug("Vulkan debugger created"_);
 #endif
-  
-  Debug("Creating Vulkan surface..."_);
-  Assign(vk->surface, os_vk_create_surface());
-  Debug("Vulkan surface created"_);
+}
 
-  vk->device = vk_device_create();
-
-  vk->swapchain = vk_swapchain_create(vk->frame.width, vk->frame.height);
+void vk_r_backend_init(R_Backend* backend) {
+  vk = push_struct(backend->arena, VK);
+  vk->arena = backend->arena;
   
-  // World renderpass
-  vk->main_renderpass = vk_renderpass_create(
+  // TODO: custom allocator.
+  vk->allocator = 0;
+  instance_create();
+  
+  vk_surface_create();
+
+  vk_device_create();
+
+  vk_swapchain_create(vk->frame.width, vk->frame.height);
+  
+  vk->main_renderpass_id = vk_renderpass_create(
     Rect{0, 0, vk->frame.width, vk->frame.height},
     v4{0, 0, 0.2, 1.0},
     1.0f,
@@ -159,16 +159,16 @@ void vk_r_backend_init(R_Backend* backend) {
     false, true);
     
   // UI renderpass
-  vk->ui_renderpass = vk_renderpass_create(
+  vk->ui_renderpass_id = vk_renderpass_create(
     Rect{0, 0, vk->frame.width, vk->frame.height},
     v4{0, 0, 0, 0},
     1.0f,
     0,
     RenderpassClearFlag_None,
     true, false);
-
+    
   // Regenerate swapchain and world framebuffers
-  regenerate_framebuffers();
+  framebuffers_create();
 
   Loop (i, vk->swapchain.image_count) {
     vk->render.cmds[i] = vk_cmd_alloc(vk->device.graphics_cmd_pool, true);
@@ -234,12 +234,11 @@ void vk_r_backend_shutdown() {
   }
   
   // Renderpass
-  vk_renderpass_destroy(vk->main_renderpass);
-  vk->main_renderpass.handle = 0;
-  vk_renderpass_destroy(vk->ui_renderpass);
-  vk->ui_renderpass.handle = 0;
+  vk_renderpass_destroy(vk->main_renderpass_id);
+  vk_renderpass_destroy(vk->ui_renderpass_id);
   
   // Swapchain
+  // vk->swapchain.destroy();
   vk_swapchain_destroy(&vk->swapchain);
   
   Debug("Destroying Vulkan device..."_);
@@ -264,8 +263,6 @@ void vk_r_backend_shutdown() {
 }
 
 void vk_r_backend_on_resize(u32 width, u32 height) {
-  // cached_framebuffer_extent.x = width;
-  // cached_framebuffer_extent.y = height;
   vk->frame.width = width;
   vk->frame.height = height;
   ++vk->frame.size_generation;
@@ -303,10 +300,10 @@ b32 vk_r_backend_begin_frame(f32 delta_time) {
 
   // Acquire the next image from the swap chain. Pass along the semaphore that should signaled when this completes.
   // This same semaphore will later be waited on by the queue submission to ensure this image is available.
-  vk->frame.image_index = vk_swapchain_acquire_next_image_index(vk->swapchain, U64_MAX, vk->sync.image_available_semaphores[vk->frame.current_frame], 0);
+  vk->frame.image_index = vk_swapchain_acquire_next_image_index(&vk->swapchain, vk_get_current_image_available_semaphore(), 0);
 
   // Begin recording commands.
-  VK_Cmd* cmd = &vk->render.cmds[vk->frame.image_index];
+  VK_CommandBuffer* cmd = &vk->render.cmds[vk->frame.image_index];
   vk_cmd_begin(cmd, false, false, false);
   
   // Dynamic state
@@ -327,10 +324,12 @@ b32 vk_r_backend_begin_frame(f32 delta_time) {
   vkCmdSetViewport(cmd->handle, 0, 1, &viewport);
   vkCmdSetScissor(cmd->handle, 0, 1, &scissor);
   
-  vk->main_renderpass.render_area.w = vk->frame.width;
-  vk->main_renderpass.render_area.h = vk->frame.height;
-  vk->ui_renderpass.render_area.w = vk->frame.width;
-  vk->ui_renderpass.render_area.h = vk->frame.height;
+  VK_Renderpass* main_renderpass = vk_get_renderpass(vk->main_renderpass_id);
+  main_renderpass->render_area.w = vk->frame.width;
+  main_renderpass->render_area.h = vk->frame.height;
+  VK_Renderpass* ui_renderpass = vk_get_renderpass(vk->ui_renderpass_id);
+  ui_renderpass->render_area.w = vk->frame.width;
+  ui_renderpass->render_area.h = vk->frame.height;
 
   return true;
 }
@@ -358,7 +357,7 @@ void vk_r_update_global_ui_state(mat4 projection, mat4 view, i32 mode) {
 }
 
 b32 vk_r_backend_end_frame(f32 delta_time) {
-  VK_Cmd* cmd = &vk->render.cmds[vk->frame.image_index];
+  VK_CommandBuffer* cmd = &vk->render.cmds[vk->frame.image_index];
   
   vk_cmd_end(cmd);
   
@@ -370,10 +369,12 @@ b32 vk_r_backend_end_frame(f32 delta_time) {
   submit_info.pCommandBuffers = &cmd->handle;
   
   submit_info.signalSemaphoreCount = 1;
-  submit_info.pSignalSemaphores = &vk->sync.queue_complete_semaphores[vk->frame.current_frame];
+  VkSemaphore queue_available = vk_get_current_queue_complete_semaphore();
+  submit_info.pSignalSemaphores = &queue_available;
 
   submit_info.waitSemaphoreCount = 1;
-  submit_info.pWaitSemaphores = &vk->sync.image_available_semaphores[vk->frame.current_frame];
+  VkSemaphore image_available = vk_get_current_image_available_semaphore();
+  submit_info.pWaitSemaphores = &image_available;
 
   // Each semaphore waits on the corresponding pipeline stage to complete. 1:1 ratio.
   // VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT prevents subsequent color attachment
@@ -392,9 +393,9 @@ b32 vk_r_backend_end_frame(f32 delta_time) {
   }
 
   vk_swapchain_present(
-    &vk->swapchain, vk->device.graphics_queue,
+    &vk->swapchain,
     vk->device.present_queue,
-    vk->sync.queue_complete_semaphores[vk->frame.current_frame],
+    vk_get_current_queue_complete_semaphore(),
     vk->frame.image_index);
   return true;
 }
@@ -402,16 +403,16 @@ b32 vk_r_backend_end_frame(f32 delta_time) {
 b32 vk_r_begin_renderpass(u32 renderpass_id) {
   VK_Renderpass* renderpass = 0;
   VkFramebuffer framebuffer = 0;
-  VK_Cmd* cmd = &vk->render.cmds[vk->frame.image_index];
+  VK_CommandBuffer* cmd = &vk->render.cmds[vk->frame.image_index];
 
   // Choose a renderpass based on ID.
   switch (renderpass_id) {
     case BuiltinRenderpass_World: {
-      renderpass = &vk->main_renderpass;
+      renderpass = vk_get_renderpass(vk->main_renderpass_id);
       framebuffer = vk->world_framebuffers[vk->frame.image_index];
     } break;
     case BuiltinRenderpass_UI: {
-      renderpass = &vk->ui_renderpass;
+      renderpass = vk_get_renderpass(vk->ui_renderpass_id);
       framebuffer = vk->swapchain.framebuffers[vk->frame.image_index];
     } break;
     default:
@@ -420,7 +421,7 @@ b32 vk_r_begin_renderpass(u32 renderpass_id) {
   }
 
   // Begin the render pass.
-  vk_renderpass_begin(cmd, *renderpass, framebuffer);
+  vk_renderpass_begin(cmd, renderpass, framebuffer);
 
   // Use the appropriate shader.
   switch (renderpass_id) {
@@ -437,15 +438,15 @@ b32 vk_r_begin_renderpass(u32 renderpass_id) {
 
 b32 vk_r_end_renderpass(u32 renderpass_id) {
   VK_Renderpass* renderpass = 0;
-  VK_Cmd* cmd = &vk->render.cmds[vk->frame.image_index];
+  VK_CommandBuffer* cmd = &vk->render.cmds[vk->frame.image_index];
 
   // Choose a renderpass based on ID.
   switch (renderpass_id) {
   case BuiltinRenderpass_World:
-    renderpass = &vk->main_renderpass;
+    renderpass = vk_get_renderpass(vk->main_renderpass_id);
     break;
   case BuiltinRenderpass_UI:
-    renderpass = &vk->ui_renderpass;
+    renderpass = vk_get_renderpass(vk->ui_renderpass_id);
     break;
   default:
     Error("vk_renderer_end_renderpass called on unrecognized renderpass id:  %#02x", renderpass_id);
@@ -479,12 +480,12 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
   return VK_FALSE;
 }
 
-internal void regenerate_framebuffers() {
+internal void framebuffers_create() {
   Loop (i, vk->swapchain.image_count) {
     VkImageView world_attachments[] = {vk->swapchain.views[i], vk->swapchain.depth_attachment.view};
     VkFramebufferCreateInfo framebuffer_info = {
       .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-      .renderPass = vk->main_renderpass.handle,
+      .renderPass = vk_get_renderpass(vk->main_renderpass_id)->handle,
       .attachmentCount = 2,
       .pAttachments = world_attachments,
       .width = vk->frame.width,
@@ -497,7 +498,7 @@ internal void regenerate_framebuffers() {
     VkImageView ui_attachments[] = {vk->swapchain.views[i]};
     VkFramebufferCreateInfo sc_framebuffer_info = {
       .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-      .renderPass = vk->ui_renderpass.handle,
+      .renderPass = vk_get_renderpass(vk->ui_renderpass_id)->handle,
       .attachmentCount = 1,
       .pAttachments = ui_attachments,
       .width = vk->frame.width,
@@ -530,20 +531,22 @@ internal b32 recreate_swapchain(VK_Swapchain* swapchain) {
     vkDestroyFramebuffer(vkdevice, vk->swapchain.framebuffers[i], vk->allocator);
   }
 
+  // swapchain->recreate(vk->frame.width, vk->frame.height);
   vk_swapchain_recreate(swapchain, vk->frame.width, vk->frame.height);
   
-  vk->main_renderpass.render_area.w = vk->frame.width;
-  vk->main_renderpass.render_area.h = vk->frame.height;
+  VK_Renderpass* main_renderpass = vk_get_renderpass(vk->main_renderpass_id);
+  main_renderpass->render_area.w = vk->frame.width;
+  main_renderpass->render_area.h = vk->frame.height;
 
   // Update framebuffer size generation.
   vk->frame.size_last_generation = vk->frame.size_generation;
 
-  vk->main_renderpass.render_area.x = 0;
-  vk->main_renderpass.render_area.y = 0;
-  vk->main_renderpass.render_area.w = vk->frame.width;
-  vk->main_renderpass.render_area.h = vk->frame.height;
+  main_renderpass->render_area.x = 0;
+  main_renderpass->render_area.y = 0;
+  main_renderpass->render_area.w = vk->frame.width;
+  main_renderpass->render_area.h = vk->frame.height;
 
-  regenerate_framebuffers();
+  framebuffers_create();
 
   // Clear the recreating flag.
   vk->recreating_swapchain = false;
@@ -604,7 +607,7 @@ void* vk_r_create_texture(u8* pixels, u32 width, u32 height, u32 channel_count) 
   
   VkCommandPool pool = vk->device.graphics_cmd_pool;
   VkQueue queue = vk->device.graphics_queue;
-  VK_Cmd temp_buffer = vk_cmd_alloc_and_begin_single_use(pool);
+  VK_CommandBuffer temp_buffer = vk_cmd_alloc_and_begin_single_use(pool);
   
   // Transition the layout from whatever it is currently to optimal for receiving data
   vk_image_transition_layout(

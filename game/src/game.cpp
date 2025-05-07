@@ -49,7 +49,6 @@ internal void camera_pitch(f32 amount) {
 
 #include "test.h"
 void application_init(App* app) {
-  test();
   Scratch scratch;
   
   app->state = push_struct(app->arena, GameState);
@@ -62,90 +61,101 @@ void application_init(App* app) {
   state->camera_view_dirty = true;
 }
 
-void application_update(App* app) {
-  Assign(state, app->state);
-  f32 delta_time = app->delta_time;
-  // TODO temp
-  if (input_is_key_up(KEY_T) && input_was_key_down(KEY_T)) {
-    Debug("Swapping texture!");
-    EventContext context = {};
-    event_fire(EventCode_Debug0, app, context);
-  }
-  
-  f32 rotation_speed = 2.0f;
+#include <stdlib.h>
+// void application_update(App* app) {
+//   rand();
+//   Assign(state, app->state);
+//   f32 delta_time = app->delta_time;
+//   // TODO temp
+//   mat4 mat = mat4_identity();
+//   mat4_inverse(mat);
 
-  // HACK temp back to move camera around
-  if (input_is_key_down(KEY_A) || input_is_key_down(KEY_LEFT)) {
-    camera_yaw(rotation_speed * app->delta_time);
-  }
-  if (input_is_key_down(KEY_D) || input_is_key_down(KEY_RIGHT)) {
-    camera_yaw(-rotation_speed * app->delta_time);
-  }
-  if (input_is_key_down(KEY_UP)) {
-    camera_pitch(rotation_speed * app->delta_time);
-  }
-  if (input_is_key_down(KEY_DOWN)) {
-    camera_pitch(-rotation_speed * app->delta_time);
-  }
+//   if (input_is_key_up(KEY_T) && input_was_key_down(KEY_T)) {
+//     Debug("Swapping texture!");
+//     EventContext context = {};
+//     event_fire(EventCode_Debug0, app, context);
+//   }
   
-  f32 temp_move_speed = 50.0f;
-  v3 velocity = v3_zero();
-  
-  if (input_is_key_down(KEY_W)) {
-    v3 forward = mat4_forward(state->view);
-    velocity += forward;
-  }
-  if (input_is_key_down(KEY_S)) {
-    v3 backward = mat4_backward(state->view);
-    velocity += backward;
-  }
-  
-  if (input_is_key_down(KEY_Q)) {
-    v3 left = mat4_left(state->view);
-    velocity += left;
-  }
-  if (input_is_key_down(KEY_E)) {
-    v3 right = mat4_right(state->view);
-    velocity += right;
-  }
-  
-  if (input_is_key_down(KEY_SPACE)) {
-    velocity.y += 1.0f;
-  }
-  if (input_is_key_down(KEY_X)) {
-    velocity.y -= 1.0f;
-  }
-  
-  v3 z = v3_zero();
-  if (z != velocity) {
-    // Be sure to normalize the velocity before applying speed 
-    v3_normalize(&velocity);
-    state->camera_position += velocity * temp_move_speed * delta_time;
-    state->camera_view_dirty = true;
-  }
-  
-  recalculate_view_matrix();
+//   f32 rotation_speed = 2.0f;
 
-  // HACK This should not be available outside the engine
-  r_set_view(state->view);
-}
+//   // HACK temp back to move camera around
+//   if (input_is_key_down(KEY_A) || input_is_key_down(KEY_LEFT)) {
+//     camera_yaw(rotation_speed * app->delta_time);
+//   }
+//   if (input_is_key_down(KEY_D) || input_is_key_down(KEY_RIGHT)) {
+//     camera_yaw(-rotation_speed * app->delta_time);
+//   }
+//   if (input_is_key_down(KEY_UP)) {
+//     camera_pitch(rotation_speed * app->delta_time);
+//   }
+//   if (input_is_key_down(KEY_DOWN)) {
+//     camera_pitch(-rotation_speed * app->delta_time);
+//   }
+  
+//   f32 temp_move_speed = 50.0f;
+//   v3 velocity = v3_zero();
+  
+//   if (input_is_key_down(KEY_W)) {
+//     v3 forward = mat4_forward(state->view);
+//     velocity += forward;
+//   }
+//   if (input_is_key_down(KEY_S)) {
+//     v3 backward = mat4_backward(state->view);
+//     velocity += backward;
+//   }
+  
+//   if (input_is_key_down(KEY_Q)) {
+//     v3 left = mat4_left(state->view);
+//     velocity += left;
+//   }
+//   if (input_is_key_down(KEY_E)) {
+//     v3 right = mat4_right(state->view);
+//     velocity += right;
+//   }
+  
+//   if (input_is_key_down(KEY_SPACE)) {
+//     velocity.y += 1.0f;
+//   }
+//   if (input_is_key_down(KEY_X)) {
+//     velocity.y -= 1.0f;
+//   }
+  
+//   v3 z = v3_zero();
+//   if (z != velocity) {
+//     // Be sure to normalize the velocity before applying speed 
+//     v3_normalize(&velocity);
+//     state->camera_position += velocity * temp_move_speed * delta_time;
+//     state->camera_view_dirty = true;
+//   }
+  
+//   recalculate_view_matrix();
+
+//   // HACK This should not be available outside the engine
+//   r_set_view(state->view);
+// }
 
 #define gui(begin) DeferLoop(begin, ImGui::End())
 
 #include "network.h"
-// void application_update(App* app) {
-//   // Begin the main window (with no extra options like fullscreen, padding, etc.)
+void application_update(App* app) {
+  // Begin the main window (with no extra options like fullscreen, padding, etc.)
 
-//   const ImGuiViewport* viewport = ImGui::GetMainViewport();
-//   ImGui::SetNextWindowPos(viewport->WorkPos);
-//   ImGui::SetNextWindowSize(viewport->WorkSize);
-//   ImGui::SetNextWindowViewport(viewport->ID);
-//   gui(ImGui::Begin("DockSpace", NULL, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
-//     ImGui::DockSpace(ImGui::GetID("MyDockSpace"), ImVec2(0.0f, 0.0f), 0);
-//   }
+  const ImGuiViewport* viewport = ImGui::GetMainViewport();
+  ImGui::SetNextWindowPos(viewport->WorkPos);
+  ImGui::SetNextWindowSize(viewport->WorkSize);
+  ImGui::SetNextWindowViewport(viewport->ID);
+  gui(ImGui::Begin("DockSpace", NULL, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
+    ImGui::DockSpace(ImGui::GetID("MyDockSpace"), ImVec2(0.0f, 0.0f), 0);
+  }
   
-//   ImGui::ShowDemoWindow();
-// }
+  gui(ImGui::Begin("new window")) {
+    if (ImGui::Button("click here!")) {
+      Info("yes");
+    }
+  }
+  
+  ImGui::ShowDemoWindow();
+}
 
 void application_render(struct App* app) {
 }
