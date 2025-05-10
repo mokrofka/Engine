@@ -168,8 +168,8 @@ void r_destroy_material(Material* material) {
   vk_r_destroy_material(material);
 }
 
-void r_create_geometry(Geometry* geometry, u32 vertex_size, u32 vertex_count, void* vertices, u32 index_size, u32 index_count, void* indices) {
-  vk_r_create_geometry(geometry, vertex_size, vertex_count, vertices, index_size, index_count, indices);
+void r_create_geometry(Geometry* geometry) {
+  vk_r_create_geometry(geometry);
 }
 
 void r_destroy_geometry(Geometry* geometry) {

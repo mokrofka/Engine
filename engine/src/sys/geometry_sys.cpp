@@ -20,7 +20,6 @@ struct GeometrySysState {
 global GeometrySysState* state;
 
 void create_default_geometries();
-void create_geometry(GeometryConfig config, Geometry* g);
 void destroy_geometry(Geometry* g);
 
 void geometry_sys_init(Arena* arena, GeometrySysConfig config) {
@@ -49,7 +48,7 @@ void geometry_sys_shutdown() {
   // NOTE: nothing to do here.
 }
 
-Geometry* geometry_system_acquire_by_id(u32 id) {
+Geometry* geometry_sys_acquire_by_id(u32 id) {
   if (id != INVALID_ID && state->registered_geometries[id].geometry.id != INVALID_ID) {
     state->registered_geometries[id].reference_count++;
     return &state->registered_geometries[id].geometry;
@@ -69,6 +68,12 @@ Geometry* geometry_sys_acquire_from_config(GeometryConfig config, b8 auto_releas
       state->registered_geometries[i].reference_count = 1;
       g = &state->registered_geometries[i].geometry;
       g->id = i;
+      g->vertex_size = config.vertex_size;
+      g->vertex_count = config.vertex_count;
+      g->vertices = config.vertices;
+      g->index_size = config.index_size;
+      g->index_count = config.index_count;
+      g->indices = config.indices;
       break;
     }
   }
@@ -78,7 +83,7 @@ Geometry* geometry_sys_acquire_from_config(GeometryConfig config, b8 auto_releas
     return 0;
   }
 
-  create_geometry(config, g);
+  r_create_geometry(g);
 
   return g;
 }
@@ -121,25 +126,6 @@ Geometry* geometry_sys_get_default_2D() {
 
   Error("geometry_system_get_default called before system was initialized. Returning nullptr"_);
   return 0;
-}
-
-void create_geometry(GeometryConfig config, Geometry* g) {
-  // Send the geometry off to the renderer to be uploaded to the GPU.
-  r_create_geometry(g, config.vertex_size, config.vertex_count, config.vertices, config.index_size, config.index_count, config.indices);
-    // Invalidate the entry.
-    // state->registered_geometries[g->id].reference_count = 0;
-    // state->registered_geometries[g->id].auto_release = false;
-    // g->id = INVALID_ID;
-    // g->generation = INVALID_ID;
-    // g->internal_id = INVALID_ID;
-
-  // Acquire the material
-  if (config.material_name64.size > 0) {
-    g->material = material_system_acquire(config.material_name64);
-    if (!g->material) {
-      g->material = material_sys_get_default();
-    }
-  }
 }
 
 void destroy_geometry(Geometry* g) {
@@ -185,7 +171,7 @@ void create_default_geometries() {
   u32 indices[6] = {0, 1, 2, 0, 3, 1};
 
   // Send the geometry off to the renderer to be uploaded to the GPU.
-  r_create_geometry(&state->default_geometry, sizeof(Vertex3D), 4, verts, sizeof(u32), 6, indices);
+  // r_create_geometry(&state->default_geometry, sizeof(Vertex3D), 4, verts, sizeof(u32), 6, indices);
 
   // Acquire the default material.
   state->default_geometry.material = material_sys_get_default();
@@ -215,7 +201,7 @@ void create_default_geometries() {
   u32 indices2D[6] = {2,1,0,3,0,1};
   
   // Send the geometry off to the renderer to be uploaded to the GPU.
-  r_create_geometry(&state->default_2D_geometry, sizeof(Vertex2D), 4, verts2D, sizeof(u32), 6, indices2D);
+  // r_create_geometry(&state->default_2D_geometry, sizeof(Vertex2D), 4, verts2D, sizeof(u32), 6, indices2D);
 
   // Acquire the default material.
   state->default_2D_geometry.material = material_sys_get_default();

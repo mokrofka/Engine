@@ -135,13 +135,13 @@ INLINE String str8_chop(String str, u32 amt);
 // String Formatting & Copying
 
 String push_str_cat(Arena* arena, String s1, String s2);
-String push_str_copy(Arena *arena, String s);
+KAPI String push_str_copy(Arena *arena, String s);
 String push_strfv(Arena* arena, const void* fmt, void* argc);
 String push_strf(Arena* arena, const void* fmt, ...);
 
 ////////////////////////////////
 // String some random stuff
-void str_copy(String64& dest, String str);
+KAPI void str_copy(String64& dest, String str);
 String str_read_line(StringCursor* cursor);
 String new_str_read_line(StringCursor* cursor);
 String str_trim(String string);

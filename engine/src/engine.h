@@ -1,7 +1,7 @@
 #pragma once
 #include "lib.h"
 
-#define AppSize            (MB(32))
+#define AppSize            (MB(48))
 #define GameSize           MB(1)
 #define ScratchArenasSize (MB(8) * 2)
 #define EngineSize        (AppSize - GameSize - ScratchArenasSize - KB(10))

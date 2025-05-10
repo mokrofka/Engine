@@ -120,6 +120,7 @@ struct FreeList {
 };
 
 KAPI u8* free_list_alloc(FreeList& fl, u64 size, u64 alignment = DEFAULT_ALIGNMENT);
+KAPI u64 free_list_alloc_block(FreeList& fl, u64 size, u64 alignment = DEFAULT_ALIGNMENT);
 
 KAPI FreeList free_list_create(Arena* arena, u64 size);
 KAPI void free_list_free(FreeList& fl, void* ptr);

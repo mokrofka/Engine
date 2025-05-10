@@ -58,7 +58,7 @@ VK_CommandBuffer vk_cmd_alloc_and_begin_single_use(VkCommandPool pool) {
   return out_cmd;
 }
 
-void vk_cmd_end_single_use(VkCommandPool pool, VK_CommandBuffer* command_buffer, VkQueue queue) {
+void vk_cmd_end_single_use(VkCommandPool pool, VK_CommandBuffer* command_buffer) {
 
   // End the command buffer.
   vk_cmd_end(command_buffer);
@@ -67,10 +67,10 @@ void vk_cmd_end_single_use(VkCommandPool pool, VK_CommandBuffer* command_buffer,
   VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
   submit_info.commandBufferCount = 1;
   submit_info.pCommandBuffers = &command_buffer->handle;
-  VK_CHECK(vkQueueSubmit(queue, 1, &submit_info, 0));
+  VK_CHECK(vkQueueSubmit(vk->device.graphics_queue, 1, &submit_info, 0));
   
   // Wait for it to finish
-  VK_CHECK(vkQueueWaitIdle(queue));
+  VK_CHECK(vkQueueWaitIdle(vk->device.graphics_queue));
   
   // Free the command buffer.
   vk_cmd_free(pool, command_buffer);

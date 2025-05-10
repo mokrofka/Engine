@@ -25,7 +25,7 @@ void r_destroy_texture(Texture* texture);
 void r_create_material(Material* material);
 void r_destroy_material(Material* material);
 
-void r_create_geometry(Geometry* geometry, u32 vertex_size, u32 vertex_count, void* vertices, u32 index_size, u32 index_count, void* indices);
+void r_create_geometry(Geometry* geometry);
 void r_destroy_geometry(Geometry* geometry);
 
 u32 r_renderpass_id(String name);

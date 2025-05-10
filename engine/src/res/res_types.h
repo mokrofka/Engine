@@ -92,6 +92,13 @@ struct Geometry {
   u32 generation;
   String64 name64;
   Material* material;
+  
+  u32 vertex_size;
+  u32 vertex_count;
+  void* vertices;
+  u32 index_size;
+  u32 index_count;
+  void* indices;
 };
 
 enum ShaderStage {

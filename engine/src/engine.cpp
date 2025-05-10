@@ -149,7 +149,7 @@ void engine_create(App* app) {
 
   {
     R_Config config = {
-      .mem_reserve = MB(1)
+      .mem_reserve = MB(5)
     };
     r_init(state->arena, config);
   }
@@ -180,47 +180,47 @@ void engine_create(App* app) {
   }
 
   {
-    GeometryConfig config = geometry_sys_generate_plane_config(10.0f, 5.0f, 5, 5, 5.0f, 2.0f, "test geometry"_, "test_material"_);
-    state->test_geometry = geometry_sys_acquire_from_config(config, true);
+    // GeometryConfig config = geometry_sys_generate_plane_config(10.0f, 5.0f, 5, 5, 5.0f, 2.0f, "test geometry"_, "test_material"_);
+    // state->test_geometry = geometry_sys_acquire_from_config(config, true);
     
-    // Load up some test UI geometry.
-    GeometryConfig ui_config;
-    ui_config.vertex_size = sizeof(Vertex2D);
-    ui_config.vertex_count = 4;
-    ui_config.index_size = sizeof(u32);
-    ui_config.index_count = 6;
-    str_copy(ui_config.material_name64, "test_ui_material"_);
-    str_copy(ui_config.name64, "test_ui_geometry"_);
+    // // Load up some test UI geometry.
+    // GeometryConfig ui_config;
+    // ui_config.vertex_size = sizeof(Vertex2D);
+    // ui_config.vertex_count = 4;
+    // ui_config.index_size = sizeof(u32);
+    // ui_config.index_count = 6;
+    // str_copy(ui_config.material_name64, "test_ui_material"_);
+    // str_copy(ui_config.name64, "test_ui_geometry"_);
 
-    const f32 f = 512.0f;
-    Vertex2D uiverts [4];
-    uiverts[0].position.x = 0.0f;  // 0    3
-    uiverts[0].position.y = 0.0f;  //
-    uiverts[0].texcoord.x = 0.0f;  //
-    uiverts[0].texcoord.y = 0.0f;  // 2    1
+    // const f32 f = 512.0f;
+    // Vertex2D uiverts [4];
+    // uiverts[0].position.x = 0.0f;  // 0    3
+    // uiverts[0].position.y = 0.0f;  //
+    // uiverts[0].texcoord.x = 0.0f;  //
+    // uiverts[0].texcoord.y = 0.0f;  // 2    1
 
-    uiverts[1].position.y = f;
-    uiverts[1].position.x = f;
-    uiverts[1].texcoord.x = 1.0f;
-    uiverts[1].texcoord.y = 1.0f;
+    // uiverts[1].position.y = f;
+    // uiverts[1].position.x = f;
+    // uiverts[1].texcoord.x = 1.0f;
+    // uiverts[1].texcoord.y = 1.0f;
 
-    uiverts[2].position.x = 0.0f;
-    uiverts[2].position.y = f;
-    uiverts[2].texcoord.x = 0.0f;
-    uiverts[2].texcoord.y = 1.0f;
+    // uiverts[2].position.x = 0.0f;
+    // uiverts[2].position.y = f;
+    // uiverts[2].texcoord.x = 0.0f;
+    // uiverts[2].texcoord.y = 1.0f;
 
-    uiverts[3].position.x = f;
-    uiverts[3].position.y = 0.0;
-    uiverts[3].texcoord.x = 1.0f;
-    uiverts[3].texcoord.y = 0.0f;
-    ui_config.vertices = uiverts;
+    // uiverts[3].position.x = f;
+    // uiverts[3].position.y = 0.0;
+    // uiverts[3].texcoord.x = 1.0f;
+    // uiverts[3].texcoord.y = 0.0f;
+    // ui_config.vertices = uiverts;
 
-    // Indices - counter-clockwise
-    u32 indices[6] = {2, 1, 0, 3, 0, 1};
-    ui_config.indices = indices;
+    // // Indices - counter-clockwise
+    // u32 indices[6] = {2, 1, 0, 3, 0, 1};
+    // ui_config.indices = indices;
 
-    // Get UI geometry from config.
-    state->test_ui_geometry = geometry_sys_acquire_from_config(ui_config, true);
+    // // Get UI geometry from config.
+    // state->test_ui_geometry = geometry_sys_acquire_from_config(ui_config, true);
   }
 
   // TODO temp
@@ -254,24 +254,24 @@ void engine_run(App* app) {
 
       check_dll_changes(app);
 
-      // TODO refactor packet creation
-      R_Packet packet;
-      packet.delta_time = delta;
+      // // TODO refactor packet creation
+      R_Packet packet = {};
+      // packet.delta_time = delta;
       
-      // TODO temp
-      GeometryRenderData test_render;
-      test_render.geometry = state->test_geometry;
-      test_render.model = mat4_identity();
+      // // TODO temp
+      // GeometryRenderData test_render;
+      // test_render.geometry = state->test_geometry;
+      // test_render.model = mat4_identity();
       
-      packet.geometry_count = 1;
-      packet.geometries = &test_render;
+      // packet.geometry_count = 1;
+      // packet.geometries = &test_render;
 
-      GeometryRenderData test_ui_render;
-      test_ui_render.geometry = state->test_ui_geometry;
-      test_ui_render.model = mat4_translation(v3(0, 0, 0));
-      packet.ui_geometry_count = 1;
-      packet.ui_geometries = &test_ui_render;
-      // TODO end
+      // GeometryRenderData test_ui_render;
+      // test_ui_render.geometry = state->test_ui_geometry;
+      // test_ui_render.model = mat4_translation(v3(0, 0, 0));
+      // packet.ui_geometry_count = 1;
+      // packet.ui_geometries = &test_ui_render;
+      // // TODO end
 
       // r_draw_frame(&packet);
       r_begin_draw_frame(&packet);

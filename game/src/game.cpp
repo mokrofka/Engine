@@ -6,48 +6,34 @@
 
 // HACK This should not be available outside the engine
 #include <render/r_frontend.h>
+#include "sys/geometry_sys.h"
 
 #include <event.h>
 #include <input.h>
 
+struct Object {
+  Geometry* geom;
+  
+};
+
 struct GameState {
   Arena* arena;
   
-  mat4 view;
-  v3 camera_position;
-  v3 camera_euler;
-  b8 camera_view_dirty;
+  Object triangle;
 };
 
 GameState* state;
 
-internal void recalculate_view_matrix() {
-  if (state->camera_view_dirty) {
-    mat4 rotaion = mat4_euler_xyz(state->camera_euler.x, state->camera_euler.y, state->camera_euler.z);
-    mat4 translation = mat4_translation(state->camera_position);
-    
-    state->view = translation * rotaion;
-    state->view = mat4_inverse(state->view);
-    state->camera_view_dirty = false;
-  }
-}
+struct Vertex {
+  v3 position;
+};
 
-internal void camera_yaw(f32 amount) {
-  state->camera_euler.y += amount;
-  state->camera_view_dirty = true;
-}
+Vertex vertices[] = {
+  v3(-0.5f, -0.5f, 0.0f),
+  v3( 0.5f, -0.5f, 0.0f),
+  v3( 0.0f,  0.5f, 0.0f)
+};
 
-internal void camera_pitch(f32 amount) {
-  state->camera_euler.x += amount;
-  
-  // Clamp to avoid Gimball lock
-  f32 limit = deg_to_rad(89.0f);
-  state->camera_euler.x = Clamp(-limit, state->camera_euler.x, limit);
-  
-  state->camera_view_dirty = true;
-}
-
-#include "test.h"
 void application_init(App* app) {
   Scratch scratch;
   
@@ -55,119 +41,19 @@ void application_init(App* app) {
   Assign(state, app->state);
   state->arena = arena_alloc(app->arena, GameSize);
   
-  state->camera_position = v3(0,0,30.0f);
-  state->camera_euler = v3_zero();
-  
-  state->camera_view_dirty = true;
+  {
+    GeometryConfig config {
+      .vertex_size = sizeof(Vertex),
+      .vertex_count = ArrayCount(vertices),
+      .vertices = vertices,
+    };
+    str_copy(config.name64, "triangle"_);
+    state->triangle.geom = geometry_sys_acquire_from_config(config, true);
+  }
 }
 
-void game_update(App* app);
-void ui_update();
-  
 void application_update(App* app) {
-  b32 is_game = 1;
-  if (is_game) {
-    game_update(app);
-  } else {
-    ui_update();
-  }
-}
-
-void game_update(App* app) {
   Assign(state, app->state);
-  f32 delta_time = app->delta_time;
-  // TODO temp
-  mat4 mat = mat4_identity();
-  mat4_inverse(mat);
-
-  if (input_is_key_up(KEY_T) && input_was_key_down(KEY_T)) {
-    Debug("Swapping texture!");
-    EventContext context = {};
-    event_fire(EventCode_Debug0, app, context);
-  }
   
-  f32 rotation_speed = 2.0f;
-
-  // HACK temp back to move camera around
-  if (input_is_key_down(KEY_A) || input_is_key_down(KEY_LEFT)) {
-    camera_yaw(rotation_speed * delta_time);
-  }
-  if (input_is_key_down(KEY_D) || input_is_key_down(KEY_RIGHT)) {
-    camera_yaw(-rotation_speed * delta_time);
-  }
-  if (input_is_key_down(KEY_UP)) {
-    camera_pitch(rotation_speed * delta_time);
-  }
-  if (input_is_key_down(KEY_DOWN)) {
-    camera_pitch(-rotation_speed * delta_time);
-  }
   
-  f32 temp_move_speed = 50.0f;
-  v3 velocity = v3_zero();
-  
-  if (input_is_key_down(KEY_W)) {
-    v3 forward = mat4_forward(state->view);
-    velocity += forward;
-  }
-  if (input_is_key_down(KEY_S)) {
-    v3 backward = mat4_backward(state->view);
-    velocity += backward;
-  }
-  
-  if (input_is_key_down(KEY_Q)) {
-    v3 left = mat4_left(state->view);
-    velocity += left;
-  }
-  if (input_is_key_down(KEY_E)) {
-    v3 right = mat4_right(state->view);
-    velocity += right;
-  }
-  
-  if (input_is_key_down(KEY_SPACE)) {
-    velocity.y += 1.0f;
-  }
-  if (input_is_key_down(KEY_X)) {
-    velocity.y -= 1.0f;
-  }
-  
-  v3 z = v3_zero();
-  if (z != velocity) {
-    // Be sure to normalize the velocity before applying speed 
-    v3_normalize(&velocity);
-    state->camera_position += velocity * temp_move_speed * delta_time;
-    state->camera_view_dirty = true;
-  }
-  
-  recalculate_view_matrix();
-
-  // HACK This should not be available outside the engine
-  r_set_view(state->view);
 }
-
-void ui_update() {
-  // Begin the main window (with no extra options like fullscreen, padding, etc.)
-
-  const ImGuiViewport* viewport = ImGui::GetMainViewport();
-  ImGui::SetNextWindowPos(viewport->WorkPos);
-  ImGui::SetNextWindowSize(viewport->WorkSize);
-  ImGui::SetNextWindowViewport(viewport->ID);
-  UI_Window(ImGui::Begin("DockSpace", null, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
-    ImGui::DockSpace(ImGui::GetID("MyDockSpace"), ImVec2(0.0f, 0.0f), 0);
-  }
-  
-  UI_Window(ImGui::Begin("new window")) {
-    if (ImGui::Button("click here!")) {
-      Info("yes");
-    }
-  }
-  
-  ImGui::ShowDemoWindow();
-}
-
-void application_render(struct App* app) {
-}
-
-void application_on_resize(struct App* app) {
-}
-
-

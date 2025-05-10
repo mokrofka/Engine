@@ -23,7 +23,7 @@ void vk_r_destroy_texture(Texture* texture);
 void vk_r_create_material(Material* material);
 void vk_r_destroy_material(Material* material);
 
-void vk_r_create_geometry(Geometry* geometry, u32 vertex_size, u32 vertex_count, void* vertices, u32 index_size, u32 index_count, void* indices);
+void vk_r_create_geometry(Geometry* geometry);
 void vk_r_destroy_geometry(Geometry* geometry);
 
 // Shader

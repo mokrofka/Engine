@@ -14,6 +14,7 @@
 struct VK_Buffer {
   VkBuffer handle;
   VkDeviceMemory memory;
+  void* maped_memory;
   FreeList freelist;
   u64 size;
   u64 usage;
@@ -153,10 +154,10 @@ struct VK_GeometryData {
   u32 id;
   u32 generation;
   u32 vertex_count;
-  u32 vertex_element_size;
+  u32 vertex_size;
   u32 vertex_buffer_offset;
   u32 index_count;
-  u32 index_element_size;
+  u32 index_size;
   u32 index_buffer_offset;
 };
 
@@ -445,6 +446,10 @@ struct VK {
   
   VkFramebuffer world_framebuffers[3];
   
+  VK_Buffer vert_buffer;
+  VK_Buffer index_buffer;
+  VK_Buffer stage_buffer;
+  VK_GeometryData geometries[VK_MaxGeometryCount];
 #if _DEBUG
   VkDebugUtilsMessengerEXT debug_messenger;
 #endif

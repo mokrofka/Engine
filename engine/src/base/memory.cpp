@@ -285,6 +285,40 @@ u8* free_list_alloc(FreeList& fl, u64 size, u64 alignment) {
   return (u8*)header_ptr + sizeof(FreeListAllocationHeader);
 }
 
+u64 free_list_alloc_block(FreeList& fl, u64 size, u64 alignment) {
+  u64 padding = 0;
+  FreeListNode* prev_node = null;
+  FreeListNode* node = null;
+
+  if (size < sizeof(FreeListNode)) {
+    size = sizeof(FreeListNode);
+  }
+
+  node = free_list_find_first(fl, size, alignment, &padding, &prev_node);
+  Assert(node && "Free list has no free memory");
+
+  u64 alignment_padding = padding - sizeof(FreeListAllocationHeader);
+  u64 required_space = size + padding;
+  u64 remaining = node->block_size - required_space;
+
+  if (remaining > 0) {
+    FreeListNode* new_node = (FreeListNode*)((PtrInt)node + required_space);
+    new_node->block_size = remaining;
+    free_list_node_insert(&fl.head, node, new_node);
+  }
+
+  free_list_node_remove(&fl.head, prev_node, node);
+
+  FreeListAllocationHeader* header_ptr = (FreeListAllocationHeader*)((PtrInt)node + alignment_padding);
+  header_ptr->block_size = required_space;
+  header_ptr->padding = alignment_padding;
+  header_ptr->magic_value = DebugMagic;
+
+  fl.used += required_space;
+
+  return ((PtrInt)header_ptr + sizeof(FreeListAllocationHeader)) - (PtrInt)fl.data;
+}
+
 void FreeList_coalescence(FreeList& fl, FreeListNode* prev_node, FreeListNode* free_node);
 
 void free_list_free(FreeList& fl, void* ptr) {

@@ -172,7 +172,7 @@ void vk_r_shader_destroy(Shader* s) {
   }
 
   // Uniform buffer.
-  vk_buffer_unlock_memory(&shader->uniform_buffer);
+  vk_buffer_unmap_memory(&shader->uniform_buffer);
   shader->mapped_uniform_buffer_block = 0;
   vk_buffer_destroy(&shader->uniform_buffer);
 

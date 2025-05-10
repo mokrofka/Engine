@@ -23,9 +23,9 @@ struct GeometryConfig {
 void geometry_sys_init(Arena* arena, GeometrySysConfig config);
 void geometry_sys_shutdown();
 
-Geometry* geometry_sys_acquire_by_id(u32 id);
+KAPI Geometry* geometry_sys_acquire_by_id(u32 id);
 
-Geometry* geometry_sys_acquire_from_config(GeometryConfig config, b8 auto_release);
+KAPI Geometry* geometry_sys_acquire_from_config(GeometryConfig config, b8 auto_release);
 
 void geometry_sys_release(Geometry* geometry);
 
