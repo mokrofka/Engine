@@ -75,3 +75,4 @@ void vk_cmd_end_single_use(VkCommandPool pool, VK_CommandBuffer* command_buffer,
   // Free the command buffer.
   vk_cmd_free(pool, command_buffer);
 }
+

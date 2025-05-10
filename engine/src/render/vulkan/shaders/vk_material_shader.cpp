@@ -40,9 +40,9 @@ VK_MaterialShader vk_material_shader_create() {
   g_pool_info.pPoolSizes = &g_pool_size;
   g_pool_info.maxSets = vk->swapchain.image_count;
   VK_CHECK(vkCreateDescriptorPool(vkdevice, &g_pool_info, vk->allocator, &shader.global_descriptor_pool));
-  
-  shader.sampler_uses[0] = TextureUse_MapDiffuse ;
-  
+
+  shader.sampler_uses[0] = TextureUse_MapDiffuse;
+
   // Local/Object Descriptors
   VkDescriptorType descriptor_types[MaterialShaderDescriptorCount] = {
     VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         // Binding 0 - uniform buffer
@@ -66,15 +66,15 @@ VK_MaterialShader vk_material_shader_create() {
   VkDescriptorPoolSize obj_pool_sizes[2];
   // The first section will be used for uniform buffers
   obj_pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  obj_pool_sizes[0].descriptorCount = MaxMaterialCount; // how many descriptor in whole you have
+  obj_pool_sizes[0].descriptorCount = VK_MaxMaterialCount; // how many descriptor in whole you have
   // The second section will be used for image samplers
   obj_pool_sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  obj_pool_sizes[1].descriptorCount = MaterialShaderSamplerCount * MaxMaterialCount;
+  obj_pool_sizes[1].descriptorCount = MaterialShaderSamplerCount * VK_MaxMaterialCount;
   
   VkDescriptorPoolCreateInfo obj_pool_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
   obj_pool_info.poolSizeCount = 2;
   obj_pool_info.pPoolSizes = obj_pool_sizes;
-  obj_pool_info.maxSets = MaxMaterialCount;
+  obj_pool_info.maxSets = VK_MaxMaterialCount;
   obj_pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT; // allows you free 
   
   // Create object descriptor pool
@@ -152,7 +152,7 @@ VK_MaterialShader vk_material_shader_create() {
     true);
   
   // Allocate global descriptor sets
-  VkDescriptorSetLayout global_layouts[3] = {
+  VkDescriptorSetLayout global_layouts[] = {
     shader.global_descriptor_set_layout,
     shader.global_descriptor_set_layout,
     shader.global_descriptor_set_layout};
@@ -165,7 +165,7 @@ VK_MaterialShader vk_material_shader_create() {
   
   // Create the object uniform buffer
   shader.obj_uniform_buffer = vk_buffer_create(
-    sizeof(VK_MaterialShaderInstUbo) * MaxMaterialCount,
+    sizeof(VK_MaterialShaderInstUbo) * VK_MaxMaterialCount,
     VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
     true);
@@ -184,7 +184,7 @@ void vk_material_shader_destroy(VK_MaterialShader* shader) {
   vk_buffer_destroy(&shader->obj_uniform_buffer);
   
   // Destroy pipeline
-  vk_pipeline_destroy(shader->pipeline);
+  vk_pipeline_destroy(&shader->pipeline);
 
   // Destroy global descriptor pool
   vkDestroyDescriptorPool(logical_device, shader->global_descriptor_pool, vk->allocator);
@@ -206,9 +206,10 @@ void vk_material_shader_use(VK_MaterialShader* shader) {
 void vk_material_shader_update_global_state(VK_MaterialShader* shader, f32 delta_time) {
   u32 image_index = vk->frame.image_index;
   VkDescriptorSet global_descriptor = shader->global_descriptor_sets[image_index];
+  VK_CommandBuffer cmd = vk_get_current_cmd();
   
   // Bind the global descriptor set to be updated
-  vkCmdBindDescriptorSets(vk->render.cmds[vk->frame.image_index].handle, VK_PIPELINE_BIND_POINT_GRAPHICS, shader->pipeline.pipeline_layout, 0, 1, &global_descriptor, 0, 0);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader->pipeline.pipeline_layout, 0, 1, &global_descriptor, 0, 0);
   
   // Configure the descriptors for the given index
   u32 range = sizeof(VK_MaterialShaderGlobalUbo);

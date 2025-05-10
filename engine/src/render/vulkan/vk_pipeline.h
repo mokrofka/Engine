@@ -15,6 +15,6 @@ VK_Pipeline vk_graphics_pipeline_create(
     b32 is_wireframe,
     b32 depth_test_enabled);
 
-void vk_pipeline_destroy(VK_Pipeline pipeline);
+void vk_pipeline_destroy(VK_Pipeline* pipeline);
 
 void vk_pipeline_bind(VkCommandBuffer cmd, VkPipelineBindPoint bind_point, VK_Pipeline pipeline);

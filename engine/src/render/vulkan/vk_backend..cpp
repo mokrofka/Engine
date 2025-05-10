@@ -193,7 +193,7 @@ void vk_r_backend_init(R_Backend* backend) {
   
   create_buffers(&vk->render);
   
-  Loop (i, MaxGeometryCount) {
+  Loop (i, VK_MaxGeometryCount) {
     vk->render.geometries[i].id = INVALID_ID;
   }
   
@@ -727,7 +727,7 @@ void vk_r_create_geometry(Geometry* geometry, u32 vertex_size, u32 vertex_count,
     old_range.vertex_count = internal_data->vertex_count;
     old_range.vertex_element_size = internal_data->vertex_element_size;
   } else {
-    Loop (i, MaxGeometryCount) {
+    Loop (i, VK_MaxGeometryCount) {
       if (vk->render.geometries[i].id == INVALID_ID) {
         // Found a free index.
         geometry->internal_id = i;
@@ -807,7 +807,7 @@ void vk_r_draw_geometry(GeometryRenderData data) {
   }
   
   VK_GeometryData* buffer_data = &vk->render.geometries[data.geometry->internal_id];
-  VkCommandBuffer cmd = vk->render.cmds[vk->frame.image_index].handle;
+  VK_CommandBuffer& cmd = vk_get_current_cmd();
   
   Material* m = 0;
   if (data.geometry->material) {

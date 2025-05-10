@@ -160,10 +160,10 @@ VK_Pipeline vk_graphics_pipeline_create(
   VK_Pipeline p = {}; return p;
 }
 
-void vk_pipeline_destroy(VK_Pipeline pipeline) {
-  Assert(pipeline.handle && pipeline.pipeline_layout);
-  vkDestroyPipeline(vkdevice, pipeline.handle, vk->allocator);
-  vkDestroyPipelineLayout(vkdevice, pipeline.pipeline_layout, vk->allocator);
+void vk_pipeline_destroy(VK_Pipeline* pipeline) {
+  Assert(pipeline->handle && pipeline->pipeline_layout);
+  vkDestroyPipeline(vkdevice, pipeline->handle, vk->allocator);
+  vkDestroyPipelineLayout(vkdevice, pipeline->pipeline_layout, vk->allocator);
 }
 
 void vk_pipeline_bind(VkCommandBuffer cmd, VkPipelineBindPoint bind_point, VK_Pipeline pipeline) {

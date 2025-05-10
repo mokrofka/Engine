@@ -26,7 +26,7 @@ HashMap hashmap_create(Arena* arena, u32 element_size, u32 element_count, b32 is
   hashtable.element_size = element_size;
   hashtable.element_count = element_count;
   hashtable.is_pointer_type = is_pointer_type;
-  MemZero(hashtable.data, element_size * element_count);
+  MemClear(hashtable.data, element_size * element_count);
   return hashtable;
 }
 

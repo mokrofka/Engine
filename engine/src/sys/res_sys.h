@@ -33,8 +33,8 @@ String res_sys_base_path();
 //////////////////////////////////////////////////////////
 // Loaders
 
-Binary res_load_binary(Arena* arena, String filepath);
-Texture res_load_texture(String filepath);
-void res_unload_texture(void* data);
+Binary res_binary_load(Arena* arena, String filepath);
+Texture res_texture_load(String filepath);
+void res_texture_unload(void* data);
 MaterialConfig res_load_material_config(String filepath);
 

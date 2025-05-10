@@ -16,7 +16,7 @@ void* _darray_create(u32 length, u32 stride) {
   void* new_array = 0;
   MemAlloc(new_array, HeaderSize + array_size);
 
-  ClearMemory(new_array, HeaderSize + array_size);
+  MemClear(new_array, HeaderSize + array_size);
   Assert(length && "length should be > 0");
   
   DarrayHeader* header; Assign(header, new_array);

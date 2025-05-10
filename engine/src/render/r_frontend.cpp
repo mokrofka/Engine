@@ -128,9 +128,6 @@ void r_begin_draw_frame(R_Packet* packet) {
 
     vk_r_update_global_world_state(state->projection, state->view, v3_zero(), v4_one(), 0);
 
-    // ui_begin_frame();
-    // ui_test();
-    // ui_end_frame();
     // Draw geometries
     u32 count = packet->geometry_count;
     Loop(i, count) {

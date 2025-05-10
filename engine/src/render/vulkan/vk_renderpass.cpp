@@ -169,6 +169,3 @@ void vk_renderpass_end(VK_CommandBuffer* command_buffer) {
   command_buffer->state = VK_CmdState_Recording;
 }
 
-VK_Renderpass* vk_get_renderpass(u32 id) {
-  return &vk->renderpasses[id];
-}

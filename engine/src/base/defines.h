@@ -124,11 +124,14 @@ typedef void VoidProc(void);
 
 #define ZERO_MEMORY
 #ifdef ZERO_MEMORY
-  #define ClearMemory(ptr, size) MemZero(ptr, size)
+  #define MemClear(ptr, size) MemZero(ptr, size)
+  #define MemClearStruct(ptr) MemZero(ptr, sizeof(*(ptr)))
 #else
-  #define ClearMemory(ptr, size)
+  #define MemClear(ptr, size)
+  #define MemClearStruct(ptr)
 #endif
 
+// #define UI_Window(begin) DeferLoop(begin, ImGui::End())
 struct String {
   u8* str;
   u32 size;

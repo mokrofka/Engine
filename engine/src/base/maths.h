@@ -114,12 +114,21 @@ INLINE i32 rand_in_range_i32(i32 min, i32 max) {
   return min + (i32)(x % (u32)(max - min + 1));
 }
 
-INLINE f32 rand_unilateral() {
+INLINE f32 rand_f32_01() {
   return (f32)rand_u32() / (f32)U32_MAX;
 }
 
-INLINE f32 rand_bilateral() {
-  return rand_unilateral() * 2.f - 1.f;
+INLINE f32 rand_f32_11() {
+  return rand_f32_01() * 2.f - 1.f;
+}
+
+INLINE f32 rand_f32() {
+  f32 normalized = (f32)rand_u32() / (f32)U32_MAX;
+  return normalized * 2 * U16_MAX - U16_MAX;
+}
+
+INLINE f32 rand_in_range_f32(f32 min, f32 max) {
+  return min + (max - min) * rand_f32_01();
 }
 
 INLINE b32 rand_b32() {

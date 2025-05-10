@@ -4,7 +4,7 @@
 #include "res/res_types.h"
 
 struct ShaderSysConfig {
-  u32 mem_reserve;
+  u64 mem_reserve;
   u16 shader_count_max;
   u8 uniform_count_max;
   u8 global_textures_max;

@@ -24,16 +24,12 @@ internal void shader_destroy(Shader* s);
 
 void shader_sys_init(Arena* arena, ShaderSysConfig config) {
   state = push_struct(arena, ShaderSysState);
-  state->arena = arena_alloc(arena, MB(1));
+  state->arena = arena_alloc(arena, config.mem_reserve);
   state->shaders = push_array(arena, Shader, config.shader_count_max);
   state->config = config;
   state->current_shader_id = INVALID_ID;
 
   state->lookup = hashmap_create(arena, sizeof(u32), config.shader_count_max, false);
-
-  Loop (i, config.shader_count_max) {
-    state->shaders[i].id = INVALID_ID;
-  }
 
   u32 invalid_fill_id = INVALID_ID;
   hashmap_fill(&state->lookup, &invalid_fill_id);

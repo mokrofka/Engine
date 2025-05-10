@@ -7,7 +7,7 @@ VK_ShaderStage shader_module_create(String name, String type_str, VkShaderStageF
   VK_ShaderStage shader_stage = {};
   String file_path = push_strf(scratch, "shaders/%s.%s.spv", name, type_str);
   
-  Binary binary = res_load_binary(scratch, file_path);
+  Binary binary = res_binary_load(scratch, file_path);
   if (!binary.data) {
     Error("Unable to read shader module: %s", file_path);
   }

@@ -57,7 +57,7 @@ Arena* arena_alloc(Arena* arena, u64 size, u64 align) {
   ptr->res = size;
   arena->pos = offset+size;
 
-  ClearMemory((u8*)ptr+ARENA_HEADER, size);
+  MemClear((u8*)ptr+ARENA_HEADER, size);
   return ptr;
 }
 
@@ -73,7 +73,7 @@ void* _arena_push(Arena* arena, u64 size, u64 align) {
   u8* buffer = (u8*)((PtrInt)arena + ARENA_HEADER) + offset;
   arena->pos = offset+size;
 
-  ClearMemory(buffer, size);
+  MemClear(buffer, size);
   return buffer;
 }
 
@@ -148,7 +148,7 @@ u8* pool_alloc(Pool& p) {
   // Pop free node
   p.head = p.head->next;
 
-  ClearMemory(node, p.chunk_size);
+  MemClear(node, p.chunk_size);
   return (u8*)node;
 }
 

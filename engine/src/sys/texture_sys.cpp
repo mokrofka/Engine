@@ -215,7 +215,7 @@ internal void destroy_default_textures(TextureSystemState* state) {
 }
 
 internal Texture load_texture(String texture_name) {
-  Texture texture = res_load_texture(texture_name);
+  Texture texture = res_texture_load(texture_name);
   if (!texture.data) {
     goto error;
   }
@@ -243,7 +243,7 @@ internal Texture load_texture(String texture_name) {
 internal void destroy_texture(Texture* t) {
   // Clean up back resources  
   r_destroy_texture(t);
-  res_unload_texture(t->data);
+  res_texture_unload(t->data);
   
   MemZeroStruct(t);
   t->id = INVALID_ID;

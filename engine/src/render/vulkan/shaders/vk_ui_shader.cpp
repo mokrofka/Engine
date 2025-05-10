@@ -183,7 +183,7 @@ void vk_ui_shader_destroy(VK_UIShader* shader) {
   vk_buffer_destroy(&shader->obj_uniform_buffer);
   
   // Destroy pipeline
-  vk_pipeline_destroy(shader->pipeline);
+  vk_pipeline_destroy(&shader->pipeline);
 
   // Destroy global descriptor pool
   vkDestroyDescriptorPool(logical_device, shader->global_descriptor_pool, vk->allocator);

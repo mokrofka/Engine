@@ -64,7 +64,7 @@ ResLoader image_resource_loader_create() {
   return loader;
 }
 
-Texture res_load_texture(String filepath) {
+Texture res_texture_load(String filepath) {
   Scratch scratch;
   Texture texture = {};
   
@@ -72,7 +72,7 @@ Texture res_load_texture(String filepath) {
   stbi_set_flip_vertically_on_load(true);
 
   // TODO: try different extensions
-  String file_path = push_strf(scratch, "%s/%s/%s%s", res_sys_base_path(), "textures"_,filepath, ".png"_);
+  String file_path = push_strf(scratch, "%s/%s/%s%s", res_sys_base_path(), "textures"_, filepath, ".png"_);
 
   String file_path_c = push_str_copy(scratch, file_path);
 
@@ -97,6 +97,6 @@ Texture res_load_texture(String filepath) {
   return texture;
 }
 
-void res_unload_texture(void* data) {
+void res_texture_unload(void* data) {
   stbi_image_free(data);
 }
