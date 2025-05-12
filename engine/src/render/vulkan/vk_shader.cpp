@@ -43,152 +43,152 @@ internal VK_ShaderStage shader_module_create(String name, String type_str, VkSha
 
 
 void vk_r_shader_create(Shader* s, u32 renderpass_id, u32 stage_count, String* stage_filenames, ShaderStage* stages) {
-  s->internal_data = mem_alloc_struct(VK_Shader);
+  // s->internal_data = mem_alloc_struct(VK_Shader);
 
-  // TODO: dynamic renderpasses
-  VK_Renderpass* renderpass = vk_get_renderpass(renderpass_id);
+  // // TODO: dynamic renderpasses
+  // VK_Renderpass* renderpass = vk_get_renderpass(renderpass_id);
 
-  // Translate stages
-  VkShaderStageFlags vk_stages[VK_ShaderMaxStages];
-  Loop (i, stage_count) {
-    switch (stages[i]) {
-    case ShaderStage_Fragment: {
-      vk_stages[i] = VK_SHADER_STAGE_FRAGMENT_BIT;
-    } break;
-    case ShaderStage_Vertex: {
-      vk_stages[i] = VK_SHADER_STAGE_VERTEX_BIT;
-    } break;
-    case ShaderStage_Geometry: {
-      Warn("vk_r_shader_create: VK_SHADER_STAGE_GEOMETRY_BIT is set but not yet supported.");
-      vk_stages[i] = VK_SHADER_STAGE_GEOMETRY_BIT;
-    } break;
-    case ShaderStage_Compute: {
-      Warn("vk_r_shader_create: SHADER_STAGE_COMPUTE_BIT is set but not yet supported.");
-      vk_stages[i] = VK_SHADER_STAGE_COMPUTE_BIT;
-    } break;
-    default:
-      Error("Unsupported stage type: %i", stages[i]);
-      break;
-    }
-  }
+  // // Translate stages
+  // VkShaderStageFlags vk_stages[VK_ShaderMaxStages];
+  // Loop (i, stage_count) {
+  //   switch (stages[i]) {
+  //   case ShaderStage_Fragment: {
+  //     vk_stages[i] = VK_SHADER_STAGE_FRAGMENT_BIT;
+  //   } break;
+  //   case ShaderStage_Vertex: {
+  //     vk_stages[i] = VK_SHADER_STAGE_VERTEX_BIT;
+  //   } break;
+  //   case ShaderStage_Geometry: {
+  //     Warn("vk_r_shader_create: VK_SHADER_STAGE_GEOMETRY_BIT is set but not yet supported.");
+  //     vk_stages[i] = VK_SHADER_STAGE_GEOMETRY_BIT;
+  //   } break;
+  //   case ShaderStage_Compute: {
+  //     Warn("vk_r_shader_create: SHADER_STAGE_COMPUTE_BIT is set but not yet supported.");
+  //     vk_stages[i] = VK_SHADER_STAGE_COMPUTE_BIT;
+  //   } break;
+  //   default:
+  //     Error("Unsupported stage type: %i", stages[i]);
+  //     break;
+  //   }
+  // }
 
-  // TODO: configurable max descriptor allocate count.
+  // // TODO: configurable max descriptor allocate count.
 
-  u32 max_descriptor_allocate_count = 1024;
+  // u32 max_descriptor_allocate_count = 1024;
 
-  // Take a copy of the pointer to the context.
-  VK_Shader* out_shader; Assign(out_shader, s->internal_data);
+  // // Take a copy of the pointer to the context.
+  // VK_Shader* out_shader; Assign(out_shader, s->internal_data);
 
-  out_shader->renderpass = renderpass;
+  // out_shader->renderpass = renderpass;
 
-  // Build out the configuration.
-  out_shader->config.max_descriptor_set_count = max_descriptor_allocate_count;
+  // // Build out the configuration.
+  // out_shader->config.max_descriptor_set_count = max_descriptor_allocate_count;
 
-  // Shader stages. Parse out the flags.
-  out_shader->config.stage_count = 0;
-  // Iterate provided stages.
-  Loop (i, stage_count) {
-    // Make sure there is room enough to add the stage.
-    if (out_shader->config.stage_count + 1 > VK_ShaderMaxStages) {
-      Error("Shaders may have a maximum of %i stages", VK_ShaderMaxStages);
-      return;
-    }
+  // // Shader stages. Parse out the flags.
+  // out_shader->config.stage_count = 0;
+  // // Iterate provided stages.
+  // Loop (i, stage_count) {
+  //   // Make sure there is room enough to add the stage.
+  //   if (out_shader->config.stage_count + 1 > VK_ShaderMaxStages) {
+  //     Error("Shaders may have a maximum of %i stages", VK_ShaderMaxStages);
+  //     return;
+  //   }
 
-    // Make sure the stage is a supported one.
-    VkShaderStageFlagBits stage_flag;
-    switch (stages[i]) {
-    case ShaderStage_Vertex: {
-      stage_flag = VK_SHADER_STAGE_VERTEX_BIT;
-    } break;
-    case ShaderStage_Fragment: {
-      stage_flag = VK_SHADER_STAGE_FRAGMENT_BIT;
-    } break;
-    default:
-      // Go to the next type.
-      Error("vulkan_shader_create: Unsupported shader stage flagged: %i. Stage ignored.", stages[i]);
-      continue;
-    }
+  //   // Make sure the stage is a supported one.
+  //   VkShaderStageFlagBits stage_flag;
+  //   switch (stages[i]) {
+  //   case ShaderStage_Vertex: {
+  //     stage_flag = VK_SHADER_STAGE_VERTEX_BIT;
+  //   } break;
+  //   case ShaderStage_Fragment: {
+  //     stage_flag = VK_SHADER_STAGE_FRAGMENT_BIT;
+  //   } break;
+  //   default:
+  //     // Go to the next type.
+  //     Error("vulkan_shader_create: Unsupported shader stage flagged: %i. Stage ignored.", stages[i]);
+  //     continue;
+  //   }
 
-    // Set the stage and bump the counter.
-    out_shader->config.stages[out_shader->config.stage_count].stage = stage_flag;
-    str_copy(out_shader->config.stages[out_shader->config.stage_count].file_name64, stage_filenames[i]);
-    ++out_shader->config.stage_count;
-  }
+  //   // Set the stage and bump the counter.
+  //   out_shader->config.stages[out_shader->config.stage_count].stage = stage_flag;
+  //   str_copy(out_shader->config.stages[out_shader->config.stage_count].file_name64, stage_filenames[i]);
+  //   ++out_shader->config.stage_count;
+  // }
 
-  // For now, shaders will only ever have these 2 types of descriptor pools.
-  out_shader->config.pool_sizes[0] = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1024};         // HACK: max number of ubo descriptor sets.
-  out_shader->config.pool_sizes[1] = {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4096}; // HACK: max number of image sampler descriptor sets.
+  // // For now, shaders will only ever have these 2 types of descriptor pools.
+  // out_shader->config.pool_sizes[0] = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1024};         // HACK: max number of ubo descriptor sets.
+  // out_shader->config.pool_sizes[1] = {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4096}; // HACK: max number of image sampler descriptor sets.
 
-  // Global descriptor set config.
-  VK_DescriptorSetConfig global_descriptor_set_config = {};
+  // // Global descriptor set config.
+  // VK_DescriptorSetConfig global_descriptor_set_config = {};
 
-  // UBO is always available and first.
-  global_descriptor_set_config.bindings[BINDING_INDEX_UBO].binding = BINDING_INDEX_UBO;
-  global_descriptor_set_config.bindings[BINDING_INDEX_UBO].descriptorCount = 1;
-  global_descriptor_set_config.bindings[BINDING_INDEX_UBO].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  global_descriptor_set_config.bindings[BINDING_INDEX_UBO].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-  ++global_descriptor_set_config.binding_count;
+  // // UBO is always available and first.
+  // global_descriptor_set_config.bindings[BINDING_INDEX_UBO].binding = BINDING_INDEX_UBO;
+  // global_descriptor_set_config.bindings[BINDING_INDEX_UBO].descriptorCount = 1;
+  // global_descriptor_set_config.bindings[BINDING_INDEX_UBO].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  // global_descriptor_set_config.bindings[BINDING_INDEX_UBO].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+  // ++global_descriptor_set_config.binding_count;
 
-  out_shader->config.descriptor_sets[DESC_SET_INDEX_GLOBAL] = global_descriptor_set_config;
-  ++out_shader->config.descriptor_set_count;
-  if (s->use_instances) {
-    // If using instances, add a second descriptor set.
-    VK_DescriptorSetConfig instance_descriptor_set_config = {};
+  // out_shader->config.descriptor_sets[DESC_SET_INDEX_GLOBAL] = global_descriptor_set_config;
+  // ++out_shader->config.descriptor_set_count;
+  // if (s->use_instances) {
+  //   // If using instances, add a second descriptor set.
+  //   VK_DescriptorSetConfig instance_descriptor_set_config = {};
 
-    // Add a UBO to it, as instances should always have one available.
-    // NOTE: Might be a good idea to only add this if it is going to be used...
-    instance_descriptor_set_config.bindings[BINDING_INDEX_UBO].binding = BINDING_INDEX_UBO;
-    instance_descriptor_set_config.bindings[BINDING_INDEX_UBO].descriptorCount = 1;
-    instance_descriptor_set_config.bindings[BINDING_INDEX_UBO].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    instance_descriptor_set_config.bindings[BINDING_INDEX_UBO].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-    ++instance_descriptor_set_config.binding_count;
+  //   // Add a UBO to it, as instances should always have one available.
+  //   // NOTE: Might be a good idea to only add this if it is going to be used...
+  //   instance_descriptor_set_config.bindings[BINDING_INDEX_UBO].binding = BINDING_INDEX_UBO;
+  //   instance_descriptor_set_config.bindings[BINDING_INDEX_UBO].descriptorCount = 1;
+  //   instance_descriptor_set_config.bindings[BINDING_INDEX_UBO].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  //   instance_descriptor_set_config.bindings[BINDING_INDEX_UBO].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+  //   ++instance_descriptor_set_config.binding_count;
 
-    out_shader->config.descriptor_sets[DESC_SET_INDEX_INSTANCE] = instance_descriptor_set_config;
-    ++out_shader->config.descriptor_set_count;
-  }
+  //   out_shader->config.descriptor_sets[DESC_SET_INDEX_INSTANCE] = instance_descriptor_set_config;
+  //   ++out_shader->config.descriptor_set_count;
+  // }
 
-  // Invalidate all instance states.
-  // TODO: dynamic
-  Loop (i, 1024) {
-    out_shader->instance_states[i].id = INVALID_ID;
-  }
+  // // Invalidate all instance states.
+  // // TODO: dynamic
+  // Loop (i, 1024) {
+  //   out_shader->instance_states[i].id = INVALID_ID;
+  // }
 }
 
 void vk_r_shader_destroy(Shader* s) {
-  Assert(s && s->internal_data);
-  VK_Shader* shader; Assign(shader, s->internal_data);
+  // Assert(s && s->internal_data);
+  // VK_Shader* shader; Assign(shader, s->internal_data);
 
-  // Descriptor set layouts.
-  Loop (i, shader->config.descriptor_set_count) {
-    if (shader->descriptor_set_layouts[i]) {
-      vkDestroyDescriptorSetLayout(vkdevice, shader->descriptor_set_layouts[i], vk->allocator);
-      shader->descriptor_set_layouts[i] = 0;
-    }
-  }
+  // // Descriptor set layouts.
+  // Loop (i, shader->config.descriptor_set_count) {
+  //   if (shader->descriptor_set_layouts[i]) {
+  //     vkDestroyDescriptorSetLayout(vkdevice, shader->descriptor_set_layouts[i], vk->allocator);
+  //     shader->descriptor_set_layouts[i] = 0;
+  //   }
+  // }
 
-  // Descriptor pool
-  if (shader->descriptor_pool) {
-    vkDestroyDescriptorPool(vkdevice, shader->descriptor_pool, vk->allocator);
-  }
+  // // Descriptor pool
+  // if (shader->descriptor_pool) {
+  //   vkDestroyDescriptorPool(vkdevice, shader->descriptor_pool, vk->allocator);
+  // }
 
-  // Uniform buffer.
-  vk_buffer_unmap_memory(&shader->uniform_buffer);
-  shader->mapped_uniform_buffer_block = 0;
-  vk_buffer_destroy(&shader->uniform_buffer);
+  // // Uniform buffer.
+  // vk_buffer_unmap_memory(&shader->uniform_buffer);
+  // shader->mapped_uniform_buffer_block = 0;
+  // vk_buffer_destroy(&shader->uniform_buffer);
 
-  // Pipeline
-  vk_pipeline_destroy(&shader->pipeline);
+  // // Pipeline
+  // vk_pipeline_destroy(&shader->pipeline);
 
-  // Shader modules
-  Loop (i, shader->config.stage_count) {
-    vkDestroyShaderModule(vkdevice, shader->stages[i].handle, vk->allocator);
-  }
+  // // Shader modules
+  // Loop (i, shader->config.stage_count) {
+  //   vkDestroyShaderModule(vkdevice, shader->stages[i].handle, vk->allocator);
+  // }
 
-  // Destroy the configuration.
-  MemClearStruct(&shader->config);
+  // // Destroy the configuration.
+  // MemClearStruct(&shader->config);
 
-  mem_free(s->internal_data);
-  s->internal_data = 0;
+  // mem_free(s->internal_data);
+  // s->internal_data = 0;
 }
 
 void vk_r_shader_initialize(Shader* shader) {

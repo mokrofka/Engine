@@ -1,6 +1,7 @@
 #include "test.h"
 #include <stdlib.h>
 
+
 struct Time {
   f32 start;
   f32 end;
@@ -14,7 +15,6 @@ struct Time {
     Info("%f", end - start);
   }
 };
-
 void foo(void* p);
 
 void test() {

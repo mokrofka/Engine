@@ -297,9 +297,9 @@ GeometryConfig geometry_sys_generate_plane_config(f32 width, f32 height, u32 x_s
   }
 
   if (name.str && name.size > 0) {
-    str_copy(config.name64, name);
+    config.name = name;
   } else {
-    str_copy(config.name64, DefaultGeometryName);
+    config.name = DefaultGeometryName;
   }
 
   if (material_name.str && material_name.size > 0) {

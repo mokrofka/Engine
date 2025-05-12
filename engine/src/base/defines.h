@@ -86,10 +86,15 @@ typedef void VoidProc(void);
 #define Abs(x) ((x) < 0 ? -(x) : (x))
 #define Compose64Bit(a,b)  (((u64)a << 32) | (u64)b)
 #define CeilIntDiv(a,b) (((a) + (b) - 1)/(b))
-#define Bit(x) (1 << (x))
 #define IsBetween(lower, x, upper) (((lower) <= (x)) && ((x) <= (upper)))
 #define Assign(a,b) *((void**)(&(a))) = (void*)(b)
 #define GetProcAddr(x,l,s) Assign((x), os_lib_get_proc((l), (s)))
+
+#define Bit(x) (1 << (x))
+#define SetBit(x, c) ((x) |= Bit(c))
+#define ClearBit(x, c) ((x) &= ~Bit(c))
+#define ToggleBit(x, c) ((x) ^= Bit(c))
+#define HasBit(x, c) (((x) & Bit(c)) != 0)
 
 #define Glue(A,B) A##B
 #define Stringify(S) #S

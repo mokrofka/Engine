@@ -8,13 +8,13 @@ struct GeometrySysConfig {
 };
 
 struct GeometryConfig {
+  String name;
   u32 vertex_size;
   u32 vertex_count;
   void* vertices;
   u32 index_size;
   u32 index_count;
   void* indices;
-  String64 name64;
   String64 material_name64;
 };
 

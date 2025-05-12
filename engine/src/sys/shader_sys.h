@@ -33,51 +33,55 @@ struct ShaderAttribute {
   u32 size;
 };
 
+// struct Shader {
+//   u32 id;
+
+//   String64 name64;
+//   b8 use_instances;
+//   b8 use_locals;
+
+//   u64 required_ubo_alignment;
+
+//   u64 global_ubo_size;
+//   u64 global_ubo_stride;
+//   u64 global_ubo_offset;
+
+//   u64 ubo_size;
+//   u64 ubo_stride;
+
+//   u64 push_constant_size;
+//   u64 push_constant_stride;
+
+//   Texture** global_textures;
+
+//   u8 instance_texture_count;
+
+//   ShaderScope bound_scope;
+
+//   u32 bound_instance_id;
+//   u32 bound_ubo_offset;
+
+//   HashMap uniform_lookup;
+
+//   ShaderUniform* uniforms;
+//   ShaderAttribute* attributes;
+//   ShaderState state;
+
+//   u8 push_constant_range_count;
+//   MemRange push_constant_ranges[32];
+//   u16 attribute_stride;
+
+//   void* internal_data;
+// };
+
 struct Shader {
-  u32 id;
 
-  String64 name64;
-  b8 use_instances;
-  b8 use_locals;
-
-  u64 required_ubo_alignment;
-
-  u64 global_ubo_size;
-  u64 global_ubo_stride;
-  u64 global_ubo_offset;
-
-  u64 ubo_size;
-  u64 ubo_stride;
-
-  u64 push_constant_size;
-  u64 push_constant_stride;
-
-  Texture** global_textures;
-
-  u8 instance_texture_count;
-
-  ShaderScope bound_scope;
-
-  u32 bound_instance_id;
-  u32 bound_ubo_offset;
-
-  HashMap uniform_lookup;
-
-  ShaderUniform* uniforms;
-  ShaderAttribute* attributes;
-  ShaderState state;
-
-  u8 push_constant_range_count;
-  MemRange push_constant_ranges[32]; // TODO make new type
-  u16 attribute_stride;
-
-  void* internal_data;
 };
 
 void shader_sys_init(Arena* arena, ShaderSysConfig config);
 void shader_sys_shutdown();
 
-void shader_sys_create(ShaderConfig* config);
+KAPI Shader* shader_sys_create(ShaderConfig* config);
 
 u32 shader_sys_get_id(char* shader_name);
 Shader* shader_sys_get_by_id(u32 shader_id);

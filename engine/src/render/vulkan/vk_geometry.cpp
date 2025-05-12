@@ -88,5 +88,4 @@ void vk_r_create_geometry(Geometry* geometry) {
   u64 offset = vk_buffer_alloc(&vk->vert_buffer, size);
   MemRange range = {offset, size};
   upload_data_range(&vk->vert_buffer, range, geometry->vertices);
-  
 }

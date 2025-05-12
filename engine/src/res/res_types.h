@@ -160,22 +160,27 @@ struct ShaderUniformConfig {
   ShaderScope scope;
 };
 
+// struct ShaderConfig {
+//   String64 name64;
+
+//   b8 use_instances;
+//   b8 use_local;
+
+//   u8 attribute_count;
+//   ShaderAttributeConfig* attributes;
+
+//   u8 uniform_count;
+//   ShaderUniformConfig* uniforms;
+
+//   String64 renderpass_name64;
+
+//   u8 stage_count;
+//   ShaderStage* stages;
+//   String* stage_names;
+//   String* stage_filenames;
+// };
+
 struct ShaderConfig {
-  String64 name64;
-
-  b8 use_instances;
-  b8 use_local;
-
-  u8 attribute_count;
-  ShaderAttributeConfig* attributes;
-
-  u8 uniform_count;
-  ShaderUniformConfig* uniforms;
-
-  String64 renderpass_name64;
-
-  u8 stage_count;
-  ShaderStage* stages;
-  String* stage_names;
-  String* stage_filenames;
+  String name;
+  b8 has_position;
 };
