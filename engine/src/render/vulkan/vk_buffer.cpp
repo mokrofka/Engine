@@ -113,7 +113,7 @@ void vk_buffer_unmap_memory(VK_Buffer* buffer) {
 }
 
 void vk_buffer_load_data(VK_Buffer* buffer, u64 offset, u64 size, u32 flags, void* data) {
-  MemCopy(buffer->maped_memory, data, size);
+  MemCopy((u8*)buffer->maped_memory + offset, data, size);
 }
 
 void vk_buffer_load_image_data(VK_Buffer* buffer, u64 offset, u64 size, u32 flags, void* data) {
@@ -149,7 +149,7 @@ u64 vk_buffer_alloc(VK_Buffer* buffer, u64 size) {
 
 void upload_data_range(VK_Buffer* buffer, MemRange range, void* data) {
   // Load the data into the staging buffer
-  vk_buffer_load_data(&vk->stage_buffer, range.offset, range.size, 0, data);
+  vk_buffer_load_data(&vk->stage_buffer, 0, range.size, 0, data);
   
   // Perform the copy from staging to the device local buffer
   vk_buffer_copy_to(&vk->stage_buffer, 0, buffer, range.offset, range.size);

@@ -27,15 +27,17 @@ void vk_r_create_geometry(Geometry* geometry);
 void vk_r_destroy_geometry(Geometry* geometry);
 
 // Shader
-void vk_r_shader_create(struct Shader* s, u32 renderpass_id, u32 stage_count, String* stage_filenames, ShaderStage* stages);
-void vk_r_shader_destroy(struct Shader* shader);
+void vk_r_shader_create(struct Shader* s);
+void vk_draw();
+void vk_make_renderable(u32 id, u32 geom_id, u32 shader_id);
+// void vk_r_shader_destroy(struct Shader* shader);
 
-void vk_r_shader_initialize(struct Shader* shader);
-void vk_r_shader_use(struct Shader* shader);
-void vk_r_shader_bind_globals(struct Shader* s);
-void vk_r_shader_bind_instance(struct Shader* s, u32 instance_id);
-void vk_r_shader_apply_globals(struct Shader* s);
-void vk_r_shader_apply_instance(struct Shader* s);
-void vk_r_shader_acquire_instance_resources(struct Shader* s, u32* out_instance_id);
-void vk_r_shader_release_instance_resources(struct Shader* s, u32 instance_id);
-void vk_r_set_uniform(struct Shader* frontend_shader, struct ShaderUniform* uniform, const void* value);
+// void vk_r_shader_initialize(struct Shader* shader);
+// void vk_r_shader_use(struct Shader* shader);
+// void vk_r_shader_bind_globals(struct Shader* s);
+// void vk_r_shader_bind_instance(struct Shader* s, u32 instance_id);
+// void vk_r_shader_apply_globals(struct Shader* s);
+// void vk_r_shader_apply_instance(struct Shader* s);
+// void vk_r_shader_acquire_instance_resources(struct Shader* s, u32* out_instance_id);
+// void vk_r_shader_release_instance_resources(struct Shader* s, u32 instance_id);
+// void vk_r_set_uniform(struct Shader* frontend_shader, struct ShaderUniform* uniform, const void* value);

@@ -18,18 +18,6 @@ struct GeometryConfig {
   String64 material_name64;
 };
 
-#define DefaultGeometryName "default"_
-
 void geometry_sys_init(Arena* arena, GeometrySysConfig config);
-void geometry_sys_shutdown();
 
-KAPI Geometry* geometry_sys_acquire_by_id(u32 id);
-
-KAPI Geometry* geometry_sys_acquire_from_config(GeometryConfig config, b8 auto_release);
-
-void geometry_sys_release(Geometry* geometry);
-
-Geometry* geometry_sys_get_default();
-Geometry* geometry_sys_get_default_2D();
-
-GeometryConfig geometry_sys_generate_plane_config(f32 width, f32 height, u32 x_segment_count, u32 y_segment, f32 tile_x, f32 tile_y, String name, String material_name);
+KAPI Geometry* geometry_create(GeometryConfig config);

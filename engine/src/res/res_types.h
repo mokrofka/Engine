@@ -90,7 +90,7 @@ struct Geometry {
   u32 id;
   u32 internal_id;
   u32 generation;
-  String64 name64;
+  String name;
   Material* material;
   
   u32 vertex_size;
@@ -183,4 +183,5 @@ struct ShaderUniformConfig {
 struct ShaderConfig {
   String name;
   b8 has_position;
+  u8 stages;
 };

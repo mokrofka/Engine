@@ -7,3 +7,4 @@
 #include "base/os.h"
 #include "base/hashtable.h"
 #include "base/darray.h"
+#include "base/sparse_set.h"

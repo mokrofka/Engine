@@ -125,6 +125,7 @@ void r_begin_draw_frame(R_Packet* packet) {
   // World renderpass
   {
     vk_r_begin_renderpass(BuiltinRenderpass_World);
+    vk_draw();
 
     vk_r_update_global_world_state(state->projection, state->view, v3_zero(), v4_one(), 0);
 
@@ -136,13 +137,13 @@ void r_begin_draw_frame(R_Packet* packet) {
     vk_r_end_renderpass(BuiltinRenderpass_World);
   }
 
-  ui_begin_frame();
-  vk_r_begin_renderpass(BuiltinRenderpass_UI);
+  // ui_begin_frame();
+  // vk_r_begin_renderpass(BuiltinRenderpass_UI);
 }
 
 void r_end_draw_frame(R_Packet* packet) {
-  ui_end_frame();
-  vk_r_end_renderpass(BuiltinRenderpass_UI);
+  // ui_end_frame();
+  // vk_r_end_renderpass(BuiltinRenderpass_UI);
 
   // End the fram. If this fails, it is likely unrecovarble.
   vk_r_backend_end_frame(packet->delta_time);
@@ -189,46 +190,50 @@ u32 r_renderpass_id(String name) {
   return 0;
 }
 
-void r_shader_create(struct Shader* s, u32 renderpass_id, u32 stage_count, String* stage_filenames, ShaderStage* stages) {
-  vk_r_shader_create(s, renderpass_id, stage_count, stage_filenames, stages);
+void r_shader_create(struct Shader* s) {
+  vk_r_shader_create(s);
 }
 
-void r_shader_destroy(Shader* s) {
-  vk_r_shader_destroy(s);
+void r_make_renderable(u32 id, u32 geom_id, u32 shader_id) {
+  vk_make_renderable(id, geom_id, shader_id);
 }
 
-void r_shader_initialize(Shader* s) {
-  vk_r_shader_initialize(s);
-}
+// void r_shader_destroy(Shader* s) {
+//   vk_r_shader_destroy(s);
+// }
 
-void r_shader_use(Shader* s) {
-  vk_r_shader_use(s);
-}
+// void r_shader_initialize(Shader* s) {
+//   vk_r_shader_initialize(s);
+// }
 
-void r_shader_bind_globals(Shader* s) {
-  vk_r_shader_bind_globals(s);
-}
+// void r_shader_use(Shader* s) {
+//   vk_r_shader_use(s);
+// }
 
-void r_shader_bind_instance(Shader* s, u32 instance_id) {
-  vk_r_shader_bind_instance(s, instance_id);
-}
+// void r_shader_bind_globals(Shader* s) {
+//   vk_r_shader_bind_globals(s);
+// }
 
-void r_shader_apply_globals(Shader* s) {
-  vk_r_shader_apply_globals(s);
-}
+// void r_shader_bind_instance(Shader* s, u32 instance_id) {
+//   vk_r_shader_bind_instance(s, instance_id);
+// }
 
-void r_shader_apply_instance(Shader* s) {
-  vk_r_shader_apply_instance(s);
-}
+// void r_shader_apply_globals(Shader* s) {
+//   vk_r_shader_apply_globals(s);
+// }
 
-void r_shader_acquire_instance_resources(Shader* s, u32* out_instance_id) {
-  vk_r_shader_acquire_instance_resources(s, out_instance_id);
-}
+// void r_shader_apply_instance(Shader* s) {
+//   vk_r_shader_apply_instance(s);
+// }
 
-void r_shader_release_instance_resources(Shader* s, u32 instance_id) {
-  vk_r_shader_release_instance_resources(s, instance_id);
-}
+// void r_shader_acquire_instance_resources(Shader* s, u32* out_instance_id) {
+//   vk_r_shader_acquire_instance_resources(s, out_instance_id);
+// }
 
-void r_set_uniform(Shader* s, shader_uniform* uniform, const void* value) {
+// void r_shader_release_instance_resources(Shader* s, u32 instance_id) {
+//   vk_r_shader_release_instance_resources(s, instance_id);
+// }
+
+// void r_set_uniform(Shader* s, shader_uniform* uniform, const void* value) {
   // vk_r_set_uniform(s, uniform, value);
-}
+// }

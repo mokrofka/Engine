@@ -313,7 +313,7 @@ void engine_run(App* app) {
   event_unregister(EventCode_Debug0, 0, event_on_debug_event);
   // TODO end
 
-  geometry_sys_shutdown();
+  // geometry_sys_shutdown();
   material_system_shutdown(); texture_system_shutdown();
   ui_shutdown();
   r_shutdown();

@@ -49,6 +49,15 @@ void shader_sys_shutdown() {
   // hashmap_destroy(&state->lookup);
 }
 
+Shader* shader_create(ShaderConfig config) {
+  Shader* shader = mem_alloc_struct(Shader);
+  shader->name = config.name;
+  shader->has_position = config.has_position;
+  shader->stages = config.stages;
+  r_shader_create(shader);
+  return shader;
+}
+
 Shader* shader_sys_create(ShaderConfig* config) {
   // u32 id = new_shader_id();
   // Shader* out_shader = &state->shaders[id];

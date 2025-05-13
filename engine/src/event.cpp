@@ -50,7 +50,7 @@ b32 event_register(u32 code, void* listener, PFN_On_Event on_event) {
     return false;
   }
   
-  if (state->registered[code].events == 0) {
+  if (state->registered[code].events == null) {
     // state->registered[code].events = push_array(state->arena, RegisteredEvent, 4);
     state->registered[code].events = push_array(state->arena, RegisteredEvent, 5);
     state->registered[code].array = {.res = 5, .pos = 0};

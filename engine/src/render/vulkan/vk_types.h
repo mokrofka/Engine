@@ -153,12 +153,13 @@ struct VK_MaterialShaderInstState {
 struct VK_GeometryData {
   u32 id;
   u32 generation;
-  u32 vertex_count;
   u32 vertex_size;
+  u32 vertex_count;
   u32 vertex_buffer_offset;
-  u32 index_count;
   u32 index_size;
+  u32 index_count;
   u32 index_buffer_offset;
+  MemRange range;
 };
 
 #define VK_MaxUICount 1024
@@ -421,6 +422,17 @@ struct VK_Render {
   VK_GeometryData geometries[VK_MaxGeometryCount];
 };
 
+struct vk_Shader {
+  VK_Pipeline pipeline;
+  VkPipelineLayout pipeline_layout;
+  VK_ShaderStage stages[3];
+};
+
+struct Entity {
+  u32 id; 
+  u32 mesh_id;
+};
+
 struct VK {
   Arena* arena;
   
@@ -446,10 +458,18 @@ struct VK {
   
   VkFramebuffer world_framebuffers[3];
   
+  // new stuff
   VK_Buffer vert_buffer;
   VK_Buffer index_buffer;
   VK_Buffer stage_buffer;
-  VK_GeometryData geometries[VK_MaxGeometryCount];
+  VK_GeometryData geometries[10];
+  VkDescriptorPool descriptor_pool;
+  VkDescriptorSetLayout descriptor_set_layout;
+  vk_Shader shader;
+  VkDescriptorSet descriptor_sets[3];
+  u32 entity_count;
+  Entity entities[10];
+  
 #if _DEBUG
   VkDebugUtilsMessengerEXT debug_messenger;
 #endif

@@ -7,6 +7,7 @@
 #include "vk_buffer.h"
 #include "vk_swapchain.h"
 #include "vk_image.h"
+#include "vk_draw.h"
 
 #include "shaders/vk_material_shader.h"
 #include "shaders/vk_ui_shader.h"
@@ -196,9 +197,9 @@ void vk_r_backend_init(R_Backend* backend) {
   Loop (i, VK_MaxGeometryCount) {
     vk->render.geometries[i].id = INVALID_ID;
   }
-  Loop (i, VK_MaxGeometryCount) {
-    vk->geometries[i].id = INVALID_ID;
-  }
+  // Loop (i, VK_MaxGeometryCount) {
+  //   vk->geometries[i].id = INVALID_ID;
+  // }
   
   
   Info("Vulkan renderer initialized successfully"_);
@@ -757,6 +758,8 @@ void vk_r_destroy_geometry(Geometry* geometry) {
 }
 
 void vk_r_draw_geometry(GeometryRenderData data) {
+
+
   if (data.geometry && data.geometry->internal_id == INVALID_ID) {
     return;
   }

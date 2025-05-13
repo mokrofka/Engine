@@ -75,13 +75,17 @@ struct ShaderAttribute {
 // };
 
 struct Shader {
-
+  String name;
+  u32 id;
+  b8 has_position;
+  u8 stages;
 };
 
 void shader_sys_init(Arena* arena, ShaderSysConfig config);
 void shader_sys_shutdown();
 
 KAPI Shader* shader_sys_create(ShaderConfig* config);
+KAPI Shader* shader_create(ShaderConfig config);
 
 u32 shader_sys_get_id(char* shader_name);
 Shader* shader_sys_get_by_id(u32 shader_id);

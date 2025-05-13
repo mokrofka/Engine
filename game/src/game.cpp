@@ -12,16 +12,15 @@
 #include <event.h>
 #include <input.h>
 
-struct Object {
-  Geometry* geom;
-  Shader* shader; 
-};
-
+#include "object.h"
 
 struct GameState {
   Arena* arena;
   
   Object triangle;
+  
+  Geometry* geom;
+  Shader* shader; 
 };
 
 GameState* state;
@@ -31,12 +30,27 @@ struct Vertex {
 };
 
 Vertex vertices[] = {
-  v3(-0.5f, -0.5f, 0.0f),
-  v3( 0.5f, -0.5f, 0.0f),
-  v3( 0.0f,  0.5f, 0.0f)
+  // v3(-0.5f, -0.5f, 0.0f),
+  // v3( 0.5f, -0.5f, 0.0f),
+  // v3( 0.0f,  0.5f, 0.0f),
+  
+  // v3(0.5f, -0.5f, 0.0f ),
+  // v3(-0.5f, -0.5f, 0.0f),
+  // v3(-0.5f,  0.5f, 0.0f)
+  
+  v3(0.5f,  0.5f, 0.0f  ),// top right
+  v3( 0.5f, -0.5f, 0.0f  ),// bottom right
+  v3(-0.5f,  0.5f, 0.0f  ),// top left 
+  
+ v3(  0.5f, -0.5f, 0.0f  ),// bottom right
+ v3( -0.5f, -0.5f, 0.0f  ),// bottom left
+ v3( -0.5f,  0.5f, 0.0f  ),// top left
 };
 
-#include "ecs.h"
+struct UBO {
+  f32 gree_color;
+};
+
 void application_init(App* app) {
   Scratch scratch;
   
@@ -52,7 +66,7 @@ void application_init(App* app) {
       .vertex_count = ArrayCount(vertices),
       .vertices = vertices,
     };
-    geometry_sys_acquire_from_config(config, true);
+    state->geom = geometry_create(config);
   }
   
   // Shader
@@ -61,23 +75,24 @@ void application_init(App* app) {
       .name = "triangle"_,
       .has_position = true,
     };
-    // shader_sys_create(&config);
-    // entity_set_shader(entity.id, shader.id);
-    // entity_set_geometry(entity.id, geom.id);
+    state->shader = shader_create(config);
   }
+  object_sys_init();
+  // state->triangle.id = object_create();
+  Object object1 = object_create(state->geom->id, state->shader->id);
+  object_make_renderable(object1);
+  Object object2 = object_create(state->geom->id, state->shader->id);
+  object_make_renderable(object2);
+
+  // make_render_entity(object);
   
-  ecs_init();
-  test();
-  i32 a = 1;
+  // state->triangle.e = entity_create();
+  // component_add(state->triangle.e, Renderable, 0);
+
+   
 }
 
-i32 main();
 void application_update(App* app) {
   Assign(state, app->state);
   
-  i32 a = 0;
-  SetBit(a, 1);
-  Info("%i", a);
-   
-  // main();
 }

@@ -29,15 +29,5 @@ void r_create_geometry(Geometry* geometry);
 void r_destroy_geometry(Geometry* geometry);
 
 u32 r_renderpass_id(String name);
-void r_shader_create(struct Shader* s, u32 renderpass_id, u32 stage_count, String* stage_filenames, ShaderStage* stages);
-void r_shader_destroy(Shader* s);
-
-void r_shader_initialize(struct Shader* shader);
-void r_shader_use(struct Shader* shader);
-void r_shader_bind_globals(struct Shader* s);
-void r_shader_bind_instance(struct Shader* s, u32 instance_id);
-void r_shader_apply_globals(struct Shader* s);
-void r_shader_apply_instance(struct Shader* s);
-void r_shader_acquire_instance_resources(struct Shader* s, u32* out_instance_id);
-void r_shader_release_instance_resources(struct Shader* s, u32 instance_id);
-void r_set_uniform(struct Shader* frontend_shader, struct shader_uniform* uniform, const void* value);
+void r_shader_create(struct Shader* s);
+void r_make_renderable(u32 id, u32 geom_id, u32 shader_id);

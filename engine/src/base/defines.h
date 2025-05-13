@@ -117,6 +117,9 @@ typedef void VoidProc(void);
 #define C_LINKAGE extern "C"
 
 #define INLINE __forceinline
+#if _DEBUG
+#define DebugDo(x) (x)
+#endif
 
 #define U64_MAX 18446744073709551615ull
 #define U32_MAX 4294967295u
