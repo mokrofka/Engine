@@ -183,5 +183,6 @@ struct ShaderUniformConfig {
 struct ShaderConfig {
   String name;
   b8 has_position;
+  b8 has_color;
   u8 stages;
 };

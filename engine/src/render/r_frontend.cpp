@@ -190,8 +190,8 @@ u32 r_renderpass_id(String name) {
   return 0;
 }
 
-void r_shader_create(struct Shader* s) {
-  vk_r_shader_create(s);
+void r_shader_create(struct Shader* s, void* data, u64 size) {
+  // vk_r_shader_create(s, data, size);
 }
 
 void r_make_renderable(u32 id, u32 geom_id, u32 shader_id) {

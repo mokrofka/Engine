@@ -84,7 +84,7 @@ void vk_r_create_geometry(Geometry* geometry) {
   geom_data->index_count = geometry->index_count;
   
   u64 size = geom_data->vertex_size * geom_data->vertex_count;
-  u64 offset = vk_buffer_alloc(&vk->vert_buffer, size);
+  u64 offset = vk_buffer_alloc(&vk->vert_buffer, size, 64);
   MemRange range = {offset, size};
   geom_data->range = range;
   upload_data_range(&vk->vert_buffer, range, geometry->vertices);

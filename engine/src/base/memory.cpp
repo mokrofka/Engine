@@ -195,9 +195,9 @@ void free_list_free_all(FreeList& fl) {
   fl.head = first_node;
 }
 
-FreeList free_list_create(Arena* arena, u64 size) {
+FreeList free_list_create(Arena* arena, u64 size, u64 alignment) {
   FreeList fl;
-  fl.data = push_buffer(arena, u8, size);
+  fl.data = push_buffer(arena, u8, size, alignment);
   fl.size = size;
   free_list_free_all(fl);
   return fl;

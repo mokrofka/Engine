@@ -27,7 +27,7 @@ void vk_r_create_geometry(Geometry* geometry);
 void vk_r_destroy_geometry(Geometry* geometry);
 
 // Shader
-void vk_r_shader_create(struct Shader* s);
+void vk_r_shader_create(struct Shader* s, void* data, void* data_new, u64 size);
 void vk_draw();
 void vk_make_renderable(u32 id, u32 geom_id, u32 shader_id);
 // void vk_r_shader_destroy(struct Shader* shader);

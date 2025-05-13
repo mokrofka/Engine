@@ -462,13 +462,17 @@ struct VK {
   VK_Buffer vert_buffer;
   VK_Buffer index_buffer;
   VK_Buffer stage_buffer;
+  VK_Buffer uniform_buffer;
   VK_GeometryData geometries[10];
   VkDescriptorPool descriptor_pool;
   VkDescriptorSetLayout descriptor_set_layout;
   vk_Shader shader;
   VkDescriptorSet descriptor_sets[3];
+  VkDescriptorSet descriptor_sets_new[3];
   u32 entity_count;
   Entity entities[10];
+  MemRange uniform_buffer_mem_range;
+  MemRange uniform_buffer_mem_range_new;
   
 #if _DEBUG
   VkDebugUtilsMessengerEXT debug_messenger;

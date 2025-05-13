@@ -29,5 +29,5 @@ void r_create_geometry(Geometry* geometry);
 void r_destroy_geometry(Geometry* geometry);
 
 u32 r_renderpass_id(String name);
-void r_shader_create(struct Shader* s);
+void r_shader_create(struct Shader* s, void* data, u64 size);
 void r_make_renderable(u32 id, u32 geom_id, u32 shader_id);

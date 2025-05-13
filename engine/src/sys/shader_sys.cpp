@@ -1,6 +1,7 @@
 #include "shader_sys.h"
 
 #include "render/r_frontend.h"
+#include "render/vulkan/vk_backend.h"
 
 struct ShaderSysState {
   Arena* arena;
@@ -49,12 +50,13 @@ void shader_sys_shutdown() {
   // hashmap_destroy(&state->lookup);
 }
 
-Shader* shader_create(ShaderConfig config) {
+Shader* shader_create(ShaderConfig config, void* data, void*data_new, u64 data_size) {
   Shader* shader = mem_alloc_struct(Shader);
   shader->name = config.name;
   shader->has_position = config.has_position;
+  shader->has_color = config.has_position;
   shader->stages = config.stages;
-  r_shader_create(shader);
+  vk_r_shader_create(shader, data, data_new, data_size);
   return shader;
 }
 

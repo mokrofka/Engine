@@ -17,6 +17,6 @@ void vk_buffer_load_image_data(VK_Buffer* buffer, u64 offset, u64 size, u32 flag
 
 void vk_buffer_copy_to(VK_Buffer* source, u64 source_offset, VK_Buffer* dest, u64 dest_offset, u64 size);
 
-u64 vk_buffer_alloc(VK_Buffer* buffer, u64 size);
+u64 vk_buffer_alloc(VK_Buffer* buffer, u64 size, u64 alignment);
 
 void upload_data_range(VK_Buffer* buffer, MemRange range, void* data);

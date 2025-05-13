@@ -142,9 +142,9 @@ void vk_buffer_copy_to(VK_Buffer* source, u64 source_offset, VK_Buffer* dest, u6
   vk_cmd_end_single_use(vk->device.graphics_cmd_pool, &temp_cmd);
 }
 
-u64 vk_buffer_alloc(VK_Buffer* buffer, u64 size) {
+u64 vk_buffer_alloc(VK_Buffer* buffer, u64 size, u64 alignment) {
   FreeList& fl = buffer->freelist;
-  return free_list_alloc_block(fl, size);
+  return free_list_alloc_block(fl, size, alignment);
 }
 
 void upload_data_range(VK_Buffer* buffer, MemRange range, void* data) {

@@ -54,16 +54,15 @@ void vk_descriptor_pool_create() {
   pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
   pool_info.poolSizeCount = ArrayCount(pool_sizes);
   pool_info.pPoolSizes = pool_sizes;
-  pool_info.maxSets = 1000;
+  pool_info.maxSets = 100;
   pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
   vkCreateDescriptorPool(vkdevice, &pool_info, null, &vk->descriptor_pool);
 }
 
 void vk_descriptor_set_create() {
-  // Global Descriptors
   VkDescriptorSetLayoutBinding g_ubo_layout_binding = {};
-  g_ubo_layout_binding.binding = 0;         // binding in shader
+  g_ubo_layout_binding.binding = 0;           // binding in shader
   g_ubo_layout_binding.descriptorCount = 100; // how much you have seperate resources you can access in shader (array)
   g_ubo_layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
   g_ubo_layout_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -85,10 +84,26 @@ void vk_descriptor_set_alloc() {
   alloc_info.descriptorSetCount = 3;
   alloc_info.pSetLayouts = global_layouts;
   VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, vk->descriptor_sets));
+  VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, vk->descriptor_sets_new));
+  vkDeviceWaitIdle(vkdevice);
 }
 
-void vk_r_shader_create(Shader* s) {
-  local u32 yes = (vk_descriptor_pool_create(), vk_descriptor_set_create(), 1);
+void vk_r_shader_create(struct Shader* s, void* data, void* data_new, u64 size) {
+  // storage buffer
+
+  u64 storage_buffer_offset = vk_buffer_alloc(&vk->uniform_buffer, size, 64);
+  u64 storage_buffer_offset_new = vk_buffer_alloc(&vk->uniform_buffer, size, 64);
+  MemRange range = {storage_buffer_offset, size};
+  MemRange range_new = {storage_buffer_offset_new, size};
+  vk->uniform_buffer_mem_range = range;
+  vk->uniform_buffer_mem_range_new = range_new;
+  // *(void**)data = (u8*)vk->uniform_buffer.maped_memory + storage_buffer_offset;
+  // *(void**)data = (u8*)vk->uniform_buffer.maped_memory + range.offset;
+  *(void**)data = (u8*)vk->uniform_buffer.maped_memory + range.offset;
+  *(void**)data_new = (u8*)vk->uniform_buffer.maped_memory + range_new.offset;
+
+  // shader
+  local u32 yes = (vk_descriptor_pool_create(), vk_descriptor_set_create(), vk_descriptor_set_alloc(), 1);
   String stage_type_strs[3] = { "vert"_, "frag"_, };
   #define ShaderStageCount 3
   VkShaderStageFlagBits stage_types[ShaderStageCount] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
@@ -104,6 +119,15 @@ void vk_r_shader_create(Shader* s) {
   u32 offset = 0;
   VkVertexInputAttributeDescription attribute_desriptions[AttributeCount];
   if (s->has_position) {
+    attribute_desriptions[attribute_counter].binding = 0;
+    attribute_desriptions[attribute_counter].location = attribute_counter;
+    attribute_desriptions[attribute_counter].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attribute_desriptions[attribute_counter].offset = offset;
+    offset += sizeof(v3);
+    vert_stride += sizeof(v3);
+    ++attribute_counter;
+  }
+  if (s->has_color) {
     attribute_desriptions[attribute_counter].binding = 0;
     attribute_desriptions[attribute_counter].location = attribute_counter;
     attribute_desriptions[attribute_counter].format = VK_FORMAT_R32G32B32_SFLOAT;
@@ -240,8 +264,12 @@ VK_Pipeline vk_pipeline_create(
   pipeline_layout_create_info.pPushConstantRanges = &push_constant;
   
   // Descriptor set layouts
-  pipeline_layout_create_info.setLayoutCount = 1;
-  pipeline_layout_create_info.pSetLayouts = &vk->descriptor_set_layout;
+  VkDescriptorSetLayout set_layouts[2] = {
+    vk->descriptor_set_layout,
+    vk->descriptor_set_layout,
+  };
+  pipeline_layout_create_info.setLayoutCount = 2;
+  pipeline_layout_create_info.pSetLayouts = set_layouts;
   
   // Create the pipeline layout.
   VK_CHECK(vkCreatePipelineLayout(vkdevice, &pipeline_layout_create_info, vk->allocator, &pipeline.pipeline_layout));

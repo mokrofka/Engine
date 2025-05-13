@@ -7,7 +7,6 @@
 #include "vk_buffer.h"
 #include "vk_swapchain.h"
 #include "vk_image.h"
-#include "vk_draw.h"
 
 #include "shaders/vk_material_shader.h"
 #include "shaders/vk_ui_shader.h"
@@ -153,7 +152,7 @@ void vk_r_backend_init(R_Backend* backend) {
   
   vk->main_renderpass_id = vk_renderpass_create(
     Rect{0, 0, vk->frame.width, vk->frame.height},
-    v4{0.1, 0.1, 0.1, 1.0},
+    v4{0.01, 0.01, 0.01, 1.0},
     1.0f,
     0,
     RenderpassClearFlag_ColorBuffer | RenderpassClearFlag_DepthBuffer | RenderpassClearFlag_StencilBuffer,
@@ -568,7 +567,7 @@ internal void create_buffers(VK_Render* render) {
     VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
     memory_property_flags,
     true);
-  vk->vert_buffer.freelist = free_list_create(vk->arena, MB(1));
+  vk->vert_buffer.freelist = free_list_create(vk->arena, vk->vert_buffer.size, 64);
   
   // index
   vk->index_buffer = vk_buffer_create(
@@ -576,7 +575,7 @@ internal void create_buffers(VK_Render* render) {
     VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
     memory_property_flags,
     true);
-  vk->index_buffer.freelist = free_list_create(vk->arena, MB(1));
+  vk->index_buffer.freelist = free_list_create(vk->arena, vk->index_buffer.size, 64);
   
   // stage
   vk->stage_buffer = vk_buffer_create(
@@ -585,6 +584,15 @@ internal void create_buffers(VK_Render* render) {
     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     true);
   vk->stage_buffer.maped_memory = vk_buffer_map_memory(&vk->stage_buffer, 0, vk->stage_buffer.size, 0);
+  
+  // uniform
+  vk->uniform_buffer = vk_buffer_create(
+    MB(1),
+    VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    true);
+  vk->uniform_buffer.maped_memory = vk_buffer_map_memory(&vk->uniform_buffer, 0, vk->uniform_buffer.size, 0);
+  vk->uniform_buffer.freelist = free_list_create(vk->arena, vk->index_buffer.size, 64);
   
   // Geometry vertex buffer
   const u64 vertex_buffer_size = sizeof(Vertex3D) * MB(1);
