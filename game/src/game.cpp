@@ -14,8 +14,8 @@
 
 #include "object.h"
 
-struct UBO {
-  v4 color;
+struct alignas(16) UBO {
+  f32 color;
 };
 
 struct GameState {
@@ -74,21 +74,21 @@ void application_init(App* app) {
   Object object1 = object_create(state->geom->id, state->shader->id);
   object_make_renderable(object1);
   Object object2 = object_create(state->geom->id, state->shader->id);
-  // object_make_renderable(object2);
+  object_make_renderable(object2);
 
   // make_render_entity(object);
   
   // state->triangle.e = entity_create();
   // component_add(state->triangle.e, Renderable, 0);
 
-  state->entities_ubo[0].color.x = 0;
+  state->entities_ubo[0].color = 0;
    
 }
 
 void application_update(App* app) {
   Assign(state, app->state);
-  state->entities_ubo[0].color.x += 0.001;
-  state->entities_ubo[0].color.y -= 0.001;
+  state->entities_ubo[0].color += 0.001;
+  state->entities_ubo[1].color -= 0.001;
   // state->entities_ubo_new[1000].color.x = Sin(os_now_seconds()) / 2 + 0.5;
   
   // Info("%f", state->entities_ubo[0].color.x);
