@@ -438,6 +438,7 @@ struct VK {
   
   VkInstance instance;
   VkAllocationCallbacks* allocator;
+  VkAllocationCallbacks _allocator;
   VkSurfaceKHR surface;
   
   VK_Frame frame;
@@ -473,6 +474,7 @@ struct VK {
   Entity entities[10];
   MemRange uniform_buffer_mem_range;
   MemRange uniform_buffer_mem_range_new;
+  u64 vulkan_driver_memory_allocated;
   
 #if _DEBUG
   VkDebugUtilsMessengerEXT debug_messenger;

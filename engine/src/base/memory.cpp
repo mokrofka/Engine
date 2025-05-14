@@ -479,6 +479,28 @@ void mem_free(void* ptr) {
   Assert(0 && "global_free: pointer does not belong to any pool");
 }
 
+u8* mem_realoc(void* origin, u64 size) {
+  u8* result;
+  u64 offset_num = GB(10);
+  u8* base = mem_ctx.start;
+
+  Loop (i, ArrayCount(mem_ctx.pools)) {
+    u8* start = base + i * offset_num;
+    u8* end = start + offset_num;
+
+    u64 base_size = 8;
+    base_size <<= i;
+    if ((u8*)origin >= start && (u8*)origin < end) {
+      result = mem_alloc(size);
+      MemCopy(result, origin, base_size);
+      segregated_pool_free(mem_ctx.pools[i], origin);
+      return result;
+    }
+  }
+
+  Assert(0 && "global_free: pointer does not belong to any pool");
+}
+
 void global_allocator_init() {
   mem_ctx.start = (u8*)os_reserve(TB(1));
   u64 offset = 0;

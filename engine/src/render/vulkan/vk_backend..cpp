@@ -13,7 +13,7 @@
 
 #include "sys/material_sys.h"
 
-// #define VulkanUseAllocator 1
+#define VulkanUseAllocator 1
 // #define VulkanAllocatorTrace 1
 
 VK* vk;
@@ -21,25 +21,19 @@ VK* vk;
 
 void* vk_alloc(void* user_data, u64 size, u64 alignment, VkSystemAllocationScope allocation_scope) {
   Assert(size)
-  // if (size == 0) {
-  //   Error("vk_allocation shouldn't happen");
-  //   return 0;
-  // }
   void* result = mem_alloc(size);
   
 #if VulkanAllocatorTrace
   Trace("vulkan allocate block %i bytes, %i alignment", size, alignment);
 #endif
-
   return result;
 }
 
 void vk_free(void* user_data, void* memory) {
   Assert(memory);
-  // if (memory == 0) {
-  //   Error("vk_free shouldn't happen");
-  //   return;
-  // }
+  if (!memory) {
+    return;
+  }
   mem_free(memory);
   
 #if VulkanAllocatorTrace
@@ -49,13 +43,7 @@ void vk_free(void* user_data, void* memory) {
 
 void* vk_realloc(void* user_data, void* origin, u64 size, u64 alignment, VkSystemAllocationScope allocation_scope) {
   Assert(origin && size);
-  // if (!origin) {
-  //   Error("vk_realoc shouldn't happen");
-  //   return 0;
-  // }
-  void* result = vk_alloc(size, alignment);
-  MemCopy(result, size);
-  vk_free(origin);
+  void* result = mem_realoc(origin, size);
   
 #if VulkanAllocatorTrace
   Trace("vulkan realoc block %i bytes, %i alignment", size, alignment);
@@ -64,20 +52,26 @@ void* vk_realloc(void* user_data, void* origin, u64 size, u64 alignment, VkSyste
   return result;
 }
 
-void vk_internal_alloc(void* user_data, u64 size, VkSystemAllocationType allocation_type, VkSystemAllocationScope allocation_scope) {
+void vk_internal_alloc(void* user_data, u64 size, VkInternalAllocationType allocation_type, VkSystemAllocationScope allocation_scope) {
 #if VulkanAllocatorTrace
   Trace("vulkan internal alloc %i bytes", size);
 #endif
 }
-void vk_internal_free(void* user_data, u64 size, VkSystemAllocationType allocation_type, VkSystemAllocationScope allocation_scope) {
+void vk_internal_free(void* user_data, u64 size, VkInternalAllocationType allocation_type, VkSystemAllocationScope allocation_scope) {
 #if VulkanAllocatorTrace
   Trace("vulkan internal free %i bytes", size);
 #endif
 }
 
-void vk_allocator_create(VkAllocationCallbacks* callbacks) {
-  Assert(callbacks);
-  callbacks->pfnAllocation = 
+VkAllocationCallbacks vk_allocator_create() {
+  VkAllocationCallbacks callbacks = {};
+  callbacks.pfnAllocation = vk_alloc;
+  callbacks.pfnReallocation = vk_realloc;
+  callbacks.pfnFree = vk_free;
+  callbacks.pfnInternalAllocation = vk_internal_alloc;
+  callbacks.pfnInternalFree = vk_internal_free;
+  callbacks.pUserData = 0;
+  return callbacks;
 }
 
 #endif
@@ -207,8 +201,14 @@ void vk_r_backend_init(R_Backend* backend) {
   vk = push_struct(backend->arena, VK);
   vk->arena = backend->arena;
   
-  // TODO: custom allocator.
+  // NOTE: custom allocator.
+#if VulkanUseAllocator
+  vk->_allocator = vk_allocator_create();
+  vk->allocator = &vk->_allocator;
+#else
   vk->allocator = 0;
+#endif
+
   instance_create();
   
   vk_surface_create();
