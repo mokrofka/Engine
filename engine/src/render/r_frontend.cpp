@@ -127,13 +127,13 @@ void r_begin_draw_frame(R_Packet* packet) {
     vk_r_begin_renderpass(BuiltinRenderpass_World);
     vk_draw();
 
-    vk_r_update_global_world_state(state->projection, state->view, v3_zero(), v4_one(), 0);
+    // vk_r_update_global_world_state(state->projection, state->view, v3_zero(), v4_one(), 0);
 
-    // Draw geometries
-    u32 count = packet->geometry_count;
-    Loop(i, count) {
-      vk_r_draw_geometry(packet->geometries[i]);
-    }
+    // // Draw geometries
+    // u32 count = packet->geometry_count;
+    // Loop(i, count) {
+    //   vk_r_draw_geometry(packet->geometries[i]);
+    // }
     vk_r_end_renderpass(BuiltinRenderpass_World);
   }
 

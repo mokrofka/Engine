@@ -497,14 +497,14 @@ b32 vk_r_begin_renderpass(u32 renderpass_id) {
   vk_renderpass_begin(cmd, renderpass, framebuffer);
 
   // Use the appropriate shader.
-  switch (renderpass_id) {
-    case BuiltinRenderpass_World: {
-      vk_material_shader_use(&vk->render.material_shader);
-    } break;
-    case BuiltinRenderpass_UI: {
-      vk_ui_shader_use(&vk->render.ui_shader);
-    } break;
-  }
+  // switch (renderpass_id) {
+  //   case BuiltinRenderpass_World: {
+  //     vk_material_shader_use(&vk->render.material_shader);
+  //   } break;
+  //   case BuiltinRenderpass_UI: {
+  //     vk_ui_shader_use(&vk->render.ui_shader);
+  //   } break;
+  // }
 
   return true;
 }

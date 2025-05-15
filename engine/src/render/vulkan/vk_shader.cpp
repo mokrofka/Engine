@@ -54,7 +54,7 @@ void vk_descriptor_pool_create() {
   pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
   pool_info.poolSizeCount = ArrayCount(pool_sizes);
   pool_info.pPoolSizes = pool_sizes;
-  pool_info.maxSets = 100;
+  pool_info.maxSets = 6;
   pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
   vkCreateDescriptorPool(vkdevice, &pool_info, null, &vk->descriptor_pool);
@@ -63,7 +63,7 @@ void vk_descriptor_pool_create() {
 void vk_descriptor_set_create() {
   VkDescriptorSetLayoutBinding g_ubo_layout_binding = {};
   g_ubo_layout_binding.binding = 0;           // binding in shader
-  g_ubo_layout_binding.descriptorCount = 100; // how much you have seperate resources you can access in shader (array)
+  g_ubo_layout_binding.descriptorCount = 10; // how much you have seperate resources you can access in shader (array)
   g_ubo_layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
   g_ubo_layout_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
   
@@ -71,7 +71,7 @@ void vk_descriptor_set_create() {
   texture_layout_binding.binding = 1;           // binding in shader
   texture_layout_binding.descriptorCount = 3; // how much you have seperate resources you can access in shader (array)
   texture_layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  texture_layout_binding.stageFlags =VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+  texture_layout_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
   VkDescriptorSetLayoutBinding layout_bindings[2] = {g_ubo_layout_binding, texture_layout_binding};
   
