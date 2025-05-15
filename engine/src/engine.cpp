@@ -2,9 +2,9 @@
 
 #include "render/r_frontend.h"
 
-#include "sys/texture_sys.h"
+#include "sys/texture.h"
 #include "sys/material_sys.h"
-#include "sys/geometry_sys.h"
+#include "sys/geometry.h"
 #include "sys/res_sys.h"
 #include "sys/shader_sys.h"
 
@@ -60,11 +60,11 @@ b32 event_on_debug_event(u32 code, void* sender, void* listener_inst, EventConte
   choice %= 3;
   
   // Load up the new texture
-  state->test_geometry->material->diffuse_map.texture = texture_system_acquire(names[choice], true);
-  if (!state->test_geometry->material->diffuse_map.texture) {
-    Warn("event_on_debug_event no texture! using default"_);
-    state->test_geometry->material->diffuse_map.texture = texture_system_get_default_texture();
-  }
+  // state->test_geometry->material->diffuse_map.texture = texture_system_acquire(names[choice], true);
+  // if (!state->test_geometry->material->diffuse_map.texture) {
+  //   Warn("event_on_debug_event no texture! using default"_);
+  //   state->test_geometry->material->diffuse_map.texture = texture_system_get_default_texture();
+  // }
   
   // Release the old texture
   texture_system_release(old_name);
@@ -81,7 +81,7 @@ void engine_create(App* app) {
   Assign(state, app->engine_state);
   state->app = app;
   state->arena = arena_alloc(app->arena, EngineSize);
-
+  
   {
     logging_init(state->arena);
   }
@@ -93,7 +93,7 @@ void engine_create(App* app) {
   {
     network_init(state->arena);
   }
-  test();
+  // test();
   
   {
     ResSysConfig res_sys_cfg = {

@@ -520,15 +520,16 @@ inline mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 Near, f32 Fa
   mat4 mat = {};
   mat.data[0*4 + 0] = 1.0f / (Tan(fov_radians / 2.0f) * aspect_ratio);
   mat.data[1*4 + 1] = 1.0f / Tan(fov_radians / 2.0f);
-  mat.data[2*4 + 2] = -(Far + Near) / (Far - Near); // Flip sign
-  mat.data[2*4 + 3] = -1.0f; // Flip sign
-  mat.data[3*4 + 2] = (-2.0f * Far * Near) / (Far - Near); // Flip sign
+  mat.data[2 * 4 + 2] = -(Far + Near) / (Far - Near);        // Flip sign
+  mat.data[2 * 4 + 3] = -1.0f;                               // Flip sign
+  mat.data[3 * 4 + 2] = (-2.0f * Far * Near) / (Far - Near); // Flip sign
   
   return mat;
 }
 
 inline mat4 mat4_look_at(v3 position, v3 target, v3 up) {
-  v3 z = v3_normal(target - position);
+  // v3 z = v3_normal(target - position);
+  v3 z = v3_normal(position - target);
   v3 x = v3_normal(v3_cross(up, z));
   v3 y = v3_cross(z, x);
   
@@ -537,7 +538,7 @@ inline mat4 mat4_look_at(v3 position, v3 target, v3 up) {
     x.y, y.y, z.y, 0.0f,
     x.z, y.z, z.z, 0.0f,
    -v3_dot(x, position), -v3_dot(y, position), -v3_dot(z, position), 1.0f
-};
+  };
 
   return camera_view;
 }

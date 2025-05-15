@@ -9,10 +9,10 @@ b32 vk_buffer_resize(u64 new_size, VK_Buffer* buffer, VkQueue queue, VkCommandPo
 
 void vk_buffer_bind(VK_Buffer* buffer, u64 offset);
 
-void* vk_buffer_map_memory(VK_Buffer* buffer, u64 offset, u64 size, u32 flags);
+void vk_buffer_map_memory(VK_Buffer* buffer, u64 offset, u64 size);
 void vk_buffer_unmap_memory(VK_Buffer* buffer);
 
-void vk_buffer_load_data(VK_Buffer* buffer, u64 offset, u64 size, u32 flags, void* data);
+void vk_buffer_load_data(VK_Buffer* buffer, u64 offset, u64 size, void* data);
 void vk_buffer_load_image_data(VK_Buffer* buffer, u64 offset, u64 size, u32 flags, void* data);
 
 void vk_buffer_copy_to(VK_Buffer* source, u64 source_offset, VK_Buffer* dest, u64 dest_offset, u64 size);

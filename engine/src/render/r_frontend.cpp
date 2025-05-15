@@ -21,7 +21,7 @@ global RendererSystemState* state;
 
 void create_texture(Texture* t) {
   MemZeroStruct(t);
-  t->generation = INVALID_ID;
+  // t->generation = INVALID_ID;
 }
 
 void r_init(Arena* arena, R_Config config) {
@@ -170,7 +170,7 @@ void r_destroy_material(Material* material) {
 }
 
 void r_create_geometry(Geometry* geometry) {
-  vk_r_create_geometry(geometry);
+  vk_r_geometry_create(geometry);
 }
 
 void r_destroy_geometry(Geometry* geometry) {
@@ -195,7 +195,7 @@ void r_shader_create(struct Shader* s, void* data, u64 size) {
 }
 
 void r_make_renderable(u32 id, u32 geom_id, u32 shader_id) {
-  vk_make_renderable(id, geom_id, shader_id);
+  // vk_make_renderable(id, geom_id, shader_id);
 }
 
 // void r_shader_destroy(Shader* s) {

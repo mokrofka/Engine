@@ -2,24 +2,26 @@
 
 layout(location = 0) in vec3 in_pos;
 layout(location = 1) in vec3 in_color;
+layout(location = 2) in vec2 in_tex_coord;
 
-layout(set = 0, binding = 0) uniform ObjectBuffer {
-  float x[];
-  float y[];
+layout(set = 0, binding = 0) uniform UniformBuffer {
+  mat4 projection_view;
 } ubo;
 
 // per draw
 layout(push_constant) uniform push_const_ubo {
   mat4 model;
-} draw_ubo;
+} push_ubo;
 
-layout(location = 0) out dto {
+layout(location = 0) out out_data {
   vec3 color;
-} out_dto;
+  vec2 tex_coord;
+} outd;
 
 void main() {
-  float x = ubo.x[0];
-  float y = ubo.y[0];
-  gl_Position = vec4(in_pos.x + x, in_pos.y + y, in_pos.z, 1.0);
-  out_dto.color = in_color;
+  // gl_Position = ubo.projection_view * push_ubo.model * vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
+  // gl_Position = push_ubo.model * vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
+  gl_Position = vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
+  outd.color = in_color;
+  outd.tex_coord = in_tex_coord;
 }

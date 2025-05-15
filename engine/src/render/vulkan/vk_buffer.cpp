@@ -102,18 +102,16 @@ void vk_buffer_bind(VK_Buffer* buffer, u64 offset) {
   VK_CHECK(vkBindBufferMemory(vkdevice, buffer->handle, buffer->memory, offset));
 }
 
-void* vk_buffer_map_memory(VK_Buffer* buffer, u64 offset, u64 size, u32 flags) {
-  void* data;
-  VK_CHECK(vkMapMemory(vkdevice, buffer->memory, offset, size, flags, &data));
-  return data;
+void vk_buffer_map_memory(VK_Buffer* buffer, u64 offset, u64 size) {
+  VK_CHECK(vkMapMemory(vkdevice, buffer->memory, offset, size, 0, (void**)&buffer->maped_memory));
 }
 
 void vk_buffer_unmap_memory(VK_Buffer* buffer) {
   vkUnmapMemory(vkdevice, buffer->memory);
 }
 
-void vk_buffer_load_data(VK_Buffer* buffer, u64 offset, u64 size, u32 flags, void* data) {
-  MemCopy((u8*)buffer->maped_memory + offset, data, size);
+void vk_buffer_load_data(VK_Buffer* buffer, u64 offset, u64 size, void* data) {
+  MemCopy(buffer->maped_memory + offset, data, size);
 }
 
 void vk_buffer_load_image_data(VK_Buffer* buffer, u64 offset, u64 size, u32 flags, void* data) {
@@ -128,7 +126,7 @@ void vk_buffer_copy_to(VK_Buffer* source, u64 source_offset, VK_Buffer* dest, u6
   vkQueueWaitIdle(vk->device.graphics_queue);
   
   // Create a one-time-use command buffer
-  VK_CommandBuffer temp_cmd = vk_cmd_alloc_and_begin_single_use(vk->device.graphics_cmd_pool);
+  VK_CommandBuffer temp_cmd = vk_cmd_alloc_and_begin_single_use();
   
   // Prepare the copy command and add it to the command buffer
   VkBufferCopy copy_region;
@@ -139,7 +137,7 @@ void vk_buffer_copy_to(VK_Buffer* source, u64 source_offset, VK_Buffer* dest, u6
   vkCmdCopyBuffer(temp_cmd.handle, source->handle, dest->handle, 1, &copy_region);
   
   // Submit the buffer for execution and wait for it to complete
-  vk_cmd_end_single_use(vk->device.graphics_cmd_pool, &temp_cmd);
+  vk_cmd_end_single_use(&temp_cmd);
 }
 
 u64 vk_buffer_alloc(VK_Buffer* buffer, u64 size, u64 alignment) {
@@ -149,7 +147,7 @@ u64 vk_buffer_alloc(VK_Buffer* buffer, u64 size, u64 alignment) {
 
 void upload_data_range(VK_Buffer* buffer, MemRange range, void* data) {
   // Load the data into the staging buffer
-  vk_buffer_load_data(&vk->stage_buffer, 0, range.size, 0, data);
+  vk_buffer_load_data(&vk->stage_buffer, 0, range.size, data);
   
   // Perform the copy from staging to the device local buffer
   vk_buffer_copy_to(&vk->stage_buffer, 0, buffer, range.offset, range.size);

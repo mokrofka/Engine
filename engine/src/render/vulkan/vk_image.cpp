@@ -1,4 +1,6 @@
 #include "vk_image.h"
+#include "vk_buffer.h"
+#include "vk_command_buffer.h"
 
 VK_Image vk_image_create(
     VkImageType image_type,
@@ -21,7 +23,7 @@ VK_Image vk_image_create(
   image_create_info.extent.width = width;
   image_create_info.extent.height = height;
   image_create_info.extent.depth = 1; // TODO: Support configurable depth.
-  image_create_info.mipLevels = 4;    // TODO: Support mip mapping
+  image_create_info.mipLevels = 1;    // TODO: Support mip mapping
   image_create_info.arrayLayers = 1;  // TODO: Support number of layers in the image.
   image_create_info.format = format;
   image_create_info.tiling = tiling;
@@ -128,7 +130,7 @@ void vk_image_transition_layout(
       1, &barrier);
 }
 
-void vk_image_copy_from_buffer(VK_Image* image, VkBuffer buffer, VK_CommandBuffer* command_buffer) {
+void vk_image_copy_from_buffer(VK_Image* image, VK_CommandBuffer* command_buffer) {
   // Region to copy
   VkBufferImageCopy region = {};
   region.bufferOffset = 0;
@@ -146,7 +148,32 @@ void vk_image_copy_from_buffer(VK_Image* image, VkBuffer buffer, VK_CommandBuffe
   
   vkCmdCopyBufferToImage(
     command_buffer->handle, 
-    buffer, 
+    vk->stage_buffer.handle, 
+    image->handle, 
+    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
+    1, 
+    &region);
+}
+
+void vk_image_copy_from_buffer(VK_Image* image, VK_Buffer buffer, VK_CommandBuffer* command_buffer) {
+  // Region to copy
+  VkBufferImageCopy region = {};
+  region.bufferOffset = 0;
+  region.bufferRowLength = 0;
+  region.bufferImageHeight = 0;
+  
+  region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  region.imageSubresource.mipLevel = 0;
+  region.imageSubresource.baseArrayLayer = 0;
+  region.imageSubresource.layerCount = 1;
+  
+  region.imageExtent.width = image->width;
+  region.imageExtent.height = image->height;
+  region.imageExtent.depth = 1;
+  
+  vkCmdCopyBufferToImage(
+    command_buffer->handle,
+    buffer.handle, 
     image->handle, 
     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
     1, 
@@ -154,16 +181,77 @@ void vk_image_copy_from_buffer(VK_Image* image, VkBuffer buffer, VK_CommandBuffe
 }
 
 void vk_image_destroy(VK_Image* image) {
-    if (image->view) {
-        vkDestroyImageView(vkdevice, image->view, vk->allocator);
-        image->view = 0;
-    }
-    if (image->memory) {
-        vkFreeMemory(vkdevice, image->memory, vk->allocator);
-        image->memory = 0;
-    }
-    if (image->handle) {
-        vkDestroyImage(vkdevice, image->handle, vk->allocator);
-        image->handle = 0;
-    }
+  if (image->view) {
+    vkDestroyImageView(vkdevice, image->view, vk->allocator);
+    image->view = 0;
+  }
+  if (image->memory) {
+    vkFreeMemory(vkdevice, image->memory, vk->allocator);
+    image->memory = 0;
+  }
+  if (image->handle) {
+    vkDestroyImage(vkdevice, image->handle, vk->allocator);
+    image->handle = 0;
+  }
+}
+
+void vk_texture_load(Texture* texture) {
+  VK_Texture* data = &vk->texture;
+  
+  u64 size = texture->width * texture->height * texture->channel_count;
+  VkFormat image_format = VK_FORMAT_R8G8B8A8_UNORM;
+  
+  vk_buffer_load_data(&vk->stage_buffer, 0, size, texture->data);
+  
+  data->image = vk_image_create(
+    VK_IMAGE_TYPE_2D, 
+    texture->width, 
+    texture->height, 
+    image_format, 
+    VK_IMAGE_TILING_OPTIMAL, 
+    VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    true,
+    VK_IMAGE_ASPECT_COLOR_BIT);
+  
+  VK_CommandBuffer cmd = vk_cmd_alloc_and_begin_single_use();
+  
+  vk_image_transition_layout(
+    &cmd, 
+    &data->image, 
+    image_format, 
+    VK_IMAGE_LAYOUT_UNDEFINED, 
+    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    
+  vk_image_copy_from_buffer(&data->image, &cmd);
+  
+  vk_image_transition_layout(
+    &cmd, 
+    &data->image, 
+    image_format, 
+    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
+    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    
+  vk_cmd_end_single_use(&cmd);
+  
+  // Create a sampler for the texture
+  VkSamplerCreateInfo sampler_info = {VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+  // TODO These filters shoud be configurable
+  sampler_info.magFilter = VK_FILTER_LINEAR;
+  sampler_info.minFilter = VK_FILTER_LINEAR;
+  sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  sampler_info.anisotropyEnable = VK_FALSE;
+  sampler_info.maxAnisotropy = 16;
+  sampler_info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+  sampler_info.unnormalizedCoordinates = VK_FALSE;
+  sampler_info.compareEnable = VK_FALSE;
+  sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
+  sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+  sampler_info.mipLodBias = 0.0f;
+  sampler_info.minLod = 0.0f;
+  sampler_info.maxLod = 0.0f;
+  
+  VkResult result = vkCreateSampler(vkdevice, &sampler_info, vk->allocator, &data->sampler);
 }

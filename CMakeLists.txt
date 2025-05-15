@@ -4,8 +4,7 @@ project(BuildEverything)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# add_compile_options(-Wuninitialized -Wvarargs -fno-exceptions -fno-rtti -Wno-writable-strings -Wno-microsoft-goto)
-add_compile_options(-Wuninitialized -Wvarargs -fno-exceptions -Wno-writable-strings -Wno-microsoft-goto)
+add_compile_options(-Wuninitialized -Wvarargs -fno-exceptions -fno-rtti -Wno-writable-strings -Wno-microsoft-goto)
 
 # binary
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/bin)

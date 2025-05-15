@@ -1,12 +1,7 @@
 #pragma once
 #include "lib.h"
 
-struct Object {
-  u32 id;
-  u32 mesh_id;
-  u32 shader_id;
-};
-
-KAPI void object_sys_init();
-KAPI Object object_create(u32 mesh_id, u32 shader_id);
-KAPI void object_make_renderable(Object obj);
+KAPI void entity_init();
+KAPI u32 entity_create();
+KAPI void entity_destroy(u32 id);
+KAPI void object_make_renderable(u32 id, u32 mesh_id);

@@ -66,11 +66,23 @@ void vk_descriptor_set_create() {
   g_ubo_layout_binding.descriptorCount = 100; // how much you have seperate resources you can access in shader (array)
   g_ubo_layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
   g_ubo_layout_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+  
+  VkDescriptorSetLayoutBinding texture_layout_binding = {};
+  texture_layout_binding.binding = 1;           // binding in shader
+  texture_layout_binding.descriptorCount = 3; // how much you have seperate resources you can access in shader (array)
+  texture_layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  texture_layout_binding.stageFlags =VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
+  VkDescriptorSetLayoutBinding layout_bindings[2] = {g_ubo_layout_binding, texture_layout_binding};
+  
   VkDescriptorSetLayoutCreateInfo g_layout_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-  g_layout_info.bindingCount = 1;
-  g_layout_info.pBindings = &g_ubo_layout_binding;
+  g_layout_info.bindingCount = 2;
+  g_layout_info.pBindings = layout_bindings;
   VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &g_layout_info, vk->allocator, &vk->descriptor_set_layout));
+  // VkDescriptorSetLayoutCreateInfo texture_layout_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+  // texture_layout_info.bindingCount = 1;
+  // texture_layout_info.pBindings = &texture_layout_binding;
+  // VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &texture_layout_info, vk->allocator, &vk->texture_descriptor_set_layout));
 }
 
 void vk_descriptor_set_alloc() {
@@ -78,29 +90,38 @@ void vk_descriptor_set_alloc() {
     vk->descriptor_set_layout,
     vk->descriptor_set_layout,
     vk->descriptor_set_layout};
-
+    
   VkDescriptorSetAllocateInfo alloc_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
   alloc_info.descriptorPool = vk->descriptor_pool;
   alloc_info.descriptorSetCount = 3;
   alloc_info.pSetLayouts = global_layouts;
   VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, vk->descriptor_sets));
-  VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, vk->descriptor_sets_new));
-  vkDeviceWaitIdle(vkdevice);
+  // VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, vk->descriptor_sets_new));
+  
+  // VkDescriptorSetLayout texture_layouts[] = {
+  //   vk->texture_descriptor_set_layout,
+  //   vk->texture_descriptor_set_layout,
+  //   vk->texture_descriptor_set_layout};
+  
+  // VkDescriptorSetAllocateInfo texture_alloc_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+  // texture_alloc_info.descriptorPool = vk->descriptor_pool;
+  // texture_alloc_info.descriptorSetCount = 3;
+  // texture_alloc_info.pSetLayouts = texture_layouts;
+  // VK_CHECK(vkAllocateDescriptorSets(vkdevice, &texture_alloc_info, vk->descriptor_sets_texture));
 }
 
-void vk_r_shader_create(struct Shader* s, void* data, void* data_new, u64 size) {
-  // storage buffer
+void vk_r_shader_create(Shader* s, void* data, u64 data_size, u64 push_size) {
+  // push constants
+  vk->sparse_push_constants.data = mem_alloc(MB(10));
+  vk->sparse_push_constants.element_size = push_size;
+  vk->sparse_push_constants.capacity = MaxEntities;
+  vk->sparse_push_constants.size = 0;
 
-  u64 storage_buffer_offset = vk_buffer_alloc(&vk->uniform_buffer, size, 64);
-  u64 storage_buffer_offset_new = vk_buffer_alloc(&vk->uniform_buffer, size, 64);
-  MemRange range = {storage_buffer_offset, size};
-  MemRange range_new = {storage_buffer_offset_new, size};
+  // storage buffer
+  u64 uniform_buffer_offset = vk_buffer_alloc(&vk->uniform_buffer, data_size*10, 64);
+  MemRange range = {uniform_buffer_offset, data_size};
   vk->uniform_buffer_mem_range = range;
-  vk->uniform_buffer_mem_range_new = range_new;
-  // *(void**)data = (u8*)vk->uniform_buffer.maped_memory + storage_buffer_offset;
-  // *(void**)data = (u8*)vk->uniform_buffer.maped_memory + range.offset;
   *(void**)data = (u8*)vk->uniform_buffer.maped_memory + range.offset;
-  *(void**)data_new = (u8*)vk->uniform_buffer.maped_memory + range_new.offset;
 
   // shader
   local u32 yes = (vk_descriptor_pool_create(), vk_descriptor_set_create(), vk_descriptor_set_alloc(), 1);
@@ -122,8 +143,7 @@ void vk_r_shader_create(struct Shader* s, void* data, void* data_new, u64 size) 
     attribute_desriptions[attribute_counter].binding = 0;
     attribute_desriptions[attribute_counter].location = attribute_counter;
     attribute_desriptions[attribute_counter].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attribute_desriptions[attribute_counter].offset = offset;
-    offset += sizeof(v3);
+    attribute_desriptions[attribute_counter].offset = vert_stride;
     vert_stride += sizeof(v3);
     ++attribute_counter;
   }
@@ -131,9 +151,16 @@ void vk_r_shader_create(struct Shader* s, void* data, void* data_new, u64 size) 
     attribute_desriptions[attribute_counter].binding = 0;
     attribute_desriptions[attribute_counter].location = attribute_counter;
     attribute_desriptions[attribute_counter].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attribute_desriptions[attribute_counter].offset = offset;
-    offset += sizeof(v3);
+    attribute_desriptions[attribute_counter].offset = vert_stride;
     vert_stride += sizeof(v3);
+    ++attribute_counter;
+  }
+  if (s->has_tex_coord) {
+    attribute_desriptions[attribute_counter].binding = 0;
+    attribute_desriptions[attribute_counter].location = attribute_counter;
+    attribute_desriptions[attribute_counter].format = VK_FORMAT_R32G32_SFLOAT;
+    attribute_desriptions[attribute_counter].offset = vert_stride;
+    vert_stride += sizeof(v2);
     ++attribute_counter;
   }
   
@@ -264,11 +291,12 @@ VK_Pipeline vk_pipeline_create(
   pipeline_layout_create_info.pPushConstantRanges = &push_constant;
   
   // Descriptor set layouts
-  VkDescriptorSetLayout set_layouts[2] = {
+  VkDescriptorSetLayout set_layouts[1] = {
     vk->descriptor_set_layout,
-    vk->descriptor_set_layout,
+    // vk->descriptor_set_layout,
+    // vk->texture_descriptor_set_layout,
   };
-  pipeline_layout_create_info.setLayoutCount = 2;
+  pipeline_layout_create_info.setLayoutCount = ArrayCount(set_layouts);
   pipeline_layout_create_info.pSetLayouts = set_layouts;
   
   // Create the pipeline layout.
@@ -284,7 +312,7 @@ VK_Pipeline vk_pipeline_create(
   pipeline_create_info.pViewportState = &viewport_state;
   pipeline_create_info.pRasterizationState = &rasterizer_create_info;
   pipeline_create_info.pMultisampleState = &multisampling_create_info;
-  pipeline_create_info.pDepthStencilState = 0;
+  pipeline_create_info.pDepthStencilState = &depth_stencil;
   pipeline_create_info.pColorBlendState = &color_blend_state_create_info;
   pipeline_create_info.pDynamicState = &dynamic_state_create_info;
   pipeline_create_info.pTessellationState = null;

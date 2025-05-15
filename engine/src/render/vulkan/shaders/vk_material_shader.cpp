@@ -4,7 +4,7 @@
 #include "render/vulkan/vk_pipeline.h"
 #include "render/vulkan/vk_buffer.h"
 
-#include "sys/texture_sys.h"
+#include "sys/texture.h"
 
 #define BUILTIN_SHADER_NAME_MATERIAL "Builtin.MaterialShader"_
 
@@ -150,7 +150,7 @@ VK_MaterialShader vk_material_shader_create() {
     VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
     true);
-  shader.global_uniform_buffer.maped_memory = vk_buffer_map_memory(&shader.global_uniform_buffer, 0, shader.global_uniform_buffer.size, 0);
+  vk_buffer_map_memory(&shader.global_uniform_buffer, 0, shader.global_uniform_buffer.size);
   
   // Allocate global descriptor sets
   VkDescriptorSetLayout global_layouts[] = {
@@ -217,7 +217,7 @@ void vk_material_shader_update_global_state(VK_MaterialShader* shader, f32 delta
   u64 offset = 0;
 
   // Copy data to buffer
-  vk_buffer_load_data(&shader->global_uniform_buffer, offset, range, 0, &shader->global_ubo);
+  vk_buffer_load_data(&shader->global_uniform_buffer, offset, range, &shader->global_ubo);
   
   VkDescriptorBufferInfo buffer_info;
   buffer_info.buffer = shader->global_uniform_buffer.handle;
@@ -263,7 +263,7 @@ void vk_material_shader_apply_material(VK_MaterialShader* shader, Material* mate
   inst_ubo.diffuse_color = material->diffuse_color;
 
   // Load the data into the buffer
-  vk_buffer_load_data(&shader->obj_uniform_buffer, offset, range, 0, &inst_ubo);
+  vk_buffer_load_data(&shader->obj_uniform_buffer, offset, range, &inst_ubo);
 
   // Only do this if the descriptor has not yet been updated
   u32* global_ubo_generation = &object_state->descriptor_states[descriptor_count].generations[image_index];
@@ -306,16 +306,17 @@ void vk_material_shader_apply_material(VK_MaterialShader* shader, Material* mate
     u32* descriptor_id = &object_state->descriptor_states[descriptor_index].ids[image_index];
 
     // If the texture hasn't been loaded yet, use the default
-    if (t->generation == INVALID_ID) {
-      t = texture_system_get_default_texture();
+    // if (t->generation == INVALID_ID) {
+    //   t = texture_system_get_default_texture();
 
-      // Reset the descriptor generation if using the default texture
-      *descriptor_generation = INVALID_ID;
-    }
+    //   // Reset the descriptor generation if using the default texture
+    //   *descriptor_generation = INVALID_ID;
+    // }
 
     // Check if the descriptor needs updating firs1t
-    if (t && (*descriptor_id != t->id || *descriptor_generation != t->generation || *descriptor_generation == INVALID_ID)) {
-      VK_TextureData* internal_data = (VK_TextureData*)t->internal_data;
+    // if (t && (*descriptor_id != t->id || *descriptor_generation != t->generation || *descriptor_generation == INVALID_ID)) {
+      // VK_TextureData* internal_data = (VK_TextureData*)t->internal_data;
+      VK_Texture* internal_data;
 
       // Assign view and sampler
       image_infos[sampler_index].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -333,12 +334,12 @@ void vk_material_shader_apply_material(VK_MaterialShader* shader, Material* mate
       descriptor_count++;
 
       // Sync frame generation if not using a default texture
-      if (t->generation != INVALID_ID) {
-        *descriptor_generation = t->generation;
-        *descriptor_id = t->id;
-      }
+      // if (t->generation != INVALID_ID) {
+      //   *descriptor_generation = t->generation;
+      //   *descriptor_id = t->id;
+      // }
       ++descriptor_index;
-    }
+    // }
   }
 
   if (descriptor_count > 0) {
@@ -350,32 +351,32 @@ void vk_material_shader_apply_material(VK_MaterialShader* shader, Material* mate
 }
 
 void vk_material_shader_acquire_resources(VK_MaterialShader* shader, Material* material) {
-  // TODO free list
-  material->internal_id = shader->obj_uniform_buffer_index;
-  ++shader->obj_uniform_buffer_index;
+  // // TODO free list
+  // material->internal_id = shader->obj_uniform_buffer_index;
+  // ++shader->obj_uniform_buffer_index;
   
-  VK_MaterialShaderInstState* object_state = &shader->instance_states[material->internal_id];
-  Loop (i, MaterialShaderDescriptorCount) {
-    Loop (j, 3) {
-      object_state->descriptor_states[i].generations[j] = INVALID_ID;
-      object_state->descriptor_states[i].ids[j] = INVALID_ID;
-    }
-  }
+  // VK_MaterialShaderInstState* object_state = &shader->instance_states[material->internal_id];
+  // Loop (i, MaterialShaderDescriptorCount) {
+  //   Loop (j, 3) {
+  //     object_state->descriptor_states[i].generations[j] = INVALID_ID;
+  //     object_state->descriptor_states[i].ids[j] = INVALID_ID;
+  //   }
+  // }
   
-  // Allocate descriptor sets
-  VkDescriptorSetLayout layouts[3] = {
-    shader->obj_descriptor_set_layout,
-    shader->obj_descriptor_set_layout,
-    shader->obj_descriptor_set_layout};
+  // // Allocate descriptor sets
+  // VkDescriptorSetLayout layouts[3] = {
+  //   shader->obj_descriptor_set_layout,
+  //   shader->obj_descriptor_set_layout,
+  //   shader->obj_descriptor_set_layout};
   
-  VkDescriptorSetAllocateInfo alloc_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-  alloc_info.descriptorPool = shader->obj_descriptor_pool;
-  alloc_info.descriptorSetCount = 3; // one per frame
-  alloc_info.pSetLayouts = layouts;
-  VkResult result = vkAllocateDescriptorSets(vkdevice, &alloc_info, object_state->descriptor_sets);
-  if (result != VK_SUCCESS) {
-    Error("Error allocating descriptor sets in shader"_);
-  }
+  // VkDescriptorSetAllocateInfo alloc_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+  // alloc_info.descriptorPool = shader->obj_descriptor_pool;
+  // alloc_info.descriptorSetCount = 3; // one per frame
+  // alloc_info.pSetLayouts = layouts;
+  // VkResult result = vkAllocateDescriptorSets(vkdevice, &alloc_info, object_state->descriptor_sets);
+  // if (result != VK_SUCCESS) {
+  //   Error("Error allocating descriptor sets in shader"_);
+  // }
 }
 
 void vk_material_shader_release_resources(VK_MaterialShader* shader, Material* material) {

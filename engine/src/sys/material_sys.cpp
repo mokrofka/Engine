@@ -1,7 +1,7 @@
 #include "material_sys.h"
 
 #include "render/r_frontend.h"
-#include "sys/texture_sys.h"
+#include "sys/texture.h"
 #include "sys/res_sys.h"
 
 struct MaterialSystemState {

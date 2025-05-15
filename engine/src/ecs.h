@@ -30,12 +30,12 @@ struct ECS_state {
 };
 
 // TODO put into .cpp
-ECS_state ecs;
+KAPI extern ECS_state ecs;
 
 //////////////////////////////////////////////////////
 // Entity
 
-void ecs_init() {
+inline void ecs_init() {
   Loop (i, MaxEntities) {
     ecs.entities[i] = i;
   }
@@ -99,7 +99,7 @@ struct ComponentArray {
     u32 new_index = size;
     entity_to_index[entity] = new_index;
     index_to_entity[new_index] = entity;
-    void* dst = (u8*)(component_array) + element_size * new_index;
+    void* dst = (u8*)(component_array) + element_size*new_index;
     MemCopy(dst, component, element_size);
     ++size;
   }
@@ -108,8 +108,8 @@ struct ComponentArray {
     // Copy element at end into deleted element's place to maintain density
     u32 index_of_removed_entity = entity_to_index[entity];
     u32 index_of_last_element = size - 1;
-    void* dst_of_removed_entity = (u8*)(component_array) + element_size * index_of_removed_entity;
-    void* src_of_last_element = (u8*)(component_array) + element_size * index_of_last_element;
+    void* dst_of_removed_entity = (u8*)(component_array) + element_size*index_of_removed_entity;
+    void* src_of_last_element = (u8*)(component_array) + element_size*index_of_last_element;
     MemCopy(dst_of_removed_entity, src_of_last_element, element_size);
 
     // Update map to point to moved spot
@@ -147,7 +147,9 @@ inline ComponentArray* get_component_array(u32 index) {
 }
 
 inline void _component_add(Entity entity, u32 index, void* component) {
-  Assert(ecs.component_arrays[index] && ecs.is_entities_alive[entity] && !has_component(entity, index));
+  Assert(ecs.component_arrays[index]);
+  Assert(ecs.is_entities_alive[entity]);
+  Assert(!has_component(entity, index));
   ecs.component_arrays[index]->insert_data(entity, component);
 }
 
@@ -315,7 +317,7 @@ struct PhysicsSystem : System {
   }
 };
 
-void test() {
+INLINE void test() {
   component_register(Gravity);
   component_register(Transform);
 

@@ -7,13 +7,12 @@ layout(set = 0, binding = 0) uniform ObjectBuffer {
   float colors[];
 } ubo;
 
-layout(set = 1, binding = 0) uniform ObjectBuffer_new {
-  float colors[];
-} ubo_new;
-
-layout(location = 0) in dto {
+layout(location = 0) in in_data {
   vec3 color;
-} in_dto;
+  vec2 tex_coord;
+} ind;
+
+layout(set = 0, binding = 1) uniform sampler2D diffuse_sampler;
 
 void main() {
   // out_color = vec4(1.0f, 0.5f, 0.2f, 1.0f);
@@ -23,5 +22,7 @@ void main() {
   
   // out_color = vec4(ubo.colors[1], ubo.colors[1], 0, 1.0f);
   // out_color = vec4(ubo.colors[512], ubo_new.colors[1000], 0, 1.0f);
-  out_color = vec4(in_dto.color, 1.0f);
+  // out_color = vec4(ind.color, 1.0f);
+  // out_color = texture(diffuse_sampler, vec2(1,1));
+  out_color = texture(diffuse_sampler, ind.tex_coord);
 } 

@@ -28,6 +28,7 @@ typedef void VoidProc(void);
     a = b;         \
     b = temp;      \
   }
+#define MaxEntities KB(10)
 
 #define internal static
 #define global   static

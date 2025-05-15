@@ -14,7 +14,7 @@
 struct VK_Buffer {
   VkBuffer handle;
   VkDeviceMemory memory;
-  void* maped_memory;
+  u8* maped_memory;
   FreeList freelist;
   u64 size;
   u64 usage;
@@ -152,7 +152,6 @@ struct VK_MaterialShaderInstState {
 
 struct VK_GeometryData {
   u32 id;
-  u32 generation;
   u32 vertex_size;
   u32 vertex_count;
   u32 vertex_buffer_offset;
@@ -428,9 +427,18 @@ struct vk_Shader {
   VK_ShaderStage stages[3];
 };
 
-struct Entity {
-  u32 id; 
-  u32 mesh_id;
+// struct Entity {
+//   u32 id; 
+//   u32 mesh_id;
+// };
+struct VK_Mesh {
+  u64 offset;
+  u64 vert_count;
+};
+
+struct VK_Texture {
+  VK_Image image;
+  VkSampler sampler;
 };
 
 struct VK {
@@ -467,23 +475,24 @@ struct VK {
   VK_GeometryData geometries[10];
   VkDescriptorPool descriptor_pool;
   VkDescriptorSetLayout descriptor_set_layout;
+  VkDescriptorSetLayout texture_descriptor_set_layout;
   vk_Shader shader;
   VkDescriptorSet descriptor_sets[3];
   VkDescriptorSet descriptor_sets_new[3];
+  VkDescriptorSet descriptor_sets_texture[3];
   u32 entity_count;
-  Entity entities[10];
+  u32 entities[MaxEntities];
   MemRange uniform_buffer_mem_range;
   MemRange uniform_buffer_mem_range_new;
   u64 vulkan_driver_memory_allocated;
+  VK_Mesh meshes[10];
+  SparseSetKeep sparse_push_constants;
+
+  VK_Texture texture;
   
 #if _DEBUG
   VkDebugUtilsMessengerEXT debug_messenger;
 #endif
-};
-
-struct VK_TextureData {
-  VK_Image image;
-  VkSampler sampler;
 };
 
 extern VK* vk;

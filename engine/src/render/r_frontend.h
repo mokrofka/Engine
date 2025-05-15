@@ -1,5 +1,6 @@
 #pragma once
 #include "lib.h"
+#include "vulkan/vk_backend.h"
 
 #include "r_types.h"
 

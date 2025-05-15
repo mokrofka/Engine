@@ -4,7 +4,7 @@
 #include "render/vulkan/vk_pipeline.h"
 #include "render/vulkan/vk_buffer.h"
 
-#include "sys/texture_sys.h"
+#include "sys/texture.h"
 
 #define BUILTIN_SHADER_NAME_UI "Builtin.UIShader"_
 
@@ -214,7 +214,7 @@ void vk_ui_shader_update_global_state(VK_UIShader* shader, f32 delta_time) {
   u64 offset = 0;
 
   // Copy data to buffer
-  vk_buffer_load_data(&shader->global_uniform_buffer, offset, range, 0, &shader->global_ubo);
+  vk_buffer_load_data(&shader->global_uniform_buffer, offset, range, &shader->global_ubo);
   
   VkDescriptorBufferInfo buffer_info;
   buffer_info.buffer = shader->global_uniform_buffer.handle;
@@ -261,7 +261,7 @@ void vk_ui_shader_apply_material(VK_UIShader* shader, Material* material) {
     inst_ubo.diffuse_color = material->diffuse_color;
 
     // Load the data into the buffer
-    vk_buffer_load_data(&shader->obj_uniform_buffer, offset, range, 0, &inst_ubo);
+    vk_buffer_load_data(&shader->obj_uniform_buffer, offset, range, &inst_ubo);
 
     // Only do this if the descriptor has not yet been updated
     u32* global_ubo_generation = &object_state->descriptor_states[descriptor_count].generations[image_index];
@@ -304,39 +304,39 @@ void vk_ui_shader_apply_material(VK_UIShader* shader, Material* material) {
       u32* descriptor_id = &object_state->descriptor_states[descriptor_index].ids[image_index];
 
       // If the texture hasn't been loaded yet, use the default
-      if (t->generation == INVALID_ID) {
-        t = texture_system_get_default_texture();
+      // if (t->generation == INVALID_ID) {
+      //   t = texture_system_get_default_texture();
 
-        // Reset the descriptor generation if using the default texture
-        *descriptor_generation = INVALID_ID;
-      }
+      //   // Reset the descriptor generation if using the default texture
+      //   *descriptor_generation = INVALID_ID;
+      // }
 
       // Check if the descriptor needs updating firs1t
-      if (t && (*descriptor_id != t->id || *descriptor_generation != t->generation || *descriptor_generation == INVALID_ID)) {
-        VK_TextureData* internal_data = (VK_TextureData*)t->internal_data;
+      // if (t && (*descriptor_id != t->id || *descriptor_generation != t->generation || *descriptor_generation == INVALID_ID)) {
+      //   VK_TextureData* internal_data = (VK_TextureData*)t->internal_data;
 
-        // Assign view and sampler
-        image_infos[sampler_index].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        image_infos[sampler_index].imageView = internal_data->image.view;
-        image_infos[sampler_index].sampler = internal_data->sampler;
+      //   // Assign view and sampler
+      //   image_infos[sampler_index].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+      //   image_infos[sampler_index].imageView = internal_data->image.view;
+      //   image_infos[sampler_index].sampler = internal_data->sampler;
 
-        VkWriteDescriptorSet descriptor = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-        descriptor.dstSet = object_descriptor_set;
-        descriptor.dstBinding = descriptor_index;
-        descriptor.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptor.descriptorCount = 1;
-        descriptor.pImageInfo = &image_infos[sampler_index];
+      //   VkWriteDescriptorSet descriptor = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+      //   descriptor.dstSet = object_descriptor_set;
+      //   descriptor.dstBinding = descriptor_index;
+      //   descriptor.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+      //   descriptor.descriptorCount = 1;
+      //   descriptor.pImageInfo = &image_infos[sampler_index];
 
-        descriptor_writes[descriptor_count] = descriptor;
-        descriptor_count++;
+      //   descriptor_writes[descriptor_count] = descriptor;
+      //   descriptor_count++;
 
-        // Sync frame generation if not using a default texture
-        if (t->generation != INVALID_ID) {
-          *descriptor_generation = t->generation;
-          *descriptor_id = t->id;
-        }
-        ++descriptor_index;
-      }
+      //   // Sync frame generation if not using a default texture
+      //   if (t->generation != INVALID_ID) {
+      //     *descriptor_generation = t->generation;
+      //     *descriptor_id = t->id;
+      //   }
+      //   ++descriptor_index;
+      // }
     }
 
     if (descriptor_count > 0) {

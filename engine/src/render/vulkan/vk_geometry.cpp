@@ -76,16 +76,17 @@ void vk_r_create_geometry(Geometry* geometry, u32 vertex_count, Vertex3D* vertic
   // }
 }
 
-void vk_r_create_geometry(Geometry* geometry) {
-  VK_GeometryData* geom_data = &vk->geometries[geometry->id];
-  geom_data->vertex_size = geometry->vertex_size;
-  geom_data->vertex_count = geometry->vertex_count;
-  geom_data->index_size = geometry->index_size;
-  geom_data->index_count = geometry->index_count;
-  
-  u64 size = geom_data->vertex_size * geom_data->vertex_count;
+u32 mesh_count;
+
+void vk_r_geometry_create(Geometry* geom) {
+  u64 size = geom->vertex_size * geom->vertex_count;
   u64 offset = vk_buffer_alloc(&vk->vert_buffer, size, 64);
+  
   MemRange range = {offset, size};
-  geom_data->range = range;
-  upload_data_range(&vk->vert_buffer, range, geometry->vertices);
+  VK_Mesh mesh = {
+    .offset = offset,
+    .vert_count = geom->vertex_count,
+  };
+  vk->meshes[mesh_count++] = mesh;
+  upload_data_range(&vk->vert_buffer, range, geom->vertices);
 }

@@ -79,7 +79,7 @@ void os_register_window_resized_callback(WindowResizedCallback callback);
 void os_window_destroy();
 void* os_get_handle_info();
 void* os_get_window_handle();
-v2i os_get_framebuffer_size();
+KAPI v2i os_get_framebuffer_size();
 
 //////////////////////////////////////////////////////////////////////////
 // Memory

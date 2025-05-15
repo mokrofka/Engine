@@ -34,15 +34,12 @@ struct Binary {
 
 
 struct Texture {
-  u32 id;
+  String64 file_path64;
   u32 width;
   u32 height;
   u8 channel_count;
   b8 has_transparency;
-  u32 generation;
-  String64 file_path64;
   u8* data;
-  void* internal_data;
 };
 
 enum TextureUse {
@@ -87,11 +84,7 @@ struct Material {
 };
 
 struct Geometry {
-  u32 id;
-  u32 internal_id;
-  u32 generation;
   String name;
-  Material* material;
   
   u32 vertex_size;
   u32 vertex_count;
@@ -184,5 +177,6 @@ struct ShaderConfig {
   String name;
   b8 has_position;
   b8 has_color;
+  b8 has_tex_coord;
   u8 stages;
 };

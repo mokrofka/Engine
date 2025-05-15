@@ -66,9 +66,9 @@ void imgui_init() {
   Assign(platform_io.Platform_CreateVkSurface, imgui_surface_create);
   ImGui_ImplVulkan_Init(&init_info);
   
-  VK_CommandBuffer cmd = vk_cmd_alloc_and_begin_single_use(vk->device.graphics_cmd_pool);
+  VK_CommandBuffer cmd = vk_cmd_alloc_and_begin_single_use();
   ImGui_ImplVulkan_CreateFontsTexture();
-  vk_cmd_end_single_use(vk->device.graphics_cmd_pool, &cmd);
+  vk_cmd_end_single_use(&cmd);
   ImGui_ImplVulkan_DestroyFontsTexture(); // destroy staging/temp resources
 }
 

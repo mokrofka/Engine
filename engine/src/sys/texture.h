@@ -17,3 +17,4 @@ void texture_system_release(String name);
 
 Texture* texture_system_get_default_texture();
 
+KAPI void texture_load(String name);

@@ -21,6 +21,7 @@ void vk_image_transition_layout(
     VkImageLayout old_layout,
     VkImageLayout new_layout);
 
-void vk_image_copy_from_buffer(VK_Image* image, VkBuffer buffer, VK_CommandBuffer* command_buffer);
+void vk_image_copy_from_buffer(VK_Image* image, VK_CommandBuffer* command_buffer);
+void vk_image_copy_from_buffer(VK_Image* image, VK_Buffer buffer, VK_CommandBuffer* command_buffer);
 
 void vk_image_destroy(VK_Image* image);

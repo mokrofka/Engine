@@ -34,7 +34,7 @@ String res_sys_base_path();
 // Loaders
 
 Binary res_binary_load(Arena* arena, String filepath);
-Texture res_texture_load(String filepath);
+KAPI Texture res_texture_load(String filepath);
 void res_texture_unload(void* data);
 MaterialConfig res_load_material_config(String filepath);
 

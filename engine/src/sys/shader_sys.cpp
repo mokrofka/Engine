@@ -50,13 +50,14 @@ void shader_sys_shutdown() {
   // hashmap_destroy(&state->lookup);
 }
 
-Shader* shader_create(ShaderConfig config, void* data, void*data_new, u64 data_size) {
+Shader* shader_create(ShaderConfig config, void* data, u64 data_size, u64 push_size) {
   Shader* shader = mem_alloc_struct(Shader);
   shader->name = config.name;
   shader->has_position = config.has_position;
   shader->has_color = config.has_position;
+  shader->has_tex_coord = config.has_tex_coord;
   shader->stages = config.stages;
-  vk_r_shader_create(shader, data, data_new, data_size);
+  vk_r_shader_create(shader, data, data_size, push_size);
   return shader;
 }
 

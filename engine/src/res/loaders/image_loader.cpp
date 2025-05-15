@@ -64,6 +64,7 @@ ResLoader image_resource_loader_create() {
   return loader;
 }
 
+u8 image[32*32];
 Texture res_texture_load(String filepath) {
   Scratch scratch;
   Texture texture = {};
@@ -72,7 +73,8 @@ Texture res_texture_load(String filepath) {
   stbi_set_flip_vertically_on_load(true);
 
   // TODO: try different extensions
-  String file_path = push_strf(scratch, "%s/%s/%s%s", res_sys_base_path(), "textures"_, filepath, ".png"_);
+  // String file_path = push_strf(scratch, "%s/%s/%s%s", res_sys_base_path(), "textures"_, filepath, ".png"_);
+  String file_path = push_strf(scratch, "%s/%s/%s", res_sys_base_path(), "textures"_, filepath);
 
   String file_path_c = push_str_copy(scratch, file_path);
 
@@ -82,7 +84,6 @@ Texture res_texture_load(String filepath) {
     (i32*)&texture.height,
     (i32*)&texture.channel_count,
     required_channel_count);
-
   if (!data) {
     Error("Image resource loader failed to load file '%s'", file_path);
     goto error;

@@ -13,6 +13,6 @@ void vk_cmd_update_submitted(VK_CommandBuffer* command_buffer);
 
 void vk_cmd_reset(VK_CommandBuffer* command_buffer);
 
-VK_CommandBuffer vk_cmd_alloc_and_begin_single_use(VkCommandPool pool);
+VK_CommandBuffer vk_cmd_alloc_and_begin_single_use();
 
-void vk_cmd_end_single_use(VkCommandPool pool, VK_CommandBuffer* command_buffer);
+void vk_cmd_end_single_use(VK_CommandBuffer* command_buffer);

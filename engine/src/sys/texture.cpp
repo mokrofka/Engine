@@ -1,4 +1,4 @@
-#include "texture_sys.h"
+#include "texture.h"
 
 #include "render/r_frontend.h"
 
@@ -47,8 +47,8 @@ void texture_system_init(Arena* arena, TextureSystemConfig config) {
   // Invalidate all textures in the array
   u32 count = state->config.max_texture_count;
   Loop (i, count) {
-    state->registered_textures[i].id = INVALID_ID;
-    state->registered_textures[i].generation = INVALID_ID;
+    // state->registered_textures[i].id = INVALID_ID;
+    // state->registered_textures[i].generation = INVALID_ID;
   }
 
   // Create default textures for use in the system
@@ -56,15 +56,15 @@ void texture_system_init(Arena* arena, TextureSystemConfig config) {
 }
 
 void texture_system_shutdown() {
-  if (state) {
-    // Destroy all loaded textures
-    Loop (i, state->config.max_texture_count) {
-      Texture* t = &state->registered_textures[i];
-      if (t->generation != INVALID_ID) {
-        r_destroy_texture(t);
-      }
-    }
-  }
+  // if (state) {
+  //   // Destroy all loaded textures
+  //   Loop (i, state->config.max_texture_count) {
+  //     Texture* t = &state->registered_textures[i];
+  //     if (t->generation != INVALID_ID) {
+  //       r_destroy_texture(t);
+  //     }
+  //   }
+  // }
   
   destroy_default_textures(state);
   
@@ -78,53 +78,53 @@ Texture* texture_system_acquire(String name, b32 auto_release) {
     return &state->default_texture;
   }
   
-  TextureRef ref;
-  hashmap_get(&state->registered_texture_table, name, &ref);
-  // This can only be changed the firts time a texture is loaded
-  if (ref.reference_count == 0) {
-    ref.auto_release = auto_release;
-  }
-  ++ref.reference_count;
-  if (ref.handle == INVALID_ID) {
-    // This means no texture exists here.Find a free index first
-    u32 count = state->config.max_texture_count;
-    Texture* t = 0;
-    Loop (i, count) {
-      if (state->registered_textures[i].id == INVALID_ID) {
-        // A free slot has been found. Use its index as the handle
-        ref.handle = i;
-        t = &state->registered_textures[i];
-        break;
-      };
-    }
+  // TextureRef ref;
+  // hashmap_get(&state->registered_texture_table, name, &ref);
+  // // This can only be changed the firts time a texture is loaded
+  // if (ref.reference_count == 0) {
+  //   ref.auto_release = auto_release;
+  // }
+  // ++ref.reference_count;
+  // if (ref.handle == INVALID_ID) {
+  //   // This means no texture exists here.Find a free index first
+  //   u32 count = state->config.max_texture_count;
+  //   Texture* t = 0;
+  //   Loop (i, count) {
+  //     if (state->registered_textures[i].id == INVALID_ID) {
+  //       // A free slot has been found. Use its index as the handle
+  //       ref.handle = i;
+  //       t = &state->registered_textures[i];
+  //       break;
+  //     };
+  //   }
 
-    // Check overflow
-    if (!t || ref.handle == INVALID_ID) {
-      Fatal("texture_system_acquire - Texture system cannot hold anymore textures. Adjust configuration to allow more.");
-      return 0;
-    }
+  //   // Check overflow
+  //   if (!t || ref.handle == INVALID_ID) {
+  //     Fatal("texture_system_acquire - Texture system cannot hold anymore textures. Adjust configuration to allow more.");
+  //     return 0;
+  //   }
 
-    // Create new texture
-    *t = load_texture(name);
-    if (!t->internal_data) {
-      Error("Failed to load texture '%s'.", name);
-      return 0;
-    }
+  //   // Create new texture
+  //   *t = load_texture(name);
+  //   if (!t->internal_data) {
+  //     Error("Failed to load texture '%s'.", name);
+  //     return 0;
+  //   }
 
-    // Also use the handle as the texture id
-    t->id = ref.handle;
-    Trace("Texture '%s' does not yet exist. Created, and ref_count is now %i.", name, ref.reference_count);
-  } else {
-    Trace("Texture '%s' already exists, ref_count increased to %i.", name, ref.reference_count);
-  }
+  //   // Also use the handle as the texture id
+  //   t->id = ref.handle;
+  //   Trace("Texture '%s' does not yet exist. Created, and ref_count is now %i.", name, ref.reference_count);
+  // } else {
+  //   Trace("Texture '%s' already exists, ref_count increased to %i.", name, ref.reference_count);
+  // }
 
-  // Update the entry
-  hashmap_set(&state->registered_texture_table, name, &ref);
-  return &state->registered_textures[ref.handle];
+  // // Update the entry
+  // hashmap_set(&state->registered_texture_table, name, &ref);
+  // return &state->registered_textures[ref.handle];
 
-  // NOTE: This would only happen in the event something went wrong with the state
-  Error("texture_system_acquire failed to acquire texture '%s'. Null pointer will be returned", name.str);
-  return 0;
+  // // NOTE: This would only happen in the event something went wrong with the state
+  // Error("texture_system_acquire failed to acquire texture '%s'. Null pointer will be returned", name.str);
+  // return 0;
 }
 
 void texture_system_release(String name) {
@@ -199,15 +199,15 @@ internal void create_default_textures() {
     }
   }
 
-  str_copy(state->default_texture.file_path64, DefaultTextureName);
-  state->default_texture.width = tex_dimension;
-  state->default_texture.height = tex_dimension;
-  state->default_texture.channel_count = 4;
-  state->default_texture.generation = INVALID_ID;
-  state->default_texture.has_transparency = false;
-  state->default_texture.internal_data = r_create_texture(pixels, state->default_texture.width, state->default_texture.height, state->default_texture.channel_count);
-  // Manually set the texture generation to invalid since this is a default texture
-  state->default_texture.generation = INVALID_ID;
+  // str_copy(state->default_texture.file_path64, DefaultTextureName);
+  // state->default_texture.width = tex_dimension;
+  // state->default_texture.height = tex_dimension;
+  // state->default_texture.channel_count = 4;
+  // state->default_texture.generation = INVALID_ID;
+  // state->default_texture.has_transparency = false;
+  // state->default_texture.internal_data = r_create_texture(pixels, state->default_texture.width, state->default_texture.height, state->default_texture.channel_count);
+  // // Manually set the texture generation to invalid since this is a default texture
+  // state->default_texture.generation = INVALID_ID;
 }
 
 internal void destroy_default_textures(TextureSystemState* state) {
@@ -215,29 +215,29 @@ internal void destroy_default_textures(TextureSystemState* state) {
 }
 
 internal Texture load_texture(String texture_name) {
-  Texture texture = res_texture_load(texture_name);
-  if (!texture.data) {
-    goto error;
-  }
+  // Texture texture = res_texture_load(texture_name);
+  // if (!texture.data) {
+  //   goto error;
+  // }
 
-  u64 total_size = texture.width * texture.height * texture.channel_count;
-  // Check for transparency
-  b32 has_transparency = false;
-  Loop (i, total_size) {
-    u8 a = texture.data[i + 3];
-    if (a < 255) {
-      has_transparency = true;
-      break;
-    }
-  }
+  // u64 total_size = texture.width * texture.height * texture.channel_count;
+  // // Check for transparency
+  // b32 has_transparency = false;
+  // Loop (i, total_size) {
+  //   u8 a = texture.data[i + 3];
+  //   if (a < 255) {
+  //     has_transparency = true;
+  //     break;
+  //   }
+  // }
 
-  texture.generation = INVALID_ID;
-  texture.has_transparency = has_transparency;
+  // texture.generation = INVALID_ID;
+  // texture.has_transparency = has_transparency;
 
-  texture.internal_data = r_create_texture(texture.data, texture.width, texture.height, texture.channel_count);
+  // texture.internal_data = r_create_texture(texture.data, texture.width, texture.height, texture.channel_count);
   
-  error:
-  return texture;
+  // error:
+  // return texture;
 }
 
 internal void destroy_texture(Texture* t) {
@@ -245,7 +245,14 @@ internal void destroy_texture(Texture* t) {
   r_destroy_texture(t);
   res_texture_unload(t->data);
   
-  MemZeroStruct(t);
-  t->id = INVALID_ID;
-  t->generation = INVALID_ID;
+  // MemZeroStruct(t);
+  // t->id = INVALID_ID;
+  // t->generation = INVALID_ID;
+}
+
+void texture_load(String name) {
+  Texture texture = res_texture_load(name);
+  // vk_texture_load(&texture);
+  vk_r_create_texture(texture.data, texture.width, texture.height, texture.channel_count);
+  
 }

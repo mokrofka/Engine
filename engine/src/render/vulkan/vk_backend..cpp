@@ -7,13 +7,14 @@
 #include "vk_buffer.h"
 #include "vk_swapchain.h"
 #include "vk_image.h"
+#include "vk_draw.h"
 
 #include "shaders/vk_material_shader.h"
 #include "shaders/vk_ui_shader.h"
 
 #include "sys/material_sys.h"
 
-#define VulkanUseAllocator 1
+// #define VulkanUseAllocator 1
 // #define VulkanAllocatorTrace 1
 
 VK* vk;
@@ -30,7 +31,6 @@ void* vk_alloc(void* user_data, u64 size, u64 alignment, VkSystemAllocationScope
 }
 
 void vk_free(void* user_data, void* memory) {
-  Assert(memory);
   if (!memory) {
     return;
   }
@@ -92,7 +92,7 @@ internal void upload_data_range(VkCommandPool pool, VkFence fence, VkQueue queue
   VK_Buffer staging = vk_buffer_create(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, flags, true);
   
   // Load the data into the staging buffer
-  vk_buffer_load_data(&staging, 0, size, 0, data);
+  vk_buffer_load_data(&staging, 0, size, data);
   
   // Perform the copy from staging to the device local buffer
   vk_buffer_copy_to(&staging, 0, buffer, offset, size);
@@ -266,8 +266,6 @@ void vk_r_backend_init(R_Backend* backend) {
   // Loop (i, VK_MaxGeometryCount) {
   //   vk->geometries[i].id = INVALID_ID;
   // }
-  
-  
   Info("Vulkan renderer initialized successfully"_);
 }
 
@@ -326,6 +324,10 @@ void vk_r_backend_shutdown() {
     PFN_vkDestroyDebugUtilsMessengerEXT func =
         (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
             vk->instance, "vkDestroyDebugUtilsMessengerEXT");
+
+    if (func) {
+      i32 a = 1;      
+    }
     func(vk->instance, vk->debug_messenger, vk->allocator);
   }
 
@@ -650,7 +652,7 @@ internal void create_buffers(VK_Render* render) {
     VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     true);
-  vk->stage_buffer.maped_memory = vk_buffer_map_memory(&vk->stage_buffer, 0, vk->stage_buffer.size, 0);
+  vk_buffer_map_memory(&vk->stage_buffer, 0, vk->stage_buffer.size);
   
   // uniform
   vk->uniform_buffer = vk_buffer_create(
@@ -658,7 +660,7 @@ internal void create_buffers(VK_Render* render) {
     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     true);
-  vk->uniform_buffer.maped_memory = vk_buffer_map_memory(&vk->uniform_buffer, 0, vk->uniform_buffer.size, 0);
+  vk_buffer_map_memory(&vk->uniform_buffer, 0, vk->uniform_buffer.size);
   vk->uniform_buffer.freelist = free_list_create(vk->arena, vk->index_buffer.size, 64);
   
   // Geometry vertex buffer
@@ -683,7 +685,7 @@ internal void create_buffers(VK_Render* render) {
 void* vk_r_create_texture(u8* pixels, u32 width, u32 height, u32 channel_count) {
   // Internal data creation
   // TODO free memory
-  VK_TextureData* data = push_struct(vk->arena, VK_TextureData);
+  VK_Texture* data = push_struct(vk->arena, VK_Texture);
   VkDeviceSize image_size = width * height * channel_count;
   
   // NOTE assumes 8 bits per channel
@@ -711,7 +713,7 @@ void* vk_r_create_texture(u8* pixels, u32 width, u32 height, u32 channel_count) 
   
   VkCommandPool pool = vk->device.graphics_cmd_pool;
   VkQueue queue = vk->device.graphics_queue;
-  VK_CommandBuffer temp_buffer = vk_cmd_alloc_and_begin_single_use(pool);
+  VK_CommandBuffer temp_buffer = vk_cmd_alloc_and_begin_single_use();
   
   // Transition the layout from whatever it is currently to optimal for receiving data
   vk_image_transition_layout(
@@ -722,7 +724,7 @@ void* vk_r_create_texture(u8* pixels, u32 width, u32 height, u32 channel_count) 
     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
   
   // Copy the data from the buffer
-  vk_image_copy_from_buffer(&data->image, staging.handle, &temp_buffer);
+  vk_image_copy_from_buffer(&data->image, staging, &temp_buffer);
   
   // Copy the data from the buffer
   vk_image_transition_layout(
@@ -732,7 +734,7 @@ void* vk_r_create_texture(u8* pixels, u32 width, u32 height, u32 channel_count) 
     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   
-  vk_cmd_end_single_use(pool, &temp_buffer);
+  vk_cmd_end_single_use(&temp_buffer);
   
   vk_buffer_destroy(&staging);
 
@@ -760,6 +762,7 @@ void* vk_r_create_texture(u8* pixels, u32 width, u32 height, u32 channel_count) 
     Error("Error creating texture sampler: %s", vk_result_string(result, true));
     return data;
   }
+  vk->texture = *data;
   
   return data;
 }
@@ -767,12 +770,12 @@ void* vk_r_create_texture(u8* pixels, u32 width, u32 height, u32 channel_count) 
 void vk_r_destroy_texture(Texture* texture) {
   vkDeviceWaitIdle(vkdevice);
   
-  VK_TextureData* data = (VK_TextureData*)texture->internal_data;
-  if (data) {
-    vk_image_destroy(&data->image);
-    vkDestroySampler(vkdevice, data->sampler, vk->allocator);
-    // TODO free memory
-  }
+  // VK_TextureData* data = (VK_TextureData*)texture->internal_data;
+  // if (data) {
+  //   vk_image_destroy(&data->image);
+  //   vkDestroySampler(vkdevice, data->sampler, vk->allocator);
+  //   // TODO free memory
+  // }
 }
 
 void vk_r_create_material(Material* material) {
@@ -813,67 +816,67 @@ void vk_r_destroy_material(Material* material) {
 }
 
 void vk_r_destroy_geometry(Geometry* geometry) {
-  if (geometry && geometry->internal_id != INVALID_ID) {
-    vkDeviceWaitIdle(vk->device.logical_device);
-    VK_GeometryData* internal_data = &vk->render.geometries[geometry->internal_id];
+  // if (geometry && geometry->internal_id != INVALID_ID) {
+  //   vkDeviceWaitIdle(vk->device.logical_device);
+  //   VK_GeometryData* internal_data = &vk->render.geometries[geometry->internal_id];
 
-    // Free vertex data
-    free_data_range(&vk->render.obj_vertex_buffer, internal_data->vertex_buffer_offset, internal_data->vertex_size * internal_data->vertex_count);
+  //   // Free vertex data
+  //   free_data_range(&vk->render.obj_vertex_buffer, internal_data->vertex_buffer_offset, internal_data->vertex_size * internal_data->vertex_count);
 
-    // Free index data, if applicable
-    if (internal_data->index_size > 0) {
-      free_data_range(&vk->render.obj_index_buffer, internal_data->index_buffer_offset, internal_data->index_size * internal_data->index_count);
-    }
+  //   // Free index data, if applicable
+  //   if (internal_data->index_size > 0) {
+  //     free_data_range(&vk->render.obj_index_buffer, internal_data->index_buffer_offset, internal_data->index_size * internal_data->index_count);
+  //   }
 
-    // Clean up data.
-    MemZeroStruct(internal_data);
-    internal_data->id = INVALID_ID;
-    internal_data->generation = INVALID_ID;
-  }
+  //   // Clean up data.
+  //   MemZeroStruct(internal_data);
+  //   internal_data->id = INVALID_ID;
+  //   internal_data->generation = INVALID_ID;
+  // }
 }
 
 void vk_r_draw_geometry(GeometryRenderData data) {
 
 
-  if (data.geometry && data.geometry->internal_id == INVALID_ID) {
-    return;
-  }
+  // if (data.geometry && data.geometry->internal_id == INVALID_ID) {
+  //   return;
+  // }
   
-  VK_GeometryData* buffer_data = &vk->render.geometries[data.geometry->internal_id];
-  VK_CommandBuffer& cmd = vk_get_current_cmd();
+  // VK_GeometryData* buffer_data = &vk->render.geometries[data.geometry->internal_id];
+  // VK_CommandBuffer& cmd = vk_get_current_cmd();
   
-  Material* m = 0;
-  if (data.geometry->material) {
-    m = data.geometry->material;
-  } else {
-    m = material_sys_get_default(); 
-  }
+  // Material* m = 0;
+  // if (data.geometry->material) {
+  //   m = data.geometry->material;
+  // } else {
+  //   m = material_sys_get_default(); 
+  // }
   
-  switch (m->type) {
-    case MaterialType_World: {
-      vk_material_shader_set_model(&vk->render.material_shader, data.model);
-      vk_material_shader_apply_material(&vk->render.material_shader, m);
-    } break;
-    case MaterialType_UI: {
-      vk_ui_shader_set_model(&vk->render.ui_shader, data.model);
-      vk_ui_shader_apply_material(&vk->render.ui_shader, m);
-    } break;
-      default:
-        Error("vk_r_draw_geometry - unknown material type %i", m->type);
-  }
+  // switch (m->type) {
+  //   case MaterialType_World: {
+  //     vk_material_shader_set_model(&vk->render.material_shader, data.model);
+  //     vk_material_shader_apply_material(&vk->render.material_shader, m);
+  //   } break;
+  //   case MaterialType_UI: {
+  //     vk_ui_shader_set_model(&vk->render.ui_shader, data.model);
+  //     vk_ui_shader_apply_material(&vk->render.ui_shader, m);
+  //   } break;
+  //     default:
+  //       Error("vk_r_draw_geometry - unknown material type %i", m->type);
+  // }
 
   // Bind vertex buffer at offset
-  VkDeviceSize offsets[1] = {buffer_data->vertex_buffer_offset};
-  vkCmdBindVertexBuffers(cmd, 0, 1, &vk->render.obj_vertex_buffer.handle, offsets);
+  // VkDeviceSize offsets[1] = {buffer_data->vertex_buffer_offset};
+  // vkCmdBindVertexBuffers(cmd, 0, 1, &vk->render.obj_vertex_buffer.handle, offsets);
   
-  // Draw indexed or non-indexed
-  if (buffer_data->index_count > 0) {
-    // Bind index buffer at offset
-    vkCmdBindIndexBuffer(cmd, vk->render.obj_index_buffer.handle, buffer_data->index_buffer_offset, VK_INDEX_TYPE_UINT32);
+  // // Draw indexed or non-indexed
+  // if (buffer_data->index_count > 0) {
+  //   // Bind index buffer at offset
+  //   vkCmdBindIndexBuffer(cmd, vk->render.obj_index_buffer.handle, buffer_data->index_buffer_offset, VK_INDEX_TYPE_UINT32);
 
-    // Issue the draw
-    vkCmdDrawIndexed(cmd, buffer_data->index_count, 1, 0, 0, 0);
-  } else {
-    vkCmdDraw(cmd, buffer_data->vertex_count, 1, 0, 0);
-  }
+  //   // Issue the draw
+  //   vkCmdDrawIndexed(cmd, buffer_data->index_count, 1, 0, 0, 0);
+  // } else {
+  //   vkCmdDraw(cmd, buffer_data->vertex_count, 1, 0, 0);
+  // }
 }
