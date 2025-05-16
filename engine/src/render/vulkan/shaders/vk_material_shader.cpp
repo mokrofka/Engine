@@ -150,7 +150,6 @@ VK_MaterialShader vk_material_shader_create() {
     VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
     true);
-  vk_buffer_map_memory(&shader.global_uniform_buffer, 0, shader.global_uniform_buffer.size);
   
   // Allocate global descriptor sets
   VkDescriptorSetLayout global_layouts[] = {

@@ -375,6 +375,15 @@ void clock_stop(Clock *clock) {
   clock->start_time = 0;
 }
 
+f64 delta_time_second;
+void os_set_delta_time_second(f64 delta_time) {
+  delta_time_second = delta_time; 
+};
+
+f64 os_get_delta_time_second() {
+  return delta_time_second; 
+}
+
 ///////////////////////////////////////////////////////////////////////////
 // Win proc
 LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);

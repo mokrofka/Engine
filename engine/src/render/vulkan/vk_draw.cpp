@@ -41,12 +41,6 @@ void descriptor_update() {
   VK_CommandBuffer cmd = vk_get_current_cmd();
   
   VkDescriptorSet descriptor_set = vk->descriptor_sets[vk->frame.image_index];
-  // VkDescriptorSet descriptor_set_new = vk->descriptor_sets_new[vk->frame.image_index];
-  // VkDescriptorSet descriptor_set_texture = vk->descriptor_sets_texture[vk->frame.image_index];
-  
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->shader.pipeline.pipeline_layout, 0, 1, &descriptor_set, 0, null);
-  // vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->shader.pipeline.pipeline_layout, 1, 1, &descriptor_set_new, 0, null);
-  // vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->shader.pipeline.pipeline_layout, 1, 1, &descriptor_set_texture, 0, null);
   
   MemRange mem_range = vk->uniform_buffer_mem_range;
   MemRange mem_range_new = vk->uniform_buffer_mem_range_new;
@@ -56,54 +50,41 @@ void descriptor_update() {
   buffer_info.buffer = vk->uniform_buffer.handle;
   buffer_info.offset = offset;
   buffer_info.range = range;
-  
-  // u64 range_new = mem_range_new.size;
-  // u64 offset_new = mem_range_new.offset;
-  // VkDescriptorBufferInfo buffer_info_new;
-  // buffer_info_new.buffer = vk->uniform_buffer.handle;
-  // buffer_info_new.offset = offset_new;
-  // buffer_info_new.range = range_new;
-  
+
   // Update descriptor sets
-  VkWriteDescriptorSet descriptor_write = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-  descriptor_write.dstSet = descriptor_set;
-  descriptor_write.dstBinding = 0;
-  descriptor_write.dstArrayElement = 0;
-  descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  descriptor_write.descriptorCount = 1;
-  descriptor_write.pBufferInfo = &buffer_info;
-  
-  // VkWriteDescriptorSet descriptor_write_new = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-  // descriptor_write_new.dstSet = descriptor_set_new;
-  // descriptor_write_new.dstBinding = 0;
-  // descriptor_write_new.dstArrayElement = 0;
-  // descriptor_write_new.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  // descriptor_write_new.descriptorCount = 1;
-  // descriptor_write_new.pBufferInfo = &buffer_info_new;
-  
-  // vkUpdateDescriptorSets(vkdevice, 1, &descriptor_write, 0, null);
-  // vkUpdateDescriptorSets(vkdevice, 1, &descriptor_write_new, 0, null);
+  VkWriteDescriptorSet ubo_descriptor = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+  ubo_descriptor.dstSet = descriptor_set;
+  ubo_descriptor.dstBinding = 0;
+  ubo_descriptor.dstArrayElement = 0;
+  ubo_descriptor.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  ubo_descriptor.descriptorCount = 1;
+  ubo_descriptor.pBufferInfo = &buffer_info;
   
   VkDescriptorImageInfo image_info;
   image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
   image_info.imageView = vk->texture.image.view;
   image_info.sampler = vk->texture.sampler;
 
-  VkWriteDescriptorSet descriptor = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-  descriptor.dstSet = descriptor_set;
-  descriptor.dstBinding = 0;
-  descriptor.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  descriptor.descriptorCount = 1;
-  descriptor.pImageInfo = &image_info;
-  // vkUpdateDescriptorSets(vkdevice, 1, &descriptor_write, 0, null);
-  VkWriteDescriptorSet writes[2] = {descriptor_write, descriptor};
-  vkUpdateDescriptorSets(vkdevice, 1, &descriptor, 0, null);
+  VkWriteDescriptorSet texture_descriptor = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+  texture_descriptor.dstSet = descriptor_set;
+  texture_descriptor.dstBinding = 1;
+  texture_descriptor.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  texture_descriptor.descriptorCount = 1;
+  texture_descriptor.pImageInfo = &image_info;
+  VkWriteDescriptorSet descriptors[] = {ubo_descriptor, texture_descriptor};
+  
+  vkUpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->shader.pipeline.pipeline_layout, 0, 1, &descriptor_set, 0, null);
 }
 
 void vk_draw() {
   VK_CommandBuffer cmd = vk_get_current_cmd();
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->shader.pipeline.handle);
   descriptor_update();
+  
+  // VkDescriptorSet descriptor_set = te.descriptors[vk->frame.image_index];
+  // i32 a = (descriptor_update(), 1);
+  // vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->shader.pipeline.pipeline_layout, 0, 1, &descriptor_set, 0, null);
   
   Loop (i, vk->entity_count) {
     u32 entity = vk->entities[i];

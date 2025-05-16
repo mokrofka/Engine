@@ -253,6 +253,8 @@ internal void destroy_texture(Texture* t) {
 void texture_load(String name) {
   Texture texture = res_texture_load(name);
   vk_texture_load(&texture);
+  
+  // vk_r_create_texture(tex.data, tex.width, tex.height, tex.channel_count);
   // vk_r_create_texture(texture.data, texture.width, texture.height, texture.channel_count);
   
 }

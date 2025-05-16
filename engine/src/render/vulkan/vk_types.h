@@ -495,6 +495,14 @@ struct VK {
 #endif
 };
 
+struct Te {
+  VK_Texture texture;
+  VkDescriptorSetLayout layout;
+  VkDescriptorSet descriptors[3];
+  VkDescriptorPool descriptor_pool;
+};
+extern Te te;
+
 extern VK* vk;
 
 INLINE i32 vk_find_memory_index(u32 type_filter, u32 property_flags) {

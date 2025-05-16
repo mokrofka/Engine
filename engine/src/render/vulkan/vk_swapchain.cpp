@@ -79,10 +79,6 @@ internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
       break;
     }
   }
-  VkSurfaceFormatKHR format;
-  Loop (i, 4) {
-     format = vk->device.swapchain_support.formats[i];
-  }
   
   if (!found) {
     swapchain.image_format = vk->device.swapchain_support.formats[0];

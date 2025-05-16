@@ -282,6 +282,7 @@ void engine_run(App* app) {
       
       f64 frame_end_time = os_now_seconds();
       f64 frame_elapsed_time = frame_end_time - frame_start_time;
+      os_set_delta_time_second(frame_elapsed_time);
       running_time += frame_elapsed_time;
       f64 remaining_seconds = target_frame_seconds - frame_elapsed_time;
 

@@ -61,53 +61,36 @@ void vk_descriptor_pool_create() {
 }
 
 void vk_descriptor_set_create() {
-  // VkDescriptorSetLayoutBinding g_ubo_layout_binding = {};
-  // g_ubo_layout_binding.binding = 0;           // binding in shader
-  // g_ubo_layout_binding.descriptorCount = 1; // how much you have seperate resources you can access in shader (array)
-  // g_ubo_layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  // g_ubo_layout_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+  VkDescriptorSetLayoutBinding ubo_layout_binding = {};
+  ubo_layout_binding.binding = 0;           // binding in shader
+  ubo_layout_binding.descriptorCount = 1; // how much you have seperate resources you can access in shader (array)
+  ubo_layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  ubo_layout_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
   
   VkDescriptorSetLayoutBinding texture_layout_binding = {};
-  texture_layout_binding.binding = 0;           // binding in shader
+  texture_layout_binding.binding = 1;           // binding in shader
   texture_layout_binding.descriptorCount = 1; // how much you have seperate resources you can access in shader (array)
   texture_layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
   texture_layout_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-  // VkDescriptorSetLayoutBinding layout_bindings[2] = {g_ubo_layout_binding, texture_layout_binding};
+  VkDescriptorSetLayoutBinding layout_bindings[] = {ubo_layout_binding, texture_layout_binding};
   
-  VkDescriptorSetLayoutCreateInfo g_layout_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-  g_layout_info.bindingCount = 1;
-  g_layout_info.pBindings = &texture_layout_binding;
-  VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &g_layout_info, vk->allocator, &vk->descriptor_set_layout));
-  // VkDescriptorSetLayoutCreateInfo texture_layout_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-  // texture_layout_info.bindingCount = 1;
-  // texture_layout_info.pBindings = &texture_layout_binding;
-  // VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &texture_layout_info, vk->allocator, &vk->texture_descriptor_set_layout));
+  VkDescriptorSetLayoutCreateInfo layout_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+  layout_info.bindingCount = ArrayCount(layout_bindings);
+  layout_info.pBindings = layout_bindings;
+  VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &layout_info, vk->allocator, &vk->descriptor_set_layout));
 }
 
 void vk_descriptor_set_alloc() {
-  VkDescriptorSetLayout global_layouts[] = {
+  VkDescriptorSetLayout layouts[] = {
     vk->descriptor_set_layout,
     vk->descriptor_set_layout,
     vk->descriptor_set_layout};
     
   VkDescriptorSetAllocateInfo alloc_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
   alloc_info.descriptorPool = vk->descriptor_pool;
-  alloc_info.descriptorSetCount = 3;
-  alloc_info.pSetLayouts = global_layouts;
+  alloc_info.descriptorSetCount = ArrayCount(layouts);
+  alloc_info.pSetLayouts = layouts;
   VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, vk->descriptor_sets));
-  // VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, vk->descriptor_sets_new));
-  
-  // VkDescriptorSetLayout texture_layouts[] = {
-  //   vk->texture_descriptor_set_layout,
-  //   vk->texture_descriptor_set_layout,
-  //   vk->texture_descriptor_set_layout};
-  
-  // VkDescriptorSetAllocateInfo texture_alloc_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-  // texture_alloc_info.descriptorPool = vk->descriptor_pool;
-  // texture_alloc_info.descriptorSetCount = 3;
-  // texture_alloc_info.pSetLayouts = texture_layouts;
-  // VK_CHECK(vkAllocateDescriptorSets(vkdevice, &texture_alloc_info, vk->descriptor_sets_texture));
 }
 
 void vk_r_shader_create(Shader* s, void* data, u64 data_size, u64 push_size) {
@@ -117,7 +100,7 @@ void vk_r_shader_create(Shader* s, void* data, u64 data_size, u64 push_size) {
   vk->sparse_push_constants.capacity = MaxEntities;
   vk->sparse_push_constants.size = 0;
 
-  // storage buffer
+  // uniform buffer
   u64 uniform_buffer_offset = vk_buffer_alloc(&vk->uniform_buffer, data_size*10, 64);
   MemRange range = {uniform_buffer_offset, data_size};
   vk->uniform_buffer_mem_range = range;
@@ -291,10 +274,8 @@ VK_Pipeline vk_pipeline_create(
   pipeline_layout_create_info.pPushConstantRanges = &push_constant;
   
   // Descriptor set layouts
-  VkDescriptorSetLayout set_layouts[1] = {
+  VkDescriptorSetLayout set_layouts[] = {
     vk->descriptor_set_layout,
-    // vk->descriptor_set_layout,
-    // vk->texture_descriptor_set_layout,
   };
   pipeline_layout_create_info.setLayoutCount = ArrayCount(set_layouts);
   pipeline_layout_create_info.pSetLayouts = set_layouts;

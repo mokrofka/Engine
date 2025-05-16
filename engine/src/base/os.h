@@ -113,5 +113,7 @@ VoidProc* os_lib_get_proc(OS_Handle lib, String name);
 void clock_update(Clock* clock);
 void clock_start(Clock* clock);
 void clock_stop(Clock* clock);
+void os_set_delta_time_second(f64 delta_time);
+KAPI f64 os_get_delta_time_second();
 
 void os_show_window();

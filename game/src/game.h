@@ -14,6 +14,8 @@ C_LINKAGE_END
 struct Object {
   u32 id;
   v3 position;
+  v3 velocity;
+  v3 acceleration;
 };
 
 struct GameState {
@@ -32,6 +34,9 @@ struct GameState {
   b8 camera_view_dirty;
   v3 camera_position;
   v3 camera_direction;
+  Object* objs;
+  u32 obj_count;
+  f32 rot;
 };
 
 extern GameState* state;

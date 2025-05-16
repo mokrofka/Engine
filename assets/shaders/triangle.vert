@@ -19,9 +19,9 @@ layout(location = 0) out out_data {
 } outd;
 
 void main() {
-  // gl_Position = ubo.projection_view * push_ubo.model * vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
+  gl_Position = ubo.projection_view * push_ubo.model * vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
   // gl_Position = push_ubo.model * vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
-  gl_Position = vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
+  // gl_Position = vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
   outd.color = in_color;
   outd.tex_coord = in_tex_coord;
 }

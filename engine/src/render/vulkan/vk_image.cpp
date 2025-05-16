@@ -195,6 +195,7 @@ void vk_image_destroy(VK_Image* image) {
   }
 }
 
+i32 te_texture_load();
 void vk_texture_load(Texture* texture) {
   VK_Texture* data = &vk->texture;
   
@@ -209,7 +210,7 @@ void vk_texture_load(Texture* texture) {
     texture->height, 
     image_format, 
     VK_IMAGE_TILING_OPTIMAL, 
-    VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     true,
     VK_IMAGE_ASPECT_COLOR_BIT);
@@ -254,4 +255,7 @@ void vk_texture_load(Texture* texture) {
   sampler_info.maxLod = 0.0f;
   
   VkResult result = vkCreateSampler(vkdevice, &sampler_info, vk->allocator, &data->sampler);
+  
+  // TODO
+  // i32 a = te_texture_load();
 }
