@@ -1,7 +1,6 @@
 #include "render/vulkan/vk_utils.h"
 #include "vk_types.h"
 #include "vk_buffer.h"
-#include "vk_pipeline.h"
 
 #include "sys/shader_sys.h"
 #include "sys/res_sys.h"

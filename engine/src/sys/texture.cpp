@@ -42,7 +42,7 @@ void texture_system_init(Arena* arena, TextureSystemConfig config) {
   invalid_ref.auto_release = false;
   invalid_ref.handle = INVALID_ID; // Primary reason for needing default values
   invalid_ref.reference_count = 0;
-  hashmap_fill(&state->registered_texture_table, &invalid_ref);
+  hashmap_fill(state->registered_texture_table, &invalid_ref);
   
   // Invalidate all textures in the array
   u32 count = state->config.max_texture_count;
@@ -134,7 +134,7 @@ void texture_system_release(String name) {
     return;
   }
   TextureRef ref;
-  hashmap_get(&state->registered_texture_table, name, &ref);
+  hashmap_get(state->registered_texture_table, name, &ref);
   if (ref.reference_count == 0) {
     Warn("Tried to release non-existent texture: '%s'", name);
     return;
@@ -160,7 +160,7 @@ void texture_system_release(String name) {
   }
 
   // Update the entry.
-  hashmap_set(&state->registered_texture_table, name_copy, &ref);
+  hashmap_set(state->registered_texture_table, name_copy, &ref);
 }
 
 Texture* texture_system_get_default_texture() {

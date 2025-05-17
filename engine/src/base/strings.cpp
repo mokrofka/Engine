@@ -339,13 +339,14 @@ String push_str_copy(Arena* arena, String s) {
 
 String push_strfv(Arena* arena, const void* format, void* argc) {
   va_list argc_copy = (va_list)argc;
-  u32 need_bytes = my_vsnprintf(0, 0, format, argc);
+  u32 need_bytes = my_vsnprintf(0, 0, format, argc) + 1;
   va_end(argc_copy);
   
   u8* buffer = push_buffer(arena, u8, need_bytes);
   u32 final_size = my_vsnprintf(buffer, need_bytes, format, argc_copy);
   
   String result = {buffer, final_size};
+  result.str[result.size] = 0;
   return result;
 }
 

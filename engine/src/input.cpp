@@ -83,7 +83,7 @@ void input_process_mouse_move(u32 x, u32 y) {
   // Only process if actually different.
   if (state->mouse_current.x != x || state->mouse_current.y != y) {
     // NOTE: Enable this if debugging.
-    // Debug("Mouse pos: %i, %i!", x, y);
+    Debug("Mouse pos: %i, %i!", x, y);
     
     state->mouse_current.x = x;
     state->mouse_current.y = y;
@@ -119,6 +119,14 @@ b32 input_was_key_down(Keys key) {
 
 b32 input_was_key_up(Keys key) {
   return state->keyboard_previous.keys[key] == false;
+}
+
+b32 input_was_key_pressed(Keys key) {
+  return input_is_key_down(key) && input_was_key_up(key);
+}
+
+b32 input_was_key_released(Keys key) {
+  return input_is_key_up(key) && input_was_key_down(key);
 }
 
 // mouse input

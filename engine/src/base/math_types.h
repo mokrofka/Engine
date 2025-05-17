@@ -19,10 +19,10 @@ union v2i {
   i32 e[2];
   struct {
     union {
-      f32 x,r,u;
+      i32 x,r,u;
     };
     union {
-      f32 y,g,v;
+      i32 y,g,v;
     };
   };
   v2i () = default;

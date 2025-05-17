@@ -28,12 +28,24 @@ INLINE f32 Sin(f32 a) {
   return __builtin_sinf(a);
 }
 
+INLINE f32 SinD(f32 a) {
+  return Sin(a * DegToRad_Multiplier);
+}
+
 INLINE f32 Cos(f32 a) {
   return __builtin_cosf(a);
 }
 
+INLINE f32 CosD(f32 a) {
+  return Cos(a * DegToRad_Multiplier);
+}
+
 INLINE f32 Tan(f32 a) {
   return __builtin_tanf(a);
+}
+
+INLINE f32 Asin(f32 a) {
+  return __builtin_asin(a);
 }
 
 INLINE f32 Acos(f32 a) {
@@ -218,13 +230,7 @@ INLINE f32 v2_length(v2 a) {
   return Sqrt(v2_length_squared(a));
 }
 
-INLINE void v2_normalize(v2* a) {
-  f32 length = v2_length(*a);
-  a->x /= length;
-  a->y /= length;
-}
-
-INLINE v2 v2_normal(v2 a) {
+INLINE v2 v2_normalize(v2 a) {
   f32 length = v2_length(a);
   a.x /= length;
   a.y /= length;
@@ -344,14 +350,7 @@ INLINE f32 v3_length(v3 a) {
   return Sqrt(v3_length_squared(a));
 }
 
-INLINE void v3_normalize(v3* a) {
-  f32 length = v3_length(*a);
-  a->x /= length;
-  a->y /= length;
-  a->z /= length;
-}
-
-INLINE v3 v3_normal(v3 a) {
+INLINE v3 v3_normalize(v3 a) {
   f32 length = v3_length(a);
   a.x /= length;
   a.y /= length;
@@ -441,14 +440,7 @@ INLINE f32 v4_length(v4 a) {
   return Sqrt(v4_length_squared(a));
 }
 
-INLINE void v4_normalize(v4* a) {
-  f32 length = v4_length(*a);
-  a->x /= length;
-  a->y /= length;
-  a->z /= length;
-}
-
-INLINE v4 v4_normal(v4 a) {
+INLINE v4 v4_normalize(v4 a) {
   f32 length = v4_length(a);
   a.x /= length;
   a.y /= length;
@@ -528,9 +520,8 @@ inline mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 Near, f32 Fa
 }
 
 inline mat4 mat4_look_at(v3 position, v3 target, v3 up) {
-  // v3 z = v3_normal(target - position);
-  v3 z = v3_normal(position - target);
-  v3 x = v3_normal(v3_cross(up, z));
+  v3 z = v3_normalize(position - target);
+  v3 x = v3_normalize(v3_cross(up, z));
   v3 y = v3_cross(z, x);
   
   mat4 camera_view = {
@@ -689,7 +680,7 @@ INLINE v3 mat4_forward(mat4 matrix) {
   forward.x = -matrix.data[2];
   forward.y = -matrix.data[6];
   forward.z = -matrix.data[10];
-  v3_normalize(&forward);
+  forward = v3_normalize(forward);
   return forward;
 }
 
@@ -698,7 +689,7 @@ INLINE v3 mat4_backward(mat4 matrix) {
   backward.x = matrix.data[2];
   backward.y = matrix.data[6];
   backward.z = matrix.data[10];
-  v3_normalize(&backward);
+  backward = v3_normalize(backward);
   return backward;
 }
 
@@ -707,7 +698,7 @@ INLINE v3 mat4_up(mat4 matrix) {
   up.x = matrix.data[1];
   up.y = matrix.data[5];
   up.z = matrix.data[9];
-  v3_normalize(&up);
+  up = v3_normalize(up);
   return up;
 }
 
@@ -716,7 +707,7 @@ INLINE v3 mat4_down(mat4 matrix) {
   down.x = -matrix.data[1];
   down.y = -matrix.data[5];
   down.z = -matrix.data[9];
-  v3_normalize(&down);
+  down = v3_normalize(down);
   return down;
 }
 
@@ -725,7 +716,7 @@ INLINE v3 mat4_left(mat4 matrix) {
   right.x = -matrix.data[0];
   right.y = -matrix.data[4];
   right.z = -matrix.data[8];
-  v3_normalize(&right);
+  right = v3_normalize(right);
   return right;
 }
 
@@ -734,7 +725,7 @@ INLINE v3 mat4_right(mat4 matrix) {
   left.x = matrix.data[0];
   left.y = matrix.data[4];
   left.z = matrix.data[8];
-  v3_normalize(&left);
+  left = v3_normalize(left);
   return left;
 }
 

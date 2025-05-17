@@ -425,6 +425,8 @@ struct vk_Shader {
   VK_Pipeline pipeline;
   VkPipelineLayout pipeline_layout;
   VK_ShaderStage stages[3];
+  u32 entities[1024];
+  u32 entity_count;
 };
 
 // struct Entity {
@@ -472,23 +474,25 @@ struct VK {
   VK_Buffer index_buffer;
   VK_Buffer stage_buffer;
   VK_Buffer uniform_buffer;
-  VK_GeometryData geometries[10];
+  
   VkDescriptorPool descriptor_pool;
   VkDescriptorSetLayout descriptor_set_layout;
-  VkDescriptorSetLayout texture_descriptor_set_layout;
-  vk_Shader shader;
   VkDescriptorSet descriptor_sets[3];
-  VkDescriptorSet descriptor_sets_new[3];
-  VkDescriptorSet descriptor_sets_texture[3];
+  
+  vk_Shader shader;
   u32 entity_count;
   u32 entities[MaxEntities];
   MemRange uniform_buffer_mem_range;
-  MemRange uniform_buffer_mem_range_new;
   u64 vulkan_driver_memory_allocated;
   VK_Mesh meshes[10];
   SparseSetKeep sparse_push_constants;
 
-  VK_Texture texture;
+  VK_Texture texture; // TODO bindless textures
+  
+  // Shader
+  vk_Shader shaders[10];
+  u32 shader_count;
+  SparseSetKeep sparse_push_constants_array[10];
   
 #if _DEBUG
   VkDebugUtilsMessengerEXT debug_messenger;

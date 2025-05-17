@@ -1,4 +1,4 @@
 #pragma once
 #include "lib.h"
 
-void camera_manage();
+void camera_update();

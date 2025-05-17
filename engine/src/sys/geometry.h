@@ -11,3 +11,5 @@ void geometry_sys_init(Arena* arena, GeometrySysConfig config);
 
 KAPI u32 geometry_create(Geometry geometry);
 KAPI void geometry_destroy(u32 id);
+
+KAPI u32 geometry_get(String name);

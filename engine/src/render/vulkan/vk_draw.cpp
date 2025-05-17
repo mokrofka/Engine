@@ -43,7 +43,6 @@ void descriptor_update() {
   VkDescriptorSet descriptor_set = vk->descriptor_sets[vk->frame.image_index];
   
   MemRange mem_range = vk->uniform_buffer_mem_range;
-  MemRange mem_range_new = vk->uniform_buffer_mem_range_new;
   u64 range = mem_range.size;
   u64 offset = mem_range.offset;
   VkDescriptorBufferInfo buffer_info;
@@ -79,25 +78,27 @@ void descriptor_update() {
 
 void vk_draw() {
   VK_CommandBuffer cmd = vk_get_current_cmd();
-  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->shader.pipeline.handle);
-  descriptor_update();
-  
-  // VkDescriptorSet descriptor_set = te.descriptors[vk->frame.image_index];
-  // i32 a = (descriptor_update(), 1);
-  // vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->shader.pipeline.pipeline_layout, 0, 1, &descriptor_set, 0, null);
-  
-  Loop (i, vk->entity_count) {
-    u32 entity = vk->entities[i];
-    VK_Mesh& mesh = vk->meshes[sparse.get_data(entity)];
-    void* push_constant = vk->sparse_push_constants.get_data(entity);
-    u32 push_constant_size = vk->sparse_push_constants.element_size;
-    vkCmdPushConstants(cmd, vk->shader.pipeline.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, push_constant_size, push_constant);
-    vkCmdBindVertexBuffers(cmd, 0, 1, &vk->vert_buffer.handle, &mesh.offset);
-    vkCmdDraw(cmd, mesh.vert_count, 1, 0, 0);
-  }
+  // Loop (j, vk->shader_count) {
+    // vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->shaders[j].pipeline.handle);
+    // u32* entities = vk->shaders[j].entities;
+    // u32 entity_count = vk->shaders[j].entity_count;
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->shader.pipeline.handle);
+    descriptor_update(); // TODO make descriptors
+    
+    Loop (i, vk->entity_count) {
+    // Loop (i, vk->entity_count) {
+      u32 entity = vk->entities[i];
+      VK_Mesh& mesh = vk->meshes[sparse.get_data(entity)];
+      void* push_constant = vk->sparse_push_constants.get_data(entity);
+      u32 push_constant_size = vk->sparse_push_constants.element_size;
+      vkCmdPushConstants(cmd, vk->shader.pipeline.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, push_constant_size, push_constant);
+      vkCmdBindVertexBuffers(cmd, 0, 1, &vk->vert_buffer.handle, &mesh.offset);
+      vkCmdDraw(cmd, mesh.vert_count, 1, 0, 0);
+    }
+  // }
 }
 
-void vk_make_renderable(u32 id, u32 geom_id) {
+void vk_make_renderable(u32 id, u32 geom_id, u32 shader_id) {
   sparse.insert_data(id, geom_id);
   vk->sparse_push_constants.insert_data(id);
   vk->entities[vk->entity_count] = id;

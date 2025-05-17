@@ -14,6 +14,13 @@ struct WindowPlatformState {
 };
 
 struct PlatformState {
+  b8 is_mouse;
+  f32 pos_x;
+  f32 pos_y;
+  f32 delta_x;
+  f32 delta_y;
+  f32 old_x;
+  f32 old_y;
   HINSTANCE instance;
   Window* window;
   WindowClosedCallback window_closed_callback;
@@ -39,6 +46,7 @@ internal void clock_setup() {
 
 void platform_init(Arena* arena) {
   state = push_struct(arena, PlatformState);
+  state->is_mouse = true;
   
   state->instance = GetModuleHandleA(0);
 
@@ -196,6 +204,30 @@ void* os_get_window_handle() {
 
 v2i os_get_framebuffer_size() {
   return v2i(state->window->width, state->window->height);
+}
+
+void os_mouse_enable() {
+  state->is_mouse = true; 
+  ClipCursor(null);
+  ShowCursor(true);
+}
+
+void os_mouse_disable() {
+  state->is_mouse = false;
+  POINT ul = {0, 0};
+  POINT lr = {state->window->width, state->window->height};
+
+  // Convert client coords to screen coords
+  ClientToScreen((HWND)state->window->hwnd, &ul);
+  ClientToScreen((HWND)state->window->hwnd, &lr);
+
+  RECT clipRect = {ul.x, ul.y, lr.x, lr.y};
+  ClipCursor(&clipRect);
+  ShowCursor(false);
+}
+
+v2 os_get_mouse_delta() {
+  return v2(state->delta_x, state->delta_y);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -413,7 +445,7 @@ internal LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_par
       u32 height = r.bottom - r.top;
       
       Window* w = state->window;
-      
+
       if (width != w->width || height != w->height) {
         w->resizing = true;
         w->width = width;
@@ -424,8 +456,14 @@ internal LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_par
     
     case WM_MOUSEMOVE: // within client area
     case WM_NCMOUSEMOVE: { // within non-client area
+      POINT center = {state->window->width / 2, state->window->height / 2};
+      ClientToScreen((HWND)state->window->hwnd, &center);
+      
       u32 x = GET_X_LPARAM(l_param);
       u32 y = GET_Y_LPARAM(l_param);
+      if (!state->is_mouse) {
+        SetCursorPos(center.x, center.y);
+      }
       
       state->process_mouse_move(x, y);
     } break;

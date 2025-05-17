@@ -48,6 +48,7 @@ void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayo
     destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
   } else {
     Error("bad");
+    return;
   }
 
   vkCmdPipelineBarrier(

@@ -31,7 +31,7 @@ void vk_r_shader_create(struct Shader* s, void* data, u64 data_size, u64 push_si
 void vk_draw();
 KAPI void* vk_get_push_constant(u32 id);
 
-void vk_make_renderable(u32 id, u32 geom_id);
+void vk_make_renderable(u32 id, u32 geom_id, u32 shader_id);
 // void vk_r_shader_destroy(struct Shader* shader);
 
 // void vk_r_shader_initialize(struct Shader* shader);

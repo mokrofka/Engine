@@ -24,227 +24,180 @@ struct PushConstant {
   mat4 model;
 };
 
-GameState* state;
+GameState* st;
 
 struct Vertex {
   v3 position;
-  v3 color;
+  // v3 color;
   v2 tex_coord;
 };
 
-Vertex triangle_vertices[] = {
-  {v3(0.5f, -0.5f, 0.0f), v3(1.0f, 0.0f, 0.0f), {1.0f, 0.0f}},
-  {v3(-0.5f, -0.5f, 0.0f), v3(0.0f, 1.0f, 0.0f), {0.0f, 0.0f}},
-  {v3(0.0f, 0.5f, 0.0f), v3(0.0f, 0.0f, 1.0f), {0.5, 1.0f}}
+Vertex vertices[] = {
+  // Position             // Tex coord
+  // Front face
+  {{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}},
+  {{ 0.5f, -0.5f,  0.5f}, {1.0f, 0.0f}},
+  {{ 0.5f,  0.5f,  0.5f}, {1.0f, 1.0f}},
+  {{ 0.5f,  0.5f,  0.5f}, {1.0f, 1.0f}},
+  {{-0.5f,  0.5f,  0.5f}, {0.0f, 1.0f}},
+  {{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}},
+
+  // Back face
+  {{ 0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}},
+  {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f}},
+  {{-0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}},
+  {{-0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}},
+  {{ 0.5f,  0.5f, -0.5f}, {0.0f, 1.0f}},
+  {{ 0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}},
+
+  // Left face
+  {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}},
+  {{-0.5f, -0.5f,  0.5f}, {1.0f, 0.0f}},
+  {{-0.5f,  0.5f,  0.5f}, {1.0f, 1.0f}},
+  {{-0.5f,  0.5f,  0.5f}, {1.0f, 1.0f}},
+  {{-0.5f,  0.5f, -0.5f}, {0.0f, 1.0f}},
+  {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}},
+
+  // Right face
+  {{ 0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}},
+  {{ 0.5f, -0.5f, -0.5f}, {1.0f, 0.0f}},
+  {{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}},
+  {{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}},
+  {{ 0.5f,  0.5f,  0.5f}, {0.0f, 1.0f}},
+  {{ 0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}},
+
+  // Bottom face
+  {{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}},
+  {{ 0.5f, -0.5f, -0.5f}, {1.0f, 1.0f}},
+  {{ 0.5f, -0.5f,  0.5f}, {1.0f, 0.0f}},
+  {{ 0.5f, -0.5f,  0.5f}, {1.0f, 0.0f}},
+  {{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}},
+  {{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}},
+
+  // Top face
+  {{-0.5f,  0.5f,  0.5f}, {0.0f, 0.0f}},
+  {{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f}},
+  {{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}},
+  {{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}},
+  {{-0.5f,  0.5f, -0.5f}, {0.0f, 1.0f}},
+  {{-0.5f,  0.5f,  0.5f}, {0.0f, 0.0f}},
 };
 
-// Vertex cube_vertices[] = {
-//     // Front face (red)
-//     {v3(-0.5f, -0.5f,  0.5f), v3(1.0f, 0.0f, 0.0f)},
-//     {v3( 0.5f, -0.5f,  0.5f), v3(1.0f, 0.0f, 0.0f)},
-//     {v3( 0.5f,  0.5f,  0.5f), v3(1.0f, 0.0f, 0.0f)},
-
-//     {v3( 0.5f,  0.5f,  0.5f), v3(1.0f, 0.0f, 0.0f)},
-//     {v3(-0.5f,  0.5f,  0.5f), v3(1.0f, 0.0f, 0.0f)},
-//     {v3(-0.5f, -0.5f,  0.5f), v3(1.0f, 0.0f, 0.0f)},
-
-//     // Back face (green)
-//     {v3(-0.5f, -0.5f, -0.5f), v3(0.0f, 1.0f, 0.0f)},
-//     {v3( 0.5f,  0.5f, -0.5f), v3(0.0f, 1.0f, 0.0f)},
-//     {v3( 0.5f, -0.5f, -0.5f), v3(0.0f, 1.0f, 0.0f)},
-
-//     {v3( 0.5f,  0.5f, -0.5f), v3(0.0f, 1.0f, 0.0f)},
-//     {v3(-0.5f, -0.5f, -0.5f), v3(0.0f, 1.0f, 0.0f)},
-//     {v3(-0.5f,  0.5f, -0.5f), v3(0.0f, 1.0f, 0.0f)},
-
-//     // Left face (blue)
-//     {v3(-0.5f, -0.5f, -0.5f), v3(0.0f, 0.0f, 1.0f)},
-//     {v3(-0.5f, -0.5f,  0.5f), v3(0.0f, 0.0f, 1.0f)},
-//     {v3(-0.5f,  0.5f,  0.5f), v3(0.0f, 0.0f, 1.0f)},
-
-//     {v3(-0.5f,  0.5f,  0.5f), v3(0.0f, 0.0f, 1.0f)},
-//     {v3(-0.5f,  0.5f, -0.5f), v3(0.0f, 0.0f, 1.0f)},
-//     {v3(-0.5f, -0.5f, -0.5f), v3(0.0f, 0.0f, 1.0f)},
-
-//     // Right face (yellow)
-//     {v3(0.5f, -0.5f, -0.5f), v3(1.0f, 1.0f, 0.0f)},
-//     {v3(0.5f,  0.5f,  0.5f), v3(1.0f, 1.0f, 0.0f)},
-//     {v3(0.5f, -0.5f,  0.5f), v3(1.0f, 1.0f, 0.0f)},
-
-//     {v3(0.5f,  0.5f,  0.5f), v3(1.0f, 1.0f, 0.0f)},
-//     {v3(0.5f, -0.5f, -0.5f), v3(1.0f, 1.0f, 0.0f)},
-//     {v3(0.5f,  0.5f, -0.5f), v3(1.0f, 1.0f, 0.0f)},
-
-//     // Top face (cyan)
-//     {v3(-0.5f,  0.5f, -0.5f), v3(0.0f, 1.0f, 1.0f)},
-//     {v3(-0.5f,  0.5f,  0.5f), v3(0.0f, 1.0f, 1.0f)},
-//     {v3( 0.5f,  0.5f,  0.5f), v3(0.0f, 1.0f, 1.0f)},
-
-//     {v3( 0.5f,  0.5f,  0.5f), v3(0.0f, 1.0f, 1.0f)},
-//     {v3( 0.5f,  0.5f, -0.5f), v3(0.0f, 1.0f, 1.0f)},
-//     {v3(-0.5f,  0.5f, -0.5f), v3(0.0f, 1.0f, 1.0f)},
-
-//     // Bottom face (magenta)
-//     {v3(-0.5f, -0.5f, -0.5f), v3(1.0f, 0.0f, 1.0f)},
-//     {v3( 0.5f, -0.5f,  0.5f), v3(1.0f, 0.0f, 1.0f)},
-//     {v3(-0.5f, -0.5f,  0.5f), v3(1.0f, 0.0f, 1.0f)},
-
-//     {v3( 0.5f, -0.5f,  0.5f), v3(1.0f, 0.0f, 1.0f)},
-//     {v3(-0.5f, -0.5f, -0.5f), v3(1.0f, 0.0f, 1.0f)},
-//     {v3( 0.5f, -0.5f, -0.5f), v3(1.0f, 0.0f, 1.0f)},
-// };
-Vertex cube_vertices[] = {
-    // Front face (red)
-    {v3(-0.5f, -0.5f,  0.5f), v3(1.0f, 0.0f, 0.0f), {0.0f, 0.0f}},
-    {v3( 0.5f, -0.5f,  0.5f), v3(1.0f, 0.0f, 0.0f), {1.0f, 0.0f}},
-    {v3( 0.5f,  0.5f,  0.5f), v3(1.0f, 0.0f, 0.0f), {1.0f, 1.0f}},
-
-    {v3( 0.5f,  0.5f,  0.5f), v3(1.0f, 0.0f, 0.0f), {1.0f, 1.0f}},
-    {v3(-0.5f,  0.5f,  0.5f), v3(1.0f, 0.0f, 0.0f), {0.0f, 1.0f}},
-    {v3(-0.5f, -0.5f,  0.5f), v3(1.0f, 0.0f, 0.0f), {0.0f, 0.0f}},
-
-    // Back face (green)
-    {v3(-0.5f, -0.5f, -0.5f), v3(0.0f, 1.0f, 0.0f), {1.0f, 0.0f}},
-    {v3( 0.5f,  0.5f, -0.5f), v3(0.0f, 1.0f, 0.0f), {0.0f, 1.0f}},
-    {v3( 0.5f, -0.5f, -0.5f), v3(0.0f, 1.0f, 0.0f), {0.0f, 0.0f}},
-
-    {v3( 0.5f,  0.5f, -0.5f), v3(0.0f, 1.0f, 0.0f), {0.0f, 1.0f}},
-    {v3(-0.5f, -0.5f, -0.5f), v3(0.0f, 1.0f, 0.0f), {1.0f, 0.0f}},
-    {v3(-0.5f,  0.5f, -0.5f), v3(0.0f, 1.0f, 0.0f), {1.0f, 1.0f}},
-
-    // Left face (blue)
-    {v3(-0.5f, -0.5f, -0.5f), v3(0.0f, 0.0f, 1.0f), {0.0f, 0.0f}},
-    {v3(-0.5f, -0.5f,  0.5f), v3(0.0f, 0.0f, 1.0f), {1.0f, 0.0f}},
-    {v3(-0.5f,  0.5f,  0.5f), v3(0.0f, 0.0f, 1.0f), {1.0f, 1.0f}},
-
-    {v3(-0.5f,  0.5f,  0.5f), v3(0.0f, 0.0f, 1.0f), {1.0f, 1.0f}},
-    {v3(-0.5f,  0.5f, -0.5f), v3(0.0f, 0.0f, 1.0f), {0.0f, 1.0f}},
-    {v3(-0.5f, -0.5f, -0.5f), v3(0.0f, 0.0f, 1.0f), {0.0f, 0.0f}},
-
-    // Right face (yellow)
-    {v3(0.5f, -0.5f, -0.5f), v3(1.0f, 1.0f, 0.0f), {1.0f, 0.0f}},
-    {v3(0.5f,  0.5f,  0.5f), v3(1.0f, 1.0f, 0.0f), {0.0f, 1.0f}},
-    {v3(0.5f, -0.5f,  0.5f), v3(1.0f, 1.0f, 0.0f), {0.0f, 0.0f}},
-
-    {v3(0.5f,  0.5f,  0.5f), v3(1.0f, 1.0f, 0.0f), {0.0f, 1.0f}},
-    {v3(0.5f, -0.5f, -0.5f), v3(1.0f, 1.0f, 0.0f), {1.0f, 0.0f}},
-    {v3(0.5f,  0.5f, -0.5f), v3(1.0f, 1.0f, 0.0f), {1.0f, 1.0f}},
-
-    // Top face (cyan)
-    {v3(-0.5f,  0.5f, -0.5f), v3(0.0f, 1.0f, 1.0f), {0.0f, 1.0f}},
-    {v3(-0.5f,  0.5f,  0.5f), v3(0.0f, 1.0f, 1.0f), {0.0f, 0.0f}},
-    {v3( 0.5f,  0.5f,  0.5f), v3(0.0f, 1.0f, 1.0f), {1.0f, 0.0f}},
-
-    {v3( 0.5f,  0.5f,  0.5f), v3(0.0f, 1.0f, 1.0f), {1.0f, 0.0f}},
-    {v3( 0.5f,  0.5f, -0.5f), v3(0.0f, 1.0f, 1.0f), {1.0f, 1.0f}},
-    {v3(-0.5f,  0.5f, -0.5f), v3(0.0f, 1.0f, 1.0f), {0.0f, 1.0f}},
-
-    // Bottom face (magenta)
-    {v3(-0.5f, -0.5f, -0.5f), v3(1.0f, 0.0f, 1.0f), {0.0f, 1.0f}},
-    {v3( 0.5f, -0.5f,  0.5f), v3(1.0f, 0.0f, 1.0f), {1.0f, 0.0f}},
-    {v3(-0.5f, -0.5f,  0.5f), v3(1.0f, 0.0f, 1.0f), {0.0f, 0.0f}},
-
-    {v3( 0.5f, -0.5f,  0.5f), v3(1.0f, 0.0f, 1.0f), {1.0f, 0.0f}},
-    {v3(-0.5f, -0.5f, -0.5f), v3(1.0f, 0.0f, 1.0f), {0.0f, 1.0f}},
-    {v3( 0.5f, -0.5f, -0.5f), v3(1.0f, 0.0f, 1.0f), {1.0f, 1.0f}},
+f32 triangle_vertices[] = {
+  // position          // color
+  0.0f,  0.5f, 0.0f,   1.0f, 0.0f, 0.0f,  // Vertex 1: red
+ -0.5f, -0.5f, 0.0f,   0.0f, 1.0f, 0.0f,  // Vertex 2: green
+  0.5f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f   // Vertex 3: blue
 };
-Texture texture;
+
+u32 cube_create() {
+  u32 id = entity_create();
+  object_make_renderable(id, geometry_get("cube"_), shader_get("texture_shader"_));
+  return id;
+}
+
+u32 triangle_create() {
+  u32 id = entity_create();
+  object_make_renderable(id, geometry_get("triangle"_), shader_get("texture_shader"_));
+  return id;
+}
 
 void application_init(App* app) {
   Scratch scratch;
 
   app->state = push_struct(app->arena, GameState);
-  Assign(state, app->state);
-  state->arena = arena_alloc(app->arena, GameSize);
-  state->obj_count = KB(10);
-  state->objs = (Object*)mem_alloc(state->obj_count * sizeof(Object));
+  Assign(st, app->state);
+  st->arena = arena_alloc(app->arena, GameSize);
   
-  state->camera_view_dirty = true;
-  state->camera_position = v3(0,0, 10);
-  state->camera_direction = v3_zero();
+  st->obj_count = 1;
+  st->objs = (Object*)mem_alloc(st->obj_count * sizeof(Object));
+  st->obj_count_new = 1;
+  st->objs_new = (Object*)mem_alloc(st->obj_count_new * sizeof(Object));
+  
+  st->camera.view_dirty = true;
+  st->camera.position = v3(0,0, 10);
+  st->camera.yaw = -90;
+  st->camera.fov = 45;
   entity_init();
+  camera_update();
  
-  // Geom
   {
-    Geometry triangle_geom {
-      .name = "triangle"_,
-      .vertex_size = sizeof(Vertex),
-      .vertex_count = ArrayCount(triangle_vertices),
-      .vertices = triangle_vertices,
-    };
     Geometry cube_geom {
       .name = "cube"_,
       .vertex_size = sizeof(Vertex),
-      .vertex_count = ArrayCount(cube_vertices),
+      .vertex_count = ArrayCount(vertices),
+      .vertices = vertices,
+    };
+    st->cube_geom_id = geometry_create(cube_geom);
+  }
+  
+  {
+    Geometry triangle_geom {
+      .name = "triangle"_,
+      .vertex_size = sizeof(v3) + sizeof(v3),
+      .vertex_count = ArrayCount(triangle_vertices) / 6,
       .vertices = triangle_vertices,
     };
-    state->geom_id = geometry_create(cube_geom);
+    st->triangle.id = geometry_create(triangle_geom);
   }
   
-  // Shader
   {
     ShaderConfig config = {
-      .name = "triangle"_,
+      .name = "texture_shader"_,
       .has_position = true,
-      .has_color = true,
       .has_tex_coord = true,
     };
-    state->shader = shader_create(config, &state->entities_ubo, sizeof(UBO), sizeof(PushConstant));
+    shader_create(config, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
   }
+  // {
+  //   ShaderConfig config = {
+  //     .name = "color_shader"_,
+  //     .has_position = true,
+  //     .has_color = true,
+  //   };
+  //   shader_create(config, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
+  // }
   
-  texture_load("super.jpg"_);
+  texture_load("container.jpg"_);
   
-  Loop (i, state->obj_count) {
-    state->objs[i].id = entity_create();
-    object_make_renderable(state->objs[i].id, state->geom_id);
-    f32 min = -100, max = 100;
+  Loop (i, st->obj_count) {
+    st->objs[i].id = cube_create();
+    f32 min = -1, max = 1;
     f32 x = rand_in_range_f32(min, max);
     f32 y = rand_in_range_f32(min, max);
     f32 z = rand_in_range_f32(min, max);
-    state->objs[i].position = v3(x/100, y/100, z/100);
-    
-    state->objs[i].velocity = v3(x, y, z);
-    state->objs[i].acceleration = v3(x, y, z);
+    st->objs[i].position = v3(x, y, z);
   }
-  
-  // state->triangle.id = entity_create();
-  // object_make_renderable(state->triangle.id, state->geom_id);
+  Loop (i, st->obj_count_new) {
+    st->objs_new[i].id = triangle_create();
+    f32 min = -1, max = 1;
+    f32 x = rand_in_range_f32(min, max);
+    f32 y = rand_in_range_f32(min, max);
+    f32 z = rand_in_range_f32(min, max);
+    st->objs_new[i].position = v3(x, y, z);
+  }
 }
 
 void application_update(App* app) {
-  Assign(state, app->state);
-  state->delta = app->delta_time;
-  v2i frame_sise = os_get_framebuffer_size();
-  state->projection = mat4_perspective(deg_to_rad(45.0f), frame_sise.x / frame_sise.y, 0.1f, 1000.0f);
-  Object* objs = state->objs;
+  Assign(st, app->state);
+  st->delta = app->delta_time;
+  Object* objs = st->objs;
+  Object* objs_new = st->objs_new;
   
-  state->entities_ubo[0].projection_view = state->projection * state->view;
-  f32& rot = state->rot;
+  st->entities_ubo[0].projection_view = st->camera.projection * st->camera.view;
+  f32& rot = st->rot;
   rot += 0.01;
-  // mat4* model = (mat4*)vk_get_push_constant(state->triangle.id);
-  // *model = mat4_euler_y(rot) * mat4_identity();
   
-  f32 wave = Sin(os_now_seconds() / 5);
-  Loop(i, state->obj_count) {
-
-    v3 to_center = v3(0, 0, 0) - objs[i].position; // direction to origin
-    f32 dist = v3_length(to_center);
-    v3 dir = v3_normal(to_center);
-    f32 strength = 1.01f;
-
-    objs[i].acceleration *= 1.0f / (dist + 1.0f);
-    
-    objs[i].velocity += objs[i].acceleration * state->delta;
-    if (wave >= 0) {
-      objs[i].position += objs[i].velocity * state->delta;
-    } else {
-      objs[i].position -= objs[i].velocity * state->delta;
-    }
-
+  Loop(i, st->obj_count) {
     mat4* model = (mat4*)vk_get_push_constant(objs[i].id);
     *model = mat4_translation(objs[i].position) * mat4_euler_y(rot);
     *model = mat4_euler_y(rot / 2) * mat4_translation(objs[i].position);
   }
+  Loop(i, st->obj_count_new) {
+    mat4* model = (mat4*)vk_get_push_constant(objs_new[i].id);
+    *model = mat4_translation(objs_new[i].position) * mat4_euler_y(rot);
+    *model = mat4_euler_y(rot / 2) * mat4_translation(objs_new[i].position);
+  }
 
-  camera_manage();
+  camera_update();
 }

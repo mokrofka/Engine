@@ -5,6 +5,6 @@
 #include "base/strings.h"
 #include "base/maths.h"
 #include "base/os.h"
-#include "base/hashtable.h"
+#include "base/hashmap.h"
 #include "base/darray.h"
 #include "base/sparse_set.h"

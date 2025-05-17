@@ -80,6 +80,9 @@ void os_window_destroy();
 void* os_get_handle_info();
 void* os_get_window_handle();
 KAPI v2i os_get_framebuffer_size();
+KAPI void os_mouse_enable();
+KAPI void os_mouse_disable();
+KAPI v2 os_get_mouse_delta();
 
 //////////////////////////////////////////////////////////////////////////
 // Memory

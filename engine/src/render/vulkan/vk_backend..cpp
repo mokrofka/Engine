@@ -12,8 +12,6 @@
 #include "shaders/vk_material_shader.h"
 #include "shaders/vk_ui_shader.h"
 
-#include "sys/material_sys.h"
-
 // #define VulkanUseAllocator 1
 // #define VulkanAllocatorTrace 1
 

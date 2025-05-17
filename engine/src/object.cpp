@@ -24,6 +24,6 @@ void entity_destroy(u32 entity) {
   entities[--entity_count] = entity;
 }
 
-void object_make_renderable(u32 id, u32 mesh_id) {
-  vk_make_renderable(id, mesh_id);
+void object_make_renderable(u32 id, u32 mesh_id, u32 shader_id) {
+  vk_make_renderable(id, mesh_id, shader_id);
 }

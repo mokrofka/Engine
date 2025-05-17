@@ -4,8 +4,6 @@
 #include "render/vulkan/vk_pipeline.h"
 #include "render/vulkan/vk_buffer.h"
 
-#include "sys/texture.h"
-
 #define BUILTIN_SHADER_NAME_UI "Builtin.UIShader"_
 
 VK_UIShader vk_ui_shader_create() {
