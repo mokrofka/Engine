@@ -36,8 +36,10 @@ struct SparseSetIndex {
   }
 };
 SparseSetIndex sparse;
+SparseSetIndex entity_shader;
 
-void descriptor_update() {
+void descriptor_update(u32 shader_id) {
+  vk_Shader* shader = &vk->shaders[shader_id];
   VK_CommandBuffer cmd = vk_get_current_cmd();
   
   VkDescriptorSet descriptor_set = vk->descriptor_sets[vk->frame.image_index];
@@ -73,38 +75,48 @@ void descriptor_update() {
   VkWriteDescriptorSet descriptors[] = {ubo_descriptor, texture_descriptor};
   
   vkUpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->shader.pipeline.pipeline_layout, 0, 1, &descriptor_set, 0, null);
+  // vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->shader.pipeline.pipeline_layout, 0, 1, &descriptor_set, 0, null);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader->pipeline.pipeline_layout, 0, 1, &descriptor_set, 0, null);
 }
 
 void vk_draw() {
   VK_CommandBuffer cmd = vk_get_current_cmd();
-  // Loop (j, vk->shader_count) {
-    // vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->shaders[j].pipeline.handle);
-    // u32* entities = vk->shaders[j].entities;
-    // u32 entity_count = vk->shaders[j].entity_count;
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->shader.pipeline.handle);
-    descriptor_update(); // TODO make descriptors
+  Loop (j, vk->shader_count) {
+    vk_Shader* shader = &vk->shaders[j];
+    SparseSetKeep* push_constants = &shader->push_constants;
     
-    Loop (i, vk->entity_count) {
-    // Loop (i, vk->entity_count) {
-      u32 entity = vk->entities[i];
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader->pipeline.handle);
+    u32* entities = shader->entities;
+    u32 entity_count = shader->entity_count;
+    descriptor_update(j); // TODO make descriptors
+    
+    Loop (i, entity_count) {
+      u32 entity = entities[i];
       VK_Mesh& mesh = vk->meshes[sparse.get_data(entity)];
-      void* push_constant = vk->sparse_push_constants.get_data(entity);
-      u32 push_constant_size = vk->sparse_push_constants.element_size;
-      vkCmdPushConstants(cmd, vk->shader.pipeline.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, push_constant_size, push_constant);
+      void* push_constant = push_constants->get_data(entity);
+      u32 push_constant_size = push_constants->element_size;
+      vkCmdPushConstants(cmd, shader->pipeline.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, push_constant_size, push_constant);
       vkCmdBindVertexBuffers(cmd, 0, 1, &vk->vert_buffer.handle, &mesh.offset);
       vkCmdDraw(cmd, mesh.vert_count, 1, 0, 0);
     }
-  // }
+  }
 }
 
 void vk_make_renderable(u32 id, u32 geom_id, u32 shader_id) {
+  u32 entity_count = vk->shaders[shader_id].entity_count++;
+  vk_Shader* shader = &vk->shaders[shader_id];
+  shader->entities[entity_count] = id;
+  shader->push_constants.insert_data(id);
+  
   sparse.insert_data(id, geom_id);
-  vk->sparse_push_constants.insert_data(id);
-  vk->entities[vk->entity_count] = id;
-  ++vk->entity_count;
+  entity_shader.insert_data(id, shader_id);
+}
+
+void vk_remove_renderable(u32 id) {
+
 }
 
 KAPI void* vk_get_push_constant(u32 id) {
-  return vk->sparse_push_constants.get_data(id);
+  u32 shader_id = entity_shader.get_data(id);
+  return vk->shaders[shader_id].push_constants.get_data(id);
 }

@@ -98,7 +98,7 @@ u32 cube_create() {
 
 u32 triangle_create() {
   u32 id = entity_create();
-  object_make_renderable(id, geometry_get("triangle"_), shader_get("texture_shader"_));
+  object_make_renderable(id, geometry_get("triangle"_), shader_get("color_shader"_));
   return id;
 }
 
@@ -109,10 +109,15 @@ void application_init(App* app) {
   Assign(st, app->state);
   st->arena = arena_alloc(app->arena, GameSize);
   
-  st->obj_count = 1;
+  u32 count = 1;
+  u32 capacity = KB(10);
+  st->obj_count = capacity;
   st->objs = (Object*)mem_alloc(st->obj_count * sizeof(Object));
-  st->obj_count_new = 1;
+  st->obj_count_new = capacity;
   st->objs_new = (Object*)mem_alloc(st->obj_count_new * sizeof(Object));
+  
+  st->obj_count = count;
+  st->obj_count_new = count;
   
   st->camera.view_dirty = true;
   st->camera.position = v3(0,0, 10);
@@ -149,20 +154,20 @@ void application_init(App* app) {
     };
     shader_create(config, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
   }
-  // {
-  //   ShaderConfig config = {
-  //     .name = "color_shader"_,
-  //     .has_position = true,
-  //     .has_color = true,
-  //   };
-  //   shader_create(config, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
-  // }
+  {
+    ShaderConfig config = {
+      .name = "color_shader"_,
+      .has_position = true,
+      .has_color = true,
+    };
+    shader_create(config, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
+  }
   
   texture_load("container.jpg"_);
   
+  f32 min = -100, max = 100;
   Loop (i, st->obj_count) {
     st->objs[i].id = cube_create();
-    f32 min = -1, max = 1;
     f32 x = rand_in_range_f32(min, max);
     f32 y = rand_in_range_f32(min, max);
     f32 z = rand_in_range_f32(min, max);
@@ -170,7 +175,6 @@ void application_init(App* app) {
   }
   Loop (i, st->obj_count_new) {
     st->objs_new[i].id = triangle_create();
-    f32 min = -1, max = 1;
     f32 x = rand_in_range_f32(min, max);
     f32 y = rand_in_range_f32(min, max);
     f32 z = rand_in_range_f32(min, max);
@@ -178,6 +182,7 @@ void application_init(App* app) {
   }
 }
 
+f32 min = -100, max = 100;
 void application_update(App* app) {
   Assign(st, app->state);
   st->delta = app->delta_time;

@@ -94,10 +94,12 @@ void vk_descriptor_set_alloc() {
 
 void vk_r_shader_create(Shader* s, void* data, u64 data_size, u64 push_size) {
   // push constants
-  vk->sparse_push_constants.data = mem_alloc(MB(10));
-  vk->sparse_push_constants.element_size = push_size;
-  vk->sparse_push_constants.capacity = MaxEntities;
-  vk->sparse_push_constants.size = 0;
+  vk_Shader* shader = &vk->shaders[vk->shader_count];
+  SparseSetKeep* push_constants = &shader->push_constants;
+  push_constants->data = mem_alloc(push_size * 1024);
+  push_constants->element_size = push_size;
+  push_constants->capacity = 1024;
+  push_constants->size = 0;
 
   // uniform buffer
   u64 uniform_buffer_offset = vk_buffer_alloc(&vk->uniform_buffer, data_size*10, 64);
@@ -150,8 +152,11 @@ void vk_r_shader_create(Shader* s, void* data, u64 data_size, u64 push_size) {
   Loop (i, ShaderStageCount) {
     stage_create_infos[i] = vk->shader.stages[i].shader_state_create_info;
   }
-  vk->shader.pipeline = vk_pipeline_create(vert_stride, attribute_counter, attribute_desriptions,
+  // vk->shader.pipeline = vk_pipeline_create(vert_stride, attribute_counter, attribute_desriptions,
+  //                                          2, stage_create_infos);
+  shader->pipeline = vk_pipeline_create(vert_stride, attribute_counter, attribute_desriptions,
                                            2, stage_create_infos);
+  ++vk->shader_count;
 }
 
 VK_Pipeline vk_pipeline_create(

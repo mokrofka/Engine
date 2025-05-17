@@ -27,3 +27,7 @@ void entity_destroy(u32 entity) {
 void object_make_renderable(u32 id, u32 mesh_id, u32 shader_id) {
   vk_make_renderable(id, mesh_id, shader_id);
 }
+
+void object_remove_renderable(u32 id) {
+  vk_remove_renderable(id);
+}

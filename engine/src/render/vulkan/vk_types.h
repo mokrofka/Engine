@@ -423,16 +423,12 @@ struct VK_Render {
 
 struct vk_Shader {
   VK_Pipeline pipeline;
-  VkPipelineLayout pipeline_layout;
   VK_ShaderStage stages[3];
   u32 entities[1024];
   u32 entity_count;
+  SparseSetKeep push_constants;
 };
 
-// struct Entity {
-//   u32 id; 
-//   u32 mesh_id;
-// };
 struct VK_Mesh {
   u64 offset;
   u64 vert_count;
@@ -490,9 +486,8 @@ struct VK {
   VK_Texture texture; // TODO bindless textures
   
   // Shader
-  vk_Shader shaders[10];
   u32 shader_count;
-  SparseSetKeep sparse_push_constants_array[10];
+  vk_Shader shaders[10];
   
 #if _DEBUG
   VkDebugUtilsMessengerEXT debug_messenger;
