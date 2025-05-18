@@ -17,4 +17,17 @@ void main() {
   // out_color = vec4(ubo.colors[1], ubo.colors[1], 0, 1.0f);
   // out_color = vec4(ubo.colors[512], ubo_new.colors[1000], 0, 1.0f);
   out_color = vec4(ind.color, 1.0f);
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 } 

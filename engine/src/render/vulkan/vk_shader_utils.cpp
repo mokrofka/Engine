@@ -5,7 +5,7 @@
 VK_ShaderStage shader_module_create(String name, String type_str, VkShaderStageFlagBits shader_stage_flag) {
   Scratch scratch;
   VK_ShaderStage shader_stage = {};
-  String file_path = push_strf(scratch, "shaders/%s.%s.spv", name, type_str);
+  String file_path = push_strf(scratch, "shaders/compiled/%s.%s.spv", name, type_str);
   
   Binary binary = res_binary_load(scratch, file_path);
   if (!binary.data) {

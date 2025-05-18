@@ -293,7 +293,67 @@ OS_Handle os_file_open(String path, OS_AccessFlags mode) {
 
   return result;
 }
-  
+
+OVERLAPPED overlapped[2];
+DWORD bytesReturned;
+u8 buffer[KB(1) * 2];
+
+OS_Handle os_directory_open(String path) {
+  Scratch scratch;
+  String path_c = push_str_copy(scratch, path);
+  HANDLE handle = CreateFileA(
+      (char*)path_c.str,
+      FILE_LIST_DIRECTORY,
+      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+      NULL,
+      OPEN_EXISTING,
+      FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
+      NULL);
+
+  if (handle == INVALID_HANDLE_VALUE) {
+    Error(L"Failed to open directory handle. Error: %u\n", GetLastError());
+    return 0;
+  }
+  return (OS_Handle)handle;
+}
+
+void os_directory_watch(OS_Handle dir_handle, u32 id) {
+  BOOL success = ReadDirectoryChangesW(
+      (HANDLE)dir_handle,
+      &buffer[id * KB(1)],
+      KB(1),
+      false, // monitor subdirectories too
+      FILE_NOTIFY_CHANGE_LAST_WRITE,
+      &bytesReturned,
+      &overlapped[id],
+      NULL);
+
+  if (!success) {
+    Error("ReadDirectoryChangesW failed. Error: %u", GetLastError());
+    return;
+  }
+}
+
+String os_directory_name_change(Arena* arena, u32 id) {
+  FILE_NOTIFY_INFORMATION* info = (FILE_NOTIFY_INFORMATION*)&buffer[id*KB(1)];
+  String filename;
+  do {
+    filename = push_str_wchar(arena, info->FileName, info->FileNameLength / 2);
+    Debug("Shader changed: %s", filename);
+
+    if (info->NextEntryOffset == 0)
+      break;
+    info = (FILE_NOTIFY_INFORMATION*)((BYTE*)info + info->NextEntryOffset);
+  } while (true);
+  return filename;
+}
+
+b32 os_directory_check_change(OS_Handle dir_handle, u32 id) {
+  DWORD byte_transferred;
+  b32 ready = GetOverlappedResult((HANDLE)dir_handle, &overlapped[id], &byte_transferred, FALSE);
+  return ready;
+}
+
 void os_file_close(OS_Handle file) {
   CloseHandle((HANDLE)file);
 }
@@ -337,10 +397,12 @@ FileProperties os_properties_from_file(OS_Handle file) {
 }
 
 FileProperties os_properties_from_file_path(String path) {
+  Scratch scratch;
   FileProperties props = {};
+  String path_c = push_str_copy(scratch, path);
 
   WIN32_FILE_ATTRIBUTE_DATA info;
-  b32 success = GetFileAttributesExA((char*)path.str, GetFileExInfoStandard, &info);
+  b32 success = GetFileAttributesExA((char*)path_c.str, GetFileExInfoStandard, &info);
   if (success) {
     props.size = Compose64Bit(info.nFileSizeHigh, info.nFileSizeLow);
     props.modified = Compose64Bit(info.ftLastWriteTime.dwHighDateTime, info.ftLastWriteTime.dwLowDateTime);
@@ -388,6 +450,42 @@ VoidProc* os_lib_get_proc(OS_Handle lib, String name) {
   HMODULE mod = (HMODULE)lib;
   VoidProc* result = (VoidProc*)GetProcAddress(mod, (char*)name.str);
   return result;
+}
+
+PROCESS_INFORMATION pi;
+b32 is_process_alive;
+void os_process_create(String cmd) {
+  if (is_process_alive) {
+    DWORD result = WaitForSingleObject(pi.hProcess, 0); // check immediately
+    if (result == WAIT_OBJECT_0) {
+      // Process finished
+      is_process_alive = false;
+      CloseHandle(pi.hProcess);
+      CloseHandle(pi.hThread);
+    }
+  }
+  
+  Scratch scratch;
+  String cmd_c = push_str_copy(scratch, cmd);
+  STARTUPINFO si = {};
+  si.cb = sizeof(si);
+
+  BOOL success = CreateProcess(
+      NULL,             // No module name, use command line
+      (char*)cmd_c.str, // Command line
+      NULL,             // Process handle not inheritable
+      NULL,             // Thread handle not inheritable
+      FALSE,            // No handle inheritance
+      0,                // No creation flags
+      NULL,             // Use parent's environment block
+      NULL,             // Use parent's starting directory
+      &si,              // Pointer to STARTUPINFO
+      &pi);             // Pointer to PROCESS_INFORMATION
+
+  if (!success) {
+    Error("CreateProcess failed (%u).\n", GetLastError());
+  }
+  is_process_alive = true;
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -92,13 +92,13 @@ f32 triangle_vertices[] = {
 
 u32 cube_create() {
   u32 id = entity_create();
-  object_make_renderable(id, geometry_get("cube"_), shader_get("texture_shader"_));
+  entity_make_renderable(id, geometry_get("cube"_), shader_get("texture_shader"_));
   return id;
 }
 
 u32 triangle_create() {
   u32 id = entity_create();
-  object_make_renderable(id, geometry_get("triangle"_), shader_get("color_shader"_));
+  entity_make_renderable(id, geometry_get("triangle"_), shader_get("color_shader"_));
   return id;
 }
 
@@ -109,7 +109,7 @@ void application_init(App* app) {
   Assign(st, app->state);
   st->arena = arena_alloc(app->arena, GameSize);
   
-  u32 count = 1;
+  u32 count = 0;
   u32 capacity = KB(10);
   st->obj_count = capacity;
   st->objs = (Object*)mem_alloc(st->obj_count * sizeof(Object));
@@ -165,7 +165,7 @@ void application_init(App* app) {
   
   texture_load("container.jpg"_);
   
-  f32 min = -100, max = 100;
+  f32 min = -1, max = 1;
   Loop (i, st->obj_count) {
     st->objs[i].id = cube_create();
     f32 x = rand_in_range_f32(min, max);
@@ -182,7 +182,7 @@ void application_init(App* app) {
   }
 }
 
-f32 min = -100, max = 100;
+f32 min = -30, max = 30;
 void application_update(App* app) {
   Assign(st, app->state);
   st->delta = app->delta_time;
@@ -192,6 +192,34 @@ void application_update(App* app) {
   st->entities_ubo[0].projection_view = st->camera.projection * st->camera.view;
   f32& rot = st->rot;
   rot += 0.01;
+  u32 index = st->obj_count;
+  u32 index_new = st->obj_count_new;
+  if (input_was_key_down(KEY_1)) {
+    objs[index].id = cube_create();
+    f32 x = rand_in_range_f32(min, max);
+    f32 y = rand_in_range_f32(min, max);
+    f32 z = rand_in_range_f32(min, max);
+    objs[index].position = v3(x, y, z);
+    st->obj_count++;
+  }
+  if (input_was_key_down(KEY_2)) {
+    entity_destroy(objs[index-1].id);
+    entity_remove_renderable(objs[index-1].id);
+    st->obj_count--;
+  }
+  if (input_was_key_down(KEY_3)) {
+    objs_new[index_new].id = triangle_create();
+    f32 x = rand_in_range_f32(min, max);
+    f32 y = rand_in_range_f32(min, max);
+    f32 z = rand_in_range_f32(min, max);
+    objs_new[index_new].position = v3(x, y, z);
+    st->obj_count_new++;
+  }
+  if (input_was_key_down(KEY_4)) {
+    entity_destroy(objs_new[index_new-1].id);
+    entity_remove_renderable(objs_new[index_new-1].id);
+    st->obj_count_new--;
+  }
   
   Loop(i, st->obj_count) {
     mat4* model = (mat4*)vk_get_push_constant(objs[i].id);

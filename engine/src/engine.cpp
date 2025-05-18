@@ -1,6 +1,6 @@
 #include "engine.h"
-
 #include "render/r_frontend.h"
+
 
 #include "sys/texture.h"
 #include "sys/material_sys.h"
@@ -8,6 +8,7 @@
 #include "sys/res_sys.h"
 #include "sys/shader_sys.h"
 
+#include "asset_watch.h"
 #include "event.h"
 #include "input.h"
 #include "ui.h"
@@ -71,10 +72,13 @@ b32 event_on_debug_event(u32 code, void* sender, void* listener_inst, EventConte
   return true;
 }
 // TODO end temp
-
 void engine_create(App* app) {
   global_allocator_init();
   app_create(app);
+  wchar_t whello[] = L"Hello";
+  Scratch scratch;
+  String s = push_str_wchar(scratch, whello, 5);
+  Info("%s", s);
   
   app->engine_state = push_struct(app->arena, EngineState);
   
@@ -94,6 +98,7 @@ void engine_create(App* app) {
     network_init(state->arena);
   }
   // test();
+  // foo("D:\\VS_Code\\Engine\\assets\\shaders"_);
   
   {
     ResSysConfig res_sys_cfg = {
@@ -149,7 +154,7 @@ void engine_create(App* app) {
 
   {
     R_Config config = {
-      .mem_reserve = MB(5)
+      .mem_reserve = MB(10)
     };
     r_init(state->arena, config);
   }
@@ -177,6 +182,10 @@ void engine_create(App* app) {
       .max_geometry_count = 4096,
     };
     geometry_sys_init(state->arena, geometry_sys_config);
+  }
+  
+  {
+    asset_watch_init(state->arena);
   }
 
   {
@@ -299,6 +308,7 @@ void engine_run(App* app) {
       }
 
       input_update();
+      asset_watch_update();
 
       state->last_time = current_time;
     }

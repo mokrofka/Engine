@@ -1,6 +1,6 @@
 #include "test.h"
 #include <stdlib.h>
-
+#include <stdio.h>
 
 struct Time {
   f32 start;
@@ -18,5 +18,4 @@ struct Time {
 void foo(void* p);
 
 void test() {
-  
 }

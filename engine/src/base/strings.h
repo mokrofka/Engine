@@ -73,7 +73,6 @@ INLINE b32 cstr_matchi(const void* str0, const void* str1);
 #define str_lit(S) str((u8*)(S), sizeof(S) - 1) // deprecated
 
 INLINE String str(u8* str, u32 size);
-u32 my_vsnprintf(void* buffer, u32 buffer_size, const void* format, void* argc_);
 
 constexpr INLINE String operator""_(const char* string, u64 len) {
   return str((u8*)string, len);
@@ -181,6 +180,11 @@ String str_skip_last_slash(String string);
 String str_chop_last_dot(String string);
 
 ////////////////////////////////
+// wchar stuff
+
+String push_str_wchar(Arena* arena, const wchar_t* in, u32 wchar_size);
+
+////////////////////////////////
 
 INLINE u32 cstr_length(void* c) {
   u8* p = (u8*)c;
@@ -254,4 +258,27 @@ INLINE String str8_chop(String str, u32 amt) {
   amt = ClampTop(amt, str.size);
   str.size -= amt;
   return str;
+}
+
+inline size_t wchar_to_char(char* out, const wchar_t* in, size_t out_size) {
+  size_t out_len = 0;
+
+  while (*in && out_len < out_size) {
+    u16 wc = *in++;
+    out[out_len++] = (char)wc;
+  }
+
+  if (out_len < out_size)
+    out[out_len] = '\0'; // null-terminate
+
+  return out_len;
+}
+
+inline String push_str_wchar(Arena* arena, const wchar_t* in, u32 wchar_length) {
+  u8* buff = push_buffer(arena, u8, wchar_length + 1);
+  Loop (i , wchar_length) {
+    buff[i] = in[i];
+  }
+  buff[wchar_length] = 0;
+  return {buff, wchar_length};
 }

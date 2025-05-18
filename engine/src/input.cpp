@@ -83,7 +83,7 @@ void input_process_mouse_move(u32 x, u32 y) {
   // Only process if actually different.
   if (state->mouse_current.x != x || state->mouse_current.y != y) {
     // NOTE: Enable this if debugging.
-    Debug("Mouse pos: %i, %i!", x, y);
+    // Debug("Mouse pos: %i, %i!", x, y);
     
     state->mouse_current.x = x;
     state->mouse_current.y = y;

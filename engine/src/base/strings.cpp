@@ -210,14 +210,12 @@ u32 my_vsnprintf(void* buffer, u32 buffer_size, const void* format, void* argc_)
             ++fmt; // skip f
             written += len;
           } break;
-          
         }
       } else {
         buff[written++] = *fmt++;
       };
     }
   }
-  
   return written;
 }
 
@@ -282,7 +280,7 @@ b32 str_match(String str0, String str1) {
   if (str0.size != str1.size) return false;
   u8* a = str0.str;
   u8* b = str1.str;
-  Loop(i, str0.size) {
+  Loop (i, str0.size) {
     if (*a != *b) return false;
     ++a;
     ++b;

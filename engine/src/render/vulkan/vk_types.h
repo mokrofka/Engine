@@ -424,9 +424,10 @@ struct VK_Render {
 struct vk_Shader {
   VK_Pipeline pipeline;
   VK_ShaderStage stages[3];
-  u32 entities[1024];
-  u32 entity_count;
   SparseSetKeep push_constants;
+  u32 vert_stride;
+  u32 attribute_count;
+  VkVertexInputAttributeDescription attribute_desriptions[10];
 };
 
 struct VK_Mesh {

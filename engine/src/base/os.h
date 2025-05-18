@@ -98,6 +98,10 @@ b32 os_commit_large(void* ptr, u64 size);
 //////////////////////////////////////////////////////////////////////////
 // files
 OS_Handle      os_file_open(String path, OS_AccessFlags flags);
+OS_Handle      os_directory_open(String path);
+void           os_directory_watch(OS_Handle dir_handle, u32 id);
+String         os_directory_name_change(Arena* arena, u32 id);
+b32            os_directory_check_change(OS_Handle dir_handle, u32 id);
 void           os_file_close(OS_Handle file);
 u64            os_file_read(OS_Handle file, u64 size, void *out_data);
 u64            os_file_write(OS_Handle file, u64 size, void *data);
@@ -108,10 +112,14 @@ b32            os_copy_file_path(String dst, String src);
 b32            os_file_path_exists(String path);
 String         os_exe_filename(Arena* arena);
 b32            os_file_compare_time(u64 new_write_time, u64 last_write_time);
+void foo(String dir_path);
 
 OS_Handle os_lib_open(String path);
 void      os_lib_close(OS_Handle lib);
 VoidProc* os_lib_get_proc(OS_Handle lib, String name);
+
+void os_process_create(String cmd);
+void os_is_process_alive();
 
 void clock_update(Clock* clock);
 void clock_start(Clock* clock);

@@ -19,8 +19,23 @@ layout(location = 0) out out_data {
 
 void main() {
   gl_Position = ubo.projection_view * push_ubo.model * vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
+  
   // gl_Position = push_ubo.model * vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
   // gl_Position = vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
+
   // outd.color = in_color;
-  outd.color = in_color;
+  
+  
+  outd.color = in_color * 1.3;
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 }

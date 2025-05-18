@@ -4,16 +4,18 @@
 
 #include "sys/shader_sys.h"
 #include "sys/res_sys.h"
+#include "asset_watch.h"
 
 VK_Pipeline vk_pipeline_create(
     u32 vert_stride, u32 attribute_count,
     VkVertexInputAttributeDescription* attributes,
     u32 stage_count, VkPipelineShaderStageCreateInfo* stages);
       
+void vk_reload_shader(String shader_name, u32 id);
 internal VK_ShaderStage shader_module_create(String name, String type_str, VkShaderStageFlagBits shader_stage_flag) {
   Scratch scratch;
   VK_ShaderStage shader_stage = {};
-  String file_path = push_strf(scratch, "shaders/%s.%s.spv", name, type_str);
+  String file_path = push_strf(scratch, "shaders/compiled/%s.%s.spv", name, type_str);
   
   Binary binary = res_binary_load(scratch, file_path);
   if (!binary.data) {
@@ -92,7 +94,12 @@ void vk_descriptor_set_alloc() {
   VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, vk->descriptor_sets));
 }
 
+void register_callback() {
+  asset_watch_add(vk_reload_shader);
+}
+
 void vk_r_shader_create(Shader* s, void* data, u64 data_size, u64 push_size) {
+  Scratch scratch;
   // push constants
   vk_Shader* shader = &vk->shaders[vk->shader_count];
   SparseSetKeep* push_constants = &shader->push_constants;
@@ -108,54 +115,65 @@ void vk_r_shader_create(Shader* s, void* data, u64 data_size, u64 push_size) {
   *(void**)data = (u8*)vk->uniform_buffer.maped_memory + range.offset;
 
   // shader
-  local u32 yes = (vk_descriptor_pool_create(), vk_descriptor_set_create(), vk_descriptor_set_alloc(), 1);
+  local u32 yes = (vk_descriptor_pool_create(), vk_descriptor_set_create(), vk_descriptor_set_alloc(), register_callback(), 1);
   String stage_type_strs[3] = { "vert"_, "frag"_, };
   #define ShaderStageCount 3
   VkShaderStageFlagBits stage_types[ShaderStageCount] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
-
+  String assets_dir;
   Loop (i, 2) {
-    vk->shader.stages[i] = shader_module_create(s->name, stage_type_strs[i], stage_types[i]);
+    // vk->shader.stages[i] = shader_module_create(s->name, stage_type_strs[i], stage_types[i]);
+    shader->stages[i] = shader_module_create(s->name, stage_type_strs[i], stage_types[i]);
+    String filepath = push_strf(scratch, "shaders/%s.%s", s->name, stage_type_strs);
+    String exe_path = os_exe_filename(scratch);
+    String cur_dir = str_chop_last_slash(exe_path);
+    String project_dir = str_chop_last_slash(cur_dir);
+    assets_dir = push_str_cat(scratch, project_dir, "/assets/shaders"_);
+    String shader_file_path = push_str_cat(scratch, assets_dir, filepath);
+    // asset_watch_add(shader_file_path, vk->shader_count, vk_reload_shader);
   }
+  
   
   #define AttributeCount 10
   u32 stages_count = 0;
   u32 vert_stride = 0;
-  u32 attribute_counter = 0;
+  u32 attribute_count = 0;
   u32 offset = 0;
   VkVertexInputAttributeDescription attribute_desriptions[AttributeCount];
   if (s->has_position) {
-    attribute_desriptions[attribute_counter].binding = 0;
-    attribute_desriptions[attribute_counter].location = attribute_counter;
-    attribute_desriptions[attribute_counter].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attribute_desriptions[attribute_counter].offset = vert_stride;
+    attribute_desriptions[attribute_count].binding = 0;
+    attribute_desriptions[attribute_count].location = attribute_count;
+    attribute_desriptions[attribute_count].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attribute_desriptions[attribute_count].offset = vert_stride;
     vert_stride += sizeof(v3);
-    ++attribute_counter;
+    ++attribute_count;
   }
   if (s->has_color) {
-    attribute_desriptions[attribute_counter].binding = 0;
-    attribute_desriptions[attribute_counter].location = attribute_counter;
-    attribute_desriptions[attribute_counter].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attribute_desriptions[attribute_counter].offset = vert_stride;
+    attribute_desriptions[attribute_count].binding = 0;
+    attribute_desriptions[attribute_count].location = attribute_count;
+    attribute_desriptions[attribute_count].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attribute_desriptions[attribute_count].offset = vert_stride;
     vert_stride += sizeof(v3);
-    ++attribute_counter;
+    ++attribute_count;
   }
   if (s->has_tex_coord) {
-    attribute_desriptions[attribute_counter].binding = 0;
-    attribute_desriptions[attribute_counter].location = attribute_counter;
-    attribute_desriptions[attribute_counter].format = VK_FORMAT_R32G32_SFLOAT;
-    attribute_desriptions[attribute_counter].offset = vert_stride;
+    attribute_desriptions[attribute_count].binding = 0;
+    attribute_desriptions[attribute_count].location = attribute_count;
+    attribute_desriptions[attribute_count].format = VK_FORMAT_R32G32_SFLOAT;
+    attribute_desriptions[attribute_count].offset = vert_stride;
     vert_stride += sizeof(v2);
-    ++attribute_counter;
+    ++attribute_count;
   }
   
   VkPipelineShaderStageCreateInfo stage_create_infos[ShaderStageCount] = {};
   Loop (i, ShaderStageCount) {
-    stage_create_infos[i] = vk->shader.stages[i].shader_state_create_info;
+    stage_create_infos[i] = shader->stages[i].shader_state_create_info;
   }
-  // vk->shader.pipeline = vk_pipeline_create(vert_stride, attribute_counter, attribute_desriptions,
-  //                                          2, stage_create_infos);
-  shader->pipeline = vk_pipeline_create(vert_stride, attribute_counter, attribute_desriptions,
-                                           2, stage_create_infos);
+  MemCopy(&shader->attribute_desriptions, &attribute_desriptions, attribute_count*sizeof(VkVertexInputAttributeDescription));
+  shader->pipeline = vk_pipeline_create(vert_stride, attribute_count, attribute_desriptions,
+                                        2, stage_create_infos);
+
+  shader->attribute_count = attribute_count;
+  shader->vert_stride = vert_stride;
   ++vk->shader_count;
 }
 
@@ -324,4 +342,28 @@ VK_Pipeline vk_pipeline_create(
   
   Error("vkCreateGraphicsPipelines failed with %s.", vk_result_string(result, true));
   VK_Pipeline p = {}; return p;
+}
+
+void vk_reload_shader(String shader_name, u32 id) {
+  vk_Shader* shader = &vk->shaders[id];
+  vkDeviceWaitIdle(vkdevice);
+  
+  vkDestroyPipeline(vkdevice, shader->pipeline.handle, vk->allocator);
+  Loop (i, MaterialShaderStageCount) {
+    vkDestroyShaderModule(vkdevice, shader->stages[i].handle, vk->allocator);
+  }
+  
+  String stage_type_strs[2] = { "vert"_, "frag"_, };
+  VkShaderStageFlagBits stage_types[2] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
+  
+  Loop (i, 2) {
+    shader->stages[i] = shader_module_create(shader_name, stage_type_strs[i], stage_types[i]);
+  }
+  
+  VkPipelineShaderStageCreateInfo stage_create_infos[ShaderStageCount] = {};
+  Loop (i, ShaderStageCount) {
+    stage_create_infos[i] = shader->stages[i].shader_state_create_info;
+  }
+  shader->pipeline = vk_pipeline_create(shader->vert_stride, shader->attribute_count, shader->attribute_desriptions,
+                                        2, stage_create_infos);
 }

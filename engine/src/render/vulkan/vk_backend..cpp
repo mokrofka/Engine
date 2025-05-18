@@ -253,14 +253,14 @@ void vk_r_backend_init(R_Backend* backend) {
     VK_CHECK(vkCreateFence(vkdevice, &fence_create_info, vk->allocator, &vk->sync.in_flight_fences[i]));
   }
 
-  vk->render.material_shader = vk_material_shader_create();
-  vk->render.ui_shader = vk_ui_shader_create();
+  // vk->render.material_shader = vk_material_shader_create();
+  // vk->render.ui_shader = vk_ui_shader_create();
   
   create_buffers(&vk->render);
   
-  Loop (i, VK_MaxGeometryCount) {
-    vk->render.geometries[i].id = INVALID_ID;
-  }
+  // Loop (i, VK_MaxGeometryCount) {
+  //   vk->render.geometries[i].id = INVALID_ID;
+  // }
   // Loop (i, VK_MaxGeometryCount) {
   //   vk->geometries[i].id = INVALID_ID;
   // }
@@ -272,11 +272,11 @@ void vk_r_backend_shutdown() {
   
   // Destroy in opposite order of creation
   // buffers
-  vk_buffer_destroy(&vk->render.obj_vertex_buffer);
-  vk_buffer_destroy(&vk->render.obj_index_buffer);
+  // vk_buffer_destroy(&vk->render.obj_vertex_buffer);
+  // vk_buffer_destroy(&vk->render.obj_index_buffer);
   
-  vk_ui_shader_destroy(&vk->render.ui_shader);
-  vk_material_shader_destroy(&vk->render.material_shader);
+  // vk_ui_shader_destroy(&vk->render.ui_shader);
+  // vk_material_shader_destroy(&vk->render.material_shader);
   
   // Sync objects
   Loop (i, vk->swapchain.max_frames_in_flight) {
@@ -661,23 +661,23 @@ internal void create_buffers(VK_Render* render) {
   vk_buffer_map_memory(&vk->uniform_buffer, 0, vk->uniform_buffer.size);
   vk->uniform_buffer.freelist = free_list_create(vk->arena, vk->index_buffer.size, 64);
   
-  // Geometry vertex buffer
-  const u64 vertex_buffer_size = sizeof(Vertex3D) * MB(1);
-  render->obj_vertex_buffer = vk_buffer_create(
-    vertex_buffer_size,
-    VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-    memory_property_flags,
-    true);
-  render->geometry_vertex_offset = 0;
+  // // Geometry vertex buffer
+  // const u64 vertex_buffer_size = sizeof(Vertex3D) * MB(1);
+  // render->obj_vertex_buffer = vk_buffer_create(
+  //   vertex_buffer_size,
+  //   VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+  //   memory_property_flags,
+  //   true);
+  // render->geometry_vertex_offset = 0;
   
-  // Geometry index buffer
-  const u64 index_buffer_size = sizeof(u32) * MB(1);
-  render->obj_index_buffer = vk_buffer_create(
-    vertex_buffer_size,
-    VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-    memory_property_flags,
-    true);
-  render->geometry_index_offset = 0;
+  // // Geometry index buffer
+  // const u64 index_buffer_size = sizeof(u32) * MB(1);
+  // render->obj_index_buffer = vk_buffer_create(
+  //   vertex_buffer_size,
+  //   VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+  //   memory_property_flags,
+  //   true);
+  // render->geometry_index_offset = 0;
 }
 
 void* vk_r_create_texture(u8* pixels, u32 width, u32 height, u32 channel_count) {

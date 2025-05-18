@@ -147,9 +147,6 @@ struct String {
   INLINE operator bool() {
     return size;
   }
-  // INLINE operator char*() {
-  //   return (char*)str;
-  // }
 };
 
 struct Arena;

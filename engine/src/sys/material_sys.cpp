@@ -52,15 +52,15 @@ void material_system_init(Arena* arena, MaterialSystemConfig config) {
 
 void material_system_shutdown() {
   // Invalidate all materials in the array.
-  u32 count = state->config.max_material_count;
-  Loop (i, count) {
-    if (state->registered_materials[i].id != INVALID_ID) {
-      destroy_material(&state->registered_materials[i]);
-    }
-  }
+  // u32 count = state->config.max_material_count;
+  // Loop (i, count) {
+  //   if (state->registered_materials[i].id != INVALID_ID) {
+  //     destroy_material(&state->registered_materials[i]);
+  //   }
+  // }
 
-  // Destroy the default material.
-  destroy_material(&state->default_material);
+  // // Destroy the default material.
+  // destroy_material(&state->default_material);
 }
 
 Material* material_system_acquire(String name) {
