@@ -265,7 +265,7 @@ void engine_run(App* app) {
 
       // // TODO refactor packet creation
       R_Packet packet = {};
-      // packet.delta_time = delta;
+      packet.delta_time = delta;
       
       // // TODO temp
       // GeometryRenderData test_render;

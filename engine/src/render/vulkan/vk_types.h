@@ -10,6 +10,8 @@
     Assert(expr == VK_SUCCESS); \
   }
 #define vkdevice vk->device.logical_device
+#define FramesInFlight 2
+#define ParticleCount KB(10)
 
 struct VK_Buffer {
   VkBuffer handle;
@@ -342,6 +344,7 @@ struct VK_Frame {
 struct VK_SyncObj {
   VkSemaphore* image_available_semaphores;
   VkSemaphore* queue_complete_semaphores;
+  VkSemaphore* compute_complete_semaphores;
   
   u32 in_flight_fence_count;
   VkFence in_flight_fences[2];
@@ -414,7 +417,7 @@ struct VK_Render {
   u64 geometry_vertex_offset;
   u64 geometry_index_offset;
 
-  VK_CommandBuffer cmds[3];
+  VK_CommandBuffer cmds[2];
   VK_MaterialShader material_shader;
   VK_UIShader ui_shader;
   
@@ -428,6 +431,11 @@ struct vk_Shader {
   u32 vert_stride;
   u32 attribute_count;
   VkVertexInputAttributeDescription attribute_desriptions[10];
+};
+
+struct VK_ComputeShader {
+  VK_Pipeline pipeline;
+  VK_ShaderStage stage;
 };
 
 struct VK_Mesh {
@@ -471,10 +479,14 @@ struct VK {
   VK_Buffer index_buffer;
   VK_Buffer stage_buffer;
   VK_Buffer uniform_buffer;
+  VK_Buffer storage_buffers[2];
+  VK_Buffer compute_uniform_buffer;
   
   VkDescriptorPool descriptor_pool;
   VkDescriptorSetLayout descriptor_set_layout;
-  VkDescriptorSet descriptor_sets[3];
+  VkDescriptorSetLayout compute_descriptor_set_layout;
+  VkDescriptorSet descriptor_sets[2];
+  VkDescriptorSet compute_descriptor_sets[FramesInFlight];
   
   vk_Shader shader;
   u32 entity_count;
@@ -486,9 +498,13 @@ struct VK {
 
   VK_Texture texture; // TODO bindless textures
   
+  VK_CommandBuffer compute_cmds[FramesInFlight];
+  
   // Shader
   u32 shader_count;
   vk_Shader shaders[10];
+  VK_ComputeShader compute_shader;
+  vk_Shader graphics_shader_compute;
   
 #if _DEBUG
   VkDebugUtilsMessengerEXT debug_messenger;
@@ -534,5 +550,5 @@ INLINE VkSemaphore vk_get_current_queue_complete_semaphore() {
 }
 
 INLINE VK_CommandBuffer& vk_get_current_cmd() {
-  return vk->render.cmds[vk->frame.image_index];
+  return vk->render.cmds[vk->frame.current_frame];
 }

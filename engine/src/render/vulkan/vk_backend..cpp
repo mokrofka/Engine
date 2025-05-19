@@ -235,18 +235,22 @@ void vk_r_backend_init(R_Backend* backend) {
   // Regenerate swapchain and world framebuffers
   framebuffers_create();
 
-  Loop (i, vk->swapchain.image_count) {
+  // Loop (i, vk->swapchain.image_count) {
+  Loop (i, FramesInFlight) {
     vk->render.cmds[i] = vk_cmd_alloc(vk->device.graphics_cmd_pool, true);
+    vk->compute_cmds[i] = vk_cmd_alloc(vk->device.graphics_cmd_pool, true);
   }
   Debug("Vulkan command buffers created"_);
 
   vk->sync.image_available_semaphores = push_array(vk->arena, VkSemaphore, vk->swapchain.max_frames_in_flight);
   vk->sync.queue_complete_semaphores = push_array(vk->arena, VkSemaphore, vk->swapchain.max_frames_in_flight);
+  vk->sync.compute_complete_semaphores = push_array(vk->arena, VkSemaphore, vk->swapchain.max_frames_in_flight);
 
   Loop (i, vk->swapchain.max_frames_in_flight) {
     VkSemaphoreCreateInfo semaphore_create_info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
     vkCreateSemaphore(vkdevice, &semaphore_create_info, vk->allocator, &vk->sync.image_available_semaphores[i]);
     vkCreateSemaphore(vkdevice, &semaphore_create_info, vk->allocator, &vk->sync.queue_complete_semaphores[i]);
+    vkCreateSemaphore(vkdevice, &semaphore_create_info, vk->allocator, &vk->sync.compute_complete_semaphores[i]);
 
     VkFenceCreateInfo fence_create_info = {VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
     fence_create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
@@ -374,7 +378,7 @@ b32 vk_r_backend_begin_frame(f32 delta_time) {
   vk->frame.image_index = vk_swapchain_acquire_next_image_index(&vk->swapchain, vk_get_current_image_available_semaphore(), 0);
 
   // Begin recording commands.
-  VK_CommandBuffer* cmd = &vk->render.cmds[vk->frame.image_index];
+  VK_CommandBuffer* cmd = &vk->render.cmds[vk->frame.current_frame];
   vk_cmd_begin(cmd, false, false, false);
   
   // Dynamic state
@@ -406,7 +410,7 @@ b32 vk_r_backend_begin_frame(f32 delta_time) {
 }
 
 void vk_r_update_global_world_state(mat4 projection, mat4 view, v3 view_position, v4 ambient_color, i32 mode) {
-  VkCommandBuffer cmd = vk->render.cmds[vk->frame.image_index].handle;
+  VkCommandBuffer cmd = vk_get_current_cmd();
 
   vk_material_shader_use(&vk->render.material_shader);
   
@@ -417,7 +421,7 @@ void vk_r_update_global_world_state(mat4 projection, mat4 view, v3 view_position
 }
 
 void vk_r_update_global_ui_state(mat4 projection, mat4 view, i32 mode) {
-  VkCommandBuffer cmd = vk->render.cmds[vk->frame.image_index].handle;
+  VkCommandBuffer cmd = vk_get_current_cmd();
 
   vk_ui_shader_use(&vk->render.ui_shader);
   
@@ -428,29 +432,47 @@ void vk_r_update_global_ui_state(mat4 projection, mat4 view, i32 mode) {
 }
 
 b32 vk_r_backend_end_frame(f32 delta_time) {
-  VK_CommandBuffer* cmd = &vk->render.cmds[vk->frame.image_index];
+  VK_CommandBuffer cmd = vk_get_current_cmd();
   
-  vk_cmd_end(cmd);
+  vk_cmd_end(&cmd);
   
   VK_CHECK(vkResetFences(vkdevice, 1, &vk->sync.in_flight_fences[vk->frame.current_frame]));
+  
+  // compute
+  VkSubmitInfo compute_submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
+  compute_submit_info.commandBufferCount = 1;
+  compute_submit_info.pCommandBuffers = &vk->compute_cmds[vk->frame.current_frame].handle;
+  compute_submit_info.signalSemaphoreCount = 1;
+  compute_submit_info.pSignalSemaphores = &vk->sync.compute_complete_semaphores[vk->frame.current_frame];
+  
+  VK_CHECK(vkQueueSubmit(vk->device.graphics_queue, 1, &compute_submit_info, null));
 
+  // graphics
   VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
   
   submit_info.commandBufferCount = 1;
-  submit_info.pCommandBuffers = &cmd->handle;
+  submit_info.pCommandBuffers = &cmd.handle;
   
   submit_info.signalSemaphoreCount = 1;
   VkSemaphore queue_available = vk_get_current_queue_complete_semaphore();
   submit_info.pSignalSemaphores = &queue_available;
 
-  submit_info.waitSemaphoreCount = 1;
-  VkSemaphore image_available = vk_get_current_image_available_semaphore();
-  submit_info.pWaitSemaphores = &image_available;
+  VkSemaphore wait[] = {
+    vk_get_current_image_available_semaphore(),
+    vk->sync.compute_complete_semaphores[vk->frame.current_frame]
+  };
+  submit_info.waitSemaphoreCount = ArrayCount(wait);
+  // VkSemaphore image_available = vk_get_current_image_available_semaphore();
+  // submit_info.pWaitSemaphores = &image_available;
+  submit_info.pWaitSemaphores = wait;
 
   // Each semaphore waits on the corresponding pipeline stage to complete. 1:1 ratio.
   // VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT prevents subsequent color attachment
   // writes from executing until the semaphore signals (i.e. one frame is presented at a time)
-  VkPipelineStageFlags flags[1] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+  VkPipelineStageFlags flags[] = {
+    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+  };
   submit_info.pWaitDstStageMask = flags;
 
   VkResult result = vkQueueSubmit(
@@ -474,7 +496,7 @@ b32 vk_r_backend_end_frame(f32 delta_time) {
 b32 vk_r_begin_renderpass(u32 renderpass_id) {
   VK_Renderpass* renderpass = 0;
   VkFramebuffer framebuffer = 0;
-  VK_CommandBuffer* cmd = &vk->render.cmds[vk->frame.image_index];
+  VK_CommandBuffer* cmd = &vk->render.cmds[vk->frame.current_frame];
 
   // Choose a renderpass based on ID.
   switch (renderpass_id) {
@@ -509,7 +531,7 @@ b32 vk_r_begin_renderpass(u32 renderpass_id) {
 
 b32 vk_r_end_renderpass(u32 renderpass_id) {
   VK_Renderpass* renderpass = 0;
-  VK_CommandBuffer* cmd = &vk->render.cmds[vk->frame.image_index];
+  VK_CommandBuffer cmd = vk_get_current_cmd();
 
   // Choose a renderpass based on ID.
   switch (renderpass_id) {
@@ -524,7 +546,7 @@ b32 vk_r_end_renderpass(u32 renderpass_id) {
     return false;
   }
 
-  vk_renderpass_end(cmd);
+  vk_renderpass_end(&cmd);
   return true;
 }
 
@@ -660,6 +682,25 @@ internal void create_buffers(VK_Render* render) {
     true);
   vk_buffer_map_memory(&vk->uniform_buffer, 0, vk->uniform_buffer.size);
   vk->uniform_buffer.freelist = free_list_create(vk->arena, vk->index_buffer.size, 64);
+  
+  // storage
+  Loop (i, 2) {
+    vk->storage_buffers[i] = vk_buffer_create(
+        MB(1),
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        true);
+  }
+  
+  vk->compute_uniform_buffer = vk_buffer_create(
+    128,
+    VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    true);
+  vk_buffer_map_memory(&vk->compute_uniform_buffer, 0, vk->uniform_buffer.size);
+    
+  // vk_buffer_map_memory(&vk->uniform_buffer, 0, vk->uniform_buffer.size);
+  // vk->uniform_buffer.freelist = free_list_create(vk->arena, vk->index_buffer.size, 64);
   
   // // Geometry vertex buffer
   // const u64 vertex_buffer_size = sizeof(Vertex3D) * MB(1);

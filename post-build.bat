@@ -25,4 +25,13 @@ for %%F in (%SHADER_DIR%\*.frag) do (
   )
 )
 
+for %%F in (%SHADER_DIR%\*.comp) do (
+  echo Compiling %%F...
+  %GLSLC% -fshader-stage=comp "%%F" -o "%COMPILED_DIR%\%%~nF.comp.spv"
+  IF %ERRORLEVEL% NEQ 0 (
+    echo Error compiling %%F
+    exit /b %ERRORLEVEL%
+  )
+)
+
 echo All shaders compiled successfully.

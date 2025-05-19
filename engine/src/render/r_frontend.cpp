@@ -125,6 +125,7 @@ void r_begin_draw_frame(R_Packet* packet) {
   // World renderpass
   {
     vk_r_begin_renderpass(BuiltinRenderpass_World);
+    vk_compute_draw();
     vk_draw();
 
     // vk_r_update_global_world_state(state->projection, state->view, v3_zero(), v4_one(), 0);

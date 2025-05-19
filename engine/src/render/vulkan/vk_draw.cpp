@@ -7,7 +7,7 @@ void descriptor_update(u32 shader_id) {
   vk_Shader* shader = &vk->shaders[shader_id];
   VK_CommandBuffer cmd = vk_get_current_cmd();
   
-  VkDescriptorSet descriptor_set = vk->descriptor_sets[vk->frame.image_index];
+  VkDescriptorSet descriptor_set = vk->descriptor_sets[vk->frame.current_frame];
   
   MemRange mem_range = vk->uniform_buffer_mem_range;
   u64 range = mem_range.size;
@@ -64,6 +64,12 @@ void vk_draw() {
       vkCmdDraw(cmd, mesh.vert_count, 1, 0, 0);
     }
   }
+  
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->graphics_shader_compute.pipeline.handle);
+  VkDeviceSize offsets[] = {0};
+  vkCmdBindVertexBuffers(cmd, 0, 1, &vk->storage_buffers[vk->frame.current_frame].handle, offsets);
+
+  vkCmdDraw(cmd, ParticleCount, 1, 0, 0);
 }
 
 void vk_make_renderable(u32 id, u32 geom_id, u32 shader_id) {
@@ -83,4 +89,62 @@ void vk_remove_renderable(u32 id) {
 KAPI void* vk_get_push_constant(u32 id) {
   u32 shader_id = entity_to_shader[id];
   return vk->shaders[shader_id].push_constants.get_data(id);
+}
+
+struct Particle {
+  v2 position;
+  v2 velocity;
+  v4 color;
+};
+
+void compute_descriptor_update() {
+  i32 i = vk->frame.current_frame;
+  VkWriteDescriptorSet descriptor_writes[2];
+
+  VkDescriptorBufferInfo storage_buffer_info_last_frame{};
+  storage_buffer_info_last_frame.buffer = vk->storage_buffers[i].handle;
+  storage_buffer_info_last_frame.offset = 0;
+  storage_buffer_info_last_frame.range = sizeof(Particle) * ParticleCount;
+
+  descriptor_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  descriptor_writes[0].dstSet = vk->compute_descriptor_sets[i];
+  descriptor_writes[0].dstBinding = 1;
+  descriptor_writes[0].dstArrayElement = 0;
+  descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  descriptor_writes[0].descriptorCount = 1;
+  descriptor_writes[0].pBufferInfo = &storage_buffer_info_last_frame;
+
+  VkDescriptorBufferInfo storage_buffer_info_current_frame{};
+  storage_buffer_info_current_frame.buffer = vk->storage_buffers[(i + 1) % FramesInFlight].handle;
+  storage_buffer_info_current_frame.offset = 0;
+  storage_buffer_info_current_frame.range = sizeof(Particle) * ParticleCount;
+
+  descriptor_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  descriptor_writes[1].dstSet = vk->compute_descriptor_sets[i];
+  descriptor_writes[1].dstBinding = 2;
+  descriptor_writes[1].dstArrayElement = 0;
+  descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  descriptor_writes[1].descriptorCount = 1;
+  descriptor_writes[1].pBufferInfo = &storage_buffer_info_current_frame;
+
+  vkUpdateDescriptorSets(vkdevice, 2, descriptor_writes, 0, null);
+}
+
+void vk_compute_draw() {
+  compute_descriptor_update();
+  VK_CommandBuffer cmd = vk->compute_cmds[vk->frame.current_frame];
+
+  VkCommandBufferBeginInfo beginInfo = {};
+  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo))
+  
+  f32* delta_time; Assign(delta_time, vk->compute_uniform_buffer.maped_memory);
+  *delta_time = vk->frame.delta_time;
+  
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, vk->compute_shader.pipeline.handle);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, vk->compute_shader.pipeline.pipeline_layout, 0, 1, &vk->compute_descriptor_sets[vk->frame.current_frame], 0, null);
+
+  vkCmdDispatch(cmd, ParticleCount / 256, 1, 1);
+  
+  VK_CHECK(vkEndCommandBuffer(cmd))
 }

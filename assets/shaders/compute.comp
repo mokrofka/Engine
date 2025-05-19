@@ -1,0 +1,69 @@
+#version 450 core
+
+struct Particle {
+  vec2 position;
+  vec2 velocity;
+  vec4 color;
+};
+
+layout (binding = 0) uniform ParameterUBO {
+  float deltaTime;
+} ubo;
+
+layout(std140, binding = 1) readonly buffer ParticleSSBOIn {
+  Particle particles_in[];
+};
+
+layout(std140, binding = 2) writeonly buffer ParticleSSBOOut {
+  Particle particles_out[];
+};
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+// void main() {
+//   uint index = gl_GlobalInvocationID.x;  
+
+//   Particle particle_in = particles_in[index];
+
+//   particles_out[index].position = particle_in.position + particle_in.velocity.xy * ubo.deltaTime;
+//   particles_out[index].velocity = particle_in.velocity;
+// }
+
+
+void main() {
+    uint index = gl_GlobalInvocationID.x;  
+
+    Particle p = particles_in[index];
+
+    // Integrate position
+    vec2 pos = p.position + p.velocity.xy * ubo.deltaTime;
+    vec2 vel = p.velocity;
+
+    // Frame bounds in NDC-like space (-1 to 1)
+    const float minX = -1.0;
+    const float maxX =  1.0;
+    const float minY = -1.0;
+    const float maxY =  1.0;
+
+    // Bounce on X axis
+    if (pos.x < minX) {
+        pos.x = minX;
+        vel.x *= -1.0;
+    } else if (pos.x > maxX) {
+        pos.x = maxX;
+        vel.x *= -1.0;
+    }
+
+    // Bounce on Y axis
+    if (pos.y < minY) {
+        pos.y = minY;
+        vel.y *= -1.0;
+    } else if (pos.y > maxY) {
+        pos.y = maxY;
+        vel.y *= -1.0;
+    }
+
+    // Write result
+    particles_out[index].position = pos;
+    particles_out[index].velocity = vel;
+}
