@@ -275,7 +275,7 @@ inline size_t wchar_to_char(char* out, const wchar_t* in, size_t out_size) {
 }
 
 inline String push_str_wchar(Arena* arena, const wchar_t* in, u32 wchar_length) {
-  u8* buff = push_buffer(arena, u8, wchar_length + 1);
+  u8* buff = push_buffer(arena, wchar_length + 1);
   Loop (i , wchar_length) {
     buff[i] = in[i];
   }

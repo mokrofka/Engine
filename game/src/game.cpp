@@ -108,23 +108,14 @@ void application_init(App* app) {
   app->state = push_struct(app->arena, GameState);
   Assign(st, app->state);
   st->arena = arena_alloc(app->arena, GameSize);
-  
-  u32 count = 0;
-  u32 capacity = KB(10);
-  st->obj_count = capacity;
-  st->objs = (Object*)mem_alloc(st->obj_count * sizeof(Object));
-  st->obj_count_new = capacity;
-  st->objs_new = (Object*)mem_alloc(st->obj_count_new * sizeof(Object));
-  
-  st->obj_count = count;
-  st->obj_count_new = count;
-  
+
+  st->obj_count = 2;
+
   st->camera.view_dirty = true;
   st->camera.position = v3(0,0, 10);
   st->camera.yaw = -90;
   st->camera.fov = 45;
   entity_init();
-  camera_update();
  
   {
     Geometry cube_geom {
@@ -135,7 +126,6 @@ void application_init(App* app) {
     };
     st->cube_geom_id = geometry_create(cube_geom);
   }
-  
   {
     Geometry triangle_geom {
       .name = "triangle"_,
@@ -173,29 +163,22 @@ void application_init(App* app) {
     f32 z = rand_in_range_f32(min, max);
     st->objs[i].position = v3(x, y, z);
   }
-  Loop (i, st->obj_count_new) {
-    st->objs_new[i].id = triangle_create();
-    f32 x = rand_in_range_f32(min, max);
-    f32 y = rand_in_range_f32(min, max);
-    f32 z = rand_in_range_f32(min, max);
-    st->objs_new[i].position = v3(x, y, z);
-  }
 }
 
 f32 min = -30, max = 30;
+b32 toggle;
 void application_update(App* app) {
   Assign(st, app->state);
   st->delta = app->delta_time;
   Object* objs = st->objs;
-  Object* objs_new = st->objs_new;
   
   st->entities_ubo[0].projection_view = st->camera.projection * st->camera.view;
+  
   f32& rot = st->rot;
   rot += 0.01;
   u32 index = st->obj_count;
-  u32 index_new = st->obj_count_new;
   if (input_was_key_down(KEY_1)) {
-    objs[index].id = cube_create();
+    objs[index].id = (++toggle+1)%2 ? cube_create() : triangle_create();
     f32 x = rand_in_range_f32(min, max);
     f32 y = rand_in_range_f32(min, max);
     f32 z = rand_in_range_f32(min, max);
@@ -207,29 +190,11 @@ void application_update(App* app) {
     entity_remove_renderable(objs[index-1].id);
     st->obj_count--;
   }
-  if (input_was_key_down(KEY_3)) {
-    objs_new[index_new].id = triangle_create();
-    f32 x = rand_in_range_f32(min, max);
-    f32 y = rand_in_range_f32(min, max);
-    f32 z = rand_in_range_f32(min, max);
-    objs_new[index_new].position = v3(x, y, z);
-    st->obj_count_new++;
-  }
-  if (input_was_key_down(KEY_4)) {
-    entity_destroy(objs_new[index_new-1].id);
-    entity_remove_renderable(objs_new[index_new-1].id);
-    st->obj_count_new--;
-  }
   
   Loop(i, st->obj_count) {
     mat4* model = (mat4*)vk_get_push_constant(objs[i].id);
     *model = mat4_translation(objs[i].position) * mat4_euler_y(rot);
     *model = mat4_euler_y(rot / 2) * mat4_translation(objs[i].position);
-  }
-  Loop(i, st->obj_count_new) {
-    mat4* model = (mat4*)vk_get_push_constant(objs_new[i].id);
-    *model = mat4_translation(objs_new[i].position) * mat4_euler_y(rot);
-    *model = mat4_euler_y(rot / 2) * mat4_translation(objs_new[i].position);
   }
 
   camera_update();

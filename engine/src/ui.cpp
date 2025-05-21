@@ -50,15 +50,15 @@ void imgui_init() {
 
   alloc_resource();
   ImGui_ImplVulkan_InitInfo init_info = {
-    .Instance = vk->instance,
-    .PhysicalDevice = vk->device.physical_device,
-    .Device = vk->device.logical_device,
-    .QueueFamily = vk->device.graphics_queue_index,
-    .Queue = vk->device.graphics_queue,
+    .Instance = vk.instance,
+    .PhysicalDevice = vk.device.physical_device,
+    .Device = vk.device.logical_device,
+    .QueueFamily = vk.device.graphics_queue_index,
+    .Queue = vk.device.graphics_queue,
     .DescriptorPool = state.imgui_pool,
-    .RenderPass = vk_get_renderpass(vk->ui_renderpass_id)->handle,
-    .MinImageCount = vk->swapchain.max_frames_in_flight,
-    .ImageCount = vk->swapchain.image_count,
+    .RenderPass = vk_get_renderpass(vk.ui_renderpass_id)->handle,
+    .MinImageCount = vk.swapchain.max_frames_in_flight,
+    .ImageCount = vk.swapchain.image_count,
     .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
   };
 
@@ -93,7 +93,7 @@ void ui_begin_frame() {
 void ui_end_frame() {
   ImGui::PopFont();
   ImGui::Render();
-  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk->render.cmds[vk->frame.image_index].handle);
+  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk.render.cmds[vk.frame.image_index].handle);
   
   ImGui::UpdatePlatformWindows();
   ImGui::RenderPlatformWindowsDefault();

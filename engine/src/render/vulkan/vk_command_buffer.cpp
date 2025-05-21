@@ -53,7 +53,7 @@ void vk_cmd_reset(VK_CommandBuffer* cmd) {
 }
 
 VK_CommandBuffer vk_cmd_alloc_and_begin_single_use() {
-  VK_CommandBuffer out_cmd = vk_cmd_alloc(vk->device.graphics_cmd_pool, true);
+  VK_CommandBuffer out_cmd = vk_cmd_alloc(vk.device.graphics_cmd_pool, true);
   vk_cmd_begin(&out_cmd, true, false, false);
   return out_cmd;
 }
@@ -67,12 +67,12 @@ void vk_cmd_end_single_use(VK_CommandBuffer* command_buffer) {
   VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
   submit_info.commandBufferCount = 1;
   submit_info.pCommandBuffers = &command_buffer->handle;
-  VK_CHECK(vkQueueSubmit(vk->device.graphics_queue, 1, &submit_info, 0));
+  VK_CHECK(vkQueueSubmit(vk.device.graphics_queue, 1, &submit_info, 0));
   
   // Wait for it to finish
-  VK_CHECK(vkQueueWaitIdle(vk->device.graphics_queue));
+  VK_CHECK(vkQueueWaitIdle(vk.device.graphics_queue));
   
   // Free the command buffer.
-  vk_cmd_free(vk->device.graphics_cmd_pool, command_buffer);
+  vk_cmd_free(vk.device.graphics_cmd_pool, command_buffer);
 }
 

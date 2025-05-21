@@ -423,7 +423,7 @@ b32 os_file_path_exists(String path) {
 }
 
 String os_exe_filename(Arena* arena) {
-  u8* buff = push_buffer(arena, u8, 512);
+  u8* buff = push_buffer(arena, 512);
   DWORD size = GetModuleFileNameA(0, (char*)buff, 512);
   return str(buff, size);
 }

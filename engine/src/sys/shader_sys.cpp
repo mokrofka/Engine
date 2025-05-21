@@ -9,16 +9,15 @@ struct ShaderSysState {
   u32 shader_count;
 };
 
-global ShaderSysState* st;
+global ShaderSysState st;
 
 void shader_sys_init(Arena* arena, ShaderSysConfig config) {
-  st = push_struct(arena, ShaderSysState);
-  st->config = config; 
-  st->hashmap = hashmap_create(arena, sizeof(u32), config.shader_count_max);
+  st.config = config; 
+  st.hashmap = hashmap_create(arena, sizeof(u32), config.shader_count_max);
 }
 
 u32 shader_create(ShaderConfig config, void* data, u64 data_size, u64 push_size) {
-  hashmap_set(st->hashmap, config.name, &st->shader_count);
+  hashmap_set(st.hashmap, config.name, &st.shader_count);
 
   Shader shader;
   shader.name = config.name;
@@ -28,11 +27,11 @@ u32 shader_create(ShaderConfig config, void* data, u64 data_size, u64 push_size)
   shader.stages = config.stages;
   vk_r_shader_create(&shader, data, data_size, push_size);
   
-  return st->shader_count++;
+  return st.shader_count++;
 }
 
 u32 shader_get(String name) {
   u32 id;
-  hashmap_get(st->hashmap, name, &id);
+  hashmap_get(st.hashmap, name, &id);
   return id;
 }

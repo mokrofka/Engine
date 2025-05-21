@@ -118,9 +118,6 @@ typedef void VoidProc(void);
 #define C_LINKAGE extern "C"
 
 #define INLINE __forceinline
-#if _DEBUG
-#define DebugDo(x) (x)
-#endif
 
 #define U64_MAX 18446744073709551615ull
 #define U32_MAX 4294967295u
@@ -131,13 +128,22 @@ typedef void VoidProc(void);
 #define INVALID_ID_U16 U16_MAX
 #define INVALID_ID_U8  U8_MAX
 
-#define ZERO_MEMORY
-#ifdef ZERO_MEMORY
-  #define MemClear(ptr, size) MemZero(ptr, size)
-  #define MemClearStruct(ptr) MemZero(ptr, sizeof(*(ptr)))
+#define ALLOC_HEADER_GUARD   0xA110C8
+#define DEALLOC_HEADER_GUARD 0xDE1E7E
+#define ALLOC_GUARD          0xA1
+#define DEALLOC_GUARD        0xDE
+
+#define DEBUG_ZERO_MEMORY
+#ifdef DEBUG_ZERO_MEMORY
+  #define AllocMemZero(ptr, size) MemSet(ptr, ALLOC_GUARD, size)
+  #define AllocMemZeroStruct(ptr) MemSet(ptr, ALLOC_GUARD, sizeof(*(ptr)))
+  #define DealocMemZero(ptr, size) MemSet(ptr, DEALLOC_GUARD, size)
+  #define DealocMemZeroStruct(ptr) MemSet(ptr, DEALLOC_GUARD, sizeof(*(ptr)))
 #else
-  #define MemClear(ptr, size)
-  #define MemClearStruct(ptr)
+  #define AllocMemZero(ptr, size)
+  #define AllocMemZeroStruct(ptr)
+  #define DealocMemZero(ptr, size)
+  #define DealocMemZeroStruct(ptr)
 #endif
 
 // #define UI_Window(begin) DeferLoop(begin, ImGui::End())

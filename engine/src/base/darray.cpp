@@ -14,9 +14,9 @@ struct DarrayHeader {
 void* _darray_create(u32 length, u32 stride) {
   u32 array_size = length * stride;
   void* new_array = 0;
-  MemAlloc(new_array, HeaderSize + array_size);
+  Assign(new_array, mem_alloc(HeaderSize + array_size));
 
-  MemClear(new_array, HeaderSize + array_size);
+  AllocMemZero(new_array, HeaderSize + array_size);
   Assert(length && "length should be > 0");
   
   DarrayHeader* header; Assign(header, new_array);

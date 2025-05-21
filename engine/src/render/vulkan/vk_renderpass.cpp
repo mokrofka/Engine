@@ -4,8 +4,8 @@ u32 vk_renderpass_create(Rect rect, v4 color, f32 depth, u32 stencil, u32 clear_
   VK_Renderpass* renderpass = null;
   i32 i;
   for (i = 0; i < 2; ++i) {
-    if (!vk->renderpasses[i].handle) {
-      renderpass = &vk->renderpasses[i];
+    if (!vk.renderpasses[i].handle) {
+      renderpass = &vk.renderpasses[i];
       
       *renderpass = {
         .render_area = rect,
@@ -33,7 +33,7 @@ u32 vk_renderpass_create(Rect rect, v4 color, f32 depth, u32 stencil, u32 clear_
   // Color attachment
   b32 do_clear_color = (renderpass->clear_flags & RenderpassClearFlag_ColorBuffer) != 0;
   VkAttachmentDescription color_attachment;
-  color_attachment.format = vk->swapchain.image_format.format; // TODO: configurable
+  color_attachment.format = vk.swapchain.image_format.format; // TODO: configurable
   color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
   color_attachment.loadOp = do_clear_color ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
   color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -60,7 +60,7 @@ u32 vk_renderpass_create(Rect rect, v4 color, f32 depth, u32 stencil, u32 clear_
 
   if (do_clear_color) {
     VkAttachmentDescription depth_attachment = {};
-    depth_attachment.format = vk->device.depth_format;
+    depth_attachment.format = vk.device.depth_format;
     depth_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
     depth_attachment.loadOp = do_clear_depth ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
     depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -116,14 +116,14 @@ u32 vk_renderpass_create(Rect rect, v4 color, f32 depth, u32 stencil, u32 clear_
   render_pass_create_info.pNext = 0;
   render_pass_create_info.flags = 0;
 
-  VK_CHECK(vkCreateRenderPass(vkdevice, &render_pass_create_info, vk->allocator, &renderpass->handle));
+  VK_CHECK(vkCreateRenderPass(vkdevice, &render_pass_create_info, vk.allocator, &renderpass->handle));
   return renderpass->id;
 }
 
 void vk_renderpass_destroy(u32 id) {
   VK_Renderpass* renderpass = vk_get_renderpass(id);
-  vkDestroyRenderPass(vkdevice, renderpass->handle, vk->allocator);
-  vk->renderpasses[id].handle = 0;
+  vkDestroyRenderPass(vkdevice, renderpass->handle, vk.allocator);
+  vk.renderpasses[id].handle = 0;
 }
 
 void vk_renderpass_begin(VK_CommandBuffer* command_buffer, VK_Renderpass* renderpass, VkFramebuffer frame_buffer) {

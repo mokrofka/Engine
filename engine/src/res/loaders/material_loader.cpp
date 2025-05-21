@@ -10,13 +10,13 @@ b32 material_loader_load(Arena* arena, ResLoader* self, String name, Res* out_re
 
   str_copy(out_res->file_path64, file_path);
 
-  MaterialConfig* res_data = mem_alloc_struct(MaterialConfig);
+  MaterialConfig* res_data;
   // Set some defaults.
-  res_data->type = MaterialType_World;
-  res_data->auto_release = true;
-  res_data->diffuse_color = v4_one(); // white.
-  res_data->diffuse_map_name64.size = 0;
-  str_copy(res_data->name64, name);
+  // res_data->type = MaterialType_World;
+  // res_data->auto_release = true;
+  // res_data->diffuse_color = v4_one(); // white.
+  // res_data->diffuse_map_name64.size = 0;
+  // str_copy(res_data->name64, name);
   
   OS_Handle f = os_file_open(file_path, OS_AccessFlag_Read);
   if (!f) {
@@ -24,7 +24,7 @@ b32 material_loader_load(Arena* arena, ResLoader* self, String name, Res* out_re
     return false;
   }
   u64 file_size = os_file_size(f);
-  u8* buffer = push_buffer(scratch, u8, file_size);
+  u8* buffer = push_buffer(scratch, file_size);
   os_file_read(f, file_size, buffer);
   StringCursor cursor = {buffer, buffer+file_size};
   
@@ -83,7 +83,7 @@ b32 material_loader_load(Arena* arena, ResLoader* self, String name, Res* out_re
   }
   os_file_close(f);
 
-  Assign(out_res->data, res_data);
+  // Assign(out_res->data, res_data);
   out_res->data_size = sizeof(MaterialConfig);
   str_copy(out_res->name64, name);
 
@@ -121,7 +121,7 @@ MaterialConfig res_load_material_config(String filepath) {
   material_cfg.diffuse_color = v4_one(); // white.
   
   u64 file_size = os_file_size(f);
-  u8* buffer = push_buffer(scratch, u8, file_size);
+  u8* buffer = push_buffer(scratch, file_size);
   os_file_read(f, file_size, buffer);
   StringCursor cursor = {buffer, buffer+file_size};
   

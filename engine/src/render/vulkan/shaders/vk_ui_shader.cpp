@@ -26,7 +26,7 @@ VK_UIShader vk_ui_shader_create() {
   VkDescriptorSetLayoutCreateInfo g_layout_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
   g_layout_info.bindingCount = 1;
   g_layout_info.pBindings = &g_ubo_layout_binding;
-  VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &g_layout_info, vk->allocator, &shader.global_descriptor_set_layout));
+  VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &g_layout_info, vk.allocator, &shader.global_descriptor_set_layout));
   
   // Global descriptor pool: Used for global items such as view/projection matrix
   VkDescriptorPoolSize g_pool_size = {};
@@ -36,8 +36,8 @@ VK_UIShader vk_ui_shader_create() {
   VkDescriptorPoolCreateInfo g_pool_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
   g_pool_info.poolSizeCount = 1;
   g_pool_info.pPoolSizes = &g_pool_size;
-  g_pool_info.maxSets = vk->swapchain.image_count;
-  VK_CHECK(vkCreateDescriptorPool(vkdevice, &g_pool_info, vk->allocator, &shader.global_descriptor_pool));
+  g_pool_info.maxSets = vk.swapchain.image_count;
+  VK_CHECK(vkCreateDescriptorPool(vkdevice, &g_pool_info, vk.allocator, &shader.global_descriptor_pool));
 
   shader.sampler_uses[0] = TextureUse_MapDiffuse;
 
@@ -58,7 +58,7 @@ VK_UIShader vk_ui_shader_create() {
   VkDescriptorSetLayoutCreateInfo layout_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
   layout_info.bindingCount = VK_UIShaderDescriptorCount;
   layout_info.pBindings = bindings;
-  VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &layout_info, vk->allocator, &shader.obj_descriptor_set_layout));
+  VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &layout_info, vk.allocator, &shader.obj_descriptor_set_layout));
   
   // Local/Object descriptor pool: Used for object-specific items like diffuse color
   VkDescriptorPoolSize obj_pool_sizes[2];
@@ -76,22 +76,22 @@ VK_UIShader vk_ui_shader_create() {
   obj_pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT; // allows you free 
   
   // Create object descriptor pool
-  VK_CHECK(vkCreateDescriptorPool(vkdevice, &obj_pool_info, vk->allocator, &shader.obj_descriptor_pool));
+  VK_CHECK(vkCreateDescriptorPool(vkdevice, &obj_pool_info, vk.allocator, &shader.obj_descriptor_pool));
   
   // Pipeline creation
   VkViewport viewport;
   viewport.x = 0.0f;
-  viewport.y = (f32)vk->frame.height;
-  viewport.width = (f32)vk->frame.width;
-  viewport.height = (f32)vk->frame.height;
+  viewport.y = (f32)vk.frame.height;
+  viewport.width = (f32)vk.frame.width;
+  viewport.height = (f32)vk.frame.height;
   viewport.minDepth = 0.0f;
   viewport.maxDepth = 1.0f;
 
   // Scissor
   VkRect2D scissor;
   scissor.offset.x = scissor.offset.y = 0;
-  scissor.extent.width = vk->frame.width;
-  scissor.extent.height = vk->frame.height;
+  scissor.extent.width = vk.frame.width;
+  scissor.extent.height = vk.frame.height;
   
   // Attributes
   u32 offset = 0;
@@ -128,7 +128,7 @@ VK_UIShader vk_ui_shader_create() {
   }
 
   shader.pipeline = vk_graphics_pipeline_create(
-    vk_get_renderpass(vk->ui_renderpass_id),
+    vk_get_renderpass(vk.ui_renderpass_id),
     sizeof(Vertex2D),
     ATTRIBUTE_COUNT,
     attribute_desriptions,
@@ -173,8 +173,8 @@ VK_UIShader vk_ui_shader_create() {
 void vk_ui_shader_destroy(VK_UIShader* shader) {
   VkDevice logical_device = vkdevice;
   
-  vkDestroyDescriptorPool(logical_device, shader->obj_descriptor_pool, vk->allocator);
-  vkDestroyDescriptorSetLayout(logical_device, shader->obj_descriptor_set_layout, vk->allocator);
+  vkDestroyDescriptorPool(logical_device, shader->obj_descriptor_pool, vk.allocator);
+  vkDestroyDescriptorSetLayout(logical_device, shader->obj_descriptor_set_layout, vk.allocator);
   
   // Destroy uniform buffer
   vk_buffer_destroy(&shader->global_uniform_buffer);
@@ -184,28 +184,28 @@ void vk_ui_shader_destroy(VK_UIShader* shader) {
   vk_pipeline_destroy(&shader->pipeline);
 
   // Destroy global descriptor pool
-  vkDestroyDescriptorPool(logical_device, shader->global_descriptor_pool, vk->allocator);
+  vkDestroyDescriptorPool(logical_device, shader->global_descriptor_pool, vk.allocator);
   
   // Destroy global set layouts
-  vkDestroyDescriptorSetLayout(logical_device, shader->global_descriptor_set_layout, vk->allocator);
+  vkDestroyDescriptorSetLayout(logical_device, shader->global_descriptor_set_layout, vk.allocator);
   
   // Destroy shader modules
   Loop (i, UI_ShaderStageCount) {
-    vkDestroyShaderModule(vkdevice, shader->stages[i].handle, vk->allocator);
+    vkDestroyShaderModule(vkdevice, shader->stages[i].handle, vk.allocator);
   }
 }
 
 void vk_ui_shader_use(VK_UIShader* shader) {
   VkPipelineBindPoint bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS;
-  vk_pipeline_bind(vk->render.cmds[vk->frame.image_index].handle, bind_point, shader->pipeline);
+  vk_pipeline_bind(vk.render.cmds[vk.frame.image_index].handle, bind_point, shader->pipeline);
 }
 
 void vk_ui_shader_update_global_state(VK_UIShader* shader, f32 delta_time) {
-  u32 image_index = vk->frame.image_index;
+  u32 image_index = vk.frame.image_index;
   VkDescriptorSet global_descriptor = shader->global_descriptor_sets[image_index];
   
   // Bind the global descriptor set to be updated
-  vkCmdBindDescriptorSets(vk->render.cmds[vk->frame.image_index].handle, VK_PIPELINE_BIND_POINT_GRAPHICS, shader->pipeline.pipeline_layout, 0, 1, &global_descriptor, 0, 0);
+  vkCmdBindDescriptorSets(vk.render.cmds[vk.frame.image_index].handle, VK_PIPELINE_BIND_POINT_GRAPHICS, shader->pipeline.pipeline_layout, 0, 1, &global_descriptor, 0, 0);
   
   // Configure the descriptors for the given index
   u32 range = sizeof(VK_MaterialShaderGlobalUbo);
@@ -233,13 +233,13 @@ void vk_ui_shader_update_global_state(VK_UIShader* shader, f32 delta_time) {
 
 void vk_ui_shader_set_model(VK_UIShader* shader, mat4 model) {
   Assert(shader);
-  u32 image_index = vk->frame.image_index;
-  vkCmdPushConstants(vk->render.cmds[vk->frame.image_index].handle, shader->pipeline.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4), &model);
+  u32 image_index = vk.frame.image_index;
+  vkCmdPushConstants(vk.render.cmds[vk.frame.image_index].handle, shader->pipeline.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4), &model);
 }
 
 void vk_ui_shader_apply_material(VK_UIShader* shader, Material* material) {
   if (shader) {
-    u32 image_index = vk->frame.image_index;
+    u32 image_index = vk.frame.image_index;
 
     // Obtain material data
     VK_UIShaderInstState* object_state = &shader->instance_states[material->internal_id];
@@ -342,7 +342,7 @@ void vk_ui_shader_apply_material(VK_UIShader* shader, Material* material) {
     }
 
     // Bind the descriptor set to be updated, or in case the shader changed
-    vkCmdBindDescriptorSets(vk->render.cmds[vk->frame.image_index].handle, VK_PIPELINE_BIND_POINT_GRAPHICS, shader->pipeline.pipeline_layout, 1, 1, &object_descriptor_set, 0, 0);
+    vkCmdBindDescriptorSets(vk.render.cmds[vk.frame.image_index].handle, VK_PIPELINE_BIND_POINT_GRAPHICS, shader->pipeline.pipeline_layout, 1, 1, &object_descriptor_set, 0, 0);
   }
 }
 

@@ -9,9 +9,8 @@
   {                             \
     Assert(expr == VK_SUCCESS); \
   }
-#define vkdevice vk->device.logical_device
+#define vkdevice vk.device.logical_device
 #define FramesInFlight 2
-#define ParticleCount KB(10)
 
 struct VK_Buffer {
   VkBuffer handle;
@@ -505,6 +504,7 @@ struct VK {
   vk_Shader shaders[10];
   VK_ComputeShader compute_shader;
   vk_Shader graphics_shader_compute;
+  mat4* projection_view;
   
 #if _DEBUG
   VkDebugUtilsMessengerEXT debug_messenger;
@@ -519,11 +519,11 @@ struct Te {
 };
 extern Te te;
 
-extern VK* vk;
+extern VK vk;
 
 INLINE i32 vk_find_memory_index(u32 type_filter, u32 property_flags) {
   VkPhysicalDeviceMemoryProperties memory_properties;
-  vkGetPhysicalDeviceMemoryProperties(vk->device.physical_device, &memory_properties);
+  vkGetPhysicalDeviceMemoryProperties(vk.device.physical_device, &memory_properties);
   u32 index = -1;
 
   Loop (i, memory_properties.memoryTypeCount) {
@@ -538,17 +538,30 @@ INLINE i32 vk_find_memory_index(u32 type_filter, u32 property_flags) {
 }
 
 INLINE VK_Renderpass* vk_get_renderpass(u32 id) {
-  return &vk->renderpasses[id];
+  return &vk.renderpasses[id];
 }
 
 INLINE VkSemaphore vk_get_current_image_available_semaphore() {
-  return vk->sync.image_available_semaphores[vk->frame.current_frame];
+  return vk.sync.image_available_semaphores[vk.frame.current_frame];
 }
 
 INLINE VkSemaphore vk_get_current_queue_complete_semaphore() {
-  return vk->sync.queue_complete_semaphores[vk->frame.current_frame];
+  return vk.sync.queue_complete_semaphores[vk.frame.current_frame];
 }
 
 INLINE VK_CommandBuffer& vk_get_current_cmd() {
-  return vk->render.cmds[vk->frame.current_frame];
+  return vk.render.cmds[vk.frame.current_frame];
 }
+
+#define ParticleCount KB(40)
+
+struct alignas(16) Particle {
+  v3 pos;
+  v3 velocity;
+  v4 color;
+};
+
+struct UniformBufferObject {
+  mat4 projection_view;
+  f32 delta_time = 1.0f;
+};

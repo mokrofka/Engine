@@ -134,7 +134,7 @@ struct ComponentArray {
 
 inline void _component_register(u32 index, u32 element_size) {
   Assert(!ecs.component_arrays[index]);
-  ecs.component_arrays[index] = mem_alloc_struct(ComponentArray);
+  Assign(ecs.component_arrays[index], mem_alloc(sizeof(ComponentArray)));
   ComponentArray* array = ecs.component_arrays[index];
   array->size = 0;
   array->element_size = element_size;
@@ -207,7 +207,7 @@ struct System {
 
 inline void* system_manager_register_system(u32 index, Signature signature) {
   Assert(!ecs.systems[index]);
-  ecs.systems[index] = mem_alloc_struct(System);
+  Assign(ecs.systems[index], mem_alloc(sizeof(System)));
   ecs.system_signatures[index] = signature;
   ecs.systems[index]->size = 0;
   Loop (i, MaxEntities) { ecs.systems[index]->entity_to_index[i] = INVALID_ID; }

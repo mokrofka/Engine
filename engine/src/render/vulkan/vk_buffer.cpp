@@ -12,7 +12,7 @@ VK_Buffer vk_buffer_create(u64 size, u32 usage, u32 memory_property_flags, b32 b
   buffer_info.usage = usage;
   buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // NOTE only used in one queue
   
-  VK_CHECK(vkCreateBuffer(vkdevice, &buffer_info, vk->allocator, &buffer.handle));
+  VK_CHECK(vkCreateBuffer(vkdevice, &buffer_info, vk.allocator, &buffer.handle));
 
   // Gather memory requirements
   VkMemoryRequirements requirements;
@@ -25,7 +25,7 @@ VK_Buffer vk_buffer_create(u64 size, u32 usage, u32 memory_property_flags, b32 b
   allocate_info.memoryTypeIndex = (u32)buffer.memory_index;
   
   // Allocate the memory.
-  VkResult result = vkAllocateMemory(vkdevice, &allocate_info, vk->allocator, &buffer.memory);
+  VkResult result = vkAllocateMemory(vkdevice, &allocate_info, vk.allocator, &buffer.memory);
   if (result != VK_SUCCESS) {
     Error("Unable to create vulkan buffer because the required memory allocation failed. Error: %i", result);
   }
@@ -39,9 +39,9 @@ VK_Buffer vk_buffer_create(u64 size, u32 usage, u32 memory_property_flags, b32 b
 
 void vk_buffer_destroy(VK_Buffer* buffer) {
   Assert(buffer->memory && buffer->handle);
-  vkFreeMemory(vkdevice, buffer->memory, vk->allocator);
+  vkFreeMemory(vkdevice, buffer->memory, vk.allocator);
   buffer->memory = 0;
-  vkDestroyBuffer(vkdevice, buffer->handle, vk->allocator);
+  vkDestroyBuffer(vkdevice, buffer->handle, vk.allocator);
   buffer->handle = 0;
   
   buffer->size = 0;
@@ -57,7 +57,7 @@ b32 vk_buffer_resize(u64 new_size, VK_Buffer* buffer, VkQueue queue, VkCommandPo
   buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   
   VkBuffer new_buffer;
-  VK_CHECK(vkCreateBuffer(vkdevice, &buffer_info, vk->allocator, &new_buffer));
+  VK_CHECK(vkCreateBuffer(vkdevice, &buffer_info, vk.allocator, &new_buffer));
   
   // Gather memory requirements
   VkMemoryRequirements requirements;
@@ -70,7 +70,7 @@ b32 vk_buffer_resize(u64 new_size, VK_Buffer* buffer, VkQueue queue, VkCommandPo
   
   // Allocate the memory
   VkDeviceMemory new_memory;
-  VkResult result = vkAllocateMemory(vkdevice, &allocate_info, vk->allocator, &new_memory);
+  VkResult result = vkAllocateMemory(vkdevice, &allocate_info, vk.allocator, &new_memory);
   if (result != VK_SUCCESS) {
     Error("Unable to resize vulkan buffer because the required memory allocation failed. Error: %i", result);
     return false;
@@ -86,9 +86,9 @@ b32 vk_buffer_resize(u64 new_size, VK_Buffer* buffer, VkQueue queue, VkCommandPo
   vkDeviceWaitIdle(vkdevice);
   
   // Destroy the old
-  vkFreeMemory(vkdevice, buffer->memory, vk->allocator);
+  vkFreeMemory(vkdevice, buffer->memory, vk.allocator);
   buffer->memory = 0;
-  vkDestroyBuffer(vkdevice, buffer->handle, vk->allocator);
+  vkDestroyBuffer(vkdevice, buffer->handle, vk.allocator);
   buffer->handle = 0;
   
   // Set new properties
@@ -123,7 +123,7 @@ void vk_buffer_load_image_data(VK_Buffer* buffer, u64 offset, u64 size, u32 flag
 
 void vk_buffer_copy_to(VK_Buffer* source, u64 source_offset, VK_Buffer* dest, u64 dest_offset, u64 size) {
 
-  vkQueueWaitIdle(vk->device.graphics_queue);
+  vkQueueWaitIdle(vk.device.graphics_queue);
   
   // Create a one-time-use command buffer
   VK_CommandBuffer temp_cmd = vk_cmd_alloc_and_begin_single_use();
@@ -147,8 +147,8 @@ u64 vk_buffer_alloc(VK_Buffer* buffer, u64 size, u64 alignment) {
 
 void upload_data_range(VK_Buffer* buffer, MemRange range, void* data) {
   // Load the data into the staging buffer
-  vk_buffer_load_data(&vk->stage_buffer, 0, range.size, data);
+  vk_buffer_load_data(&vk.stage_buffer, 0, range.size, data);
   
   // Perform the copy from staging to the device local buffer
-  vk_buffer_copy_to(&vk->stage_buffer, 0, buffer, range.offset, range.size);
+  vk_buffer_copy_to(&vk.stage_buffer, 0, buffer, range.offset, range.size);
 }

@@ -1,12 +1,13 @@
 #version 450 core
 
 struct Particle {
-  vec2 position;
-  vec2 velocity;
+  vec3 position;
+  vec3 velocity;
   vec4 color;
 };
 
 layout (binding = 0) uniform ParameterUBO {
+  mat4 projection_view;
   float deltaTime;
 } ubo;
 
@@ -21,14 +22,42 @@ layout(std140, binding = 2) writeonly buffer ParticleSSBOOut {
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 // void main() {
-//   uint index = gl_GlobalInvocationID.x;  
+//     uint index = gl_GlobalInvocationID.x;  
 
-//   Particle particle_in = particles_in[index];
+//     Particle p = particles_in[index];
 
-//   particles_out[index].position = particle_in.position + particle_in.velocity.xy * ubo.deltaTime;
-//   particles_out[index].velocity = particle_in.velocity;
+//     // Integrate position
+//     vec2 pos = p.position + p.velocity.xy * ubo.deltaTime;
+//     vec2 vel = p.velocity;
+
+//     // Frame bounds in NDC-like space (-1 to 1)
+//     const float minX = -1.0;
+//     const float maxX =  1.0;
+//     const float minY = -1.0;
+//     const float maxY =  1.0;
+
+//     // Bounce on X axis
+//     if (pos.x < minX) {
+//         pos.x = minX;
+//         vel.x *= -1.0;
+//     } else if (pos.x > maxX) {
+//         pos.x = maxX;
+//         vel.x *= -1.0;
+//     }
+
+//     // Bounce on Y axis
+//     if (pos.y < minY) {
+//         pos.y = minY;
+//         vel.y *= -1.0;
+//     } else if (pos.y > maxY) {
+//         pos.y = maxY;
+//         vel.y *= -1.0;
+//     }
+
+//     // Write result
+//     particles_out[index].position = pos;
+//     particles_out[index].velocity = vel;
 // }
-
 
 void main() {
     uint index = gl_GlobalInvocationID.x;  
@@ -36,34 +65,82 @@ void main() {
     Particle p = particles_in[index];
 
     // Integrate position
-    vec2 pos = p.position + p.velocity.xy * ubo.deltaTime;
-    vec2 vel = p.velocity;
+    vec3 pos = p.position + p.velocity * ubo.deltaTime;
+    vec3 vel = p.velocity;
 
     // Frame bounds in NDC-like space (-1 to 1)
-    const float minX = -1.0;
-    const float maxX =  1.0;
-    const float minY = -1.0;
-    const float maxY =  1.0;
+    const float minVal = -1.0;
+    const float maxVal =  1.0;
 
     // Bounce on X axis
-    if (pos.x < minX) {
-        pos.x = minX;
+    if (pos.x < minVal) {
+        pos.x = minVal;
         vel.x *= -1.0;
-    } else if (pos.x > maxX) {
-        pos.x = maxX;
+    } else if (pos.x > maxVal) {
+        pos.x = maxVal;
         vel.x *= -1.0;
     }
 
     // Bounce on Y axis
-    if (pos.y < minY) {
-        pos.y = minY;
+    if (pos.y < minVal) {
+        pos.y = minVal;
         vel.y *= -1.0;
-    } else if (pos.y > maxY) {
-        pos.y = maxY;
+    } else if (pos.y > maxVal) {
+        pos.y = maxVal;
         vel.y *= -1.0;
     }
 
-    // Write result
+    // Bounce on Z axis
+    if (pos.z < minVal) {
+        pos.z = minVal;
+        vel.z *= -1.0;
+    } else if (pos.z > maxVal) {
+        pos.z = maxVal;
+        vel.z *= -1.0;
+    }
+
     particles_out[index].position = pos;
     particles_out[index].velocity = vel;
+    particles_out[index].color = p.color; // keep color same
 }
+
+// float rand(vec2 co) {
+//     return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+// }
+
+// void main() {
+//     uint index = gl_GlobalInvocationID.x;
+//     float rand = rand(gl_GlobalInvocationID.xy);
+//     Particle particle = particles_in[index];
+
+//     vec3 p = particle.position;
+//     float x = p.x;
+//     float y = p.y;
+
+//     float r = sqrt(x * x + y * y);
+//     if (r < 0.001f) 
+//         r = 0.001f; // avoid division by zero
+
+//     // Galaxy rotation curve
+//     float velocity = (r < 2.0f) ? r * 0.5f : 1.0f;
+
+//     // Angular speed ω = v / r
+//     float omega = velocity / r;
+
+//     // Time step
+//     float dt = 1.0f / 60.0f;
+//     float theta = omega * dt;
+
+//     // Rotate position (simulate orbit)
+//     float x_new = cos(theta) * x - sin(theta) * y;
+//     float y_new = sin(theta) * x + cos(theta) * y;
+
+//     // Compute new velocity from position delta (optional)
+//     vec3 new_pos = vec3(x_new, y_new, p.z);
+//     vec3 new_vel = (new_pos - p) / dt;
+
+//     // Write to output
+//     particles_out[index].position = new_pos;
+//     // particles_out[index].velocity = new_vel;
+//     // particles_out[index].color = vec4(1.0,0.0,0.,1);
+// }

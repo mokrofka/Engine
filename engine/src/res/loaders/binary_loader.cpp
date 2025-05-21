@@ -25,7 +25,7 @@ b32 binary_loader_load(Arena* arena, ResLoader* self, String name, Res* out_res)
 
   u8* buffer;
   if (arena) {
-    buffer = push_buffer(arena, u8, file_size);
+    buffer = push_buffer(arena, file_size);
   } else {
     buffer = mem_alloc(file_size);
   }
@@ -82,7 +82,7 @@ Binary res_binary_load(Arena* arena, String filepath) {
 
   u8* buffer;
   if (arena) {
-    buffer = push_buffer(arena, u8, file_size);
+    buffer = push_buffer(arena, file_size);
   } else {
     buffer = mem_alloc(file_size);
   }

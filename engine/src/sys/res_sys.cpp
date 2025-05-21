@@ -19,6 +19,7 @@ void res_sys_init(Arena* arena, ResSysConfig config) {
   state = push_struct(arena, ResSysState);
   state->config = config;
   state->registered_loaders = push_array(arena, ResLoader, 0);
+  state->max_loader_count = 0;
   
   // // NOTE Auto-register known loader types here
   // res_sys_register_loader(binary_res_loader_create());

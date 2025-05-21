@@ -22,11 +22,10 @@ HashMap hashmap_create(Arena* arena, u32 element_size, u32 element_count, b32 is
   Assert(element_count && element_size && "element_size and element_count must be a positive non-zero value");
   HashMap hashtable;
   
-  hashtable.data = push_buffer(arena, u8, element_size * element_count);
+  hashtable.data = push_buffer(arena, element_size * element_count);
   hashtable.element_size = element_size;
   hashtable.element_count = element_count;
   hashtable.is_pointer_type = is_pointer_type;
-  MemClear(hashtable.data, element_size * element_count);
   return hashtable;
 }
 

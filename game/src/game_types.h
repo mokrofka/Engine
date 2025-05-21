@@ -4,7 +4,6 @@ struct Object {
   u32 id;
   v3 position;
   v3 velocity;
-  v3 acceleration;
 };
 
 struct Camera {
@@ -31,10 +30,8 @@ struct GameState {
   struct PushConstant* entities_push_constant;
   Camera camera;
   
-  Object* objs;
+  Object objs[100];
   u32 obj_count;
-  Object* objs_new;
-  u32 obj_count_new;
   f32 rot;
   b8 is_mouse_move;
 };

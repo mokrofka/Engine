@@ -340,7 +340,7 @@ String push_strfv(Arena* arena, const void* format, void* argc) {
   u32 need_bytes = my_vsnprintf(0, 0, format, argc) + 1;
   va_end(argc_copy);
   
-  u8* buffer = push_buffer(arena, u8, need_bytes);
+  u8* buffer = push_buffer(arena, need_bytes);
   u32 final_size = my_vsnprintf(buffer, need_bytes, format, argc_copy);
   
   String result = {buffer, final_size};

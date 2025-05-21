@@ -68,6 +68,10 @@ INLINE f32 Round(f32 a) {
   return __builtin_roundf(a);
 }
 
+INLINE f32 Exp(f32 a) {
+  return __builtin_expf(a);
+}
+
 INLINE f32 lerp(f32 a, f32 t, f32 b) {
   return (1 - t) * a + t * b;
 }

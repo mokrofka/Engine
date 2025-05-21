@@ -13,8 +13,7 @@
 #include "input.h"
 #include "ui.h"
 #include "network.h"
-
-void test();
+#include "test.h"
 
 struct EngineState {
   Arena* arena;
@@ -31,7 +30,7 @@ struct EngineState {
   // end
 };
 
-global EngineState* state;
+global EngineState st;
 
 internal void engine_on_window_closed();
 internal void engine_on_window_resized(Window* window);
@@ -61,10 +60,10 @@ b32 event_on_debug_event(u32 code, void* sender, void* listener_inst, EventConte
   choice %= 3;
   
   // Load up the new texture
-  // state->test_geometry->material->diffuse_map.texture = texture_system_acquire(names[choice], true);
-  // if (!state->test_geometry->material->diffuse_map.texture) {
+  // st.test_geometry->material->diffuse_map.texture = texture_system_acquire(names[choice], true);
+  // if (!st.test_geometry->material->diffuse_map.texture) {
   //   Warn("event_on_debug_event no texture! using default"_);
-  //   state->test_geometry->material->diffuse_map.texture = texture_system_get_default_texture();
+  //   st.test_geometry->material->diffuse_map.texture = texture_system_get_default_texture();
   // }
   
   // Release the old texture
@@ -75,43 +74,38 @@ b32 event_on_debug_event(u32 code, void* sender, void* listener_inst, EventConte
 void engine_create(App* app) {
   global_allocator_init();
   app_create(app);
-  wchar_t whello[] = L"Hello";
   Scratch scratch;
-  String s = push_str_wchar(scratch, whello, 5);
-  Info("%s", s);
   
-  app->engine_state = push_struct(app->arena, EngineState);
-  
-  Assign(state, app->engine_state);
-  state->app = app;
-  state->arena = arena_alloc(app->arena, EngineSize);
+  st.app = app;
+  st.arena = arena_alloc(app->arena, EngineSize);
   
   {
-    logging_init(state->arena);
+    logging_init(st.arena);
   }
 
   {
-    platform_init(state->arena);
+    platform_init(st.arena);
   }
   
   {
-    network_init(state->arena);
+    network_init(st.arena);
   }
-  // test();
-  // foo("D:\\VS_Code\\Engine\\assets\\shaders"_);
+  test();
+  i32 a = 0xa1;
+  i32 b = 0xde;
   
   {
     ResSysConfig res_sys_cfg = {
       .asset_base_path = "../assets"_
     };
-    res_sys_init(state->arena, res_sys_cfg);
+    res_sys_init(st.arena, res_sys_cfg);
   }
 
   {
     EventSysConfig config = {
       .mem_reserve = KB(1)
     };
-    event_init(state->arena, config);
+    event_init(st.arena, config);
     
     os_register_process_key(input_process_key);
     os_register_process_mouse_move(input_process_mouse_move);
@@ -128,7 +122,7 @@ void engine_create(App* app) {
   }
 
   {
-    input_init(state->arena);
+    input_init(st.arena);
   }
   
   {
@@ -138,7 +132,7 @@ void engine_create(App* app) {
       .width = 680,
       .height = 480,
       .name = app->name};
-    os_window_create(state->arena, config);
+    os_window_create(st.arena, config);
   }
   
   {
@@ -149,14 +143,14 @@ void engine_create(App* app) {
       .global_textures_max = 31,
       .instance_textures_max = 31
     };
-    shader_sys_init(state->arena, config);
+    shader_sys_init(st.arena, config);
   }
 
   {
     R_Config config = {
       .mem_reserve = MB(10)
     };
-    r_init(state->arena, config);
+    r_init(st.arena, config);
   }
   
   {
@@ -167,30 +161,30 @@ void engine_create(App* app) {
     TextureSystemConfig texture_sys_config = {
       .max_texture_count = 65536,
     };
-    texture_system_init(state->arena, texture_sys_config);
+    texture_system_init(st.arena, texture_sys_config);
   }
 
   {
     MaterialSystemConfig material_sys_config = {
         .max_material_count = 4096,
     };
-    material_system_init(state->arena, material_sys_config);
+    material_system_init(st.arena, material_sys_config);
   }
 
   {
     GeometrySysConfig geometry_sys_config = {
       .max_geometry_count = 4096,
     };
-    geometry_sys_init(state->arena, geometry_sys_config);
+    geometry_sys_init(st.arena, geometry_sys_config);
   }
   
   {
-    asset_watch_init(state->arena);
+    asset_watch_init(st.arena);
   }
 
   {
     // GeometryConfig config = geometry_sys_generate_plane_config(10.0f, 5.0f, 5, 5, 5.0f, 2.0f, "test geometry"_, "test_material"_);
-    // state->test_geometry = geometry_sys_acquire_from_config(config, true);
+    // st.test_geometry = geometry_sys_acquire_from_config(config, true);
     
     // // Load up some test UI geometry.
     // GeometryConfig ui_config;
@@ -229,11 +223,11 @@ void engine_create(App* app) {
     // ui_config.indices = indices;
 
     // // Get UI geometry from config.
-    // state->test_ui_geometry = geometry_sys_acquire_from_config(ui_config, true);
+    // st.test_ui_geometry = geometry_sys_acquire_from_config(ui_config, true);
   }
 
   // TODO temp
-  // state->test_geometry = geometry_sys_get_default();
+  // st.test_geometry = geometry_sys_get_default();
   // TODO end
 
   app->init(app);
@@ -241,24 +235,24 @@ void engine_create(App* app) {
 
 void engine_run(App* app) {
   os_show_window();
-  state->is_running = true;
+  st.is_running = true;
   
-  clock_start(&state->clock);
-  clock_update(&state->clock);
-  state->last_time = state->clock.elapsed;
+  clock_start(&st.clock);
+  clock_update(&st.clock);
+  st.last_time = st.clock.elapsed;
   f64 running_time = 0;
   u8 frame_count = 0;
   f64 target_frame_seconds = 1.0f / 60;
   
-  while (state->is_running) {
+  while (st.is_running) {
     
     os_pump_messages();
 
-    if (!state->is_suspended) {
-      clock_update(&state->clock);
-      f64 current_time = state->clock.elapsed;
-      f64 delta = (current_time - state->last_time);
-      state->app->delta_time = delta;
+    if (!st.is_suspended) {
+      clock_update(&st.clock);
+      f64 current_time = st.clock.elapsed;
+      f64 delta = (current_time - st.last_time);
+      st.app->delta_time = delta;
       f64 frame_start_time = os_now_seconds();
 
       check_dll_changes(app);
@@ -269,14 +263,14 @@ void engine_run(App* app) {
       
       // // TODO temp
       // GeometryRenderData test_render;
-      // test_render.geometry = state->test_geometry;
+      // test_render.geometry = st.test_geometry;
       // test_render.model = mat4_identity();
       
       // packet.geometry_count = 1;
       // packet.geometries = &test_render;
 
       // GeometryRenderData test_ui_render;
-      // test_ui_render.geometry = state->test_ui_geometry;
+      // test_ui_render.geometry = st.test_ui_geometry;
       // test_ui_render.model = mat4_translation(v3(0, 0, 0));
       // packet.ui_geometry_count = 1;
       // packet.ui_geometries = &test_ui_render;
@@ -285,7 +279,7 @@ void engine_run(App* app) {
       // r_draw_frame(&packet);
       r_begin_draw_frame(&packet);
 
-      state->app->update(state->app);
+      st.app->update(st.app);
       
       r_end_draw_frame(&packet);
       
@@ -310,11 +304,11 @@ void engine_run(App* app) {
       input_update();
       asset_watch_update();
 
-      state->last_time = current_time;
+      st.last_time = current_time;
     }
   }
   
-  state->is_running = false;
+  st.is_running = false;
 
   event_unregister(EventCode_ApplicationQuit, 0, app_on_event);
   event_unregister(EventCode_KeyPressed, 0, app_on_key);
@@ -340,11 +334,11 @@ internal void engine_on_window_resized(Window* window) {
   // Handle minimization
   if (window->width == 0 || window->height == 0) {
     Info("Window minimized, suspending application.");
-    state->is_suspended = true;
+    st.is_suspended = true;
   } else {
-    if (state->is_suspended) {
+    if (st.is_suspended) {
       Info("Window restored, resuming application.");
-      state->is_suspended = false;
+      st.is_suspended = false;
     }
 
     // Fire an event for anything listening for window resizes.
@@ -359,7 +353,7 @@ internal b32 app_on_event(u32 code, void* sender, void* listener_inst, EventCont
   switch (code) {
     case EventCode_ApplicationQuit: {
       Info("EVENT_CORE_APPLICATION_QUIT received, shutting down.\n");
-      state->is_running = false;
+      st.is_running = false;
       return true;
     }
   }
@@ -429,8 +423,8 @@ internal void load_game_lib_init(App* app) {
 }
 
 internal void app_create(App* app) {
-  MemAlloc(app->arena, AppSize);
-  app->arena->res = AppSize;
+  Assign(app->arena, mem_alloc(AppSize));
+  app->arena->size = AppSize;
   tctx_init(app->arena);
   Scratch scratch;
   

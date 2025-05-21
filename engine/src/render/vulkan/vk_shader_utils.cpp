@@ -16,7 +16,7 @@ VK_ShaderStage shader_module_create(String name, String type_str, VkShaderStageF
   shader_stage.create_info.codeSize = binary.size;
   shader_stage.create_info.pCode = (u32*)binary.data;
 
-  VK_CHECK(vkCreateShaderModule(vkdevice, &shader_stage.create_info, vk->allocator, &shader_stage.handle));
+  VK_CHECK(vkCreateShaderModule(vkdevice, &shader_stage.create_info, vk.allocator, &shader_stage.handle));
   
   // Shader stage info
   shader_stage.shader_state_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;

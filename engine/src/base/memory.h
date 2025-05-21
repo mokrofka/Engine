@@ -7,17 +7,15 @@ struct MemRange {
   u64 size; 
 };
 
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////
 // Arena
 
 #define DEFAULT_ALIGNMENT (sizeof(void*))
 #define ARENA_HEADER sizeof(Arena)
 
 struct Arena {
-  u64 res;
-  u64 pos;
+  u64 size;
+  u64 used;
 };
 
 struct TCTX {
@@ -36,25 +34,25 @@ struct Scratch {
   INLINE operator Arena*() { return this->arena; }
 
   INLINE Scratch(Arena** conflics = null, u64 counts = 0);
-  INLINE ~Scratch() { arena->pos = pos; };
+  INLINE ~Scratch() { arena->used = pos; };
 };
 
 KAPI Arena* arena_alloc(Arena *a, u64 size, u64 align = DEFAULT_ALIGNMENT);
 
-INLINE u64 arena_pos(Arena* arena) { return ARENA_HEADER + arena->pos; };
-INLINE void arena_clear(Arena* arena) { arena->pos = 0; };
+INLINE u64 arena_pos(Arena* arena) { return ARENA_HEADER + arena->used; };
+INLINE void arena_clear(Arena* arena) { arena->used = 0; };
 
 KAPI void* _arena_push(Arena* arena, u64 size, u64 align = DEFAULT_ALIGNMENT);
 
-INLINE Temp temp_begin(Arena* arena) { return Temp{arena, arena->pos}; };
-INLINE void temp_end(Temp temp) { temp.arena->pos = temp.pos; }
+INLINE Temp temp_begin(Arena* arena) { return Temp{arena, arena->used}; };
+INLINE void temp_end(Temp temp) { temp.arena->used = temp.pos; }
 
 void tctx_init(Arena* arena);
 KAPI Temp tctx_get_scratch(Arena** conflics, u64 counts);
 
 #define push_array(a, T, c) (T*)_arena_push(a, sizeof(T)*c, Max(DEFAULT_ALIGNMENT, alignof(T)))
 #define push_struct(a, T) (T*)_arena_push(a, sizeof(T), Max(DEFAULT_ALIGNMENT, alignof(T)))
-#define push_buffer(a, T, c, ...) (T*)_arena_push(a, c, ## __VA_ARGS__)
+#define push_buffer(a, c, ...) (u8*)_arena_push(a, c, ##__VA_ARGS__)
 
 void _arena_move(Arena* arena, u64 size, u64 align);
 #define arena_move_array(a, T, c) _arena_move(a, sizeof(T)*c, Max(DEFAULT_ALIGNMENT, alignof(T)))
@@ -67,9 +65,7 @@ INLINE Scratch::Scratch(Arena** conflics, u64 counts) {
   *this = *(Scratch*)&temp;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////
 // Pool
 
 struct PoolFreeNode {
@@ -77,9 +73,9 @@ struct PoolFreeNode {
 };
 
 struct Pool {
+  u8* data;
 	u64 chunk_count;
 	u64 chunk_size;
-  u8* data;
 
 	PoolFreeNode *head;
 };
@@ -90,11 +86,7 @@ KAPI Pool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_a
 KAPI void pool_free(Pool& p, void* ptr);
 KAPI void pool_free_all(Pool& pool);
 
-#define PoolAlloc(p, a) Assign(a, pool_alloc(p))
-
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////
 // Free list
 
 #define DebugMagic 0xDEADBEEF
@@ -126,25 +118,15 @@ KAPI FreeList free_list_create(Arena* arena, u64 size, u64 alignment = DEFAULT_A
 KAPI void free_list_free(FreeList& fl, void* ptr);
 KAPI void free_list_free_all(FreeList& fl);
 
-#define FreeListAlloc(p, a, size) Assign(a, free_list_alloc(p, size))
-
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////
 // Global Allocator
 
 KAPI void global_allocator_init();
 KAPI u8* mem_alloc(u64 size);
 KAPI u8* mem_realoc(void* origin, u64 size);
-
-#define MemAlloc(a, size) Assign(a, mem_alloc(size))
-#define mem_alloc_struct(T) (T*)mem_alloc(sizeof(T))
-
 KAPI void mem_free(void* ptr);
 
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////
 // Ring Buffer
 
 u64 ring_write(u8* ring_base, u64 ring_size, u64 ring_pos, void* src_data, u64 src_data_size);

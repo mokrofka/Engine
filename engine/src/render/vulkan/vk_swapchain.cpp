@@ -7,14 +7,14 @@ internal VK_Swapchain create(u32 width, u32 height, b32 reuse);
 internal void destroy(VK_Swapchain* swapchain);
 
 void vk_swapchain_create(u32 width, u32 height) {
-  // vk->old_swapchain = push_struct(vk->arena, VK_Swapchain);
-  vk->swapchain = create(width, height, false);
+  // vk.old_swapchain = push_struct(vk.arena, VK_Swapchain);
+  vk.swapchain = create(width, height, false);
 }
 
 void vk_swapchain_recreate(VK_Swapchain* swapchain, u32 width, u32 height) {
-  vk->old_swapchain = *swapchain;
+  vk.old_swapchain = *swapchain;
   *swapchain = create(width, height, true);
-  destroy(&vk->old_swapchain);
+  destroy(&vk.old_swapchain);
 }
 
 void vk_swapchain_destroy(VK_Swapchain* swapchain) {
@@ -48,7 +48,7 @@ void vk_swapchain_present(
   vkQueuePresentKHR(present_queue, &present_info);
   
   // Increment (and loop) the index
-  vk->frame.current_frame = (vk->frame.current_frame + 1) % swapchain->max_frames_in_flight;
+  vk.frame.current_frame = (vk.frame.current_frame + 1) % swapchain->max_frames_in_flight;
 }
 
 internal void destroy(VK_Swapchain* swapchain) {
@@ -56,10 +56,10 @@ internal void destroy(VK_Swapchain* swapchain) {
   vk_image_destroy(&swapchain->depth_attachment);
 
   Loop (i, swapchain->image_count) {
-    vkDestroyImageView(vkdevice, swapchain->views[i], vk->allocator);
+    vkDestroyImageView(vkdevice, swapchain->views[i], vk.allocator);
   }
 
-  vkDestroySwapchainKHR(vkdevice, swapchain->handle, vk->allocator);
+  vkDestroySwapchainKHR(vkdevice, swapchain->handle, vk.allocator);
 }
 
 internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
@@ -68,8 +68,8 @@ internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
   
   // Choose a swap surface format
   b32 found = false;
-  Loop (i, vk->device.swapchain_support.format_count) {
-    VkSurfaceFormatKHR format = vk->device.swapchain_support.formats[i];
+  Loop (i, vk.device.swapchain_support.format_count) {
+    VkSurfaceFormatKHR format = vk.device.swapchain_support.formats[i];
     // Preferred formats
     // if (format.format == VK_FORMAT_B8G8R8A8_UNORM && // darker
     if (format.format == VK_FORMAT_B8G8R8A8_SRGB && // brighter
@@ -81,13 +81,13 @@ internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
   }
   
   if (!found) {
-    swapchain.image_format = vk->device.swapchain_support.formats[0];
+    swapchain.image_format = vk.device.swapchain_support.formats[0];
   }
   
   VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
   // TODO configurable
-  // Loop (i, vk->device.swapchain_support.present_mode_count) {
-  //   VkPresentModeKHR mode = vk->device.swapchain_support.present_modes[i];
+  // Loop (i, vk.device.swapchain_support.present_mode_count) {
+  //   VkPresentModeKHR mode = vk.device.swapchain_support.present_modes[i];
   //   if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
   //     present_mode = mode;
   //     break;
@@ -95,29 +95,29 @@ internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
   // }
   
   // Requery swapchain support.
-  vk_device_query_swapchain_support(vk->device.physical_device, &vk->device.swapchain_support);
+  vk_device_query_swapchain_support(vk.device.physical_device, &vk.device.swapchain_support);
   
   // Swapchain extent
-  if (vk->device.swapchain_support.capabilities.currentExtent.width != U32_MAX) {
-    swapchain_extent = vk->device.swapchain_support.capabilities.currentExtent;
+  if (vk.device.swapchain_support.capabilities.currentExtent.width != U32_MAX) {
+    swapchain_extent = vk.device.swapchain_support.capabilities.currentExtent;
   }
   
   // Clamp to the value allows by the GPU.
-  VkExtent2D min = vk->device.swapchain_support.capabilities.minImageExtent;
-  VkExtent2D max = vk->device.swapchain_support.capabilities.maxImageExtent;
+  VkExtent2D min = vk.device.swapchain_support.capabilities.minImageExtent;
+  VkExtent2D max = vk.device.swapchain_support.capabilities.maxImageExtent;
   swapchain_extent.width = Clamp(min.width, swapchain_extent.width, max.width);
   swapchain_extent.height = Clamp(min.height, swapchain_extent.height, max.height);
   
-  u32 image_count = vk->device.swapchain_support.capabilities.minImageCount + 1;
-  if (vk->device.swapchain_support.capabilities.maxImageCount > 0 &&
-      image_count > vk->device.swapchain_support.capabilities.maxImageCount) {
-        image_count = vk->device.swapchain_support.capabilities.maxImageCount;
+  u32 image_count = vk.device.swapchain_support.capabilities.minImageCount + 1;
+  if (vk.device.swapchain_support.capabilities.maxImageCount > 0 &&
+      image_count > vk.device.swapchain_support.capabilities.maxImageCount) {
+        image_count = vk.device.swapchain_support.capabilities.maxImageCount;
   }
   
   swapchain.max_frames_in_flight = image_count - 1;
   
   VkSwapchainCreateInfoKHR swapchain_create_info = {VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
-  swapchain_create_info.surface = vk->surface;
+  swapchain_create_info.surface = vk.surface;
   swapchain_create_info.minImageCount = image_count;
   swapchain_create_info.imageFormat = swapchain.image_format.format;
   swapchain_create_info.imageColorSpace = swapchain.image_format.colorSpace;
@@ -126,10 +126,10 @@ internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
   swapchain_create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
   // Setup the queue family indices
-  if (vk->device.graphics_queue_index != vk->device.present_queue_index) {
+  if (vk.device.graphics_queue_index != vk.device.present_queue_index) {
     u32 queueFamilyIndices[] = {
-        (u32)vk->device.graphics_queue_index,
-        (u32)vk->device.present_queue_index};
+        (u32)vk.device.graphics_queue_index,
+        (u32)vk.device.present_queue_index};
     swapchain_create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
     swapchain_create_info.queueFamilyIndexCount = 2;
     swapchain_create_info.pQueueFamilyIndices = queueFamilyIndices;
@@ -139,16 +139,16 @@ internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
     swapchain_create_info.pQueueFamilyIndices = 0;
   }
 
-  swapchain_create_info.preTransform = vk->device.swapchain_support.capabilities.currentTransform;
+  swapchain_create_info.preTransform = vk.device.swapchain_support.capabilities.currentTransform;
   swapchain_create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
   swapchain_create_info.presentMode = present_mode;
   swapchain_create_info.clipped = VK_TRUE;
-  swapchain_create_info.oldSwapchain = reuse ? vk->old_swapchain.handle : 0;
+  swapchain_create_info.oldSwapchain = reuse ? vk.old_swapchain.handle : 0;
   
-  VK_CHECK(vkCreateSwapchainKHR(vkdevice, &swapchain_create_info, vk->allocator, &swapchain.handle));
+  VK_CHECK(vkCreateSwapchainKHR(vkdevice, &swapchain_create_info, vk.allocator, &swapchain.handle));
   
   // Start with a zero frame index.
-  vk->frame.current_frame = 0;
+  vk.frame.current_frame = 0;
   
   // Images
   swapchain.image_count = 0;
@@ -167,18 +167,18 @@ internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
     view_info.subresourceRange.baseArrayLayer = 0;
     view_info.subresourceRange.layerCount = 1;
 
-    VK_CHECK(vkCreateImageView(vkdevice, &view_info, vk->allocator, &swapchain.views[i]));
+    VK_CHECK(vkCreateImageView(vkdevice, &view_info, vk.allocator, &swapchain.views[i]));
   }
 
   // Depth resources
-  vk_device_detect_depth_format(&vk->device);
+  vk_device_detect_depth_format(&vk.device);
 
   // Create depth image and its view.
   swapchain.depth_attachment = vk_image_create(
       VK_IMAGE_TYPE_2D,
       swapchain_extent.width,
       swapchain_extent.height,
-      vk->device.depth_format,
+      vk.device.depth_format,
       VK_IMAGE_TILING_OPTIMAL,
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -212,7 +212,7 @@ void vk_surface_create() {
   create_info.hinstance = h_instance;
   create_info.hwnd = hwnd;
 
-  vkCreateWin32SurfaceKHR(vk->instance, &create_info, vk->allocator, &vk->surface);
+  vkCreateWin32SurfaceKHR(vk.instance, &create_info, vk.allocator, &vk.surface);
 }
 
 i32 imgui_surface_create(void* vp, u64 vk_inst, const void* vk_allocators, u64* out_vk_surface) {

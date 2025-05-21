@@ -32,7 +32,7 @@ VK_Image vk_image_create(
   image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;         // TODO: Configurable sample count.
   image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // TODO: Configurable sharing mode.
 
-  VK_CHECK(vkCreateImage(vkdevice, &image_create_info, vk->allocator, &result.handle));
+  VK_CHECK(vkCreateImage(vkdevice, &image_create_info, vk.allocator, &result.handle));
 
   // Query memory requirements.
   VkMemoryRequirements memory_requirements;
@@ -45,7 +45,7 @@ VK_Image vk_image_create(
   VkMemoryAllocateInfo memory_allocate_info = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
   memory_allocate_info.allocationSize = memory_requirements.size;
   memory_allocate_info.memoryTypeIndex = memory_type;
-  VK_CHECK(vkAllocateMemory(vkdevice, &memory_allocate_info, vk->allocator, &result.memory));
+  VK_CHECK(vkAllocateMemory(vkdevice, &memory_allocate_info, vk.allocator, &result.memory));
 
   // Bind the memory
   VK_CHECK(vkBindImageMemory(vkdevice, result.handle, result.memory, 0)); // TODO: configurable memory offset.
@@ -72,7 +72,7 @@ void vk_image_view_create(VkFormat format, VK_Image* image, VkImageAspectFlags a
   view_create_info.subresourceRange.baseArrayLayer = 0;
   view_create_info.subresourceRange.layerCount = 1;
 
-  VK_CHECK(vkCreateImageView(vkdevice, &view_create_info, vk->allocator, &image->view));
+  VK_CHECK(vkCreateImageView(vkdevice, &view_create_info, vk.allocator, &image->view));
 }
 
 void vk_image_transition_layout(
@@ -84,8 +84,8 @@ void vk_image_transition_layout(
   VkImageMemoryBarrier barrier = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
   barrier.oldLayout = old_layout;
   barrier.newLayout = new_layout;
-  barrier.srcQueueFamilyIndex = vk->device.graphics_queue_index;
-  barrier.dstQueueFamilyIndex = vk->device.graphics_queue_index;
+  barrier.srcQueueFamilyIndex = vk.device.graphics_queue_index;
+  barrier.dstQueueFamilyIndex = vk.device.graphics_queue_index;
   barrier.image = image->handle;
   barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   barrier.subresourceRange.baseMipLevel = 0;
@@ -148,7 +148,7 @@ void vk_image_copy_from_buffer(VK_Image* image, VK_CommandBuffer* command_buffer
   
   vkCmdCopyBufferToImage(
     command_buffer->handle, 
-    vk->stage_buffer.handle, 
+    vk.stage_buffer.handle, 
     image->handle, 
     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
     1, 
@@ -182,27 +182,27 @@ void vk_image_copy_from_buffer(VK_Image* image, VK_Buffer buffer, VK_CommandBuff
 
 void vk_image_destroy(VK_Image* image) {
   if (image->view) {
-    vkDestroyImageView(vkdevice, image->view, vk->allocator);
+    vkDestroyImageView(vkdevice, image->view, vk.allocator);
     image->view = 0;
   }
   if (image->memory) {
-    vkFreeMemory(vkdevice, image->memory, vk->allocator);
+    vkFreeMemory(vkdevice, image->memory, vk.allocator);
     image->memory = 0;
   }
   if (image->handle) {
-    vkDestroyImage(vkdevice, image->handle, vk->allocator);
+    vkDestroyImage(vkdevice, image->handle, vk.allocator);
     image->handle = 0;
   }
 }
 
 i32 te_texture_load();
 void vk_texture_load(Texture* texture) {
-  VK_Texture* data = &vk->texture;
+  VK_Texture* data = &vk.texture;
   
   u64 size = texture->width * texture->height * texture->channel_count;
   VkFormat image_format = VK_FORMAT_R8G8B8A8_UNORM;
   
-  vk_buffer_load_data(&vk->stage_buffer, 0, size, texture->data);
+  vk_buffer_load_data(&vk.stage_buffer, 0, size, texture->data);
   
   data->image = vk_image_create(
     VK_IMAGE_TYPE_2D, 
@@ -254,7 +254,7 @@ void vk_texture_load(Texture* texture) {
   sampler_info.minLod = 0.0f;
   sampler_info.maxLod = 0.0f;
   
-  VkResult result = vkCreateSampler(vkdevice, &sampler_info, vk->allocator, &data->sampler);
+  VkResult result = vkCreateSampler(vkdevice, &sampler_info, vk.allocator, &data->sampler);
   
   // TODO
   // i32 a = te_texture_load();

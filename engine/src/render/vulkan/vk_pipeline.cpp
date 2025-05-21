@@ -119,7 +119,7 @@ VK_Pipeline vk_graphics_pipeline_create(
   pipeline_layout_create_info.pSetLayouts = descriptor_set_layouts;
   
   // Create the pipeline layout.
-  VK_CHECK(vkCreatePipelineLayout(vkdevice, &pipeline_layout_create_info, vk->allocator, &pipeline.pipeline_layout));
+  VK_CHECK(vkCreatePipelineLayout(vkdevice, &pipeline_layout_create_info, vk.allocator, &pipeline.pipeline_layout));
 
   // Pipeline create
   VkGraphicsPipelineCreateInfo pipeline_create_info = {VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
@@ -148,7 +148,7 @@ VK_Pipeline vk_graphics_pipeline_create(
     VK_NULL_HANDLE, 
     1, 
     &pipeline_create_info, 
-    vk->allocator, 
+    vk.allocator, 
     &pipeline.handle);
   
   if (vk_result_is_success(result)) {
@@ -162,8 +162,8 @@ VK_Pipeline vk_graphics_pipeline_create(
 
 void vk_pipeline_destroy(VK_Pipeline* pipeline) {
   Assert(pipeline->handle && pipeline->pipeline_layout);
-  vkDestroyPipeline(vkdevice, pipeline->handle, vk->allocator);
-  vkDestroyPipelineLayout(vkdevice, pipeline->pipeline_layout, vk->allocator);
+  vkDestroyPipeline(vkdevice, pipeline->handle, vk.allocator);
+  vkDestroyPipelineLayout(vkdevice, pipeline->pipeline_layout, vk.allocator);
 }
 
 void vk_pipeline_bind(VkCommandBuffer cmd, VkPipelineBindPoint bind_point, VK_Pipeline pipeline) {

@@ -27,12 +27,12 @@ internal VK_PhysicalDeviceQueueFamilyInfo physical_device_meets_requirements(
     VK_SwapchainSupportInfo* out_swapchain_support);
 
 void vk_device_create() {
-  select_physical_device(&vk->device);
+  select_physical_device(&vk.device);
   
   Info("Creating logical device..."_);
   // NOTE: Do not create additional queues for shared indices.
-  b32 present_shares_graphics_queue = vk->device.graphics_queue_index == vk->device.present_queue_index;
-  b32 transfer_shares_graphics_queue = vk->device.graphics_queue_index == vk->device.transfer_queue_index;
+  b32 present_shares_graphics_queue = vk.device.graphics_queue_index == vk.device.present_queue_index;
+  b32 transfer_shares_graphics_queue = vk.device.graphics_queue_index == vk.device.transfer_queue_index;
   u32 index_count = 1;
   if (!present_shares_graphics_queue) {
     ++index_count;
@@ -42,12 +42,12 @@ void vk_device_create() {
   }
   u32 indices[32];
   u32 index = 0;
-  indices[index++] = vk->device.graphics_queue_index;
+  indices[index++] = vk.device.graphics_queue_index;
   if (!present_shares_graphics_queue) {
-    indices[index++] = vk->device.present_queue_index;
+    indices[index++] = vk.device.present_queue_index;
   }
   if (!transfer_shares_graphics_queue) {
-    indices[index++] = vk->device.transfer_queue_index;
+    indices[index++] = vk.device.transfer_queue_index;
   }
   
   VkDeviceQueueCreateInfo queue_create_infos[32];
@@ -82,79 +82,79 @@ void vk_device_create() {
   device_create_info.ppEnabledLayerNames = 0;
   
   // Create the device.
-  VK_CHECK(vkCreateDevice(vk->device.physical_device, &device_create_info, vk->allocator, &vk->device.logical_device));
+  VK_CHECK(vkCreateDevice(vk.device.physical_device, &device_create_info, vk.allocator, &vk.device.logical_device));
 
   Info("Logical device created"_);
   
   // Get queues.
-  vkGetDeviceQueue(vk->device.logical_device, vk->device.graphics_queue_index, 0, &vk->device.graphics_queue);
-  vkGetDeviceQueue(vk->device.logical_device, vk->device.present_queue_index, 0, &vk->device.present_queue);
-  vkGetDeviceQueue(vk->device.logical_device, vk->device.transfer_queue_index, 0, &vk->device.transfer_queue);
+  vkGetDeviceQueue(vk.device.logical_device, vk.device.graphics_queue_index, 0, &vk.device.graphics_queue);
+  vkGetDeviceQueue(vk.device.logical_device, vk.device.present_queue_index, 0, &vk.device.present_queue);
+  vkGetDeviceQueue(vk.device.logical_device, vk.device.transfer_queue_index, 0, &vk.device.transfer_queue);
   
   Info("Queues obtained"_);
   
   // Create command pool for graphics queue.
   VkCommandPoolCreateInfo pool_create_info = {VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-  pool_create_info.queueFamilyIndex = vk->device.graphics_queue_index;
+  pool_create_info.queueFamilyIndex = vk.device.graphics_queue_index;
   pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-  VK_CHECK(vkCreateCommandPool(vk->device.logical_device, &pool_create_info, vk->allocator, &vk->device.graphics_cmd_pool));
+  VK_CHECK(vkCreateCommandPool(vk.device.logical_device, &pool_create_info, vk.allocator, &vk.device.graphics_cmd_pool));
   Info("Graphics command pool created"_);
 }
 
 void vk_device_destroy() {
   // Unset queues
-  vk->device.graphics_queue = 0;
-  vk->device.present_queue = 0;
-  vk->device.transfer_queue = 0;
+  vk.device.graphics_queue = 0;
+  vk.device.present_queue = 0;
+  vk.device.transfer_queue = 0;
   
   Info("Destroying command pools..."_);
-  vkDestroyCommandPool(vkdevice, vk->device.graphics_cmd_pool, vk->allocator);
+  vkDestroyCommandPool(vkdevice, vk.device.graphics_cmd_pool, vk.allocator);
 
   // Destroy logical device
   Info("Destroying logical device..."_);
-  vkDestroyDevice(vkdevice, vk->allocator);
+  vkDestroyDevice(vkdevice, vk.allocator);
   vkdevice = 0;
   
   // Physical device are not destroyed.
   Info("Releasing physical device resources..."_);
-  vk->device.physical_device = 0;
+  vk.device.physical_device = 0;
   
-  if (vk->device.swapchain_support.formats) {
-    vk->device.swapchain_support.formats = 0;
-    vk->device.swapchain_support.format_count = 0;
+  if (vk.device.swapchain_support.formats) {
+    vk.device.swapchain_support.formats = 0;
+    vk.device.swapchain_support.format_count = 0;
   }
   
-  if (vk->device.swapchain_support.present_modes) {
-    vk->device.swapchain_support.present_modes = 0;
-    vk->device.swapchain_support.present_mode_count = 0;
+  if (vk.device.swapchain_support.present_modes) {
+    vk.device.swapchain_support.present_modes = 0;
+    vk.device.swapchain_support.present_mode_count = 0;
   }
 
-  MemZeroStruct(&vk->device.swapchain_support.capabilities);
+  MemZeroStruct(&vk.device.swapchain_support.capabilities);
 
-  vk->device.graphics_queue_index = -1;
-  vk->device.present_queue_index = -1;
-  vk->device.transfer_queue_index = -1;
+  vk.device.graphics_queue_index = -1;
+  vk.device.present_queue_index = -1;
+  vk.device.transfer_queue_index = -1;
 }
 
 VK_SwapchainSupportInfo* vk_device_query_swapchain_support(VkPhysicalDevice physical_device, VK_SwapchainSupportInfo* support_info) {
   // Surface capabilities
-  VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, vk->surface, &support_info->capabilities));
+  VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, vk.surface, &support_info->capabilities));
 
   // Surface formats
-  VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, vk->surface, &support_info->format_count, 0));
+  VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, vk.surface, &support_info->format_count, 0));
   Assert(support_info->format_count);
   if (!support_info->formats) {
-    support_info->formats = push_array(vk->arena, VkSurfaceFormatKHR, support_info->format_count);
+    support_info->formats = push_array(vk.arena, VkSurfaceFormatKHR, support_info->format_count);
   }
-  VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, vk->surface, &support_info->format_count, support_info->formats));
+  VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, vk.surface, &support_info->format_count, support_info->formats));
   
   // Present modes
-  VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, vk->surface, &support_info->present_mode_count, 0));
+  VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, vk.surface, &support_info->present_mode_count, 0));
   Assert(support_info->present_mode_count);
   if (!support_info->present_modes) {
-    support_info->present_modes = push_array(vk->arena, VkPresentModeKHR, support_info->present_mode_count);
+    support_info->present_modes = push_array(vk.arena, VkPresentModeKHR, support_info->present_mode_count);
   }
-  VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, vk->surface, &support_info->present_mode_count, support_info->present_modes));
+  VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, vk.surface, &support_info->present_mode_count, support_info->present_modes));
   
   return support_info;
 }
@@ -187,11 +187,11 @@ void vk_device_detect_depth_format(VK_Device* device) {
 
 internal void select_physical_device(VK_Device* device) {
   u32 physical_device_count = 0;
-  VK_CHECK(vkEnumeratePhysicalDevices(vk->instance, &physical_device_count, 0));
+  VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &physical_device_count, 0));
   
   const u32 max_device_count = 32;
   VkPhysicalDevice physical_devices[max_device_count];
-  VK_CHECK(vkEnumeratePhysicalDevices(vk->instance, &physical_device_count, physical_devices));
+  VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &physical_device_count, physical_devices));
   Loop (i, physical_device_count) {
     VkPhysicalDeviceProperties properties;
     vkGetPhysicalDeviceProperties(physical_devices[i], &properties);
@@ -331,7 +331,7 @@ internal VK_PhysicalDeviceQueueFamilyInfo physical_device_meets_requirements(
     }
     
     VkBool32 supports_present = VK_FALSE;
-    VK_CHECK(vkGetPhysicalDeviceSurfaceSupportKHR(device, i, vk->surface, &supports_present));
+    VK_CHECK(vkGetPhysicalDeviceSurfaceSupportKHR(device, i, vk.surface, &supports_present));
     if (supports_present) {
       queue_info.present_family_index = i;
     }
@@ -361,7 +361,7 @@ internal VK_PhysicalDeviceQueueFamilyInfo physical_device_meets_requirements(
     Trace("Compute Family Index: %i", queue_info.compute_family_index);
 
     // Query swapchain support.
-    *out_swapchain_support = *vk_device_query_swapchain_support(device, &vk->device.swapchain_support);
+    *out_swapchain_support = *vk_device_query_swapchain_support(device, &vk.device.swapchain_support);
     Assert(!(out_swapchain_support->format_count < 1) || !(out_swapchain_support->present_mode_count < 1) &&
              "Required swapchain support not present, skipping device");
 

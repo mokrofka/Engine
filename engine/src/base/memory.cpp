@@ -5,9 +5,8 @@
 
 global thread_local TCTX tctx_thread_local;
 
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////
 // Utils
 
 u64 calc_padding_with_header(PtrInt ptr, u64 alignment, u64 header_size) {
@@ -38,52 +37,49 @@ u64 calc_padding_with_header(PtrInt ptr, u64 alignment, u64 header_size) {
   return padding;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////
 // Arena
 
-// TODO check this with different int size
 Arena* arena_alloc(Arena* arena, u64 size, u64 align) {
-  PtrInt curr_ptr = (PtrInt)arena + ARENA_HEADER + arena->pos;
+  PtrInt curr_ptr = (PtrInt)arena + ARENA_HEADER + arena->used;
   PtrInt offset = AlignPow2(curr_ptr, align);
   PtrInt temp = (PtrInt)arena + ARENA_HEADER;
 	offset -= temp; // Change to relative offset
 
-  Assert(offset+size <= arena->res && "Arena is out of memory");
+  Assert(offset+size <= arena->size && "Arena is out of memory");
   
   Arena* ptr = (Arena*)(((PtrInt)arena + ARENA_HEADER) + offset);
-  ptr->pos = 0;
-  ptr->res = size;
-  arena->pos = offset+size;
+  ptr->used = 0;
+  ptr->size = size;
+  arena->used = offset+size;
 
-  MemClear((u8*)ptr+ARENA_HEADER, size);
+  AllocMemZero((u8*)ptr+ARENA_HEADER, size);
   return ptr;
 }
 
 void* _arena_push(Arena* arena, u64 size, u64 align) {
   // Align 'curr_offset' forward to the specified alignment
-  PtrInt curr_ptr = (PtrInt)arena + ARENA_HEADER + arena->pos;
+  PtrInt curr_ptr = (PtrInt)arena + ARENA_HEADER + arena->used;
   u64 offset = AlignPow2(curr_ptr, align);
   u64 temp = (PtrInt)arena + ARENA_HEADER;
 	offset -= temp; // Change to relative offset
 
-  Assert(offset+size <= arena->res && "Arena is out of memory");
+  Assert(offset+size <= arena->size && "Arena is out of memory");
   
-  u8* buffer = (u8*)((PtrInt)arena + ARENA_HEADER) + offset;
-  arena->pos = offset+size;
+  u8* buffer = (u8*)arena + ARENA_HEADER + offset;
+  arena->used = offset+size;
 
-  MemClear(buffer, size);
+  AllocMemZero(buffer, size);
   return buffer;
 }
 
 void _arena_move(Arena* arena, u64 size, u64 align) {
-  PtrInt curr_ptr = (PtrInt)arena + ARENA_HEADER + arena->pos;
+  PtrInt curr_ptr = (PtrInt)arena + ARENA_HEADER + arena->used;
   u64 offset = AlignPow2(curr_ptr, align);
   u64 temp = (PtrInt)arena + ARENA_HEADER;
 	offset -= temp; // Change to relative offset
-  Assert(offset+size <= arena->res && "Arena is out of memory");
-  arena->pos = offset+size;
+  Assert(offset+size <= arena->size && "Arena is out of memory");
+  arena->used = offset+size;
 }
 
 void tctx_init(Arena* arena) {
@@ -95,98 +91,79 @@ Temp tctx_get_scratch(Arena** conflics, u64 counts) {
   TCTX* tctx = &tctx_thread_local;
   
   Loop (i, ArrayCount(tctx->arenas)) {
-    b32 isConflictingArena = false;
+    b32 is_conflicting_arena = false;
     Loop (z, counts) {
       if (tctx->arenas[i] == conflics[z]) {
-        isConflictingArena = true;
+        is_conflicting_arena = true;
       }
     }
 
-    if (!isConflictingArena) {
+    if (!is_conflicting_arena) {
       return temp_begin(tctx->arenas[i]);
     }
   }
   return {};
 }
 
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////
 // Pool
 
 Pool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignment) {
-  Pool p;
-
-  // Align chunk size up to the required chunk_alignment
   chunk_size = AlignPow2(chunk_size, chunk_alignment);
   
   PtrInt init_start = (PtrInt)arena + arena_pos(arena);
   PtrInt start = AlignPow2(init_start, chunk_alignment);
   
-  u8* data = push_buffer(arena, u8, chunk_count*chunk_size, chunk_alignment);
+  u8* data = push_buffer(arena, chunk_count*chunk_size, chunk_alignment);
   
-  // Assert that the parameters passed are valid
   Assert(chunk_size >= sizeof(PoolFreeNode) && "Chunk size is too small");
 
-  // Store the adjusted parameters
-  p.data = data;
-  p.chunk_count = chunk_count;
-  p.chunk_size = chunk_size;
-  p.head = null; // Free List Head
+  Pool result = {
+    .data = data,
+    .chunk_count = chunk_count,
+    .chunk_size = chunk_size,
+    .head = null
+  };
 
-  // Set up the free list for free chunks
-  pool_free_all(p);
-  return p;
+  pool_free_all(result);
+  return result;
 }
 
 u8* pool_alloc(Pool& p) {
   // Get latest free node
-  PoolFreeNode* node = p.head;
+  PoolFreeNode* result = p.head;
 
-  Assert(node && "Pool allocator has no free memory");
+  Assert(result && "Pool allocator has no free memory");
 
   // Pop free node
   p.head = p.head->next;
 
-  MemClear(node, p.chunk_size);
-  return (u8*)node;
+  AllocMemZero(result, p.chunk_size);
+  return (u8*)result;
 }
 
-void pool_free(Pool& p, void *ptr) {
-	PoolFreeNode *node;
+void pool_free(Pool& p, void* ptr) {
+	void* start = p.data;
+	void* end = &p.data[p.chunk_count*p.chunk_size];
+  Assert((start <= ptr && ptr < end) && "Memory is out of bounds");
 
-	void *start = p.data;
-	void *end = &(p.data)[p.chunk_count*p.chunk_size];
-
-  Assert((start <= ptr && ptr < end) && "Memory is out of bounds of the buffer in this pool");
-
-	// Push free node
-  node = (PoolFreeNode*)ptr;
-
-  Assert(!(start <= node->next && ptr < end) && "Memomy chunk is already free");
+  PoolFreeNode* node; Assign(node, ptr);
 	node->next = p.head;
 	p.head = node;
 }
 
 void pool_free_all(Pool& p) {
-	// Set all chunks to be free
   Loop (i, p.chunk_count) {
-		void* ptr = &p.data[i * p.chunk_size];
-		PoolFreeNode *node = (PoolFreeNode*)ptr;
-		// Push free node onto thte free list
+		PoolFreeNode *node; Assign(node, p.data + i*p.chunk_size);
 		node->next = p.head;
 		p.head = node;
 	}
 }
 
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////
 // Free list
 
-// Unlike our trivial stack allocator, this header needs to store the
-// block size along with the padding meaning the header is a bit
-// larger than the trivial stack allocator
 void free_list_free_all(FreeList& fl) {
   fl.used = 0;
   FreeListNode* first_node = (FreeListNode*)fl.data;
@@ -197,7 +174,7 @@ void free_list_free_all(FreeList& fl) {
 
 FreeList free_list_create(Arena* arena, u64 size, u64 alignment) {
   FreeList fl;
-  fl.data = push_buffer(arena, u8, size, alignment);
+  fl.data = push_buffer(arena, size, alignment);
   fl.size = size;
   free_list_free_all(fl);
   return fl;
@@ -372,9 +349,7 @@ void FreeList_coalescence(FreeList& fl, FreeListNode* prev_node, FreeListNode* f
   }
 }
 
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////
 // Global Allocator
 
 struct SegPool {
@@ -499,6 +474,7 @@ u8* mem_realoc(void* origin, u64 size) {
   }
 
   Assert(0 && "global_free: pointer does not belong to any pool");
+  return null;
 }
 
 void global_allocator_init() {
@@ -515,9 +491,7 @@ void global_allocator_init() {
   };
 }
 
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////
 // Ring Buffer
 
 u64 ring_write(u8* ring_base, u64 ring_size, u64 ring_pos, void* src_data, u64 src_data_size) {
