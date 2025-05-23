@@ -86,8 +86,8 @@ struct Material {
 struct Geometry {
   String name;
   
-  u32 vertex_size;
   u32 vertex_count;
+  u32 vertex_size;
   void* vertices;
   u32 index_size;
   u32 index_count;

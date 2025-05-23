@@ -148,8 +148,7 @@ VK_MaterialShader vk_material_shader_create() {
   shader.global_uniform_buffer = vk_buffer_create(
     sizeof(VK_MaterialShaderGlobalUbo),
     VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
-    true);
+    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
   
   // Allocate global descriptor sets
   VkDescriptorSetLayout global_layouts[] = {
@@ -167,8 +166,7 @@ VK_MaterialShader vk_material_shader_create() {
   shader.obj_uniform_buffer = vk_buffer_create(
     sizeof(VK_MaterialShaderInstUbo) * VK_MaxMaterialCount,
     VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
-    true);
+    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
   return shader;
 }
@@ -212,16 +210,16 @@ void vk_material_shader_update_global_state(VK_MaterialShader* shader, f32 delta
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader->pipeline.pipeline_layout, 0, 1, &global_descriptor, 0, 0);
   
   // Configure the descriptors for the given index
-  u32 range = sizeof(VK_MaterialShaderGlobalUbo);
+  u32 size = sizeof(VK_MaterialShaderGlobalUbo);
   u64 offset = 0;
 
   // Copy data to buffer
-  vk_buffer_load_data(&shader->global_uniform_buffer, offset, range, &shader->global_ubo);
+  MemCopy(&shader->global_uniform_buffer, &shader->global_ubo, size);
   
   VkDescriptorBufferInfo buffer_info;
   buffer_info.buffer = shader->global_uniform_buffer.handle;
   buffer_info.offset = offset;
-  buffer_info.range = range;
+  buffer_info.range = size;
   
   // Update descriptor sets
   VkWriteDescriptorSet descriptor_write = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
@@ -254,7 +252,7 @@ void vk_material_shader_apply_material(VK_MaterialShader* shader, Material* mate
   u32 descriptor_index = 0;
 
   // Descriptor 0 - Uniform buffer
-  u32 range = sizeof(VK_MaterialShaderInstUbo);
+  u32 size = sizeof(VK_MaterialShaderInstUbo);
   u32 offset = sizeof(VK_MaterialShaderInstUbo) * material->internal_id;
   VK_MaterialShaderInstUbo inst_ubo;
 
@@ -262,7 +260,7 @@ void vk_material_shader_apply_material(VK_MaterialShader* shader, Material* mate
   inst_ubo.diffuse_color = material->diffuse_color;
 
   // Load the data into the buffer
-  vk_buffer_load_data(&shader->obj_uniform_buffer, offset, range, &inst_ubo);
+  MemCopy(&shader->obj_uniform_buffer, &inst_ubo, size);
 
   // Only do this if the descriptor has not yet been updated
   u32* global_ubo_generation = &object_state->descriptor_states[descriptor_count].generations[image_index];
@@ -270,7 +268,7 @@ void vk_material_shader_apply_material(VK_MaterialShader* shader, Material* mate
     VkDescriptorBufferInfo buffer_info;
     buffer_info.buffer = shader->obj_uniform_buffer.handle;
     buffer_info.offset = offset;
-    buffer_info.range = range;
+    buffer_info.range = size;
 
     VkWriteDescriptorSet descriptor = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
     descriptor.dstSet = object_descriptor_set;

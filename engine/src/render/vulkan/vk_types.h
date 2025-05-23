@@ -11,18 +11,17 @@
   }
 #define vkdevice vk.device.logical_device
 #define FramesInFlight 2
+#define ImagesInSwapchain 3
 
 struct VK_Buffer {
   VkBuffer handle;
   VkDeviceMemory memory;
   u8* maped_memory;
-  FreeList freelist;
+  FreelistGpu freelist;
   u64 size;
   u64 usage;
   u32 memory_index;
   u32 memory_property_flags;
-  b8 is_locked;
-  b8 has_freelist;
 };
 
 struct VK_SwapchainSupportInfo {
@@ -91,13 +90,12 @@ struct VK_Swapchain  {
   VkSurfaceFormatKHR image_format;  
   u32 max_frames_in_flight;
   u32 image_count;
-  VkImage images[3];
-  VkImageView views[3];
+  VkImage images[ImagesInSwapchain];
+  VkImageView views[ImagesInSwapchain];
   
   VK_Image depth_attachment;
   
-  // framebuffers used for on-screen rendering.
-  VkFramebuffer framebuffers[3];
+  VkFramebuffer framebuffers[ImagesInSwapchain];
 };
 
 enum VK_CmdState {
@@ -341,12 +339,10 @@ struct VK_Frame {
 };
 
 struct VK_SyncObj {
-  VkSemaphore* image_available_semaphores;
-  VkSemaphore* queue_complete_semaphores;
-  VkSemaphore* compute_complete_semaphores;
-  
-  u32 in_flight_fence_count;
-  VkFence in_flight_fences[2];
+  VkSemaphore image_available_semaphores[FramesInFlight];
+  VkSemaphore queue_complete_semaphores[FramesInFlight];
+  VkSemaphore compute_complete_semaphores[FramesInFlight];
+  VkFence in_flight_fences[FramesInFlight];
 };
 
 #define UI_ShaderStageCount 2
@@ -517,7 +513,6 @@ struct Te {
   VkDescriptorSet descriptors[3];
   VkDescriptorPool descriptor_pool;
 };
-extern Te te;
 
 extern VK vk;
 

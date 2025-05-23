@@ -2,8 +2,7 @@
 
 u32 vk_renderpass_create(Rect rect, v4 color, f32 depth, u32 stencil, u32 clear_flags, b32 has_prev_pass, b32 has_next_pass) {
   VK_Renderpass* renderpass = null;
-  i32 i;
-  for (i = 0; i < 2; ++i) {
+  Loop (i, 2) {
     if (!vk.renderpasses[i].handle) {
       renderpass = &vk.renderpasses[i];
       

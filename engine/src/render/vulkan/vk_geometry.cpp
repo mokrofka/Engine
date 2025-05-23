@@ -45,7 +45,7 @@ void vk_r_create_geometry(Geometry* geometry, u32 vertex_count, Vertex3D* vertic
   // internal_data->vertex_buffer_offset = vk.render.geometry_vertex_offset;
   // internal_data->vertex_count = vertex_count;
   // internal_data->vertex_size = sizeof(Vertex3D) * vertex_count;
-  // upload_data_range(pool, 0, queue, &vk.render.obj_vertex_buffer, internal_data->vertex_buffer_offset, internal_data->vertex_size, vertices);
+  // upload_to_gpu(pool, 0, queue, &vk.render.obj_vertex_buffer, internal_data->vertex_buffer_offset, internal_data->vertex_size, vertices);
   // // TODO: should maintain a free list instead of this.
   // vk.render.geometry_vertex_offset += internal_data->vertex_size;
 
@@ -54,7 +54,7 @@ void vk_r_create_geometry(Geometry* geometry, u32 vertex_count, Vertex3D* vertic
   //   internal_data->index_buffer_offset = vk.render.geometry_index_offset;
   //   internal_data->index_count = index_count;
   //   internal_data->index_size = sizeof(u32) * index_count;
-  //   upload_data_range(pool, 0, queue, &vk.render.obj_index_buffer, internal_data->index_buffer_offset, internal_data->index_size, indices);
+  //   upload_to_gpu(pool, 0, queue, &vk.render.obj_index_buffer, internal_data->index_buffer_offset, internal_data->index_size, indices);
   //   // TODO: should maintain a free list instead of this.
   //   vk.render.geometry_index_offset += internal_data->index_size;
   // }
@@ -80,7 +80,7 @@ u32 mesh_count;
 
 void vk_r_geometry_create(Geometry* geom) {
   u64 size = geom->vertex_size * geom->vertex_count;
-  u64 offset = vk_buffer_alloc(&vk.vert_buffer, size, 64);
+  u64 offset = freelist_gpu_alloc(vk.vert_buffer.freelist, size);
   
   MemRange range = {offset, size};
   VK_Mesh mesh = {
@@ -88,5 +88,5 @@ void vk_r_geometry_create(Geometry* geom) {
     .vert_count = geom->vertex_count,
   };
   vk.meshes[mesh_count++] = mesh;
-  upload_data_range(&vk.vert_buffer, range, geom->vertices);
+  upload_to_gpu(&vk.vert_buffer, range, geom->vertices);
 }

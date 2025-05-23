@@ -122,36 +122,12 @@ struct FreeList {
   FreeListNode* head;
 };
 
-struct MetaData {
-  u64 offset;
-  u64 size;
-  u64 padding;
-  u64 next;
-  u64 next_size;
-};
+KAPI u8* freelist_alloc(FreeList& fl, u64 size, u64 alignment = DEFAULT_ALIGNMENT);
+// KAPI u64 freelist_alloc_block(FreeList& fl, u64 size, u64 alignment = DEFAULT_ALIGNMENT);
 
-struct FreeListGpu {
-  MetaData free_blocks[128];
-  u32 free_count;
-  u32 used_count;
-  MetaData used_blocks[128];
-  u64 size;
-  u64 used;
-  u32 count = 128;
-  u32 head;
-};
-
-KAPI u8* free_list_alloc(FreeList& fl, u64 size, u64 alignment = DEFAULT_ALIGNMENT);
-KAPI u64 free_list_alloc_block(FreeList& fl, u64 size, u64 alignment = DEFAULT_ALIGNMENT);
-
-KAPI FreeList free_list_create(Arena* arena, u64 size, u64 alignment = DEFAULT_ALIGNMENT);
-KAPI void free_list_free(FreeList& fl, void* ptr);
-KAPI void free_list_free_all(FreeList& fl);
-
-// FreeListGpu free_list_gpu_create(u64 size, u64 alignment = DEFAULT_ALIGNMENT);
-// u32 free_list_gpu_alloc(FreeListGpu& fl, u64 size, u64 alignment = DEFAULT_ALIGNMENT);
-// void free_list_gpu_free(FreeListGpu& fl, void* ptr);
-// void free_list_gpu_free_all(FreeListGpu& fl);
+KAPI FreeList freelist_create(Arena* arena, u64 size, u64 alignment = DEFAULT_ALIGNMENT);
+KAPI void freelist_free(FreeList& fl, void* ptr);
+KAPI void freelist_free_all(FreeList& fl);
 
 ////////////////////////////////
 // Global Allocator
@@ -168,3 +144,25 @@ u64 ring_write(u8* ring_base, u64 ring_size, u64 ring_pos, void* src_data, u64 s
 u64 ring_read(u8* ring_base, u64 ring_size, u64 ring_pos, void* dst_data, u64 read_size);
 #define ring_write_struct(ring_base, ring_size, ring_pos, ptr) ring_write((ring_base), (ring_size), (ring_pos), (ptr), sizeof(*(ptr)))
 #define ring_read_struct(ring_base, ring_size, ring_pos, ptr) ring_read((ring_base), (ring_size), (ring_pos), (ptr), sizeof(*(ptr)))
+
+////////////////////////////////
+// for Gpu freelist
+
+struct FreelistGpuNode {
+  u64 offset;
+  u64 size;
+  FreelistGpuNode* next;
+};
+
+struct FreelistGpu {
+  u64 total_size;
+  u64 max_entries;
+  FreelistGpuNode* head;
+  FreelistGpuNode* nodes;
+};
+
+FreelistGpu freelist_gpu_create(Arena* arena, u64 size);
+
+u64 freelist_gpu_alloc(FreelistGpu& list, u64 size);
+
+void freelist_gpu_free(FreelistGpu& list, u64 size, u64 offset);

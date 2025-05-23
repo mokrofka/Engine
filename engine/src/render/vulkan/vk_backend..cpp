@@ -12,11 +12,11 @@
 #include "shaders/vk_material_shader.h"
 #include "shaders/vk_ui_shader.h"
 
-// #define VulkanUseAllocator 1
+#define VulkanUseAllocator
 // #define VulkanAllocatorTrace 1
 
 VK vk;
-#if VulkanUseAllocator
+#ifdef VulkanUseAllocator
 
 void* vk_alloc(void* user_data, u64 size, u64 alignment, VkSystemAllocationScope allocation_scope) {
   Assert(size)
@@ -83,26 +83,6 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
 internal void framebuffers_create();
 internal b32 recreate_swapchain(VK_Swapchain* swapchain);
 internal void create_buffers(VK_Render* render);
-
-internal void upload_data_range(VkCommandPool pool, VkFence fence, VkQueue queue, VK_Buffer* buffer, u64 offset, u64 size, void* data) {
-  // Create a host-visible stagin buffer to upload to. Mark it as the source or the transfer
-  VkBufferUsageFlags flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-  VK_Buffer staging = vk_buffer_create(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, flags, true);
-  
-  // Load the data into the staging buffer
-  vk_buffer_load_data(&staging, 0, size, data);
-  
-  // Perform the copy from staging to the device local buffer
-  vk_buffer_copy_to(&staging, 0, buffer, offset, size);
-  
-  // Clean up the stagin buffer
-  vk_buffer_destroy(&staging);
-}
-
-void free_data_range(VK_Buffer* buffer, u64 offset, u64 size) {
-  // TODO free this in the buffer
-  // TODO update free list with this range being free
-}
 
 void instance_create() {
   v2i framebuffer_extent = os_get_framebuffer_size();
@@ -199,7 +179,7 @@ void vk_r_backend_init(R_Backend* backend) {
   vk.arena = backend->arena;
   
   // NOTE: custom allocator.
-#if VulkanUseAllocator
+#ifdef VulkanUseAllocator
   vk._allocator = vk_allocator_create();
   vk.allocator = &vk._allocator;
 #else
@@ -241,10 +221,6 @@ void vk_r_backend_init(R_Backend* backend) {
   }
   Debug("Vulkan command buffers created"_);
 
-  vk.sync.image_available_semaphores = push_array(vk.arena, VkSemaphore, vk.swapchain.max_frames_in_flight);
-  vk.sync.queue_complete_semaphores = push_array(vk.arena, VkSemaphore, vk.swapchain.max_frames_in_flight);
-  vk.sync.compute_complete_semaphores = push_array(vk.arena, VkSemaphore, vk.swapchain.max_frames_in_flight);
-
   Loop (i, vk.swapchain.max_frames_in_flight) {
     VkSemaphoreCreateInfo semaphore_create_info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
     vkCreateSemaphore(vkdevice, &semaphore_create_info, vk.allocator, &vk.sync.image_available_semaphores[i]);
@@ -256,30 +232,12 @@ void vk_r_backend_init(R_Backend* backend) {
     VK_CHECK(vkCreateFence(vkdevice, &fence_create_info, vk.allocator, &vk.sync.in_flight_fences[i]));
   }
 
-  // vk.render.material_shader = vk_material_shader_create();
-  // vk.render.ui_shader = vk_ui_shader_create();
-  
   create_buffers(&vk.render);
-  
-  // Loop (i, VK_MaxGeometryCount) {
-  //   vk.render.geometries[i].id = INVALID_ID;
-  // }
-  // Loop (i, VK_MaxGeometryCount) {
-  //   vk.geometries[i].id = INVALID_ID;
-  // }
   Info("Vulkan renderer initialized successfully"_);
 }
 
 void vk_r_backend_shutdown() {
   vkDeviceWaitIdle(vkdevice);
-  
-  // Destroy in opposite order of creation
-  // buffers
-  // vk_buffer_destroy(&vk.render.obj_vertex_buffer);
-  // vk_buffer_destroy(&vk.render.obj_index_buffer);
-  
-  // vk_ui_shader_destroy(&vk.render.ui_shader);
-  // vk_material_shader_destroy(&vk.render.material_shader);
   
   // Sync objects
   Loop (i, vk.swapchain.max_frames_in_flight) {
@@ -287,8 +245,6 @@ void vk_r_backend_shutdown() {
     vkDestroySemaphore(vkdevice, vk.sync.queue_complete_semaphores[i], vk.allocator);
     vkDestroyFence(vkdevice, vk.sync.in_flight_fences[i], vk.allocator);
   }
-  vk.sync.image_available_semaphores = 0;
-  vk.sync.queue_complete_semaphores = 0;
   
   // Command buffers
   Loop (i, vk.swapchain.image_count) {
@@ -653,71 +609,30 @@ internal void create_buffers(VK_Render* render) {
   vk.vert_buffer = vk_buffer_create(
     MB(1),
     VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-    memory_property_flags,
-    true);
-  vk.vert_buffer.freelist = free_list_create(vk.arena, vk.vert_buffer.size, 64);
+    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+  vk.vert_buffer.freelist = freelist_gpu_create(vk.arena, vk.vert_buffer.size);
   
   // index
   vk.index_buffer = vk_buffer_create(
     MB(1),
     VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-    memory_property_flags,
-    true);
-  vk.index_buffer.freelist = free_list_create(vk.arena, vk.index_buffer.size, 64);
+    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+  vk.index_buffer.freelist = freelist_gpu_create(vk.arena, vk.index_buffer.size);
   
   // stage
   vk.stage_buffer = vk_buffer_create(
     MB(8),
     VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-    true);
+    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
   vk_buffer_map_memory(&vk.stage_buffer, 0, vk.stage_buffer.size);
   
   // uniform
   vk.uniform_buffer = vk_buffer_create(
     MB(1),
     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-    true);
+    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
   vk_buffer_map_memory(&vk.uniform_buffer, 0, vk.uniform_buffer.size);
-  vk.uniform_buffer.freelist = free_list_create(vk.arena, vk.index_buffer.size, 64);
-  
-  // // storage
-  // Loop (i, 2) {
-  //   vk.storage_buffers[i] = vk_buffer_create(
-  //       MB(8),
-  //       VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-  //       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-  //       true);
-  // }
-  
-  // vk.compute_uniform_buffer = vk_buffer_create(
-  //   128,
-  //   VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-  //   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-  //   true);
-  // vk_buffer_map_memory(&vk.compute_uniform_buffer, 0, vk.uniform_buffer.size);
-    
-  // vk_buffer_map_memory(&vk.uniform_buffer, 0, vk.uniform_buffer.size);
-  // vk.uniform_buffer.freelist = free_list_create(vk.arena, vk.index_buffer.size, 64);
-  
-  // // Geometry vertex buffer
-  // const u64 vertex_buffer_size = sizeof(Vertex3D) * MB(1);
-  // render->obj_vertex_buffer = vk_buffer_create(
-  //   vertex_buffer_size,
-  //   VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-  //   memory_property_flags,
-  //   true);
-  // render->geometry_vertex_offset = 0;
-  
-  // // Geometry index buffer
-  // const u64 index_buffer_size = sizeof(u32) * MB(1);
-  // render->obj_index_buffer = vk_buffer_create(
-  //   vertex_buffer_size,
-  //   VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-  //   memory_property_flags,
-  //   true);
-  // render->geometry_index_offset = 0;
+  vk.uniform_buffer.freelist = freelist_gpu_create(vk.arena, vk.index_buffer.size);
 }
 
 void* vk_r_create_texture(u8* pixels, u32 width, u32 height, u32 channel_count) {
@@ -732,9 +647,9 @@ void* vk_r_create_texture(u8* pixels, u32 width, u32 height, u32 channel_count) 
   // Create a staging buffer and load data into it
   VkBufferUsageFlagBits usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
   VkMemoryPropertyFlags memory_prop_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-  VK_Buffer staging = vk_buffer_create(image_size, usage, memory_prop_flags, true);
+  VK_Buffer staging = vk_buffer_create(image_size, usage, memory_prop_flags);
   
-  vk_buffer_load_image_data(&staging, 0, image_size, 0, pixels);
+  MemCopy(staging.maped_memory, pixels, image_size);
   
   // Note Lots of assumptions, different texture types will require
   // different options here

@@ -118,23 +118,31 @@ void application_init(App* app) {
   entity_init();
  
   {
-    Geometry cube_geom {
+    Geometry cube_geom = {
       .name = "cube"_,
-      .vertex_size = sizeof(Vertex),
       .vertex_count = ArrayCount(vertices),
+      .vertex_size = sizeof(Vertex),
       .vertices = vertices,
     };
-    st->cube_geom_id = geometry_create(cube_geom);
+    geometry_create(cube_geom);
   }
   {
-    Geometry triangle_geom {
+    Geometry triangle_geom = {
       .name = "triangle"_,
-      .vertex_size = sizeof(v3) + sizeof(v3),
       .vertex_count = ArrayCount(triangle_vertices) / 6,
+      .vertex_size = sizeof(v3) + sizeof(v3),
       .vertices = triangle_vertices,
     };
-    st->triangle.id = geometry_create(triangle_geom);
+    geometry_create(triangle_geom);
   }
+  // {
+  //   Geometry grid = {
+  //     .name = "grid"_,
+  //     .vertex_count = ,
+  //     .vertex_size = ,
+  //     .vertices = ,
+  //   }
+  // }
   
   {
     ShaderConfig config = {

@@ -125,13 +125,13 @@ void test_pool() {
 FreeList fl;
 
 void test_setup(Arena* arena) {
-  fl = free_list_create(arena, BUFFER_SIZE);
+  fl = freelist_create(arena, BUFFER_SIZE);
 }
 
 void test_basic_allocation() {
   Scratch scratch;
   test_setup(scratch);
-  u8* ptr = free_list_alloc(fl, 16);
+  u8* ptr = freelist_alloc(fl, 16);
   Assert(ptr != null);
   Assert((PtrInt)ptr % DEFAULT_ALIGNMENT == 0);
 }
@@ -139,8 +139,8 @@ void test_basic_allocation() {
 void test_multiple_allocations() {
   Scratch scratch;
   test_setup(scratch);
-  u8* a = free_list_alloc(fl, 32);
-  u8* b = free_list_alloc(fl, 64);
+  u8* a = freelist_alloc(fl, 32);
+  u8* b = freelist_alloc(fl, 64);
   Assert(a != null && b != null);
   Assert(a != b);
 }
@@ -149,7 +149,7 @@ void test_alignment() {
   Scratch scratch;
   test_setup(scratch);
   for (u64 align = 8; align <= 128; align *= 2) {
-    u8* ptr = free_list_alloc(fl, 24, align);
+    u8* ptr = freelist_alloc(fl, 24, align);
     Assert(ptr != null);
     Assert(((PtrInt)ptr % align == 0));
   }
@@ -158,9 +158,9 @@ void test_alignment() {
 void test_free_and_reallocate() {
   Scratch scratch;
   test_setup(scratch);
-  u8* a = free_list_alloc(fl, 64);
-  free_list_free(fl, a);
-  u8* b = free_list_alloc(fl, 64);
+  u8* a = freelist_alloc(fl, 64);
+  freelist_free(fl, a);
+  u8* b = freelist_alloc(fl, 64);
   Assert(a == b);
 }
 
@@ -185,42 +185,42 @@ void test_allocation_until_full() {
 void test_free_all() {
   Scratch scratch;
   test_setup(scratch);
-  u8* a = free_list_alloc(fl, 64);
-  u8* b = free_list_alloc(fl, 64);
-  free_list_free_all(fl);
+  u8* a = freelist_alloc(fl, 64);
+  u8* b = freelist_alloc(fl, 64);
+  freelist_free_all(fl);
   Assert(fl.used == 0);
   // Assert(fl.head == null); // If your implementation clears head
-  u8* c = free_list_alloc(fl, 64);
+  u8* c = freelist_alloc(fl, 64);
   Assert(c != null);
 }
 
 void test_fragmentation_resistance() {
   Scratch scratch;
   test_setup(scratch);
-  u8* a = free_list_alloc(fl, 32);
-  u8* b = free_list_alloc(fl, 32);
-  u8* c = free_list_alloc(fl, 32);
-  free_list_free(fl, b);
-  u8* d = free_list_alloc(fl, 32);
+  u8* a = freelist_alloc(fl, 32);
+  u8* b = freelist_alloc(fl, 32);
+  u8* c = freelist_alloc(fl, 32);
+  freelist_free(fl, b);
+  u8* d = freelist_alloc(fl, 32);
   Assert(d == b);
 }
 
 void test_block_alloc() {
   Scratch scratch;
   test_setup(scratch);
-  u64 offset = free_list_alloc_block(fl, 64);
-  Assert(offset + 64 <= fl.size);
-  u8* ptr = fl.data + offset;
-  Assert((PtrInt)ptr % DEFAULT_ALIGNMENT == 0);
+  // u64 offset = freelist_alloc_block(fl, 64);
+  // Assert(offset + 64 <= fl.size);
+  // u8* ptr = fl.data + offset;
+  // Assert((PtrInt)ptr % DEFAULT_ALIGNMENT == 0);
 }
 
 void test_block_vs_regular_alloc() {
   Scratch scratch;
   test_setup(scratch);
-  u64 off1 = free_list_alloc_block(fl, 32, 16);
-  u8* ptr1 = free_list_alloc(fl, 32, 16);
+  // u64 off1 = freelist_alloc_block(fl, 32, 16);
+  u8* ptr1 = freelist_alloc(fl, 32, 16);
   Assert(ptr1 >= fl.data);
-  Assert(off1 >= 0);
+  // Assert(off1 >= 0);
 }
 
 void test_free_list() {
@@ -239,38 +239,38 @@ void test_free_list() {
   u64 total_size = 1024;
   u64 alignment = 8;
 
-  FreeList fl = free_list_create(scratch, total_size, alignment);
+  FreeList fl = freelist_create(scratch, total_size, alignment);
   Assert(fl.data != null);
   Assert(fl.size == total_size);
   Assert(fl.used == 0);
 
   // Allocate one block
   u64 alloc_size = 128;
-  void* ptr1 = free_list_alloc(fl, alloc_size, alignment);
+  void* ptr1 = freelist_alloc(fl, alloc_size, alignment);
   Assert(ptr1 != null);
   Assert(fl.used >= alloc_size);
 
   // Allocate second block
-  void* ptr2 = free_list_alloc(fl, alloc_size, alignment);
+  void* ptr2 = freelist_alloc(fl, alloc_size, alignment);
   Assert(ptr2 != null);
   Assert(fl.used >= 2 * alloc_size);
   Assert(ptr2 != ptr1);
 
   // Free first block
-  free_list_free(fl, ptr1);
+  freelist_free(fl, ptr1);
   Assert(fl.used >= alloc_size);
 
   // Free second block
-  free_list_free(fl, ptr2);
+  freelist_free(fl, ptr2);
   Assert(fl.used == 0);
 
   // Test reallocation of freed memory
-  void* ptr3 = free_list_alloc(fl, alloc_size, alignment);
+  void* ptr3 = freelist_alloc(fl, alloc_size, alignment);
   Assert(ptr3 != null);
   Assert(ptr3 == ptr1 || ptr3 == ptr2); // Should reuse one of the freed blocks
 
   // Free again
-  free_list_free(fl, ptr3);
+  freelist_free(fl, ptr3);
   Assert(fl.used == 0);
 
   // Fill the whole memory
@@ -286,44 +286,44 @@ void test_free_list() {
 
   // Free everything
   for (u64 i = 0; i < max_allocs; ++i) {
-    free_list_free(fl, ptrs[i]);
+    freelist_free(fl, ptrs[i]);
   }
   Assert(fl.used == 0);
 
-  // Test free_list_free_all
-  void* check_ptr = free_list_alloc(fl, 64, alignment);
+  // Test freelist_free_all
+  void* check_ptr = freelist_alloc(fl, 64, alignment);
   Assert(check_ptr);
-  free_list_free_all(fl);
+  freelist_free_all(fl);
   Assert(fl.used == 0);
-  void* check_ptr2 = free_list_alloc(fl, 64, alignment);
+  void* check_ptr2 = freelist_alloc(fl, 64, alignment);
   Assert(check_ptr2);
   // Assert(check_ptr2 == fl.data); // Should be start of memory
 
   // Test alignment correctness
   for (int a = 8; a <= 64; a *= 2) {
-    void* aptr = free_list_alloc(fl, 100, a);
+    void* aptr = freelist_alloc(fl, 100, a);
     Assert(aptr);
     Assert(((PtrInt)aptr % a) == 0);
-    free_list_free(fl, aptr);
+    freelist_free(fl, aptr);
   }
 
-  free_list_free_all(fl);
-  void* c1 = free_list_alloc(fl, 128, alignment);
-  void* c2 = free_list_alloc(fl, 128, alignment);
-  void* c3 = free_list_alloc(fl, 128, alignment);
+  freelist_free_all(fl);
+  void* c1 = freelist_alloc(fl, 128, alignment);
+  void* c2 = freelist_alloc(fl, 128, alignment);
+  void* c3 = freelist_alloc(fl, 128, alignment);
 
   // Free c2 then c1, they are adjacent
-  free_list_free(fl, c2);
-  free_list_free(fl, c1);
+  freelist_free(fl, c2);
+  freelist_free(fl, c1);
 
   // After coalescence, c1 + c2 should be merged into one free block
   // Allocate a 256-byte block, it should succeed and return same address as c1
-  void* c12 = free_list_alloc(fl, 256, alignment);
+  void* c12 = freelist_alloc(fl, 256, alignment);
   Assert(c12 == c1); // Coalesced block should allow 256 bytes
-  free_list_free(fl, c12);
+  freelist_free(fl, c12);
 
   // Free c3, then check full memory is free again
-  free_list_free(fl, c3);
+  freelist_free(fl, c3);
   Assert(fl.used == 0);
 }
 
@@ -331,10 +331,9 @@ void copy_to_gpu(MemRange range) {
 
 }
 
-#include "freelist.h"
 void test() {
   Scratch scratch;
-  FreeList fl = free_list_create(scratch, KB(1));
+  FreeList fl = freelist_create(scratch, KB(1));
   test_pool();
   test_free_list();
 
@@ -343,12 +342,13 @@ void test() {
 
   // copy_to_gpu({fl_gpu.blocks[index].offset, fl_gpu.blocks[index].size});
 
-  FreelistGpu gpu = gpu_freelist_create(scratch, KB(1));
-  u64 a = gpu_freelist_alloc(gpu, 100);
-  u64 a1 = gpu_freelist_alloc(gpu, 100);
-  gpu_freelist_free(gpu, 100, 100);
-  u64 a2 = gpu_freelist_alloc(gpu, 100);
-  u64 a3 = gpu_freelist_alloc(gpu, 100);
-  u64 a4 = gpu_freelist_alloc(gpu, 100);
+  FreelistGpu gpu = freelist_gpu_create(scratch, KB(1));
+  u64 a = freelist_gpu_alloc(gpu, 100);
+  u64 a1 = freelist_gpu_alloc(gpu, 100);
+  freelist_gpu_free(gpu, 100, 100);
+  u64 a2 = freelist_gpu_alloc(gpu, 100);
+  u64 a3 = freelist_gpu_alloc(gpu, 100);
+  freelist_gpu_free(gpu, 100, 200);
+  u64 a4 = freelist_gpu_alloc(gpu, 100);
 
 }

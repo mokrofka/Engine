@@ -91,8 +91,7 @@ i32 te_texture_load() {
   VK_Buffer stage_buffer = vk_buffer_create(
     size, 
     VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
-    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-    true);
+    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
   void* data;
   vkMapMemory(vkdevice, stage_buffer.memory, 0, size, 0, &data);

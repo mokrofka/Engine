@@ -202,7 +202,7 @@ void vk_texture_load(Texture* texture) {
   u64 size = texture->width * texture->height * texture->channel_count;
   VkFormat image_format = VK_FORMAT_R8G8B8A8_UNORM;
   
-  vk_buffer_load_data(&vk.stage_buffer, 0, size, texture->data);
+  MemCopy(vk.stage_buffer.maped_memory, texture->data, size);
   
   data->image = vk_image_create(
     VK_IMAGE_TYPE_2D, 

@@ -108,7 +108,7 @@ void vk_r_shader_create(Shader* s, void* data, u64 data_size, u64 push_size) {
   push_constants->size = 0;
 
   // uniform buffer
-  u64 uniform_buffer_offset = vk_buffer_alloc(&vk.uniform_buffer, data_size*10, 64);
+  u64 uniform_buffer_offset = 0; // NOTE won't work
   MemRange range = {uniform_buffer_offset, data_size};
   vk.uniform_buffer_mem_range = range;
   *(void**)data = (u8*)vk.uniform_buffer.maped_memory + range.offset;
@@ -453,8 +453,8 @@ void compute_shader() {
   // }
 
   MemRange range = {0, ParticleCount * sizeof(Particle)};
-  upload_data_range(&vk.storage_buffers[0], range, particles);
-  upload_data_range(&vk.storage_buffers[1], range, particles);
+  upload_to_gpu(&vk.storage_buffers[0], range, particles);
+  upload_to_gpu(&vk.storage_buffers[1], range, particles);
   
   VkDescriptorSetLayoutBinding layout_bindings[3] = {};
   layout_bindings[0].binding = 0;
