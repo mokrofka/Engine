@@ -7,7 +7,6 @@ internal VK_Swapchain create(u32 width, u32 height, b32 reuse);
 internal void destroy(VK_Swapchain* swapchain);
 
 void vk_swapchain_create(u32 width, u32 height) {
-  // vk.old_swapchain = push_struct(vk.arena, VK_Swapchain);
   vk.swapchain = create(width, height, false);
 }
 

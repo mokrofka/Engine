@@ -13,7 +13,7 @@
 #include "shaders/vk_material_shader.h"
 #include "shaders/vk_ui_shader.h"
 
-#define VulkanUseAllocator
+// #define VulkanUseAllocator
 // #define VulkanAllocatorTrace 1
 
 VK vk;
