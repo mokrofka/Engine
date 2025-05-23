@@ -108,35 +108,32 @@ Temp tctx_get_scratch(Arena** conflics, u64 counts) {
 
 ////////////////////////////////
 // Pool
+#if 1
 
 Pool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignment) {
-  chunk_size = AlignPow2(chunk_size, chunk_alignment);
-  
-  PtrInt init_start = (PtrInt)arena + arena_pos(arena);
-  PtrInt start = AlignPow2(init_start, chunk_alignment);
-  
-  u8* data = push_buffer(arena, chunk_count*chunk_size, chunk_alignment);
-  
   Assert(chunk_size >= sizeof(PoolFreeNode) && "Chunk size is too small");
+  Pool result;
 
-  Pool result = {
-    .data = data,
-    .chunk_count = chunk_count,
-    .chunk_size = chunk_size,
-    .head = null
-  };
+  chunk_size = AlignPow2(chunk_size, chunk_alignment);
+  u64 stride = chunk_size + chunk_alignment;
+  u8* data = push_buffer(arena, chunk_count*stride, chunk_alignment);
+
+  result.data = data;
+  result.chunk_count = chunk_count;
+  result.chunk_size = chunk_size;
+  result.head = null;
+  result.guard_size = chunk_alignment;
 
   pool_free_all(result);
   return result;
 }
 
 u8* pool_alloc(Pool& p) {
-  // Get latest free node
   PoolFreeNode* result = p.head;
-
   Assert(result && "Pool allocator has no free memory");
 
-  // Pop free node
+  *(u64*)((u8*)result - p.guard_size) = ALLOC_HEADER_GUARD;
+
   p.head = p.head->next;
 
   AllocMemZero(result, p.chunk_size);
@@ -144,9 +141,13 @@ u8* pool_alloc(Pool& p) {
 }
 
 void pool_free(Pool& p, void* ptr) {
+  Assert(*(u64*)((u8*)ptr - p.guard_size) == ALLOC_HEADER_GUARD && "Double free memory");
+  *(u64*)((u8*)ptr - p.guard_size) = DEALLOC_HEADER_GUARD;
+
 	void* start = p.data;
-	void* end = &p.data[p.chunk_count*p.chunk_size];
+	void* end = p.data + p.chunk_count*(p.chunk_size + p.guard_size);
   Assert((start <= ptr && ptr < end) && "Memory is out of bounds");
+  DealocMemZero(ptr, p.chunk_size);
 
   PoolFreeNode* node; Assign(node, ptr);
 	node->next = p.head;
@@ -154,6 +155,55 @@ void pool_free(Pool& p, void* ptr) {
 }
 
 void pool_free_all(Pool& p) {
+  DealocMemZero(p.data, p.chunk_count*(p.chunk_size + p.guard_size));
+  Loop (i, p.chunk_count) {
+		u64* free_guard; Assign(free_guard, p.data + i*(p.chunk_size + p.guard_size));
+    *free_guard = DEALLOC_HEADER_GUARD;
+		PoolFreeNode *node; Assign(node, p.data + i*(p.chunk_size + p.guard_size) + p.guard_size);
+		node->next = p.head;
+		p.head = node;
+	}
+}
+
+#else
+
+Pool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignment) {
+  Assert(chunk_size >= sizeof(PoolFreeNode) && "Chunk size is too small");
+  Pool result;
+
+  chunk_size = AlignPow2(chunk_size, chunk_alignment);
+  u64 size = chunk_count* chunk_size;
+  u8* data = push_buffer(arena, size, chunk_alignment);
+
+  result.data = data,
+  result.chunk_count = chunk_count,
+  result.chunk_size = chunk_size,
+  result.head = null,
+
+  pool_free_all(result);
+  return result;
+}
+
+u8* pool_alloc(Pool& p) {
+  PoolFreeNode* result = p.head;
+  Assert(result && "Pool allocator has no free memory");
+
+  p.head = p.head->next;
+
+  AllocMemZero(result, p.chunk_size);
+  return (u8*)result;
+}
+
+void pool_free(Pool& p, void* ptr) {
+  DealocMemZero(ptr, p.chunk_size);
+
+  PoolFreeNode* node; Assign(node, ptr);
+	node->next = p.head;
+	p.head = node;
+}
+
+void pool_free_all(Pool& p) {
+  DealocMemZero(p.data, p.chunk_count*p.chunk_size);
   Loop (i, p.chunk_count) {
 		PoolFreeNode *node; Assign(node, p.data + i*p.chunk_size);
 		node->next = p.head;
@@ -161,8 +211,174 @@ void pool_free_all(Pool& p) {
 	}
 }
 
+#endif
+
 ////////////////////////////////
 // Free list
+#if 1
+
+FreeList free_list_create(Arena* arena, u64 size, u64 alignment) {
+  FreeList fl;
+  fl.data = push_buffer(arena, size, alignment);
+  fl.size = size;
+  free_list_free_all(fl);
+  return fl;
+}
+
+void free_list_free_all(FreeList& fl) {
+  fl.used = 0;
+  FreeListNode* first_node = (FreeListNode*)fl.data;
+  first_node->block_size = fl.size;
+  first_node->next = null;
+  fl.head = first_node;
+}
+
+void free_list_node_insert(FreeListNode** phead, FreeListNode* prev_node, FreeListNode* new_node) {
+  if (prev_node == null) {
+    if (*phead != null) {
+      new_node->next = *phead;
+      *phead = new_node;
+    } else {
+      *phead = new_node;
+    }
+  } else {
+    if (prev_node->next == null) {
+      new_node->next = null;
+      prev_node->next = new_node;
+    } else {
+      new_node->next = prev_node->next;
+      prev_node->next = new_node;
+    }
+  }
+}
+
+void free_list_node_remove(FreeListNode** phead, FreeListNode* prev_node, FreeListNode* del_node) {
+  if (prev_node == null) {
+    *phead = del_node->next;
+  } else {
+    prev_node->next = del_node->next;
+  }
+}
+
+FreeListNode* free_list_find_first(FreeList& fl, u64 size, u64 alignment, u64* padding_, FreeListNode** prev_node_) {
+  FreeListNode* node = fl.head;
+  FreeListNode* prev_node = null;
+
+  u64 padding = 0;
+
+  while (node != null) {
+    padding = sizeof(FreeListAllocationHeader) + AlignPadPow2((PtrInt)node+sizeof(FreeListAllocationHeader), alignment);
+    u64 required_space = size + padding;
+    if (node->block_size >= required_space) {
+      break;
+    }
+    prev_node = node;
+    node = node->next;
+  }
+  *padding_ = padding;
+  *prev_node_ = prev_node;
+  return node;
+}
+
+u8* free_list_alloc(FreeList& fl, u64 size, u64 alignment) {
+  u64 padding = 0;
+  FreeListNode* prev_node = null;
+  FreeListNode* node = null;
+
+  if (size < sizeof(FreeListNode)) {
+    size = sizeof(FreeListNode);
+  }
+
+  node = free_list_find_first(fl, size, alignment, &padding, &prev_node);
+  Assert(node && "Free list has no free memory");
+
+  u64 required_space = size + padding;
+  u64 remaining = node->block_size - required_space;
+
+  if (remaining > 0) {
+    FreeListNode* new_node = (FreeListNode*)((u8*)node + required_space);
+    new_node->block_size = remaining;
+    free_list_node_insert(&fl.head, node, new_node);
+  }
+
+  free_list_node_remove(&fl.head, prev_node, node);
+
+  u64 mem_alignment = padding - sizeof(FreeListAllocationHeader);
+  FreeListAllocationHeader* header_ptr; Assign(header_ptr, (u8*)node+mem_alignment);
+  header_ptr->block_size = required_space;
+  header_ptr->padding = mem_alignment;
+#ifdef MEMORY_ALLOCATED_GUARD
+  header_ptr->guard = ALLOC_HEADER_GUARD;
+#endif
+
+  fl.used += required_space;
+  u8* result = (u8*)header_ptr + sizeof(FreeListAllocationHeader);
+  AllocMemZero(result, size);
+
+  return result;
+}
+
+void free_list_coalescence(FreeList& fl, FreeListNode* prev_node, FreeListNode* free_node);
+
+void free_list_free(FreeList& fl, void* ptr) {
+  Assert(fl.data <= ptr && ptr < fl.data+fl.size && "out of bounce");
+  
+  FreeListAllocationHeader* header;
+  FreeListNode* free_node;
+  FreeListNode* node;
+  FreeListNode* prev_node = null;
+
+  Assign(header, (u8*)ptr-sizeof(FreeListAllocationHeader));
+#ifdef MEMORY_ALLOCATED_GUARD
+  Assert(header->guard == ALLOC_HEADER_GUARD && "double free memory");
+  header->guard = DEALLOC_HEADER_GUARD;
+#endif
+
+  u64 padding = header->padding;
+  free_node = (FreeListNode*)((u8*)header - header->padding);
+  free_node->block_size = header->block_size;
+  free_node->next = null;
+
+  if (fl.head == null) {
+    fl.head = free_node;
+  }
+  node = fl.head;
+  while (node != null) {
+    if (ptr < node) {
+      // free_list_node_free_insert(&fl.head, prev_node, free_node);
+      free_list_node_insert(&fl.head, prev_node, free_node);
+      break;
+    }
+    prev_node = node;
+    node = node->next;
+  }
+
+  fl.used -= free_node->block_size;
+
+  free_list_coalescence(fl, prev_node, free_node);
+
+  DealocMemZero(ptr, free_node->block_size - padding - sizeof(FreeListAllocationHeader));
+}
+
+void free_list_coalescence(FreeList& fl, FreeListNode* prev_node, FreeListNode* free_node) {
+  if (free_node->next != null && (void*)((PtrInt)free_node + free_node->block_size) == free_node->next) {
+    free_node->block_size += free_node->next->block_size;
+    free_list_node_remove(&fl.head, free_node, free_node->next);
+  }
+
+  if (prev_node == null) {
+    return;
+  } 
+  else if (prev_node->next != null && (void*)((PtrInt)prev_node + prev_node->block_size) == free_node) {
+    // prev_node->block_size += free_node->next->block_size;
+    prev_node->block_size += free_node->block_size;
+    free_list_node_remove(&fl.head, prev_node, free_node);
+  }
+}
+
+
+#else
+
 
 void free_list_free_all(FreeList& fl) {
   fl.used = 0;
@@ -255,7 +471,7 @@ u8* free_list_alloc(FreeList& fl, u64 size, u64 alignment) {
   FreeListAllocationHeader* header_ptr = (FreeListAllocationHeader*)((PtrInt)node + alignment_padding);
   header_ptr->block_size = required_space;
   header_ptr->padding = alignment_padding;
-  header_ptr->magic_value = DebugMagic;
+  header_ptr->guard = DebugMagic;
 
   fl.used += required_space;
 
@@ -289,7 +505,7 @@ u64 free_list_alloc_block(FreeList& fl, u64 size, u64 alignment) {
   FreeListAllocationHeader* header_ptr = (FreeListAllocationHeader*)((PtrInt)node + alignment_padding);
   header_ptr->block_size = required_space;
   header_ptr->padding = alignment_padding;
-  header_ptr->magic_value = DebugMagic;
+  header_ptr->guard = DebugMagic;
 
   fl.used += required_space;
 
@@ -308,8 +524,8 @@ void free_list_free(FreeList& fl, void* ptr) {
 
   header = (FreeListAllocationHeader*)((PtrInt)ptr - sizeof(FreeListAllocationHeader));
 #if _DEBUG
-  Assert(header->magic_value == DebugMagic);
-  header->magic_value = 0;
+  Assert(header->guard == DebugMagic);
+  header->guard = 0;
 #endif
 
   free_node = (FreeListNode*)((PtrInt)header - header->padding);
@@ -347,6 +563,210 @@ void FreeList_coalescence(FreeList& fl, FreeListNode* prev_node, FreeListNode* f
     prev_node->block_size += free_node->block_size;
     free_list_node_remove(&fl.head, prev_node, free_node);
   }
+}
+
+#endif
+
+FreeListGpu free_list_gpu_create(u64 size, u64 alignment) {
+  // FreeListGpu fl = {
+  //   .free_count = 1,
+  //   .size = size,
+  // };
+  // fl.blocks_free[0] = {
+  //   .size = size
+  // };
+  // return fl;
+}
+
+void free_list_gpu_free_all(FreeList& fl) {
+  fl.used = 0;
+  FreeListNode* first_node = (FreeListNode*)fl.data;
+  first_node->block_size = fl.size;
+  first_node->next = null;
+  fl.head = first_node;
+}
+
+void free_list_gpu_node_insert(FreeListNode** phead, FreeListNode* prev_node, FreeListNode* new_node) {
+  if (prev_node == null) {
+    if (*phead != null) {
+      new_node->next = *phead;
+      *phead = new_node;
+    } else {
+      *phead = new_node;
+    }
+  } else {
+    if (prev_node->next == null) {
+      new_node->next = null;
+      prev_node->next = new_node;
+    } else {
+      new_node->next = prev_node->next;
+      prev_node->next = new_node;
+    }
+  }
+}
+
+void free_list_gpu_node_remove(FreeListNode** phead, FreeListNode* prev_node, FreeListNode* del_node) {
+  if (prev_node == null) {
+    *phead = del_node->next;
+  } else {
+    prev_node->next = del_node->next;
+  }
+}
+
+u32 free_list_gpu_find_first(FreeListGpu& fl, u64 size, u64 alignment, u64* padding_, u32* prev_index_) {
+  u32 index = fl.head;
+  u32 prev_index = 0;
+
+  u64 padding = 0;
+  Loop (i, fl.free_count) {
+
+    if (fl.free_blocks[i].size >= size) {
+      fl.used_blocks[fl.used_count].offset = size;
+      fl.used_blocks[fl.used_count].offset = size;
+      ++fl.used_count;
+      break;
+    }
+
+
+  }
+
+  // while (fl.blocks[index].next != 0) {
+  //   padding = sizeof(FreeListAllocationHeader) + AlignPadPow2((PtrInt)index+sizeof(FreeListAllocationHeader), alignment);
+  //   u64 required_space = size + padding;
+  //   // if (node->block_size >= required_space) {
+  //   //   break;
+  //   // }
+  //   // prev_node = node;
+  //   // node = node->next;
+  // }
+  // *padding_ = padding;
+  // *prev_index_ = prev_index;
+  return index;
+
+}
+
+u32 free_list_gpu_alloc(FreeListGpu& fl, u64 size, u64 alignment) {
+  u64 padding = 0;
+  u32 prev_index = null;
+  u32 index = null;
+
+  index = free_list_gpu_find_first(fl, size, alignment, &padding, &prev_index);
+  // Assert(node && "Free list has no free memory");
+
+  u64 required_space = size + padding;
+  // u64 remaining = fl.blocks[index].size - required_space;
+
+  // if (remaining > 0) {
+  //   FreeListNode* new_node = (FreeListNode*)((u8*)node + required_space);
+  //   new_node->block_size = remaining;
+  //   free_list_gpu_node_insert(&fl.head, node, new_node);
+  // }
+
+  // free_list_gpu_node_remove(&fl.head, prev_node, node);
+
+  // u64 mem_alignment = padding - sizeof(FreeListAllocationHeader);
+  // FreeListAllocationHeader* header_ptr;
+  // FreeListAllocationHeader* header_ptr; Assign(header_ptr, (u8*)node+mem_alignment);
+  // header_ptr->block_size = required_space;
+  // header_ptr->padding = mem_alignment;
+
+  // fl.used += required_space;
+  // u8* result = (u8*)header_ptr + sizeof(FreeListAllocationHeader);
+  // AllocMemZero(result, size);
+
+  return index;
+}
+
+void free_list_gpu_coalescence(FreeList& fl, FreeListNode* prev_node, FreeListNode* free_node);
+
+void free_list_gpu_free(FreeList& fl, void* ptr) {
+  Assert(fl.data <= ptr && ptr < fl.data+fl.size && "out of bounce");
+  
+  FreeListAllocationHeader* header;
+  FreeListNode* free_node;
+  FreeListNode* node;
+  FreeListNode* prev_node = null;
+
+  Assign(header, (u8*)ptr-sizeof(FreeListAllocationHeader));
+#ifdef MEMORY_ALLOCATED_GUARD
+  Assert(header->guard == ALLOC_HEADER_GUARD && "double free memory");
+  header->guard = DEALLOC_HEADER_GUARD;
+#endif
+
+  u64 padding = header->padding;
+  free_node = (FreeListNode*)((u8*)header - header->padding);
+  free_node->block_size = header->block_size;
+  free_node->next = null;
+
+  if (fl.head == null) {
+    fl.head = free_node;
+  }
+  node = fl.head;
+  while (node != null) {
+    if (ptr < node) {
+      // free_list_gpu_node_free_insert(&fl.head, prev_node, free_node);
+      free_list_gpu_node_insert(&fl.head, prev_node, free_node);
+      break;
+    }
+    prev_node = node;
+    node = node->next;
+  }
+
+  fl.used -= free_node->block_size;
+
+  free_list_coalescence(fl, prev_node, free_node);
+
+  DealocMemZero(ptr, free_node->block_size - padding - sizeof(FreeListAllocationHeader));
+}
+
+void free_list_gpu_coalescence(FreeList& fl, FreeListNode* prev_node, FreeListNode* free_node) {
+  if (free_node->next != null && (void*)((PtrInt)free_node + free_node->block_size) == free_node->next) {
+    free_node->block_size += free_node->next->block_size;
+    free_list_gpu_node_remove(&fl.head, free_node, free_node->next);
+  }
+
+  if (prev_node == null) {
+    return;
+  } 
+  else if (prev_node->next != null && (void*)((PtrInt)prev_node + prev_node->block_size) == free_node) {
+    // prev_node->block_size += free_node->next->block_size;
+    prev_node->block_size += free_node->block_size;
+    free_list_gpu_node_remove(&fl.head, prev_node, free_node);
+  }
+}
+
+u64 free_list_alloc_block(FreeList& fl, u64 size, u64 alignment) {
+  u64 padding = 0;
+  FreeListNode* prev_node = null;
+  FreeListNode* node = null;
+
+  if (size < sizeof(FreeListNode)) {
+    size = sizeof(FreeListNode);
+  }
+
+  node = free_list_find_first(fl, size, alignment, &padding, &prev_node);
+  Assert(node && "Free list has no free memory");
+
+  u64 alignment_padding = padding - sizeof(FreeListAllocationHeader);
+  u64 required_space = size + padding;
+  u64 remaining = node->block_size - required_space;
+
+  if (remaining > 0) {
+    FreeListNode* new_node = (FreeListNode*)((PtrInt)node + required_space);
+    new_node->block_size = remaining;
+    free_list_node_insert(&fl.head, node, new_node);
+  }
+
+  free_list_node_remove(&fl.head, prev_node, node);
+
+  FreeListAllocationHeader* header_ptr = (FreeListAllocationHeader*)((PtrInt)node + alignment_padding);
+  header_ptr->block_size = required_space;
+  header_ptr->padding = alignment_padding;
+  header_ptr->guard = DebugMagic;
+
+  fl.used += required_space;
+
+  return ((PtrInt)header_ptr + sizeof(FreeListAllocationHeader)) - (PtrInt)fl.data;
 }
 
 ////////////////////////////////
@@ -519,3 +939,4 @@ u64 ring_read(u8* ring_base, u64 ring_size, u64 ring_pos, void* dst_data, u64 re
   MemCopy((u8*)dst_data + pre_split_bytes, ring_base + 0, pst_split_bytes);
   return read_size;
 }
+
