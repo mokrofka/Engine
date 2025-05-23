@@ -54,7 +54,7 @@ internal void vk_descriptor_pool_create() {
   pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
   pool_info.poolSizeCount = ArrayCount(pool_sizes);
   pool_info.pPoolSizes = pool_sizes;
-  pool_info.maxSets = 100;
+  pool_info.maxSets = 4;
   pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
   vkCreateDescriptorPool(vkdevice, &pool_info, null, &vk.descriptor_pool);

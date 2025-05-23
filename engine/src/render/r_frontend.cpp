@@ -35,20 +35,6 @@ void r_init(Arena* arena, R_Config config) {
   state->backend.frame_number = 0;
 
   vk_r_backend_init(&state->backend);
-
-  // World projection/view
-  state->near_clip = 0.1f;
-  state->far_clip = 1000.0f;
-  state->projection = mat4_perspective(deg_to_rad(45.0f), 1280 / 720.0f, state->near_clip, state->far_clip);
-  
-  // TODO configutable camera starting position
-  state->view = mat4_translation(v3(0, 0, -30));
-  state->view = mat4_inverse(state->view);
-  
-  // UI projection/view
-  // state->ui_projection = mat4_orthographic(0.0f, 1280.0f, 720.0f, 0.0f, -100.0f, 100.0f); // Intentionally flipped on y axis
-  state->ui_projection = mat4_orthographic(0.0f, 1280.0f, 0.0f, 720.0f, -100.0f, 100.0f); // Intentionally flipped on y axis
-  state->ui_view = mat4_inverse(mat4_identity());
 }
 
 void r_shutdown() {

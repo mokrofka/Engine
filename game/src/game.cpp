@@ -178,15 +178,15 @@ void application_init(App* app) {
   st->camera.fov = 45;
   entity_init();
  
-  {
-    Geometry cube_geom = {
-      .name = "cube"_,
-      .vertex_count = ArrayCount(vertices),
-      .vertex_size = sizeof(Vertex),
-      .vertices = vertices,
-    };
-    geometry_create(cube_geom);
-  }
+  // {
+  //   Geometry cube_geom = {
+  //     .name = "cube"_,
+  //     .vertex_count = ArrayCount(vertices),
+  //     .vertex_size = sizeof(Vertex),
+  //     .vertices = vertices,
+  //   };
+  //   geometry_create(cube_geom);
+  // }
   // {
   //   Geometry triangle_geom = {
   //     .name = "triangle"_,
@@ -209,45 +209,45 @@ void application_init(App* app) {
   //   geometry_create(grid);
   // }
   
-  {
-    Shader shader = {
-      .name = "texture_shader"_,
-      .attribut = {3,2},
-    };
-    shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
-  }
-  {
-    Shader shader = {
-      .name = "color_shader"_,
-      .attribut = {3,3},
-    };
-    shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
-  }
-  {
-    Shader shader = {
-      .name = "grid_shader"_,
-      .primitive = ShaderTopology_Line,
-      .is_transparent = true,
-      .attribut = {3},
-    };
-    shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
-  }
+  // {
+  //   Shader shader = {
+  //     .name = "texture_shader"_,
+  //     .attribut = {3,2},
+  //   };
+  //   shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
+  // }
+  // {
+  //   Shader shader = {
+  //     .name = "color_shader"_,
+  //     .attribut = {3,3},
+  //   };
+  //   shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
+  // }
+  // {
+  //   Shader shader = {
+  //     .name = "grid_shader"_,
+  //     .primitive = ShaderTopology_Line,
+  //     .is_transparent = true,
+  //     .attribut = {3},
+  //   };
+  //   shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
+  // }
   
-  texture_load("container.jpg"_);
+  // texture_load("container.jpg"_);
 
   // u32 id = entity_create();
   // entity_make_renderable(id, geometry_get("grid"_), shader_get("grid_shader"_));
   // mat4* position = (mat4*)vk_get_push_constant(id);
   // *position = mat4_translation(v3(0,0,0));
   
-  f32 min = -1, max = 1;
-  Loop (i, st->obj_count) {
-    st->objs[i].id = cube_create();
-    f32 x = rand_in_range_f32(min, max);
-    f32 y = rand_in_range_f32(min, max);
-    f32 z = rand_in_range_f32(min, max);
-    st->objs[i].position = v3(x, y, z);
-  }
+  // f32 min = -1, max = 1;
+  // Loop (i, st->obj_count) {
+  //   st->objs[i].id = cube_create();
+  //   f32 x = rand_in_range_f32(min, max);
+  //   f32 y = rand_in_range_f32(min, max);
+  //   f32 z = rand_in_range_f32(min, max);
+  //   st->objs[i].position = v3(x, y, z);
+  // }
 }
 
 f32 min = -30, max = 30;
@@ -257,30 +257,30 @@ void application_update(App* app) {
   st->delta = app->delta_time;
   Object* objs = st->objs;
   
-  st->entities_ubo[0].projection_view = st->camera.projection * st->camera.view;
+  // st->entities_ubo[0].projection_view = st->camera.projection * st->camera.view;
   
-  f32& rot = st->rot;
-  rot += 0.01;
-  u32 index = st->obj_count;
-  if (input_was_key_down(KEY_1)) {
-    objs[index].id = (++toggle+1)%2 ? cube_create() : triangle_create();
-    f32 x = rand_in_range_f32(min, max);
-    f32 y = rand_in_range_f32(min, max);
-    f32 z = rand_in_range_f32(min, max);
-    objs[index].position = v3(x, y, z);
-    st->obj_count++;
-  }
-  if (input_was_key_down(KEY_2)) {
-    entity_destroy(objs[index-1].id);
-    entity_remove_renderable(objs[index-1].id);
-    st->obj_count--;
-  }
+  // f32& rot = st->rot;
+  // rot += 0.01;
+  // u32 index = st->obj_count;
+  // if (input_was_key_down(KEY_1)) {
+  //   objs[index].id = (++toggle+1)%2 ? cube_create() : triangle_create();
+  //   f32 x = rand_in_range_f32(min, max);
+  //   f32 y = rand_in_range_f32(min, max);
+  //   f32 z = rand_in_range_f32(min, max);
+  //   objs[index].position = v3(x, y, z);
+  //   st->obj_count++;
+  // }
+  // if (input_was_key_down(KEY_2)) {
+  //   entity_destroy(objs[index-1].id);
+  //   entity_remove_renderable(objs[index-1].id);
+  //   st->obj_count--;
+  // }
   
-  Loop(i, st->obj_count) {
-    mat4* model = (mat4*)vk_get_push_constant(objs[i].id);
-    *model = mat4_translation(objs[i].position) * mat4_euler_y(rot);
-    *model = mat4_euler_y(rot / 2) * mat4_translation(objs[i].position);
-  }
+  // Loop(i, st->obj_count) {
+  //   mat4* model = (mat4*)vk_get_push_constant(objs[i].id);
+  //   *model = mat4_translation(objs[i].position) * mat4_euler_y(rot);
+  //   *model = mat4_euler_y(rot / 2) * mat4_translation(objs[i].position);
+  // }
 
   camera_update();
 }

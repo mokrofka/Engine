@@ -162,26 +162,26 @@ void engine_create(App* app) {
     ui_init();
   }
 
-  {
-    TextureSystemConfig texture_sys_config = {
-      .max_texture_count = 65536,
-    };
-    texture_system_init(st.arena, texture_sys_config);
-  }
+  // {
+  //   TextureSystemConfig texture_sys_config = {
+  //     .max_texture_count = 65536,
+  //   };
+  //   texture_system_init(st.arena, texture_sys_config);
+  // }
 
-  {
-    MaterialSystemConfig material_sys_config = {
-        .max_material_count = 4096,
-    };
-    material_system_init(st.arena, material_sys_config);
-  }
+  // {
+  //   MaterialSystemConfig material_sys_config = {
+  //       .max_material_count = 4096,
+  //   };
+  //   material_system_init(st.arena, material_sys_config);
+  // }
 
-  {
-    GeometrySysConfig geometry_sys_config = {
-      .max_geometry_count = 4096,
-    };
-    geometry_sys_init(st.arena, geometry_sys_config);
-  }
+  // {
+  //   GeometrySysConfig geometry_sys_config = {
+  //     .max_geometry_count = 4096,
+  //   };
+  //   geometry_sys_init(st.arena, geometry_sys_config);
+  // }
 
   {
     // GeometryConfig config = geometry_sys_generate_plane_config(10.0f, 5.0f, 5, 5, 5.0f, 2.0f, "test geometry"_, "test_material"_);
