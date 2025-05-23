@@ -233,8 +233,8 @@ void vk_r_backend_init(R_Backend* backend) {
     VK_CHECK(vkCreateFence(vkdevice, &fence_create_info, vk.allocator, &vk.sync.in_flight_fences[i]));
   }
 
-  create_buffers(&vk.render);
-  vk_shader_init();
+  // create_buffers(&vk.render);
+  // vk_shader_init();
   Info("Vulkan renderer initialized successfully"_);
 }
 
@@ -395,14 +395,14 @@ b32 vk_r_backend_end_frame(f32 delta_time) {
   
   VK_CHECK(vkResetFences(vkdevice, 1, &vk.sync.in_flight_fences[vk.frame.current_frame]));
   
-  // compute
-  VkSubmitInfo compute_submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
-  compute_submit_info.commandBufferCount = 1;
-  compute_submit_info.pCommandBuffers = &vk.compute_cmds[vk.frame.current_frame].handle;
-  compute_submit_info.signalSemaphoreCount = 1;
-  compute_submit_info.pSignalSemaphores = &vk.sync.compute_complete_semaphores[vk.frame.current_frame];
+  // // compute
+  // VkSubmitInfo compute_submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
+  // compute_submit_info.commandBufferCount = 1;
+  // compute_submit_info.pCommandBuffers = &vk.compute_cmds[vk.frame.current_frame].handle;
+  // compute_submit_info.signalSemaphoreCount = 1;
+  // compute_submit_info.pSignalSemaphores = &vk.sync.compute_complete_semaphores[vk.frame.current_frame];
   
-  VK_CHECK(vkQueueSubmit(vk.device.graphics_queue, 1, &compute_submit_info, null));
+  // VK_CHECK(vkQueueSubmit(vk.device.graphics_queue, 1, &compute_submit_info, null));
 
   // graphics
   VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
@@ -605,36 +605,34 @@ internal b32 recreate_swapchain(VK_Swapchain* swapchain) {
 }
 
 internal void create_buffers(VK_Render* render) {
-  VkMemoryPropertyFlagBits memory_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;   
+  // // vert
+  // vk.vert_buffer = vk_buffer_create(
+  //   MB(1),
+  //   VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+  //   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+  // vk.vert_buffer.freelist = freelist_gpu_create(vk.arena, vk.vert_buffer.size);
   
-  // vert
-  vk.vert_buffer = vk_buffer_create(
-    MB(1),
-    VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-  vk.vert_buffer.freelist = freelist_gpu_create(vk.arena, vk.vert_buffer.size);
+  // // index
+  // vk.index_buffer = vk_buffer_create(
+  //   MB(1),
+  //   VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+  //   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+  // vk.index_buffer.freelist = freelist_gpu_create(vk.arena, vk.index_buffer.size);
   
-  // index
-  vk.index_buffer = vk_buffer_create(
-    MB(1),
-    VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-  vk.index_buffer.freelist = freelist_gpu_create(vk.arena, vk.index_buffer.size);
+  // // stage
+  // vk.stage_buffer = vk_buffer_create(
+  //   MB(8),
+  //   VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+  //   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  // vk_buffer_map_memory(&vk.stage_buffer, 0, vk.stage_buffer.size);
   
-  // stage
-  vk.stage_buffer = vk_buffer_create(
-    MB(8),
-    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-  vk_buffer_map_memory(&vk.stage_buffer, 0, vk.stage_buffer.size);
-  
-  // uniform
-  vk.uniform_buffer = vk_buffer_create(
-    MB(1),
-    VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-  vk_buffer_map_memory(&vk.uniform_buffer, 0, vk.uniform_buffer.size);
-  vk.uniform_buffer.freelist = freelist_gpu_create(vk.arena, vk.index_buffer.size);
+  // // uniform
+  // vk.uniform_buffer = vk_buffer_create(
+  //   MB(1),
+  //   VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+  //   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  // vk_buffer_map_memory(&vk.uniform_buffer, 0, vk.uniform_buffer.size);
+  // vk.uniform_buffer.freelist = freelist_gpu_create(vk.arena, vk.index_buffer.size);
 }
 
 void* vk_r_create_texture(u8* pixels, u32 width, u32 height, u32 channel_count) {

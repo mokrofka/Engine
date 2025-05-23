@@ -159,7 +159,7 @@ void engine_create(App* app) {
   }
   
   {
-    ui_init();
+    // ui_init();
   }
 
   // {
@@ -320,8 +320,8 @@ void engine_run(App* app) {
   // TODO end
 
   // geometry_sys_shutdown();
-  material_system_shutdown(); texture_system_shutdown();
-  ui_shutdown();
+  // material_system_shutdown(); texture_system_shutdown();
+  // ui_shutdown();
   r_shutdown();
   // res_sys_shutdown();
   os_window_destroy();
