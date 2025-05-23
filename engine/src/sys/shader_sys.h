@@ -76,18 +76,18 @@ struct ShaderAttribute {
 
 struct Shader {
   String name;
-  b8 has_position;
-  b8 has_color;
-  b8 has_tex_coord;
+  ShaderTopology primitive;
   u8 stages;
+  b8 is_transparent;
+  u8 attribut[10];
 };
 KAPI u32 shader_get(String name);
 
 void shader_sys_init(Arena* arena, ShaderSysConfig config);
 void shader_sys_shutdown();
 
-KAPI Shader* shader_sys_create(ShaderConfig* config);
-KAPI u32 shader_create(ShaderConfig config, void* data, u64 data_size, u64 push_size);
+// KAPI Shader* shader_sys_create(ShaderConfig* config);
+KAPI u32 shader_create(Shader shader, void* data, u64 data_size, u64 push_size);
 
 u32 shader_sys_get_id(char* shader_name);
 Shader* shader_sys_get_by_id(u32 shader_id);

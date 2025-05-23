@@ -173,10 +173,8 @@ struct ShaderUniformConfig {
 //   String* stage_filenames;
 // };
 
-struct ShaderConfig {
-  String name;
-  b8 has_position;
-  b8 has_color;
-  b8 has_tex_coord;
-  u8 stages;
+enum ShaderTopology {
+  ShaderTopology_Triangle,
+  ShaderTopology_Line,
+  ShaderTopology_Point,
 };

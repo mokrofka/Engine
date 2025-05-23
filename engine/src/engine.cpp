@@ -134,6 +134,11 @@ void engine_create(App* app) {
       .name = app->name};
     os_window_create(st.arena, config);
   }
+
+  
+  {
+    asset_watch_init(st.arena);
+  }
   
   {
     ShaderSysConfig config = {
@@ -176,10 +181,6 @@ void engine_create(App* app) {
       .max_geometry_count = 4096,
     };
     geometry_sys_init(st.arena, geometry_sys_config);
-  }
-  
-  {
-    asset_watch_init(st.arena);
   }
 
   {

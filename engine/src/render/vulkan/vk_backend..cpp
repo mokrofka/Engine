@@ -8,6 +8,7 @@
 #include "vk_swapchain.h"
 #include "vk_image.h"
 #include "vk_draw.h"
+#include "vk_shader.h"
 
 #include "shaders/vk_material_shader.h"
 #include "shaders/vk_ui_shader.h"
@@ -233,6 +234,7 @@ void vk_r_backend_init(R_Backend* backend) {
   }
 
   create_buffers(&vk.render);
+  vk_shader_init();
   Info("Vulkan renderer initialized successfully"_);
 }
 

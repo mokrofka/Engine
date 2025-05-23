@@ -420,12 +420,15 @@ struct VK_Render {
 };
 
 struct vk_Shader {
+  String name;
   VK_Pipeline pipeline;
   VK_ShaderStage stages[3];
   SparseSetKeep push_constants;
   u32 vert_stride;
   u32 attribute_count;
   VkVertexInputAttributeDescription attribute_desriptions[10];
+  VkPrimitiveTopology topology;
+  b8 is_transparent;
 };
 
 struct VK_ComputeShader {

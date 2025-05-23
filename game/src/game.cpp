@@ -102,6 +102,67 @@ u32 triangle_create() {
   return id;
 }
 
+void* grid_create(Arena* arena, i32 grid_size, f32 grid_step) {
+
+#if 0
+  v3* grid = push_array(arena, v3, grid_size*4);
+
+  i32 i = 0;
+  f32 half = (grid_size / 2.0f) * grid_step;
+  // horizontal from left to right
+  {
+    f32 z = -grid_size * grid_step;
+    f32 x = -grid_size * grid_step;
+    Loop (j, grid_size) {
+      grid[i++] = v3(x, 0, z + half);
+      grid[i++] = v3(-x, 0, z + half);
+      z -= 2*grid_step;
+    }
+  }
+
+  // vertical from top to down
+  {
+    f32 z = -grid_size * grid_step;
+    f32 x = -grid_size * grid_step;
+    Loop (j, grid_size) {
+      grid[i++] = v3(x + half, 0, z);
+      grid[i++] = v3(x + half, 0, -z);
+      x += 2*grid_step;
+    }
+  }
+  return grid;
+
+#else 
+  v3* grid = push_array(arena, v3, grid_size*4);
+
+  i32 i = 0;
+  f32 half = (grid_size / 2.0f) * grid_step;
+  // horizontal from left to right
+  {
+    f32 z = 0;
+    f32 x = grid_size * grid_step;
+    Loop (j, grid_size) {
+      grid[i++] = v3(0 - half, 0, z + half);
+      grid[i++] = v3(x - half, 0, z + half);
+      z -= grid_step;
+    }
+  }
+
+  // vertical from top to down
+  {
+    f32 z = -grid_size * grid_step;
+    f32 x = 0;
+    Loop (j, grid_size) {
+      grid[i++] = v3(x - half, 0, 0 + half);
+      grid[i++] = v3(x - half, 0, z + half);
+      x += grid_step;
+    }
+  }
+  return grid;
+#endif
+
+}
+
 void application_init(App* app) {
   Scratch scratch;
 
@@ -126,42 +187,58 @@ void application_init(App* app) {
     };
     geometry_create(cube_geom);
   }
-  {
-    Geometry triangle_geom = {
-      .name = "triangle"_,
-      .vertex_count = ArrayCount(triangle_vertices) / 6,
-      .vertex_size = sizeof(v3) + sizeof(v3),
-      .vertices = triangle_vertices,
-    };
-    geometry_create(triangle_geom);
-  }
   // {
+  //   Geometry triangle_geom = {
+  //     .name = "triangle"_,
+  //     .vertex_count = ArrayCount(triangle_vertices) / 6,
+  //     .vertex_size = sizeof(v3) + sizeof(v3),
+  //     .vertices = triangle_vertices,
+  //   };
+  //   geometry_create(triangle_geom);
+  // }
+  // {
+  //   u32 grid_size = 200;
+  //   f32 grid_step = 1;
+  //   void* vertices = grid_create(scratch, grid_size, grid_step);
   //   Geometry grid = {
   //     .name = "grid"_,
-  //     .vertex_count = ,
-  //     .vertex_size = ,
-  //     .vertices = ,
-  //   }
+  //     .vertex_count = grid_size*4,
+  //     .vertex_size = sizeof(v3),
+  //     .vertices = vertices,
+  //   };
+  //   geometry_create(grid);
   // }
   
   {
-    ShaderConfig config = {
+    Shader shader = {
       .name = "texture_shader"_,
-      .has_position = true,
-      .has_tex_coord = true,
+      .attribut = {3,2},
     };
-    shader_create(config, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
+    shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
   }
   {
-    ShaderConfig config = {
+    Shader shader = {
       .name = "color_shader"_,
-      .has_position = true,
-      .has_color = true,
+      .attribut = {3,3},
     };
-    shader_create(config, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
+    shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
+  }
+  {
+    Shader shader = {
+      .name = "grid_shader"_,
+      .primitive = ShaderTopology_Line,
+      .is_transparent = true,
+      .attribut = {3},
+    };
+    shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
   }
   
   texture_load("container.jpg"_);
+
+  // u32 id = entity_create();
+  // entity_make_renderable(id, geometry_get("grid"_), shader_get("grid_shader"_));
+  // mat4* position = (mat4*)vk_get_push_constant(id);
+  // *position = mat4_translation(v3(0,0,0));
   
   f32 min = -1, max = 1;
   Loop (i, st->obj_count) {
