@@ -12,7 +12,7 @@ u32 vk_renderpass_create(Rect rect, v4 color, f32 depth, u32 stencil, u32 clear_
 
 void vk_renderpass_destroy(u32 id);
 
-void vk_renderpass_begin(VK_CommandBuffer* command_buffer, VK_Renderpass* renderpass, VkFramebuffer frame_buffer);
+void vk_renderpass_begin(VkCommandBuffer cmd, VK_Renderpass* renderpass, VkFramebuffer frame_buffer);
 
-void vk_renderpass_end(VK_CommandBuffer* command_buffer);
+void vk_renderpass_end(VkCommandBuffer cmd);
 

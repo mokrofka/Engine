@@ -217,3 +217,4 @@ CheckNil(nil,p) ? \
 #define SLLStackPush(f,n) SLLStackPush_N(f,n,next)
 #define SLLStackPop(f) SLLStackPop_N(f,next)
 
+KAPI extern f32 delta_time;

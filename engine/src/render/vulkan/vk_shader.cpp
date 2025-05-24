@@ -347,7 +347,7 @@ void vk_reload_shader(String shader_name, u32 id) {
   vkDeviceWaitIdle(vkdevice);
   
   vkDestroyPipeline(vkdevice, shader->pipeline.handle, vk.allocator);
-  Loop (i, MaterialShaderStageCount) {
+  Loop (i, 2) {
     vkDestroyShaderModule(vkdevice, shader->stages[i].handle, vk.allocator);
   }
   
@@ -460,8 +460,8 @@ void compute_shader() {
   // }
 
   MemRange range = {0, ParticleCount * sizeof(Particle)};
-  upload_to_gpu(&vk.storage_buffers[0], range, particles);
-  upload_to_gpu(&vk.storage_buffers[1], range, particles);
+  vk_upload_to_gpu(&vk.storage_buffers[0], range, particles);
+  vk_upload_to_gpu(&vk.storage_buffers[1], range, particles);
   
   VkDescriptorSetLayoutBinding layout_bindings[3] = {};
   layout_bindings[0].binding = 0;

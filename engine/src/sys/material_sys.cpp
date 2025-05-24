@@ -200,7 +200,7 @@ internal void load_material(MaterialConfig config, Material* m) {
   // TODO: other maps
 
   // Send it off to the renderer to acquire resources.
-  r_create_material(m);
+  // r_create_material(m);
 }
 
 internal void destroy_material(Material* m) {
@@ -212,7 +212,7 @@ internal void destroy_material(Material* m) {
   }
 
   // Release renderer resources.
-  r_destroy_material(m);
+  // r_destroy_material(m);
 
   // Zero it out, invalidate IDs.
   MemZeroStruct(m);
@@ -229,5 +229,5 @@ internal void create_default_material() {
   state->default_material.diffuse_map.use = TextureUse_MapDiffuse ;
   state->default_material.diffuse_map.texture = texture_system_get_default_texture();
 
-  r_create_material(&state->default_material);
+  // r_create_material(&state->default_material);
 }

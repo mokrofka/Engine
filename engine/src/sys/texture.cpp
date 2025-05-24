@@ -239,7 +239,7 @@ internal Texture load_texture(String texture_name) {
 
 internal void destroy_texture(Texture* t) {
   // Clean up back resources  
-  r_destroy_texture(t);
+  // r_destroy_texture(t);
   res_texture_unload(t->data);
   
   // MemZeroStruct(t);

@@ -125,7 +125,7 @@ void vk_renderpass_destroy(u32 id) {
   vk.renderpasses[id].handle = 0;
 }
 
-void vk_renderpass_begin(VK_CommandBuffer* command_buffer, VK_Renderpass* renderpass, VkFramebuffer frame_buffer) {
+void vk_renderpass_begin(VkCommandBuffer cmd, VK_Renderpass* renderpass, VkFramebuffer frame_buffer) {
   VkRenderPassBeginInfo begin_info = {VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
   begin_info.renderPass = renderpass->handle;
   begin_info.framebuffer = frame_buffer;
@@ -159,12 +159,10 @@ void vk_renderpass_begin(VK_CommandBuffer* command_buffer, VK_Renderpass* render
   
   begin_info.pClearValues = begin_info.clearValueCount > 0 ? clear_values : 0;
   
-  vkCmdBeginRenderPass(command_buffer->handle, &begin_info, VK_SUBPASS_CONTENTS_INLINE);
-  command_buffer->state = VK_CmdState_InRenderPass;
+  vkCmdBeginRenderPass(cmd, &begin_info, VK_SUBPASS_CONTENTS_INLINE);
 }
 
-void vk_renderpass_end(VK_CommandBuffer* command_buffer) {
-  vkCmdEndRenderPass(command_buffer->handle);
-  command_buffer->state = VK_CmdState_Recording;
+void vk_renderpass_end(VkCommandBuffer cmd) {
+  vkCmdEndRenderPass(cmd);
 }
 

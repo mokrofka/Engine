@@ -23,11 +23,6 @@ struct EngineState {
 
   Clock clock;
   f32 last_time;
-  
-  // TODO temp
-  Geometry* test_geometry;
-  Geometry* test_ui_geometry;
-  // end
 };
 
 global EngineState st;
@@ -42,6 +37,8 @@ internal b32 app_on_resized(u32 code, void* sender, void* listener_inst, EventCo
 internal void check_dll_changes(App* app);
 internal void app_create(App* app);
 internal void load_game_lib_init(App* app);
+
+f32 delta_time;
 
 // TODO temp
 b32 event_on_debug_event(u32 code, void* sender, void* listener_inst, EventContext data) {
@@ -73,6 +70,10 @@ b32 event_on_debug_event(u32 code, void* sender, void* listener_inst, EventConte
 // TODO end temp
 void engine_create(App* app) {
   global_allocator_init();
+  Assign(app->arena, mem_alloc(AppSize));
+  app->arena->size = AppSize;
+  tctx_init(app->arena);
+  
   app_create(app);
   Scratch scratch;
   
@@ -90,9 +91,7 @@ void engine_create(App* app) {
   {
     network_init(st.arena);
   }
-  test();
-  i32 a = 0xa1;
-  i32 b = 0xde;
+  // test();
   
   {
     ResSysConfig res_sys_cfg = {
@@ -135,7 +134,6 @@ void engine_create(App* app) {
     os_window_create(st.arena, config);
   }
 
-  
   {
     asset_watch_init(st.arena);
   }
@@ -159,77 +157,15 @@ void engine_create(App* app) {
   }
   
   {
-    // ui_init();
+    ui_init();
   }
-
-  // {
-  //   TextureSystemConfig texture_sys_config = {
-  //     .max_texture_count = 65536,
-  //   };
-  //   texture_system_init(st.arena, texture_sys_config);
-  // }
-
-  // {
-  //   MaterialSystemConfig material_sys_config = {
-  //       .max_material_count = 4096,
-  //   };
-  //   material_system_init(st.arena, material_sys_config);
-  // }
-
-  // {
-  //   GeometrySysConfig geometry_sys_config = {
-  //     .max_geometry_count = 4096,
-  //   };
-  //   geometry_sys_init(st.arena, geometry_sys_config);
-  // }
 
   {
-    // GeometryConfig config = geometry_sys_generate_plane_config(10.0f, 5.0f, 5, 5, 5.0f, 2.0f, "test geometry"_, "test_material"_);
-    // st.test_geometry = geometry_sys_acquire_from_config(config, true);
-    
-    // // Load up some test UI geometry.
-    // GeometryConfig ui_config;
-    // ui_config.vertex_size = sizeof(Vertex2D);
-    // ui_config.vertex_count = 4;
-    // ui_config.index_size = sizeof(u32);
-    // ui_config.index_count = 6;
-    // str_copy(ui_config.material_name64, "test_ui_material"_);
-    // str_copy(ui_config.name64, "test_ui_geometry"_);
-
-    // const f32 f = 512.0f;
-    // Vertex2D uiverts [4];
-    // uiverts[0].position.x = 0.0f;  // 0    3
-    // uiverts[0].position.y = 0.0f;  //
-    // uiverts[0].texcoord.x = 0.0f;  //
-    // uiverts[0].texcoord.y = 0.0f;  // 2    1
-
-    // uiverts[1].position.y = f;
-    // uiverts[1].position.x = f;
-    // uiverts[1].texcoord.x = 1.0f;
-    // uiverts[1].texcoord.y = 1.0f;
-
-    // uiverts[2].position.x = 0.0f;
-    // uiverts[2].position.y = f;
-    // uiverts[2].texcoord.x = 0.0f;
-    // uiverts[2].texcoord.y = 1.0f;
-
-    // uiverts[3].position.x = f;
-    // uiverts[3].position.y = 0.0;
-    // uiverts[3].texcoord.x = 1.0f;
-    // uiverts[3].texcoord.y = 0.0f;
-    // ui_config.vertices = uiverts;
-
-    // // Indices - counter-clockwise
-    // u32 indices[6] = {2, 1, 0, 3, 0, 1};
-    // ui_config.indices = indices;
-
-    // // Get UI geometry from config.
-    // st.test_ui_geometry = geometry_sys_acquire_from_config(ui_config, true);
+    GeometrySysConfig geometry_sys_config = {
+      .max_geometry_count = 4096,
+    };
+    geometry_sys_init(st.arena, geometry_sys_config);
   }
-
-  // TODO temp
-  // st.test_geometry = geometry_sys_get_default();
-  // TODO end
 
   app->init(app);
 }
@@ -252,41 +188,22 @@ void engine_run(App* app) {
     if (!st.is_suspended) {
       clock_update(&st.clock);
       f64 current_time = st.clock.elapsed;
-      f64 delta = (current_time - st.last_time);
-      st.app->delta_time = delta;
+      delta_time = (current_time - st.last_time);
       f64 frame_start_time = os_now_seconds();
 
       check_dll_changes(app);
 
-      // // TODO refactor packet creation
-      R_Packet packet = {};
-      packet.delta_time = delta;
-      
-      // // TODO temp
-      // GeometryRenderData test_render;
-      // test_render.geometry = st.test_geometry;
-      // test_render.model = mat4_identity();
-      
-      // packet.geometry_count = 1;
-      // packet.geometries = &test_render;
-
-      // GeometryRenderData test_ui_render;
-      // test_ui_render.geometry = st.test_ui_geometry;
-      // test_ui_render.model = mat4_translation(v3(0, 0, 0));
-      // packet.ui_geometry_count = 1;
-      // packet.ui_geometries = &test_ui_render;
-      // // TODO end
-
       // r_draw_frame(&packet);
-      r_begin_draw_frame(&packet);
+      r_begin_draw_frame();
 
       st.app->update(st.app);
       
-      r_end_draw_frame(&packet);
+      r_end_draw_frame();
       
       f64 frame_end_time = os_now_seconds();
       f64 frame_elapsed_time = frame_end_time - frame_start_time;
-      os_set_delta_time_second(frame_elapsed_time);
+      // delta_time = frame_end_time - frame_start_time;
+      // os_set_delta_time_second(frame_elapsed_time);
       running_time += frame_elapsed_time;
       f64 remaining_seconds = target_frame_seconds - frame_elapsed_time;
 
@@ -321,7 +238,7 @@ void engine_run(App* app) {
 
   // geometry_sys_shutdown();
   // material_system_shutdown(); texture_system_shutdown();
-  // ui_shutdown();
+  ui_shutdown();
   r_shutdown();
   // res_sys_shutdown();
   os_window_destroy();
@@ -396,7 +313,8 @@ internal void load_game_lib(App* app) {
   app->modified = props.modified;
   os_copy_file_path(app->lib_temp_file_path, app->lib_file_path);
   app->lib = os_lib_open(app->lib_temp_file_path);
-  GetProcAddr(app->update, app->lib, "application_update"_);
+  GetProcAddr(app->update, app->lib, "app_update"_);
+  GetProcAddr(app->on_resize, app->lib, "app_on_resize"_);
 }
 
 internal void check_dll_changes(App* app) {
@@ -416,17 +334,15 @@ internal void load_game_lib_init(App* app) {
   app->modified = file_props.modified;
   os_copy_file_path(app->lib_temp_file_path, app->lib_file_path);
   
-  app->lib = os_lib_open(("game_temp.dll"_));
-  GetProcAddr(app->update, app->lib, ("application_update"_));
-  GetProcAddr(app->init, app->lib, ("application_init"_));
+  app->lib = os_lib_open("game_temp.dll"_);
+  GetProcAddr(app->update, app->lib, "app_update"_);
+  GetProcAddr(app->init, app->lib, "app_init"_);
+  GetProcAddr(app->on_resize, app->lib, "app_on_resize"_);
   
-  Assert(app->lib && app->init && app->update);
+  Assert(app->lib && app->init && app->update && app->on_resize);
 }
 
 internal void app_create(App* app) {
-  Assign(app->arena, mem_alloc(AppSize));
-  app->arena->size = AppSize;
-  tctx_init(app->arena);
   Scratch scratch;
   
   String filepath = os_exe_filename(scratch);

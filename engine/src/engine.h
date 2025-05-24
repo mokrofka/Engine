@@ -10,7 +10,6 @@ struct App {
   Arena* arena;
   void (*init)(App* app_inst);
   void (*update)(App* app_inst);
-  void (*render)(App* app_inst);
   void (*on_resize)(App* app_inst);
   
   String name;

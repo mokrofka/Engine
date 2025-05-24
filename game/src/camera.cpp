@@ -1,6 +1,7 @@
 #include "camera.h"
 #include "game.h"
 #include "input.h"
+#include "engine.h"
 
 void view_matrix_update() {
   if (st->camera.view_dirty) {
@@ -45,7 +46,7 @@ internal void camera_pitch(f32 amount) {
 void camera_update() {
   Camera* camera = &st->camera;
   v2i frame_sise = os_get_framebuffer_size();
-  st->camera.projection = mat4_perspective(deg_to_rad(st->camera.fov), frame_sise.x / frame_sise.y, 0.1f, 1000.0f);
+  st->camera.projection = mat4_perspective(deg_to_rad(st->camera.fov), (f32)frame_sise.x / frame_sise.y, 0.1f, 1000.0f);
   
   if (input_was_key_pressed(KEY_T)) {
     st->is_mouse_move = !st->is_mouse_move;
@@ -61,16 +62,16 @@ void camera_update() {
 
   f32 rotation_speed = 180.0f;
   if (input_is_key_down(KEY_A)) {
-    camera_yaw(-rotation_speed * st->delta);
+    camera_yaw(-rotation_speed * delta_time);
   }
   if (input_is_key_down(KEY_D)) {
-    camera_yaw(rotation_speed * st->delta);
+    camera_yaw(rotation_speed * delta_time);
   }
   if (input_is_key_down(KEY_R)) {
-    camera_pitch(rotation_speed * st->delta);
+    camera_pitch(rotation_speed * delta_time);
   }
   if (input_is_key_down(KEY_F)) {
-    camera_pitch(-rotation_speed * st->delta);
+    camera_pitch(-rotation_speed * delta_time);
   }
   
   f32 temp_move_speed = 20.0f;
@@ -104,7 +105,7 @@ void camera_update() {
   if (z != velocity) {
     // Be sure to normalize the velocity before applying speed 
     velocity = v3_normalize(velocity);
-    camera->position += velocity * temp_move_speed * st->delta;
+    camera->position += velocity * temp_move_speed * delta_time;
     camera->view_dirty = true;
   }
   

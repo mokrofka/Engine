@@ -104,18 +104,18 @@ void vk_buffer_unmap_memory(VK_Buffer* buffer) {
   vkUnmapMemory(vkdevice, buffer->memory);
 }
 
-void upload_to_gpu(VK_Buffer* buffer, MemRange range, void* data) {
+void vk_upload_to_gpu(VK_Buffer* buffer, MemRange range, void* data) {
   MemCopy(vk.stage_buffer.maped_memory, data, range.size);
 
-  VK_CommandBuffer temp_cmd = vk_cmd_alloc_and_begin_single_use();
+  VkCommandBuffer temp_cmd = vk_cmd_alloc_and_begin_single_use();
   
   VkBufferCopy copy_region;
   copy_region.srcOffset = 0;
   copy_region.dstOffset = range.offset;
   copy_region.size = range.size;
   
-  vkCmdCopyBuffer(temp_cmd.handle, vk.stage_buffer.handle, buffer->handle, 1, &copy_region);
+  vkCmdCopyBuffer(temp_cmd, vk.stage_buffer.handle, buffer->handle, 1, &copy_region);
   
   // Submit the buffer for execution and wait for it to complete
-  vk_cmd_end_single_use(&temp_cmd);
+  vk_cmd_end_single_use(temp_cmd);
 }

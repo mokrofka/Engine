@@ -19,7 +19,6 @@ struct Camera {
 
 struct GameState {
   Arena* arena;
-  f32 delta;
   
   Object triangle;
   

@@ -66,9 +66,9 @@ void imgui_init() {
   Assign(platform_io.Platform_CreateVkSurface, imgui_surface_create);
   ImGui_ImplVulkan_Init(&init_info);
   
-  VK_CommandBuffer cmd = vk_cmd_alloc_and_begin_single_use();
+  VkCommandBuffer cmd = vk_cmd_alloc_and_begin_single_use();
   ImGui_ImplVulkan_CreateFontsTexture();
-  vk_cmd_end_single_use(&cmd);
+  vk_cmd_end_single_use(cmd);
   ImGui_ImplVulkan_DestroyFontsTexture(); // destroy staging/temp resources
 }
 
@@ -87,13 +87,11 @@ void ui_begin_frame() {
   ImGui_ImplVulkan_NewFrame();
   ImGui_ImplWin32_NewFrame();
   ImGui::NewFrame();
-  ImGui::PushFont(state.font);
 }
 
 void ui_end_frame() {
-  ImGui::PopFont();
   ImGui::Render();
-  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk.render.cmds[vk.frame.image_index].handle);
+  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk.cmds[vk.frame.current_frame]);
   
   ImGui::UpdatePlatformWindows();
   ImGui::RenderPlatformWindowsDefault();

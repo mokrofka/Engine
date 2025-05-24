@@ -5,7 +5,7 @@ u32 entity_to_shader[1024];
 
 void descriptor_update(u32 shader_id) {
   vk_Shader* shader = &vk.shaders[shader_id];
-  VK_CommandBuffer cmd = vk_get_current_cmd();
+  VkCommandBuffer cmd = vk_get_current_cmd();
   
   VkDescriptorSet descriptor_set = vk.descriptor_sets[vk.frame.current_frame];
   
@@ -44,7 +44,7 @@ void descriptor_update(u32 shader_id) {
 }
 
 void vk_draw() {
-  VK_CommandBuffer cmd = vk_get_current_cmd();
+  VkCommandBuffer cmd = vk_get_current_cmd();
   Loop (j, vk.shader_count) {
     vk_Shader* shader = &vk.shaders[j];
     SparseSetKeep* push_constants = &shader->push_constants;
@@ -129,7 +129,7 @@ void compute_descriptor_update() {
 
 void vk_compute_draw() {
   compute_descriptor_update();
-  VK_CommandBuffer cmd = vk.compute_cmds[vk.frame.current_frame];
+  VkCommandBuffer cmd = vk.compute_cmds[vk.frame.current_frame];
 
   VkCommandBufferBeginInfo beginInfo = {};
   beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -137,7 +137,7 @@ void vk_compute_draw() {
   
   UniformBufferObject* ubo; Assign(ubo, vk.compute_uniform_buffer.maped_memory);
   ubo->projection_view = *vk.projection_view;
-  ubo->delta_time = vk.frame.delta_time;
+  ubo->delta_time = delta_time;
   
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, vk.compute_shader.pipeline.handle);
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, vk.compute_shader.pipeline.pipeline_layout, 0, 1, &vk.compute_descriptor_sets[vk.frame.current_frame], 0, null);

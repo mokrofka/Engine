@@ -52,16 +52,16 @@ VK_Image vk_image_create(
 
   // Create view
   if (create_view) {
-    result.view = 0;
-    vk_image_view_create(format, &result, view_aspect_flags);
+    result.view = vk_image_view_create(format, result.handle, view_aspect_flags);
   }
   
   return result;
 }
 
-void vk_image_view_create(VkFormat format, VK_Image* image, VkImageAspectFlags aspect_flags) {
+VkImageView vk_image_view_create(VkFormat format, VkImage image, VkImageAspectFlags aspect_flags) {
+  VkImageView result;
   VkImageViewCreateInfo view_create_info = {VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
-  view_create_info.image = image->handle;
+  view_create_info.image = image;
   view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D; // TODO: Make configurable.
   view_create_info.format = format;
   view_create_info.subresourceRange.aspectMask = aspect_flags;
@@ -72,13 +72,13 @@ void vk_image_view_create(VkFormat format, VK_Image* image, VkImageAspectFlags a
   view_create_info.subresourceRange.baseArrayLayer = 0;
   view_create_info.subresourceRange.layerCount = 1;
 
-  VK_CHECK(vkCreateImageView(vkdevice, &view_create_info, vk.allocator, &image->view));
+  VK_CHECK(vkCreateImageView(vkdevice, &view_create_info, vk.allocator, &result));
+  return result;
 }
 
 void vk_image_transition_layout(
-    VK_CommandBuffer* command_buffer,
-    VK_Image* image,
-    VkFormat format,
+    VkCommandBuffer cmd,
+    VK_Image image,
     VkImageLayout old_layout,
     VkImageLayout new_layout) {
   VkImageMemoryBarrier barrier = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
@@ -86,7 +86,7 @@ void vk_image_transition_layout(
   barrier.newLayout = new_layout;
   barrier.srcQueueFamilyIndex = vk.device.graphics_queue_index;
   barrier.dstQueueFamilyIndex = vk.device.graphics_queue_index;
-  barrier.image = image->handle;
+  barrier.image = image.handle;
   barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   barrier.subresourceRange.baseMipLevel = 0;
   barrier.subresourceRange.levelCount = 1;
@@ -122,7 +122,7 @@ void vk_image_transition_layout(
   }
 
   vkCmdPipelineBarrier(
-      command_buffer->handle,
+      cmd,
       source_stage, dest_stage,
       0,
       0, 0,
@@ -130,7 +130,7 @@ void vk_image_transition_layout(
       1, &barrier);
 }
 
-void vk_image_copy_from_buffer(VK_Image* image, VK_CommandBuffer* command_buffer) {
+void vk_upload_image_to_gpu(VkCommandBuffer cmd, VK_Image image) {
   // Region to copy
   VkBufferImageCopy region = {};
   region.bufferOffset = 0;
@@ -142,39 +142,14 @@ void vk_image_copy_from_buffer(VK_Image* image, VK_CommandBuffer* command_buffer
   region.imageSubresource.baseArrayLayer = 0;
   region.imageSubresource.layerCount = 1;
   
-  region.imageExtent.width = image->width;
-  region.imageExtent.height = image->height;
+  region.imageExtent.width = image.width;
+  region.imageExtent.height = image.height;
   region.imageExtent.depth = 1;
   
   vkCmdCopyBufferToImage(
-    command_buffer->handle, 
+    cmd,
     vk.stage_buffer.handle, 
-    image->handle, 
-    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
-    1, 
-    &region);
-}
-
-void vk_image_copy_from_buffer(VK_Image* image, VK_Buffer buffer, VK_CommandBuffer* command_buffer) {
-  // Region to copy
-  VkBufferImageCopy region = {};
-  region.bufferOffset = 0;
-  region.bufferRowLength = 0;
-  region.bufferImageHeight = 0;
-  
-  region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  region.imageSubresource.mipLevel = 0;
-  region.imageSubresource.baseArrayLayer = 0;
-  region.imageSubresource.layerCount = 1;
-  
-  region.imageExtent.width = image->width;
-  region.imageExtent.height = image->height;
-  region.imageExtent.depth = 1;
-  
-  vkCmdCopyBufferToImage(
-    command_buffer->handle,
-    buffer.handle, 
-    image->handle, 
+    image.handle, 
     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
     1, 
     &region);
@@ -195,19 +170,18 @@ void vk_image_destroy(VK_Image* image) {
   }
 }
 
-i32 te_texture_load();
-void vk_texture_load(Texture* texture) {
-  VK_Texture* data = &vk.texture;
+void vk_texture_load(Texture* t) {
+  VK_Texture* texture = &vk.texture;
   
-  u64 size = texture->width * texture->height * texture->channel_count;
+  u64 size = t->width * t->height * t->channel_count;
   VkFormat image_format = VK_FORMAT_R8G8B8A8_UNORM;
   
-  MemCopy(vk.stage_buffer.maped_memory, texture->data, size);
+  MemCopy(vk.stage_buffer.maped_memory, t->data, size);
   
-  data->image = vk_image_create(
+  texture->image = vk_image_create(
     VK_IMAGE_TYPE_2D, 
-    texture->width, 
-    texture->height, 
+    t->width, 
+    t->height, 
     image_format, 
     VK_IMAGE_TILING_OPTIMAL, 
     VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -215,25 +189,23 @@ void vk_texture_load(Texture* texture) {
     true,
     VK_IMAGE_ASPECT_COLOR_BIT);
   
-  VK_CommandBuffer cmd = vk_cmd_alloc_and_begin_single_use();
+  VkCommandBuffer cmd = vk_cmd_alloc_and_begin_single_use();
   
   vk_image_transition_layout(
-    &cmd, 
-    &data->image, 
-    image_format, 
+    cmd, 
+    texture->image, 
     VK_IMAGE_LAYOUT_UNDEFINED, 
     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     
-  vk_image_copy_from_buffer(&data->image, &cmd);
+  vk_upload_image_to_gpu(cmd, texture->image);
   
   vk_image_transition_layout(
-    &cmd, 
-    &data->image, 
-    image_format, 
+    cmd, 
+    texture->image, 
     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     
-  vk_cmd_end_single_use(&cmd);
+  vk_cmd_end_single_use(cmd);
   
   // Create a sampler for the texture
   VkSamplerCreateInfo sampler_info = {VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
@@ -254,8 +226,8 @@ void vk_texture_load(Texture* texture) {
   sampler_info.minLod = 0.0f;
   sampler_info.maxLod = 0.0f;
   
-  VkResult result = vkCreateSampler(vkdevice, &sampler_info, vk.allocator, &data->sampler);
-  
-  // TODO
-  // i32 a = te_texture_load();
+  VK_CHECK(vkCreateSampler(vkdevice, &sampler_info, vk.allocator, &texture->sampler));
+}
+
+void vk_render_target_create() {
 }

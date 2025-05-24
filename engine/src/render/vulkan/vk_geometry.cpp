@@ -88,5 +88,5 @@ void vk_r_geometry_create(Geometry* geom) {
     .vert_count = geom->vertex_count,
   };
   vk.meshes[mesh_count++] = mesh;
-  upload_to_gpu(&vk.vert_buffer, range, geom->vertices);
+  vk_upload_to_gpu(&vk.vert_buffer, range, geom->vertices);
 }

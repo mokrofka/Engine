@@ -18,7 +18,7 @@ struct VK_PhysicalDeviceQueueFamilyInfo {
   u32 transfer_family_index;
 };
 
-internal void select_physical_device(VK_Device* device);
+internal VK_Device select_physical_device();
 internal VK_PhysicalDeviceQueueFamilyInfo physical_device_meets_requirements(
     VkPhysicalDevice device,
     VkPhysicalDeviceProperties properties,
@@ -26,31 +26,39 @@ internal VK_PhysicalDeviceQueueFamilyInfo physical_device_meets_requirements(
     VK_PhysicalDeviceRequirements requirements,
     VK_SwapchainSupportInfo* out_swapchain_support);
 
+internal b32 index_in_list(u32* list, u32 count, u32 value) {
+  Loop (i, count) {
+    if (list[i] == value) return true;
+  }
+  return false;
+}
 void vk_device_create() {
-  select_physical_device(&vk.device);
+  vk.device = select_physical_device();
   
   Info("Creating logical device..."_);
   // NOTE: Do not create additional queues for shared indices.
-  b32 present_shares_graphics_queue = vk.device.graphics_queue_index == vk.device.present_queue_index;
-  b32 transfer_shares_graphics_queue = vk.device.graphics_queue_index == vk.device.transfer_queue_index;
-  u32 index_count = 1;
-  if (!present_shares_graphics_queue) {
-    ++index_count;
+  u32 indices[4];
+  u32 index_count = 0;
+
+  // Add graphics queue index
+  indices[index_count++] = vk.device.graphics_queue_index;
+
+  // Add present queue index if unique
+  if (!index_in_list(indices, index_count, vk.device.present_queue_index)) {
+    indices[index_count++] = vk.device.present_queue_index;
   }
-  if (!transfer_shares_graphics_queue) {
-    ++index_count;
+
+  // Add transfer queue index if unique
+  if (!index_in_list(indices, index_count, vk.device.transfer_queue_index)) {
+    indices[index_count++] = vk.device.transfer_queue_index;
   }
-  u32 indices[32];
-  u32 index = 0;
-  indices[index++] = vk.device.graphics_queue_index;
-  if (!present_shares_graphics_queue) {
-    indices[index++] = vk.device.present_queue_index;
+
+  // Add compute queue index if unique
+  if (!index_in_list(indices, index_count, vk.device.compute_queue_index)) {
+    indices[index_count++] = vk.device.compute_queue_index;
   }
-  if (!transfer_shares_graphics_queue) {
-    indices[index++] = vk.device.transfer_queue_index;
-  }
-  
-  VkDeviceQueueCreateInfo queue_create_infos[32];
+
+  VkDeviceQueueCreateInfo queue_create_infos[4];
   Loop (i, index_count) {
     queue_create_infos[i].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     queue_create_infos[i].queueFamilyIndex = indices[i];
@@ -62,24 +70,22 @@ void vk_device_create() {
   }
   
   // Request device features.
-  // TODO: should be config driven
-  VkPhysicalDeviceFeatures device_features = {};
-  device_features.samplerAnisotropy = VK_TRUE; // Request anistrophy
-  device_features.fillModeNonSolid = VK_TRUE; // Request wireframe
+  VkPhysicalDeviceFeatures device_features = {
+    .fillModeNonSolid = true,  // Request anistrophy
+    .samplerAnisotropy = true, // Request wireframe
+  };
   
-  VkDeviceCreateInfo device_create_info = {VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
-  device_create_info.queueCreateInfoCount = index_count;
-  device_create_info.pQueueCreateInfos = queue_create_infos;
-  device_create_info.pEnabledFeatures = &device_features;
-  device_create_info.enabledExtensionCount = 1;
-  const char* extension_names[1] = {
+  const char* extension_names[] = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
   };
-  device_create_info.ppEnabledExtensionNames = extension_names;
-  
-  // Deprecated and ingnored, so pass nothing.
-  device_create_info.enabledLayerCount = 0;
-  device_create_info.ppEnabledLayerNames = 0;
+  VkDeviceCreateInfo device_create_info = {
+    .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+    .queueCreateInfoCount = index_count,
+    .pQueueCreateInfos = queue_create_infos,
+    .enabledExtensionCount = ArrayCount(extension_names),
+    .ppEnabledExtensionNames = extension_names,
+    .pEnabledFeatures = &device_features,
+  };
   
   // Create the device.
   VK_CHECK(vkCreateDevice(vk.device.physical_device, &device_create_info, vk.allocator, &vk.device.logical_device));
@@ -90,14 +96,24 @@ void vk_device_create() {
   vkGetDeviceQueue(vk.device.logical_device, vk.device.graphics_queue_index, 0, &vk.device.graphics_queue);
   vkGetDeviceQueue(vk.device.logical_device, vk.device.present_queue_index, 0, &vk.device.present_queue);
   vkGetDeviceQueue(vk.device.logical_device, vk.device.transfer_queue_index, 0, &vk.device.transfer_queue);
+  vkGetDeviceQueue(vk.device.logical_device, vk.device.compute_queue_index, 0, &vk.device.compute_queue);
   
   Info("Queues obtained"_);
   
-  // Create command pool for graphics queue.
-  VkCommandPoolCreateInfo pool_create_info = {VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-  pool_create_info.queueFamilyIndex = vk.device.graphics_queue_index;
-  pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-  VK_CHECK(vkCreateCommandPool(vk.device.logical_device, &pool_create_info, vk.allocator, &vk.device.graphics_cmd_pool));
+  VkCommandPoolCreateInfo graphics_pool_create_info = {
+    .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+    .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+    .queueFamilyIndex = vk.device.graphics_queue_index,
+  };
+  VK_CHECK(vkCreateCommandPool(vk.device.logical_device, &graphics_pool_create_info, vk.allocator, &vk.device.cmd_pool));
+
+  VkCommandPoolCreateInfo transfer_pool_create_info = {
+    .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+    .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
+    .queueFamilyIndex = vk.device.transfer_queue_index,
+  };
+  VK_CHECK(vkCreateCommandPool(vk.device.logical_device, &transfer_pool_create_info, vk.allocator, &vk.device.transient_cmd_pool));
+
   Info("Graphics command pool created"_);
 }
 
@@ -108,12 +124,11 @@ void vk_device_destroy() {
   vk.device.transfer_queue = 0;
   
   Info("Destroying command pools..."_);
-  vkDestroyCommandPool(vkdevice, vk.device.graphics_cmd_pool, vk.allocator);
+  vkDestroyCommandPool(vkdevice, vk.device.cmd_pool, vk.allocator);
 
   // Destroy logical device
   Info("Destroying logical device..."_);
   vkDestroyDevice(vkdevice, vk.allocator);
-  vkdevice = 0;
   
   // Physical device are not destroyed.
   Info("Releasing physical device resources..."_);
@@ -185,12 +200,16 @@ void vk_device_detect_depth_format(VK_Device* device) {
   Assert(!"Failed to find a supported format!");
 }
 
-internal void select_physical_device(VK_Device* device) {
+internal VK_Device select_physical_device() {
+  Scratch scratch;
+  VK_Device result;
   u32 physical_device_count = 0;
   VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &physical_device_count, 0));
-  
-  const u32 max_device_count = 32;
-  VkPhysicalDevice physical_devices[max_device_count];
+  VK_Device* devices = push_array(scratch, VK_Device, physical_device_count);
+  VkPhysicalDevice* physical_devices = push_array(scratch, VkPhysicalDevice, physical_device_count);
+  i32 discrete_gpu_index = -1;
+  i32 fallback_gpu_index = -1;
+
   VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &physical_device_count, physical_devices));
   Loop (i, physical_device_count) {
     VkPhysicalDeviceProperties properties;
@@ -208,12 +227,10 @@ internal void select_physical_device(VK_Device* device) {
     requirements.graphics = true;
     requirements.present = true;
     requirements.transfer = true;
-    // NOTE: Enable this fi compute will be required.
-    // requirements.compute = true;
+    requirements.compute = true;
     requirements.sampler_anisotropy = true;
-    // requirements.discrete_gpu = false;
     
-    const char* extentions[1] = {
+    const char* extentions[] = {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     };
     requirements.device_extension_names = extentions;
@@ -223,27 +240,32 @@ internal void select_physical_device(VK_Device* device) {
       properties,
       features,
       requirements,
-      &device->swapchain_support);
+      &devices[i].swapchain_support);
 
-    Info("Selected device: '%s'", str_cstr(properties.deviceName));
+    Info("Available device: '%s'", str_cstr(properties.deviceName));
     // GPU type, etc.
     switch (properties.deviceType) {
     default:
-    case VK_PHYSICAL_DEVICE_TYPE_OTHER:
-      Info("GPU type is Unkown"_);
-      break;
-    case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
-      Info("GPU type is Integrated"_);
-      break;
-    case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
-      Info("GPU type is Descrete"_);
-      break;
-    case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
-      Info("GPU type is Virtual"_);
-      break;
-    case VK_PHYSICAL_DEVICE_TYPE_CPU:
-      Info("GPU type is CPU"_);
-      break;
+      case VK_PHYSICAL_DEVICE_TYPE_OTHER: {
+        Info("GPU type is Unkown"_);
+        fallback_gpu_index = i;
+      } break;
+      case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: {
+        Info("GPU type is Integrated"_);
+        fallback_gpu_index = i;
+      } break;
+      case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU: {
+        discrete_gpu_index = i;
+      } Info("GPU type is Descrete"_);
+        break;
+      case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU: {
+        Info("GPU type is Virtual"_);
+        fallback_gpu_index = i;
+      } break;
+      case VK_PHYSICAL_DEVICE_TYPE_CPU: {
+        Info("GPU type is CPU"_);
+        fallback_gpu_index = i;
+      } break;
     }
 
     Info(
@@ -269,22 +291,31 @@ internal void select_physical_device(VK_Device* device) {
       }
     }
 
-    device->physical_device = physical_devices[i];
-    device->graphics_queue_index = queue_info.graphics_family_index;
-    device->present_queue_index = queue_info.present_family_index;
-    device->transfer_queue_index = queue_info.transfer_family_index;
+    devices[i].physical_device = physical_devices[i];
+    devices[i].graphics_queue_index = queue_info.graphics_family_index;
+    devices[i].present_queue_index = queue_info.present_family_index;
+    devices[i].transfer_queue_index = queue_info.transfer_family_index;
+    devices[i].compute_queue_index = queue_info.compute_family_index;
     // NOTE: set computer index here if needed.
 
     // Keep a copy of properties, features and memory info for later use.
-    device->properties = properties;
-    device->features = features;
-    device->memory = memory;
+    devices[i].properties = properties;
+    devices[i].features = features;
+    devices[i].memory = memory;
+  }
+  i32 selected_index;
+  if (discrete_gpu_index != -1) {
+    selected_index = discrete_gpu_index; 
+    Info("Discrete GPU was choosen");
+  } else {
+    selected_index = fallback_gpu_index;
+    Info("Integrated GPU was choosen");
   }
   
-  // Ensure a device was selected
-  Assert(device->physical_device && "No physical devices were found which meet the requirements");
+  Assert(devices[selected_index].physical_device && "No physical devices were found which meet the requirements");
   
   Info("Physical device selected"_);
+  return devices[selected_index];
 }
 
 internal VK_PhysicalDeviceQueueFamilyInfo physical_device_meets_requirements(
@@ -299,40 +330,37 @@ internal VK_PhysicalDeviceQueueFamilyInfo physical_device_meets_requirements(
   queue_info.present_family_index = -1;  
   queue_info.compute_family_index = -1;  
   queue_info.transfer_family_index = -1;  
-  
-  // Discrete GPU?
-  if (requirements.discrete_gpu) {
-    if (properties.deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
-      Info("Device is not a discrete GPU, and one is required. Skipping"_);
-    }
-  }
+  Scratch scratch;
   
   u32 queue_family_count = 0;
   vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, 0);
-  VkQueueFamilyProperties queue_families[32] = {};
+  VkQueueFamilyProperties* queue_families = push_array(scratch, VkQueueFamilyProperties, queue_family_count);
   vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, queue_families);
   
   // Look at each queue and see what queues it supports
   Info("Graphics | Present | Computer | Transfer | Name"_);
   Loop (i, queue_family_count) {
     // Graphics queue?
-    if (queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+    if ((queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) && (queue_info.graphics_family_index == -1)) {
       queue_info.graphics_family_index = i;
     }
-    
+
+    // Transfer queue?
+    if ((queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT) && (queue_info.transfer_family_index == -1) &&
+        !(queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) && !(queue_families[i].queueFlags & VK_QUEUE_COMPUTE_BIT)) {
+      queue_info.transfer_family_index = i;
+    }
+
     // Compute queue?
-    if (queue_families[i].queueFlags & VK_QUEUE_COMPUTE_BIT) {
+    if ((queue_families[i].queueFlags & VK_QUEUE_COMPUTE_BIT) && (queue_info.compute_family_index == -1) &&
+        !(queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) && !(queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT)) {
       queue_info.compute_family_index = i;
     }
     
-    // Transfer queue?
-    if (queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT) {
-      queue_info.transfer_family_index = i;
-    }
-    
-    VkBool32 supports_present = VK_FALSE;
+    // Present queue?
+    VkBool32 supports_present;
     VK_CHECK(vkGetPhysicalDeviceSurfaceSupportKHR(device, i, vk.surface, &supports_present));
-    if (supports_present) {
+    if (supports_present && queue_info.present_family_index == -1) {
       queue_info.present_family_index = i;
     }
     if (queue_info.graphics_family_index != -1 &&
@@ -342,6 +370,9 @@ internal VK_PhysicalDeviceQueueFamilyInfo physical_device_meets_requirements(
       break;
     }
   }
+
+  if (queue_info.transfer_family_index == -1) queue_info.transfer_family_index = queue_info.graphics_family_index;
+  if (queue_info.compute_family_index == -1) queue_info.compute_family_index = queue_info.graphics_family_index;
 
   Info("       %i |       %i |        %i |        %i | %s",
         queue_info.graphics_family_index != -1,

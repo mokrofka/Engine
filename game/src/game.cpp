@@ -1,3 +1,4 @@
+#include "vendor/imgui/imgui.h"
 #include "game.h"
 
 #include <engine.h>
@@ -163,7 +164,7 @@ void* grid_create(Arena* arena, i32 grid_size, f32 grid_step) {
 
 }
 
-void application_init(App* app) {
+void app_init(App* app) {
   Scratch scratch;
 
   app->state = push_struct(app->arena, GameState);
@@ -178,109 +179,116 @@ void application_init(App* app) {
   st->camera.fov = 45;
   entity_init();
  
-  // {
-  //   Geometry cube_geom = {
-  //     .name = "cube"_,
-  //     .vertex_count = ArrayCount(vertices),
-  //     .vertex_size = sizeof(Vertex),
-  //     .vertices = vertices,
-  //   };
-  //   geometry_create(cube_geom);
-  // }
-  // {
-  //   Geometry triangle_geom = {
-  //     .name = "triangle"_,
-  //     .vertex_count = ArrayCount(triangle_vertices) / 6,
-  //     .vertex_size = sizeof(v3) + sizeof(v3),
-  //     .vertices = triangle_vertices,
-  //   };
-  //   geometry_create(triangle_geom);
-  // }
-  // {
-  //   u32 grid_size = 200;
-  //   f32 grid_step = 1;
-  //   void* vertices = grid_create(scratch, grid_size, grid_step);
-  //   Geometry grid = {
-  //     .name = "grid"_,
-  //     .vertex_count = grid_size*4,
-  //     .vertex_size = sizeof(v3),
-  //     .vertices = vertices,
-  //   };
-  //   geometry_create(grid);
-  // }
+  {
+    Geometry cube_geom = {
+      .name = "cube"_,
+      .vertex_count = ArrayCount(vertices),
+      .vertex_size = sizeof(Vertex),
+      .vertices = vertices,
+    };
+    geometry_create(cube_geom);
+  }
+  {
+    Geometry triangle_geom = {
+      .name = "triangle"_,
+      .vertex_count = ArrayCount(triangle_vertices) / 6,
+      .vertex_size = sizeof(v3) + sizeof(v3),
+      .vertices = triangle_vertices,
+    };
+    geometry_create(triangle_geom);
+  }
+  {
+    u32 grid_size = 200;
+    f32 grid_step = 1;
+    void* vertices = grid_create(scratch, grid_size, grid_step);
+    Geometry grid = {
+      .name = "grid"_,
+      .vertex_count = grid_size*4,
+      .vertex_size = sizeof(v3),
+      .vertices = vertices,
+    };
+    geometry_create(grid);
+  }
   
-  // {
-  //   Shader shader = {
-  //     .name = "texture_shader"_,
-  //     .attribut = {3,2},
-  //   };
-  //   shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
-  // }
-  // {
-  //   Shader shader = {
-  //     .name = "color_shader"_,
-  //     .attribut = {3,3},
-  //   };
-  //   shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
-  // }
-  // {
-  //   Shader shader = {
-  //     .name = "grid_shader"_,
-  //     .primitive = ShaderTopology_Line,
-  //     .is_transparent = true,
-  //     .attribut = {3},
-  //   };
-  //   shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
-  // }
+  {
+    Shader shader = {
+      .name = "texture_shader"_,
+      .attribut = {3,2},
+    };
+    shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
+  }
+  {
+    Shader shader = {
+      .name = "color_shader"_,
+      .attribut = {3,3},
+    };
+    shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
+  }
+  {
+    Shader shader = {
+      .name = "grid_shader"_,
+      .primitive = ShaderTopology_Line,
+      .is_transparent = true,
+      .attribut = {3},
+    };
+    shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
+  }
   
-  // texture_load("container.jpg"_);
+  texture_load("container.jpg"_);
 
-  // u32 id = entity_create();
-  // entity_make_renderable(id, geometry_get("grid"_), shader_get("grid_shader"_));
-  // mat4* position = (mat4*)vk_get_push_constant(id);
-  // *position = mat4_translation(v3(0,0,0));
+  u32 id = entity_create();
+  entity_make_renderable(id, geometry_get("grid"_), shader_get("grid_shader"_));
+  mat4* position = (mat4*)vk_get_push_constant(id);
+  *position = mat4_translation(v3(0,0,0));
   
-  // f32 min = -1, max = 1;
-  // Loop (i, st->obj_count) {
-  //   st->objs[i].id = cube_create();
-  //   f32 x = rand_in_range_f32(min, max);
-  //   f32 y = rand_in_range_f32(min, max);
-  //   f32 z = rand_in_range_f32(min, max);
-  //   st->objs[i].position = v3(x, y, z);
-  // }
+  f32 min = -1, max = 1;
+  Loop (i, st->obj_count) {
+    st->objs[i].id = cube_create();
+    f32 x = rand_in_range_f32(min, max);
+    f32 y = rand_in_range_f32(min, max);
+    f32 z = rand_in_range_f32(min, max);
+    st->objs[i].position = v3(x, y, z);
+  }
 }
 
 f32 min = -30, max = 30;
 b32 toggle;
-void application_update(App* app) {
+void app_update(App* app) {
   Assign(st, app->state);
-  st->delta = app->delta_time;
   Object* objs = st->objs;
   
-  // st->entities_ubo[0].projection_view = st->camera.projection * st->camera.view;
+  st->entities_ubo[0].projection_view = st->camera.projection * st->camera.view;
   
-  // f32& rot = st->rot;
-  // rot += 0.01;
-  // u32 index = st->obj_count;
-  // if (input_was_key_down(KEY_1)) {
-  //   objs[index].id = (++toggle+1)%2 ? cube_create() : triangle_create();
-  //   f32 x = rand_in_range_f32(min, max);
-  //   f32 y = rand_in_range_f32(min, max);
-  //   f32 z = rand_in_range_f32(min, max);
-  //   objs[index].position = v3(x, y, z);
-  //   st->obj_count++;
-  // }
-  // if (input_was_key_down(KEY_2)) {
-  //   entity_destroy(objs[index-1].id);
-  //   entity_remove_renderable(objs[index-1].id);
-  //   st->obj_count--;
-  // }
+  f32& rot = st->rot;
+  rot += 0.01;
+  u32 index = st->obj_count;
+  if (input_was_key_down(KEY_1)) {
+    objs[index].id = (++toggle+1)%2 ? cube_create() : triangle_create();
+    f32 x = rand_in_range_f32(min, max);
+    f32 y = rand_in_range_f32(min, max);
+    f32 z = rand_in_range_f32(min, max);
+    objs[index].position = v3(x, y, z);
+    st->obj_count++;
+  }
+  if (input_was_key_down(KEY_2)) {
+    entity_destroy(objs[index-1].id);
+    entity_remove_renderable(objs[index-1].id);
+    st->obj_count--;
+  }
   
-  // Loop(i, st->obj_count) {
-  //   mat4* model = (mat4*)vk_get_push_constant(objs[i].id);
-  //   *model = mat4_translation(objs[i].position) * mat4_euler_y(rot);
-  //   *model = mat4_euler_y(rot / 2) * mat4_translation(objs[i].position);
-  // }
+  Loop(i, st->obj_count) {
+    mat4* model = (mat4*)vk_get_push_constant(objs[i].id);
+    *model = mat4_translation(objs[i].position) * mat4_euler_y(rot);
+    *model = mat4_euler_y(rot / 2) * mat4_translation(objs[i].position);
+  }
+
+  UI_Window(ImGui::Begin("window")) {
+    ImGui::Text("%u", st->obj_count);
+  }
 
   camera_update();
+}
+
+void app_on_resize(App* game_inst) {
+
 }
