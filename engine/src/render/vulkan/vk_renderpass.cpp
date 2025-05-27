@@ -166,3 +166,27 @@ void vk_renderpass_end(VkCommandBuffer cmd) {
   vkCmdEndRenderPass(cmd);
 }
 
+void vk_renderpass_begin_dynamic(VkCommandBuffer cmd, Rect rect, VkImageView color_view, v4 clear_color, VkImageView depth_view, f32 clear_depth, u32 clear_flags) {
+  VkRenderingAttachmentInfo color_attachment_info = {};
+  VkRenderingAttachmentInfo* p_depth_attachment = NULL;
+
+  // if (clear_flags & RenderpassClearFlag_DepthBuffer) {
+  //   // setup depth_attachment_info...
+  //   p_depth_attachment = &depth_attachment_info;
+  // }
+
+  // VkRenderingInfo rendering_info = {
+  //   .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+  //   .renderArea = {rect.x, rect.y, rect.w, rect.h},
+  //   .layerCount = 1,
+  //   .colorAttachmentCount = 1,
+  //   .pColorAttachments = &color_attachment_info,
+  //   .pDepthAttachment = p_depth_attachment,
+  // };
+
+  // vkCmdBeginRendering(cmd, &rendering_info);
+}
+
+void vk_renderpass_end_dynamic(VkCommandBuffer cmd) {
+  vkCmdEndRendering(cmd);
+}

@@ -234,7 +234,9 @@ void app_init(App* app) {
     shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
   }
   
-  texture_load("container.jpg"_);
+  // texture_load("container.jpg"_);
+  // texture_load("paving.png"_);
+  texture_load("orange_lines_512.png"_);
 
   u32 id = entity_create();
   entity_make_renderable(id, geometry_get("grid"_), shader_get("grid_shader"_));
@@ -282,9 +284,30 @@ void app_update(App* app) {
     *model = mat4_euler_y(rot / 2) * mat4_translation(objs[i].position);
   }
 
-  UI_Window(ImGui::Begin("window")) {
-    ImGui::Text("%u", st->obj_count);
-  }
+  // ImGui::ShowDemoWindow();
+
+  // Begin the main window (with no extra options like fullscreen, padding, etc.)
+
+  // const ImGuiViewport* viewport = ImGui::GetMainViewport();
+  // ImGui::SetNextWindowPos(viewport->WorkPos);
+  // ImGui::SetNextWindowSize(viewport->WorkSize);
+  // ImGui::SetNextWindowViewport(viewport->ID);
+  // UI_Window(ImGui::Begin("DockSpace", NULL, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
+  // // UI_Window(ImGui::Begin("DockSpace")) {
+  //   // ImGui::DockSpace(ImGui::GetID("MyDockSpace"), ImVec2(0.0f, 0.0f), 0);
+  //   ImGui::DockSpace(ImGui::GetID("MyDockSpace")) ;
+  // }
+  
+  // UI_Window(ImGui::Begin("window")) {
+  //   ImGui::Text("%u", st->obj_count);
+  // }
+  // UI_Window(ImGui::Begin("new window")) {
+  //   if (ImGui::Button("click here!")) {
+  //     Info("yes");
+  //   }
+  // }
+  
+  // ImGui::ShowDemoWindow();
 
   camera_update();
 }

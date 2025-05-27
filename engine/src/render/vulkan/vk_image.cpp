@@ -175,6 +175,7 @@ void vk_texture_load(Texture* t) {
   
   u64 size = t->width * t->height * t->channel_count;
   VkFormat image_format = VK_FORMAT_R8G8B8A8_UNORM;
+  // VkFormat image_format = VK_FORMAT_R8G8B8A8_SRGB;
   
   MemCopy(vk.stage_buffer.maped_memory, t->data, size);
   
@@ -230,4 +231,5 @@ void vk_texture_load(Texture* t) {
 }
 
 void vk_render_target_create() {
+  
 }

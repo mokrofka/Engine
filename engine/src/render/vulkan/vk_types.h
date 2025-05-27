@@ -229,7 +229,7 @@ struct VK {
   // offscreen rendering
   VK_Texture texture_targets[ImagesInFlight];
   VkFramebuffer texture_framebuffers[ImagesInFlight];
-  VK_Image depth_texture;
+  VK_Image depth;
   
 #ifdef _DEBUG
   VkDebugUtilsMessengerEXT debug_messenger;

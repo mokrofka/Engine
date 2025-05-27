@@ -9,9 +9,10 @@
 struct UIState {
   VkDescriptorPool imgui_pool;
   ImFont* font;
+  ImTextureID texture_ids[FramesInFlight];
 };
 
-global UIState state;
+global UIState st;
 
 void alloc_resource() {
   VkDescriptorPoolSize pool_sizes[] = {
@@ -34,7 +35,7 @@ void alloc_resource() {
   pool_info.maxSets = 1000;
   pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
-  VkResult result = vkCreateDescriptorPool(vkdevice, &pool_info, null, &state.imgui_pool);
+  VkResult result = vkCreateDescriptorPool(vkdevice, &pool_info, null, &st.imgui_pool);
 }
 
 i32 imgui_surface_create(void* vp, u64 vk_inst, const void* vk_allocators, u64* out_vk_surface);
@@ -49,17 +50,25 @@ void imgui_init() {
   ImGui_ImplWin32_Init(os_get_window_handle());
 
   alloc_resource();
+  VkFormat format = VK_FORMAT_B8G8R8A8_UNORM;
+  // VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
   ImGui_ImplVulkan_InitInfo init_info = {
     .Instance = vk.instance,
     .PhysicalDevice = vk.device.physical_device,
     .Device = vk.device.logical_device,
     .QueueFamily = vk.device.graphics_queue_index,
     .Queue = vk.device.graphics_queue,
-    .DescriptorPool = state.imgui_pool,
-    .RenderPass = vk_get_renderpass(vk.ui_renderpass_id)->handle,
+    .DescriptorPool = st.imgui_pool,
+    // .RenderPass = vk_get_renderpass(vk.ui_renderpass_id)->handle,
     .MinImageCount = vk.swapchain.max_frames_in_flight,
     .ImageCount = vk.swapchain.image_count,
     .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
+    .UseDynamicRendering = true,
+    .PipelineRenderingCreateInfo = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
+      .colorAttachmentCount = 1,
+      .pColorAttachmentFormats = &format,
+    },
   };
 
   ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
@@ -70,6 +79,14 @@ void imgui_init() {
   ImGui_ImplVulkan_CreateFontsTexture();
   vk_cmd_end_single_use(cmd);
   ImGui_ImplVulkan_DestroyFontsTexture(); // destroy staging/temp resources
+
+  Loop (i, ImagesInFlight) {
+    st.texture_ids[i] = (ImTextureID)ImGui_ImplVulkan_AddTexture(
+      vk.texture_targets[i].sampler,
+      vk.texture_targets[i].image.view, // VkImageView
+      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  }
+  
 }
 
 void ui_init() {
@@ -80,7 +97,7 @@ void ui_shutdown() {
   ImGui_ImplVulkan_Shutdown();
   ImGui_ImplWin32_Shutdown();
   ImGui::DestroyContext();
-  vkDestroyDescriptorPool(vkdevice, state.imgui_pool, 0);
+  vkDestroyDescriptorPool(vkdevice, st.imgui_pool, 0);
 }
 
 void ui_begin_frame() {
@@ -90,8 +107,14 @@ void ui_begin_frame() {
 }
 
 void ui_end_frame() {
+
+  UI_Window(ImGui::Begin("Rendered Texture Preview")) {
+    ImGui::Image(st.texture_ids[vk.frame.image_index], ImVec2(vk.frame.width, vk.frame.height));
+  }
+
   ImGui::Render();
-  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk.cmds[vk.frame.current_frame]);
+  VkCommandBuffer cmd = vk_get_current_cmd();
+  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
   
   ImGui::UpdatePlatformWindows();
   ImGui::RenderPlatformWindowsDefault();

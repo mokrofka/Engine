@@ -70,8 +70,8 @@ internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
   Loop (i, vk.device.swapchain_support.format_count) {
     VkSurfaceFormatKHR format = vk.device.swapchain_support.formats[i];
     // Preferred formats
-    // if (format.format == VK_FORMAT_B8G8R8A8_UNORM && // darker
-    if (format.format == VK_FORMAT_B8G8R8A8_SRGB && // brighter
+    if (format.format == VK_FORMAT_B8G8R8A8_UNORM && // darker
+    // if (format.format == VK_FORMAT_B8G8R8A8_SRGB && // brighter
         format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
       swapchain.image_format = format;
       found = true;

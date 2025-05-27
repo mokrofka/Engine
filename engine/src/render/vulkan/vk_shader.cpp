@@ -1,4 +1,3 @@
-#include "render/vulkan/vk_utils.h"
 #include "vk_types.h"
 #include "vk_buffer.h"
 
@@ -167,7 +166,7 @@ VK_Pipeline vk_pipeline_create(
     u32 vert_stride, u32 attribute_count,
     VkVertexInputAttributeDescription* attributes,
     u32 stage_count, VkPipelineShaderStageCreateInfo* stages, VkPrimitiveTopology topology, b32 is_depth, b32 is_alpha) {
-  VK_Pipeline pipeline = {};
+  VK_Pipeline result = {};
   
   // Pipeline creation
   VkViewport viewport;
@@ -301,7 +300,7 @@ VK_Pipeline vk_pipeline_create(
   pipeline_layout_create_info.pSetLayouts = set_layouts;
   
   // Create the pipeline layout.
-  VK_CHECK(vkCreatePipelineLayout(vkdevice, &pipeline_layout_create_info, vk.allocator, &pipeline.pipeline_layout));
+  VK_CHECK(vkCreatePipelineLayout(vkdevice, &pipeline_layout_create_info, vk.allocator, &result.pipeline_layout));
 
   // Pipeline create
   VkGraphicsPipelineCreateInfo pipeline_create_info = {VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
@@ -318,28 +317,26 @@ VK_Pipeline vk_pipeline_create(
   pipeline_create_info.pDynamicState = &dynamic_state_create_info;
   pipeline_create_info.pTessellationState = null;
   
-  pipeline_create_info.layout = pipeline.pipeline_layout;
+  pipeline_create_info.layout = result.pipeline_layout;
   
-  pipeline_create_info.renderPass = vk_get_renderpass(vk.main_renderpass_id)->handle;
+  pipeline_create_info.renderPass = 0;
   pipeline_create_info.subpass = 0;
   pipeline_create_info.basePipelineHandle = VK_NULL_HANDLE;
   pipeline_create_info.basePipelineIndex = -1;
-  
-  VkResult result = vkCreateGraphicsPipelines(
-    vkdevice, 
-    VK_NULL_HANDLE, 
-    1, 
-    &pipeline_create_info, 
-    vk.allocator, 
-    &pipeline.handle);
-  
-  if (vk_result_is_success(result)) {
-    Debug("Graphics pipeline created"_);
-    return pipeline;
-  } 
-  
-  Error("vkCreateGraphicsPipelines failed with %s.", vk_result_string(result, true));
-  VK_Pipeline p = {}; return p;
+
+  VkFormat color_format = VK_FORMAT_R8G8B8A8_UNORM;
+  // VkFormat color_format = VK_FORMAT_R8G8B8A8_SRGB;
+  VkPipelineRenderingCreateInfo renderingCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+    .colorAttachmentCount = 1,
+    .pColorAttachmentFormats = &color_format,
+    .depthAttachmentFormat = vk.device.depth_format,
+  };
+  pipeline_create_info.pNext = &renderingCreateInfo;
+
+  VK_CHECK(vkCreateGraphicsPipelines(vkdevice, VK_NULL_HANDLE, 1, &pipeline_create_info, vk.allocator, &result.handle));
+
+  return result;
 }
 
 void vk_reload_shader(String shader_name, u32 id) {

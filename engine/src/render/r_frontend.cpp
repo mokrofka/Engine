@@ -21,14 +21,6 @@ void r_shutdown() {
   vk_r_backend_shutdown();
 }
 
-void r_begin_frame() {
-  vk_r_backend_begin_frame();
-}
-
-void r_end_frame() {
-  vk_r_backend_end_frame();
-}
-
 void r_on_resized(u32 width, u32 height) {
   vk_r_backend_on_resize(width, height);
 }
@@ -45,13 +37,19 @@ void r_begin_draw_frame() {
     vk_r_end_renderpass(BuiltinRenderpass_World);
   }
 
-  vk_r_begin_renderpass(BuiltinRenderpass_UI);
-  ui_begin_frame();
+  // // begin UI renderpass
+  // {
+    // vk_r_begin_renderpass(BuiltinRenderpass_UI);
+    // ui_begin_frame();
+  // }
 }
 
 void r_end_draw_frame() {
-  ui_end_frame();
-  vk_r_end_renderpass(BuiltinRenderpass_UI);
+  // // end UI renderpass
+  // {
+    // ui_end_frame();
+    // vk_r_end_renderpass(BuiltinRenderpass_UI);
+  // }
 
   vk_r_backend_end_frame();
 }

@@ -16,3 +16,6 @@ void vk_renderpass_begin(VkCommandBuffer cmd, VK_Renderpass* renderpass, VkFrame
 
 void vk_renderpass_end(VkCommandBuffer cmd);
 
+void vk_renderpass_begin_dynamic(VkCommandBuffer cmd, Rect rect, VkImageView color_view, v4 clear_color, VkImageView depth_view, f32 clear_depth, u32 clear_flags);
+
+void vk_renderpass_end_dynamic(VkCommandBuffer cmd);

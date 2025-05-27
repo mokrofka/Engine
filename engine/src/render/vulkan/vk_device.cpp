@@ -77,6 +77,7 @@ void vk_device_create() {
   
   const char* extension_names[] = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+    VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
   };
   VkDeviceCreateInfo device_create_info = {
     .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
