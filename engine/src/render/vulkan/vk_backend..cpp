@@ -380,10 +380,10 @@ void vk_r_backend_begin_frame() {
   // Scissor
   VkRect2D scissor;
   scissor.offset.x = scissor.offset.y = 0;
-  // scissor.extent.width = vk.frame.width;
-  // scissor.extent.height = vk.frame.height;
-  scissor.extent.width = 2000;
-  scissor.extent.height = 2000;
+  scissor.extent.width = vk.frame.width;
+  scissor.extent.height = vk.frame.height;
+  // scissor.extent.width = 100;
+  // scissor.extent.height = 100;
   
   vkCmdSetViewport(cmd, 0, 1, &viewport);
   vkCmdSetScissor(cmd, 0, 1, &scissor);
@@ -519,7 +519,8 @@ void vk_r_begin_renderpass(u32 renderpass_id) {
       depthBarrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
       depthBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED; // or current layout
       depthBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
-      depthBarrier.image = vk.depth.handle; // your depth image handle
+      // depthBarrier.image = vk.depth.handle;
+      depthBarrier.image = vk.swapchain.depth_attachment.handle;
       depthBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
       depthBarrier.subresourceRange.levelCount = 1;
       depthBarrier.subresourceRange.layerCount = 1;
@@ -535,7 +536,7 @@ void vk_r_begin_renderpass(u32 renderpass_id) {
 
       VkRenderingAttachmentInfo depth_attachment = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-        .imageView = vk.depth.view, // Your depth image view here
+        .imageView = vk.swapchain.depth_attachment.view, // Your depth image view here
         .imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
@@ -546,6 +547,7 @@ void vk_r_begin_renderpass(u32 renderpass_id) {
     VkRenderingInfo render_info = {
       .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
       .renderArea = {{0, 0}, {vk.frame.width, vk.frame.height}},
+      // .renderArea = {{0, 0}, {10, 10}},
       .layerCount = 1,
       .colorAttachmentCount = 1,
       .pColorAttachments = &color_attachment,

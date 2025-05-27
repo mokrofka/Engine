@@ -37,18 +37,18 @@ void r_begin_draw_frame() {
     vk_r_end_renderpass(BuiltinRenderpass_World);
   }
 
-  // // begin UI renderpass
+  // begin UI renderpass
   // {
-    // vk_r_begin_renderpass(BuiltinRenderpass_UI);
-    // ui_begin_frame();
+  //   vk_r_begin_renderpass(BuiltinRenderpass_UI);
+  //   ui_begin_frame();
   // }
 }
 
 void r_end_draw_frame() {
-  // // end UI renderpass
+  // end UI renderpass
   // {
-    // ui_end_frame();
-    // vk_r_end_renderpass(BuiltinRenderpass_UI);
+  //   ui_end_frame();
+  //   vk_r_end_renderpass(BuiltinRenderpass_UI);
   // }
 
   vk_r_backend_end_frame();

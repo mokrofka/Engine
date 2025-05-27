@@ -84,6 +84,57 @@ Vertex vertices[] = {
   {{-0.5f,  0.5f,  0.5f}, {0.0f, 0.0f}},
 };
 
+v3 cube_position_vertices[] = {
+  // Position             // Tex coord
+  // Front face
+  {-0.5f, -0.5f,  0.5f},
+  { 0.5f, -0.5f,  0.5f},
+  { 0.5f,  0.5f,  0.5f},
+  { 0.5f,  0.5f,  0.5f},
+  {-0.5f,  0.5f,  0.5f},
+  {-0.5f, -0.5f,  0.5f},
+
+  // Back face
+  { 0.5f, -0.5f, -0.5f},
+  {-0.5f, -0.5f, -0.5f},
+  {-0.5f,  0.5f, -0.5f},
+  {-0.5f,  0.5f, -0.5f},
+  { 0.5f,  0.5f, -0.5f},
+  { 0.5f, -0.5f, -0.5f},
+
+  // Left face
+  {-0.5f, -0.5f, -0.5f},
+  {-0.5f, -0.5f,  0.5f},
+  {-0.5f,  0.5f,  0.5f},
+  {-0.5f,  0.5f,  0.5f},
+  {-0.5f,  0.5f, -0.5f},
+  {-0.5f, -0.5f, -0.5f},
+
+  // Right face
+  { 0.5f, -0.5f,  0.5f},
+  { 0.5f, -0.5f, -0.5f},
+  { 0.5f,  0.5f, -0.5f},
+  { 0.5f,  0.5f, -0.5f},
+  { 0.5f,  0.5f,  0.5f},
+  { 0.5f, -0.5f,  0.5f},
+
+  // Bottom face
+  {-0.5f, -0.5f, -0.5f},
+  { 0.5f, -0.5f, -0.5f},
+  { 0.5f, -0.5f,  0.5f},
+  { 0.5f, -0.5f,  0.5f},
+  {-0.5f, -0.5f,  0.5f},
+  {-0.5f, -0.5f, -0.5f},
+
+  // Top face
+  {-0.5f,  0.5f,  0.5f},
+  { 0.5f,  0.5f,  0.5f},
+  { 0.5f,  0.5f, -0.5f},
+  { 0.5f,  0.5f, -0.5f},
+  {-0.5f,  0.5f, -0.5f},
+  {-0.5f,  0.5f,  0.5f},
+};
+
 f32 triangle_vertices[] = {
   // position          // color
   0.0f,  0.5f, 0.0f,   1.0f, 0.0f, 0.0f,  // Vertex 1: red
@@ -189,6 +240,15 @@ void app_init(App* app) {
     geometry_create(cube_geom);
   }
   {
+    Geometry cube_geom = {
+      .name = "cube_position_vertices"_,
+      .vertex_count = ArrayCount(vertices),
+      .vertex_size = sizeof(Vertex),
+      .vertices = cube_position_vertices,
+    };
+    geometry_create(cube_geom);
+  }
+  {
     Geometry triangle_geom = {
       .name = "triangle"_,
       .vertex_count = ArrayCount(triangle_vertices) / 6,
@@ -233,6 +293,14 @@ void app_init(App* app) {
     };
     shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
   }
+  {
+    Shader shader = {
+      .name = "transparent_shader"_,
+      .is_transparent = true,
+      .attribut = {3},
+    };
+    shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
+  }
   
   // texture_load("container.jpg"_);
   // texture_load("paving.png"_);
@@ -242,6 +310,21 @@ void app_init(App* app) {
   entity_make_renderable(id, geometry_get("grid"_), shader_get("grid_shader"_));
   mat4* position = (mat4*)vk_get_push_constant(id);
   *position = mat4_translation(v3(0,0,0));
+
+
+  {
+    u32 gray_cube_id = entity_create();
+    entity_make_renderable(gray_cube_id, geometry_get("cube_position_vertices"_), shader_get("transparent_shader"_));
+    // entity_make_renderable(gray_cube_id, geometry_get("cube"_), shader_get("texture_shader"_));
+    mat4* position = (mat4*)vk_get_push_constant(gray_cube_id);
+    *position = mat4_translation(v3(0,0,0));
+  }
+
+  {
+    u32 cube = cube_create();
+    mat4* position = (mat4*)vk_get_push_constant(cube);
+    *position = mat4_translation(v3(0,0,0)) * mat4_scale(v3(100,100,100));
+  }
   
   f32 min = -1, max = 1;
   Loop (i, st->obj_count) {
