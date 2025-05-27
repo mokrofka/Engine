@@ -183,11 +183,6 @@ struct VK {
   VK_Swapchain swapchain;
   VK_Swapchain old_swapchain;
   
-  #define RenderpassCount 2
-  u32 main_renderpass_id;
-  u32 ui_renderpass_id;
-  VK_Renderpass renderpasses[RenderpassCount];
-  
   b8 recreating_swapchain;
   
   VkFramebuffer world_framebuffers[3];
@@ -230,6 +225,10 @@ struct VK {
   VK_Texture texture_targets[ImagesInFlight];
   VkFramebuffer texture_framebuffers[ImagesInFlight];
   VK_Image depth;
+  i32 size = 300;
+
+  v2 current_viewport_size;
+  v2 viewport_size;
   
 #ifdef _DEBUG
   VkDebugUtilsMessengerEXT debug_messenger;
@@ -252,10 +251,6 @@ INLINE i32 vk_find_memory_index(u32 type_filter, u32 property_flags) {
 
   Assert(index != -1 && "Unable to find suitable memory type");
   return index;
-}
-
-INLINE VK_Renderpass* vk_get_renderpass(u32 id) {
-  return &vk.renderpasses[id];
 }
 
 INLINE VkSemaphore vk_get_current_image_available_semaphore() {
@@ -282,3 +277,5 @@ struct UniformBufferObject {
   mat4 projection_view;
   f32 delta_time = 1.0f;
 };
+
+void vk_resize_framebuffer();

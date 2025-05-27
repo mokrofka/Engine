@@ -3,11 +3,11 @@
 
 #include <engine.h>
 
-// HACK This should not be available outside the engine
 #include <render/r_frontend.h>
 #include "sys/geometry.h"
 #include "sys/shader_sys.h"
 #include "sys/texture.h"
+#include "ui.h"
 
 #include <event.h>
 #include <input.h>
@@ -361,34 +361,33 @@ void app_update(App* app) {
     st->obj_count--;
   }
   
-  Loop(i, st->obj_count) {
+  Loop (i, st->obj_count) {
     mat4* model = (mat4*)vk_get_push_constant(objs[i].id);
     *model = mat4_translation(objs[i].position) * mat4_euler_y(rot);
     *model = mat4_euler_y(rot / 2) * mat4_translation(objs[i].position);
   }
 
-  // ImGui::ShowDemoWindow();
-
   // Begin the main window (with no extra options like fullscreen, padding, etc.)
 
-  // const ImGuiViewport* viewport = ImGui::GetMainViewport();
-  // ImGui::SetNextWindowPos(viewport->WorkPos);
-  // ImGui::SetNextWindowSize(viewport->WorkSize);
-  // ImGui::SetNextWindowViewport(viewport->ID);
-  // UI_Window(ImGui::Begin("DockSpace", NULL, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
-  // // UI_Window(ImGui::Begin("DockSpace")) {
-  //   // ImGui::DockSpace(ImGui::GetID("MyDockSpace"), ImVec2(0.0f, 0.0f), 0);
-  //   ImGui::DockSpace(ImGui::GetID("MyDockSpace")) ;
-  // }
+  const ImGuiViewport* viewport = ImGui::GetMainViewport();
+  ImGui::SetNextWindowPos(viewport->WorkPos);
+  ImGui::SetNextWindowSize(viewport->WorkSize);
+  ImGui::SetNextWindowViewport(viewport->ID);
+  UI_Window(ImGui::Begin("DockSpace", NULL, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
+  // UI_Window(ImGui::Begin("DockSpace")) {
+    // ImGui::DockSpace(ImGui::GetID("MyDockSpace"), ImVec2(0.0f, 0.0f), 0);
+    ImGui::DockSpace(ImGui::GetID("MyDockSpace")) ;
+  }
+
+  ui_texture_render();
   
-  // UI_Window(ImGui::Begin("window")) {
-  //   ImGui::Text("%u", st->obj_count);
-  // }
-  // UI_Window(ImGui::Begin("new window")) {
-  //   if (ImGui::Button("click here!")) {
-  //     Info("yes");
-  //   }
-  // }
+  UI_Window(ImGui::Begin("window")) {
+    ImGui::Text("%u", st->obj_count);
+  }
+
+  UI_Window(ImGui::Begin("new window")) {
+    ImGui::Text("%u", st->obj_count);
+  }
   
   // ImGui::ShowDemoWindow();
 

@@ -16,3 +16,4 @@ void r_on_resized(u32 width, u32 height);
 void r_begin_draw_frame();
 void r_end_draw_frame();
 
+KAPI v2 get_viewport_size();

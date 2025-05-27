@@ -39,35 +39,6 @@ internal void app_create(App* app);
 internal void load_game_lib_init(App* app);
 
 f32 delta_time;
-
-// TODO temp
-b32 event_on_debug_event(u32 code, void* sender, void* listener_inst, EventContext data) {
-  Scratch scratch;
-  String names[] = {
-    "cobblestone"_,
-    "paving"_,
-    "paving2"_,
-  };
-  local i8 choice = 2;
-  
-  // Save off the old name
-  String old_name = names[choice];
-  
-  ++choice;
-  choice %= 3;
-  
-  // Load up the new texture
-  // st.test_geometry->material->diffuse_map.texture = texture_system_acquire(names[choice], true);
-  // if (!st.test_geometry->material->diffuse_map.texture) {
-  //   Warn("event_on_debug_event no texture! using default"_);
-  //   st.test_geometry->material->diffuse_map.texture = texture_system_get_default_texture();
-  // }
-  
-  // Release the old texture
-  texture_system_release(old_name);
-  return true;
-}
-// TODO end temp
 void engine_create(App* app) {
   global_allocator_init();
   Assign(app->arena, mem_alloc(AppSize));
@@ -115,9 +86,6 @@ void engine_create(App* app) {
     event_register(EventCode_KeyPressed, 0, app_on_key);
     event_register(EventCode_KeyReleased, 0, app_on_key);
     event_register(EventCode_Resized, 0, app_on_resized);
-    // TODO temp
-    event_register(EventCode_Debug0, 0, event_on_debug_event);
-    // end
   }
 
   {
@@ -128,8 +96,8 @@ void engine_create(App* app) {
     WindowConfig config = {
       .position_x = 100,
       .position_y = 100,
-      .width = 680,
-      .height = 480,
+      .width = 800,
+      .height = 600,
       .name = app->name};
     os_window_create(st.arena, config);
   }
@@ -232,9 +200,6 @@ void engine_run(App* app) {
   event_unregister(EventCode_KeyPressed, 0, app_on_key);
   event_unregister(EventCode_KeyReleased, 0, app_on_key);
   event_unregister(EventCode_Resized, 0, app_on_resized);
-  // TODO temp
-  event_unregister(EventCode_Debug0, 0, event_on_debug_event);
-  // TODO end
 
   // geometry_sys_shutdown();
   // material_system_shutdown(); texture_system_shutdown();

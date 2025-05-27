@@ -28,7 +28,7 @@ void r_on_resized(u32 width, u32 height) {
 void r_begin_draw_frame() {
   vk_r_backend_begin_frame();
 
-  // World renderpass
+  // scene render
   {
     vk_r_begin_renderpass(BuiltinRenderpass_World);
     // vk_compute_draw();
@@ -37,19 +37,23 @@ void r_begin_draw_frame() {
     vk_r_end_renderpass(BuiltinRenderpass_World);
   }
 
-  // begin UI renderpass
-  // {
-  //   vk_r_begin_renderpass(BuiltinRenderpass_UI);
-  //   ui_begin_frame();
-  // }
+  // begin UI render
+  {
+    vk_r_begin_renderpass(BuiltinRenderpass_UI);
+    ui_begin_frame();
+  }
 }
 
 void r_end_draw_frame() {
-  // end UI renderpass
-  // {
-  //   ui_end_frame();
-  //   vk_r_end_renderpass(BuiltinRenderpass_UI);
-  // }
+  // end UI ender
+  {
+    ui_end_frame();
+    vk_r_end_renderpass(BuiltinRenderpass_UI);
+  }
 
   vk_r_backend_end_frame();
+}
+
+v2 get_viewport_size() {
+  return vk_get_viewport_size(); 
 }

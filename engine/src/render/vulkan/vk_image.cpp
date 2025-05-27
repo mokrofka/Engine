@@ -155,18 +155,15 @@ void vk_upload_image_to_gpu(VkCommandBuffer cmd, VK_Image image) {
     &region);
 }
 
-void vk_image_destroy(VK_Image* image) {
-  if (image->view) {
-    vkDestroyImageView(vkdevice, image->view, vk.allocator);
-    image->view = 0;
+void vk_image_destroy(VK_Image image) {
+  if (image.view) {
+    vkDestroyImageView(vkdevice, image.view, vk.allocator);
   }
-  if (image->memory) {
-    vkFreeMemory(vkdevice, image->memory, vk.allocator);
-    image->memory = 0;
+  if (image.memory) {
+    vkFreeMemory(vkdevice, image.memory, vk.allocator);
   }
-  if (image->handle) {
-    vkDestroyImage(vkdevice, image->handle, vk.allocator);
-    image->handle = 0;
+  if (image.handle) {
+    vkDestroyImage(vkdevice, image.handle, vk.allocator);
   }
 }
 
@@ -175,7 +172,6 @@ void vk_texture_load(Texture* t) {
   
   u64 size = t->width * t->height * t->channel_count;
   VkFormat image_format = VK_FORMAT_R8G8B8A8_UNORM;
-  // VkFormat image_format = VK_FORMAT_R8G8B8A8_SRGB;
   
   MemCopy(vk.stage_buffer.maped_memory, t->data, size);
   
@@ -228,8 +224,4 @@ void vk_texture_load(Texture* t) {
   sampler_info.maxLod = 0.0f;
   
   VK_CHECK(vkCreateSampler(vkdevice, &sampler_info, vk.allocator, &texture->sampler));
-}
-
-void vk_render_target_create() {
-  
 }

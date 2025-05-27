@@ -7,3 +7,4 @@ void ui_shutdown();
 void ui_begin_frame();
 void ui_end_frame();
 
+KAPI void ui_texture_render();

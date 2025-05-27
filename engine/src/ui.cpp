@@ -45,13 +45,12 @@ void imgui_init() {
   ImGuiIO& io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;   
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-  io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+  // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
   
   ImGui_ImplWin32_Init(os_get_window_handle());
 
   alloc_resource();
   VkFormat format = VK_FORMAT_B8G8R8A8_UNORM;
-  // VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
   ImGui_ImplVulkan_InitInfo init_info = {
     .Instance = vk.instance,
     .PhysicalDevice = vk.device.physical_device,
@@ -59,7 +58,6 @@ void imgui_init() {
     .QueueFamily = vk.device.graphics_queue_index,
     .Queue = vk.device.graphics_queue,
     .DescriptorPool = st.imgui_pool,
-    // .RenderPass = vk_get_renderpass(vk.ui_renderpass_id)->handle,
     .MinImageCount = vk.swapchain.max_frames_in_flight,
     .ImageCount = vk.swapchain.image_count,
     .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
@@ -107,15 +105,31 @@ void ui_begin_frame() {
 }
 
 void ui_end_frame() {
-
-  UI_Window(ImGui::Begin("Rendered Texture Preview")) {
-    ImGui::Image(st.texture_ids[vk.frame.image_index], ImVec2(vk.frame.width, vk.frame.height));
-  }
-
   ImGui::Render();
   VkCommandBuffer cmd = vk_get_current_cmd();
   ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
   
   ImGui::UpdatePlatformWindows();
   ImGui::RenderPlatformWindowsDefault();
+}
+
+void ui_texture_render() {
+  UI_Window(ImGui::Begin("viewport")) {
+    
+    ImVec2 viewport_size = ImGui::GetContentRegionAvail();
+    vk.current_viewport_size = *(v2*)&viewport_size;
+    if (vk.viewport_size != vk.current_viewport_size) {
+      Loop (i, ImagesInFlight) {
+        ImGui_ImplVulkan_RemoveTexture((VkDescriptorSet)st.texture_ids[i]);
+        st.texture_ids[i] = (ImTextureID)ImGui_ImplVulkan_AddTexture(
+          vk.texture_targets[i].sampler,
+          vk.texture_targets[i].image.view, // VkImageView
+          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+      }
+    }
+    ImGui::Image(st.texture_ids[vk.frame.image_index], viewport_size);
+    // ImGui::Image(st.texture_ids[vk.frame.image_index], ImVec2(300,300));
+
+
+  }
 }

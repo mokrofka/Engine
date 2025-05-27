@@ -222,8 +222,17 @@ INLINE v2& operator/=(v2& a, f32 scalar) {
   return a;
 }
 
+INLINE b32 operator==(v2 a, v2 b) {
+  return Abs(a.x - b.x) <= FloatEpsilon &&
+         Abs(a.y - b.y) <= FloatEpsilon;
+}
+
+INLINE b32 operator!=(v2 a, v2 b) {
+  return !(a == b);
+}
+
 INLINE v2 operator-(const v2& a) {
-    return v2(-a.x, -a.y);
+  return v2(-a.x, -a.y);
 }
 
 INLINE f32 v2_length_squared(v2 a) {
@@ -342,9 +351,20 @@ INLINE v3& operator/=(v3& a, f32 scalar) {
   return a;
 }
 
+INLINE b32 operator==(v3 a, v3 b) {
+  return Abs(a.x - b.x) <= FloatEpsilon &&
+         Abs(a.y - b.y) <= FloatEpsilon &&
+         Abs(a.z - b.z) <= FloatEpsilon;
+}
+
+INLINE b32 operator!=(v3 a, v3 b) {
+  return !(a == b);
+}
+
 INLINE v3 operator-(const v3& a) {
     return v3(-a.x, -a.y, -a.z);
 }
+
 
 INLINE f32 v3_length_squared(v3 a) {
   return Sqr(a.x) + Sqr(a.y) + Sqr(a.z);
@@ -354,28 +374,13 @@ INLINE f32 v3_length(v3 a) {
   return Sqrt(v3_length_squared(a));
 }
 
+
 INLINE v3 v3_normalize(v3 a) {
   f32 length = v3_length(a);
   a.x /= length;
   a.y /= length;
   a.z /= length;
   return a;
-}
-
-INLINE b32 v3_compare(v3 a, v3 b, f32 tolerance) {
-  return Abs(a.x - b.x) <= tolerance &&
-         Abs(a.y - b.y) <= tolerance &&
-         Abs(a.z - b.z) <= tolerance;
-}
-
-INLINE b32 operator==(v3 a, v3 b) {
-  return Abs(a.x - b.x) <= FloatEpsilon &&
-         Abs(a.y - b.y) <= FloatEpsilon &&
-         Abs(a.z - b.z) <= FloatEpsilon;
-}
-
-INLINE b32 operator!=(v3 a, v3 b) {
-  return !(a == b);
 }
 
 INLINE f32 v3_distance(v3 a, v3 b) {

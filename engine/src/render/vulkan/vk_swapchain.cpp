@@ -52,7 +52,7 @@ void vk_swapchain_present(
 
 internal void destroy(VK_Swapchain* swapchain) {
   vkDeviceWaitIdle(vkdevice);
-  vk_image_destroy(&swapchain->depth_attachment);
+  vk_image_destroy(swapchain->depth_attachment);
 
   Loop (i, swapchain->image_count) {
     vkDestroyImageView(vkdevice, swapchain->views[i], vk.allocator);

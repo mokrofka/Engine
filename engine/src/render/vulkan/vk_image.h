@@ -18,4 +18,4 @@ void vk_image_transition_layout(VkCommandBuffer cmd, VK_Image image, VkImageLayo
 
 void vk_upload_image_to_gpu(VkCommandBuffer cmd, VK_Image image);
 
-void vk_image_destroy(VK_Image* image);
+void vk_image_destroy(VK_Image image);

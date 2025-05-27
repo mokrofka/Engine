@@ -32,3 +32,4 @@ void vk_make_renderable(u32 id, u32 geom_id, u32 shader_id);
 void vk_remove_renderable(u32 id);
 
 void vk_texture_load(Texture* texture);
+v2 vk_get_viewport_size();
