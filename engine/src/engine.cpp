@@ -14,6 +14,7 @@
 #include "ui.h"
 #include "network.h"
 #include "test.h"
+#include "ecs.h"
 
 struct EngineState {
   Arena* arena;
@@ -63,6 +64,7 @@ void engine_create(App* app) {
     network_init(st.arena);
   }
   // test();
+  component_register(Some);
   
   {
     ResSysConfig res_sys_cfg = {
@@ -161,7 +163,6 @@ void engine_run(App* app) {
 
       check_dll_changes(app);
 
-      // r_draw_frame(&packet);
       r_begin_draw_frame();
 
       st.app->update(st.app);
@@ -170,22 +171,20 @@ void engine_run(App* app) {
       
       f64 frame_end_time = os_now_seconds();
       f64 frame_elapsed_time = frame_end_time - frame_start_time;
-      // delta_time = frame_end_time - frame_start_time;
-      // os_set_delta_time_second(frame_elapsed_time);
       running_time += frame_elapsed_time;
       f64 remaining_seconds = target_frame_seconds - frame_elapsed_time;
 
-      if (remaining_seconds > 0) {
-        u32 remaining_ms = (remaining_seconds * 1000);
+      // if (remaining_seconds > 0) {
+      //   u32 remaining_ms = (remaining_seconds * 1000);
 
-        // If there is time left, give it back to the OS.
-        b32 limit_frames = true;
-        if (remaining_ms > 0 && limit_frames) {
-          os_sleep(remaining_ms - 1);
-        }
+      //   // If there is time left, give it back to the OS.
+      //   b32 limit_frames = true;
+      //   if (remaining_ms > 0 && limit_frames) {
+      //     os_sleep(remaining_ms - 1);
+      //   }
 
-        ++frame_count;
-      }
+      //   ++frame_count;
+      // }
 
       input_update();
       asset_watch_update();

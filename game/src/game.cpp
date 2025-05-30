@@ -8,6 +8,7 @@
 #include "sys/shader_sys.h"
 #include "sys/texture.h"
 #include "ui.h"
+#include "ecs.h"
 
 #include <event.h>
 #include <input.h>
@@ -382,11 +383,9 @@ void app_update(App* app) {
   ui_texture_render();
   
   UI_Window(ImGui::Begin("window")) {
-    ImGui::Text("%u", st->obj_count);
-  }
-
-  UI_Window(ImGui::Begin("new window")) {
-    ImGui::Text("%u", st->obj_count);
+    ImGui::Text("objects: %u", st->obj_count);
+    f32 framerate = ImGui::GetIO().Framerate;
+    ImGui::Text("fps: %f", framerate);
   }
   
   // ImGui::ShowDemoWindow();

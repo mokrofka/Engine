@@ -225,9 +225,8 @@ struct VK {
   VK_Texture texture_targets[ImagesInFlight];
   VkFramebuffer texture_framebuffers[ImagesInFlight];
   VK_Image depth;
-  i32 size = 300;
+  b8 is_viewport_sezied;
 
-  v2 current_viewport_size;
   v2 viewport_size;
   
 #ifdef _DEBUG

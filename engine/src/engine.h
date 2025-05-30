@@ -28,3 +28,7 @@ struct App {
 KAPI void engine_create(struct App* game_inst);
 
 KAPI void engine_run(struct App* game_inst);
+
+struct Some {
+  f32 x,y,z;
+};

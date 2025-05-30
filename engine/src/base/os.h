@@ -69,7 +69,7 @@ void os_console_write(String message, u32 color);
 void os_console_write_error(String message, u32 color);
 
 KAPI f32 os_now_seconds();
-void os_sleep(u64 ms);
+KAPI void os_sleep(u64 ms);
 
 void os_register_process_key(ProcessKeyCallback  callback);
 void os_register_process_mouse_move(ProcessMouseMoveCallback callback);

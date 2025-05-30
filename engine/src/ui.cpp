@@ -102,6 +102,17 @@ void ui_begin_frame() {
   ImGui_ImplVulkan_NewFrame();
   ImGui_ImplWin32_NewFrame();
   ImGui::NewFrame();
+
+  if (vk.is_viewport_sezied) {
+    vk.is_viewport_sezied = false;
+    Loop (i, ImagesInFlight) {
+      ImGui_ImplVulkan_RemoveTexture((VkDescriptorSet)st.texture_ids[i]);
+      st.texture_ids[i] = (ImTextureID)ImGui_ImplVulkan_AddTexture(
+        vk.texture_targets[i].sampler,
+        vk.texture_targets[i].image.view,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
+  }
 }
 
 void ui_end_frame() {
@@ -116,20 +127,12 @@ void ui_end_frame() {
 void ui_texture_render() {
   UI_Window(ImGui::Begin("viewport")) {
     
-    ImVec2 viewport_size = ImGui::GetContentRegionAvail();
-    vk.current_viewport_size = *(v2*)&viewport_size;
-    if (vk.viewport_size != vk.current_viewport_size) {
-      Loop (i, ImagesInFlight) {
-        ImGui_ImplVulkan_RemoveTexture((VkDescriptorSet)st.texture_ids[i]);
-        st.texture_ids[i] = (ImTextureID)ImGui_ImplVulkan_AddTexture(
-          vk.texture_targets[i].sampler,
-          vk.texture_targets[i].image.view, // VkImageView
-          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-      }
+    ImVec2 current_viewport_size = ImGui::GetContentRegionAvail();
+    if (vk.viewport_size != *(v2*)&current_viewport_size) {
+      vk.viewport_size = *(v2*)&current_viewport_size;
+      vk.is_viewport_sezied = true;
     }
-    ImGui::Image(st.texture_ids[vk.frame.image_index], viewport_size);
-    // ImGui::Image(st.texture_ids[vk.frame.image_index], ImVec2(300,300));
 
-
+    ImGui::Image(st.texture_ids[vk.frame.image_index], current_viewport_size);
   }
 }

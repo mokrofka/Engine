@@ -301,10 +301,6 @@ struct Transform {
 	v3 position;
 };
 
-struct Some {
-  i32 a;
-};
-
 struct PhysicsSystem : System {
 	void update() {
     LoopC (i, size) {

@@ -210,7 +210,6 @@ void vk_r_backend_init(Arena* arena) {
     vk.texture_targets[i].image = vk_image_create(
         VK_IMAGE_TYPE_2D,
         vk.frame.width, vk.frame.height,
-        // 300, 300,
         VK_FORMAT_R8G8B8A8_UNORM,
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -226,7 +225,7 @@ void vk_r_backend_init(Arena* arena) {
     sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     sampler_info.anisotropyEnable = VK_FALSE;
-    sampler_info.maxAnisotropy = 16;
+    sampler_info.maxAnisotropy = 1;
     sampler_info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
     sampler_info.unnormalizedCoordinates = VK_FALSE;
     sampler_info.compareEnable = VK_FALSE;
@@ -248,6 +247,7 @@ void vk_r_backend_init(Arena* arena) {
       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
       true,
       VK_IMAGE_ASPECT_DEPTH_BIT);
+  vk.viewport_size = v2(vk.frame.width, vk.frame.height);
 
   Info("Vulkan renderer initialized successfully"_);
 }
@@ -314,8 +314,8 @@ void vk_r_backend_begin_frame() {
     
     Info("Resized, booting"_);
   }
-  if (vk.current_viewport_size != vk.viewport_size) {
-    vk.viewport_size = vk.current_viewport_size;
+
+  if (vk.is_viewport_sezied) {
     vk_resize_framebuffer();
   }
 
@@ -500,7 +500,6 @@ void vk_r_begin_renderpass(u32 renderpass_id) {
       barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Or whatever it currently is
       barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
       barrier.image = vk.swapchain.images[vk.frame.image_index];
-      // barrier.image = vk.texture_targets[vk.frame.image_index].image.handle;
       barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
       barrier.subresourceRange.levelCount = 1;
       barrier.subresourceRange.layerCount = 1;
@@ -516,7 +515,6 @@ void vk_r_begin_renderpass(u32 renderpass_id) {
       VkRenderingAttachmentInfo color_attachment = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
         .imageView = vk.swapchain.views[vk.frame.image_index],
-        // .imageView = vk.texture_targets[vk.frame.image_index].image.view,
         .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -526,8 +524,7 @@ void vk_r_begin_renderpass(u32 renderpass_id) {
 
       VkRenderingInfo render_info = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-        // .renderArea = {{0, 0}, {vk.frame.width, vk.frame.height}},
-        .renderArea = {{0, 0}, {300, 300}},
+        .renderArea = {{0, 0}, {vk.frame.width, vk.frame.height}},
         .layerCount = 1,
         .colorAttachmentCount = 1,
         .pColorAttachments = &color_attachment,
@@ -564,7 +561,7 @@ void vk_r_end_renderpass(u32 renderpass_id) {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
         0,
-        0, nullptr, 0, nullptr,
+        0, null, 0, null,
         1, &barrier2);
 
     // NOTE transition to present layout
@@ -598,7 +595,7 @@ void vk_r_end_renderpass(u32 renderpass_id) {
     barrier2.dstAccessMask = 0;
     barrier2.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     barrier2.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    barrier2.image = vk.texture_targets[vk.frame.image_index].image.handle;
+    barrier2.image = vk.swapchain.images[vk.frame.image_index];
     barrier2.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     barrier2.subresourceRange.levelCount = 1;
     barrier2.subresourceRange.layerCount = 1;
@@ -697,6 +694,7 @@ internal void create_buffers(VK_Render* render) {
 void vk_resize_framebuffer() {
   vkDeviceWaitIdle(vkdevice);
 
+  Info("%f %f", vk.viewport_size.x, vk.viewport_size.y);
   Loop (i, ImagesInFlight) {
     vk_image_destroy(vk.texture_targets[i].image);
     vk_image_destroy(vk.depth);
