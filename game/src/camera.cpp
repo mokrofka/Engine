@@ -48,7 +48,7 @@ void camera_update() {
   Camera* camera = &st->camera;
   v2i frame_size = os_get_framebuffer_size();
   // v2 frame_size = get_viewport_size();
-  st->camera.projection = mat4_perspective(deg_to_rad(st->camera.fov), (f32)frame_size.x / frame_size.y, 0.1f, 1000.0f);
+  // st->camera.projection = mat4_perspective(deg_to_rad(st->camera.fov), (f32)frame_size.x / frame_size.y, 0.1f, 1000.0f);
   
   if (input_was_key_pressed(KEY_T)) {
     st->is_mouse_move = !st->is_mouse_move;

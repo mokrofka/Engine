@@ -101,10 +101,6 @@ b32 event_unregister(u32 code, void* listener, PFN_On_Event on_event) {
 }
 
 b32 event_fire(u32 code, void* sender, EventContext context) {
-  if (st.is_initialized == false) {
-    return false;
-  }
-  
   // On nothing is registered for the code, boot out.
   if (st.registered[code].events == 0) {
     return false;

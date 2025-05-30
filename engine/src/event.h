@@ -89,5 +89,7 @@ enum SystemEventCode {
   EventCode_Debug3 = 0x13,
   EventCode_Debug4 = 0x14,
 
+  EventCode_ViewportResized,
+
   EventCode_COUNT = 0xFF
 };

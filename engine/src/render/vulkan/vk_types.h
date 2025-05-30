@@ -277,4 +277,4 @@ struct UniformBufferObject {
   f32 delta_time = 1.0f;
 };
 
-void vk_resize_framebuffer();
+void vk_resize_viewport();

@@ -8,6 +8,8 @@
 #include "vk_draw.h"
 #include "vk_shader.h"
 
+#include "event.h"
+
 #define VulkanUseAllocator
 // #define VulkanAllocatorTrace 1
 
@@ -248,6 +250,13 @@ void vk_r_backend_init(Arena* arena) {
       true,
       VK_IMAGE_ASPECT_DEPTH_BIT);
   vk.viewport_size = v2(vk.frame.width, vk.frame.height);
+  event_register(EventCode_ViewportResized, &vk.is_viewport_sezied, [](u32 code, void* sender, void* listener_inst, EventContext context)->b32 {
+    f32 width = context.data.u32[0];
+    f32 height = context.data.u32[1];
+    vk.viewport_size = {width, height};
+    vk.is_viewport_sezied = true;
+    return false;
+  });
 
   Info("Vulkan renderer initialized successfully"_);
 }
@@ -316,7 +325,7 @@ void vk_r_backend_begin_frame() {
   }
 
   if (vk.is_viewport_sezied) {
-    vk_resize_framebuffer();
+    vk_resize_viewport();
   }
 
   // Wait for the execution of the current frame to complete. The fence being free will allow this one to move on.
@@ -691,10 +700,9 @@ internal void create_buffers(VK_Render* render) {
   vk.uniform_buffer.freelist = freelist_gpu_create(vk.arena, vk.index_buffer.size);
 }
 
-void vk_resize_framebuffer() {
+void vk_resize_viewport() {
   vkDeviceWaitIdle(vkdevice);
 
-  Info("%f %f", vk.viewport_size.x, vk.viewport_size.y);
   Loop (i, ImagesInFlight) {
     vk_image_destroy(vk.texture_targets[i].image);
     vk_image_destroy(vk.depth);

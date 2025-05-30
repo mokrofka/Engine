@@ -230,6 +230,13 @@ void app_init(App* app) {
   st->camera.yaw = -90;
   st->camera.fov = 45;
   entity_init();
+
+  event_register(EventCode_ViewportResized, &st->camera, [](u32 code, void* sender, void* listener_inst, EventContext context)->b32 {
+    f32 width = context.data.u32[0];
+    f32 height = context.data.u32[1];
+    st->camera.projection = mat4_perspective(deg_to_rad(st->camera.fov), width / height, 0.1f, 1000.0f);
+    return false;
+  });
  
   {
     Geometry cube_geom = {

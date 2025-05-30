@@ -204,31 +204,14 @@ struct SECURITY_ATTRIBUTES {
 
 #include <vulkan/vulkan_win32.h>
 void vk_surface_create() {
-  HINSTANCE h_instance = os_get_handle_info();
+  HINSTANCE hinstance = os_get_handle_info();
   HWND hwnd = os_get_window_handle();
   
-  VkWin32SurfaceCreateInfoKHR create_info = {VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR};
-  create_info.hinstance = h_instance;
-  create_info.hwnd = hwnd;
+  VkWin32SurfaceCreateInfoKHR surface_create_info = {
+    .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
+    .hinstance = hinstance,
+    .hwnd = hwnd
+  };
 
-  vkCreateWin32SurfaceKHR(vk.instance, &create_info, vk.allocator, &vk.surface);
-}
-
-i32 imgui_surface_create(void* vp, u64 vk_inst, const void* vk_allocators, u64* out_vk_surface) {
-  VkInstance instance; Assign(instance, vk_inst);
-  
-  HINSTANCE h_instance = os_get_handle_info();
-  HWND hwnd = os_get_window_handle();
-
-  // Create Vulkan surface for the viewport (on Windows, you'd use vkCreateWin32SurfaceKHR)
-  VkWin32SurfaceCreateInfoKHR surface_info = {};
-  surface_info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-  surface_info.hwnd = vp;
-  surface_info.hinstance = h_instance;
-
-  VkSurfaceKHR surface;
-  vkCreateWin32SurfaceKHR(instance, &surface_info, nullptr, &surface);
-
-  *out_vk_surface = (u64)surface; // Store the Vulkan surface in the out_vk_surface pointer
-  return 0;                       // Success
+  vkCreateWin32SurfaceKHR(vk.instance, &surface_create_info, vk.allocator, &vk.surface);
 }
