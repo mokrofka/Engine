@@ -40,6 +40,7 @@ internal void app_create(App* app);
 internal void load_game_lib_init(App* app);
 
 f32 delta_time;
+
 void engine_create(App* app) {
   global_allocator_init();
   Assign(app->arena, mem_alloc(AppSize));
@@ -63,8 +64,8 @@ void engine_create(App* app) {
   {
     network_init(st.arena);
   }
-  // test();
-  component_register(Some);
+  ecs_init();
+  // test_ecs();
   
   {
     ResSysConfig res_sys_cfg = {

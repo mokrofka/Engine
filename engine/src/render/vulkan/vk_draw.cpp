@@ -1,7 +1,8 @@
 #include "vk_types.h"
+#include "ecs.h"
 
 SparseSetIndex sparse_entity_to_mesh;
-u32 entity_to_shader[1024];
+u32 entity_to_shader[MaxEntities];
 
 void descriptor_update(u32 shader_id) {
   vk_Shader* shader = &vk.shaders[shader_id];

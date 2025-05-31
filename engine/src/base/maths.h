@@ -427,6 +427,10 @@ INLINE v4 operator-(v4 a, v4 b) {
   return v4(a.x - b.x, a.y - b.y, a.z - b.z, a.z - b.z);
 }
 
+INLINE v4 operator*(v4 a, f32 scalar) {
+  return v4(a.x * scalar, a.y * scalar, a.z * scalar, a.w * scalar);
+}
+
 INLINE v4& operator+=(v4& a, v4 b) {
   a = a + b;
   return a;
@@ -491,6 +495,15 @@ inline mat4 operator*(mat4 matrix_0, mat4 matrix_1) {
 INLINE mat4& operator*=(mat4& a, mat4 b) {
   a = b * a;
   return a;
+}
+
+INLINE v4 operator*(const mat4& mat, const v4& vec) {
+    v4 result;
+    result.x = mat.data[0] * vec.x + mat.data[1] * vec.y + mat.data[2] * vec.z + mat.data[3] * vec.w;
+    result.y = mat.data[4] * vec.x + mat.data[5] * vec.y + mat.data[6] * vec.z + mat.data[7] * vec.w;
+    result.z = mat.data[8] * vec.x + mat.data[9] * vec.y + mat.data[10] * vec.z + mat.data[11] * vec.w;
+    result.w = mat.data[12] * vec.x + mat.data[13] * vec.y + mat.data[14] * vec.z + mat.data[15] * vec.w;
+    return result;
 }
 
 inline mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 Near, f32 Far) {

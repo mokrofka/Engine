@@ -34,6 +34,29 @@ struct Vertex {
   v2 tex_coord;
 };
 
+struct Position {
+  f32 x,y,z; 
+};
+Component(Position)
+
+struct Velocity {
+  f32 value;
+};
+Component(Velocity)
+
+f32 rotation_speed = 0.01;
+
+System(PositionUpdate, "Position", "Velocity")
+void position_update() {
+  BaseSystem* system = system_get(PositionUpdate);
+  Loop (i, system->entity_count) {
+    Position* pos = entity_get_component(system->entities[i], Position);
+    Velocity* vel = entity_get_component(system->entities[i], Velocity);
+    v4 pos_v4 = (mat4_euler_y(rotation_speed) * v4(pos->x, pos->y, pos->z, 0));
+    *pos = {pos_v4.x, pos_v4.y, pos_v4.z};
+  }
+}
+
 Vertex vertices[] = {
   // Position             // Tex coord
   // Front face
@@ -143,49 +166,23 @@ f32 triangle_vertices[] = {
   0.5f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f   // Vertex 3: blue
 };
 
-u32 cube_create() {
-  u32 id = entity_create();
-  entity_make_renderable(id, geometry_get("cube"_), shader_get("texture_shader"_));
-  return id;
+Entity cube_create() {
+  Entity e = entity_create();
+  component_add(e, Position, Position{});
+  component_add(e, Velocity, Velocity{0.01});
+  entity_make_renderable(e, geometry_get("cube"_), shader_get("texture_shader"_));
+  return e;
 }
 
-u32 triangle_create() {
-  u32 id = entity_create();
-  entity_make_renderable(id, geometry_get("triangle"_), shader_get("color_shader"_));
-  return id;
+Entity triangle_create() {
+  Entity e = entity_create();
+  component_add(e, Position, Position{});
+  component_add(e, Velocity, Velocity{0.01});
+  entity_make_renderable(e, geometry_get("triangle"_), shader_get("color_shader"_));
+  return e;
 }
 
 void* grid_create(Arena* arena, i32 grid_size, f32 grid_step) {
-
-#if 0
-  v3* grid = push_array(arena, v3, grid_size*4);
-
-  i32 i = 0;
-  f32 half = (grid_size / 2.0f) * grid_step;
-  // horizontal from left to right
-  {
-    f32 z = -grid_size * grid_step;
-    f32 x = -grid_size * grid_step;
-    Loop (j, grid_size) {
-      grid[i++] = v3(x, 0, z + half);
-      grid[i++] = v3(-x, 0, z + half);
-      z -= 2*grid_step;
-    }
-  }
-
-  // vertical from top to down
-  {
-    f32 z = -grid_size * grid_step;
-    f32 x = -grid_size * grid_step;
-    Loop (j, grid_size) {
-      grid[i++] = v3(x + half, 0, z);
-      grid[i++] = v3(x + half, 0, -z);
-      x += 2*grid_step;
-    }
-  }
-  return grid;
-
-#else 
   v3* grid = push_array(arena, v3, grid_size*4);
 
   i32 i = 0;
@@ -212,24 +209,22 @@ void* grid_create(Arena* arena, i32 grid_size, f32 grid_step) {
     }
   }
   return grid;
-#endif
-
 }
 
 void app_init(App* app) {
   Scratch scratch;
 
-  app->state = push_struct(app->arena, GameState);
+  // app->state = push_struct(app->arena, GameState);
+  app->state = mem_alloc(sizeof(GameState));
   Assign(st, app->state);
   st->arena = arena_alloc(app->arena, GameSize);
 
-  st->obj_count = 2;
+  st->entity_count = 0;
 
   st->camera.view_dirty = true;
   st->camera.position = v3(0,0, 10);
   st->camera.yaw = -90;
   st->camera.fov = 45;
-  entity_init();
 
   event_register(EventCode_ViewportResized, &st->camera, [](u32 code, void* sender, void* listener_inst, EventContext context)->b32 {
     f32 width = context.data.u32[0];
@@ -314,68 +309,73 @@ void app_init(App* app) {
   // texture_load("paving.png"_);
   texture_load("orange_lines_512.png"_);
 
-  u32 id = entity_create();
-  entity_make_renderable(id, geometry_get("grid"_), shader_get("grid_shader"_));
-  mat4* position = (mat4*)vk_get_push_constant(id);
-  *position = mat4_translation(v3(0,0,0));
-
-
   {
-    u32 gray_cube_id = entity_create();
-    entity_make_renderable(gray_cube_id, geometry_get("cube_position_vertices"_), shader_get("transparent_shader"_));
-    // entity_make_renderable(gray_cube_id, geometry_get("cube"_), shader_get("texture_shader"_));
-    mat4* position = (mat4*)vk_get_push_constant(gray_cube_id);
+    Entity grid = entity_create();
+    entity_make_renderable(grid, geometry_get("grid"_), shader_get("grid_shader"_));
+    mat4* position = (mat4*)vk_get_push_constant(grid);
     *position = mat4_translation(v3(0,0,0));
   }
 
   {
-    u32 cube = cube_create();
-    mat4* position = (mat4*)vk_get_push_constant(cube);
-    *position = mat4_translation(v3(0,0,0)) * mat4_scale(v3(100,100,100));
+    Entity transparent_cube = entity_create();
+    entity_make_renderable(transparent_cube, geometry_get("cube_position_vertices"_), shader_get("transparent_shader"_));
+    mat4* position = (mat4*)vk_get_push_constant(transparent_cube);
+    *position = mat4_translation(v3(0,0,0));
   }
+
+  // {
+  //   Entity LargeCube = cube_create();
+  //   mat4* position = (mat4*)vk_get_push_constant(LargeCube);
+  //   *position = mat4_translation(v3(0,0,0)) * mat4_scale(v3(100,100,100));
+  //   st->entities[st->entity_count] = LargeCube;
+  // }
   
   f32 min = -1, max = 1;
-  Loop (i, st->obj_count) {
-    st->objs[i].id = cube_create();
+  u32 count = 2;
+  for (i32 i = st->entity_count; i < st->entity_count + count; ++i) {
+    st->entities[i] = cube_create();
     f32 x = rand_in_range_f32(min, max);
     f32 y = rand_in_range_f32(min, max);
     f32 z = rand_in_range_f32(min, max);
-    st->objs[i].position = v3(x, y, z);
+    Position* pos = entity_get_component(st->entities[i], Position);
+    *pos = {x,y,z};
   }
+  st->entity_count += count;
 }
 
 f32 min = -30, max = 30;
 b32 toggle;
 void app_update(App* app) {
   Assign(st, app->state);
-  Object* objs = st->objs;
+  Entity* entities = st->entities;
   
   st->entities_ubo[0].projection_view = st->camera.projection * st->camera.view;
   
   f32& rot = st->rot;
   rot += 0.01;
-  u32 index = st->obj_count;
   if (input_was_key_down(KEY_1)) {
-    objs[index].id = (++toggle+1)%2 ? cube_create() : triangle_create();
+    entities[st->entity_count] = (++toggle+1)%2 ? cube_create() : triangle_create();
     f32 x = rand_in_range_f32(min, max);
     f32 y = rand_in_range_f32(min, max);
     f32 z = rand_in_range_f32(min, max);
-    objs[index].position = v3(x, y, z);
-    st->obj_count++;
+    Position* pos = entity_get_component(entities[st->entity_count], Position);
+    *pos = {x,y,z};
+    ++st->entity_count;
   }
   if (input_was_key_down(KEY_2)) {
-    entity_destroy(objs[index-1].id);
-    entity_remove_renderable(objs[index-1].id);
-    st->obj_count--;
+    entity_destroy(entities[st->entity_count-1]);
+    entity_remove_renderable(entities[st->entity_count-1]);
+    --st->entity_count;
   }
   
-  Loop (i, st->obj_count) {
-    mat4* model = (mat4*)vk_get_push_constant(objs[i].id);
-    *model = mat4_translation(objs[i].position) * mat4_euler_y(rot);
-    *model = mat4_euler_y(rot / 2) * mat4_translation(objs[i].position);
+  Loop (i, st->entity_count) {
+    mat4* model = (mat4*)vk_get_push_constant(entities[i]);
+    Position* pos = entity_get_component(entities[i], Position);
+    // *model = mat4_euler_y(rot / 2) * mat4_translation(v3(pos->x, pos->y, pos->z));
+    *model = mat4_translation(v3(pos->x, pos->y, pos->z));
   }
 
-  // Begin the main window (with no extra options like fullscreen, padding, etc.)
+  position_update();
 
   const ImGuiViewport* viewport = ImGui::GetMainViewport();
   ImGui::SetNextWindowPos(viewport->WorkPos);
@@ -390,9 +390,9 @@ void app_update(App* app) {
   ui_texture_render();
   
   UI_Window(ImGui::Begin("window")) {
-    ImGui::Text("objects: %u", st->obj_count);
-    f32 framerate = ImGui::GetIO().Framerate;
-    ImGui::Text("fps: %f", framerate);
+    ImGui::Text("objects: %u", st->entity_count);
+    // f32 framerate = ImGui::GetIO().Framerate;
+    // ImGui::Text("fps: %f", framerate);
   }
   
   // ImGui::ShowDemoWindow();

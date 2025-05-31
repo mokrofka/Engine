@@ -1,9 +1,8 @@
 #include "lib.h"
+#include "ecs.h"
 
 struct Object {
   u32 id;
-  v3 position;
-  v3 velocity;
 };
 
 struct Camera {
@@ -29,8 +28,8 @@ struct GameState {
   struct PushConstant* entities_push_constant;
   Camera camera;
   
-  Object objs[100];
-  u32 obj_count;
+  u32 entity_count;
+  u32 entities[MaxEntities];
   f32 rot;
   b8 is_mouse_move;
 };

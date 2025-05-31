@@ -89,7 +89,7 @@ void vk_r_shader_create(Shader* s, void* data, u64 data_size, u64 push_size) {
   // push constants
   vk_Shader* shader = &vk.shaders[vk.shader_count];
   SparseSetKeep* push_constants = &shader->push_constants;
-  push_constants->data = mem_alloc(push_size * 1024);
+  push_constants->data = mem_alloc(push_size * MaxEntities);
   push_constants->element_size = push_size;
   push_constants->capacity = 1024;
   push_constants->size = 0;

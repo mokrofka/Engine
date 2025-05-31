@@ -2,6 +2,7 @@
 #include "lib.h"
 
 #include "render/r_types.h"
+#include "ecs.h"
 
 #include <vulkan/vulkan.h>
 
