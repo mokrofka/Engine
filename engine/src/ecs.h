@@ -29,7 +29,6 @@ struct ECS_state {
   struct System* systems[MaxSystems];
 };
 
-// TODO put into .cpp
 KAPI extern ECS_state ecs;
 
 //////////////////////////////////////////////////////
@@ -48,7 +47,7 @@ inline Entity entity_create() {
   return ecs.entities[ecs.entity_count++];
 }
 
-inline void _entity_destroy(Entity entity) {
+inline void entity_destroy_internal(Entity entity) {
   Assert(ecs.is_entities_alive[entity]);
   ecs.is_entities_alive[entity] = false;
   ecs.entities[--ecs.entity_count] = entity;
@@ -259,7 +258,7 @@ inline void entity_signature_changed(Entity entity, Signature entity_signature) 
 inline void entity_destroy(Entity entity) {
   components_entity_destroy(entity);
   system_manager_entity_destroyed(entity);
-  _entity_destroy(entity);
+  entity_destroy_internal(entity);
 }
 
 #define component_register(T) \
