@@ -8,6 +8,7 @@ typedef u32 Signature;
 #define MaxEntities KB(20)
 #define MaxComponents 32
 #define MaxSystems 32
+#define MaxEcsHashes KB(5)
 
 INLINE constexpr u64 hash_name_at_compile(String name) {
   // A multipler to use when generating a hash. Prime to hopefully avoid collisions
@@ -22,7 +23,7 @@ INLINE constexpr u64 hash_name_at_compile(String name) {
   }
   
   // Mod it against the size of the table
-  hash %= KB(10);
+  hash %= MaxEcsHashes;
   
   return hash;
 }
@@ -47,8 +48,8 @@ struct ECS_state {
   struct BaseSystem* systems[MaxSystems];
 
   // hashed string to id
-  u32 hashed_id_to_component_id[KB(10)];
-  u32 hashed_id_to_system_id[KB(10)];
+  u32 hashed_id_to_component_id[MaxEcsHashes];
+  u32 hashed_id_to_system_id[MaxEcsHashes];
 
   // queue
   u32 component_queue_count;
@@ -335,17 +336,6 @@ inline void __component_add(Entity entity, u32 component_id, void* component) {
   entity_signature_changed(entity, signature);
 }
 
-
-
-// #define component_add(entity, T, component)                      \
-//   {                                                              \
-//     auto temp = component;                                       \
-//     _component_add_internal(entity, component_get_id(T), &temp); \
-//     Signature signature = entity_get_signature(entity);          \
-//     SetBit(signature, component_get_id(T));                      \
-//     entity_set_signature(entity, signature);                     \
-//     entity_signature_changed(entity, signature);                 \
-//   }
 #define component_add(entity, T, component)                 \
   {                                                         \
     auto temp = component;                                  \
@@ -389,19 +379,25 @@ inline void component_queue_register() {
   }
 }
 
-template<typename... Args>
-inline void system_enqueue(String system_name, Args&&... args) {
+inline void system_enqueue(String system_name, String dependency) {
   Signature system_signature = 0;
 
-  // Fold expression over all arguments
   u32 component_count = 0;
-  (([&] {
-    const String& s = str_cstr(args);
+  Range range = {};
+  Loop (i, dependency.size + 1) {
+    if (char_is_space(dependency.str[i]) || dependency.str[i] == '\0') {
+      String s = str_substr(dependency, range);
+      range.min += range.max + 1;
 
-    Assert(!ecs.component_queue_hash_ids[hash_name_at_compile(s)]);
-    ecs.system_queue_component[ecs.system_queue_count].components_hash_id[component_count++] = hash_name_at_compile(s);
-    ecs.system_queue_component[ecs.system_queue_count].component_count = component_count;
-  }()), ...);
+      u32 component_id = hash_name_at_compile(s);
+      ecs.system_queue_component[ecs.system_queue_count].components_hash_id[component_count++] = component_id;
+      ecs.system_queue_component[ecs.system_queue_count].component_count = component_count;
+      if (dependency.str[i] == '\0') {
+        break;
+      }
+    }
+    ++range.max;
+  }
 
   ecs.system_queue_hash_ids[ecs.system_queue_count] = hash_name_at_compile(system_name);
   ++ecs.system_queue_count;
@@ -414,6 +410,7 @@ inline void system_queue_register() {
     u32 signature = 0;
     Loop (j, ecs.system_queue_component[i].component_count) {
       u32 component_hashed_id = ecs.system_queue_component[i].components_hash_id[j];
+      Assert(ecs.hashed_id_to_component_id[component_hashed_id] != INVALID_ID && "component isn't registered");
       signature |= Bit(ecs.hashed_id_to_component_id[component_hashed_id]);
     }
 
@@ -436,6 +433,9 @@ inline void ecs_init() {
     ecs.entities[i] = i;
   }
   ecs.entity_count = 0;
+  Loop (i, MaxEcsHashes) {
+    ecs.hashed_id_to_component_id[i] = INVALID_ID;
+  }
   component_queue_register();
   system_queue_register();
 }
@@ -448,12 +448,20 @@ inline void ecs_init() {
   };                                                       \
   static Glue(__, T) Glue(__variable, T);
 
-#define System(T, ...)                                    \
-  struct Glue(__, T) {                                    \
-    Glue(__, T)() {                                       \
-      system_enqueue(str_lit(Stringify(T)), __VA_ARGS__); \
-    }                                                     \
-  };                                                      \
+// #define System(T, ...)                                    \
+//   struct Glue(__, T) {                                    \
+//     Glue(__, T)() {                                       \
+//       system_enqueue(str_lit(Stringify(T)), __VA_ARGS__); \
+//     }                                                     \
+//   };                                                      \
+//   static Glue(__, T) Glue(__variable, T);
+
+#define System(T, ...)                                              \
+  struct Glue(__, T) {                                              \
+    Glue(__, T)() {                                                 \
+      system_enqueue(str_lit(Stringify(T)), str_lit(#__VA_ARGS__)); \
+    }                                                               \
+  };                                                                \
   static Glue(__, T) Glue(__variable, T);
 
 void test_ecs();

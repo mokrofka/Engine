@@ -45,15 +45,21 @@ struct Velocity {
 Component(Velocity)
 
 f32 rotation_speed = 0.01;
+f32 speed;
 
-System(PositionUpdate, "Position", "Velocity")
+// System(PositionUpdate, "Position", "Velocity")
+System(PositionUpdate, Position Velocity)
+// System(PositionUpdate, Pos Vel)
 void position_update() {
   BaseSystem* system = system_get(PositionUpdate);
   Loop (i, system->entity_count) {
     Position* pos = entity_get_component(system->entities[i], Position);
     Velocity* vel = entity_get_component(system->entities[i], Velocity);
-    v4 pos_v4 = (mat4_euler_y(rotation_speed) * v4(pos->x, pos->y, pos->z, 0));
-    *pos = {pos_v4.x, pos_v4.y, pos_v4.z};
+    // v4 pos_v4 = (mat4_euler_y(rotation_speed) * v4(pos->x, pos->y, pos->z, 0));
+    // *pos = {pos_v4.x, pos_v4.y, pos_v4.z};
+    speed = 0.01;
+    // pos->x += SinD(rotation_speed);
+    pos->y += speed;
   }
 }
 
@@ -341,6 +347,11 @@ void app_init(App* app) {
     *pos = {x,y,z};
   }
   st->entity_count += count;
+
+  // Global_Data_Shader* global_shader_data = shader_get_global_state();
+  // PerFrame_Data_ShaderName* per_frame_shader_data = shader_get_data_per_frame(u32 shader_id);
+  // PerEntity_Data_ShaderName* per_entity_shader_data = shader_get_data_per_entity(u32 entity_id);
+  // PushConstant_ShaderName* push_constant = shader_get_push_constant(u32 entity_id);
 }
 
 f32 min = -30, max = 30;
@@ -377,11 +388,11 @@ void app_update(App* app) {
 
   position_update();
 
-  const ImGuiViewport* viewport = ImGui::GetMainViewport();
+  ImGuiViewport* viewport = ImGui::GetMainViewport();
   ImGui::SetNextWindowPos(viewport->WorkPos);
   ImGui::SetNextWindowSize(viewport->WorkSize);
   ImGui::SetNextWindowViewport(viewport->ID);
-  UI_Window(ImGui::Begin("DockSpace", NULL, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
+  UI_Window(ImGui::Begin("DockSpace", null, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
   // UI_Window(ImGui::Begin("DockSpace")) {
     // ImGui::DockSpace(ImGui::GetID("MyDockSpace"), ImVec2(0.0f, 0.0f), 0);
     ImGui::DockSpace(ImGui::GetID("MyDockSpace")) ;
@@ -398,6 +409,7 @@ void app_update(App* app) {
   // ImGui::ShowDemoWindow();
 
   camera_update();
+
 }
 
 void app_on_resize(App* game_inst) {

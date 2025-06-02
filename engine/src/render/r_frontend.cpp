@@ -32,8 +32,8 @@ void r_begin_draw_frame() {
   {
     vk_r_begin_renderpass(BuiltinRenderpass_World);
     // vk_compute_draw();
-    vk_draw();
 
+    vk_draw();
     vk_r_end_renderpass(BuiltinRenderpass_World);
   }
 

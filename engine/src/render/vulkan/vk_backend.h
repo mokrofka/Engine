@@ -33,3 +33,8 @@ void vk_remove_renderable(u32 id);
 
 void vk_texture_load(Texture* texture);
 v2 vk_get_viewport_size();
+
+KAPI void* shader_get_global_state();
+KAPI void* shader_get_data_per_frame(u32 shader_id);
+KAPI void* shader_get_data_per_entity(u32 entity_id);
+KAPI void* shader_get_push_constant(u32 entity_id);

@@ -147,3 +147,19 @@ void vk_compute_draw() {
   
   VK_CHECK(vkEndCommandBuffer(cmd))
 }
+
+void* get_ubo_global_state() {
+
+}
+
+void* get_ubo_per_frame(u32 shader_id) {
+
+}
+
+void* get_ubo_per_entity(u32 entity_id) {
+
+}
+
+void* get_push_constant(u32 entity_id) {
+
+}
