@@ -144,7 +144,8 @@ struct vk_Shader {
   String name;
   VK_Pipeline pipeline;
   VK_ShaderStage stages[3];
-  SparseSetKeep push_constants;
+  // SparseSetKeep push_constants;
+  SparseSetEntity sparse_set;
   u32 vert_stride;
   u32 attribute_count;
   VkVertexInputAttributeDescription attribute_desriptions[10];
@@ -177,7 +178,6 @@ struct VK {
   
   VK_Frame frame;
   VK_SyncObj sync;
-  VK_Render render;
 
   VK_Device device;
   
@@ -186,20 +186,18 @@ struct VK {
   
   b8 recreating_swapchain;
   
-  VkFramebuffer world_framebuffers[3];
-  
   // new stuff
   VK_Buffer vert_buffer;
   VK_Buffer index_buffer;
   VK_Buffer stage_buffer;
-  VK_Buffer uniform_buffer;
+  VK_Buffer storage_buffer;
   VK_Buffer storage_buffers[2];
   VK_Buffer compute_uniform_buffer;
   
   VkDescriptorPool descriptor_pool;
   VkDescriptorSetLayout descriptor_set_layout;
   VkDescriptorSetLayout compute_descriptor_set_layout;
-  VkDescriptorSet descriptor_sets[2];
+  VkDescriptorSet descriptor_sets[FramesInFlight];
   VkDescriptorSet compute_descriptor_sets[FramesInFlight];
   
   vk_Shader shader;
@@ -214,6 +212,9 @@ struct VK {
   
   VkCommandBuffer cmds[FramesInFlight];
   VkCommandBuffer compute_cmds[FramesInFlight];
+
+  SparseSetIndex entity_to_mesh;
+  u32 entity_to_shader[MaxEntities];
   
   // Shader
   u32 shader_count;
@@ -221,6 +222,9 @@ struct VK {
   VK_ComputeShader compute_shader;
   vk_Shader graphics_shader_compute;
   mat4* projection_view;
+  SparseSetKeep push_constants;
+  GlobalShaderState* global_shader_state;
+  EntityShader* entities_shader_data;
 
   // offscreen rendering
   VK_Texture texture_targets[ImagesInFlight];

@@ -23,10 +23,10 @@ void vk_r_geometry_create(Geometry* geometry);
 void vk_r_destroy_geometry(Geometry* geometry);
 
 // Shader
-void vk_r_shader_create(struct Shader* s, void* data, u64 data_size, u64 push_size);
+void vk_r_shader_create(struct Shader* s);
 void vk_draw();
 void vk_compute_draw();
-KAPI void* vk_get_push_constant(u32 id);
+KAPI PushConstant* vk_get_push_constant(u32 id);
 
 void vk_make_renderable(u32 id, u32 geom_id, u32 shader_id);
 void vk_remove_renderable(u32 id);
@@ -34,7 +34,5 @@ void vk_remove_renderable(u32 id);
 void vk_texture_load(Texture* texture);
 v2 vk_get_viewport_size();
 
-KAPI void* shader_get_global_state();
-KAPI void* shader_get_data_per_frame(u32 shader_id);
-KAPI void* shader_get_data_per_entity(u32 entity_id);
-KAPI void* shader_get_push_constant(u32 entity_id);
+KAPI GlobalShaderState* shader_get_global_state();
+KAPI EntityShader* shader_get_entity_data(u32 entity_id);

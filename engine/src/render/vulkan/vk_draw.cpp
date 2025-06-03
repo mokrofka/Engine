@@ -1,8 +1,6 @@
 #include "vk_types.h"
 #include "ecs.h"
 
-SparseSetIndex sparse_entity_to_mesh;
-u32 entity_to_shader[MaxEntities];
 
 void descriptor_update(u32 shader_id) {
   vk_Shader* shader = &vk.shaders[shader_id];
@@ -14,7 +12,7 @@ void descriptor_update(u32 shader_id) {
   u64 range = mem_range.size;
   u64 offset = mem_range.offset;
   VkDescriptorBufferInfo buffer_info;
-  buffer_info.buffer = vk.uniform_buffer.handle;
+  buffer_info.buffer = vk.storage_buffer.handle;
   buffer_info.offset = offset;
   buffer_info.range = range;
 
@@ -23,7 +21,7 @@ void descriptor_update(u32 shader_id) {
   ubo_descriptor.dstSet = descriptor_set;
   ubo_descriptor.dstBinding = 0;
   ubo_descriptor.dstArrayElement = 0;
-  ubo_descriptor.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  ubo_descriptor.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
   ubo_descriptor.descriptorCount = 1;
   ubo_descriptor.pBufferInfo = &buffer_info;
   
@@ -48,19 +46,18 @@ void vk_draw() {
   VkCommandBuffer cmd = vk_get_current_cmd();
   Loop (j, vk.shader_count) {
     vk_Shader* shader = &vk.shaders[j];
-    SparseSetKeep* push_constants = &shader->push_constants;
-    u32 push_size = push_constants->element_size;
-    u32* entities = push_constants->entities;
-    u32 entity_count = push_constants->size;
+    u32 push_size = vk.push_constants.element_size;
+    u32* entities = shader->sparse_set.entities;
+    u32 entity_count = shader->sparse_set.entity_count;
     
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader->pipeline.handle);
     descriptor_update(j); // TODO make descriptors
     
     Loop (i, entity_count) {
       u32 entity = entities[i];
-      VK_Mesh& mesh = vk.meshes[sparse_entity_to_mesh.get_data(entity)];
-      void* push_constant = push_constants->get_data(entity);
-      vkCmdPushConstants(cmd, shader->pipeline.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, push_size, push_constant);
+      VK_Mesh& mesh = vk.meshes[vk.entity_to_mesh.get_data(entity)];
+      void* push_constant = vk.push_constants.get_data(entity);
+      vkCmdPushConstants(cmd, shader->pipeline.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT , 0, push_size, push_constant);
       vkCmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, &mesh.offset);
       vkCmdDraw(cmd, mesh.vert_count, 1, 0, 0);
     }
@@ -76,23 +73,27 @@ void vk_draw() {
   // vkCmdDraw(cmd, ParticleCount, 1, 0, 0);
 }
 
-void vk_make_renderable(u32 id, u32 geom_id, u32 shader_id) {
+void vk_make_renderable(u32 entity_id, u32 geom_id, u32 shader_id) {
   vk_Shader* shader = &vk.shaders[shader_id];
-  shader->push_constants.insert_data(id);
+  shader->sparse_set.add(entity_id);
   
-  sparse_entity_to_mesh.insert_data(id, geom_id);
-  entity_to_shader[id] = shader_id;
+  vk.push_constants.insert_data(entity_id);
+  PushConstant* push = (PushConstant*)vk.push_constants.get_data(entity_id);
+  push->entity_index = entity_id;
+  vk.entity_to_mesh.insert_data(entity_id, geom_id);
+  vk.entity_to_shader[entity_id] = shader_id;
 }
 
-void vk_remove_renderable(u32 id) {
-  vk_Shader* shader = &vk.shaders[entity_to_shader[id]];
-  shader->push_constants.remove_data(id);
-  sparse_entity_to_mesh.remove_data(id);
+void vk_remove_renderable(u32 entity_id) {
+  vk_Shader* shader = &vk.shaders[vk.entity_to_shader[entity_id]];
+  shader->sparse_set.remove(entity_id);
+
+  vk.push_constants.remove_data(entity_id);
+  vk.entity_to_mesh.remove_data(entity_id);
 }
 
-KAPI void* vk_get_push_constant(u32 id) {
-  u32 shader_id = entity_to_shader[id];
-  return vk.shaders[shader_id].push_constants.get_data(id);
+KAPI PushConstant* vk_get_push_constant(u32 entity_id) {
+  return (PushConstant*)vk.push_constants.get_data(entity_id);
 }
 
 void compute_descriptor_update() {
@@ -148,18 +149,11 @@ void vk_compute_draw() {
   VK_CHECK(vkEndCommandBuffer(cmd))
 }
 
-void* get_ubo_global_state() {
-
+KAPI GlobalShaderState* shader_get_global_state() {
+  return (GlobalShaderState*)vk.storage_buffer.maped_memory;
 }
 
-void* get_ubo_per_frame(u32 shader_id) {
-
-}
-
-void* get_ubo_per_entity(u32 entity_id) {
-
-}
-
-void* get_push_constant(u32 entity_id) {
-
+KAPI EntityShader* shader_get_entity_data(u32 entity_id) {
+  return (EntityShader*)(vk.storage_buffer.maped_memory +
+                         sizeof(GlobalShaderState) + sizeof(EntityShader) * entity_id);
 }

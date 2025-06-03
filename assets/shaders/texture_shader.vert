@@ -5,10 +5,6 @@
 layout(location = 0) in vec3 in_pos;
 layout(location = 1) in vec2 in_tex_coord;
 
-layout(push_constant) uniform PushConstants {
-  mat4 u_model;
-};
-
 layout(location = 0) out out_data {
   vec2 out_tex_coord;
 };

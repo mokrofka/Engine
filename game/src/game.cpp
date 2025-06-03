@@ -16,16 +16,6 @@
 #include "object.h"
 #include "camera.h"
 
-struct alignas(16) UBO {
-  mat4 projection_view;
-  mat4 model;
-  f32 color;
-};
-
-struct PushConstant {
-  mat4 model;
-};
-
 GameState* st;
 
 struct Vertex {
@@ -59,7 +49,7 @@ void position_update() {
     // *pos = {pos_v4.x, pos_v4.y, pos_v4.z};
     speed = 0.01;
     // pos->x += SinD(rotation_speed);
-    pos->y += speed;
+    // pos->y += speed;
   }
 }
 
@@ -177,6 +167,12 @@ Entity cube_create() {
   component_add(e, Position, Position{});
   component_add(e, Velocity, Velocity{0.01});
   entity_make_renderable(e, geometry_get("cube"_), shader_get("texture_shader"_));
+
+  EntityShader* entity_shader_data = shader_get_entity_data(e);
+  // EntityShader* entity_shader_data = shader_get_entity_data(1);
+  entity_shader_data->intensity = rand_f32_01();
+  // entity_shader_data->intensity = rand_in_range_f32(0.5, 1);
+  // entity_shader_data->intensity = 0.1;
   return e;
 }
 
@@ -284,14 +280,14 @@ void app_init(App* app) {
       .name = "texture_shader"_,
       .attribut = {3,2},
     };
-    shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
+    shader_create(shader);
   }
   {
     Shader shader = {
       .name = "color_shader"_,
       .attribut = {3,3},
     };
-    shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
+    shader_create(shader);
   }
   {
     Shader shader = {
@@ -300,7 +296,7 @@ void app_init(App* app) {
       .is_transparent = true,
       .attribut = {3},
     };
-    shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
+    shader_create(shader);
   }
   {
     Shader shader = {
@@ -308,26 +304,26 @@ void app_init(App* app) {
       .is_transparent = true,
       .attribut = {3},
     };
-    shader_create(shader, &st->entities_ubo, sizeof(UBO), sizeof(PushConstant));
+    shader_create(shader);
   }
   
   // texture_load("container.jpg"_);
   // texture_load("paving.png"_);
   texture_load("orange_lines_512.png"_);
 
-  {
-    Entity grid = entity_create();
-    entity_make_renderable(grid, geometry_get("grid"_), shader_get("grid_shader"_));
-    mat4* position = (mat4*)vk_get_push_constant(grid);
-    *position = mat4_translation(v3(0,0,0));
-  }
+  // {
+  //   Entity grid = entity_create();
+  //   entity_make_renderable(grid, geometry_get("grid"_), shader_get("grid_shader"_));
+  //   mat4* position = (mat4*)vk_get_push_constant(grid);
+  //   *position = mat4_translation(v3(0,0,0));
+  // }
 
-  {
-    Entity transparent_cube = entity_create();
-    entity_make_renderable(transparent_cube, geometry_get("cube_position_vertices"_), shader_get("transparent_shader"_));
-    mat4* position = (mat4*)vk_get_push_constant(transparent_cube);
-    *position = mat4_translation(v3(0,0,0));
-  }
+  // {
+  //   Entity transparent_cube = entity_create();
+  //   entity_make_renderable(transparent_cube, geometry_get("cube_position_vertices"_), shader_get("transparent_shader"_));
+  //   mat4* position = (mat4*)vk_get_push_constant(transparent_cube);
+  //   *position = mat4_translation(v3(0,0,0));
+  // }
 
   // {
   //   Entity LargeCube = cube_create();
@@ -347,11 +343,6 @@ void app_init(App* app) {
     *pos = {x,y,z};
   }
   st->entity_count += count;
-
-  // Global_Data_Shader* global_shader_data = shader_get_global_state();
-  // PerFrame_Data_ShaderName* per_frame_shader_data = shader_get_data_per_frame(u32 shader_id);
-  // PerEntity_Data_ShaderName* per_entity_shader_data = shader_get_data_per_entity(u32 entity_id);
-  // PushConstant_ShaderName* push_constant = shader_get_push_constant(u32 entity_id);
 }
 
 f32 min = -30, max = 30;
@@ -360,7 +351,9 @@ void app_update(App* app) {
   Assign(st, app->state);
   Entity* entities = st->entities;
   
-  st->entities_ubo[0].projection_view = st->camera.projection * st->camera.view;
+  GlobalShaderState* shader_state = shader_get_global_state();
+  shader_state->g_projection_view = st->camera.projection * st->camera.view;
+  shader_state->time += 0.01;
   
   f32& rot = st->rot;
   rot += 0.01;
@@ -380,10 +373,19 @@ void app_update(App* app) {
   }
   
   Loop (i, st->entity_count) {
-    mat4* model = (mat4*)vk_get_push_constant(entities[i]);
+    PushConstant* push = vk_get_push_constant(entities[i]);
     Position* pos = entity_get_component(entities[i], Position);
-    // *model = mat4_euler_y(rot / 2) * mat4_translation(v3(pos->x, pos->y, pos->z));
-    *model = mat4_translation(v3(pos->x, pos->y, pos->z));
+    push->model = mat4_translation(v3(pos->x, pos->y, pos->z));
+  }
+  Loop (i, st->entity_count) {
+    // EntityShader* entity_shader_data = shader_get_entity_data(entities[i]);
+    // local f32 some_thing = 0;
+    // entity_shader_data->intensity += SinD(some_thing)/30;
+    // shader_state.
+    // some_thing += 0.1;
+
+    // EntityShader* data = (EntityShader*)shader_get_entity_data(0);
+    // data->intensity = 0.9;
   }
 
   position_update();

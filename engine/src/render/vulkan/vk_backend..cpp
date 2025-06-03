@@ -79,7 +79,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     void* user_data);
 
 internal void recreate_swapchain(VK_Swapchain* swapchain);
-internal void create_buffers(VK_Render* render);
+internal void create_buffers();
 
 void instance_create() {
   v2i framebuffer_extent = os_get_framebuffer_size();
@@ -205,7 +205,7 @@ void vk_r_backend_init(Arena* arena) {
     VK_CHECK(vkCreateFence(vkdevice, &fence_create_info, vk.allocator, &vk.sync.in_flight_fences[i]));
   }
 
-  create_buffers(&vk.render);
+  create_buffers();
   vk_shader_init();
 
   Loop (i, ImagesInFlight) {
@@ -275,11 +275,6 @@ void vk_r_backend_shutdown() {
   Loop (i, FramesInFlight) {
     vk_cmd_free(vk.device.cmd_pool, vk.cmds[i]);
     vk_cmd_free(vk.device.cmd_pool, vk.compute_cmds[i]);
-  }
-  
-  Loop (i, FramesInFlight) {
-    vkDestroyFramebuffer(vkdevice, vk.world_framebuffers[i], vk.allocator);
-    vkDestroyFramebuffer(vkdevice, vk.swapchain.framebuffers[i], vk.allocator);
   }
   
   // Swapchain
@@ -669,7 +664,7 @@ internal void recreate_swapchain(VK_Swapchain* swapchain) {
   vk.recreating_swapchain = false;
 }
 
-internal void create_buffers(VK_Render* render) {
+internal void create_buffers() {
   // vert
   vk.vert_buffer = vk_buffer_create(
     MB(1),
@@ -691,13 +686,22 @@ internal void create_buffers(VK_Render* render) {
     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
   vk_buffer_map_memory(&vk.stage_buffer, 0, vk.stage_buffer.size);
   
+  // TODO remove ubo buffer
   // uniform
-  vk.uniform_buffer = vk_buffer_create(
+  // vk.uniform_buffer = vk_buffer_create(
+  //   MB(1),
+  //   VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+  //   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  // vk_buffer_map_memory(&vk.uniform_buffer, 0, vk.uniform_buffer.size);
+  // vk.uniform_buffer.freelist = freelist_gpu_create(vk.arena, vk.uniform_buffer.size);
+
+  // storage
+  vk.storage_buffer = vk_buffer_create(
     MB(1),
-    VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-  vk_buffer_map_memory(&vk.uniform_buffer, 0, vk.uniform_buffer.size);
-  vk.uniform_buffer.freelist = freelist_gpu_create(vk.arena, vk.index_buffer.size);
+  vk_buffer_map_memory(&vk.storage_buffer, 0, vk.storage_buffer.size);
+  vk.storage_buffer.freelist = freelist_gpu_create(vk.arena, vk.storage_buffer.size);
 }
 
 void vk_resize_viewport() {

@@ -46,7 +46,7 @@ internal void vk_descriptor_pool_create() {
   pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
   pool_info.poolSizeCount = ArrayCount(pool_sizes);
   pool_info.pPoolSizes = pool_sizes;
-  pool_info.maxSets = 20;
+  pool_info.maxSets = 3;
   pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
   vkCreateDescriptorPool(vkdevice, &pool_info, null, &vk.descriptor_pool);
@@ -54,14 +54,14 @@ internal void vk_descriptor_pool_create() {
 
 internal void vk_descriptor_set_create() {
   VkDescriptorSetLayoutBinding ubo_layout_binding = {};
-  ubo_layout_binding.binding = 0;           // binding in shader
-  ubo_layout_binding.descriptorCount = 1; // how much you have seperate resources you can access in shader (array)
-  ubo_layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  ubo_layout_binding.binding = 0;
+  ubo_layout_binding.descriptorCount = 1;
+  ubo_layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
   ubo_layout_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
   
   VkDescriptorSetLayoutBinding texture_layout_binding = {};
-  texture_layout_binding.binding = 1;           // binding in shader
-  texture_layout_binding.descriptorCount = 1; // how much you have seperate resources you can access in shader (array)
+  texture_layout_binding.binding = 1;
+  texture_layout_binding.descriptorCount = 1;
   texture_layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
   texture_layout_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
   VkDescriptorSetLayoutBinding layout_bindings[] = {ubo_layout_binding, texture_layout_binding};
@@ -84,24 +84,25 @@ internal void vk_descriptor_set_alloc() {
   VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, vk.descriptor_sets));
 }
 
-void vk_r_shader_create(Shader* s, void* data, u64 data_size, u64 push_size) {
+void vk_r_shader_create(Shader* s) {
   Scratch scratch;
   // push constants
   vk_Shader* shader = &vk.shaders[vk.shader_count];
-  SparseSetKeep* push_constants = &shader->push_constants;
-  push_constants->data = mem_alloc(push_size * MaxEntities);
-  push_constants->element_size = push_size;
-  push_constants->capacity = 1024;
-  push_constants->size = 0;
+  // SparseSetKeep* push_constants = &shader->push_constants;
+  // push_constants->data = mem_alloc(push_size * MaxEntities);
+  // push_constants->element_size = push_size;
+  // push_constants->capacity = 1024;
+  // push_constants->size = 0;
 
   // TODO
   // uniform buffer
   u64 uniform_buffer_offset = 0; // NOTE won't work
-  MemRange range = {uniform_buffer_offset, data_size};
-  vk.uniform_buffer_mem_range = range;
+  // MemRange range = {uniform_buffer_offset, data_size};
+  // vk.uniform_buffer_mem_range = range;
   // *(void**)data = (u8*)vk.uniform_buffer.maped_memory + range.offset;
-  *(void**)data = (u8*)vk.uniform_buffer.maped_memory;
-  vk.projection_view = (mat4*)data;
+  // *(void**)data = (u8*)vk.uniform_buffer.maped_memory;
+  // *(void**)data = (u8*)vk.storage_buffer.maped_memory;
+  // vk.projection_view = (mat4*)data;
 
   // shader
   #define ShaderStageCount 2
@@ -279,7 +280,7 @@ VK_Pipeline vk_pipeline_create(
   
   // Push constants
   VkPushConstantRange push_constant;
-  push_constant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+  push_constant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
   push_constant.offset = sizeof(mat4) * 0;
   push_constant.size = sizeof(mat4) * 2;
   pipeline_layout_create_info.pushConstantRangeCount = 1;
@@ -593,4 +594,14 @@ void vk_shader_init() {
   vk_descriptor_set_create();
   vk_descriptor_set_alloc();
   asset_watch_add(vk_reload_shader);
+
+  vk.push_constants.data = mem_alloc(sizeof(PushConstant) * MaxEntities);
+  vk.push_constants.element_size = sizeof(PushConstant);
+  vk.push_constants.capacity = 1024;
+  vk.push_constants.entity_count = 0;
+
+  u64 size = sizeof(GlobalShaderState) + sizeof(EntityShader)*MaxEntities;
+  u64 offset = freelist_gpu_alloc(vk.storage_buffer.freelist, size);
+  MemRange range = {offset, size};
+  Assign(vk.global_shader_state, vk.storage_buffer.maped_memory + offset);
 }

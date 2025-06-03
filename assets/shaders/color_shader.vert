@@ -1,41 +1,18 @@
 #version 450 core
 
+#extension GL_GOOGLE_include_directive : enable
+#include "global.vert.glsl"
+
 layout(location = 0) in vec3 in_pos;
 layout(location = 1) in vec3 in_color;
 
-layout(set = 0, binding = 0) uniform UniformBuffer {
-  mat4 projection_view;
-} ubo;
-
-// per draw
-layout(push_constant) uniform push_const_ubo {
-  mat4 model;
-} push_ubo;
-
 layout(location = 0) out out_data {
-  vec3 color;
-  vec2 tex_coord;
-} outd;
+  vec3 out_color;
+  vec2 out_tex_coord;
+};
 
 void main() {
-  gl_Position = ubo.projection_view * push_ubo.model * vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
+  gl_Position = g_projection_view * u_model * vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
   
-  // gl_Position = push_ubo.model * vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
-  // gl_Position = vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
-
-  // outd.color = in_color;
-  
-  
-  outd.color = in_color * 1.3;
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
+  out_color = in_color * 1.3;
 }
