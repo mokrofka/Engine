@@ -18,25 +18,29 @@ void main() {
   vec3 norm = normalize(in_normal);
   vec3 frag_pos = in_frag_pos;
   vec4 texture_color = texture(diffuse_sampler, in_tex_coord);
+  vec3 view_dir = normalize(vec3(0) - frag_pos);
 
-  vec3 total_light = vec3(0.0);
+  float specularStrength = 0.9;
+  vec3 ambient = vec3(0.1);
+
+  vec3 total_light = vec3(0);
 
   for (int i = 0; i < g_directional_light_count; ++i) {
     DirectionaltLight light = g_directional_lights[i];
+    vec3 light_pos = vec3(g_view * vec4(light.pos, 1));
 
+    vec3 light_dir = normalize(light_pos - frag_pos);
+    vec3 reflect_dir = reflect(-light_dir, norm);
 
-    vec3 light_dir = normalize(light.pos - frag_pos);
+    float spec = specularStrength * pow(max(dot(view_dir, reflect_dir), 0.0), 32);
     float diff = max(dot(norm, light_dir), 0.0);
 
-    vec3 light_contrib = light.color * diff; // Multiply by color (e.g., RGB of light)
+    vec3 light_contrib = light.color * (diff + spec);
+
     total_light += light_contrib;
-
-
-    // vec3 light_dir = normalize(g_directional_lights[i].pos - in_frag_pos);
-
   }
- // vec3 light_dir = normalize(g_directional_lights[0].pos - in_frag_pos);
-  total_light = clamp(total_light, 0.0, 1.0);
+  vec3 final_color = total_light + ambient;
+  final_color = clamp(total_light, 0.0, 1.0);
 
-  out_color = vec4(texture_color.rgb * total_light, texture_color.a);
+  out_color = vec4(texture_color.rgb * final_color, texture_color.a);
 } 

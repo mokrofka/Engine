@@ -103,9 +103,9 @@ void position_update() {
     Transform* trans = entity_get_component(system->entities[i], Transform);
     // trans->pos.y += 0.01;
 
-    trans->rot.x += 0.01;
-    trans->rot.y += 0.01;
-    trans->rot.z += 0.01;
+    // trans->rot.x += 0.01;
+    // trans->rot.y += 0.01;
+    // trans->rot.z += 0.01;
   }
 }
 
@@ -135,7 +135,7 @@ Entity light_create() {
 
   DirectionalLight* light_data = shader_get_light_data(light);
   light_data->pos = v3(0, 0, 0);
-  light_data->color = v3(0.5, 0.5, 0.5);
+  light_data->color = {1,1,1};
 
   ShaderGlobalState* shader_global_state = shader_get_global_state();
   ++shader_global_state->light_count;
@@ -146,6 +146,11 @@ void cube_destroy(Entity e) {
   entity_destroy(e);
   entity_remove_renderable(e);
 };
+
+void light_remove(Entity e) {
+  entity_destroy(e);
+  entity_remove_renderable(e);
+}
 
 void* grid_create(Arena* arena, i32 grid_size, f32 grid_step) {
   v3* grid = push_array(arena, v3, grid_size*4);
@@ -357,6 +362,7 @@ void app_update(App* app) {
   
   ShaderGlobalState* shader_state = shader_get_global_state();
   shader_state->g_projection_view = st->camera.projection * st->camera.view;
+  shader_state->g_view = st->camera.view;
   shader_state->time += 0.01;
   
   if (input_was_key_down(KEY_1)) {
@@ -391,39 +397,116 @@ void app_update(App* app) {
 
   ui_texture_render();
   
-  UI_Window(ImGui::Begin("window")) {
-    ImGui::Text("entity count: %u", ecs.entity_count);
-    if (ImGui::Button("create cube")) {
-      cube_create();
-    }
-    if (ImGui::Button("create light")) {
-      light_create();
-    }
-    ComponentArray* transform_array = component_get_array(component_get_id(Transform));
+  // UI_Window(ImGui::Begin("window")) {
+  //   ImGui::Text("entity count: %u", ecs.entity_count);
+  //   if (ImGui::Button("create cube")) {
+  //     cube_create();
+  //   }
+  //   if (ImGui::Button("create light")) {
+  //     light_create();
+  //   }
+  //   ComponentArray* transform_array = component_get_array(component_get_id(Transform));
 
-    Loop (i, transform_array->size) {
-      Entity e = transform_array->index_to_entity[i];
+  //   Loop (i, transform_array->size) {
+  //     Entity e = transform_array->index_to_entity[i];
 
-      ImGui::PushID(i); // Make ImGui ID unique per entity
+  //     ImGui::PushID(i); // Make ImGui ID unique per entity
 
-      // Expandable tree node per entity
-      String entity_name_c = push_str_copy(scratch, ecs.entity_names[e]);
-      if (ImGui::TreeNode((char*)entity_name_c.str)) {
-        Transform* trans = entity_get_component(e, Transform);
+  //     // Expandable tree node per entity
+  //     String entity_name_c = push_str_copy(scratch, ecs.entity_names[e]);
+  //     if (ImGui::TreeNode((char*)entity_name_c.str)) {
+  //       Transform* trans = entity_get_component(e, Transform);
 
-        ImGui::DragFloat("x: ", &trans->pos.x, 0.05f);
-        ImGui::DragFloat("y: ", &trans->pos.y, 0.05f);
-        ImGui::DragFloat("z: ", &trans->pos.z, 0.05f);
+  //       ImGui::Text("position");
+  //       ImGui::DragFloat("x: ", &trans->pos.x, 0.05f);
+  //       ImGui::DragFloat("y: ", &trans->pos.y, 0.05f);
+  //       ImGui::DragFloat("z: ", &trans->pos.z, 0.05f);
+  //       ImGui::Text("scale");
+  //       ImGui::DragFloat("x: ", &trans->pos.x, 0.05f);
+  //       ImGui::DragFloat("y: ", &trans->pos.y, 0.05f);
+  //       ImGui::DragFloat("z: ", &trans->pos.z, 0.05f);
 
-        ImGui::TreePop();
-        if (ImGui::Button("delete cube")) {
-          cube_destroy(e);
-        }
+  //       ImGui::TreePop();
+  //       if (ImGui::Button("delete cube")) {
+  //         cube_destroy(e);
+  //       }
+  //     }
+
+  //     ImGui::PopID();
+  //   }
+  // }
+  UI_Window(ImGui::Begin("Scene Editor")) {
+  ImGui::Text("Total entities: %u", ecs.entity_count);
+
+  static int selected_tab = 0;
+  const char* tabs[] = { "Cubes", "Lights" };
+  // ImGui::TTabBar("EntityTabs");
+
+  if (ImGui::BeginTabBar("EntityTabs")) {
+    if (ImGui::BeginTabItem("Cubes")) {
+      if (ImGui::Button("+ Create Cube")) {
+        cube_create();
       }
 
-      ImGui::PopID();
+      ComponentArray* transform_array = component_get_array(component_get_id(Transform));
+
+      Loop(i, transform_array->size) {
+        Entity e = transform_array->index_to_entity[i];
+        // if (!entity_has_component(e, CubeComponent)) continue;
+
+        Transform* trans = entity_get_component(e, Transform);
+        String entity_name_c = push_str_copy(scratch, ecs.entity_names[e]);
+
+        ImGui::PushID(i);
+        if (ImGui::CollapsingHeader((char*)entity_name_c.str, ImGuiTreeNodeFlags_DefaultOpen)) {
+          ImGui::Text("Transform");
+
+          ImGui::DragFloat3("Position", &trans->pos.x, 0.1f);
+          ImGui::DragFloat3("Scale", &trans->scale.x, 0.1f);
+
+          if (ImGui::Button("Delete Cube")) {
+            cube_destroy(e);
+          }
+        }
+        ImGui::PopID();
+      }
+
+      ImGui::EndTabItem();
     }
+
+    if (ImGui::BeginTabItem("Lights")) {
+      if (ImGui::Button("+ Create Light")) {
+        light_create();
+      }
+
+      ComponentArray* light_array = component_get_array(component_get_id(DirectionalLight));
+      Loop(i, light_array->size) {
+        Entity e = light_array->index_to_entity[i];
+        // if (!entity_has_component(e, DirectionalLight)) continue;
+
+        DirectionalLight* light = entity_get_component(e, DirectionalLight);
+        String entity_name_c = push_str_copy(scratch, ecs.entity_names[e]);
+
+        ImGui::PushID(i);
+        if (ImGui::CollapsingHeader((char*)entity_name_c.str, ImGuiTreeNodeFlags_DefaultOpen)) {
+          ImGui::DragFloat3("Position", &light->pos.x, 0.1f);
+          ImGui::DragFloat3("Direction", &light->direction.x, 0.1f);
+          ImGui::ColorEdit3("Color", &light->color.x);
+
+          if (ImGui::Button("Delete Light")) {
+            // light_destroy(e);  // Your implementation
+          }
+        }
+        ImGui::PopID();
+      }
+
+      ImGui::EndTabItem();
+    }
+
+    ImGui::EndTabBar();
   }
+}
+
 
   // ImGui::ShowDemoWindow();
 }

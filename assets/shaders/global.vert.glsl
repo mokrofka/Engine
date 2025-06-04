@@ -14,6 +14,7 @@ struct DirectionaltLight {
 
 layout(set = 0, binding = 0) readonly buffer Buffer {
   mat4 g_projection_view;
+  mat4 g_view;
   vec4 g_ambient_color;
   float g_time;
   uint g_directional_light_count;
