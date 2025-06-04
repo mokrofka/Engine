@@ -31,3 +31,7 @@ void entity_make_renderable(u32 id, u32 mesh_id, u32 shader_id) {
 void entity_remove_renderable(u32 id) {
   vk_remove_renderable(id);
 }
+
+void entity_make_light(u32 id) {
+  vk_make_light(id);
+}

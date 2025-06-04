@@ -697,6 +697,10 @@ INLINE mat4 mat4_euler_xyz(f32 x_radians, f32 y_radians, f32 z_radians) {
   return mat;
 }
 
+INLINE mat4 mat4_transform(Transform trans) {
+  return mat4_translation(trans.pos) * mat4_scale(trans.scale) * mat4_euler_xyz(trans.rot.x, trans.rot.y, trans.rot.z);
+}
+
 INLINE v3 mat4_forward(mat4 matrix) {
   v3 forward;
   forward.x = -matrix.data[2];

@@ -19,13 +19,6 @@ struct Camera {
 struct GameState {
   Arena* arena;
   
-  Object triangle;
-  
-  u32 cube_geom_id;
-  u32 triangle_geom_id;
-  struct Shader* shader; 
-  struct UBO* entities_ubo;
-  struct PushConstant* entities_push_constant;
   Camera camera;
   
   u32 entity_count;

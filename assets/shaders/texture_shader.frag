@@ -5,21 +5,38 @@
 layout(location = 0) out vec4 out_color;
 
 layout(location = 0) in in_data {
+  vec3 in_frag_pos;
+  vec3 in_normal;
   vec2 in_tex_coord;
 };
 
 layout(set = 0, binding = 1) uniform sampler2D diffuse_sampler;
 
+// vec3 directional_light_calculate(DirectionalLight light, )
+
 void main() {
-  out_color = texture(diffuse_sampler, in_tex_coord);
-  // out_color.x += g_entities[u_entity_index].intensity;
-  // out_color.x += g_entities[0].intensity;
-  // out_color.y += g_entities[0].intensity;
-  // out_color.z += g_entities[0].intensity;
-  out_color.x += g_entities[u_entity_index].intensity;
-  out_color.y += g_entities[u_entity_index].intensity;
-  out_color.z += g_entities[u_entity_index].intensity;
-  out_color.x += sin(g_time);
-  out_color.y += sin(g_time);
-  out_color.z += sin(g_time);
+  vec3 norm = normalize(in_normal);
+  vec3 frag_pos = in_frag_pos;
+  vec4 texture_color = texture(diffuse_sampler, in_tex_coord);
+
+  vec3 total_light = vec3(0.0);
+
+  for (int i = 0; i < g_directional_light_count; ++i) {
+    DirectionaltLight light = g_directional_lights[i];
+
+
+    vec3 light_dir = normalize(light.pos - frag_pos);
+    float diff = max(dot(norm, light_dir), 0.0);
+
+    vec3 light_contrib = light.color * diff; // Multiply by color (e.g., RGB of light)
+    total_light += light_contrib;
+
+
+    // vec3 light_dir = normalize(g_directional_lights[i].pos - in_frag_pos);
+
+  }
+ // vec3 light_dir = normalize(g_directional_lights[0].pos - in_frag_pos);
+  total_light = clamp(total_light, 0.0, 1.0);
+
+  out_color = vec4(texture_color.rgb * total_light, texture_color.a);
 } 

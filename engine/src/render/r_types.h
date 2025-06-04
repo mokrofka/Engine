@@ -13,11 +13,25 @@ struct PushConstant {
   u32 entity_index;
 };
 
-struct alignas(16) EntityShader {
-  float intensity;
+struct ShaderEntity {
+  f32 intensity;
+  alignas(16) v4 padd;
 };
 
-struct GlobalShaderState {
+struct DirectionalLight {
+  alignas(16) v3 pos;
+  alignas(16) v3 direction;
+  alignas(16) v3 color;
+};
+// struct DirectionalLight {
+//   v3 pos;
+//   v3 direction;
+//   v3 color;
+// };
+
+struct ShaderGlobalState {
   mat4 g_projection_view;
+  v4 ambient_color;
   f32 time;
+  u32 light_count;
 };

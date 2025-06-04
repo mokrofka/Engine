@@ -43,6 +43,9 @@ union v3 {
     };
   };
   v3 () = default;
+  INLINE v3 (f32 scale) {
+    x = scale; y = scale; z = scale;
+  }
   INLINE v3(f32 x_, f32 y_, f32 z_) { x = x_, y = y_, z = z_; }
 };
 
@@ -94,4 +97,10 @@ enum Axis{
   Axis_Y,
   Axis_Z,
   Axis_W
+};
+
+struct Transform {
+  v3 pos;
+  v3 rot;
+  v3 scale;
 };

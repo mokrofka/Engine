@@ -34,11 +34,10 @@ struct ECS_state {
   Entity entities[MaxEntities];
   b8 is_entities_alive[MaxEntities];
   Signature signatures[MaxEntities];
+  String64 entity_names[MaxEntities];
   
   // ComponentManager
   u32 component_count;
-  ComponentType next_component_type;
-  u32 next_system_type;
   struct ComponentArray* component_arrays[MaxComponents];
   
   // SystemManager
@@ -62,6 +61,9 @@ struct ECS_state {
     u32 components_hash_id[10];
   } system_queue_component[100];
   u32 system_queue_hash_ids[100];
+
+  u32 tag_queue_count;
+  u32 tag_queue_hash_ids[100];
 };
 
 KAPI extern ECS_state ecs;
@@ -69,11 +71,20 @@ KAPI extern ECS_state ecs;
 //////////////////////////////////////////////////////
 // Entity
 
-inline Entity entity_create() {
+inline String64 _entity_create_default_name() {
+  Scratch scratch;
+  String entity_name = push_strf(scratch, "entity_%i", ecs.entity_count);
+  String64 result;
+  str_copy(result, entity_name);
+  return result;
+};
+
+inline Entity entity_create(String64 entity_name = _entity_create_default_name()) {
   Assert(ecs.entity_count < MaxEntities);
 
   Entity id = ecs.entities[ecs.entity_count];
   ecs.is_entities_alive[id] = true;
+  ecs.entity_names[id] = entity_name;
   ++ecs.entity_count;
   return id;
 }
@@ -141,6 +152,16 @@ struct ComponentArray {
     MemCopy(dst, component, element_size);
     ++size;
   }
+  inline void add(Entity entity) {
+    Assert(ecs.is_entities_alive);
+
+    u32 new_index = size;
+    entity_to_index[entity] = new_index;
+    index_to_entity[new_index] = entity;
+    void* dst = (u8*)(component_array) + element_size*new_index;
+    MemZero(dst, element_size);
+    ++size;
+  }
   inline void remove_data(Entity entity) {
     Assert(ecs.is_entities_alive[entity]);
 
@@ -191,7 +212,14 @@ inline ComponentArray* component_get_array(u32 component_id) {
   return ecs.component_arrays[component_id];
 }
 
-inline void _component_add_internal(Entity entity, u32 component_id, void* component) {
+inline void _component_add_internal(Entity entity, u32 component_id) {
+  Assert(ecs.component_arrays[component_id]);
+  Assert(ecs.is_entities_alive[entity]);
+  Assert(!entity_has_component(entity, component_id));
+  ecs.component_arrays[component_id]->add(entity);
+}
+
+inline void _component_set_internal(Entity entity, u32 component_id, void* component) {
   Assert(ecs.component_arrays[component_id]);
   Assert(ecs.is_entities_alive[entity]);
   Assert(!entity_has_component(entity, component_id));
@@ -319,27 +347,46 @@ inline void entity_signature_changed(Entity entity, Signature entity_signature) 
   }
 }
 
-////////////////////////////////////////////////
-// Interface
-
 inline void entity_destroy(Entity entity) {
   components_entity_destroy(entity);
   system_entity_destroyed(entity);
   entity_destroy_id(entity);
 }
 
-inline void __component_add(Entity entity, u32 component_id, void* component) {
-  _component_add_internal(entity, component_id, component);
+inline void __component_add(Entity entity, u32 component_id) {
+  _component_add_internal(entity, component_id);
+  Signature signature = entity_get_signature(entity);
+  SetBit(signature, component_id);
+  entity_set_signature(entity, signature);
+  entity_signature_changed(entity, signature);
+}
+inline void __component_set(Entity entity, u32 component_id, void* component) {
+  _component_set_internal(entity, component_id, component);
+  Signature signature = entity_get_signature(entity);
+  SetBit(signature, component_id);
+  entity_set_signature(entity, signature);
+  entity_signature_changed(entity, signature);
+}
+inline void __tag_add(Entity entity, u32 component_id) {
   Signature signature = entity_get_signature(entity);
   SetBit(signature, component_id);
   entity_set_signature(entity, signature);
   entity_signature_changed(entity, signature);
 }
 
-#define component_add(entity, T, component)                 \
-  {                                                         \
-    auto temp = component;                                  \
-    __component_add(entity, component_get_id(T), &temp);    \
+#define component_add(entity, T)                  \
+  {                                               \
+    __component_add(entity, component_get_id(T)); \
+  }
+#define component_set(entity, T, ...)                    \
+  {                                                      \
+    auto temp = __VA_ARGS__;                             \
+    __component_set(entity, component_get_id(T), &temp); \
+  }
+
+#define tag_add(entity, T)                  \
+  {                                         \
+    __tag_add(entity, component_get_id(T)); \
   }
 
 #define component_remove(entity, T)                          \
@@ -351,16 +398,10 @@ inline void __component_add(Entity entity, u32 component_id, void* component) {
     entity_signature_changed(entity, signature);             \
   }
 
-
-
-
-
-#include "stdio.h"
 inline void component_enqueue(String component_name, u32 component_size) {
   ecs.component_queue_hash_ids[ecs.component_queue_count] = hash_name_at_compile(component_name);
   ecs.component_queue_sizes[ecs.component_queue_count] = component_size;
   ++ecs.component_queue_count;
-  // printf("registered component: %s\n", component_nama.str);
 }
 
 inline void component_queue_register() {
@@ -428,6 +469,18 @@ inline void system_queue_register() {
   }
 }
 
+inline void tag_enqueue(String tag_name) {
+  ecs.tag_queue_hash_ids[ecs.component_queue_count] = hash_name_at_compile(tag_name);
+  ++ecs.tag_queue_count;
+}
+
+inline void tag_queue_register() {
+  Loop (i, ecs.tag_queue_count) {
+    u32 hashed_id = ecs.tag_queue_hash_ids[i];
+    ecs.hashed_id_to_component_id[hashed_id] = ecs.component_count++;
+  }
+}
+
 inline void ecs_init() {
   Loop (i, MaxEntities) {
     ecs.entities[i] = i;
@@ -437,6 +490,7 @@ inline void ecs_init() {
     ecs.hashed_id_to_component_id[i] = INVALID_ID;
   }
   component_queue_register();
+  tag_queue_register();
   system_queue_register();
 }
 
@@ -448,14 +502,6 @@ inline void ecs_init() {
   };                                                       \
   static Glue(__, T) Glue(__variable, T);
 
-// #define System(T, ...)                                    \
-//   struct Glue(__, T) {                                    \
-//     Glue(__, T)() {                                       \
-//       system_enqueue(str_lit(Stringify(T)), __VA_ARGS__); \
-//     }                                                     \
-//   };                                                      \
-//   static Glue(__, T) Glue(__variable, T);
-
 #define System(T, ...)                                              \
   struct Glue(__, T) {                                              \
     Glue(__, T)() {                                                 \
@@ -464,8 +510,13 @@ inline void ecs_init() {
   };                                                                \
   static Glue(__, T) Glue(__variable, T);
 
-void test_ecs();
-
+#define Tag(T)                                       \
+  struct Glue(__, T) {                                     \
+    Glue(__, T)() {                                        \
+      tag_enqueue(str_lit(Stringify(T))); \
+    }                                                      \
+  };                                                       \
+  static Glue(__, T) Glue(__variable, T);
 
 
 

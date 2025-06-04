@@ -8,6 +8,6 @@ layout(set = 0, binding = 0) uniform UniformBuffer {
 
 void main() {
   projection_view;
-  float val = 0.1;
+  float val = 0.3;
   out_color = vec4(val, val, val, 0.4f);
 }

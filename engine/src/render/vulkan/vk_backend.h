@@ -31,8 +31,11 @@ KAPI PushConstant* vk_get_push_constant(u32 id);
 void vk_make_renderable(u32 id, u32 geom_id, u32 shader_id);
 void vk_remove_renderable(u32 id);
 
+void vk_make_light(u32 entity_id);
+
 void vk_texture_load(Texture* texture);
 v2 vk_get_viewport_size();
 
-KAPI GlobalShaderState* shader_get_global_state();
-KAPI EntityShader* shader_get_entity_data(u32 entity_id);
+KAPI ShaderGlobalState* shader_get_global_state();
+KAPI ShaderEntity* shader_get_entity_data(u32 entity_id);
+KAPI DirectionalLight* shader_get_light_data(u32 entity_id);

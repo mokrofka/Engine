@@ -597,11 +597,19 @@ void vk_shader_init() {
 
   vk.push_constants.data = mem_alloc(sizeof(PushConstant) * MaxEntities);
   vk.push_constants.element_size = sizeof(PushConstant);
-  vk.push_constants.capacity = 1024;
   vk.push_constants.entity_count = 0;
 
-  u64 size = sizeof(GlobalShaderState) + sizeof(EntityShader)*MaxEntities;
+  u64 size = sizeof(ShaderGlobalState) + AlignPow2(sizeof(ShaderEntity)*MaxEntities, 16) + AlignPow2(sizeof(DirectionalLight)*KB(1), 16);
   u64 offset = freelist_gpu_alloc(vk.storage_buffer.freelist, size);
   MemRange range = {offset, size};
   Assign(vk.global_shader_state, vk.storage_buffer.maped_memory + offset);
+
+  vk.entities_data.data = vk.storage_buffer.maped_memory + AlignPow2(sizeof(ShaderGlobalState), 16);
+  // vk.entities_data.data = vk.storage_buffer.maped_memory + sizeof(ShaderGlobalState);
+  vk.entities_data.element_size = sizeof(ShaderEntity);
+  vk.entities_data.entity_count = 0;
+
+  vk.lights_data.data = vk.storage_buffer.maped_memory + AlignPow2(sizeof(ShaderGlobalState), 16) + sizeof(ShaderEntity)*MaxEntities;
+  vk.lights_data.element_size = sizeof(DirectionalLight);
+  vk.lights_data.entity_count = 0;
 }

@@ -71,6 +71,7 @@ INLINE b32 cstr_matchi(const void* str0, const void* str1);
 // String Constructors
 
 #define str_lit(S) str((u8*)(S), sizeof(S) - 1) // deprecated
+#define str_lit64(S) {.str = (S), .size = sizeof(S)-1}
 
 INLINE String str(u8* str, u32 size);
 
@@ -135,8 +136,8 @@ INLINE String str8_chop(String str, u32 amt);
 
 String push_str_cat(Arena* arena, String s1, String s2);
 KAPI String push_str_copy(Arena *arena, String s);
-String push_strfv(Arena* arena, const void* fmt, void* argc);
-String push_strf(Arena* arena, const void* fmt, ...);
+KAPI String push_strfv(Arena* arena, const void* fmt, void* argc);
+KAPI String push_strf(Arena* arena, const void* fmt, ...);
 
 ////////////////////////////////
 // String some random stuff

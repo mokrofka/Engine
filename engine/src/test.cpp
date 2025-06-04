@@ -358,10 +358,6 @@ struct Gravity {
 	f32 f;
 };
 // Component(Gravity)
-
-struct Transform {
-	v3 position;
-};
 // Component(Transform)
 
 struct PhysicsSystem : BaseSystem {
@@ -371,57 +367,57 @@ struct PhysicsSystem : BaseSystem {
       Transform* transform = entity_get_component(entity, Transform);
       Gravity* gravity = entity_get_component(entity, Gravity);
       
-      transform->position.y += gravity->f;
+      // transform->position.y += gravity->f;
     }
   }
 };
 
-void test_ecs() {
-  // component_register(Gravity);
-  // component_register(Transform);
+// void test_ecs() {
+//   // component_register(Gravity);
+//   // component_register(Transform);
 
-  Signature signature = {};
-  signature |= Bit(component_get_id(Gravity)) | Bit(component_get_id(Transform));
-  PhysicsSystem* physics = system_register(PhysicsSystem, signature);
+//   Signature signature = {};
+//   signature |= Bit(component_get_id(Gravity)) | Bit(component_get_id(Transform));
+//   PhysicsSystem* physics = system_register(PhysicsSystem, signature);
   
-  Entity some = entity_create();
-  // Forget to add component
-  component_add(some, Transform, v3(3,4,5));
-  Transform* t = entity_get_component(some, Transform); // crash!
+//   Entity some = entity_create();
+//   // Forget to add component
+//   component_add(some, Transform, v3(3,4,5));
+//   Transform* t = entity_get_component(some, Transform); // crash!
   
-  Entity entities[MaxEntities];
+//   Entity entities[MaxEntities];
   
-  Loop (i, ArrayCount(entities)-1) {
-    entities[i] = entity_create();
-    component_add(entities[i], Gravity, 0.5f);
-    component_add(entities[i], Transform, v3(1,2,3));
-  }
+//   Loop (i, ArrayCount(entities)-1) {
+//     entities[i] = entity_create();
+//     component_add(entities[i], Gravity, 0.5f);
+//     component_add(entities[i], Transform, v3(1,2,3));
+//   }
   
-  struct DoWork : BaseSystem {
-    void update() {
-      Loop (i, entity_count) {
-        Entity e = entities[i];
-        Transform* t = entity_get_component(e, Transform);
-        t->position *= 2;
-      }
-    }
-  };
-  physics->update();
+//   struct DoWork : BaseSystem {
+//     void update() {
+//       Loop (i, entity_count) {
+//         Entity e = entities[i];
+//         Transform* t = entity_get_component(e, Transform);
+//         // t->position *= 2;
+//       }
+//     }
+//   };
+//   physics->update();
   
-  Signature do_work_dependency = Bit(component_get_id(Transform));
-  DoWork* do_work = system_register(DoWork, do_work_dependency);
-  entity_destroy(some);
-  Entity e = entity_create();
-  component_add(e, Transform, v3(1,2,3));
-  do_work->update();
-  component_remove(e, Transform);
-  do_work->update();
+//   Signature do_work_dependency = Bit(component_get_id(Transform));
+//   DoWork* do_work = system_register(DoWork, do_work_dependency);
+//   entity_destroy(some);
+//   Entity e = entity_create();
+//   component_add(e, Transform, v3(1,2,3));
+//   do_work->update();
+//   component_remove(e, Transform);
+//   do_work->update();
   
   
-  // Loop (i, ArrayCount(entities)) {
-    entity_destroy(0);
-  // }
-}
+//   // Loop (i, ArrayCount(entities)) {
+//     entity_destroy(0);
+//   // }
+// }
 
 // struct BaseComponent {
 //   static BaseComponent() {

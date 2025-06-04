@@ -14,6 +14,8 @@
 #define FramesInFlight 2
 #define ImagesInFlight 3
 
+#define DirectionalLightsMax KB(1)
+
 struct VK_Buffer {
   VkBuffer handle;
   VkDeviceMemory memory;
@@ -201,8 +203,6 @@ struct VK {
   VkDescriptorSet compute_descriptor_sets[FramesInFlight];
   
   vk_Shader shader;
-  u32 entity_count;
-  u32 entities[MaxEntities];
   MemRange uniform_buffer_mem_range;
   u64 vulkan_driver_memory_allocated;
   VK_Mesh meshes[10];
@@ -215,6 +215,8 @@ struct VK {
 
   SparseSetIndex entity_to_mesh;
   u32 entity_to_shader[MaxEntities];
+  SparseSetKeep entities_data;
+  SparseSetKeep lights_data;
   
   // Shader
   u32 shader_count;
@@ -223,8 +225,7 @@ struct VK {
   vk_Shader graphics_shader_compute;
   mat4* projection_view;
   SparseSetKeep push_constants;
-  GlobalShaderState* global_shader_state;
-  EntityShader* entities_shader_data;
+  ShaderGlobalState* global_shader_state;
 
   // offscreen rendering
   VK_Texture texture_targets[ImagesInFlight];

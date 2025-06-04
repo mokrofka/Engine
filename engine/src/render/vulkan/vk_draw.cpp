@@ -1,4 +1,5 @@
 #include "vk_types.h"
+#include "vk_draw.h"
 #include "ecs.h"
 
 
@@ -43,6 +44,9 @@ void descriptor_update(u32 shader_id) {
 }
 
 void vk_draw() {
+  push_constants_update();
+  light_update();
+
   VkCommandBuffer cmd = vk_get_current_cmd();
   Loop (j, vk.shader_count) {
     vk_Shader* shader = &vk.shaders[j];
@@ -82,6 +86,12 @@ void vk_make_renderable(u32 entity_id, u32 geom_id, u32 shader_id) {
   push->entity_index = entity_id;
   vk.entity_to_mesh.insert_data(entity_id, geom_id);
   vk.entity_to_shader[entity_id] = shader_id;
+
+  vk.entities_data.insert_data(entity_id);
+}
+
+void vk_make_light(u32 entity_id) {
+  vk.lights_data.insert_data(entity_id);
 }
 
 void vk_remove_renderable(u32 entity_id) {
@@ -90,6 +100,8 @@ void vk_remove_renderable(u32 entity_id) {
 
   vk.push_constants.remove_data(entity_id);
   vk.entity_to_mesh.remove_data(entity_id);
+
+  vk.entities_data.remove_data(entity_id);
 }
 
 KAPI PushConstant* vk_get_push_constant(u32 entity_id) {
@@ -149,11 +161,43 @@ void vk_compute_draw() {
   VK_CHECK(vkEndCommandBuffer(cmd))
 }
 
-KAPI GlobalShaderState* shader_get_global_state() {
-  return (GlobalShaderState*)vk.storage_buffer.maped_memory;
+KAPI ShaderGlobalState* shader_get_global_state() {
+  return (ShaderGlobalState*)vk.storage_buffer.maped_memory;
 }
 
-KAPI EntityShader* shader_get_entity_data(u32 entity_id) {
-  return (EntityShader*)(vk.storage_buffer.maped_memory +
-                         sizeof(GlobalShaderState) + sizeof(EntityShader) * entity_id);
+KAPI ShaderEntity* shader_get_entity_data(u32 entity_id) {
+  // return (EntityShader*)(vk.storage_buffer.maped_memory +
+  //                        sizeof(GlobalShaderState) + sizeof(EntityShader) * entity_id);
+
+  return (ShaderEntity*)(vk.entities_data.get_data(entity_id));
+}
+
+KAPI DirectionalLight* shader_get_light_data(u32 entity_id) {
+  // return (EntityShader*)(vk.storage_buffer.maped_memory +
+  //                        sizeof(GlobalShaderState) + sizeof(EntityShader) * MaxEntities + sizeof(Light) * entity_id);
+
+  return (DirectionalLight*)vk.lights_data.get_data(entity_id);
+}
+
+System(PushConstantUpdate, Transform)
+void push_constants_update() {
+  BaseSystem* system = system_get(PushConstantUpdate);
+  Loop (i, system->entity_count) {
+    Entity e = system->entities[i];
+    PushConstant* push = vk_get_push_constant(e);
+    Transform* trans = entity_get_component(e, Transform);
+    push->model = mat4_transform(*trans);
+  }
+}
+
+Tag(DirectionalLight)
+System(LightUpdate, Transform DirectionalLight)
+void light_update() {
+  BaseSystem* system = system_get(LightUpdate);
+  Loop (i, system->entity_count) {
+    Entity e = system->entities[i];
+    DirectionalLight* light_data = shader_get_light_data(e);
+    Transform* trans = entity_get_component(e, Transform);
+    light_data->pos = trans->pos;
+  }
 }
