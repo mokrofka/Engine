@@ -3,6 +3,7 @@
 
 struct Entity {
   float intensity;
+  vec3 color;
   vec4 padd;
 };
 

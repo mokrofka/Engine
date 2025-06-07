@@ -20,7 +20,7 @@ void main() {
   vec4 texture_color = texture(diffuse_sampler, in_tex_coord);
   vec3 view_dir = normalize(vec3(0) - frag_pos);
 
-  float specularStrength = 0.9;
+  float specularStrength = 0.5;
   vec3 ambient = vec3(0.1);
 
   vec3 total_light = vec3(0);
@@ -32,7 +32,7 @@ void main() {
     vec3 light_dir = normalize(light_pos - frag_pos);
     vec3 reflect_dir = reflect(-light_dir, norm);
 
-    float spec = specularStrength * pow(max(dot(view_dir, reflect_dir), 0.0), 32);
+    float spec = specularStrength * pow(max(dot(view_dir, reflect_dir), 0.0), 10);
     float diff = max(dot(norm, light_dir), 0.0);
 
     vec3 light_contrib = light.color * (diff + spec);

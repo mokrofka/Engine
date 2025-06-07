@@ -34,6 +34,7 @@ struct ECS_state {
   Entity entities[MaxEntities];
   b8 is_entities_alive[MaxEntities];
   Signature signatures[MaxEntities];
+  Signature tags[MaxEntities];
   String64 entity_names[MaxEntities];
   
   // ComponentManager
@@ -131,7 +132,8 @@ constexpr u32 _system_get_id_internal(String system_name) {
 #define system_get_id(T) \
   _system_get_id_internal(str_lit(Stringify(T)))
 
-#define entity_has_component(entity, T) ((entity_get_signature(entity) & Bit(T)) == Bit(T))
+#define entity_has_component_id(entity, T) ((entity_get_signature(entity) & Bit(T)) == Bit(T))
+#define entity_has_component(entity, T) ((entity_get_signature(entity) & Bit(component_get_id(T))) == Bit(component_get_id(T)))
 //////////////////////////////////////////////////////
 // ComponentArray
 
@@ -215,21 +217,21 @@ inline ComponentArray* component_get_array(u32 component_id) {
 inline void _component_add_internal(Entity entity, u32 component_id) {
   Assert(ecs.component_arrays[component_id]);
   Assert(ecs.is_entities_alive[entity]);
-  Assert(!entity_has_component(entity, component_id));
+  Assert(!entity_has_component_id(entity, component_id));
   ecs.component_arrays[component_id]->add(entity);
 }
 
 inline void _component_set_internal(Entity entity, u32 component_id, void* component) {
   Assert(ecs.component_arrays[component_id]);
   Assert(ecs.is_entities_alive[entity]);
-  Assert(!entity_has_component(entity, component_id));
+  Assert(!entity_has_component_id(entity, component_id));
   ecs.component_arrays[component_id]->insert_data(entity, component);
 }
 
 inline void _component_remove_internal(Entity entity, u32 component_id) {
   Assert(ecs.component_arrays[component_id]);
   Assert(ecs.is_entities_alive[entity]);
-  Assert(entity_has_component(entity, component_id));
+  Assert(entity_has_component_id(entity, component_id));
   ecs.component_arrays[component_id]->remove_data(entity);
 }
 
@@ -237,7 +239,7 @@ inline void* _component_get_internal(Entity entity, u32 index) {
   Assert(ecs.component_arrays[index]);
   u32 i = ecs.entity_count;
   Assert(ecs.is_entities_alive[entity]);
-  Assert(entity_has_component(entity, index));
+  Assert(entity_has_component_id(entity, index));
   return ecs.component_arrays[index]->get_data(entity);
 }
 #define entity_get_component(entity, T) \

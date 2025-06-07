@@ -15,6 +15,7 @@ struct PushConstant {
 
 struct ShaderEntity {
   f32 intensity;
+  alignas(16) v3 color;
   alignas(16) v4 padd;
 };
 

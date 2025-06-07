@@ -93,7 +93,10 @@ f32 axis_vertices[] = {
    0, 0, 1,          0, 0, 1,
 };
 
+struct Cube {};
+
 Component(Transform)
+Component(Cube)
 
 System(PositionUpdate, Transform)
 
@@ -113,6 +116,8 @@ Entity cube_create() {
   Entity e = entity_create();
   // component_add(e, Position, Position{});
   component_set(e, Transform, Transform{.pos = v3_zero(), .scale = 1});
+  component_add(e, Cube);
+
   entity_make_renderable(e, geometry_get("cube"_), shader_get("texture_shader"_));
 
   ShaderEntity* entity_shader_data = shader_get_entity_data(e);
@@ -125,7 +130,8 @@ Entity light_create() {
   entity_make_light(light);
   entity_make_renderable(light, geometry_get("cube"_), shader_get("color_shader"_));
   component_set(light, Transform, Transform{.pos = v3_zero(), .scale = 0.3});
-  tag_add(light, DirectionalLight);
+  component_add(light, DirectionalLight);
+  // tag_add(light, DirectionalLight);
 
   PushConstant* push = vk_get_push_constant(light);
   push->model = mat4_translation(v3(0, 0, 0)) * mat4_scale(0.2);
@@ -147,7 +153,7 @@ void cube_destroy(Entity e) {
   entity_remove_renderable(e);
 };
 
-void light_remove(Entity e) {
+void light_destroy(Entity e) {
   entity_destroy(e);
   entity_remove_renderable(e);
 }
@@ -323,7 +329,7 @@ void app_init(App* app) {
     entity_make_light(light);
     entity_make_renderable(light, geometry_get("cube"_), shader_get("color_shader"_));
     component_set(light, Transform, Transform{.pos = v3_zero(), .scale = 0.3});
-    tag_add(light, DirectionalLight);
+    component_add(light, DirectionalLight);
 
     PushConstant* push = vk_get_push_constant(light);
     push->model = mat4_translation(v3(0,0,0)) * mat4_scale(0.2);
@@ -397,116 +403,73 @@ void app_update(App* app) {
 
   ui_texture_render();
   
-  // UI_Window(ImGui::Begin("window")) {
-  //   ImGui::Text("entity count: %u", ecs.entity_count);
-  //   if (ImGui::Button("create cube")) {
-  //     cube_create();
-  //   }
-  //   if (ImGui::Button("create light")) {
-  //     light_create();
-  //   }
-  //   ComponentArray* transform_array = component_get_array(component_get_id(Transform));
-
-  //   Loop (i, transform_array->size) {
-  //     Entity e = transform_array->index_to_entity[i];
-
-  //     ImGui::PushID(i); // Make ImGui ID unique per entity
-
-  //     // Expandable tree node per entity
-  //     String entity_name_c = push_str_copy(scratch, ecs.entity_names[e]);
-  //     if (ImGui::TreeNode((char*)entity_name_c.str)) {
-  //       Transform* trans = entity_get_component(e, Transform);
-
-  //       ImGui::Text("position");
-  //       ImGui::DragFloat("x: ", &trans->pos.x, 0.05f);
-  //       ImGui::DragFloat("y: ", &trans->pos.y, 0.05f);
-  //       ImGui::DragFloat("z: ", &trans->pos.z, 0.05f);
-  //       ImGui::Text("scale");
-  //       ImGui::DragFloat("x: ", &trans->pos.x, 0.05f);
-  //       ImGui::DragFloat("y: ", &trans->pos.y, 0.05f);
-  //       ImGui::DragFloat("z: ", &trans->pos.z, 0.05f);
-
-  //       ImGui::TreePop();
-  //       if (ImGui::Button("delete cube")) {
-  //         cube_destroy(e);
-  //       }
-  //     }
-
-  //     ImGui::PopID();
-  //   }
-  // }
   UI_Window(ImGui::Begin("Scene Editor")) {
-  ImGui::Text("Total entities: %u", ecs.entity_count);
+    ImGui::Text("Total entities: %u", ecs.entity_count);
 
-  static int selected_tab = 0;
-  const char* tabs[] = { "Cubes", "Lights" };
-  // ImGui::TTabBar("EntityTabs");
+    if (ImGui::BeginTabBar("EntityTabs")) {
 
-  if (ImGui::BeginTabBar("EntityTabs")) {
-    if (ImGui::BeginTabItem("Cubes")) {
-      if (ImGui::Button("+ Create Cube")) {
-        cube_create();
-      }
 
-      ComponentArray* transform_array = component_get_array(component_get_id(Transform));
+      if (ImGui::BeginTabItem("Cubes")) {
+        if (ImGui::Button("+ Create Cube")) {
+          cube_create();
+        }
 
-      Loop(i, transform_array->size) {
-        Entity e = transform_array->index_to_entity[i];
-        // if (!entity_has_component(e, CubeComponent)) continue;
+        ComponentArray* transform_array = component_get_array(component_get_id(Transform));
 
-        Transform* trans = entity_get_component(e, Transform);
-        String entity_name_c = push_str_copy(scratch, ecs.entity_names[e]);
+        Loop (i, transform_array->size) {
+          Entity e = transform_array->index_to_entity[i];
+          if (entity_has_component(e, Cube)) {
+            Transform* trans = entity_get_component(e, Transform);
+            String entity_name_c = push_str_copy(scratch, ecs.entity_names[e]);
 
-        ImGui::PushID(i);
-        if (ImGui::CollapsingHeader((char*)entity_name_c.str, ImGuiTreeNodeFlags_DefaultOpen)) {
-          ImGui::Text("Transform");
+            ImGui::PushID(i);
+            if (ImGui::CollapsingHeader((char*)entity_name_c.str)) {
+              ImGui::Text("Transform");
 
-          ImGui::DragFloat3("Position", &trans->pos.x, 0.1f);
-          ImGui::DragFloat3("Scale", &trans->scale.x, 0.1f);
+              ImGui::DragFloat3("Position", &trans->pos.x, 0.1f);
+              ImGui::DragFloat3("Scale", &trans->scale.x, 0.1f);
 
-          if (ImGui::Button("Delete Cube")) {
-            cube_destroy(e);
+              if (ImGui::Button("Delete Cube")) {
+                cube_destroy(e);
+              }
+            }
+            ImGui::PopID();
           }
         }
-        ImGui::PopID();
+
+        ImGui::EndTabItem();
       }
 
-      ImGui::EndTabItem();
-    }
-
-    if (ImGui::BeginTabItem("Lights")) {
-      if (ImGui::Button("+ Create Light")) {
-        light_create();
-      }
-
-      ComponentArray* light_array = component_get_array(component_get_id(DirectionalLight));
-      Loop(i, light_array->size) {
-        Entity e = light_array->index_to_entity[i];
-        // if (!entity_has_component(e, DirectionalLight)) continue;
-
-        DirectionalLight* light = entity_get_component(e, DirectionalLight);
-        String entity_name_c = push_str_copy(scratch, ecs.entity_names[e]);
-
-        ImGui::PushID(i);
-        if (ImGui::CollapsingHeader((char*)entity_name_c.str, ImGuiTreeNodeFlags_DefaultOpen)) {
-          ImGui::DragFloat3("Position", &light->pos.x, 0.1f);
-          ImGui::DragFloat3("Direction", &light->direction.x, 0.1f);
-          ImGui::ColorEdit3("Color", &light->color.x);
-
-          if (ImGui::Button("Delete Light")) {
-            // light_destroy(e);  // Your implementation
-          }
+      if (ImGui::BeginTabItem("Lights")) {
+        if (ImGui::Button("+ Create Light")) {
+          light_create();
         }
-        ImGui::PopID();
+
+        ComponentArray* light_array = component_get_array(component_get_id(DirectionalLight));
+        Loop(i, light_array->size) {
+          Entity e = light_array->index_to_entity[i];
+          DirectionalLight* light = entity_get_component(e, DirectionalLight);
+          String entity_name_c = push_str_copy(scratch, ecs.entity_names[e]);
+
+          ImGui::PushID(i);
+          if (ImGui::CollapsingHeader((char*)entity_name_c.str)) {
+            ImGui::DragFloat3("Position", &light->pos.x, 0.1f);
+            ImGui::DragFloat3("Direction", &light->direction.x, 0.1f);
+            ImGui::ColorEdit3("Color", &light->color.x);
+
+            if (ImGui::Button("Delete Light")) {
+              light_destroy(e);
+            }
+          }
+          ImGui::PopID();
+        }
+
+        ImGui::EndTabItem();
       }
 
-      ImGui::EndTabItem();
+      ImGui::EndTabBar();
     }
-
-    ImGui::EndTabBar();
   }
-}
-
 
   // ImGui::ShowDemoWindow();
 }

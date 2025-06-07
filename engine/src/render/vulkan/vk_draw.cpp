@@ -190,7 +190,7 @@ void push_constants_update() {
   }
 }
 
-Tag(DirectionalLight)
+Component(DirectionalLight)
 System(LightUpdate, Transform DirectionalLight)
 void light_update() {
   BaseSystem* system = system_get(LightUpdate);
@@ -198,6 +198,11 @@ void light_update() {
     Entity e = system->entities[i];
     DirectionalLight* light_data = shader_get_light_data(e);
     Transform* trans = entity_get_component(e, Transform);
-    light_data->pos = trans->pos;
+    DirectionalLight* dir_light = entity_get_component(e, DirectionalLight);
+    trans->pos = dir_light->pos;
+    light_data->pos = dir_light->pos;
+    light_data->color = dir_light->color;
+    ShaderEntity* shader_e = shader_get_entity_data(e);
+    shader_e->color = light_data->color;
   }
 }

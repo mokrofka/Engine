@@ -1,10 +1,6 @@
 #include "lib.h"
 #include "ecs.h"
 
-struct Object {
-  u32 id;
-};
-
 struct Camera {
   mat4 view;
   mat4 projection;
