@@ -63,8 +63,8 @@ struct VK_Image  {
   VkImage handle;
   VkDeviceMemory memory;
   VkImageView view;
-  u16 height;
-  u16 width;
+  u32 width;
+  u32 height;
 };
 
 enum VK_RenderPassState {
@@ -203,7 +203,7 @@ struct VK {
   VkDescriptorSet compute_descriptor_sets[FramesInFlight];
   
   vk_Shader shader;
-  MemRange uniform_buffer_mem_range;
+  Range storage_buffer_range;
   u64 vulkan_driver_memory_allocated;
   VK_Mesh meshes[10];
   SparseSetKeep sparse_push_constants;
@@ -231,7 +231,8 @@ struct VK {
   VK_Texture texture_targets[ImagesInFlight];
   VkFramebuffer texture_framebuffers[ImagesInFlight];
   VK_Image depth;
-  b8 is_viewport_sezied;
+  b8 is_viewport_resized;
+  b8 is_viewport_render;
 
   v2 viewport_size;
   
@@ -242,10 +243,10 @@ struct VK {
 
 extern VK vk;
 
-INLINE i32 vk_find_memory_index(u32 type_filter, u32 property_flags) {
+INLINE u32 vk_find_memory_index(u32 type_filter, u32 property_flags) {
   VkPhysicalDeviceMemoryProperties memory_properties;
   vkGetPhysicalDeviceMemoryProperties(vk.device.physical_device, &memory_properties);
-  u32 index = -1;
+  u32 index = INVALID_ID;
 
   Loop (i, memory_properties.memoryTypeCount) {
     // Check each memory type to see if its bit is set to 1.
@@ -254,7 +255,7 @@ INLINE i32 vk_find_memory_index(u32 type_filter, u32 property_flags) {
     }
   }
 
-  Assert(index != -1 && "Unable to find suitable memory type");
+  Assert(index != INVALID_ID && "Unable to find suitable memory type");
   return index;
 }
 
@@ -283,4 +284,3 @@ struct UniformBufferObject {
   f32 delta_time = 1.0f;
 };
 
-void vk_resize_viewport();

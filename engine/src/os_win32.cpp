@@ -234,8 +234,8 @@ v2 os_get_mouse_delta() {
 // Memory
 #define PAGE_SIZE 4096
 
-void* os_reserve(u64 size) {
-  void* result = VirtualAlloc(0, size, MEM_RESERVE, PAGE_READWRITE);
+u8* os_reserve(u64 size) {
+  u8* result = (u8*)VirtualAlloc(0, size, MEM_RESERVE, PAGE_READWRITE);
   return result;
 }
 

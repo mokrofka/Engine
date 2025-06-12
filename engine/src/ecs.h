@@ -237,7 +237,6 @@ inline void _component_remove_internal(Entity entity, u32 component_id) {
 
 inline void* _component_get_internal(Entity entity, u32 index) {
   Assert(ecs.component_arrays[index]);
-  u32 i = ecs.entity_count;
   Assert(ecs.is_entities_alive[entity]);
   Assert(entity_has_component_id(entity, index));
   return ecs.component_arrays[index]->get_data(entity);
@@ -430,7 +429,7 @@ inline void system_enqueue(String system_name, String dependency) {
   Loop (i, dependency.size + 1) {
     if (char_is_space(dependency.str[i]) || dependency.str[i] == '\0') {
       String s = str_substr(dependency, range);
-      range.min += range.max + 1;
+      range.offset += range.size + 1;
 
       u32 component_id = hash_name_at_compile(s);
       ecs.system_queue_component[ecs.system_queue_count].components_hash_id[component_count++] = component_id;
@@ -439,7 +438,7 @@ inline void system_enqueue(String system_name, String dependency) {
         break;
       }
     }
-    ++range.max;
+    ++range.size;
   }
 
   ecs.system_queue_hash_ids[ecs.system_queue_count] = hash_name_at_compile(system_name);

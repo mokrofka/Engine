@@ -1,37 +1,11 @@
 #pragma once
 #include "lib.h"
 
-enum ResType {
-  ResType_Text,
-  ResType_Binary,
-  ResType_Image,
-  ResType_Material,
-  ResType_StaticMesh,
-  ResType_Custom,
-};
-
-struct Res {
-  u32 loader_id;
-  String64 name64;
-  String64 file_path64;
-  u64 data_size;
-  u8* data;
-};
-
 struct Binary {
   String64 file_path64;
   u64 size;
   u8* data;
 };
-
-// struct TextureRes {
-//   String64 file_path64;
-//   u8 channel_count;
-//   u32 width;
-//   u32 height;
-//   u8* pixels;
-// };
-
 
 struct Texture {
   String64 file_path64;

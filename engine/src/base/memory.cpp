@@ -5,38 +5,6 @@
 
 global thread_local TCTX tctx_thread_local;
 
-
-////////////////////////////////
-// Utils
-
-u64 calc_padding_with_header(PtrInt ptr, u64 alignment, u64 header_size) {
-  Assert(IsPow2OrZero(alignment));
-
-  PtrInt p = ptr;
-  u64 a = alignment;
-  u64 modulo = p & (a - 1); // (p % a) as it assumes alignment is a power of two
-
-  u64 padding = 0;
-  u64 needed_space = 0;
-
-  if (modulo != 0) { // Same logic as 'AlignPow2'
-    padding = a - modulo;
-  }
-
-  needed_space = header_size;
-
-  if (padding < needed_space) {
-    needed_space -= padding;
-
-    if ((needed_space & (a - 1)) != 0) {
-      padding += a * (1 + (needed_space / a));
-    } else {
-      padding += a * (needed_space / a);
-    }
-  }
-  return padding;
-}
-
 ////////////////////////////////
 // Arena
 
@@ -108,7 +76,7 @@ Temp tctx_get_scratch(Arena** conflics, u64 counts) {
 
 ////////////////////////////////
 // Pool
-#if 1
+#ifdef MEMORY_ALLOCATED_GUARD
 
 Pool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignment) {
   Assert(chunk_size >= sizeof(PoolFreeNode) && "Chunk size is too small");
@@ -375,54 +343,20 @@ void free_list_coalescence(FreeList& fl, FreeListNode* prev_node, FreeListNode* 
   }
 }
 
-// u64 freelist_alloc_block(FreeList& fl, u64 size, u64 alignment) {
-//   u64 padding = 0;
-//   FreeListNode* prev_node = null;
-//   FreeListNode* node = null;
-
-//   if (size < sizeof(FreeListNode)) {
-//     size = sizeof(FreeListNode);
-//   }
-
-//   node = free_list_find_first(fl, size, alignment, &padding, &prev_node);
-//   Assert(node && "Free list has no free memory");
-
-//   u64 alignment_padding = padding - sizeof(FreeListAllocationHeader);
-//   u64 required_space = size + padding;
-//   u64 remaining = node->block_size - required_space;
-
-//   if (remaining > 0) {
-//     FreeListNode* new_node = (FreeListNode*)((PtrInt)node + required_space);
-//     new_node->block_size = remaining;
-//     free_list_node_insert(&fl.head, node, new_node);
-//   }
-
-//   free_list_node_remove(&fl.head, prev_node, node);
-
-//   FreeListAllocationHeader* header_ptr = (FreeListAllocationHeader*)((PtrInt)node + alignment_padding);
-//   header_ptr->block_size = required_space;
-//   header_ptr->padding = alignment_padding;
-//   header_ptr->guard = DebugMagic;
-
-//   fl.used += required_space;
-
-//   return ((PtrInt)header_ptr + sizeof(FreeListAllocationHeader)) - (PtrInt)fl.data;
-// }
-
 ////////////////////////////////
 // Global Allocator
 
 struct SegPool {
+  u8* data;
 	u64 chunk_count;
 	u64 chunk_size;
-  u64 used;
-  u8* data;
+  u64 chunk_count_used;
 
-	PoolFreeNode *head;
+  PoolFreeNode* head;
 };
 
 struct MemCtx {
-  u8* start;
+  u8* data;
   SegPool pools[32];
 };
 
@@ -430,124 +364,117 @@ global MemCtx mem_ctx;
 
 #define PAGE_SIZE 4096
 #define MIN_CHUNKS_PER_COMMIT 32
+#define PoolStep GB(10)
 
 internal void pool_commit(SegPool& p, u64 commit_size) {
-  u8* end_pool = (u8*)(p.chunk_size * p.chunk_count + (PtrInt)p.data);
+  u8* end_pool = Offset(p.data, p.chunk_count*p.chunk_size);
   os_commit(end_pool, commit_size);
 }
 
 internal void pool_init_new_chunk(SegPool& p, u64 chunks_add) {
-	// Set all chunks to be free
   Loop (i, chunks_add) {
-		void* ptr = (u8*)&p.data[i * p.chunk_size] + p.chunk_count*p.chunk_size;
-		PoolFreeNode *node = (PoolFreeNode*)ptr;
-		node->next = p.head;
-		p.head = node;
+    u8* chunk = Offset(p.data, (p.chunk_count + i)*p.chunk_size);
+    PoolFreeNode* node; Assign(node, chunk);
+    node->next = p.head;
+    p.head = node;
 	}
 }
 
-internal void* segregated_pool_alloc(SegPool& p) {
+internal u8* segregated_pool_alloc(SegPool& p) {
+  u64 commit_size = 0;
   if (p.head == null) {
-    if (p.used + 1 > p.chunk_count) {
-      u64 commit_size;
-      if (p.chunk_size > MB(1)) {
-        commit_size = p.chunk_size;
-      } else {
-        commit_size = Clamp(PAGE_SIZE, p.chunk_size * MIN_CHUNKS_PER_COMMIT, MB(1));
-      }
-      u64 chunks_add = commit_size / p.chunk_size;
-      pool_commit(p, commit_size);
-      pool_init_new_chunk(p, chunks_add);
-      p.chunk_count += chunks_add;
+    Assert(p.chunk_count_used + 1 > p.chunk_count);
+    if (p.chunk_size > MB(1)) {
+      commit_size = p.chunk_size;
+    } else {
+      commit_size = Clamp(PAGE_SIZE, p.chunk_size*MIN_CHUNKS_PER_COMMIT, MB(1));
     }
+    u64 chunks_add = commit_size / p.chunk_size;
+    pool_commit(p, commit_size);
+    pool_init_new_chunk(p, chunks_add);
+    p.chunk_count += chunks_add;
   }
-  ++p.used;
+  ++p.chunk_count_used;
   
-  void* result = p.head;
-  Assert(result && "Pool allocator has no free memory");
+  u8* result; Assign(result, p.head);
   p.head = p.head->next;
   return result;
 }
 
 internal void segregated_pool_free(SegPool& p, void* ptr) {
-	void *start = p.data;
-	void *end = &(p.data)[p.chunk_count*p.chunk_size];
-
-  Assert((start <= ptr && ptr < end) && "Memory is out of bounds of the buffer in this pool");
-
-	PoolFreeNode* node = (PoolFreeNode*)ptr;
-  // Assert(!(start <= node->next && ptr < end) && "Memomy chunk is already free");
+	PoolFreeNode* node; Assign(node, ptr);
 	node->next = p.head;
 	p.head = node;
-  --p.used;
+  --p.chunk_count_used;
 }
 
 u8* mem_alloc(u64 size) {
-  // Minimum size is 8 bytes
+  u8* result = 0;
   u64 base_size = 8;
-  u8* mem = 0;
 
   Loop (i, ArrayCount(mem_ctx.pools)) {
     if (size <= base_size << i) {
-      mem = (u8*)segregated_pool_alloc(mem_ctx.pools[i]);
+      result = segregated_pool_alloc(mem_ctx.pools[i]);
+      AllocMemZero(result, size);
       break;
     }
   }
 
-  return mem;
+  Assert(result);
+  return result;
 }
 
 void mem_free(void* ptr) {
-  u64 offset_num = GB(10);
-  u8* base = mem_ctx.start;
+  u8* base = mem_ctx.data;
 
   Loop (i, ArrayCount(mem_ctx.pools)) {
-    u8* start = base + i * offset_num;
-    u8* end = start + offset_num;
+    u8* start = base + i*PoolStep;
+    u8* end = start + PoolStep;
 
+    u64 base_size = 8;
+    base_size <<= i;
     if ((u8*)ptr >= start && (u8*)ptr < end) {
+      DealocMemZero(ptr, base_size);
       segregated_pool_free(mem_ctx.pools[i], ptr);
       return;
     }
   }
 
-  Assert(0 && "global_free: pointer does not belong to any pool");
+  Assert(0 && "pointer doesn't belong to any pool");
 }
 
-u8* mem_realoc(void* origin, u64 size) {
-  u8* result;
-  u64 offset_num = GB(10);
-  u8* base = mem_ctx.start;
+u8* mem_realoc(void* ptr, u64 size) {
+  u8* result = 0;
+  u8* base = mem_ctx.data;
 
   Loop (i, ArrayCount(mem_ctx.pools)) {
-    u8* start = base + i * offset_num;
-    u8* end = start + offset_num;
+    u8* start = base + i*PoolStep;
+    u8* end = start + PoolStep;
 
     u64 base_size = 8;
     base_size <<= i;
-    if ((u8*)origin >= start && (u8*)origin < end) {
+    if ((u8*)ptr >= start && (u8*)ptr < end) {
       result = mem_alloc(size);
-      MemCopy(result, origin, base_size);
-      segregated_pool_free(mem_ctx.pools[i], origin);
-      return result;
+      MemCopy(result, ptr, base_size);
+      DealocMemZero(ptr, base_size);
+      segregated_pool_free(mem_ctx.pools[i], ptr);
     }
   }
 
-  Assert(0 && "global_free: pointer does not belong to any pool");
-  return null;
+  Assert(result && "pointer doesn't belong to any pool");
+  return result;
 }
 
 void global_allocator_init() {
-  mem_ctx.start = (u8*)os_reserve(TB(1));
+  mem_ctx.data = os_reserve(TB(1));
   u64 offset = 0;
-  u64 offset_num = GB(10);
   
   u64 pow_num = 1;
   Loop (i, ArrayCount(mem_ctx.pools)) {
-    mem_ctx.pools[i].data = (u8*)mem_ctx.start + offset;
+    mem_ctx.pools[i].data = Offset(mem_ctx.data, offset);
     mem_ctx.pools[i].chunk_size = 8 * pow_num;
     pow_num *= 2;
-    offset += offset_num;
+    offset += PoolStep;
   };
 }
 

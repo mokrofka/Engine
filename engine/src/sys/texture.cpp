@@ -1,8 +1,9 @@
 #include "texture.h"
 
 #include "render/r_frontend.h"
-
 #include "sys/res_sys.h"
+
+#include "vendor/stb_image.h"
 
 struct TextureSystemState {
   TextureSystemConfig config;
@@ -16,242 +17,65 @@ struct TextureSystemState {
 };
 
 struct TextureRef {
-  u64 reference_count;
+  u32 reference_count;
   u32 handle;
-  b8 auto_release;
 };
 
 global TextureSystemState st;
 
-internal void create_default_textures();
-internal void destroy_default_textures();
-internal Texture load_texture(String texture_name);
-internal void destroy_texture(Texture* t);
-
 void texture_system_init(Arena* arena, TextureSystemConfig config) {
-  Assert(config.max_texture_count > 0);
-
   st.registered_textures = push_array(arena, Texture, config.max_texture_count);
   st.registered_texture_table = hashmap_create(arena, sizeof(TextureRef), config.max_texture_count, false);
   
   st.config = config;
   
-  // Fill the hashtable with invalid references to use as a default
   TextureRef invalid_ref;
-  invalid_ref.auto_release = false;
   invalid_ref.handle = INVALID_ID; // Primary reason for needing default values
   invalid_ref.reference_count = 0;
   hashmap_fill(st.registered_texture_table, &invalid_ref);
-  
-  // Invalidate all textures in the array
-  u32 count = st.config.max_texture_count;
-  Loop (i, count) {
-    // st.registered_textures[i].id = INVALID_ID;
-    // st.registered_textures[i].generation = INVALID_ID;
-  }
-
-  // Create default textures for use in the system
-  create_default_textures();
 }
 
-void texture_system_shutdown() {
-  // if (st) {
-  //   // Destroy all loaded textures
-  //   Loop (i, st.config.max_texture_count) {
-  //     Texture* t = &st.registered_textures[i];
-  //     if (t->generation != INVALID_ID) {
-  //       r_destroy_texture(t);
-  //     }
-  //   }
-  // }
-  
-  destroy_default_textures();
-}
-
-Texture* texture_system_acquire(String name, b32 auto_release) {
-  // Return default texture, but warn about it since this should be returned via get_default_texture(); 
-  if (str_matchi(name, DefaultTextureName)) {
-    Warn("texture_system_acquire called for default texture. Use texture_system_get_default_texture for texture 'default'.");
-    return &st.default_texture;
-  }
-  
-  // TextureRef ref;
-  // hashmap_get(&st.registered_texture_table, name, &ref);
-  // // This can only be changed the firts time a texture is loaded
-  // if (ref.reference_count == 0) {
-  //   ref.auto_release = auto_release;
-  // }
-  // ++ref.reference_count;
-  // if (ref.handle == INVALID_ID) {
-  //   // This means no texture exists here.Find a free index first
-  //   u32 count = st.config.max_texture_count;
-  //   Texture* t = 0;
-  //   Loop (i, count) {
-  //     if (st.registered_textures[i].id == INVALID_ID) {
-  //       // A free slot has been found. Use its index as the handle
-  //       ref.handle = i;
-  //       t = &st.registered_textures[i];
-  //       break;
-  //     };
-  //   }
-
-  //   // Check overflow
-  //   if (!t || ref.handle == INVALID_ID) {
-  //     Fatal("texture_system_acquire - Texture system cannot hold anymore textures. Adjust configuration to allow more.");
-  //     return 0;
-  //   }
-
-  //   // Create new texture
-  //   *t = load_texture(name);
-  //   if (!t->internal_data) {
-  //     Error("Failed to load texture '%s'.", name);
-  //     return 0;
-  //   }
-
-  //   // Also use the handle as the texture id
-  //   t->id = ref.handle;
-  //   Trace("Texture '%s' does not yet exist. Created, and ref_count is now %i.", name, ref.reference_count);
-  // } else {
-  //   Trace("Texture '%s' already exists, ref_count increased to %i.", name, ref.reference_count);
-  // }
-
-  // // Update the entry
-  // hashmap_set(&st.registered_texture_table, name, &ref);
-  // return &st.registered_textures[ref.handle];
-
-  // // NOTE: This would only happen in the event something went wrong with the st
-  // Error("texture_system_acquire failed to acquire texture '%s'. Null pointer will be returned", name.str);
-  // return 0;
-}
-
-void texture_system_release(String name) {
+Texture res_texture_load(String filepath) {
   Scratch scratch;
-  // Ignore release requests for the default texture.
-  if (str_matchi(name, DefaultTextureName)) {
-    return;
-  }
-  TextureRef ref;
-  hashmap_get(st.registered_texture_table, name, &ref);
-  if (ref.reference_count == 0) {
-    Warn("Tried to release non-existent texture: '%s'", name);
-    return;
-  }
-
-  // Take a copy of the name since it will be wiped out by destroy,
-  // (as passed in name is generally a pointer to the actual texture's name)
-  String name_copy = push_str_copy(scratch, name);
-
-  --ref.reference_count;
-  if (ref.reference_count == 0 && ref.auto_release) {
-    Texture* t = &st.registered_textures[ref.handle];
-
-    // Destroy/reset texture
-    destroy_texture(t);
-
-    // Reset the reference.
-    ref.handle = INVALID_ID;
-    ref.auto_release = false;
-    Trace("Released texture '%s'., Texture unloaded because reference count=0 and auto_release=true", name_copy);
-  } else {
-    Trace("Released texture '%s', now has a reference count of '%i' (auto_release=%s)", name_copy, ref.reference_count, ref.auto_release ? "true"_ : "false"_);
-  }
-
-  // Update the entry.
-  hashmap_set(st.registered_texture_table, name_copy, &ref);
-}
-
-Texture* texture_system_get_default_texture() {
-  return &st.default_texture;
-
-  Error("texture_system_get_default_texture called before texture system initialization! Null pointer returned.");
-  return 0;
-}
-
-internal void create_default_textures() {
-  // NOTE: Create default texture, a 256x256 blue/white checkerboard pattern.
-  // This is done in code to eliminate asset dependencies.
-  Trace("Creating default texture..."_);
-  const u32 tex_dimension = 256;
-  const u32 channels = 4;
-  const u32 pixel_count = tex_dimension * tex_dimension;
-  u8 pixels[pixel_count * channels];
-  MemSet(pixels, 255, sizeof(u8) * pixel_count * channels);
-
-  // Each pixel.
-  Loop (row, tex_dimension) {
-    Loop (col, tex_dimension) {
-      u64 index = (row * tex_dimension) + col;
-      u64 index_bpp = index * channels;
-      if (row % 2) {
-        if (col % 2) {
-          pixels[index_bpp + 0] = 0;
-          pixels[index_bpp + 1] = 0;
-        }
-      } else {
-        if (!(col % 2)) {
-          pixels[index_bpp + 0] = 0;
-          pixels[index_bpp + 1] = 0;
-        }
-      }
-    }
-  }
-
-  // str_copy(st.default_texture.file_path64, DefaultTextureName);
-  // st.default_texture.width = tex_dimension;
-  // st.default_texture.height = tex_dimension;
-  // st.default_texture.channel_count = 4;
-  // st.default_texture.generation = INVALID_ID;
-  // st.default_texture.has_transparency = false;
-  // st.default_texture.internal_data = r_create_texture(pixels, st.default_texture.width, st.default_texture.height, st.default_texture.channel_count);
-  // // Manually set the texture generation to invalid since this is a default texture
-  // st.default_texture.generation = INVALID_ID;
-}
-
-internal void destroy_default_textures() {
-  destroy_texture(&st.default_texture);
-}
-
-internal Texture load_texture(String texture_name) {
-  // Texture texture = res_texture_load(texture_name);
-  // if (!texture.data) {
-  //   goto error;
-  // }
-
-  // u64 total_size = texture.width * texture.height * texture.channel_count;
-  // // Check for transparency
-  // b32 has_transparency = false;
-  // Loop (i, total_size) {
-  //   u8 a = texture.data[i + 3];
-  //   if (a < 255) {
-  //     has_transparency = true;
-  //     break;
-  //   }
-  // }
-
-  // texture.generation = INVALID_ID;
-  // texture.has_transparency = has_transparency;
-
-  // texture.internal_data = r_create_texture(texture.data, texture.width, texture.height, texture.channel_count);
+  Texture texture = {};
   
-  // error:
-  // return texture;
+  i32 required_channel_count = 4;
+  stbi_set_flip_vertically_on_load(true);
+
+  String file_path = push_strf(scratch, "%s/%s/%s", res_sys_base_path(), "textures"_, filepath);
+
+  String file_path_c = push_str_copy(scratch, file_path);
+
+  u8* data = stbi_load(
+    (char*)file_path_c.str,
+    (i32*)&texture.width,
+    (i32*)&texture.height,
+    (i32*)&texture.channel_count,
+    required_channel_count);
+  if (!data) {
+    Error("Image resource loader failed to load file '%s'", file_path);
+    goto error;
+  }
+
+  str_copy(texture.file_path64, file_path);
+
+  texture.data = data;
+  texture.channel_count = required_channel_count;
+  
+  error:
+  return texture;
 }
+
+void res_texture_unload(void* data) {
+  stbi_image_free(data);
+}
+
 
 internal void destroy_texture(Texture* t) {
-  // Clean up back resources  
-  // r_destroy_texture(t);
   res_texture_unload(t->data);
-  
-  // MemZeroStruct(t);
-  // t->id = INVALID_ID;
-  // t->generation = INVALID_ID;
 }
 
 void texture_load(String name) {
   Texture texture = res_texture_load(name);
   vk_texture_load(&texture);
-  
-  // vk_r_create_texture(tex.data, tex.width, tex.height, tex.channel_count);
-  // vk_r_create_texture(texture.data, texture.width, texture.height, texture.channel_count);
-  
 }

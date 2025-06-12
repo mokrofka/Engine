@@ -6,7 +6,7 @@ VK_Image vk_image_create(
     u32 width,
     u32 height,
     VkFormat format,
-    VkImageTiling tilling,
+    VkImageTiling tiling,
     VkImageUsageFlags usage,
     VkMemoryPropertyFlags memory_flags,
     b32 create_view,

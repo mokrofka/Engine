@@ -25,10 +25,11 @@ i32 imgui_surface_create(void* vp, u64 vk_inst, const void* vk_allocators, u64* 
   HINSTANCE hinstance = os_get_handle_info();
   HWND hwnd = os_get_window_handle();
 
-  VkWin32SurfaceCreateInfoKHR surface_info = {};
-  surface_info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-  surface_info.hwnd = vp;
-  surface_info.hinstance = hinstance;
+  VkWin32SurfaceCreateInfoKHR surface_info = {
+    .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
+    .hinstance = hinstance,
+    .hwnd = vp,
+  };
 
   VkSurfaceKHR surface;
   vkCreateWin32SurfaceKHR(instance, &surface_info, nullptr, &surface);
@@ -52,12 +53,13 @@ void imgui_renderer_init() {
     {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}
   };
 
-  VkDescriptorPoolCreateInfo pool_info = {};
-  pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-  pool_info.poolSizeCount = ArrayCount(pool_sizes);
-  pool_info.pPoolSizes = pool_sizes;
-  pool_info.maxSets = 1000;
-  pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+  VkDescriptorPoolCreateInfo pool_info = {
+    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+    .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+    .maxSets = 1000,
+    .poolSizeCount = ArrayCount(pool_sizes),
+    .pPoolSizes = pool_sizes,
+  };
   VK_CHECK(vkCreateDescriptorPool(vkdevice, &pool_info, null, &imgui_descriptor_pool));
 
   VkFormat format = VK_FORMAT_B8G8R8A8_UNORM;

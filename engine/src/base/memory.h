@@ -3,13 +3,8 @@
 #include "defines.h"
 
 #define MEMORY_ALLOCATED_GUARD
-#ifdef MEMORY_ALLOCATED_GUARD
-  #define MEMORY_ALLOCATED_GUARD_SIZE 8
-#else
-  #define MEMORY_ALLOCATED_GUARD_SIZE 0
-#endif
 
-struct MemRange {
+struct Range {
   u64 offset; 
   u64 size; 
 };
@@ -100,10 +95,10 @@ KAPI void pool_free_all(Pool& pool);
 ////////////////////////////////
 // Free list
 
-#define DebugMagic 0xDEADBEEF
 struct FreeListAllocationHeader {
   u64 block_size;
   u64 padding;
+  
 #ifdef MEMORY_ALLOCATED_GUARD
   u64 guard;
 #endif
@@ -123,7 +118,6 @@ struct FreeList {
 };
 
 KAPI u8* freelist_alloc(FreeList& fl, u64 size, u64 alignment = DEFAULT_ALIGNMENT);
-// KAPI u64 freelist_alloc_block(FreeList& fl, u64 size, u64 alignment = DEFAULT_ALIGNMENT);
 
 KAPI FreeList freelist_create(Arena* arena, u64 size, u64 alignment = DEFAULT_ALIGNMENT);
 KAPI void freelist_free(FreeList& fl, void* ptr);
@@ -134,6 +128,7 @@ KAPI void freelist_free_all(FreeList& fl);
 
 KAPI void global_allocator_init();
 KAPI u8* mem_alloc(u64 size);
+#define mem_alloc_struct(T) (T*)mem_alloc(sizeof(T))
 KAPI u8* mem_realoc(void* origin, u64 size);
 KAPI void mem_free(void* ptr);
 
@@ -162,7 +157,5 @@ struct FreelistGpu {
 };
 
 FreelistGpu freelist_gpu_create(Arena* arena, u64 size);
-
 u64 freelist_gpu_alloc(FreelistGpu& list, u64 size);
-
 void freelist_gpu_free(FreelistGpu& list, u64 size, u64 offset);

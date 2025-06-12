@@ -68,7 +68,7 @@ struct ShaderAttribute {
 //   ShaderState state;
 
 //   u8 push_constant_range_count;
-//   MemRange push_constant_ranges[32];
+//   Range push_constant_ranges[32];
 //   u16 attribute_stride;
 
 //   void* internal_data;

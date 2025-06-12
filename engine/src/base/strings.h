@@ -3,11 +3,6 @@
 #include "math_types.h"
 #include "memory.h"
 
-struct Range {
-  i32 min;
-  i32 max;
-};
-
 struct StringCursor {
   u8* at;
   u8* end;
@@ -32,7 +27,7 @@ struct StringList {
 
 struct String64 {
   u8 str[64];
-  u32 size;
+  u64 size;
   INLINE operator String() {
     return String{str, size};
   }
@@ -42,7 +37,7 @@ struct String64 {
 };
 
 INLINE u32 range_size(Range r) {
-  u32 c = ((r.max > r.min) ? (r.max - r.min) : 0);
+  u32 c = ((r.size > r.offset) ? (r.size - r.offset) : 0);
   return c;
 }
 
@@ -229,9 +224,9 @@ INLINE String str_cstr(const void* c) {
 }
 
 INLINE String str_substr(String str, Range range) {
-  range.min = ClampTop(range.min, str.size);
-  range.max = ClampTop(range.max, str.size);
-  str.str += range.min;
+  range.offset = ClampTop(range.offset, str.size);
+  range.size = ClampTop(range.size, str.size);
+  str.str += range.offset;
   str.size = range_size(range);
   return str;
 }

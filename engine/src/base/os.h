@@ -87,7 +87,7 @@ KAPI v2 os_get_mouse_delta();
 //////////////////////////////////////////////////////////////////////////
 // Memory
 
-void* os_reserve(u64 size);
+u8* os_reserve(u64 size);
 void os_commit(void* ptr, u64 size);
 void os_decommit(void* ptr, u64 size);
 void os_release(void* ptr, u64 size);

@@ -6,12 +6,14 @@
 
 struct RendererSystemState {
   R_Config config;
+  b8 is_render;
 };
 
 global RendererSystemState st;
 
 void r_init(Arena* arena, R_Config config) {
   st.config = config;
+  st.is_render = true;
   
   Arena* render_arena = arena_alloc(arena, config.mem_reserve);
   vk_r_backend_init(render_arena);
@@ -29,12 +31,14 @@ void r_begin_draw_frame() {
   vk_r_backend_begin_frame();
 
   // scene render
-  {
-    vk_r_begin_renderpass(BuiltinRenderpass_World);
-    // vk_compute_draw();
+  if (vk_is_viewport_render()) {
+    {
+      vk_r_begin_renderpass(BuiltinRenderpass_World);
+      // vk_compute_draw();
 
-    vk_draw();
-    vk_r_end_renderpass(BuiltinRenderpass_World);
+      vk_draw();
+      vk_r_end_renderpass(BuiltinRenderpass_World);
+    }
   }
 
   // begin UI render

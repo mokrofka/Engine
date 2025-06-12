@@ -9,34 +9,36 @@ void descriptor_update(u32 shader_id) {
   
   VkDescriptorSet descriptor_set = vk.descriptor_sets[vk.frame.current_frame];
   
-  MemRange mem_range = vk.uniform_buffer_mem_range;
-  u64 range = mem_range.size;
-  u64 offset = mem_range.offset;
-  VkDescriptorBufferInfo buffer_info;
-  buffer_info.buffer = vk.storage_buffer.handle;
-  buffer_info.offset = offset;
-  buffer_info.range = range;
+  VkDescriptorBufferInfo buffer_info = {
+    .buffer = vk.storage_buffer.handle,
+    .offset = vk.storage_buffer_range.offset,
+    .range = vk.storage_buffer_range.size,
+  };
 
-  // Update descriptor sets
-  VkWriteDescriptorSet ubo_descriptor = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-  ubo_descriptor.dstSet = descriptor_set;
-  ubo_descriptor.dstBinding = 0;
-  ubo_descriptor.dstArrayElement = 0;
-  ubo_descriptor.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-  ubo_descriptor.descriptorCount = 1;
-  ubo_descriptor.pBufferInfo = &buffer_info;
+  VkWriteDescriptorSet ubo_descriptor = {
+    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+    .dstSet = descriptor_set,
+    .dstBinding = 0,
+    .dstArrayElement = 0,
+    .descriptorCount = 1,
+    .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+    .pBufferInfo = &buffer_info,
+  };
   
-  VkDescriptorImageInfo image_info;
-  image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-  image_info.imageView = vk.texture.image.view;
-  image_info.sampler = vk.texture.sampler;
+  VkDescriptorImageInfo image_info = {
+    .sampler = vk.texture.sampler,
+    .imageView = vk.texture.image.view,
+    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+  };
 
-  VkWriteDescriptorSet texture_descriptor = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-  texture_descriptor.dstSet = descriptor_set;
-  texture_descriptor.dstBinding = 1;
-  texture_descriptor.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  texture_descriptor.descriptorCount = 1;
-  texture_descriptor.pImageInfo = &image_info;
+  VkWriteDescriptorSet texture_descriptor = {
+    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+    .dstSet = descriptor_set,
+    .dstBinding = 1,
+    .descriptorCount = 1,
+    .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+    .pImageInfo = &image_info,
+  };
   VkWriteDescriptorSet descriptors[] = {ubo_descriptor, texture_descriptor};
   
   vkUpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
@@ -112,33 +114,37 @@ void compute_descriptor_update() {
   i32 i = vk.frame.current_frame;
   VkWriteDescriptorSet descriptor_writes[2];
 
-  VkDescriptorBufferInfo storage_buffer_info_last_frame{};
-  storage_buffer_info_last_frame.buffer = vk.storage_buffers[i].handle;
-  storage_buffer_info_last_frame.offset = 0;
-  storage_buffer_info_last_frame.range = sizeof(Particle) * ParticleCount;
+  VkDescriptorBufferInfo storage_buffer_info_last_frame = {
+    .buffer = vk.storage_buffers[i].handle,
+    .offset = 0,
+    .range = sizeof(Particle) * ParticleCount,
+  };
+  descriptor_writes[0] = {
+    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+    .dstSet = vk.compute_descriptor_sets[i],
+    .dstBinding = 1,
+    .dstArrayElement = 0,
+    .descriptorCount = 1,
+    .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+    .pBufferInfo = &storage_buffer_info_last_frame,
+  };
 
-  descriptor_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  descriptor_writes[0].dstSet = vk.compute_descriptor_sets[i];
-  descriptor_writes[0].dstBinding = 1;
-  descriptor_writes[0].dstArrayElement = 0;
-  descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-  descriptor_writes[0].descriptorCount = 1;
-  descriptor_writes[0].pBufferInfo = &storage_buffer_info_last_frame;
+  VkDescriptorBufferInfo storage_buffer_info_current_frame = {
+    .buffer = vk.storage_buffers[(i + 1) % FramesInFlight].handle,
+    .offset = 0,
+    .range = sizeof(Particle) * ParticleCount,
+  };
+  descriptor_writes[1] = {
+    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+    .dstSet = vk.compute_descriptor_sets[i],
+    .dstBinding = 2,
+    .dstArrayElement = 0,
+    .descriptorCount = 1,
+    .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+    .pBufferInfo = &storage_buffer_info_current_frame,
+  };
 
-  VkDescriptorBufferInfo storage_buffer_info_current_frame{};
-  storage_buffer_info_current_frame.buffer = vk.storage_buffers[(i + 1) % FramesInFlight].handle;
-  storage_buffer_info_current_frame.offset = 0;
-  storage_buffer_info_current_frame.range = sizeof(Particle) * ParticleCount;
-
-  descriptor_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  descriptor_writes[1].dstSet = vk.compute_descriptor_sets[i];
-  descriptor_writes[1].dstBinding = 2;
-  descriptor_writes[1].dstArrayElement = 0;
-  descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-  descriptor_writes[1].descriptorCount = 1;
-  descriptor_writes[1].pBufferInfo = &storage_buffer_info_current_frame;
-
-  vkUpdateDescriptorSets(vkdevice, 2, descriptor_writes, 0, null);
+  vkUpdateDescriptorSets(vkdevice, ArrayCount(descriptor_writes), descriptor_writes, 0, null);
 }
 
 void vk_compute_draw() {
@@ -205,4 +211,8 @@ void light_update() {
     ShaderEntity* shader_e = shader_get_entity_data(e);
     shader_e->color = light_data->color;
   }
+}
+
+b32 vk_is_viewport_render() {
+  return vk.is_viewport_render;
 }

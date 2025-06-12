@@ -54,12 +54,12 @@ typedef void VoidProc(void);
 
 #define ArrayCount(a) (sizeof(a) / sizeof((a)[0]))
 #define ElemSize(a) (sizeof(a[0]))
-#define IntFromPtr(a) ((u64)(a))
 
 #define Member(T,m)                 (((T*)0)->m)
-#define OffsetOf(T,m)               IntFromPtr(&Member(T,m))
+#define OffsetOf(T,m)               PtrInt(&Member(T,m))
 #define MemberFromOffset(T,ptr,off) (T)((((u8 *)ptr)+(off)))
 #define CastFromMember(T,m,ptr)     (T*)(((u8*)ptr) - OffsetOf(T,m))
+#define Offset(x, y)             (u8*)(x) + (y)
 
 #define MemZero(d,s)       __builtin_memset(d,0,s)
 #define MemZeroStruct(a)   MemZero((a),sizeof(*(a)))
@@ -95,6 +95,7 @@ typedef void VoidProc(void);
 #define ClearBit(x, c) ((x) &= ~Bit(c))
 #define ToggleBit(x, c) ((x) ^= Bit(c))
 #define HasBit(x, c) (((x) & Bit(c)) != 0)
+#define LowestBit(bitset) __builtin_ctz(bitset)
 
 #define Glue(A,B) A##B
 #define Stringify(S) #S
@@ -148,7 +149,7 @@ typedef void VoidProc(void);
 // #define UI_Window(begin) DeferLoop(begin, ImGui::End())
 struct String {
   u8* str;
-  u32 size;
+  u64 size;
   INLINE operator bool() {
     return size;
   }

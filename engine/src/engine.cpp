@@ -44,8 +44,20 @@ f32 delta_time;
 void engine_create(App* app) {
   global_allocator_init();
   Assign(app->arena, mem_alloc(AppSize));
-  app->arena->size = AppSize;
+  *app->arena = { .size = AppSize, };
   tctx_init(app->arena);
+  u8* a = mem_alloc(1);
+  mem_alloc(1);
+  mem_free(a);
+  a= mem_alloc(1);
+  mem_alloc(1);
+  mem_alloc(1);
+  mem_free(a);
+  mem_alloc(1);
+  mem_alloc(1);
+  a = mem_alloc(1);
+  mem_alloc(1);
+  mem_free(a);
   
   app_create(app);
   Scratch scratch;
@@ -66,6 +78,7 @@ void engine_create(App* app) {
   }
   ecs_init();
   // test_ecs();
+  test();
   
   {
     ResSysConfig res_sys_cfg = {

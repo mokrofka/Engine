@@ -9,7 +9,7 @@ void vk_r_geometry_create(Geometry* geom) {
   u64 size = geom->vertex_size * geom->vertex_count;
   u64 offset = freelist_gpu_alloc(vk.vert_buffer.freelist, size);
   
-  MemRange range = {offset, size};
+  Range range = {offset, size};
   VK_Mesh mesh = {
     .offset = offset,
     .vert_count = geom->vertex_count,

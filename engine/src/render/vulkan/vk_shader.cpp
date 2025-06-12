@@ -75,7 +75,8 @@ internal void vk_descriptor_set_create() {
 internal void vk_descriptor_set_alloc() {
   VkDescriptorSetLayout layouts[] = {
     vk.descriptor_set_layout,
-    vk.descriptor_set_layout};
+    vk.descriptor_set_layout
+  };
     
   VkDescriptorSetAllocateInfo alloc_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
   alloc_info.descriptorPool = vk.descriptor_pool;
@@ -97,7 +98,7 @@ void vk_r_shader_create(Shader* s) {
   // TODO
   // uniform buffer
   u64 uniform_buffer_offset = 0; // NOTE won't work
-  // MemRange range = {uniform_buffer_offset, data_size};
+  // Range range = {uniform_buffer_offset, data_size};
   // vk.uniform_buffer_mem_range = range;
   // *(void**)data = (u8*)vk.uniform_buffer.maped_memory + range.offset;
   // *(void**)data = (u8*)vk.uniform_buffer.maped_memory;
@@ -450,7 +451,7 @@ void compute_shader() {
   //   }
   // }
 
-  MemRange range = {0, ParticleCount * sizeof(Particle)};
+  Range range = {0, ParticleCount * sizeof(Particle)};
   vk_upload_to_gpu(&vk.storage_buffers[0], range, particles);
   vk_upload_to_gpu(&vk.storage_buffers[1], range, particles);
   
@@ -601,7 +602,7 @@ void vk_shader_init() {
 
   u64 size = sizeof(ShaderGlobalState) + AlignPow2(sizeof(ShaderEntity)*MaxEntities, 16) + AlignPow2(sizeof(DirectionalLight)*KB(1), 16);
   u64 offset = freelist_gpu_alloc(vk.storage_buffer.freelist, size);
-  MemRange range = {offset, size};
+  Range range = {offset, size};
   Assign(vk.global_shader_state, vk.storage_buffer.maped_memory + offset);
 
   vk.entities_data.data = vk.storage_buffer.maped_memory + AlignPow2(sizeof(ShaderGlobalState), 16);

@@ -42,8 +42,8 @@ void ui_begin_frame() {
   imgui_begin_frame();
   ImGui::NewFrame();
 
-  if (vk.is_viewport_sezied) {
-    vk.is_viewport_sezied = false;
+  if (vk.is_viewport_resized) {
+    vk.is_viewport_resized = false;
     Loop(i, ImagesInFlight) {
       imgui_remove_texture(st.texture_ids[i]);
       st.texture_ids[i] = imgui_add_texture(i);
@@ -66,7 +66,7 @@ void ui_texture_render() {
 
     if (vk.viewport_size != *(v2*)&current_viewport_size) {
       vk.viewport_size = *(v2*)&current_viewport_size;
-      vk.is_viewport_sezied = true;
+      vk.is_viewport_resized = true;
 
       EventContext context;
       context.data.u32[0] = current_viewport_size.x;

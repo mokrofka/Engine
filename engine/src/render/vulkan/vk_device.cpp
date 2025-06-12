@@ -3,12 +3,11 @@
 struct VK_PhysicalDeviceRequirements {
   b8 graphics; 
   b8 present;
-  b8 compute;
   b8 transfer;
-  // darray
-  const char** device_extension_names;
+  b8 compute;
   b8 sampler_anisotropy;  
   b8 discrete_gpu;
+  const char** device_extension_names;
 };
 
 struct VK_PhysicalDeviceQueueFamilyInfo {
@@ -119,37 +118,15 @@ void vk_device_create() {
 }
 
 void vk_device_destroy() {
-  // Unset queues
-  vk.device.graphics_queue = 0;
-  vk.device.present_queue = 0;
-  vk.device.transfer_queue = 0;
-  
   Info("Destroying command pools..."_);
   vkDestroyCommandPool(vkdevice, vk.device.cmd_pool, vk.allocator);
+  vkDestroyCommandPool(vkdevice, vk.device.transient_cmd_pool, vk.allocator);
 
   // Destroy logical device
   Info("Destroying logical device..."_);
   vkDestroyDevice(vkdevice, vk.allocator);
   
-  // Physical device are not destroyed.
   Info("Releasing physical device resources..."_);
-  vk.device.physical_device = 0;
-  
-  if (vk.device.swapchain_support.formats) {
-    vk.device.swapchain_support.formats = 0;
-    vk.device.swapchain_support.format_count = 0;
-  }
-  
-  if (vk.device.swapchain_support.present_modes) {
-    vk.device.swapchain_support.present_modes = 0;
-    vk.device.swapchain_support.present_mode_count = 0;
-  }
-
-  MemZeroStruct(&vk.device.swapchain_support.capabilities);
-
-  vk.device.graphics_queue_index = -1;
-  vk.device.present_queue_index = -1;
-  vk.device.transfer_queue_index = -1;
 }
 
 VK_SwapchainSupportInfo* vk_device_query_swapchain_support(VkPhysicalDevice physical_device, VK_SwapchainSupportInfo* support_info) {
@@ -222,19 +199,17 @@ internal VK_Device select_physical_device() {
     VkPhysicalDeviceMemoryProperties memory;
     vkGetPhysicalDeviceMemoryProperties(physical_devices[i], &memory);
     
-    // TODO; There requirements should probably be drive by engine
-    // configuration
-    VK_PhysicalDeviceRequirements requirements = {};
-    requirements.graphics = true;
-    requirements.present = true;
-    requirements.transfer = true;
-    requirements.compute = true;
-    requirements.sampler_anisotropy = true;
-    
     const char* extentions[] = {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     };
-    requirements.device_extension_names = extentions;
+    VK_PhysicalDeviceRequirements requirements = {
+      .graphics = true,
+      .present = true,
+      .transfer = true,
+      .compute = true,
+      .sampler_anisotropy = true,
+      .device_extension_names = extentions,
+    };
 
     VK_PhysicalDeviceQueueFamilyInfo queue_info = physical_device_meets_requirements(
       physical_devices[i],
@@ -269,20 +244,16 @@ internal VK_Device select_physical_device() {
       } break;
     }
 
-    Info(
-        "GPU Driver version: %i.%i.%i",
-        VK_VERSION_MAJOR(properties.driverVersion),
-        VK_VERSION_MINOR(properties.driverVersion),
-        VK_VERSION_PATCH(properties.driverVersion));
+    Info("GPU Driver version: %i.%i.%i",
+         VK_VERSION_MAJOR(properties.driverVersion),
+         VK_VERSION_MINOR(properties.driverVersion),
+         VK_VERSION_PATCH(properties.driverVersion));
 
-    // Vulkan API version.
-    Info(
-        "GPU API version: %i.%i.%i",
-        VK_VERSION_MAJOR(properties.apiVersion),
-        VK_VERSION_MINOR(properties.apiVersion),
-        VK_VERSION_PATCH(properties.apiVersion));
+    Info("GPU API version: %i.%i.%i",
+         VK_VERSION_MAJOR(properties.apiVersion),
+         VK_VERSION_MINOR(properties.apiVersion),
+         VK_VERSION_PATCH(properties.apiVersion));
 
-    // Memory information
     Loop (j, memory.memoryHeapCount) {
       f32 memory_size_gib = (((f32)memory.memoryHeaps[j].size) / GB(1));
       if (memory.memoryHeaps[j].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) {
@@ -297,9 +268,7 @@ internal VK_Device select_physical_device() {
     devices[i].present_queue_index = queue_info.present_family_index;
     devices[i].transfer_queue_index = queue_info.transfer_family_index;
     devices[i].compute_queue_index = queue_info.compute_family_index;
-    // NOTE: set computer index here if needed.
 
-    // Keep a copy of properties, features and memory info for later use.
     devices[i].properties = properties;
     devices[i].features = features;
     devices[i].memory = memory;
@@ -431,5 +400,5 @@ internal VK_PhysicalDeviceQueueFamilyInfo physical_device_meets_requirements(
   }
   
   Assert(!"Device doesn't have needed queues");
-  VK_PhysicalDeviceQueueFamilyInfo r = {}; return r;
+  return {};
 }

@@ -19,6 +19,7 @@ VK vk;
 void* vk_alloc(void* user_data, u64 size, u64 alignment, VkSystemAllocationScope allocation_scope) {
   Assert(size)
   void* result = mem_alloc(size);
+  mem_alloc(1);
   
 #if VulkanAllocatorTrace
   Trace("vulkan allocate block %i bytes, %i alignment", size, alignment);
@@ -60,13 +61,14 @@ void vk_internal_free(void* user_data, u64 size, VkInternalAllocationType alloca
 }
 
 VkAllocationCallbacks vk_allocator_create() {
-  VkAllocationCallbacks callbacks = {};
-  callbacks.pfnAllocation = vk_alloc;
-  callbacks.pfnReallocation = vk_realloc;
-  callbacks.pfnFree = vk_free;
-  callbacks.pfnInternalAllocation = vk_internal_alloc;
-  callbacks.pfnInternalFree = vk_internal_free;
-  callbacks.pUserData = 0;
+  VkAllocationCallbacks callbacks = {
+    .pUserData = 0,
+    .pfnAllocation = vk_alloc,
+    .pfnReallocation = vk_realloc,
+    .pfnFree = vk_free,
+    .pfnInternalAllocation = vk_internal_alloc,
+    .pfnInternalFree = vk_internal_free,
+  };
   return callbacks;
 }
 
@@ -80,6 +82,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
 
 internal void recreate_swapchain(VK_Swapchain* swapchain);
 internal void create_buffers();
+internal void vk_resize_viewport();
 
 void instance_create() {
   v2i framebuffer_extent = os_get_framebuffer_size();
@@ -90,9 +93,6 @@ void instance_create() {
     .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
     .apiVersion = VK_API_VERSION_1_3
   };
-  
-  VkInstanceCreateInfo create_info = {VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
-  create_info.pApplicationInfo = &app_info;
   
   // Obtain a list of required extensions
   char* required_extensions[3] = {
@@ -107,9 +107,6 @@ void instance_create() {
   }
 #endif
 
-  create_info.enabledExtensionCount = ArrayCount(required_extensions);
-  create_info.ppEnabledExtensionNames = required_extensions;
-  
   char* required_validation_layer_names[1];
   u32 required_validation_layer_count = 0;
   
@@ -129,6 +126,7 @@ void instance_create() {
     b32 found = false;
     Loop (j, available_layer_count) {
       if (cstr_match(required_validation_layer_names[i], available_layers[j].layerName)) {
+        ++available_layer_count;
         found = true;
         Info("Found"_);
         break;
@@ -141,10 +139,16 @@ void instance_create() {
   Info("All required validation layers are present"_);
 #endif
 
-  create_info.enabledLayerCount = required_validation_layer_count;
-  create_info.ppEnabledLayerNames = required_validation_layer_names;
+  VkInstanceCreateInfo instance_create_info = {
+    .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+    .pApplicationInfo = &app_info,
+    .enabledLayerCount = required_validation_layer_count,
+    .ppEnabledLayerNames = required_validation_layer_names,
+    .enabledExtensionCount = ArrayCount(required_extensions),
+    .ppEnabledExtensionNames = required_extensions,
+  };
   
-  VK_CHECK(vkCreateInstance(&create_info, vk.allocator, &vk.instance));
+  VK_CHECK(vkCreateInstance(&instance_create_info, vk.allocator, &vk.instance));
   Info("Vulkan insance created"_);
 
   // Debugger
@@ -152,18 +156,20 @@ void instance_create() {
   Debug("Creating Vulkan debugger..."_);
   u32 log_severity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
                      VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                     VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT;  //|
-                                                                    //    VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT;
-  VkDebugUtilsMessengerCreateInfoEXT debug_create_info = {VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT};
-  debug_create_info.messageSeverity = log_severity;
-  debug_create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                                  VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT |
-                                  VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
-  debug_create_info.pfnUserCallback = vk_debug_callback;
+                     VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT;
+
+  VkDebugUtilsMessengerCreateInfoEXT debug_create_info = {
+    .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+    .messageSeverity = log_severity,
+    .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                   VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT |
+                   VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT,
+    .pfnUserCallback = vk_debug_callback,
+  };
 
   PFN_vkCreateDebugUtilsMessengerEXT func; Assign(func, vkGetInstanceProcAddr(vk.instance, "vkCreateDebugUtilsMessengerEXT"));
-
   Assert(func && "Failed to create debug messenger");
+  
   VK_CHECK(func(vk.instance, &debug_create_info, vk.allocator, &vk.debug_messenger));
   Debug("Vulkan debugger created"_);
 #endif
@@ -250,11 +256,11 @@ void vk_r_backend_init(Arena* arena) {
       true,
       VK_IMAGE_ASPECT_DEPTH_BIT);
   vk.viewport_size = v2(vk.frame.width, vk.frame.height);
-  event_register(EventCode_ViewportResized, &vk.is_viewport_sezied, [](u32 code, void* sender, void* listener_inst, EventContext context)->b32 {
+  event_register(EventCode_ViewportResized, &vk.is_viewport_resized, [](u32 code, void* sender, void* listener_inst, EventContext context)->b32 {
     f32 width = context.data.u32[0];
     f32 height = context.data.u32[1];
     vk.viewport_size = {width, height};
-    vk.is_viewport_sezied = true;
+    vk.is_viewport_resized = true;
     return false;
   });
 
@@ -319,8 +325,13 @@ void vk_r_backend_begin_frame() {
     Info("Resized, booting"_);
   }
 
-  if (vk.is_viewport_sezied) {
-    vk_resize_viewport();
+  if (vk.is_viewport_resized) {
+    if (vk.viewport_size.x == 0 || vk.viewport_size.y == 0) {
+      vk.is_viewport_render = false;
+    } else {
+      vk_resize_viewport();
+      vk.is_viewport_render = true;
+    }
   }
 
   // Wait for the execution of the current frame to complete. The fence being free will allow this one to move on.
@@ -410,9 +421,7 @@ void vk_r_begin_renderpass(u32 renderpass_id) {
   // Choose a renderpass based on ID.
   switch (renderpass_id) {
     case BuiltinRenderpass_World: {
-
-  {
-    // Color
+      // Color
       VkImageMemoryBarrier barrier = {};
       barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
       barrier.srcAccessMask = 0;
@@ -440,10 +449,12 @@ void vk_r_begin_renderpass(u32 renderpass_id) {
         .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-        .clearValue.color = {{0.1f, 0.1f, 0.1f, 1.0f}},
+        .clearValue = {
+          .color = {0.1f, 0.1f, 0.1f, 1.0f}
+        },
       };
 
-    // Depth
+      // Depth
       VkImageMemoryBarrier depthBarrier = {};
       depthBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
       depthBarrier.srcAccessMask = 0;
@@ -472,31 +483,25 @@ void vk_r_begin_renderpass(u32 renderpass_id) {
         .imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-        .clearValue.depthStencil = {1.0f, 0},    // typical depth clear (far plane)
+        .clearValue = {.depthStencil = {1.0f, 0}},
       };
 
-    // start pass
-    VkRenderingInfo render_info = {
-      .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-      // .renderArea = {{0, 0}, {vk.frame.width, vk.frame.height}},
-      .renderArea = {{0, 0}, {(u32)vk.viewport_size.x, (u32)vk.viewport_size.y}},
-      .layerCount = 1,
-      .colorAttachmentCount = 1,
-      .pColorAttachments = &color_attachment,
-      .pDepthAttachment = &depth_attachment
-    };
+      // start pass
+      VkRenderingInfo render_info = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+        // .renderArea = {{0, 0}, {vk.frame.width, vk.frame.height}},
+        .renderArea = {{0, 0}, {(u32)vk.viewport_size.x, (u32)vk.viewport_size.y}},
+        .layerCount = 1,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &color_attachment,
+        .pDepthAttachment = &depth_attachment
+      };
 
-    vkCmdBeginRendering(cmd, &render_info);
-
-  }
-
-      
+      vkCmdBeginRendering(cmd, &render_info);
     } break;
     case BuiltinRenderpass_UI: {
 
-
-
-    // Color
+      // Color
       VkImageMemoryBarrier barrier = {};
       barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
       barrier.srcAccessMask = 0;
@@ -522,9 +527,8 @@ void vk_r_begin_renderpass(u32 renderpass_id) {
         .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-        .clearValue.color = {{0.01f, 0.01f, 0.01f, 1.0f}},
+        .clearValue = { .color = {0.01f, 0.01f, 0.01f, 1.0f} },
       };
-
 
       VkRenderingInfo render_info = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -704,8 +708,9 @@ internal void create_buffers() {
   vk.storage_buffer.freelist = freelist_gpu_create(vk.arena, vk.storage_buffer.size);
 }
 
-void vk_resize_viewport() {
+internal void vk_resize_viewport() {
   vkDeviceWaitIdle(vkdevice);
+  Info("view port resize: x = %f y = %f", vk.viewport_size.x, vk.viewport_size.y);
 
   Loop (i, ImagesInFlight) {
     vk_image_destroy(vk.texture_targets[i].image);

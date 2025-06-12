@@ -35,6 +35,7 @@ void vk_make_light(u32 entity_id);
 
 void vk_texture_load(Texture* texture);
 v2 vk_get_viewport_size();
+b32 vk_is_viewport_render();
 
 KAPI ShaderGlobalState* shader_get_global_state();
 KAPI ShaderEntity* shader_get_entity_data(u32 entity_id);

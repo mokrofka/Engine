@@ -35,18 +35,18 @@ void vk_swapchain_present(
     VkQueue present_queue,
     VkSemaphore render_complete_semaphore,
     u32 present_image_index) {
-  // Return the image to the swapchain for presentation.
-  VkPresentInfoKHR present_info = {VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
-  present_info.waitSemaphoreCount = 1;
-  present_info.pWaitSemaphores = &render_complete_semaphore;
-  present_info.swapchainCount = 1;
-  present_info.pSwapchains = &swapchain->handle;
-  present_info.pImageIndices = &present_image_index;
-  present_info.pResults = 0;
-  
+
+  VkPresentInfoKHR present_info = {
+    .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+    .waitSemaphoreCount = 1,
+    .pWaitSemaphores = &render_complete_semaphore,
+    .swapchainCount = 1,
+    .pSwapchains = &swapchain->handle,
+    .pImageIndices = &present_image_index,
+  };
+
   vkQueuePresentKHR(present_queue, &present_info);
   
-  // Increment (and loop) the index
   vk.frame.current_frame = (vk.frame.current_frame + 1) % swapchain->max_frames_in_flight;
 }
 
@@ -113,37 +113,25 @@ internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
         image_count = vk.device.swapchain_support.capabilities.maxImageCount;
   }
   
-  swapchain.max_frames_in_flight = image_count - 1;
+  swapchain.max_frames_in_flight = FramesInFlight;
   
-  VkSwapchainCreateInfoKHR swapchain_create_info = {VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
-  swapchain_create_info.surface = vk.surface;
-  swapchain_create_info.minImageCount = image_count;
-  swapchain_create_info.imageFormat = swapchain.image_format.format;
-  swapchain_create_info.imageColorSpace = swapchain.image_format.colorSpace;
-  swapchain_create_info.imageExtent = swapchain_extent;
-  swapchain_create_info.imageArrayLayers = 1;
-  swapchain_create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+  VkSwapchainCreateInfoKHR swapchain_create_info = {
+    .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+    .surface = vk.surface,
+    .minImageCount = image_count,
+    .imageFormat = swapchain.image_format.format,
+    .imageColorSpace = swapchain.image_format.colorSpace,
+    .imageExtent = swapchain_extent,
+    .imageArrayLayers = 1,
+    .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+    .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
+    .preTransform = vk.device.swapchain_support.capabilities.currentTransform,
+    .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+    .presentMode = present_mode,
+    .clipped = VK_TRUE,
+    .oldSwapchain = reuse ? vk.old_swapchain.handle : 0,
+  };
 
-  // Setup the queue family indices
-  if (vk.device.graphics_queue_index != vk.device.present_queue_index) {
-    u32 queueFamilyIndices[] = {
-        (u32)vk.device.graphics_queue_index,
-        (u32)vk.device.present_queue_index};
-    swapchain_create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-    swapchain_create_info.queueFamilyIndexCount = 2;
-    swapchain_create_info.pQueueFamilyIndices = queueFamilyIndices;
-  } else {
-    swapchain_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    swapchain_create_info.queueFamilyIndexCount = 0;
-    swapchain_create_info.pQueueFamilyIndices = 0;
-  }
-
-  swapchain_create_info.preTransform = vk.device.swapchain_support.capabilities.currentTransform;
-  swapchain_create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-  swapchain_create_info.presentMode = present_mode;
-  swapchain_create_info.clipped = VK_TRUE;
-  swapchain_create_info.oldSwapchain = reuse ? vk.old_swapchain.handle : 0;
-  
   VK_CHECK(vkCreateSwapchainKHR(vkdevice, &swapchain_create_info, vk.allocator, &swapchain.handle));
   
   // Start with a zero frame index.
@@ -156,15 +144,19 @@ internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
 
   // Views
   Loop (i, swapchain.image_count) {
-    VkImageViewCreateInfo view_info = {VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
-    view_info.image = swapchain.images[i];
-    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view_info.format = swapchain.image_format.format;
-    view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    view_info.subresourceRange.baseMipLevel = 0;
-    view_info.subresourceRange.levelCount = 1;
-    view_info.subresourceRange.baseArrayLayer = 0;
-    view_info.subresourceRange.layerCount = 1;
+    VkImageViewCreateInfo view_info = {
+      .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+      .image = swapchain.images[i],
+      .viewType = VK_IMAGE_VIEW_TYPE_2D,
+      .format = swapchain.image_format.format,
+      .subresourceRange = {
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .baseMipLevel = 0,
+        .levelCount = 1,
+        .baseArrayLayer = 0,
+        .layerCount = 1,
+      },
+    };
 
     VK_CHECK(vkCreateImageView(vkdevice, &view_info, vk.allocator, &swapchain.views[i]));
   }

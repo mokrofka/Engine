@@ -1,15 +1,16 @@
 #include "vk_command_buffer.h"
 
 VkCommandBuffer vk_cmd_alloc(VkCommandPool pool) {
-  VkCommandBufferAllocateInfo allocate_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-  allocate_info.commandPool = pool;
-  allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  allocate_info.commandBufferCount = 1;
-  allocate_info.pNext = 0;
+  VkCommandBufferAllocateInfo allocate_info = {
+    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+    .commandPool = pool,
+    .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+    .commandBufferCount = 1,
+  };
 
-  VkCommandBuffer cmd;
-  VK_CHECK(vkAllocateCommandBuffers(vkdevice, &allocate_info, &cmd));
-  return cmd;
+  VkCommandBuffer result;
+  VK_CHECK(vkAllocateCommandBuffers(vkdevice, &allocate_info, &result));
+  return result;
 }
 
 void vk_cmd_free(VkCommandPool pool, VkCommandBuffer cmd) {
@@ -29,9 +30,9 @@ void vk_cmd_end(VkCommandBuffer cmd) {
 }
 
 VkCommandBuffer vk_cmd_alloc_and_begin_single_use() {
-  VkCommandBuffer out_cmd = vk_cmd_alloc(vk.device.transient_cmd_pool);
-  vk_cmd_begin(out_cmd);
-  return out_cmd;
+  VkCommandBuffer result = vk_cmd_alloc(vk.device.transient_cmd_pool);
+  vk_cmd_begin(result);
+  return result;
 }
 
 void vk_cmd_end_single_use(VkCommandBuffer cmd) {
