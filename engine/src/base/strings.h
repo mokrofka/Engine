@@ -124,7 +124,7 @@ INLINE String str_postfix(String str, u32 size);
 // hello_world
 // size 3
 // String: hello_wo
-INLINE String str8_chop(String str, u32 amt);
+INLINE String str_chop(String str, u32 amt);
 
 ////////////////////////////////
 // String Formatting & Copying
@@ -250,7 +250,7 @@ INLINE String str_postfix(String str, u32 size) {
   return str;
 }
 
-INLINE String str8_chop(String str, u32 amt) {
+INLINE String str_chop(String str, u32 amt) {
   amt = ClampTop(amt, str.size);
   str.size -= amt;
   return str;

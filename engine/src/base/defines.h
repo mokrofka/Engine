@@ -59,7 +59,8 @@ typedef void VoidProc(void);
 #define OffsetOf(T,m)               PtrInt(&Member(T,m))
 #define MemberFromOffset(T,ptr,off) (T)((((u8 *)ptr)+(off)))
 #define CastFromMember(T,m,ptr)     (T*)(((u8*)ptr) - OffsetOf(T,m))
-#define Offset(x, y)             (u8*)(x) + (y)
+#define Offset(x, y)                (u8*)(x) + (y)
+#define PtrMatch(x, y)              ((u8*)(x) == (u8*)(y))
 
 #define MemZero(d,s)       __builtin_memset(d,0,s)
 #define MemZeroStruct(a)   MemZero((a),sizeof(*(a)))

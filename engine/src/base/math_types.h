@@ -5,10 +5,10 @@ union v2 {
   f32 e[2];
   struct {
     union {
-      f32 x,r,u;
+      f32 x;
     };
     union {
-      f32 y,g,v;
+      f32 y;
     };
   };
   v2 () = default;
@@ -19,10 +19,10 @@ union v2i {
   i32 e[2];
   struct {
     union {
-      i32 x,r,u;
+      i32 x;
     };
     union {
-      i32 y,g,v;
+      i32 y;
     };
   };
   v2i () = default;
@@ -33,13 +33,13 @@ union v3 {
   f32 e[3];
   struct {
     union {
-      f32 x,r,u;
+      f32 x;
     };
     union {
-      f32 y,g,v;
+      f32 y;
     };
     union {
-      f32 z,b,w;
+      f32 z;
     };
   };
   v3 () = default;
@@ -53,16 +53,16 @@ union v4 {
   f32 e[4];
   struct {
     union {
-      f32 x,r,u;
+      f32 x;
     };
     union {
-      f32 y,g,v;
+      f32 y;
     };
     union {
-      f32 z,b;
+      f32 z;
     };
     union {
-      f32 w,a;
+      f32 w;
     };
   };
   v4 () = default;

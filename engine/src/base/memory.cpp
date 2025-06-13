@@ -16,37 +16,35 @@ Arena* arena_alloc(Arena* arena, u64 size, u64 align) {
 
   Assert(offset+size <= arena->size && "Arena is out of memory");
   
-  Arena* ptr = (Arena*)(((PtrInt)arena + ARENA_HEADER) + offset);
-  ptr->used = 0;
-  ptr->size = size;
-  arena->used = offset+size;
+  Arena* result; Assign(result, Offset(arena, ARENA_HEADER + offset));
+  *result = { .size = size, };
+  arena->used = offset + size;
 
-  AllocMemZero((u8*)ptr+ARENA_HEADER, size);
-  return ptr;
+  AllocMemZero(Offset(result, ARENA_HEADER), size);
+  return result;
 }
 
 void* _arena_push(Arena* arena, u64 size, u64 align) {
-  // Align 'curr_offset' forward to the specified alignment
   PtrInt curr_ptr = (PtrInt)arena + ARENA_HEADER + arena->used;
   u64 offset = AlignPow2(curr_ptr, align);
   u64 temp = (PtrInt)arena + ARENA_HEADER;
-	offset -= temp; // Change to relative offset
+	offset -= temp;
 
   Assert(offset+size <= arena->size && "Arena is out of memory");
   
-  u8* buffer = (u8*)arena + ARENA_HEADER + offset;
-  arena->used = offset+size;
+  u8* result = Offset(arena, ARENA_HEADER + offset);
+  arena->used = offset + size;
 
-  AllocMemZero(buffer, size);
-  return buffer;
+  AllocMemZero(result, size);
+  return result;
 }
 
 void _arena_move(Arena* arena, u64 size, u64 align) {
   PtrInt curr_ptr = (PtrInt)arena + ARENA_HEADER + arena->used;
   u64 offset = AlignPow2(curr_ptr, align);
   u64 temp = (PtrInt)arena + ARENA_HEADER;
-	offset -= temp; // Change to relative offset
-  Assert(offset+size <= arena->size && "Arena is out of memory");
+	offset -= temp;
+  Assert(offset + size <= arena->size && "Arena is out of memory");
   arena->used = offset+size;
 }
 
@@ -73,24 +71,22 @@ Temp tctx_get_scratch(Arena** conflics, u64 counts) {
   return {};
 }
 
-
 ////////////////////////////////
 // Pool
 #ifdef MEMORY_ALLOCATED_GUARD
 
 Pool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignment) {
-  Assert(chunk_size >= sizeof(PoolFreeNode) && "Chunk size is too small");
-  Pool result;
-
   chunk_size = AlignPow2(chunk_size, chunk_alignment);
   u64 stride = chunk_size + chunk_alignment;
   u8* data = push_buffer(arena, chunk_count*stride, chunk_alignment);
 
-  result.data = data;
-  result.chunk_count = chunk_count;
-  result.chunk_size = chunk_size;
-  result.head = null;
-  result.guard_size = chunk_alignment;
+  Pool result = {
+    .data = data,
+    .chunk_count = chunk_count,
+    .chunk_size = chunk_size,
+    .head = null,
+    .guard_size = chunk_alignment,
+  };
 
   pool_free_all(result);
   return result;
@@ -100,7 +96,7 @@ u8* pool_alloc(Pool& p) {
   PoolFreeNode* result = p.head;
   Assert(result && "Pool allocator has no free memory");
 
-  *(u64*)((u8*)result - p.guard_size) = ALLOC_HEADER_GUARD;
+  *(u64*)(Offset(result, -p.guard_size)) = ALLOC_HEADER_GUARD;
 
   p.head = p.head->next;
 
@@ -109,8 +105,8 @@ u8* pool_alloc(Pool& p) {
 }
 
 void pool_free(Pool& p, void* ptr) {
-  Assert(*(u64*)((u8*)ptr - p.guard_size) == ALLOC_HEADER_GUARD && "Double free memory");
-  *(u64*)((u8*)ptr - p.guard_size) = DEALLOC_HEADER_GUARD;
+  Assert(*(u64*)(Offset(ptr, -p.guard_size)) == ALLOC_HEADER_GUARD && "Double free memory");
+  *(u64*)(Offset(ptr, -p.guard_size)) = DEALLOC_HEADER_GUARD;
 
 	void* start = p.data;
 	void* end = p.data + p.chunk_count*(p.chunk_size + p.guard_size);
@@ -137,16 +133,17 @@ void pool_free_all(Pool& p) {
 
 Pool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignment) {
   Assert(chunk_size >= sizeof(PoolFreeNode) && "Chunk size is too small");
-  Pool result;
 
   chunk_size = AlignPow2(chunk_size, chunk_alignment);
   u64 size = chunk_count* chunk_size;
   u8* data = push_buffer(arena, size, chunk_alignment);
 
-  result.data = data,
-  result.chunk_count = chunk_count,
-  result.chunk_size = chunk_size,
-  result.head = null,
+  Pool result {
+    .data = data,
+    .chunk_count = chunk_count,
+    .chunk_size = chunk_size,
+    .head = null,
+  };
 
   pool_free_all(result);
   return result;
@@ -263,7 +260,7 @@ u8* freelist_alloc(FreeList& fl, u64 size, u64 alignment) {
   u64 remaining = node->block_size - required_space;
 
   if (remaining > 0) {
-    FreeListNode* new_node = (FreeListNode*)((u8*)node + required_space);
+    FreeListNode* new_node; Assign(new_node, Offset(node, required_space));
     new_node->block_size = remaining;
     free_list_node_insert(&fl.head, node, new_node);
   }
@@ -271,7 +268,7 @@ u8* freelist_alloc(FreeList& fl, u64 size, u64 alignment) {
   free_list_node_remove(&fl.head, prev_node, node);
 
   u64 mem_alignment = padding - sizeof(FreeListAllocationHeader);
-  FreeListAllocationHeader* header_ptr; Assign(header_ptr, (u8*)node+mem_alignment);
+  FreeListAllocationHeader* header_ptr; Assign(header_ptr, Offset(node, mem_alignment));
   header_ptr->block_size = required_space;
   header_ptr->padding = mem_alignment;
 #ifdef MEMORY_ALLOCATED_GUARD
@@ -302,7 +299,7 @@ void freelist_free(FreeList& fl, void* ptr) {
 #endif
 
   u64 padding = header->padding;
-  free_node = (FreeListNode*)((u8*)header - header->padding);
+  Assign(free_node, Offset(header, -header->padding));
   free_node->block_size = header->block_size;
   free_node->next = null;
 
@@ -312,7 +309,6 @@ void freelist_free(FreeList& fl, void* ptr) {
   node = fl.head;
   while (node != null) {
     if (ptr < node) {
-      // free_list_node_free_insert(&fl.head, prev_node, free_node);
       free_list_node_insert(&fl.head, prev_node, free_node);
       break;
     }
@@ -328,7 +324,7 @@ void freelist_free(FreeList& fl, void* ptr) {
 }
 
 void free_list_coalescence(FreeList& fl, FreeListNode* prev_node, FreeListNode* free_node) {
-  if (free_node->next != null && (void*)((PtrInt)free_node + free_node->block_size) == free_node->next) {
+  if (free_node->next != null && PtrMatch(Offset(free_node, free_node->block_size), free_node->next)) {
     free_node->block_size += free_node->next->block_size;
     free_list_node_remove(&fl.head, free_node, free_node->next);
   }
@@ -336,8 +332,7 @@ void free_list_coalescence(FreeList& fl, FreeListNode* prev_node, FreeListNode* 
   if (prev_node == null) {
     return;
   } 
-  else if (prev_node->next != null && (void*)((PtrInt)prev_node + prev_node->block_size) == free_node) {
-    // prev_node->block_size += free_node->next->block_size;
+  else if (prev_node->next != null && PtrMatch(Offset(prev_node, prev_node->block_size), free_node)) {
     prev_node->block_size += free_node->block_size;
     free_list_node_remove(&fl.head, prev_node, free_node);
   }

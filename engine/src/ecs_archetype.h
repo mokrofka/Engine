@@ -25,14 +25,9 @@ INLINE constexpr u64 hash_name_at_compile(String name) {
   return hash;
 }
 
-// struct Column {
-//   u8* data;
-//   u32 element_size;
-//   u32 count;
-// };
-
 struct Archetype {
   u32 id;
+  u32 tier;
   u32 type;
   u32 component_count;
   struct Column* components[10];
@@ -59,7 +54,8 @@ struct ECS_state {
   Record entities_records[MaxEntities];
   u32 archetype_count;
   Archetype archetypes[10];
-  u32 type_to_archetype[10];
+  u32 archetype_tiers_count[10];
+  u32 archetype_tiers[10][100];
 
   u32 component_index_to_archetype_column[10][10];
 
@@ -71,12 +67,14 @@ struct ECS_state {
   u32 component_queue_count;
   u32 component_queue_sizes[100];
   u32 component_queue_hash_ids[100];
+
+  u32 hashed_id_to_query_id[MaxEcsHashes];
 };
 
 global ECS_state ecs;
 
 struct Column {
-  u8* data;
+  u8 data[MaxEntities];
   u32 count;
   u32 element_size;
   u32 index_to_entity[MaxEntities];  
@@ -116,7 +114,11 @@ struct Column {
 // utils
 
 inline b32 type_has_component(u32 type, u32 component_id) {
-  return ((Bit(type) & Bit(component_id)) == Bit(component_id));
+  return ((type & Bit(component_id)) == Bit(component_id));
+}
+
+inline b32 type_is_subset_of(u32 subset, u32 superset) {
+  return (subset & superset) == subset;
 }
 
 INLINE constexpr u32 _component_get_id(String component_name) {
@@ -142,48 +144,118 @@ inline void entity_destroy_id(Entity entity) {
   ecs.entities[--ecs.entity_count] = entity;
 }
 
-inline void move_entity(Archetype* archetype, u32 row, Archetype* next_archetype) {
-
+void new_ecs_init() {
+  Loop (i, MaxEntities) {
+    ecs.entities[i] = i;
+  }
+  ecs.entity_count = 0;
+  ecs.archetype_count = 1;
+  Loop (i, MaxEcsHashes) {
+    ecs.hashed_id_to_component_id[i] = INVALID_ID;
+  }
 }
 
 inline void* _component_get(Entity entity, u32 component_id) {
   Record* record = &ecs.entities_records[entity];
   Archetype* archetype = &ecs.archetypes[record->archetype_id];
 
-  u32 column = ecs.component_index_to_archetype_column[component_id][archetype->id];
+  // u32 column = ecs.component_index_to_archetype_column[component_id][archetype->id];
 
-  u32 element_size = archetype->components[column]->element_size;
-  return Offset(archetype->components[column]->data, record->row*element_size);
+  // u32 element_size = archetype->components[column]->element_size;
+  u32 element_size = archetype->components[component_id]->element_size;
+  return Offset(archetype->components[component_id]->data, record->row*element_size);
 }
 #define component_get(entity, T) \
   (T*)_component_get(entity, component_get_id(T))
+
+void move_entity(Archetype* old_archetype, Entity e, u32 component_id) {
+  Record old_record = ecs.entities_records[e];
+  Record* new_record = &ecs.entities_records[e];
+  Archetype* next_archetype = old_archetype->archetype_add[component_id];
+
+  u32 old_type = old_archetype->type;
+  while (old_type) {
+    u32 component_id = LowestBit(old_type);
+    void* component = _component_get(e, component_id);
+    old_archetype->components[component_id]->remove_data(e);
+    next_archetype->components[component_id]->insert_data(e, component);
+
+    ClearBit(old_type, LowestBit(old_type));
+  }
+
+  next_archetype->components[component_id]->add(e);
+  new_record->archetype_id = next_archetype->id;
+}
 
 inline void _component_add(Entity e, String component_name) {
   u32 component_id = _component_get_id(component_name);
   Record* record = &ecs.entities_records[e];
   Archetype* archetype = &ecs.archetypes[record->archetype_id];
+  Assert(!type_has_component(archetype->type, component_id) && "entity already has component");
 
-  Archetype* next_archetype = archetype->archetype_add[component_id];
-  if (next_archetype == null) {
-    u32 type = archetype->type | Bit(component_id);
+  Archetype** next_archetype = &archetype->archetype_add[component_id];
+  if (*next_archetype == null) {
+    u32 type = archetype->type;
+    u32 tier = 0;
 
-    Archetype* new_archetype = &ecs.archetypes[ecs.archetype_count++];
-    new_archetype->type = type;
+    // Create archetype with previous components
+    Archetype* new_archetype = &ecs.archetypes[ecs.archetype_count];
     while (type) {
       u32 component_id = LowestBit(type);
 
-      new_archetype->components[new_archetype->component_count] = mem_alloc_struct(Column);
-      *new_archetype->components[new_archetype->component_count++] = {
-        .data = mem_alloc(ComponentSize),
+      new_archetype->component_names[component_id] = archetype->component_names[component_id];
+      new_archetype->components[component_id] = mem_alloc_struct(Column);
+      *new_archetype->components[component_id] = {
         .element_size = ecs.components_size[component_id],
-        .component_name = component_name,
+        .component_name = archetype->component_names[component_id],
       };
 
       ClearBit(type, LowestBit(type));
+      ++new_archetype->component_count;
+      ++tier;
+    }
+
+    // Add new component
+    {
+      new_archetype->component_names[component_id] = component_name;
+      new_archetype->components[component_id] = mem_alloc_struct(Column);
+      *new_archetype->components[component_id] = {
+        .element_size = ecs.components_size[component_id],
+        .component_name = component_name,
+      };
+    }
+
+    new_archetype->id = ecs.archetype_count++;
+    new_archetype->type = archetype->type | Bit(component_id);
+    *next_archetype = new_archetype;
+    new_archetype->archetype_remove[component_id] = archetype;
+    ++tier;
+
+    new_archetype->tier = tier;
+    ecs.archetype_tiers[tier][ecs.archetype_tiers_count[tier]++] = new_archetype->id;
+
+    Loop (i, ecs.archetype_tiers_count[tier + 1]) {
+      u32 archetype_id = ecs.archetype_tiers[tier + 1][i];
+      Archetype* next_archetype = &ecs.archetypes[archetype_id];
+      if (type_is_subset_of(new_archetype->type, next_archetype->type)) {
+        u32 type = LowestBit(next_archetype->type & ~new_archetype->type);
+        new_archetype->archetype_add[type] = next_archetype;
+        next_archetype->archetype_remove[type] = new_archetype;
+      }
+    }
+
+    Loop (i, ecs.archetype_tiers_count[tier - 1]) {
+      u32 archetype_id = ecs.archetype_tiers[tier - 1][i];
+      Archetype* prev_archetype = &ecs.archetypes[archetype_id];
+      if (type_is_subset_of(prev_archetype->type, new_archetype->type)) {
+        u32 type = LowestBit(new_archetype->type & ~prev_archetype->type);
+        new_archetype->archetype_remove[type] = prev_archetype;
+        prev_archetype->archetype_add[type] = new_archetype;
+      }
     }
   }
-
-  move_entity(archetype, record->row, next_archetype);
+  
+  move_entity(archetype, e, component_id);
 }
 #define component_add(entity, T) \
   _component_add(entity, str_lit(Stringify(T)))
@@ -210,10 +282,73 @@ inline void new_component_queue_register() {
   }
 }
 
-#define Component(T)                                       \
-  struct Glue(__, T) {                                     \
-    Glue(__, T)() {                                        \
+#define Component(T)                                           \
+  struct Glue(__, T) {                                         \
+    Glue(__, T)() {                                            \
       new_component_enqueue(str_lit(Stringify(T)), sizeof(T)); \
-    }                                                      \
-  };                                                       \
+    }                                                          \
+  };                                                           \
   static Glue(__, T) Glue(__variable, T);
+
+enum QuerySection {
+  QuerySection_Required,
+  QuerySection_Optional,
+  QuerySection_Excluded,
+  QuerySection_OptionalExcluded,
+};
+
+struct Query {
+
+};
+
+inline Query* _query_get(String text) {
+  u32 hash_query_id = hash_name_at_compile(text);
+
+  u32 start = 0;
+  QuerySection section = QuerySection_Required;
+
+  Loop (i, text.size + 1) {
+    u8 c = text.str[i];
+
+    if (c == ' ' || c == ',' || c == '|' || c == '\0') {
+      if (i > start) {
+        String word = { &text.str[start], i - start };
+        Info("%s", word);
+
+        switch (section) {
+          case QuerySection_Required: {
+            hash_name_at_compile(word);
+          } break;
+          case QuerySection_Optional: {
+
+          } break;
+          case QuerySection_Excluded: {
+
+          } break;
+          case QuerySection_OptionalExcluded: {
+
+          } break;
+        }
+      }
+
+      switch (c) {
+        case ',': {
+          if (section == QuerySection_Required) {
+            section = QuerySection_Optional;
+          } else {
+            section = QuerySection_OptionalExcluded;
+          }
+        } break;
+        case '|': {
+          section = QuerySection_Excluded;
+        } break;
+      }
+
+      start = i + 1;  // start next word
+    }
+  }
+  return {};
+}
+
+#define query_get(...) \
+  _query_get(str_lit(#__VA_ARGS__))
