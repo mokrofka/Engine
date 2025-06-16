@@ -172,16 +172,10 @@ KAPI ShaderGlobalState* shader_get_global_state() {
 }
 
 KAPI ShaderEntity* shader_get_entity_data(u32 entity_id) {
-  // return (EntityShader*)(vk.storage_buffer.maped_memory +
-  //                        sizeof(GlobalShaderState) + sizeof(EntityShader) * entity_id);
-
   return (ShaderEntity*)(vk.entities_data.get_data(entity_id));
 }
 
 KAPI DirectionalLight* shader_get_light_data(u32 entity_id) {
-  // return (EntityShader*)(vk.storage_buffer.maped_memory +
-  //                        sizeof(GlobalShaderState) + sizeof(EntityShader) * MaxEntities + sizeof(Light) * entity_id);
-
   return (DirectionalLight*)vk.lights_data.get_data(entity_id);
 }
 

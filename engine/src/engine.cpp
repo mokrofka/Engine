@@ -46,18 +46,6 @@ void engine_create(App* app) {
   Assign(app->arena, mem_alloc(AppSize));
   *app->arena = { .size = AppSize, };
   tctx_init(app->arena);
-  u8* a = mem_alloc(1);
-  mem_alloc(1);
-  mem_free(a);
-  a= mem_alloc(1);
-  mem_alloc(1);
-  mem_alloc(1);
-  mem_free(a);
-  mem_alloc(1);
-  mem_alloc(1);
-  a = mem_alloc(1);
-  mem_alloc(1);
-  mem_free(a);
   
   app_create(app);
   Scratch scratch;
@@ -77,8 +65,6 @@ void engine_create(App* app) {
     network_init(st.arena);
   }
   ecs_init();
-  // test_ecs();
-  test();
   
   {
     ResSysConfig res_sys_cfg = {
@@ -166,7 +152,6 @@ void engine_run(App* app) {
   f64 target_frame_seconds = 1.0f / 60;
   
   while (st.is_running) {
-    
     os_pump_messages();
 
     if (!st.is_suspended) {

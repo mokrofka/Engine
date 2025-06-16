@@ -79,8 +79,7 @@ typedef void VoidProc(void);
 #define AlignPow2(x,b)     (((x) + (b) - 1)&(~((b) - 1)))
 #define AlignDownPow2(x,b) ((x)&(~((b) - 1)))
 #define AlignPadPow2(x,b)  ((0-(x)) & ((b) - 1))
-#define IsPow2(x)          ((x)!=0 && ((x)&((x)-1))==0)
-#define IsPow2OrZero(x)    ((((x) - 1)&(x)) == 0)
+#define IsPow2(x)    ((((x) - 1)&(x)) == 0)
 
 #define Sqr(x) ((x)*(x))
 #define Sign(x) ((x) < 0 ? -1 : (x) > 0 ? 1 : 0)
@@ -103,7 +102,6 @@ typedef void VoidProc(void);
 
 #define DeferLoop(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
 #define Loop(i, c) for (int i = 0; i < c; ++i)
-#define LoopC(i, c) for (int i = 0, _end = (c); i < _end; ++i)
 
 #define Func(a) struct a { static
 

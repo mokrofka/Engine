@@ -28,17 +28,21 @@ struct Scale {
   f32 scale;
 };
 
-Component(Pos)
-Component(Vel)
-Component(Scale)
+// Component(Pos)
+// Component(Vel)
+// Component(Scale)
+// Tag(Light)
 
-void test() {
+void test_ecs() {
   Scratch scratch;
+
   new_ecs_init();
   new_component_queue_register();
+  new_tag_queue_register();
 
   Entity e = entity_create();
   component_add(e, Pos);
+  component_add(e, Light);
   Pos* pos = component_get(e, Pos);
   pos->x = 1;
   pos->y = 2;

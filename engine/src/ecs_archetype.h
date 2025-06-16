@@ -27,14 +27,17 @@ struct Archetype {
   u32 id;
   u32 tier;
   u32 type;
+  u32 tag;
   u32 entity_count;
   u32 component_count;
+  u32 tag_count;
   u32 add_count;
   u32 remove_count;
   struct Column* components[10];
   Archetype* archetype_add[10];
   Archetype* archetype_remove[10];
   String component_names[10];
+  String tag_names[10];
 };
 
 struct Record {
@@ -83,6 +86,12 @@ struct ECS_state {
   u32 query_count;
   Query queries[100];
   u32 hashed_id_to_query_id[MaxEcsHashes];
+
+  u32 tag_count;
+  u32 hashed_id_to_tag_id[MaxEcsHashes];
+
+  u32 tag_queue_count;
+  u32 tag_queue_hash_ids[MaxEcsHashes];
 };
 
 global ECS_state ecs;
@@ -194,7 +203,9 @@ inline void move_entity(Archetype* old_archetype, Entity e, u32 component_id) {
   --old_archetype->entity_count;
   ++next_archetype->entity_count;
 
-  next_archetype->components[component_id]->add(e);
+  if (ecs.components_size[component_id] != 0) {
+    next_archetype->components[component_id]->add(e);
+  }
   Record* new_record = &ecs.entities_records[e];
   new_record->archetype_id = next_archetype->id;
   new_record->row = next_archetype->entity_count - 1;
@@ -229,18 +240,24 @@ inline void _component_add(Entity e, String component_name) {
       ++tier;
     }
 
-    // Add new component
-    {
+    if (ecs.components_size[component_id] != 0) {
       new_archetype->component_names[component_id] = component_name;
       new_archetype->components[component_id] = mem_alloc_struct(Column);
       *new_archetype->components[component_id] = {
         .element_size = ecs.components_size[component_id],
         .component_name = component_name,
       };
+
+      new_archetype->type = archetype->type | Bit(component_id);
+      new_archetype->tag = archetype->tag;
+    } else {
+      new_archetype->tag_names[component_id] = component_name;
+
+      new_archetype->type = archetype->type;
+      new_archetype->tag = archetype->tag | Bit(component_id);
     }
 
     new_archetype->id = ecs.archetype_count++;
-    new_archetype->type = archetype->type | Bit(component_id);
     *next_archetype = new_archetype;
     new_archetype->archetype_remove[component_id] = archetype;
     ++tier;
@@ -251,20 +268,36 @@ inline void _component_add(Entity e, String component_name) {
     Loop (i, ecs.archetype_tiers_count[tier + 1]) {
       u32 archetype_id = ecs.archetype_tiers[tier + 1][i];
       Archetype* next_archetype = &ecs.archetypes[archetype_id];
-      if (type_is_subset_of(new_archetype->type, next_archetype->type)) {
-        u32 type = LowestBit(next_archetype->type & ~new_archetype->type);
-        new_archetype->archetype_add[type] = next_archetype;
-        next_archetype->archetype_remove[type] = new_archetype;
+      if (type_is_subset_of(new_archetype->type, next_archetype->type) && type_is_subset_of(new_archetype->tag, next_archetype->tag)) {
+        u32 type = next_archetype->type & ~new_archetype->type;
+        if (type != 0) {
+          type = LowestBit(type);
+        }
+        u32 tag = next_archetype->tag & ~new_archetype->tag;
+        if (tag != 0) {
+          tag = LowestBit(tag);
+        }
+        u32 id = type | tag;
+        new_archetype->archetype_add[id] = next_archetype;
+        next_archetype->archetype_remove[id] = new_archetype;
       }
     }
 
     Loop (i, ecs.archetype_tiers_count[tier - 1]) {
       u32 archetype_id = ecs.archetype_tiers[tier - 1][i];
       Archetype* prev_archetype = &ecs.archetypes[archetype_id];
-      if (type_is_subset_of(prev_archetype->type, new_archetype->type)) {
-        u32 type = LowestBit(new_archetype->type & ~prev_archetype->type);
-        new_archetype->archetype_remove[type] = prev_archetype;
-        prev_archetype->archetype_add[type] = new_archetype;
+      if (type_is_subset_of(prev_archetype->type, new_archetype->type) && type_is_subset_of(prev_archetype->tag, new_archetype->tag)) {
+        u32 type = new_archetype->type & ~prev_archetype->type;
+        if (type != 0) {
+          type = LowestBit(type);
+        }
+        u32 tag = new_archetype->tag & ~prev_archetype->tag;
+        if (tag != 0) {
+          tag = LowestBit(tag);
+        }
+        u32 id = type | tag;
+        new_archetype->archetype_remove[id] = prev_archetype;
+        prev_archetype->archetype_add[id] = new_archetype;
       }
     }
   }
@@ -273,8 +306,6 @@ inline void _component_add(Entity e, String component_name) {
 }
 #define component_add(entity, T) \
   _component_add(entity, str_lit(Stringify(T)))
-
-// component registration
 
 inline void new_component_enqueue(String component_name, u32 component_size) {
   u32 hashed_id = hash_name_at_compile(component_name);
@@ -301,6 +332,26 @@ inline void new_component_queue_register() {
       new_component_enqueue(str_lit(Stringify(T)), sizeof(T)); \
     }                                                          \
   };                                                           \
+  static Glue(__, T) Glue(__variable, T);
+
+inline void tag_enqueue(String tag_name) {
+  ecs.tag_queue_hash_ids[ecs.tag_queue_count] = hash_name_at_compile(tag_name);
+  ++ecs.tag_queue_count;
+}
+
+inline void new_tag_queue_register() {
+  Loop (i, ecs.tag_queue_count) {
+    u32 hashed_id = ecs.tag_queue_hash_ids[i];
+    ecs.hashed_id_to_component_id[hashed_id] = ecs.component_count++;
+  }
+}
+
+#define Tag(T)                            \
+  struct Glue(__, T) {                    \
+    Glue(__, T)() {                       \
+      tag_enqueue(str_lit(Stringify(T))); \
+    }                                     \
+  };                                      \
   static Glue(__, T) Glue(__variable, T);
 
 enum QuerySection {

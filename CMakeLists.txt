@@ -19,4 +19,3 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_SOURCE_DIR}/bin)
 add_subdirectory(engine)
 add_subdirectory(game)
 add_subdirectory(app)
-
