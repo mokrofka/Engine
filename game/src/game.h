@@ -1,6 +1,5 @@
 #pragma once
 #include "lib.h"
-#include "object.h"
 #include "game_types.h"
 
 C_LINKAGE_BEGIN

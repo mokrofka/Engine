@@ -128,6 +128,7 @@ KAPI void freelist_free_all(FreeList& fl);
 
 KAPI void global_allocator_init();
 KAPI u8* mem_alloc(u64 size);
+KAPI u8* mem_alloc_zero(u64 size);
 #define mem_alloc_struct(T) (T*)mem_alloc(sizeof(T))
 KAPI u8* mem_realoc(void* origin, u64 size);
 KAPI void mem_free(void* ptr);

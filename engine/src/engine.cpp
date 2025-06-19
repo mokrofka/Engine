@@ -14,7 +14,7 @@
 #include "ui.h"
 #include "network.h"
 #include "test.h"
-#include "ecs.h"
+// #include "ecs.h"
 
 struct EngineState {
   Arena* arena;
@@ -64,7 +64,6 @@ void engine_create(App* app) {
   {
     network_init(st.arena);
   }
-  ecs_init();
   
   {
     ResSysConfig res_sys_cfg = {

@@ -419,6 +419,22 @@ u8* mem_alloc(u64 size) {
   return result;
 }
 
+u8* mem_alloc_zero(u64 size) {
+  u8* result = 0;
+  u64 base_size = 8;
+
+  Loop (i, ArrayCount(mem_ctx.pools)) {
+    if (size <= base_size << i) {
+      result = segregated_pool_alloc(mem_ctx.pools[i]);
+      MemZero(result, size);
+      break;
+    }
+  }
+
+  Assert(result);
+  return result;
+}
+
 void mem_free(void* ptr) {
   u8* base = mem_ctx.data;
 

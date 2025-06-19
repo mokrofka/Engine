@@ -2,7 +2,7 @@
 #include "lib.h"
 
 #include "render/r_types.h"
-#include "ecs.h"
+#include "entity.h"
 
 #include <vulkan/vulkan.h>
 
@@ -147,7 +147,7 @@ struct vk_Shader {
   VK_Pipeline pipeline;
   VK_ShaderStage stages[3];
   // SparseSetKeep push_constants;
-  SparseSetEntity sparse_set;
+  SparseSetE sparse_set;
   u32 vert_stride;
   u32 attribute_count;
   VkVertexInputAttributeDescription attribute_desriptions[10];
@@ -206,7 +206,7 @@ struct VK {
   Range storage_buffer_range;
   u64 vulkan_driver_memory_allocated;
   VK_Mesh meshes[10];
-  SparseSetKeep sparse_push_constants;
+  SparseSet sparse_push_constants;
 
   VK_Texture texture; // TODO bindless textures
   
@@ -215,8 +215,8 @@ struct VK {
 
   SparseSetIndex entity_to_mesh;
   u32 entity_to_shader[MaxEntities];
-  SparseSetKeep entities_data;
-  SparseSetKeep lights_data;
+  SparseSet entities_data;
+  SparseSet lights_data;
   
   // Shader
   u32 shader_count;
@@ -224,7 +224,7 @@ struct VK {
   VK_ComputeShader compute_shader;
   vk_Shader graphics_shader_compute;
   mat4* projection_view;
-  SparseSetKeep push_constants;
+  SparseSet push_constants;
   ShaderGlobalState* global_shader_state;
 
   // offscreen rendering

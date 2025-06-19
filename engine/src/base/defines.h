@@ -40,6 +40,9 @@ typedef void VoidProc(void);
 #define Thousand(n)   ((n)*1000)
 #define Million(n)    ((n)*1000000)
 #define Billion(n)    ((n)*1000000000)
+#define BytesToKB(x) (x / 1024.f)
+#define BytesToMB(x) (BytesToKB(x) / 1024.f)
+#define BytesToGB(x) (BytesToMB(x) / 1024.f)
 
 #define Min(a,b) (((a)<(b))?(a):(b))
 #define Max(a,b) (((a)>(b))?(a):(b))
@@ -100,8 +103,20 @@ typedef void VoidProc(void);
 #define Glue(A,B) A##B
 #define Stringify(S) #S
 
-#define DeferLoop(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
 #define Loop(i, c) for (int i = 0; i < c; ++i)
+
+template<typename F>
+struct ImplDefer {
+	F f;
+	ImplDefer(F f_) : f(f_) {}
+	~ImplDefer() { f(); }
+};
+template<typename F>
+ImplDefer<F> MakeDefer(F f) {
+	return ImplDefer<F>(f);
+}
+#define Defer(code) auto Glue(_defer_, __COUNTER__) = MakeDefer([&](){code;})
+#define DeferLoop(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
 
 #define Func(a) struct a { static
 

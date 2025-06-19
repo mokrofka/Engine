@@ -80,15 +80,15 @@ inline String64 _entity_create_default_name() {
   return result;
 };
 
-inline Entity entity_create(String64 entity_name = _entity_create_default_name()) {
-  Assert(ecs.entity_count < MaxEntities);
+// inline Entity entity_create(String64 entity_name = _entity_create_default_name()) {
+//   Assert(ecs.entity_count < MaxEntities);
 
-  Entity id = ecs.entities[ecs.entity_count];
-  ecs.is_entities_alive[id] = true;
-  ecs.entity_names[id] = entity_name;
-  ++ecs.entity_count;
-  return id;
-}
+//   Entity id = ecs.entities[ecs.entity_count];
+//   ecs.is_entities_alive[id] = true;
+//   ecs.entity_names[id] = entity_name;
+//   ++ecs.entity_count;
+//   return id;
+// }
 
 inline void entity_destroy_id(Entity entity) {
   Assert(ecs.is_entities_alive[entity]);
@@ -348,11 +348,11 @@ inline void entity_signature_changed(Entity entity, Signature entity_signature) 
   }
 }
 
-inline void entity_destroy(Entity entity) {
-  components_entity_destroy(entity);
-  system_entity_destroyed(entity);
-  entity_destroy_id(entity);
-}
+// inline void entity_destroy(Entity entity) {
+//   components_entity_destroy(entity);
+//   system_entity_destroyed(entity);
+//   entity_destroy_id(entity);
+// }
 
 inline void __component_add(Entity entity, u32 component_id) {
   _component_add_internal(entity, component_id);
@@ -638,19 +638,19 @@ struct SparseSetIndex {
 struct SparseSetEntity {
   u32 entity_to_index[MaxEntities];  
   u32 entities[MaxEntities];  
-  u32 entity_count;
+  u32 count;
   
   inline void add(u32 entity) {
     // Put new entry at end and update the maps
-    u32 new_index = entity_count;
+    u32 new_index = count;
     entity_to_index[entity] = new_index;
     entities[new_index] = entity;
-    ++entity_count;
+    ++count;
   }
   inline void remove(u32 entity) {
     // Copy element at end into deleted element's place to maintain density
     u32 index_of_removed_entity = entity_to_index[entity];
-    u32 index_of_last_element = entity_count - 1;
+    u32 index_of_last_element = count - 1;
 
     // Update map to point to moved spot
     u32 entity_of_last_element = entities[index_of_last_element];
@@ -660,6 +660,6 @@ struct SparseSetEntity {
     entity_to_index[entity] = INVALID_ID;
     entities[index_of_last_element] = INVALID_ID;
 
-    --entity_count;
+    --count;
   }
 };
