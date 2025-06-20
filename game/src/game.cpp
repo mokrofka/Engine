@@ -213,10 +213,13 @@ void app_init(App* app) {
 
   // Entity
   {
-    // u32 grid = entity_create();
-    // entity_make_renderable(grid, geometry_get("grid"_), shader_get("grid_shader"_));
-    // PushConstant* push = vk_get_push_constant(grid);
-    // push->model = mat4_translation(v3(0,-1,0));
+    Entity e = {
+      .id = entity_create(),
+      .pos = v3(0,-1,0),
+      .scale = 1,
+    };
+    entity_make_renderable(e.id, geometry_get("grid"_), shader_get("grid_shader"_));
+    st->entities.insert_data(e);
   }
 
   {

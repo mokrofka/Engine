@@ -14,7 +14,6 @@
 #include "ui.h"
 #include "network.h"
 #include "test.h"
-// #include "ecs.h"
 
 struct EngineState {
   Arena* arena;

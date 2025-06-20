@@ -15,6 +15,5 @@ String res_sys_base_path();
 //////////////////////////////////////////////////////////
 // Loaders
 
-Binary res_binary_load(Arena* arena, String filepath);
-MaterialConfig res_load_material_config(String filepath);
+Buffer res_binary_load(Arena* arena, String filename);
 

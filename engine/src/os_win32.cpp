@@ -358,7 +358,7 @@ void os_file_close(OS_Handle file) {
   CloseHandle((HANDLE)file);
 }
 
-u64 os_file_read(OS_Handle file, u64 size, void* out_data) {
+u64 os_file_read(OS_Handle file, u64 size, u8* out_data) {
   HANDLE win32_handle = (HANDLE)file;
   DWORD bytes_read;
   if (file == 0) { return 0; }
@@ -503,15 +503,6 @@ void clock_start(Clock *clock) {
 
 void clock_stop(Clock *clock) {
   clock->start_time = 0;
-}
-
-f64 delta_time_second;
-void os_set_delta_time_second(f64 delta_time) {
-  delta_time_second = delta_time; 
-};
-
-f64 os_get_delta_time_second() {
-  return delta_time_second; 
 }
 
 ///////////////////////////////////////////////////////////////////////////

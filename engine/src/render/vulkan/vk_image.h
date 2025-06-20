@@ -12,10 +12,10 @@ VK_Image vk_image_create(
     b32 create_view,
     VkImageAspectFlags view_aspect_flags);
 
-VkImageView vk_image_view_create(VkFormat format, VkImage image, VkImageAspectFlags);
+VkImageView vk_image_view_create(VkFormat format, VkImage image, VkImageAspectFlags aspect_flags);
 
 void vk_image_transition_layout(VkCommandBuffer cmd, VK_Image image, VkImageLayout old_layout, VkImageLayout new_layout);
 
 void vk_upload_image_to_gpu(VkCommandBuffer cmd, VK_Image image);
 
-void vk_image_destroy(VK_Image image);
+void vk_image_destroy(VK_Image& image);

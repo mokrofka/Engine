@@ -10,44 +10,42 @@ void vk_swapchain_create(u32 width, u32 height) {
   vk.swapchain = create(width, height, false);
 }
 
-void vk_swapchain_recreate(VK_Swapchain* swapchain, u32 width, u32 height) {
-  vk.old_swapchain = *swapchain;
-  *swapchain = create(width, height, true);
+void vk_swapchain_recreate(u32 width, u32 height) {
+  if (vk.frame.width == 0 || vk.frame.height == 0) {
+    Debug("recreate_swapchain called when window is < 1 in a dimension. Booting"_);
+  }
+
+  vk.old_swapchain = vk.swapchain;
+  vk.swapchain = create(width, height, true);
   destroy(&vk.old_swapchain);
+  
+  vk.frame.size_last_generation = vk.frame.size_generation;
 }
 
-void vk_swapchain_destroy(VK_Swapchain* swapchain) {
-  destroy(swapchain);
+void vk_swapchain_destroy() {
+  destroy(&vk.swapchain);
 }
 
-u32 vk_swapchain_acquire_next_image_index(
-    VK_Swapchain* swapchain,
-    VkSemaphore image_available_semaphore,
-    VkFence fence) {
+u32 vk_swapchain_acquire_next_image_index(VkSemaphore image_available_semaphore) {
   u32 image_index;
-  vkAcquireNextImageKHR(vkdevice, swapchain->handle, U64_MAX,
-                        image_available_semaphore, fence, &image_index);
+  vkAcquireNextImageKHR(vkdevice, vk.swapchain.handle, U64_MAX,
+                        image_available_semaphore, 0, &image_index);
   return image_index;
 }
 
-void vk_swapchain_present(
-    VK_Swapchain* swapchain,
-    VkQueue present_queue,
-    VkSemaphore render_complete_semaphore,
-    u32 present_image_index) {
-
+void vk_swapchain_present(VkSemaphore render_complete_semaphore, u32 present_image_index) {
   VkPresentInfoKHR present_info = {
     .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
     .waitSemaphoreCount = 1,
     .pWaitSemaphores = &render_complete_semaphore,
     .swapchainCount = 1,
-    .pSwapchains = &swapchain->handle,
+    .pSwapchains = &vk.swapchain.handle,
     .pImageIndices = &present_image_index,
   };
 
-  vkQueuePresentKHR(present_queue, &present_info);
+  vkQueuePresentKHR(vk.device.graphics_queue, &present_info);
   
-  vk.frame.current_frame = (vk.frame.current_frame + 1) % swapchain->max_frames_in_flight;
+  vk.frame.current_frame = (vk.frame.current_frame + 1) % FramesInFlight;
 }
 
 internal void destroy(VK_Swapchain* swapchain) {
@@ -166,15 +164,15 @@ internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
 
   // Create depth image and its view.
   swapchain.depth_attachment = vk_image_create(
-      VK_IMAGE_TYPE_2D,
-      swapchain_extent.width,
-      swapchain_extent.height,
-      vk.device.depth_format,
-      VK_IMAGE_TILING_OPTIMAL,
-      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-      true,
-      VK_IMAGE_ASPECT_DEPTH_BIT);
+    VK_IMAGE_TYPE_2D,
+    swapchain_extent.width,
+    swapchain_extent.height,
+    vk.device.depth_format,
+    VK_IMAGE_TILING_OPTIMAL,
+    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    true,
+    VK_IMAGE_ASPECT_DEPTH_BIT);
 
   Info("Swapchain created successfully"_);
   return swapchain;

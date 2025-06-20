@@ -1,16 +1,9 @@
 #version 450 core
+#extension GL_GOOGLE_include_directive : enable
+#include "global.vert.glsl"
 
 layout(location = 0) in vec3 in_pos;
 
-layout(set = 0, binding = 0) uniform UniformBuffer {
-  mat4 projection_view;
-} ubo;
-
-// per draw
-layout(push_constant) uniform push_const_ubo {
-  mat4 model;
-} push_ubo;
-
 void main() {
-  gl_Position = ubo.projection_view * push_ubo.model * vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
+  gl_Position = g_projection_view * u_model * vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
 }

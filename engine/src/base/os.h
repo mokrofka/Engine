@@ -54,6 +54,11 @@ struct Clock {
   f64 elapsed;
 };
 
+struct Buffer {
+  u8* data;
+  u64 size;
+};
+
 using WindowClosedCallback = void (*)();
 using WindowResizedCallback = void (*)(Window* window);
 using ProcessKeyCallback = void (*)(Keys key, b32 pressed);
@@ -103,8 +108,8 @@ void           os_directory_watch(OS_Handle dir_handle, u32 id);
 String         os_directory_name_change(Arena* arena, u32 id);
 b32            os_directory_check_change(OS_Handle dir_handle, u32 id);
 void           os_file_close(OS_Handle file);
-u64            os_file_read(OS_Handle file, u64 size, void *out_data);
-u64            os_file_write(OS_Handle file, u64 size, void *data);
+u64            os_file_read(OS_Handle file, u64 size, u8* out_data);
+u64            os_file_write(OS_Handle file, u64 size, u8* data);
 u64            os_file_size(OS_Handle file);
 FileProperties os_properties_from_file(OS_Handle file);
 FileProperties os_properties_from_file_path(String path);
@@ -112,7 +117,6 @@ b32            os_copy_file_path(String dst, String src);
 b32            os_file_path_exists(String path);
 String         os_exe_filename(Arena* arena);
 b32            os_file_compare_time(u64 new_write_time, u64 last_write_time);
-void foo(String dir_path);
 
 OS_Handle os_lib_open(String path);
 void      os_lib_close(OS_Handle lib);
@@ -125,6 +129,5 @@ void clock_update(Clock* clock);
 void clock_start(Clock* clock);
 void clock_stop(Clock* clock);
 void os_set_delta_time_second(f64 delta_time);
-KAPI f64 os_get_delta_time_second();
 
 void os_show_window();

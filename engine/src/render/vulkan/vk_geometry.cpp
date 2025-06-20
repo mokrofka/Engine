@@ -1,7 +1,5 @@
-#include "vk_buffer.h"
 #include "vk_types.h"
-
-#include "res/res_types.h"
+#include "vk_buffer.h"
 
 u32 mesh_count;
 
@@ -15,5 +13,5 @@ void vk_r_geometry_create(Geometry* geom) {
     .vert_count = geom->vertex_count,
   };
   vk.meshes[mesh_count++] = mesh;
-  vk_upload_to_gpu(&vk.vert_buffer, range, geom->vertices);
+  vk_upload_to_gpu(vk.vert_buffer, range, geom->vertices);
 }

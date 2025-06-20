@@ -35,7 +35,8 @@ struct Scratch {
   
   INLINE operator Arena*() { return this->arena; }
 
-  INLINE Scratch(Arena** conflics = null, u64 counts = 0);
+  INLINE Scratch();
+  INLINE Scratch(Arena** conflics);
   INLINE ~Scratch() { arena->used = pos; };
 };
 
@@ -62,8 +63,12 @@ void _arena_move(Arena* arena, u64 size, u64 align);
 #define GetScratch(conflicts, count) (tctx_get_scratch((conflicts), (count)))
 #define ReleaseScratch(scratch) temp_end(scratch)
 
-INLINE Scratch::Scratch(Arena** conflics, u64 counts) {
-  Temp temp = tctx_get_scratch(conflics, counts);
+INLINE Scratch::Scratch(Arena** conflics) {
+  Temp temp = tctx_get_scratch(conflics, 1);
+  *this = *(Scratch*)&temp;
+}
+INLINE Scratch::Scratch() {
+  Temp temp = tctx_get_scratch(null, 0);
   *this = *(Scratch*)&temp;
 }
 

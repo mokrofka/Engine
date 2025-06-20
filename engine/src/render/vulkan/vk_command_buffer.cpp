@@ -38,11 +38,12 @@ VkCommandBuffer vk_cmd_alloc_and_begin_single_use() {
 void vk_cmd_end_single_use(VkCommandBuffer cmd) {
   vk_cmd_end(cmd);
   
-  VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
-  submit_info.commandBufferCount = 1;
-  submit_info.pCommandBuffers = &cmd;
+  VkSubmitInfo submit_info = {
+    .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+    .commandBufferCount = 1,
+    .pCommandBuffers = &cmd,
+  };
   VK_CHECK(vkQueueSubmit(vk.device.graphics_queue, 1, &submit_info, 0));
-  
   VK_CHECK(vkQueueWaitIdle(vk.device.graphics_queue));
   
   vk_cmd_free(vk.device.transient_cmd_pool, cmd);

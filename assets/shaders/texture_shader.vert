@@ -15,8 +15,6 @@ layout(location = 0) out out_data {
 void main() {
   gl_Position = g_projection_view * u_model * vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
   
-  // out_frag_pos = vec3(u_model * vec4(in_pos, 1));
-  // out_normal = mat3(u_model) * in_normal;
   out_frag_pos = vec3(g_view * u_model * vec4(in_pos, 1));
   out_normal = mat3(g_view) * mat3(u_model) * in_normal;
   out_tex_coord = in_tex_coord;

@@ -67,30 +67,6 @@ struct VK_Image  {
   u32 height;
 };
 
-enum VK_RenderPassState {
-  VK_RenderPassState_Ready,
-  VK_RenderPassState_Recording,
-  VK_RenderPassState_InRenderPass,
-  VK_RenderPassState_RecordingEnded,
-  VK_RenderPassState_Submitted,
-  VK_RenderPassState_NotAllocated
-};
-
-struct VK_Renderpass  {
-  VkRenderPass handle;
-  Rect render_area;
-  v4 clear_color;
-  f32 depth;
-  u32 stencil;
-  
-  u8 clear_flags;
-  b8 has_prev_pass;
-  b8 has_next_pass;
-
-  VK_RenderPassState state;
-  u32 id;
-};
-
 struct VK_Swapchain  {
   VkSwapchainKHR handle;
   VkSurfaceFormatKHR image_format;  
@@ -100,19 +76,6 @@ struct VK_Swapchain  {
   VkImageView views[ImagesInFlight];
   
   VK_Image depth_attachment;
-  
-  VkFramebuffer framebuffers[ImagesInFlight];
-};
-
-struct VK_ShaderStage {
-  VkShaderModuleCreateInfo create_info; 
-  VkShaderModule handle;
-  VkPipelineShaderStageCreateInfo shader_state_create_info;
-};
-
-struct VK_Pipeline {
-  VkPipeline handle;
-  VkPipelineLayout pipeline_layout;
 };
 
 struct VK_Frame {
@@ -133,20 +96,19 @@ struct VK_SyncObj {
   VkFence in_flight_fences[FramesInFlight];
 };
 
-struct VK_Render {
-  VK_Buffer obj_vertex_buffer;
-  VK_Buffer obj_index_buffer;
-  u64 geometry_vertex_offset;
-  u64 geometry_index_offset;
-
-  // VkCommandBuffer cmds[2];
+struct VK_Pipeline {
+  VkPipeline handle;
+  VkPipelineLayout pipeline_layout;
 };
 
-struct vk_Shader {
+struct VK_ShaderStage {
+  VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info;
+};
+
+struct VK_Shader {
   String name;
   VK_Pipeline pipeline;
-  VK_ShaderStage stages[3];
-  // SparseSetKeep push_constants;
+  VkPipelineShaderStageCreateInfo stages[2];
   SparseSetE sparse_set;
   u32 vert_stride;
   u32 attribute_count;
@@ -173,66 +135,55 @@ struct VK_Texture {
 struct VK {
   Arena* arena;
   
-  VkInstance instance;
   VkAllocationCallbacks* allocator;
   VkAllocationCallbacks _allocator;
+  VkInstance instance;
   VkSurfaceKHR surface;
   
+  VK_Device device;
   VK_Frame frame;
   VK_SyncObj sync;
-
-  VK_Device device;
-  
   VK_Swapchain swapchain;
   VK_Swapchain old_swapchain;
   
-  b8 recreating_swapchain;
-  
-  // new stuff
   VK_Buffer vert_buffer;
   VK_Buffer index_buffer;
   VK_Buffer stage_buffer;
+  Range storage_buffer_range;
   VK_Buffer storage_buffer;
-  VK_Buffer storage_buffers[2];
-  VK_Buffer compute_uniform_buffer;
+  VK_Buffer compute_storage_buffers[2];
   
   VkDescriptorPool descriptor_pool;
   VkDescriptorSetLayout descriptor_set_layout;
-  VkDescriptorSetLayout compute_descriptor_set_layout;
   VkDescriptorSet descriptor_sets[FramesInFlight];
-  VkDescriptorSet compute_descriptor_sets[FramesInFlight];
-  
-  vk_Shader shader;
-  Range storage_buffer_range;
-  u64 vulkan_driver_memory_allocated;
-  VK_Mesh meshes[10];
-  SparseSet sparse_push_constants;
 
-  VK_Texture texture; // TODO bindless textures
+  VkDescriptorSetLayout compute_descriptor_set_layout;
+  VkDescriptorSet compute_descriptor_sets[FramesInFlight];
   
   VkCommandBuffer cmds[FramesInFlight];
   VkCommandBuffer compute_cmds[FramesInFlight];
 
+  VK_Texture texture; // TODO bindless textures
+  
   SparseSetIndex entity_to_mesh;
-  u32 entity_to_shader[MaxEntities];
+  VK_Mesh meshes[10];
+
   SparseSet entities_data;
   SparseSet lights_data;
+  SparseSet push_constants;
   
   // Shader
+  u32 entity_to_shader[MaxEntities];
   u32 shader_count;
-  vk_Shader shaders[10];
+  VK_Shader shaders[10];
   VK_ComputeShader compute_shader;
-  vk_Shader graphics_shader_compute;
-  mat4* projection_view;
-  SparseSet push_constants;
   ShaderGlobalState* global_shader_state;
 
   // offscreen rendering
   VK_Texture texture_targets[ImagesInFlight];
-  VkFramebuffer texture_framebuffers[ImagesInFlight];
-  VK_Image depth;
+  VK_Image offscreen_depth_buffer;
   b8 is_viewport_resized;
-  b8 is_viewport_render;
+  b8 is_viewport_render; // TODO impelment
 
   v2 viewport_size;
   

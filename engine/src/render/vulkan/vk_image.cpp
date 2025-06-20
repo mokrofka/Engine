@@ -60,7 +60,6 @@ VK_Image vk_image_create(
 }
 
 VkImageView vk_image_view_create(VkFormat format, VkImage image, VkImageAspectFlags aspect_flags) {
-  VkImageView result;
   VkImageViewCreateInfo view_create_info = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
     .image = image,
@@ -75,12 +74,12 @@ VkImageView vk_image_view_create(VkFormat format, VkImage image, VkImageAspectFl
     },
   };
 
+  VkImageView result;
   VK_CHECK(vkCreateImageView(vkdevice, &view_create_info, vk.allocator, &result));
   return result;
 }
 
 void vk_image_transition_layout(VkCommandBuffer cmd, VK_Image image, VkImageLayout old_layout, VkImageLayout new_layout) {
-
   VkImageMemoryBarrier barrier = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
     .oldLayout = old_layout,
@@ -157,7 +156,7 @@ void vk_upload_image_to_gpu(VkCommandBuffer cmd, VK_Image image) {
     &region);
 }
 
-void vk_image_destroy(VK_Image image) {
+void vk_image_destroy(VK_Image& image) {
   if (image.view) {
     vkDestroyImageView(vkdevice, image.view, vk.allocator);
   }

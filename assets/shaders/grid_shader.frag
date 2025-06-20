@@ -1,13 +1,10 @@
 #version 450 core
+#extension GL_GOOGLE_include_directive : enable
+#include "global.vert.glsl"
 
 layout(location = 0) out vec4 out_color;
 
-layout(set = 0, binding = 0) uniform UniformBuffer {
-  mat4 projection_view;
-};
-
 void main() {
-  projection_view;
   float val = 0.3;
   out_color = vec4(val, val, val, 0.4f);
 }

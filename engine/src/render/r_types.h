@@ -3,9 +3,9 @@
 
 #include "res/res_types.h"
 
-enum BuiltinRenderpass {
-  BuiltinRenderpass_World = 0x01,
-  BuiltinRenderpass_UI = 0x02,
+enum {
+  Renderpass_World,
+  Renderpass_UI,
 };
 
 struct PushConstant {
