@@ -242,6 +242,7 @@ void app_init(App* app) {
     entity_make_renderable(axis.id, geometry_get("axis"_), shader_get("axis_shader"_));
   }
 
+  
   // Light
   {
     Entity light = {
