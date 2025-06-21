@@ -14,7 +14,7 @@
 #define FramesInFlight 2
 #define ImagesInFlight 3
 
-#define DirectionalLightsMax KB(1)
+#define MaxLights KB(1)
 
 struct VK_Buffer {
   VkBuffer handle;
@@ -167,7 +167,9 @@ struct VK {
   VK_Mesh meshes[10];
 
   SparseSet entities_data;
-  SparseSet lights_data;
+  SparseSet point_light_data;
+  SparseSet dir_light_data;
+  SparseSet spot_light_data;
   SparseSet push_constants;
   
   // Shader

@@ -12,7 +12,7 @@ void vk_swapchain_create(u32 width, u32 height) {
 
 void vk_swapchain_recreate(u32 width, u32 height) {
   if (vk.frame.width == 0 || vk.frame.height == 0) {
-    Debug("recreate_swapchain called when window is < 1 in a dimension. Booting"_);
+    Debug("recreate_swapchain called when window is < 1 in a dimension. Booting");
   }
 
   vk.old_swapchain = vk.swapchain;
@@ -162,7 +162,7 @@ internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
     true,
     VK_IMAGE_ASPECT_DEPTH_BIT);
 
-  Info("Swapchain created successfully"_);
+  Info("Swapchain created successfully");
   return swapchain;
 }
 

@@ -19,7 +19,7 @@ struct Entity {
   v3 rot;
   v3 color;
   v3 direction;
-  struct DirectionalLight* dir_light;
+  struct PointLight* dir_light;
 };
 
 struct SparseSetEntity {

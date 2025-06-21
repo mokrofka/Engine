@@ -21,7 +21,7 @@ struct InputState {
 global InputState st;
 
 void input_init(Arena* arena) {
-  Info("Input subsystem initialized."_);
+  Info("Input subsystem initialized.");
 }
 
 void input_shutdown() {
@@ -42,21 +42,21 @@ void input_process_key(Keys key, b32 pressed) {
     st.keyboard_current.keys[key] = pressed;
 
     if (key == KEY_LALT) {
-      Info("Left alt %s.", pressed ? "pressed"_ : "released"_);
+      Info("Left alt %s.", pressed ? str_lit("pressed") : str_lit("released"));
     } else if (key == KEY_RALT) {
-      Info("Right alt %s.", pressed ? "pressed"_ : "released"_);
+      Info("Right alt %s.", pressed ? str_lit("pressed") : str_lit("released"));
     }
 
     if (key == KEY_LCONTROL) {
-      Info("Left ctrl %s.", pressed ? "pressed"_ : "released"_);
+      Info("Left ctrl %s.", pressed ? str_lit("pressed") : str_lit("released"));
     } else if (key == KEY_RCONTROL) {
-      Info("Right ctrl %s.", pressed ? "pressed"_ : "released"_);
+      Info("Right ctrl %s.", pressed ? str_lit("pressed") : str_lit("released"));
     }
 
     if (key == KEY_LSHIFT) {
-      Info("Left shift %s.", pressed ? "pressed"_ : "released"_);
+      Info("Left shift %s.", pressed ? str_lit("pressed") : str_lit("released"));
     } else if (key == KEY_RSHIFT) {
-      Info("Right shift %s.", pressed ? "pressed"_ : "released"_);
+      Info("Right shift %s.", pressed ? str_lit("pressed") : str_lit("released"));
     }
 
     // Fire off an event for immediate processing.

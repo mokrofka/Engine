@@ -357,39 +357,10 @@ String push_strf(Arena* arena, const void* format, ...) {
 }
 
 ////////////////////////////////
-// String some random stuff
-
-// String str_read_line(StringCursor* cursor) {
-//   while (cursor->at < cursor->end) {
-//     u8* line_start = cursor->at;
-
-//     // Find end of line
-//     while (cursor->at < cursor->end && *cursor->at != '\n' && *cursor->at != '\r') {
-//       cursor->at++;
-//     }
-
-//     u64 len = cursor->at - line_start;
-
-//     // Handle \r\n or \n
-//     if (cursor->at < cursor->end && *cursor->at == '\r') cursor->at++;
-//     if (cursor->at < cursor->end && *cursor->at == '\n') cursor->at++;
-
-//     // If line is not empty, return it
-//     if (len > 0) {
-//       String result = {line_start, len};
-//       return result;
-//     }
-
-//     // If line was empty, loop to read the next one
-//   }
-
-//   // If nothing left
-//   String result = { 0, 0 };
-//   return result;
-// }
+// String utils
 
 // should be little different on linux
-String str_read_line(StringCursor* cursor) {
+String str_read_line(StringCursor* cursor) { // TODO replace StringCursor by Range
   while (cursor->at < cursor->end) {
     u8* line_start = cursor->at;
 
@@ -413,7 +384,7 @@ String str_read_line(StringCursor* cursor) {
   }
 
   // If nothing left
-  String result = { 0, 0 };
+  String result = {0, 0};
   return result;
 }
 

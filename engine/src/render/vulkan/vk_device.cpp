@@ -34,7 +34,7 @@ internal b32 index_in_list(u32* list, u32 count, u32 value) {
 void vk_device_create() {
   vk.device = select_physical_device();
   
-  Info("Creating logical device..."_);
+  Info("Creating logical device...");
   // NOTE: Do not create additional queues for shared indices.
   u32 indices[4];
   u32 index_count = 0;
@@ -90,7 +90,7 @@ void vk_device_create() {
   // Create the device.
   VK_CHECK(vkCreateDevice(vk.device.physical_device, &device_create_info, vk.allocator, &vk.device.logical_device));
 
-  Info("Logical device created"_);
+  Info("Logical device created");
   
   // Get queues.
   vkGetDeviceQueue(vk.device.logical_device, vk.device.graphics_queue_index, 0, &vk.device.graphics_queue);
@@ -98,7 +98,7 @@ void vk_device_create() {
   vkGetDeviceQueue(vk.device.logical_device, vk.device.transfer_queue_index, 0, &vk.device.transfer_queue);
   vkGetDeviceQueue(vk.device.logical_device, vk.device.compute_queue_index, 0, &vk.device.compute_queue);
   
-  Info("Queues obtained"_);
+  Info("Queues obtained");
   
   VkCommandPoolCreateInfo graphics_pool_create_info = {
     .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -114,19 +114,19 @@ void vk_device_create() {
   };
   VK_CHECK(vkCreateCommandPool(vk.device.logical_device, &transfer_pool_create_info, vk.allocator, &vk.device.transient_cmd_pool));
 
-  Info("Graphics command pool created"_);
+  Info("Graphics command pool created");
 }
 
 void vk_device_destroy() {
-  Info("Destroying command pools..."_);
+  Info("Destroying command pools...");
   vkDestroyCommandPool(vkdevice, vk.device.cmd_pool, vk.allocator);
   vkDestroyCommandPool(vkdevice, vk.device.transient_cmd_pool, vk.allocator);
 
   // Destroy logical device
-  Info("Destroying logical device..."_);
+  Info("Destroying logical device...");
   vkDestroyDevice(vkdevice, vk.allocator);
   
-  Info("Releasing physical device resources..."_);
+  Info("Releasing physical device resources...");
 }
 
 VK_SwapchainSupportInfo* vk_device_query_swapchain_support(VkPhysicalDevice physical_device, VK_SwapchainSupportInfo* support_info) {
@@ -223,23 +223,23 @@ internal VK_Device select_physical_device() {
     switch (properties.deviceType) {
     default:
       case VK_PHYSICAL_DEVICE_TYPE_OTHER: {
-        Info("GPU type is Unkown"_);
+        Info("GPU type is Unkown");
         fallback_gpu_index = i;
       } break;
       case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: {
-        Info("GPU type is Integrated"_);
+        Info("GPU type is Integrated");
         fallback_gpu_index = i;
       } break;
       case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU: {
         discrete_gpu_index = i;
-      } Info("GPU type is Descrete"_);
+      } Info("GPU type is Descrete");
         break;
       case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU: {
-        Info("GPU type is Virtual"_);
+        Info("GPU type is Virtual");
         fallback_gpu_index = i;
       } break;
       case VK_PHYSICAL_DEVICE_TYPE_CPU: {
-        Info("GPU type is CPU"_);
+        Info("GPU type is CPU");
         fallback_gpu_index = i;
       } break;
     }
@@ -284,7 +284,7 @@ internal VK_Device select_physical_device() {
   
   Assert(devices[selected_index].physical_device && "No physical devices were found which meet the requirements");
   
-  Info("Physical device selected"_);
+  Info("Physical device selected");
   return devices[selected_index];
 }
 
@@ -308,7 +308,7 @@ internal VK_PhysicalDeviceQueueFamilyInfo physical_device_meets_requirements(
   vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, queue_families);
   
   // Look at each queue and see what queues it supports
-  Info("Graphics | Present | Computer | Transfer | Name"_);
+  Info("Graphics | Present | Computer | Transfer | Name");
   Loop (i, queue_family_count) {
     // Graphics queue?
     if ((queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) && (queue_info.graphics_family_index == -1)) {
@@ -355,7 +355,7 @@ internal VK_PhysicalDeviceQueueFamilyInfo physical_device_meets_requirements(
       (!requirements.present || (requirements.present && queue_info.present_family_index != -1)) &&
       (!requirements.compute || (requirements.compute && queue_info.compute_family_index != -1)) &&
       (!requirements.compute || (requirements.compute && queue_info.transfer_family_index != -1))) {
-    Info("Device meets queue requirements"_);
+    Info("Device meets queue requirements");
     Trace("Grahics Family Index: %i", queue_info.graphics_family_index);
     Trace("Present Family Index: %i", queue_info.present_family_index);
     Trace("Transfer Family Index: %i", queue_info.transfer_family_index);

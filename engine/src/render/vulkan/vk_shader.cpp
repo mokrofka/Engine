@@ -41,7 +41,7 @@ void vk_r_shader_create(Shader& s) {
   VK_Shader* shader = &vk.shaders[vk.shader_count++];
 
   #define ShaderStageCount 2
-  String stage_type_strs[] = { "vert"_, "frag"_};
+  String stage_type_strs[] = { "vert", "frag"};
   VkShaderStageFlagBits stage_types[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
   Loop (i, ShaderStageCount) {
     shader->stages[i] = vk_shader_module_create(s.name, stage_type_strs[i], stage_types[i]);
@@ -284,7 +284,7 @@ f32 ease_in_exp(f32 x) {
 void compute_shader() {
   Scratch scratch;
   VK_ComputeShader* shader = &vk.compute_shader;
-  shader->stage.pipeline_shader_stage_create_info = vk_shader_module_create("compute"_, "comp"_, VK_SHADER_STAGE_COMPUTE_BIT);
+  shader->stage.pipeline_shader_stage_create_info = vk_shader_module_create("compute", "comp", VK_SHADER_STAGE_COMPUTE_BIT);
   
   Particle* particles = push_array(scratch, Particle, ParticleCount);
   
@@ -471,11 +471,11 @@ void compute_shader() {
 //     .has_color = true
 //   };
 //   vk_Shader* shader = &vk.graphics_shader_compute;
-//   String stage_type_strs[] = { "vert"_, "frag"_};
+//   String stage_type_strs[] = { "vert", "frag"};
 //   #define ShaderStageCount 2
 //   VkShaderStageFlagBits stage_types[ShaderStageCount] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
 //   Loop (i, 2) {
-//     shader->stages[i] = vk_shader_module_create("compute"_, stage_type_strs[i], stage_types[i]);
+//     shader->stages[i] = vk_shader_module_create("compute", stage_type_strs[i], stage_types[i]);
 //   }
   
 //   #define AttributeCount 10
@@ -581,7 +581,7 @@ void vk_shader_init() {
       vkDestroyShaderModule(vkdevice, shader->stages[i].module, vk.allocator);
     }
     
-    String stage_type_strs[2] = { "vert"_, "frag"_, };
+    String stage_type_strs[2] = { "vert", "frag", };
     VkShaderStageFlagBits stage_types[2] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
     
     Loop (i, 2) {
@@ -617,24 +617,34 @@ void vk_shader_init() {
   // }
 
   {
-    AllocMemZero(&vk.push_constants, sizeof(vk.push_constants));
-    vk.push_constants.data = mem_alloc(sizeof(PushConstant)*MaxEntities);
-    vk.push_constants.element_size = sizeof(PushConstant);
-    vk.push_constants.count = 0;
-
-    u64 size = sizeof(ShaderGlobalState) + AlignPow2(sizeof(ShaderEntity)*MaxEntities, alignof(ShaderEntity)) + AlignPow2(sizeof(DirectionalLight)*KB(1), alignof(DirectionalLight));
-    u64 offset = freelist_gpu_alloc(vk.storage_buffer.freelist, size);
-    vk.storage_buffer_range = {offset, size};
-    Assign(vk.global_shader_state, Offset(vk.storage_buffer.maped_memory, offset));
-    
     AllocMemZero(&vk.entities_data, sizeof(vk.entities_data));
     vk.entities_data.data = Offset(vk.storage_buffer.maped_memory, AlignPow2(sizeof(ShaderGlobalState), alignof(ShaderEntity)));
     vk.entities_data.element_size = sizeof(ShaderEntity);
     vk.entities_data.count = 0;
     
-    AllocMemZero(&vk.lights_data, sizeof(vk.lights_data));
-    vk.lights_data.data = Offset(vk.storage_buffer.maped_memory, AlignPow2(sizeof(ShaderGlobalState), alignof(ShaderEntity)) + AlignPow2(sizeof(ShaderEntity)*MaxEntities, alignof(DirectionalLight)));
-    vk.lights_data.element_size = sizeof(DirectionalLight);
-    vk.lights_data.count = 0;
+    AllocMemZero(&vk.point_light_data, sizeof(vk.point_light_data));
+    vk.point_light_data.data = Offset(vk.entities_data.data, AlignPow2(sizeof(ShaderEntity)*MaxEntities, alignof(PointLight)));
+    vk.point_light_data.element_size = sizeof(PointLight);
+    vk.point_light_data.count = 0;
+
+    AllocMemZero(&vk.dir_light_data, sizeof(vk.dir_light_data));
+    vk.dir_light_data.data = Offset(vk.point_light_data.data, AlignPow2(sizeof(PointLight)*MaxLights, alignof(DirLight)));
+    vk.dir_light_data.element_size = sizeof(DirLight);
+    vk.dir_light_data.count = 0;
+
+    AllocMemZero(&vk.spot_light_data, sizeof(vk.spot_light_data));
+    vk.spot_light_data.data = Offset(vk.dir_light_data.data, AlignPow2(sizeof(DirLight)*MaxLights, alignof(SpotLight)));
+    vk.spot_light_data.element_size = sizeof(SpotLight);
+    vk.spot_light_data.count = 0;
+    
+    u64 size = vk.spot_light_data.data - vk.storage_buffer.maped_memory;
+    u64 offset = freelist_gpu_alloc(vk.storage_buffer.freelist, size);
+    vk.storage_buffer_range = {offset, size};
+    Assign(vk.global_shader_state, Offset(vk.storage_buffer.maped_memory, offset));
+    
+    AllocMemZero(&vk.push_constants, sizeof(vk.push_constants));
+    vk.push_constants.data = mem_alloc(sizeof(PushConstant)*MaxEntities);
+    vk.push_constants.element_size = sizeof(PushConstant);
+    vk.push_constants.count = 0;
   }
 }

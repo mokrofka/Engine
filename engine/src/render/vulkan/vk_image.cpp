@@ -120,7 +120,7 @@ void vk_image_transition_layout(VkCommandBuffer cmd, VK_Image image, VkImageLayo
     // The fragment stage.
     dest_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
   } else {
-    Fatal("unsupported layout transition"_);
+    Fatal("unsupported layout transition");
     return;
   }
 

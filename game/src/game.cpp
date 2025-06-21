@@ -29,30 +29,39 @@ void cubes_position_update() {
 void push_constant_update() {
   Loop (i, st->cubes.count) {
     Entity& e = st->cubes.data[i];
-    PushConstant* push = vk_get_push_constant(e.id);
+    PushConstant* push = get_push_constant(e.id);
     push->model = mat4_transform({.pos = e.pos, .rot = e.rot, .scale = e.scale});
   }
   Loop (i, st->entities.count) {
     Entity& e = st->entities.data[i];
-    PushConstant* push = vk_get_push_constant(e.id);
+    PushConstant* push = get_push_constant(e.id);
     push->model = mat4_transform({.pos = e.pos, .rot = e.rot, .scale = e.scale});
   }
   Loop (i, st->lights.count) {
     Entity& e = st->lights.data[i];
-    PushConstant* push = vk_get_push_constant(e.id);
+    PushConstant* push = get_push_constant(e.id);
     push->model = mat4_transform({.pos = e.pos, .rot = e.rot, .scale = e.scale});
 
-    ShaderEntity* shader_e = shader_get_entity_data(e.id);
+    ShaderEntity* shader_e = shader_get_entity(e.id);
     *shader_e = {
       .color = e.color,  
     };
 
-    DirectionalLight* dir_light = shader_get_light_data(e.id);
-    *dir_light = {
-      .pos = e.pos,
-      .direction = e.direction,
+    // Loop (i, 1) {
+    //   PointLight* point_light = shader_get_point_light(e.id);
+    //   point_light[i] = {
+    //     .color = e.color,
+    //     .pos = e.pos,
+    //   };
+    //   point_light[-i] = {
+    //     .color = e.color,
+    //     .pos = e.pos,
+    //   };
+    // }
+    PointLight* point_light = shader_get_point_light(e.id);
+    *point_light = {
       .color = e.color,
-      // .color = v3(e.color.x, e.color.y, e.color.z),
+      .pos = e.pos,
     };
   }
 }
@@ -64,7 +73,7 @@ u32 cube_create() {
     .scale = v3(1),
   };
   st->cubes.insert_data(e);
-  entity_make_renderable(e.id, geometry_get("cube"_), shader_get("texture_shader"_));
+  entity_make_renderable(e.id, geometry_get("cube"), shader_get("texture_shader"));
   return e.id;
 }
 
@@ -81,13 +90,13 @@ Entity light_create() {
     .scale = v3(1),
   };
   st->lights.insert_data(e);
-  entity_make_light(e.id);
-  entity_make_renderable(e.id, geometry_get("cube"_), shader_get("color_shader"_));
+  entity_make_point_light(e.id);
+  entity_make_renderable(e.id, geometry_get("cube"), shader_get("color_shader"));
 
-  e.dir_light = shader_get_light_data(e.id);
+  e.dir_light = shader_get_point_light(e.id);
   *e.dir_light = {
-    .pos = e.pos,
     .color = v3(0),
+    .pos = e.pos,
   };
   return e;
 }
@@ -95,7 +104,7 @@ Entity light_create() {
 void light_destroy(Entity* e) {
   entity_destroy(e->id);
   entity_remove_renderable(e->id);
-  entity_remove_light(e->id);
+  entity_remove_point_light(e->id);
   st->lights.remove_data(e->id);
 }
 
@@ -127,7 +136,7 @@ void app_init(App* app) {
   // Mesh
   {
     Geometry cube_geom = {
-      .name = "cube"_,
+      .name = "cube",
       .vertex_count = sizeof(cube_vertices) / sizeof(Vertex3D),
       .vertex_size = sizeof(Vertex3D),
       .vertices = cube_vertices,
@@ -136,7 +145,7 @@ void app_init(App* app) {
   }
   {
     Geometry triangle_geom = {
-      .name = "triangle"_,
+      .name = "triangle",
       .vertex_count = ArrayCount(triangle_vertices) / 6,
       .vertex_size = sizeof(v3) + sizeof(v3),
       .vertices = triangle_vertices,
@@ -148,7 +157,7 @@ void app_init(App* app) {
     f32 grid_step = 1;
     void* vertices = grid_create(scratch, grid_size, grid_step);
     Geometry grid = {
-      .name = "grid"_,
+      .name = "grid",
       .vertex_count = grid_size*4,
       .vertex_size = sizeof(v3),
       .vertices = vertices,
@@ -157,7 +166,7 @@ void app_init(App* app) {
   }
   {
     Geometry axis = {
-      .name = "axis"_,
+      .name = "axis",
       .vertex_count = 6,
       .vertex_size = sizeof(axis_vertices),
       .vertices = axis_vertices,
@@ -168,21 +177,21 @@ void app_init(App* app) {
   // Shader
   {
     Shader shader = {
-      .name = "texture_shader"_,
+      .name = "texture_shader",
       .attribut = {3,3,2},
     };
     shader_create(shader);
   }
   {
     Shader shader = {
-      .name = "color_shader"_,
+      .name = "color_shader",
       .attribut = {3,3,2},
     };
     shader_create(shader);
   }
   {
     Shader shader = {
-      .name = "grid_shader"_,
+      .name = "grid_shader",
       .primitive = ShaderTopology_Line,
       .is_transparent = true,
       .attribut = {3},
@@ -191,7 +200,7 @@ void app_init(App* app) {
   }
   {
     Shader shader = {
-      .name = "transparent_shader"_,
+      .name = "transparent_shader",
       .is_transparent = true,
       .attribut = {3,3,2},
     };
@@ -199,7 +208,7 @@ void app_init(App* app) {
   }
   {
     Shader shader = {
-      .name = "axis_shader"_,
+      .name = "axis_shader",
       .primitive = ShaderTopology_Line,
       .is_transparent = true,
       .attribut = {3, 3},
@@ -209,7 +218,7 @@ void app_init(App* app) {
   
   // Texture
   {
-    texture_load("orange_lines_512.png"_);
+    texture_load("orange_lines_512.png");
   }
 
   // Entity
@@ -219,20 +228,20 @@ void app_init(App* app) {
       .pos = v3(0,-1,0),
       .scale = 1,
     };
-    entity_make_renderable(e.id, geometry_get("grid"_), shader_get("grid_shader"_));
+    entity_make_renderable(e.id, geometry_get("grid"), shader_get("grid_shader"));
     st->entities.insert_data(e);
   }
 
   {
     // Entity transparent_cube = entity_create();
-    // entity_make_renderable(transparent_cube, geometry_get("cube_position_vertices"_), shader_get("transparent_shader"_));
-    // PushConstant* push = vk_get_push_constant(transparent_cube);
+    // entity_make_renderable(transparent_cube, geometry_get("cube_position_vertices"), shader_get("transparent_shader"));
+    // PushConstant* push = push_constant(transparent_cube);
     // push->model = mat4_translation(v3(0,0,0));
   }
 
   {
     // Entity LargeCube = cube_create();
-    // PushConstant* push = vk_get_push_constant(LargeCube);
+    // PushConstant* push = push_constant(LargeCube);
     // push->model = mat4_translation(v3(0,0,0)) * mat4_scale(v3(100,100,100));
   }
 
@@ -243,7 +252,7 @@ void app_init(App* app) {
       .scale = v3(10),
     };
     st->entities.insert_data(axis);
-    entity_make_renderable(axis.id, geometry_get("axis"_), shader_get("axis_shader"_));
+    entity_make_renderable(axis.id, geometry_get("axis"), shader_get("axis_shader"));
   }
 
   // Light
@@ -254,13 +263,13 @@ void app_init(App* app) {
       .scale = v3(1),
     };
     st->lights.insert_data(light);
-    entity_make_light(light.id);
-    entity_make_renderable(light.id, geometry_get("cube"_), shader_get("color_shader"_));
+    entity_make_point_light(light.id);
+    entity_make_renderable(light.id, geometry_get("cube"), shader_get("color_shader"));
 
-    DirectionalLight* light_data = shader_get_light_data(light.id);
+    PointLight* light_data = shader_get_point_light(light.id);
     *light_data = {
-      .pos = light.pos,
       .color = {1,1,1},
+      .pos = light.pos,
     };
   }
   
@@ -355,14 +364,13 @@ void app_update(App* app) {
 
         Loop (i, st->lights.count) {
           Entity* e = &st->lights.data[i];
-          DirectionalLight* light = shader_get_light_data(e->id);
-          String entity_name_c = "light"_;
+          PointLight* light = shader_get_point_light(e->id);
+          String entity_name_c = "light";
 
           ImGui::PushID(i);
           if (ImGui::CollapsingHeader((char*)entity_name_c.str)) {
             ImGui::Text("entity id %i", e->id);
             ImGui::DragFloat3("Position", &e->pos.x, 0.1f);
-            ImGui::DragFloat3("Direction", &e->direction.x, 0.1f);
             ImGui::DragFloat3("scale", &e->scale.x, 0.1f);
             ImGui::ColorEdit3("Color", &e->color.x);
 

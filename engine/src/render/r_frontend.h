@@ -17,19 +17,3 @@ void r_begin_draw_frame();
 void r_end_draw_frame();
 
 KAPI v2 get_viewport_size();
-
-inline void entity_make_renderable(u32 id, u32 mesh_id, u32 shader_id) {
-  vk_make_renderable(id, mesh_id, shader_id);
-}
-
-inline void entity_remove_renderable(u32 id) {
-  vk_remove_renderable(id);
-}
-
-inline void entity_make_light(u32 id) {
-  vk_make_light(id);
-}
-
-inline void entity_remove_light(u32 id) {
-  vk_remove_light(id);
-}

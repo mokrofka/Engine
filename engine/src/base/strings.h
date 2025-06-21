@@ -3,7 +3,22 @@
 #include "math_types.h"
 #include "memory.h"
 
-struct StringCursor {
+INLINE u64 cstr_length(void* c);
+struct String {
+  u8* str;
+  u64 size;
+  String() = default;
+  INLINE String(u8* str_, u64 size_) {
+    str = str_;
+    size = size_;
+  }
+  constexpr INLINE String(const char* str_) : str((u8*)str_), size(cstr_length((void*)str_)) {}
+  INLINE operator bool() {
+    return str;
+  }
+};
+
+struct StringCursor { // TODO replace StringCursor by Range
   u8* at;
   u8* end;
 };
@@ -56,7 +71,7 @@ INLINE u8 char_to_correct_slash(u8 c) { if (char_is_slash(c)) { c = '/'; } retur
 ////////////////////////////////
 // C-String Measurement, Functions
 
-INLINE u32 cstr_length(void* c);
+INLINE u64 cstr_length(void* c);
 INLINE b32 _strcmp(const void* str0, const void* str1);
 INLINE b32 cstr_match(const void* str0, const void* str1);
        b32 _strcmpi(const void* str0, const void* str1);
@@ -65,14 +80,9 @@ INLINE b32 cstr_matchi(const void* str0, const void* str1);
 ////////////////////////////////
 // String Constructors
 
-#define str_lit(S) str((u8*)(S), sizeof(S) - 1) // deprecated
-#define str_lit64(S) {.str = (S), .size = sizeof(S)-1}
+#define str_lit(S) str((u8*)(S), sizeof(S) - 1)
 
 INLINE String str(u8* str, u32 size);
-
-constexpr INLINE String operator""_(const char* string, u64 len) {
-  return str((u8*)string, len);
-}
 
 //        hello_world
 //  first = &l
@@ -182,10 +192,10 @@ String push_str_wchar(Arena* arena, const wchar_t* in, u32 wchar_size);
 
 ////////////////////////////////
 
-INLINE u32 cstr_length(void* c) {
+INLINE u64 cstr_length(void* c) {
   u8* p = (u8*)c;
   for (; *p != 0; p += 1);
-  return p - (u8*)c;
+  return (u64)(p - (u8*)c);
 }
 
 INLINE b32 _strcmp(const void* str0, const void* str1) {

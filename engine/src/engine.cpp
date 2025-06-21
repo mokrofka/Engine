@@ -65,7 +65,7 @@ void engine_create(App* app) {
   
   {
     ResSysConfig res_sys_cfg = {
-      .asset_base_path = "../assets"_
+      .asset_base_path = "../assets"
     };
     res_sys_init(st.arena, res_sys_cfg);
   }
@@ -264,8 +264,8 @@ internal void load_game_lib(App* app) {
   app->modified = props.modified;
   os_copy_file_path(app->lib_temp_file_path, app->lib_file_path);
   app->lib = os_lib_open(app->lib_temp_file_path);
-  GetProcAddr(app->update, app->lib, "app_update"_);
-  GetProcAddr(app->on_resize, app->lib, "app_on_resize"_);
+  GetProcAddr(app->update, app->lib, "app_update");
+  GetProcAddr(app->on_resize, app->lib, "app_on_resize");
 }
 
 internal void check_dll_changes(App* app) {
@@ -285,10 +285,10 @@ internal void load_game_lib_init(App* app) {
   app->modified = file_props.modified;
   os_copy_file_path(app->lib_temp_file_path, app->lib_file_path);
   
-  app->lib = os_lib_open("game_temp.dll"_);
-  GetProcAddr(app->update, app->lib, "app_update"_);
-  GetProcAddr(app->init, app->lib, "app_init"_);
-  GetProcAddr(app->on_resize, app->lib, "app_on_resize"_);
+  app->lib = os_lib_open("game_temp.dll");
+  GetProcAddr(app->update, app->lib, "app_update");
+  GetProcAddr(app->init, app->lib, "app_init");
+  GetProcAddr(app->on_resize, app->lib, "app_on_resize");
   
   Assert(app->lib && app->init && app->update && app->on_resize);
 }
@@ -301,8 +301,8 @@ internal void app_create(App* app) {
   app->name = str_skip_last_slash(app->file_path);
   
   String file_directory = str_chop_after_last_slash(app->file_path);
-  app->lib_file_path = push_str_cat(app->arena, file_directory, "game.dll"_);
-  app->lib_temp_file_path = push_str_cat(app->arena, file_directory, "game_temp.dll"_);
+  app->lib_file_path = push_str_cat(app->arena, file_directory, "game.dll");
+  app->lib_temp_file_path = push_str_cat(app->arena, file_directory, "game_temp.dll");
 
   load_game_lib_init(app);
 }

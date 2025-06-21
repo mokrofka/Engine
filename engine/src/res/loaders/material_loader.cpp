@@ -4,7 +4,7 @@
 //   Scratch scratch;
 //   MaterialConfig material_cfg = {};
 
-//   String file_path = push_strf(scratch, "%s/%s/%s%s", res_sys_base_path(), "materials"_, filepath, ".kmt"_);
+//   String file_path = push_strf(scratch, "%s/%s/%s%s", res_sys_base_path(), "materials", filepath, ".kmt");
   
 //   OS_Handle f = os_file_open(file_path, OS_AccessFlag_Read);
 //   if (!f) {
@@ -51,20 +51,20 @@
 //     String trimmed_value = str_trim(value);
 
 //     // Process the variable.
-//     if (str_matchi(trimmed_var_name, "version"_)) {
+//     if (str_matchi(trimmed_var_name, "version")) {
 //       // TODO: version
-//     } else if (str_matchi(trimmed_var_name, "name"_)) {
+//     } else if (str_matchi(trimmed_var_name, "name")) {
 //       str_copy(material_cfg.name64, trimmed_value);
-//     } else if (str_matchi(trimmed_var_name, "diffuse_map_name"_)) {
+//     } else if (str_matchi(trimmed_var_name, "diffuse_map_name")) {
 //       str_copy(material_cfg.diffuse_map_name64, trimmed_value);
-//     } else if (str_matchi(trimmed_var_name, "diffuse_color"_)) {
+//     } else if (str_matchi(trimmed_var_name, "diffuse_color")) {
 //       // Parse the colour
 //       if (!str_to_v4(trimmed_value.str, &material_cfg.diffuse_color)) {
 //         Warn("Error parsing diffuse_colour in file '%s'. Using default of white instead.", file_path);
 //       }
-//     } else if (str_matchi(trimmed_value, "type"_)) {
+//     } else if (str_matchi(trimmed_value, "type")) {
 //       // TODO other material types
-//       if (str_matchi(trimmed_value, "ui"_)) {
+//       if (str_matchi(trimmed_value, "ui")) {
 //         material_cfg.type = MaterialType_UI;
 //       }
 //     }

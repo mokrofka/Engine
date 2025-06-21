@@ -28,7 +28,7 @@ Texture res_texture_load(String name) {
   u32 required_channel_count = 4;
   stbi_set_flip_vertically_on_load(true);
 
-  String filepath = push_strf(scratch, "%s/%s/%s", res_sys_base_path(), "textures"_, name);
+  String filepath = push_strf(scratch, "%s/%s/%s", res_sys_base_path(), str_lit("textures"), name);
 
   String filepath_c = push_str_copy(scratch, filepath);
 

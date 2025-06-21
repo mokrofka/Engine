@@ -37,7 +37,7 @@ void event_register(u32 code, void* listener, PFN_On_Event on_event) {
   u32 register_count = st.registered[code].array.pos;
   Loop (i, register_count) {
     if(st.registered[code].events[i].listener == listener) {
-      Warn("You're registering the same event!"_);
+      Warn("You're registering the same event!");
       return;
     }
   }
@@ -60,7 +60,7 @@ void event_register(u32 code, void* listener, PFN_On_Event on_event) {
 
 void event_unregister(u32 code, void* listener, PFN_On_Event on_event) {
   if (st.registered[code].array.pos == 0) {
-    Warn("you're trying to unregister nothing!"_);
+    Warn("you're trying to unregister nothing!");
     return;
   }
   

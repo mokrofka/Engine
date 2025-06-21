@@ -10,7 +10,7 @@ layout(location = 0) out out_data {
 };
 
 void main() {
-  gl_Position = g_projection_view * u_model * vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
+  gl_Position = g.projection_view * u_model * vec4(in_pos, 1.0);
   
   out_color = in_color;
 }

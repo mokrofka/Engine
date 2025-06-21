@@ -12,49 +12,49 @@ layout(location = 0) in in_data {
 
 layout(set = 0, binding = 1) uniform sampler2D diffuse_sampler;
 
-// vec3 point_light_calculate(int light_index) {
-//   PointLight light = g_directional_lights[light_index];
-//   vec3 light_pos = vec3(g_view * vec4(light.pos, 1));
+vec3 point_light_calculate(int light_id, vec3 frag_pos, vec3 norm) {
+  PointLight light = g.point_lights[light_id];
+  light.pos = vec3(g.view * vec4(light.pos, 1));
 
-//   vec3 light_dir = normalize(light_pos - frag_pos);
-//   vec3 reflect_dir = reflect(-light_dir, norm);
+  vec3 light_dir = normalize(light.pos - frag_pos);
+  vec3 reflect_dir = reflect(-light_dir, norm);
 
-//   float spec = specular_strength * pow(max(dot(view_dir, reflect_dir), 0.0), 10);
-//   float diff = max(dot(norm, light_dir), 0.0);
+  float spec = g.entities[u_entity_id].specular_strength * pow(max(dot(view_dir, reflect_dir), 0.0), 10);
+  float diff = max(dot(norm, light_dir), 0.0);
 
-//   vec3 light_contrib = light.color * (diff + spec);
+  vec3 light_contrib = light.color * (diff + spec);
 
-//   total_light += light_contrib;
-// }
+  return light_contrib;
+}
 
 void main() {
-  vec3 norm = normalize(in_normal);
-  vec3 frag_pos = in_frag_pos;
+  norm = normalize(in_normal);
+  frag_pos = in_frag_pos;
   vec4 texture_color = texture(diffuse_sampler, in_texcoord);
-  vec3 view_dir = normalize(vec3(0) - frag_pos);
+  view_dir = normalize(vec3(0) - frag_pos);
 
   float specular_strength = 0.5;
   vec3 ambient = vec3(0.1);
   vec3 total_light = vec3(0.0);
 
-  // for(int i = 0; i < g_directional_light_count; ++i) {
-  //   total_light += point_light_calculate(i);
-  // }
-
-  for (int i = 0; i < g_directional_light_count; ++i) {
-    PointLight light = g_directional_lights[i];
-    vec3 light_pos = vec3(g_view * vec4(light.pos, 1));
-
-    vec3 light_dir = normalize(light_pos - frag_pos);
-    vec3 reflect_dir = reflect(-light_dir, norm);
-
-    float spec = specular_strength * pow(max(dot(view_dir, reflect_dir), 0.0), 10);
-    float diff = max(dot(norm, light_dir), 0.0);
-
-    vec3 light_contrib = light.color * (diff + spec);
-
-    total_light += light_contrib;
+  for (int i = 0; i < g.point_light_count; ++i) {
+    total_light += point_light_calculate(i, frag_pos, norm);
   }
+
+  // for (int i = 0; i < g.point_light_count; ++i) {
+  //   PointLight light = g.point_lights[i];
+  //   vec3 light_pos = vec3(g.view * vec4(light.pos, 1));
+
+  //   vec3 light_dir = normalize(light_pos - frag_pos);
+  //   vec3 reflect_dir = reflect(-light_dir, norm);
+
+  //   float spec = specular_strength * pow(max(dot(view_dir, reflect_dir), 0.0), 10);
+  //   float diff = max(dot(norm, light_dir), 0.0);
+
+  //   vec3 light_contrib = light.color * (diff + spec);
+
+  //   total_light += light_contrib;
+  // }
   vec3 final_color = total_light + ambient;
   final_color = clamp(final_color, 0.0, 1.0);
 

@@ -100,7 +100,7 @@ void instance_create() {
     "VK_KHR_win32_surface",
   };
 #if _DEBUG
-  Debug("Required extensions:"_);
+  Debug("Required extensions:");
   Loop (i, ArrayCount(required_extensions)) {
     Debug(str_cstr(required_extensions[i]));
   }
@@ -110,7 +110,7 @@ void instance_create() {
   u32 required_validation_layer_count = 0;
   
 #if defined(_DEBUG)
-  Info("Validation layers enabled. Enumerating..."_);
+  Info("Validation layers enabled. Enumerating...");
   required_validation_layer_names[0] = "VK_LAYER_KHRONOS_validation";
   
   u32 available_layer_count = 0;
@@ -127,7 +127,7 @@ void instance_create() {
       if (cstr_match(required_validation_layer_names[i], available_layers[j].layerName)) {
         ++available_layer_count;
         found = true;
-        Info("Found"_);
+        Info("Found");
         break;
       }
     }
@@ -135,7 +135,7 @@ void instance_create() {
       Fatal("Required validation layer is missing: %s", str_cstr(required_validation_layer_names[i]));
     }
   }
-  Info("All required validation layers are present"_);
+  Info("All required validation layers are present");
 #endif
 
   VkInstanceCreateInfo instance_create_info = {
@@ -148,11 +148,11 @@ void instance_create() {
   };
   
   VK_CHECK(vkCreateInstance(&instance_create_info, vk.allocator, &vk.instance));
-  Info("Vulkan insance created"_);
+  Info("Vulkan insance created");
 
   // Debugger
 #ifdef _DEBUG
-  Debug("Creating Vulkan debugger..."_);
+  Debug("Creating Vulkan debugger...");
   u32 log_severity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
                      VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
                      VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT;
@@ -170,7 +170,7 @@ void instance_create() {
   Assert(func && "Failed to create debug messenger");
   
   VK_CHECK(func(vk.instance, &debug_create_info, vk.allocator, &vk.debug_messenger));
-  Debug("Vulkan debugger created"_);
+  Debug("Vulkan debugger created");
 #endif
 }
 
@@ -197,7 +197,7 @@ void vk_r_backend_init(Arena* arena) {
     vk.cmds[i] = vk_cmd_alloc(vk.device.cmd_pool);
     vk.compute_cmds[i] = vk_cmd_alloc(vk.device.cmd_pool);
   }
-  Debug("Vulkan command buffers created"_);
+  Debug("Vulkan command buffers created");
 
   Loop (i, FramesInFlight) {
     VkSemaphoreCreateInfo semaphore_create_info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
@@ -267,7 +267,7 @@ void vk_r_backend_init(Arena* arena) {
     return false;
   });
 
-  Info("Vulkan renderer initialized successfully"_);
+  Info("Vulkan renderer initialized successfully");
 }
 
 void vk_r_backend_shutdown() {
@@ -289,22 +289,22 @@ void vk_r_backend_shutdown() {
   // Swapchain
   vk_swapchain_destroy();
   
-  Debug("Destroying Vulkan device..."_);
+  Debug("Destroying Vulkan device...");
   vk_device_destroy();
   
-  Debug("Destroying Vulkan surface..."_);
+  Debug("Destroying Vulkan surface...");
   if (vk.surface) {
     vkDestroySurfaceKHR(vk.instance, vk.surface, vk.allocator);
     vk.surface = 0;
   }
   
-  Debug("Destroying Vulkan debugger..."_);
+  Debug("Destroying Vulkan debugger...");
   if (vk.debug_messenger) {
     PFN_vkDestroyDebugUtilsMessengerEXT func; Assign(func, vkGetInstanceProcAddr(vk.instance, "vkDestroyDebugUtilsMessengerEXT"));
     func(vk.instance, vk.debug_messenger, vk.allocator);
   }
 
-  Debug("Destroying Vulkan instance..."_);
+  Debug("Destroying Vulkan instance...");
   vkDestroyInstance(vk.instance, vk.allocator);
 }
 
@@ -322,7 +322,7 @@ void vk_r_backend_begin_frame() {
     
     vk_swapchain_recreate(vk.frame.width, vk.frame.height);
     
-    Info("Resized, booting"_);
+    Info("Resized, booting");
   }
 
   if (vk.is_viewport_resized) {

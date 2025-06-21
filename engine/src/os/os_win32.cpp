@@ -105,7 +105,7 @@ void os_window_create(Arena* arena, WindowConfig config) {
   if (handle == 0) {
     MessageBoxA(NULL, "window creating failed!", "Error!", MB_ICONEXCLAMATION | MB_OK);
     
-    Error("Window creating failed"_);
+    Error("Window creating failed");
   } else {
     window->hwnd = handle;
   }
@@ -188,7 +188,7 @@ void os_register_window_resized_callback(WindowResizedCallback callback) {
 }
 
 void os_window_destroy() {
-  Trace("Destroying window..."_);
+  Trace("Destroying window...");
   DestroyWindow((HWND)state->window->hwnd);
   state->window->hwnd = 0;
   state->window = 0;

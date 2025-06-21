@@ -74,60 +74,6 @@ void vk_draw() {
   // vkCmdDraw(cmd, ParticleCount, 1, 0, 0);
 }
 
-KAPI void vk_make_renderable(u32 entity_id, u32 geom_id, u32 shader_id) {
-  VK_Shader* shader = &vk.shaders[shader_id];
-  shader->sparse_set.add(entity_id);
-  
-  vk.push_constants.add(entity_id);
-  PushConstant* push = (PushConstant*)vk.push_constants.get_data(entity_id);
-  push->entity_index = entity_id;
-
-  vk.entity_to_mesh.insert_data(entity_id, geom_id);
-  vk.entity_to_shader[entity_id] = shader_id;
-
-  vk.entities_data.add(entity_id);
-}
-
-KAPI void vk_remove_renderable(u32 entity_id) {
-  VK_Shader* shader = &vk.shaders[vk.entity_to_shader[entity_id]];
-  shader->sparse_set.remove(entity_id);
-
-  vk.push_constants.remove_data(entity_id);
-  vk.entity_to_mesh.remove_data(entity_id);
-
-  vk.entities_data.remove_data(entity_id);
-}
-
-KAPI void vk_make_light(u32 entity_id) {
-  vk.lights_data.add(entity_id);
-  ++vk.global_shader_state->light_count;
-}
-
-KAPI void vk_remove_light(u32 entity_id) {
-  vk.lights_data.remove_data(entity_id);
-  --vk.global_shader_state->light_count;
-}
-
-KAPI PushConstant* vk_get_push_constant(u32 entity_id) {
-  return (PushConstant*)vk.push_constants.get_data(entity_id);
-}
-
-KAPI ShaderGlobalState* shader_get_global_state() {
-  return (ShaderGlobalState*)vk.storage_buffer.maped_memory;
-}
-
-KAPI ShaderEntity* shader_get_entity_data(u32 entity_id) {
-  return (ShaderEntity*)vk.entities_data.get_data(entity_id);
-}
-
-KAPI DirectionalLight* shader_get_light_data(u32 entity_id) {
-  return (DirectionalLight*)vk.lights_data.get_data(entity_id);
-}
-
-b32 vk_is_viewport_render() {
-  return vk.is_viewport_render;
-}
-
 void compute_descriptor_update() {
   i32 i = vk.frame.current_frame;
   VkWriteDescriptorSet descriptor_writes[2];

@@ -22,8 +22,8 @@ AssetWatcherState* st;
 void asset_watch_init(Arena* arena) {
   st = push_struct(arena, AssetWatcherState);
   st->arena = arena_alloc(arena, KB(1));
-  st->shader_dir_handle = os_directory_open("D:\\VS_Code\\Engine\\assets\\shaders"_);
-  st->compiled_shader_dir_handle = os_directory_open("D:\\VS_Code\\Engine\\assets\\shaders\\compiled"_);
+  st->shader_dir_handle = os_directory_open("D:\\VS_Code\\Engine\\assets\\shaders");
+  st->compiled_shader_dir_handle = os_directory_open("D:\\VS_Code\\Engine\\assets\\shaders\\compiled");
   st->pending = true;
   os_directory_watch(st->shader_dir_handle, 0);
   os_directory_watch(st->compiled_shader_dir_handle, 1);
@@ -66,9 +66,9 @@ void asset_watch_update() {
     os_directory_watch(st->shader_dir_handle, 0);
     os_directory_watch(st->shader_dir_handle, 0);
     
-    String filepath = push_str_cat(scratch, "D:\\VS_Code\\Engine\\assets\\shaders\\"_, name);
-    String filepath_output = push_str_cat(scratch, "D:\\VS_Code\\Engine\\assets\\shaders\\compiled\\"_, name);
-    filepath_output = push_str_cat(scratch, filepath_output, ".spv"_);
+    String filepath = push_str_cat(scratch, "D:\\VS_Code\\Engine\\assets\\shaders\\", name);
+    String filepath_output = push_str_cat(scratch, "D:\\VS_Code\\Engine\\assets\\shaders\\compiled\\", name);
+    filepath_output = push_str_cat(scratch, filepath_output, ".spv");
     String cmd = push_strf(scratch, "glslangValidator.exe -V \"%s\" -o \"%s\"", filepath, filepath_output);
     
     os_process_create(cmd);
@@ -85,12 +85,12 @@ void asset_watch_update() {
     String shader_name = str_chop_last_dot(name);
     shader_name = str_chop_last_dot(shader_name);
     
-    // String filepath = push_str_cat(scratch, "D:\\VS_Code\\Engine\\assets\\shaders\\compiled\\"_, name);
+    // String filepath = push_str_cat(scratch, "D:\\VS_Code\\Engine\\assets\\shaders\\compiled\\", name);
     st->watch.reload_callback(shader_name, shader_get(shader_name));
     
-    // String filepath = push_str_cat(scratch, "D:\\VS_Code\\Engine\\assets\\shaders\\"_, name);
-    // String filepath_output = push_str_cat(scratch, "D:\\VS_Code\\Engine\\assets\\shaders\\compiled\\"_, name);
-    // filepath_output = push_str_cat(scratch, filepath_output, ".spv"_);
+    // String filepath = push_str_cat(scratch, "D:\\VS_Code\\Engine\\assets\\shaders\\", name);
+    // String filepath_output = push_str_cat(scratch, "D:\\VS_Code\\Engine\\assets\\shaders\\compiled\\", name);
+    // filepath_output = push_str_cat(scratch, filepath_output, ".spv");
     // String cmd = push_strf(scratch, "glslangValidator.exe -V \"%s\" -o \"%s\"", filepath, filepath_output);
     
     // os_process_create(cmd);

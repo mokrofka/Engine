@@ -3,7 +3,7 @@
 
 #include "render/r_types.h"
 
-#define DefaultTextureName "default"_
+#define DefaultTextureName "default"
 
 void texture_init(Arena* arena);
 

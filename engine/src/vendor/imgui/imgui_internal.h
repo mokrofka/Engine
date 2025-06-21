@@ -229,7 +229,7 @@ extern IMGUI_API ImGuiContext* GImGui;  // Current implicit context pointer
 // [SECTION] Macros
 //-----------------------------------------------------------------------------
 
-// Internal Drag and Drop payload types. String starting with '_' are reserved for Dear ImGui.
+// Internal Drag and Drop payload types. Str starting with '_' are reserved for Dear ImGui.
 #define IMGUI_PAYLOAD_TYPE_WINDOW       "_IMWINDOW"     // Payload == ImGuiWindow*
 
 // Debug Printing Into TTY
@@ -351,7 +351,7 @@ extern IMGUI_API ImGuiContext* GImGui;  // Current implicit context pointer
 // - Helpers: Hashing
 // - Helpers: Sorting
 // - Helpers: Bit manipulation
-// - Helpers: String
+// - Helpers: Str
 // - Helpers: Formatting
 // - Helpers: UTF-8 <> wchar conversions
 // - Helpers: ImVec2/ImVec4 operators
@@ -387,7 +387,7 @@ static inline bool      ImIsPowerOfTwo(ImU64 v)             { return v != 0 && (
 static inline int       ImUpperPowerOfTwo(int v)            { v--; v |= v >> 1; v |= v >> 2; v |= v >> 4; v |= v >> 8; v |= v >> 16; v++; return v; }
 static inline unsigned int ImCountSetBits(unsigned int v)   { unsigned int count = 0; while (v > 0) { v = v & (v - 1); count++; } return count; }
 
-// Helpers: String
+// Helpers: Str
 #define ImStrlen strlen
 #define ImMemchr memchr
 IMGUI_API int           ImStricmp(const char* str1, const char* str2);                      // Case insensitive compare.

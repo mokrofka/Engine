@@ -1,5 +1,6 @@
 #pragma once
 #include "defines.h"
+#include "strings.h"
 #include "input_types.h"
 #include "math_types.h"
 

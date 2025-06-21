@@ -161,13 +161,6 @@ ImplDefer<F> MakeDefer(F f) {
 #endif
 
 // #define UI_Window(begin) DeferLoop(begin, ImGui::End())
-struct String {
-  u8* str;
-  u64 size;
-  INLINE operator bool() {
-    return size;
-  }
-};
 
 struct Arena;
 
