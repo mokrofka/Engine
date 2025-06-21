@@ -5,7 +5,7 @@
 
 #include <render/r_frontend.h>
 #include "sys/geometry.h"
-#include "sys/shader_sys.h"
+#include "sys/shader.h"
 #include "sys/texture.h"
 #include "ui.h"
 
@@ -52,6 +52,7 @@ void push_constant_update() {
       .pos = e.pos,
       .direction = e.direction,
       .color = e.color,
+      // .color = v3(e.color.x, e.color.y, e.color.z),
     };
   }
 }
@@ -86,7 +87,7 @@ Entity light_create() {
   e.dir_light = shader_get_light_data(e.id);
   *e.dir_light = {
     .pos = e.pos,
-    .color = {1,1,1},
+    .color = v3(0),
   };
   return e;
 }
@@ -261,9 +262,6 @@ void app_init(App* app) {
       .pos = light.pos,
       .color = {1,1,1},
     };
-
-    ShaderGlobalState* shader_global_state = shader_get_global_state();
-    ++shader_global_state->light_count;
   }
   
   u32 initial_cube_count = 2;
@@ -291,8 +289,8 @@ void app_update(App* app) {
   camera_update();
   
   ShaderGlobalState* shader_state = shader_get_global_state();
-  shader_state->g_projection_view = st->camera.projection * st->camera.view;
-  shader_state->g_view = st->camera.view;
+  shader_state->projection_view = st->camera.projection * st->camera.view;
+  shader_state->view = st->camera.view;
   shader_state->time += 0.01;
   
   if (input_was_key_down(KEY_1)) {
@@ -313,8 +311,8 @@ void app_update(App* app) {
   ImGui::SetNextWindowPos(viewport->WorkPos);
   ImGui::SetNextWindowSize(viewport->WorkSize);
   ImGui::SetNextWindowViewport(viewport->ID);
-  UI_Window(ImGui::Begin("DockSpace", null, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
-  // UI_Window(ImGui::Begin("DockSpace")) {
+  // UI_Window(ImGui::Begin("DockSpace", null, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
+  UI_Window(ImGui::Begin("DockSpace")) {
     // ImGui::DockSpace(ImGui::GetID("MyDockSpace"), ImVec2(0.0f, 0.0f), 0);
     ImGui::DockSpace(ImGui::GetID("MyDockSpace")) ;
   }

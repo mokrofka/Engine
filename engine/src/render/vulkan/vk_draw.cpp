@@ -44,6 +44,7 @@ void vk_draw_init() {
 
 void vk_draw() {
   VkCommandBuffer cmd = vk_get_current_cmd();
+  vk_draw_init(); // TODO add textures
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.shaders[0].pipeline.pipeline_layout, 0, 1, &vk.descriptor_sets[0], 0, null);
   
   Loop (i, vk.shader_count) {
@@ -104,13 +105,12 @@ KAPI void vk_make_light(u32 entity_id) {
 
 KAPI void vk_remove_light(u32 entity_id) {
   vk.lights_data.remove_data(entity_id);
-  ++vk.global_shader_state->light_count;
+  --vk.global_shader_state->light_count;
 }
 
 KAPI PushConstant* vk_get_push_constant(u32 entity_id) {
   return (PushConstant*)vk.push_constants.get_data(entity_id);
 }
-
 
 KAPI ShaderGlobalState* shader_get_global_state() {
   return (ShaderGlobalState*)vk.storage_buffer.maped_memory;

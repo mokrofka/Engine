@@ -59,9 +59,6 @@ void camera_update() {
     }
   }
 
-  i32 pos_x, pos_y;
-  input_get_mouse_position(&pos_x, &pos_y);
-
   f32 rotation_speed = 180.0f;
   if (input_is_key_down(KEY_A)) {
     camera_yaw(-rotation_speed * delta_time);

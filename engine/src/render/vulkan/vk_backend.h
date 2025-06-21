@@ -11,10 +11,10 @@ void vk_r_backend_end_frame();
 void vk_r_begin_renderpass(u32 renderpass_id);
 void vk_r_end_renderpass(u32 renderpass_id);
 
-void vk_r_geometry_create(Geometry* geometry);
-void vk_r_destroy_geometry(Geometry* geometry);
-void vk_r_shader_create(struct Shader* s);
-void vk_texture_load(Texture* texture);
+void vk_r_geometry_create(Geometry& geometry);
+void vk_r_destroy_geometry(Geometry& geometry);
+void vk_r_shader_create(Shader& s);
+void vk_texture_load(Texture& t);
 
 void vk_draw();
 void vk_compute_draw();

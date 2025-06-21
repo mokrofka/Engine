@@ -168,18 +168,18 @@ void vk_image_destroy(VK_Image& image) {
   }
 }
 
-void vk_texture_load(Texture* t) {
+void vk_texture_load(Texture& t) {
   VK_Texture* texture = &vk.texture;
   
-  u64 size = t->width * t->height * t->channel_count;
+  u64 size = t.width * t.height * t.channel_count;
   VkFormat image_format = VK_FORMAT_R8G8B8A8_UNORM;
   
-  MemCopy(vk.stage_buffer.maped_memory, t->data, size);
+  MemCopy(vk.stage_buffer.maped_memory, t.data, size);
   
   texture->image = vk_image_create(
     VK_IMAGE_TYPE_2D, 
-    t->width, 
-    t->height, 
+    t.width, 
+    t.height, 
     image_format, 
     VK_IMAGE_TILING_OPTIMAL, 
     VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,

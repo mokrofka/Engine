@@ -70,8 +70,6 @@ struct VK_Image  {
 struct VK_Swapchain  {
   VkSwapchainKHR handle;
   VkSurfaceFormatKHR image_format;  
-  u32 max_frames_in_flight;
-  u32 image_count;
   VkImage images[ImagesInFlight];
   VkImageView views[ImagesInFlight];
   

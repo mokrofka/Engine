@@ -2,37 +2,29 @@
 
 #include "render/r_frontend.h"
 
-#define MaxGeometries 1024
-Geometry geoms[MaxGeometries];
-
 struct GeometrySysState {
-  GeometrySysConfig config;
   u32 geom_count;
   HashMap hashmap;
 };
 
 GeometrySysState st;
 
-void geometry_sys_init(Arena* arena, GeometrySysConfig config) {
-  // st = push_struct(arena, GeometrySysState);
-  st.config = config;
-  
-  st.hashmap = hashmap_create(arena, sizeof(u32), config.max_geometry_count);
-
+#define MaxGeometryCount 1024
+void geometry_init(Arena* arena) {
+  st.hashmap = hashmap_create(arena, sizeof(u32), MaxGeometryCount);
+  u32 invalid_id = INVALID_ID;
+  hashmap_fill(st.hashmap, &invalid_id);
 }
 
-u32 geometry_create(Geometry geometry) {
+u32 geometry_create(Geometry& geometry) {
   hashmap_set(st.hashmap, geometry.name, &st.geom_count);
-  vk_r_geometry_create(&geometry);
+  vk_r_geometry_create(geometry);
   return st.geom_count++;
 }
 
 u32 geometry_get(String name) {
   u32 id;
   hashmap_get(st.hashmap, name, &id);
+  Assert(id != INVALID_ID);
   return id;
-}
-
-void geometry_destroy(u32 id) {
-
 }

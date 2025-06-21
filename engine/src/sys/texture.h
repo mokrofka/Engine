@@ -3,12 +3,9 @@
 
 #include "render/r_types.h"
 
-struct TextureSystemConfig {
-  u32 max_texture_count;
-};
-
 #define DefaultTextureName "default"_
 
-void texture_system_init(Arena* arena, TextureSystemConfig config);
+void texture_init(Arena* arena);
 
 KAPI void texture_load(String name);
+KAPI u32 texture_get(String name);

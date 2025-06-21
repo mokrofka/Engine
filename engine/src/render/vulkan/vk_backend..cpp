@@ -274,7 +274,7 @@ void vk_r_backend_shutdown() {
   vkDeviceWaitIdle(vkdevice);
   
   // Sync objects
-  Loop (i, vk.swapchain.max_frames_in_flight) {
+  Loop (i, FramesInFlight) {
     vkDestroySemaphore(vkdevice, vk.sync.image_available_semaphores[i], vk.allocator);
     vkDestroySemaphore(vkdevice, vk.sync.queue_complete_semaphores[i], vk.allocator);
     vkDestroyFence(vkdevice, vk.sync.in_flight_fences[i], vk.allocator);

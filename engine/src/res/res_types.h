@@ -1,60 +1,13 @@
 #pragma once
 #include "lib.h"
 
-struct Binary {
-  String64 file_path64;
-  u64 size;
-  u8* data;
-};
-
 struct Texture {
-  String64 file_path64;
+  String filepath;
   u32 width;
   u32 height;
   u8 channel_count;
   b8 has_transparency;
   u8* data;
-};
-
-enum TextureUse {
-  TextureUse_Unknown = 0x00,
-  TextureUse_MapDiffuse  = 0x01,
-};
-
-struct TextureMap {
-  Texture* texture;
-  TextureUse use;
-};
-
-enum MaterialType {
-  MaterialType_World,
-  MaterialType_UI,
-};
-
-struct MaterialRes {
-  String64 name64;
-  String64 diffuse_map_name64;
-  MaterialType type;
-  b8 auto_release;
-  v4 diffuse_color;
-};
-
-struct MaterialConfig {
-  String64 name64;
-  MaterialType type;
-  b8 auto_release;
-  v4 diffuse_color;
-  String64 diffuse_map_name64;
-};
-
-struct Material {
-  u32 id;
-  u32 generation;
-  u32 internal_id;
-  MaterialType type;
-  String64 name64;
-  v4 diffuse_color;
-  TextureMap diffuse_map;
 };
 
 struct Geometry {
@@ -68,67 +21,16 @@ struct Geometry {
   void* indices;
 };
 
-enum ShaderStage {
-  ShaderStage_Vertex = 0x00000001,
-  ShaderStage_Geometry = 0x00000002,
-  ShaderStage_Fragment = 0x00000004,
-  ShaderStage_Compute = 0x0000008
-};
-
-enum ShaderAttributeType {
-  ShaderAttribType_f32,
-  ShaderAttribType_v2,
-  ShaderAttribType_v3,
-  ShaderAttribType_v4,
-  ShaderAttribType_mat4,
-  ShaderAttribType_i8,
-  ShaderAttribType_u8,
-  ShaderAttribType_i16,
-  ShaderAttribType_u16,
-  ShaderAttribType_i32,
-  ShaderAttribType_u32,
-};
-
-enum ShaderUniformType {
-  ShaderUniformType_f32,
-  ShaderUniformType_v2,
-  ShaderUniformType_v3,
-  ShaderUniformType_v4,
-  ShaderUniformType_i8,
-  ShaderUniformType_u8,
-  ShaderUniformType_i16,
-  ShaderUniformType_u16,
-  ShaderUniformType_i32,
-  ShaderUniformType_u32,
-  ShaderUniformType_mat4,
-  ShaderUniformType_Sampler,
-  ShaderUniformType_Custom = 255u
-};
-
-enum ShaderScope {
-  ShaderScope_Global,
-  ShaderScope_Instance,
-  ShaderScope_Local
-};
-
-struct ShaderAttributeConfig {
-  u8 name_length;
-  char* name;
-  u8 size;
-  ShaderAttributeType type;
-};
-
-struct ShaderUniformConfig {
-  u8 name_length;
-  char* name;
-  u8 size;
-  u32 location;
-  ShaderUniformType type;
-  ShaderScope scope;
-};
-
 enum ShaderTopology {
   ShaderTopology_Triangle,
   ShaderTopology_Line,
   ShaderTopology_Point,
+};
+
+struct Shader {
+  String name;
+  ShaderTopology primitive;
+  u8 stages;
+  b8 is_transparent;
+  u8 attribut[10];
 };

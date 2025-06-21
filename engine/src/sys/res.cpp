@@ -1,4 +1,4 @@
-#include "res_sys.h"
+#include "res.h"
 
 struct ResSysState {
   ResSysConfig config;

@@ -1,8 +1,8 @@
 #include "vk_types.h"
 #include "vk_buffer.h"
 
-#include "sys/shader_sys.h"
-#include "sys/res_sys.h"
+#include "sys/shader.h"
+#include "sys/res.h"
 #include "asset_watch.h"
 
 internal VK_Pipeline vk_pipeline_create(
@@ -37,14 +37,14 @@ internal VkPipelineShaderStageCreateInfo vk_shader_module_create(String name, St
   return pipeline_shader_stage_create_info;
 }
 
-void vk_r_shader_create(Shader* s) {
-  VK_Shader* shader = &vk.shaders[vk.shader_count];
+void vk_r_shader_create(Shader& s) {
+  VK_Shader* shader = &vk.shaders[vk.shader_count++];
 
   #define ShaderStageCount 2
   String stage_type_strs[] = { "vert"_, "frag"_};
   VkShaderStageFlagBits stage_types[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
   Loop (i, ShaderStageCount) {
-    shader->stages[i] = vk_shader_module_create(s->name, stage_type_strs[i], stage_types[i]);
+    shader->stages[i] = vk_shader_module_create(s.name, stage_type_strs[i], stage_types[i]);
   }
 
   VkVertexInputAttributeDescription attribute_desriptions[10];
@@ -58,31 +58,30 @@ void vk_r_shader_create(Shader* s) {
   
   u32 vert_stride = 0;
   u32 attribute_count = 0;
-  for (u32 i = 0; s->attribut[i]; ++i) {
+  for (u32 i = 0; s.attribut[i]; ++i) {
     shader->attribute_desriptions[i] = {
       .location = i,
       .binding = 0,
-      .format = formats[s->attribut[i] - 1],
+      .format = formats[s.attribut[i] - 1],
       .offset = vert_stride,
     };
-    vert_stride += s->attribut[i] * sizeof(f32);
+    vert_stride += s.attribut[i] * sizeof(f32);
     ++attribute_count;
   }
   
   VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-  if (s->primitive == ShaderTopology_Line) {
+  if (s.primitive == ShaderTopology_Line) {
     topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
   }
   
-  shader->name = s->name;
+  shader->name = s.name;
   shader->attribute_count = attribute_count;
   shader->vert_stride = vert_stride;
   shader->topology = topology;
-  shader->is_transparent = s->is_transparent;
-  ++vk.shader_count;
+  shader->is_transparent = s.is_transparent;
 
   shader->pipeline = vk_pipeline_create(shader->vert_stride, shader->attribute_count, shader->attribute_desriptions,
-                                        2, shader->stages, shader->topology, true, s->is_transparent);
+                                        2, shader->stages, shader->topology, true, shader->is_transparent);
 }
 
 VK_Pipeline vk_pipeline_create(
@@ -511,6 +510,8 @@ void compute_shader() {
 // }
 
 void vk_shader_init() {
+  Scratch scratch;
+
   // Pool
   {
     VkDescriptorPoolSize pool_sizes[] = {
@@ -522,7 +523,7 @@ void vk_shader_init() {
     VkDescriptorPoolCreateInfo pool_info = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
       .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
-      .maxSets = 3,
+      .maxSets = FramesInFlight,
       .poolSizeCount = ArrayCount(pool_sizes),
       .pPoolSizes = pool_sizes,
     };
@@ -557,14 +558,14 @@ void vk_shader_init() {
 
   // Descriptor
   {
-    VkDescriptorSetLayout layouts[] = {
-      vk.descriptor_set_layout,
-      vk.descriptor_set_layout
-    };
+    VkDescriptorSetLayout* layouts = push_array(scratch, VkDescriptorSetLayout, FramesInFlight);
+    Loop (i, FramesInFlight) {
+      layouts[i] = vk.descriptor_set_layout;
+    }
     VkDescriptorSetAllocateInfo alloc_info = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
       .descriptorPool = vk.descriptor_pool,
-      .descriptorSetCount = ArrayCount(layouts),
+      .descriptorSetCount = FramesInFlight,
       .pSetLayouts = layouts,
     };
     VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, vk.descriptor_sets));
@@ -592,26 +593,48 @@ void vk_shader_init() {
   });
 
   // Mem for shaders
+  // {
+  //   u64 size = sizeof(ShaderGlobalState) + AlignPow2(sizeof(ShaderEntity)*MaxEntities, 16) + AlignPow2(sizeof(DirectionalLight)*KB(1), 16);
+  //   u64 offset = freelist_gpu_alloc(vk.storage_buffer.freelist, size);
+  //   vk.storage_buffer_range = {offset, size};
+
+  //   AllocMemZero(&vk.push_constants, sizeof(vk.push_constants));
+  //   vk.push_constants.data = mem_alloc(sizeof(PushConstant) * MaxEntities);
+  //   vk.push_constants.element_size = sizeof(PushConstant);
+  //   vk.push_constants.count = 0;
+    
+  //   AllocMemZero(&vk.entities_data, sizeof(vk.entities_data));
+  //   vk.entities_data.data = vk.storage_buffer.maped_memory + AlignPow2(sizeof(ShaderGlobalState), 16);
+  //   vk.entities_data.element_size = sizeof(ShaderEntity);
+  //   vk.entities_data.count = 0;
+    
+  //   AllocMemZero(&vk.lights_data, sizeof(vk.lights_data));
+  //   vk.lights_data.data = vk.storage_buffer.maped_memory + AlignPow2(sizeof(ShaderGlobalState), 16) + sizeof(ShaderEntity)*MaxEntities;
+  //   vk.lights_data.element_size = sizeof(DirectionalLight);
+  //   vk.lights_data.count = 0;
+
+  //   Assign(vk.global_shader_state, vk.storage_buffer.maped_memory + offset);
+  // }
+
   {
-    u64 size = sizeof(ShaderGlobalState) + AlignPow2(sizeof(ShaderEntity)*MaxEntities, 16) + AlignPow2(sizeof(DirectionalLight)*KB(1), 16);
+    AllocMemZero(&vk.push_constants, sizeof(vk.push_constants));
+    vk.push_constants.data = mem_alloc(sizeof(PushConstant)*MaxEntities);
+    vk.push_constants.element_size = sizeof(PushConstant);
+    vk.push_constants.count = 0;
+
+    u64 size = sizeof(ShaderGlobalState) + AlignPow2(sizeof(ShaderEntity)*MaxEntities, alignof(ShaderEntity)) + AlignPow2(sizeof(DirectionalLight)*KB(1), alignof(DirectionalLight));
     u64 offset = freelist_gpu_alloc(vk.storage_buffer.freelist, size);
     vk.storage_buffer_range = {offset, size};
-
-    vk.push_constants = {
-      .data = mem_alloc(sizeof(PushConstant) * MaxEntities),
-      .element_size = sizeof(PushConstant),
-    };
-
-    vk.entities_data = {
-      .data = vk.storage_buffer.maped_memory + AlignPow2(sizeof(ShaderGlobalState), 16),
-      .element_size = sizeof(ShaderEntity),
-    };
+    Assign(vk.global_shader_state, Offset(vk.storage_buffer.maped_memory, offset));
     
-    vk.lights_data = {
-      .data = vk.storage_buffer.maped_memory + AlignPow2(sizeof(ShaderGlobalState), 16) + sizeof(ShaderEntity)*MaxEntities,
-      .element_size = sizeof(DirectionalLight),
-    };
-
-    Assign(vk.global_shader_state, vk.storage_buffer.maped_memory + offset);
+    AllocMemZero(&vk.entities_data, sizeof(vk.entities_data));
+    vk.entities_data.data = Offset(vk.storage_buffer.maped_memory, AlignPow2(sizeof(ShaderGlobalState), alignof(ShaderEntity)));
+    vk.entities_data.element_size = sizeof(ShaderEntity);
+    vk.entities_data.count = 0;
+    
+    AllocMemZero(&vk.lights_data, sizeof(vk.lights_data));
+    vk.lights_data.data = Offset(vk.storage_buffer.maped_memory, AlignPow2(sizeof(ShaderGlobalState), alignof(ShaderEntity)) + AlignPow2(sizeof(ShaderEntity)*MaxEntities, alignof(DirectionalLight)));
+    vk.lights_data.element_size = sizeof(DirectionalLight);
+    vk.lights_data.count = 0;
   }
 }

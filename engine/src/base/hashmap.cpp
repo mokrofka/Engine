@@ -19,13 +19,13 @@ u64 hash_name(String name, u32 element_count) {
 }
 
 HashMap hashmap_create(Arena* arena, u32 element_size, u32 element_count, b32 is_pointer_type) {
-  Assert(element_count && element_size && "element_size and element_count must be a positive non-zero value");
-  HashMap hashtable;
-  
-  hashtable.data = push_buffer(arena, element_size * element_count);
-  hashtable.element_size = element_size;
-  hashtable.element_count = element_count;
-  hashtable.is_pointer_type = is_pointer_type;
+  Assert(element_count && element_size);
+  HashMap hashtable = {
+    .data = push_buffer(arena, element_size*element_count),
+    .element_size = element_size,
+    .element_count = element_count,
+    .is_pointer_type = (b8)is_pointer_type,
+  };
   return hashtable;
 }
 

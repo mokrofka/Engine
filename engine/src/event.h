@@ -1,12 +1,7 @@
 #pragma once
 #include "lib.h"
 
-struct EventSysConfig {
-  u32 mem_reserve;
-};
-
 struct EventContext {
-  // 128 bytes
   union {
     i64 i64[2];
     u64 u64[2];
@@ -29,11 +24,11 @@ struct EventContext {
 // Should return true if handled
 using PFN_On_Event = b32 (*)(u32 code, void* sender, void* listener_inst, EventContext data);
 
-void event_init(Arena* arena, EventSysConfig config);
+void event_init(Arena* arena);
 
-KAPI b32 event_register(u32 code, void* listener, PFN_On_Event on_event);
-KAPI b32 event_unregister(u32 code, void* listener, PFN_On_Event on_event);
-KAPI b32 event_fire(u32 code, void* sender, EventContext on_event);
+KAPI void event_register(u32 code, void* listener, PFN_On_Event on_event);
+KAPI void event_unregister(u32 code, void* listener, PFN_On_Event on_event);
+KAPI void event_fire(u32 code, void* sender, EventContext on_event);
 
 // System the application down on the next frame 255
 enum SystemEventCode {

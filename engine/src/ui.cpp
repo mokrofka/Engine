@@ -5,8 +5,6 @@
 
 #include "render/vulkan/vk_types.h"
 
-#define ImagesInFlight 3
-
 struct UI_State {
   ImTextureID texture_ids[10];
 };

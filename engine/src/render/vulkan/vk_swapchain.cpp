@@ -52,7 +52,7 @@ internal void destroy(VK_Swapchain* swapchain) {
   vkDeviceWaitIdle(vkdevice);
   vk_image_destroy(swapchain->depth_attachment);
 
-  Loop (i, swapchain->image_count) {
+  Loop (i, ImagesInFlight) {
     vkDestroyImageView(vkdevice, swapchain->views[i], vk.allocator);
   }
 
@@ -105,18 +105,10 @@ internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
   swapchain_extent.width = Clamp(min.width, swapchain_extent.width, max.width);
   swapchain_extent.height = Clamp(min.height, swapchain_extent.height, max.height);
   
-  u32 image_count = vk.device.swapchain_support.capabilities.minImageCount + 1;
-  if (vk.device.swapchain_support.capabilities.maxImageCount > 0 &&
-      image_count > vk.device.swapchain_support.capabilities.maxImageCount) {
-        image_count = vk.device.swapchain_support.capabilities.maxImageCount;
-  }
-  
-  swapchain.max_frames_in_flight = FramesInFlight;
-  
   VkSwapchainCreateInfoKHR swapchain_create_info = {
     .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
     .surface = vk.surface,
-    .minImageCount = image_count,
+    .minImageCount = ImagesInFlight,
     .imageFormat = swapchain.image_format.format,
     .imageColorSpace = swapchain.image_format.colorSpace,
     .imageExtent = swapchain_extent,
@@ -132,17 +124,15 @@ internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
 
   VK_CHECK(vkCreateSwapchainKHR(vkdevice, &swapchain_create_info, vk.allocator, &swapchain.handle));
   
-  // Start with a zero frame index.
   vk.frame.current_frame = 0;
   
+  u32 image_count = ImagesInFlight;
   // Images
-  swapchain.image_count = 0;
-  VK_CHECK(vkGetSwapchainImagesKHR(vkdevice, swapchain.handle, &swapchain.image_count, 0));
-  VK_CHECK(vkGetSwapchainImagesKHR(vkdevice, swapchain.handle, &swapchain.image_count, swapchain.images));
+  VK_CHECK(vkGetSwapchainImagesKHR(vkdevice, swapchain.handle, &image_count, swapchain.images));
 
   // Views
-  Loop (i, swapchain.image_count) {
-    VkImageViewCreateInfo view_info = {
+  Loop (i, ImagesInFlight) {
+    VkImageViewCreateInfo view_create_info = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
       .image = swapchain.images[i],
       .viewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -156,13 +146,11 @@ internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
       },
     };
 
-    VK_CHECK(vkCreateImageView(vkdevice, &view_info, vk.allocator, &swapchain.views[i]));
+    VK_CHECK(vkCreateImageView(vkdevice, &view_create_info, vk.allocator, &swapchain.views[i]));
   }
 
-  // Depth resources
   vk_device_detect_depth_format(&vk.device);
 
-  // Create depth image and its view.
   swapchain.depth_attachment = vk_image_create(
     VK_IMAGE_TYPE_2D,
     swapchain_extent.width,

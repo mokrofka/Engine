@@ -7,20 +7,32 @@ struct Entity {
   vec4 padd;
 };
 
-struct DirectionaltLight {
+struct PointLight {
   vec3 pos;
   vec3 direction;
   vec3 color;
 };
 
-layout(set = 0, binding = 0) readonly buffer Buffer {
+struct DirLight {
+  vec3 pos;
+  vec3 direction;
+  vec3 color;
+};
+
+struct SpotLight {
+  vec3 pos;
+  vec3 direction;
+  vec3 color;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer Buffer {
   mat4 g_projection_view;
   mat4 g_view;
   vec4 g_ambient_color;
   float g_time;
   uint g_directional_light_count;
   Entity g_entities[KB(20)];
-  DirectionaltLight g_directional_lights[KB(1)];
+  PointLight g_directional_lights[KB(1)];
 };
 
 layout(push_constant) uniform PushConstants {

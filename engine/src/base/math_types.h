@@ -4,12 +4,8 @@
 union v2 {
   f32 e[2];
   struct {
-    union {
-      f32 x;
-    };
-    union {
-      f32 y;
-    };
+    f32 x;
+    f32 y;
   };
   v2 () = default;
   INLINE v2(f32 x_, f32 y_) { x = x_, y = y_; }
@@ -18,12 +14,8 @@ union v2 {
 union v2i {
   i32 e[2];
   struct {
-    union {
-      i32 x;
-    };
-    union {
-      i32 y;
-    };
+    i32 x;
+    i32 y;
   };
   v2i () = default;
   INLINE v2i(i32 x_, i32 y_) { x = x_, y = y_; }
@@ -32,15 +24,9 @@ union v2i {
 union v3 {
   f32 e[3];
   struct {
-    union {
-      f32 x;
-    };
-    union {
-      f32 y;
-    };
-    union {
-      f32 z;
-    };
+    f32 x;
+    f32 y;
+    f32 z;
   };
   v3 () = default;
   INLINE v3 (f32 scale) {
@@ -52,18 +38,10 @@ union v3 {
 union v4 {
   f32 e[4];
   struct {
-    union {
-      f32 x;
-    };
-    union {
-      f32 y;
-    };
-    union {
-      f32 z;
-    };
-    union {
-      f32 w;
-    };
+    f32 x;
+    f32 y;
+    f32 z;
+    f32 w;
   };
   v4 () = default;
   INLINE v4(f32 x_, f32 y_, f32 z_, f32 w_) { x = x_, y = y_, z = z_, w = w_; }

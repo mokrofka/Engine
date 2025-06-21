@@ -1,5 +1,5 @@
 #include "asset_watch.h"
-#include "sys/shader_sys.h"
+#include "sys/shader.h"
 
 struct FileWatch {
   String path;

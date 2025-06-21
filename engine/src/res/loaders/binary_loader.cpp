@@ -1,4 +1,4 @@
-#include "sys/res_sys.h"
+#include "sys/res.h"
 
 Buffer res_binary_load(Arena* arena, String filename) {
   Scratch scratch(&arena);

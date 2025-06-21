@@ -2,10 +2,10 @@
 #include "defines.h"
 
 struct HashMap {
+  u8* data;
   u32 element_size;
   u32 element_count;
   b8 is_pointer_type;
-  u8* data;
 };
 
 HashMap hashmap_create(Arena* arena, u32 element_size, u32 element_count, b32 is_pointer_type = false);

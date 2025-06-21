@@ -70,8 +70,8 @@ void imgui_renderer_init() {
     .QueueFamily = vk.device.graphics_queue_index,
     .Queue = vk.device.graphics_queue,
     .DescriptorPool = imgui_descriptor_pool,
-    .MinImageCount = vk.swapchain.max_frames_in_flight,
-    .ImageCount = vk.swapchain.image_count,
+    .MinImageCount = FramesInFlight,
+    .ImageCount = ImagesInFlight,
     .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
     .UseDynamicRendering = true,
     .PipelineRenderingCreateInfo = {

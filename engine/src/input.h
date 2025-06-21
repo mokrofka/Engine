@@ -7,7 +7,7 @@ void input_init(Arena* arena);
 void input_shutdown();
 void input_update();
 
-// keyboard input
+// keyboard
 KAPI b32 input_is_key_down(Keys key);
 KAPI b32 input_is_key_up(Keys key);
 KAPI b32 input_was_key_down(Keys key);
@@ -17,7 +17,7 @@ KAPI b32 input_was_key_released(Keys key);
 
 void input_process_key(Keys key, b32 pressed);
 
-// mouse input
+// mouse
 KAPI b32 input_is_button_down(MouseButtons button);
 KAPI b32 input_is_button_up(MouseButtons button);
 KAPI b32 input_was_button_down(MouseButtons button);

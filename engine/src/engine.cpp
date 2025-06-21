@@ -3,10 +3,9 @@
 
 
 #include "sys/texture.h"
-#include "sys/material_sys.h"
 #include "sys/geometry.h"
-#include "sys/res_sys.h"
-#include "sys/shader_sys.h"
+#include "sys/res.h"
+#include "sys/shader.h"
 
 #include "asset_watch.h"
 #include "event.h"
@@ -72,10 +71,7 @@ void engine_create(App* app) {
   }
 
   {
-    EventSysConfig config = {
-      .mem_reserve = KB(1)
-    };
-    event_init(st.arena, config);
+    event_init(st.arena);
     
     os_register_process_key(input_process_key);
     os_register_process_mouse_move(input_process_mouse_move);
@@ -96,7 +92,7 @@ void engine_create(App* app) {
     WindowConfig config = {
       .position_x = 100,
       .position_y = 100,
-      .width = 800,
+      .width = 1000,
       .height = 600,
       .name = app->name};
     os_window_create(st.arena, config);
@@ -107,14 +103,11 @@ void engine_create(App* app) {
   }
   
   {
-    ShaderSysConfig config = {
-      .mem_reserve = MB(1),
-      .shader_count_max = 1024,
-      .uniform_count_max = 128,
-      .global_textures_max = 31,
-      .instance_textures_max = 31
-    };
-    shader_sys_init(st.arena, config);
+    shader_init(st.arena);
+  }
+  
+  {
+    texture_init(st.arena);
   }
 
   {
@@ -129,10 +122,7 @@ void engine_create(App* app) {
   }
 
   {
-    GeometrySysConfig geometry_sys_config = {
-      .max_geometry_count = 4096,
-    };
-    geometry_sys_init(st.arena, geometry_sys_config);
+    geometry_init(st.arena);
   }
 
   app->init(app);
