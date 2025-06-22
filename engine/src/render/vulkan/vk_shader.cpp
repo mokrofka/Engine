@@ -593,46 +593,20 @@ void vk_shader_init() {
   });
 
   // Mem for shaders
-  // {
-  //   u64 size = sizeof(ShaderGlobalState) + AlignPow2(sizeof(ShaderEntity)*MaxEntities, 16) + AlignPow2(sizeof(DirectionalLight)*KB(1), 16);
-  //   u64 offset = freelist_gpu_alloc(vk.storage_buffer.freelist, size);
-  //   vk.storage_buffer_range = {offset, size};
-
-  //   AllocMemZero(&vk.push_constants, sizeof(vk.push_constants));
-  //   vk.push_constants.data = mem_alloc(sizeof(PushConstant) * MaxEntities);
-  //   vk.push_constants.element_size = sizeof(PushConstant);
-  //   vk.push_constants.count = 0;
-    
-  //   AllocMemZero(&vk.entities_data, sizeof(vk.entities_data));
-  //   vk.entities_data.data = vk.storage_buffer.maped_memory + AlignPow2(sizeof(ShaderGlobalState), 16);
-  //   vk.entities_data.element_size = sizeof(ShaderEntity);
-  //   vk.entities_data.count = 0;
-    
-  //   AllocMemZero(&vk.lights_data, sizeof(vk.lights_data));
-  //   vk.lights_data.data = vk.storage_buffer.maped_memory + AlignPow2(sizeof(ShaderGlobalState), 16) + sizeof(ShaderEntity)*MaxEntities;
-  //   vk.lights_data.element_size = sizeof(DirectionalLight);
-  //   vk.lights_data.count = 0;
-
-  //   Assign(vk.global_shader_state, vk.storage_buffer.maped_memory + offset);
-  // }
-
   {
-    AllocMemZero(&vk.entities_data, sizeof(vk.entities_data));
-    vk.entities_data.data = Offset(vk.storage_buffer.maped_memory, AlignPow2(sizeof(ShaderGlobalState), alignof(ShaderEntity)));
-    vk.entities_data.element_size = sizeof(ShaderEntity);
-    vk.entities_data.count = 0;
+    Assign(vk.entities_data, Offset(vk.storage_buffer.maped_memory, AlignPow2(sizeof(ShaderGlobalState), alignof(ShaderEntity))));
     
-    AllocMemZero(&vk.point_light_data, sizeof(vk.point_light_data));
-    vk.point_light_data.data = Offset(vk.entities_data.data, AlignPow2(sizeof(ShaderEntity)*MaxEntities, alignof(PointLight)));
+    FillAllocStruct(&vk.point_light_data);
+    vk.point_light_data.data = Offset(vk.entities_data, AlignPow2(sizeof(ShaderEntity)*MaxEntities, alignof(PointLight)));
     vk.point_light_data.element_size = sizeof(PointLight);
     vk.point_light_data.count = 0;
 
-    AllocMemZero(&vk.dir_light_data, sizeof(vk.dir_light_data));
+    FillAllocStruct(&vk.dir_light_data);
     vk.dir_light_data.data = Offset(vk.point_light_data.data, AlignPow2(sizeof(PointLight)*MaxLights, alignof(DirLight)));
     vk.dir_light_data.element_size = sizeof(DirLight);
     vk.dir_light_data.count = 0;
 
-    AllocMemZero(&vk.spot_light_data, sizeof(vk.spot_light_data));
+    FillAllocStruct(&vk.spot_light_data);
     vk.spot_light_data.data = Offset(vk.dir_light_data.data, AlignPow2(sizeof(DirLight)*MaxLights, alignof(SpotLight)));
     vk.spot_light_data.element_size = sizeof(SpotLight);
     vk.spot_light_data.count = 0;
@@ -642,7 +616,7 @@ void vk_shader_init() {
     vk.storage_buffer_range = {offset, size};
     Assign(vk.global_shader_state, Offset(vk.storage_buffer.maped_memory, offset));
     
-    AllocMemZero(&vk.push_constants, sizeof(vk.push_constants));
+    FillAllocStruct(&vk.push_constants);
     vk.push_constants.data = mem_alloc(sizeof(PushConstant)*MaxEntities);
     vk.push_constants.element_size = sizeof(PushConstant);
     vk.push_constants.count = 0;

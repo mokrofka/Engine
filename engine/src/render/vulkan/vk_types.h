@@ -166,7 +166,8 @@ struct VK {
   SparseSetIndex entity_to_mesh;
   VK_Mesh meshes[10];
 
-  SparseSet entities_data;
+  ShaderEntity* entities_data;
+  // SparseSet entities_data;
   SparseSet point_light_data;
   SparseSet dir_light_data;
   SparseSet spot_light_data;

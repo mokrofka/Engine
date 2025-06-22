@@ -20,8 +20,14 @@ Arena* arena_alloc(Arena* arena, u64 size, u64 align) {
   *result = { .size = size, };
   arena->used = offset + size;
 
-  AllocMemZero(Offset(result, ARENA_HEADER), size);
+  FillAlloc(Offset(result, ARENA_HEADER), size);
   return result;
+}
+
+Arena* mem_arena_alloc(u64 size) {
+  Arena* arena; Assign(arena, mem_alloc(size));
+  *arena = {.size = size};
+  return arena;
 }
 
 void* _arena_push(Arena* arena, u64 size, u64 align) {
@@ -35,7 +41,7 @@ void* _arena_push(Arena* arena, u64 size, u64 align) {
   u8* result = Offset(arena, ARENA_HEADER + offset);
   arena->used = offset + size;
 
-  AllocMemZero(result, size);
+  FillAlloc(result, size);
   return result;
 }
 
@@ -48,9 +54,9 @@ void _arena_move(Arena* arena, u64 size, u64 align) {
   arena->used = offset+size;
 }
 
-void tctx_init(Arena* arena) {
-  tctx_thread_local.arenas[0] = arena_alloc(arena, MB(8));
-  tctx_thread_local.arenas[1] = arena_alloc(arena, MB(8));
+void tctx_init() {
+  tctx_thread_local.arenas[0] = mem_arena_alloc(MB(8));
+  tctx_thread_local.arenas[1] = mem_arena_alloc(MB(8));
 }
 
 Temp tctx_get_scratch(Arena** conflics, u64 counts) {
@@ -73,14 +79,14 @@ Temp tctx_get_scratch(Arena** conflics, u64 counts) {
 
 ////////////////////////////////
 // Pool
-#ifdef MEMORY_ALLOCATED_GUARD
+#ifdef GUARD_MEMORY
 
-Pool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignment) {
+MemPool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignment) {
   chunk_size = AlignPow2(chunk_size, chunk_alignment);
   u64 stride = chunk_size + chunk_alignment;
   u8* data = push_buffer(arena, chunk_count*stride, chunk_alignment);
 
-  Pool result = {
+  MemPool result = {
     .data = data,
     .chunk_count = chunk_count,
     .chunk_size = chunk_size,
@@ -92,7 +98,7 @@ Pool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignm
   return result;
 }
 
-u8* pool_alloc(Pool& p) {
+u8* pool_alloc(MemPool& p) {
   PoolFreeNode* result = p.head;
   Assert(result && "Pool allocator has no free memory");
 
@@ -100,26 +106,26 @@ u8* pool_alloc(Pool& p) {
 
   p.head = p.head->next;
 
-  AllocMemZero(result, p.chunk_size);
+  FillAlloc(result, p.chunk_size);
   return (u8*)result;
 }
 
-void pool_free(Pool& p, void* ptr) {
+void pool_free(MemPool& p, void* ptr) {
   Assert(*(u64*)(Offset(ptr, -p.guard_size)) == ALLOC_HEADER_GUARD && "Double free memory");
   *(u64*)(Offset(ptr, -p.guard_size)) = DEALLOC_HEADER_GUARD;
 
 	void* start = p.data;
 	void* end = p.data + p.chunk_count*(p.chunk_size + p.guard_size);
   Assert((start <= ptr && ptr < end) && "Memory is out of bounds");
-  DealocMemZero(ptr, p.chunk_size);
+  FillDealoc(ptr, p.chunk_size);
 
   PoolFreeNode* node; Assign(node, ptr);
 	node->next = p.head;
 	p.head = node;
 }
 
-void pool_free_all(Pool& p) {
-  DealocMemZero(p.data, p.chunk_count*(p.chunk_size + p.guard_size));
+void pool_free_all(MemPool& p) {
+  FillDealoc(p.data, p.chunk_count*(p.chunk_size + p.guard_size));
   Loop (i, p.chunk_count) {
 		u64* free_guard; Assign(free_guard, p.data + i*(p.chunk_size + p.guard_size));
     *free_guard = DEALLOC_HEADER_GUARD;
@@ -155,12 +161,12 @@ u8* pool_alloc(Pool& p) {
 
   p.head = p.head->next;
 
-  AllocMemZero(result, p.chunk_size);
+  FillAlloc(result, p.chunk_size);
   return (u8*)result;
 }
 
 void pool_free(Pool& p, void* ptr) {
-  DealocMemZero(ptr, p.chunk_size);
+  FillDealoc(ptr, p.chunk_size);
 
   PoolFreeNode* node; Assign(node, ptr);
 	node->next = p.head;
@@ -168,7 +174,7 @@ void pool_free(Pool& p, void* ptr) {
 }
 
 void pool_free_all(Pool& p) {
-  DealocMemZero(p.data, p.chunk_count*p.chunk_size);
+  FillDealoc(p.data, p.chunk_count*p.chunk_size);
   Loop (i, p.chunk_count) {
 		PoolFreeNode *node; Assign(node, p.data + i*p.chunk_size);
 		node->next = p.head;
@@ -271,13 +277,13 @@ u8* freelist_alloc(FreeList& fl, u64 size, u64 alignment) {
   FreeListAllocationHeader* header_ptr; Assign(header_ptr, Offset(node, mem_alignment));
   header_ptr->block_size = required_space;
   header_ptr->padding = mem_alignment;
-#ifdef MEMORY_ALLOCATED_GUARD
+#ifdef GUARD_MEMORY
   header_ptr->guard = ALLOC_HEADER_GUARD;
 #endif
 
   fl.used += required_space;
   u8* result = (u8*)header_ptr + sizeof(FreeListAllocationHeader);
-  AllocMemZero(result, size);
+  FillAlloc(result, size);
 
   return result;
 }
@@ -293,7 +299,7 @@ void freelist_free(FreeList& fl, void* ptr) {
   FreeListNode* prev_node = null;
 
   Assign(header, (u8*)ptr-sizeof(FreeListAllocationHeader));
-#ifdef MEMORY_ALLOCATED_GUARD
+#ifdef GUARD_MEMORY
   Assert(header->guard == ALLOC_HEADER_GUARD && "double free memory");
   header->guard = DEALLOC_HEADER_GUARD;
 #endif
@@ -320,7 +326,7 @@ void freelist_free(FreeList& fl, void* ptr) {
 
   free_list_coalescence(fl, prev_node, free_node);
 
-  DealocMemZero(ptr, free_node->block_size - padding - sizeof(FreeListAllocationHeader));
+  FillDealoc(ptr, free_node->block_size - padding - sizeof(FreeListAllocationHeader));
 }
 
 void free_list_coalescence(FreeList& fl, FreeListNode* prev_node, FreeListNode* free_node) {
@@ -410,7 +416,7 @@ u8* mem_alloc(u64 size) {
   Loop (i, ArrayCount(mem_ctx.pools)) {
     if (size <= base_size << i) {
       result = segregated_pool_alloc(mem_ctx.pools[i]);
-      AllocMemZero(result, size);
+      FillAlloc(result, size);
       break;
     }
   }
@@ -445,7 +451,7 @@ void mem_free(void* ptr) {
     u64 base_size = 8;
     base_size <<= i;
     if ((u8*)ptr >= start && (u8*)ptr < end) {
-      DealocMemZero(ptr, base_size);
+      FillDealoc(ptr, base_size);
       segregated_pool_free(mem_ctx.pools[i], ptr);
       return;
     }
@@ -467,7 +473,7 @@ u8* mem_realoc(void* ptr, u64 size) {
     if ((u8*)ptr >= start && (u8*)ptr < end) {
       result = mem_alloc(size);
       MemCopy(result, ptr, base_size);
-      DealocMemZero(ptr, base_size);
+      FillDealoc(ptr, base_size);
       segregated_pool_free(mem_ctx.pools[i], ptr);
     }
   }

@@ -114,7 +114,7 @@ struct Column {
     Assert(ecs.is_entities_alive);
 
     index_to_entity[count] = entity;
-    AllocMemZero(Offset(data, element_size*count), element_size);
+    FillAlloc(Offset(data, element_size*count), element_size);
     ++count;
   }
   inline void remove_data(Entity entity) {
@@ -133,7 +133,7 @@ struct Column {
     index_to_entity[record_of_removed.row] = entity_of_last_element;
 
     --count;
-    AllocMemZero(src, element_size);
+    FillAlloc(src, element_size);
   }
 };
 

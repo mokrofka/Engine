@@ -8,7 +8,7 @@ const u64 CHUNK_COUNT = 10;
 
 TEST(test_create_pool) {
     Scratch  scratch;// Implement or mock
-    Pool pool = pool_create(scratch, CHUNK_COUNT, CHUNK_SIZE);
+    MemPool pool = pool_create(scratch, CHUNK_COUNT, CHUNK_SIZE);
     Assert(pool.data != nullptr);
     Assert(pool.chunk_count == CHUNK_COUNT);
     Assert(pool.chunk_size == CHUNK_SIZE);
@@ -16,7 +16,7 @@ TEST(test_create_pool) {
 
 TEST(test_allocate_all_chunks) {
     Scratch scratch;
-    Pool pool = pool_create(scratch, CHUNK_COUNT, CHUNK_SIZE);
+    MemPool pool = pool_create(scratch, CHUNK_COUNT, CHUNK_SIZE);
 
     u8* chunks[CHUNK_COUNT];
     for (u64 i = 0; i < CHUNK_COUNT; ++i) {
@@ -30,7 +30,7 @@ TEST(test_allocate_all_chunks) {
 
 TEST(test_unique_allocations) {
     Scratch scratch;
-    Pool pool = pool_create(scratch, CHUNK_COUNT, CHUNK_SIZE);
+    MemPool pool = pool_create(scratch, CHUNK_COUNT, CHUNK_SIZE);
 
     u8* chunks[CHUNK_COUNT];
     for (u64 i = 0; i < CHUNK_COUNT; ++i) {
@@ -46,7 +46,7 @@ TEST(test_unique_allocations) {
 
 TEST(test_free_and_realloc) {
     Scratch scratch;
-    Pool pool = pool_create(scratch, CHUNK_COUNT, CHUNK_SIZE);
+    MemPool pool = pool_create(scratch, CHUNK_COUNT, CHUNK_SIZE);
 
     u8* first = pool_alloc(pool);
     u8* second = pool_alloc(pool);
@@ -59,7 +59,7 @@ TEST(test_free_and_realloc) {
 
 TEST(test_pool_free_all) {
     Scratch scratch;
-    Pool pool = pool_create(scratch, CHUNK_COUNT, CHUNK_SIZE);
+    MemPool pool = pool_create(scratch, CHUNK_COUNT, CHUNK_SIZE);
 
     for (u64 i = 0; i < CHUNK_COUNT; ++i) {
         pool_alloc(pool);
@@ -77,7 +77,7 @@ TEST(test_pool_free_all) {
 TEST(test_alignment_check) {
     Scratch scratch;
     u64 alignment = 16;
-    Pool pool = pool_create(scratch, CHUNK_COUNT, CHUNK_SIZE, alignment);
+    MemPool pool = pool_create(scratch, CHUNK_COUNT, CHUNK_SIZE, alignment);
 
     for (u64 i = 0; i < CHUNK_COUNT; ++i) {
         void* ptr = pool_alloc(pool);
@@ -88,7 +88,7 @@ TEST(test_alignment_check) {
 
 TEST(test_double_free_safety) {
     Scratch scratch;
-    Pool pool = pool_create(scratch, CHUNK_COUNT, CHUNK_SIZE);
+    MemPool pool = pool_create(scratch, CHUNK_COUNT, CHUNK_SIZE);
 
     void* ptr = pool_alloc(pool);
     pool_free(pool, ptr);

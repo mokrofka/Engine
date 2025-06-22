@@ -16,7 +16,6 @@
 
 struct EngineState {
   Arena* arena;
-  App* app;
   b8 is_running;
   b8 is_suspended;
 
@@ -39,17 +38,12 @@ internal void load_game_lib_init(App* app);
 
 f32 delta_time;
 
-void engine_create(App* app) {
+void engine_init(App* app) {
   global_allocator_init();
-  Assign(app->arena, mem_alloc(AppSize));
-  *app->arena = { .size = AppSize, };
-  tctx_init(app->arena);
-  
+  tctx_init();
+
+  st.arena = mem_arena_alloc(MB(10));
   app_create(app);
-  Scratch scratch;
-  
-  st.app = app;
-  st.arena = arena_alloc(app->arena, EngineSize);
   
   {
     logging_init(st.arena);
@@ -111,10 +105,7 @@ void engine_create(App* app) {
   }
 
   {
-    R_Config config = {
-      .mem_reserve = MB(10)
-    };
-    r_init(st.arena, config);
+    r_init(st.arena);
   }
   
   {
@@ -152,7 +143,7 @@ void engine_run(App* app) {
 
       r_begin_draw_frame();
 
-      st.app->update(st.app);
+      app->update(app);
       
       r_end_draw_frame();
       
@@ -297,12 +288,12 @@ internal void app_create(App* app) {
   Scratch scratch;
   
   String filepath = os_exe_filename(scratch);
-  app->file_path = push_str_copy(app->arena, filepath);
+  app->file_path = push_str_copy(st.arena, filepath);
   app->name = str_skip_last_slash(app->file_path);
   
   String file_directory = str_chop_after_last_slash(app->file_path);
-  app->lib_file_path = push_str_cat(app->arena, file_directory, "game.dll");
-  app->lib_temp_file_path = push_str_cat(app->arena, file_directory, "game_temp.dll");
+  app->lib_file_path = push_str_cat(st.arena, file_directory, "game.dll");
+  app->lib_temp_file_path = push_str_cat(st.arena, file_directory, "game_temp.dll");
 
   load_game_lib_init(app);
 }

@@ -1,8 +1,7 @@
 #pragma once
-
 #include "defines.h"
 
-#define MEMORY_ALLOCATED_GUARD
+#define GUARD_MEMORY
 
 struct Range {
   u64 offset; 
@@ -41,6 +40,7 @@ struct Scratch {
 };
 
 KAPI Arena* arena_alloc(Arena *a, u64 size, u64 align = DEFAULT_ALIGNMENT);
+KAPI Arena* mem_arena_alloc(u64 size);
 
 INLINE u64 arena_pos(Arena* arena) { return ARENA_HEADER + arena->used; };
 INLINE void arena_clear(Arena* arena) { arena->used = 0; };
@@ -50,7 +50,7 @@ KAPI void* _arena_push(Arena* arena, u64 size, u64 align = DEFAULT_ALIGNMENT);
 INLINE Temp temp_begin(Arena* arena) { return Temp{arena, arena->used}; };
 INLINE void temp_end(Temp temp) { temp.arena->used = temp.pos; }
 
-void tctx_init(Arena* arena);
+void tctx_init();
 KAPI Temp tctx_get_scratch(Arena** conflics, u64 counts);
 
 #define push_array(a, T, c) (T*)_arena_push(a, sizeof(T)*c, Max(DEFAULT_ALIGNMENT, alignof(T)))
@@ -60,7 +60,7 @@ KAPI Temp tctx_get_scratch(Arena** conflics, u64 counts);
 void _arena_move(Arena* arena, u64 size, u64 align);
 #define arena_move_array(a, T, c) _arena_move(a, sizeof(T)*c, Max(DEFAULT_ALIGNMENT, alignof(T)))
 
-#define GetScratch(conflicts, count) (tctx_get_scratch((conflicts), (count)))
+#define GetScratch(conflicts, count) (tctx_get_scratch((conflicts), (count))) // deprecated
 #define ReleaseScratch(scratch) temp_end(scratch)
 
 INLINE Scratch::Scratch(Arena** conflics) {
@@ -79,23 +79,23 @@ struct PoolFreeNode {
 	PoolFreeNode *next;
 };
 
-struct Pool {
+struct MemPool {
   u8* data;
 	u64 chunk_count;
 	u64 chunk_size;
 
 	PoolFreeNode *head;
 
-#ifdef MEMORY_ALLOCATED_GUARD
+#ifdef GUARD_MEMORY
   u64 guard_size;
 #endif
 };
 
-KAPI u8* pool_alloc(Pool& p);
+KAPI u8* pool_alloc(MemPool& p);
 
-KAPI Pool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignment = DEFAULT_ALIGNMENT);
-KAPI void pool_free(Pool& p, void* ptr);
-KAPI void pool_free_all(Pool& pool);
+KAPI MemPool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignment = DEFAULT_ALIGNMENT);
+KAPI void pool_free(MemPool& p, void* ptr);
+KAPI void pool_free_all(MemPool& pool);
 
 ////////////////////////////////
 // Free list
@@ -104,7 +104,7 @@ struct FreeListAllocationHeader {
   u64 block_size;
   u64 padding;
   
-#ifdef MEMORY_ALLOCATED_GUARD
+#ifdef GUARD_MEMORY
   u64 guard;
 #endif
 };

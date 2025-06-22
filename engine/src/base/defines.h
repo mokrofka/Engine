@@ -147,17 +147,16 @@ ImplDefer<F> MakeDefer(F f) {
 #define ALLOC_GUARD          0xA1
 #define DEALLOC_GUARD        0xDE
 
-#define DEBUG_ZERO_MEMORY
-#ifdef DEBUG_ZERO_MEMORY
-  #define AllocMemZero(ptr, size) MemSet(ptr, ALLOC_GUARD, size)
-  #define AllocMemZeroStruct(ptr) MemSet(ptr, ALLOC_GUARD, sizeof(*(ptr)))
-  #define DealocMemZero(ptr, size) MemSet(ptr, DEALLOC_GUARD, size)
-  #define DealocMemZeroStruct(ptr) MemSet(ptr, DEALLOC_GUARD, sizeof(*(ptr)))
+#ifdef GUARD_MEMORY
+  #define FillAlloc(ptr, size)  MemSet(ptr, ALLOC_GUARD, size)
+  #define FillAllocStruct(ptr)  MemSet(ptr, ALLOC_GUARD, sizeof(*(ptr)))
+  #define FillDealoc(ptr, size) MemSet(ptr, DEALLOC_GUARD, size)
+  #define FillDealocStruct(ptr) MemSet(ptr, DEALLOC_GUARD, sizeof(*(ptr)))
 #else
-  #define AllocMemZero(ptr, size)
-  #define AllocMemZeroStruct(ptr)
-  #define DealocMemZero(ptr, size)
-  #define DealocMemZeroStruct(ptr)
+  #define FillAlloc(ptr, size)
+  #define FillAllocStruct(ptr)
+  #define FillDealoc(ptr, size)
+  #define FillDealocStruct(ptr)
 #endif
 
 // #define UI_Window(begin) DeferLoop(begin, ImGui::End())

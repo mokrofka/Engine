@@ -5,17 +5,15 @@
 #include "ui.h"
 
 struct RendererSystemState {
-  R_Config config;
   b8 is_render;
 };
 
 global RendererSystemState st;
 
-void r_init(Arena* arena, R_Config config) {
-  st.config = config;
+void r_init(Arena* arena) {
   st.is_render = true;
   
-  Arena* render_arena = arena_alloc(arena, config.mem_reserve);
+  Arena* render_arena = arena_alloc(arena, MB(1));
   vk_r_backend_init(render_arena);
 }
 

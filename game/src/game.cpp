@@ -43,26 +43,11 @@ void push_constant_update() {
     push->model = mat4_transform({.pos = e.pos, .rot = e.rot, .scale = e.scale});
 
     ShaderEntity* shader_e = shader_get_entity(e.id);
-    *shader_e = {
-      .color = e.color,  
-    };
+    shader_e->color = e.color;
 
-    // Loop (i, 1) {
-    //   PointLight* point_light = shader_get_point_light(e.id);
-    //   point_light[i] = {
-    //     .color = e.color,
-    //     .pos = e.pos,
-    //   };
-    //   point_light[-i] = {
-    //     .color = e.color,
-    //     .pos = e.pos,
-    //   };
-    // }
     PointLight* point_light = shader_get_point_light(e.id);
-    *point_light = {
-      .color = e.color,
-      .pos = e.pos,
-    };
+    point_light->color = e.color;
+    point_light->pos = e.pos;
   }
 }
 
@@ -113,7 +98,7 @@ void app_init(App* app) {
 
   app->state = mem_alloc(sizeof(GameState));
   Assign(st, app->state);
-  st->arena = arena_alloc(app->arena, GameSize);
+  st->arena = mem_arena_alloc(MB(1));
 
   st->shader_global_state = shader_get_global_state();
   st->cubes.count = 0;
@@ -288,7 +273,6 @@ void app_init(App* app) {
 }
 
 f32 min = -30, max = 30;
-b32 toggle;
 void app_update(App* app) {
   Assign(st, app->state);
   Scratch scratch;
@@ -297,10 +281,9 @@ void app_update(App* app) {
   push_constant_update();
   camera_update();
   
-  ShaderGlobalState* shader_state = shader_get_global_state();
-  shader_state->projection_view = st->camera.projection * st->camera.view;
-  shader_state->view = st->camera.view;
-  shader_state->time += 0.01;
+  st->shader_global_state->projection_view = st->camera.projection * st->camera.view;
+  st->shader_global_state->view = st->camera.view;
+  st->shader_global_state->time += 0.01;
   
   if (input_was_key_down(KEY_1)) {
     u32 id = cube_create();

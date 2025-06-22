@@ -12,7 +12,7 @@ layout(location = 0) in in_data {
 
 layout(set = 0, binding = 1) uniform sampler2D diffuse_sampler;
 
-vec3 point_light_calculate(int light_id, vec3 frag_pos, vec3 norm) {
+vec3 point_light_calculate(int light_id) {
   PointLight light = g.point_lights[light_id];
   light.pos = vec3(g.view * vec4(light.pos, 1));
 
@@ -30,15 +30,15 @@ vec3 point_light_calculate(int light_id, vec3 frag_pos, vec3 norm) {
 void main() {
   norm = normalize(in_normal);
   frag_pos = in_frag_pos;
-  vec4 texture_color = texture(diffuse_sampler, in_texcoord);
   view_dir = normalize(vec3(0) - frag_pos);
+  vec4 texture_color = texture(diffuse_sampler, in_texcoord);
 
   float specular_strength = 0.5;
   vec3 ambient = vec3(0.1);
   vec3 total_light = vec3(0.0);
 
   for (int i = 0; i < g.point_light_count; ++i) {
-    total_light += point_light_calculate(i, frag_pos, norm);
+    total_light += point_light_calculate(i);
   }
 
   // for (int i = 0; i < g.point_light_count; ++i) {

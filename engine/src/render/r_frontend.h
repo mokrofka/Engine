@@ -4,11 +4,7 @@
 
 #include "r_types.h"
 
-struct R_Config {
-  u64 mem_reserve;
-};
-
-void r_init(Arena* arena, R_Config config);
+void r_init(Arena* arena);
 void r_shutdown();
 
 void r_on_resized(u32 width, u32 height);

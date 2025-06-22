@@ -5,6 +5,6 @@
 
 int main() {
   App app_inst = {};
-  engine_create(&app_inst);
+  engine_init(&app_inst);
   engine_run(&app_inst);
 }

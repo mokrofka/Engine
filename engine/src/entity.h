@@ -24,7 +24,7 @@ struct SparseSet {
   inline void add(u32 id) {
     entity_to_index[id] = count;
     entities[count] = id;
-    AllocMemZero(Offset(data, element_size*count), element_size);
+    FillAlloc(Offset(data, element_size*count), element_size);
     ++count;
   }
   inline void remove_data(u32 id) {
