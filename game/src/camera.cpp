@@ -1,6 +1,5 @@
 #include "camera.h"
 #include "game.h"
-#include "input.h"
 #include "engine.h"
 #include "render/r_frontend.h"
 
@@ -50,7 +49,7 @@ void camera_update() {
   // v2 frame_size = get_viewport_size();
   // st->camera.projection = mat4_perspective(deg_to_rad(st->camera.fov), (f32)frame_size.x / frame_size.y, 0.1f, 1000.0f);
   
-  if (input_was_key_pressed(KEY_T)) {
+  if (input_was_key_pressed(Key_T)) {
     st->is_mouse_move = !st->is_mouse_move;
     if (st->is_mouse_move) {
       os_mouse_enable();
@@ -60,43 +59,43 @@ void camera_update() {
   }
 
   f32 rotation_speed = 180.0f;
-  if (input_is_key_down(KEY_A)) {
+  if (input_is_key_down(Key_A)) {
     camera_yaw(-rotation_speed * delta_time);
   }
-  if (input_is_key_down(KEY_D)) {
+  if (input_is_key_down(Key_D)) {
     camera_yaw(rotation_speed * delta_time);
   }
-  if (input_is_key_down(KEY_R)) {
+  if (input_is_key_down(Key_R)) {
     camera_pitch(rotation_speed * delta_time);
   }
-  if (input_is_key_down(KEY_F)) {
+  if (input_is_key_down(Key_F)) {
     camera_pitch(-rotation_speed * delta_time);
   }
   
   f32 temp_move_speed = 20.0f;
   v3 velocity = {};
-  if (input_is_key_down(KEY_W)) {
+  if (input_is_key_down(Key_W)) {
     v3 forward = mat4_forward(camera->view);
     velocity += forward;
   }
-  if (input_is_key_down(KEY_S)) {
+  if (input_is_key_down(Key_S)) {
     v3 backward = mat4_backward(camera->view);
     velocity += backward;
   }
   
-  if (input_is_key_down(KEY_Q)) {
+  if (input_is_key_down(Key_Q)) {
     v3 left = mat4_left(camera->view);
     velocity += left;
   }
-  if (input_is_key_down(KEY_E)) {
+  if (input_is_key_down(Key_E)) {
     v3 right = mat4_right(camera->view);
     velocity += right;
   }
   
-  if (input_is_key_down(KEY_SPACE)) {
+  if (input_is_key_down(Key_Space)) {
     velocity.y += 1.0f;
   }
-  if (input_is_key_down(KEY_X)) {
+  if (input_is_key_down(Key_X)) {
     velocity.y -= 1.0f;
   }
   

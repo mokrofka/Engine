@@ -8,8 +8,6 @@
 #include "vk_draw.h"
 #include "vk_shader.h"
 
-#include "event.h"
-
 #define VulkanUseAllocator
 // #define VulkanAllocatorTrace 1
 

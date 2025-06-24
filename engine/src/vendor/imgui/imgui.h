@@ -1,9 +1,7 @@
 // dear imgui, v1.92.0 WIP
 // (headers)
 
-// #define UI_Window(begin) DeferLoop(begin, ImGui::End())
-// bool ImGui::Begin(const char* name, bool* p_open, ImGuiWindowFlags flags)
-#define UI_Window(begin) DeferLoop(begin, ImGui::End())
+#include "ui/imgui_helpers.h"
 // Help:
 // - See links below.
 // - Call and read ImGui::ShowDemoWindow() in imgui_demo.cpp. All applications in examples/ are doing that.

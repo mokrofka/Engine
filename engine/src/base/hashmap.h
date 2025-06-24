@@ -1,5 +1,4 @@
 #pragma once
-#include "defines.h"
 
 struct HashMap {
   u8* data;

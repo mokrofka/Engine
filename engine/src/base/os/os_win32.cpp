@@ -1,5 +1,4 @@
 #define WIN32_LEAN_AND_MEAN
-#include "base/os.h"
 #include <windows.h>
 #include <windowsx.h>
 
@@ -29,7 +28,7 @@ struct PlatformState {
   ProcessMouseMoveCallback process_mouse_move;
 };
 
-global PlatformState* state;
+global PlatformState st;
 
 // Clock
 global f64 clock_frequency;
@@ -37,35 +36,41 @@ global UINT min_period;
 global LARGE_INTEGER start_time;
 
 internal LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARAM l_param);
-internal void clock_setup() {
-  LARGE_INTEGER frequency;
-  QueryPerformanceFrequency(&frequency);
-  clock_frequency = 1.0 / (f64)frequency.QuadPart;
-  QueryPerformanceCounter(&start_time);
-}
-
-void platform_init(Arena* arena) {
-  state = push_struct(arena, PlatformState);
-  state->is_mouse = true;
+void w32_entry_point_caller() {
+  st.is_mouse = true;
   
-  state->instance = GetModuleHandleA(0);
+  st.instance = GetModuleHandleA(0);
 
-  clock_setup();
+  // Clock
+  {
+    LARGE_INTEGER frequency;
+    QueryPerformanceFrequency(&frequency);
+    clock_frequency = 1.0 / (f64)frequency.QuadPart;
+    QueryPerformanceCounter(&start_time);
+  }
   
   WNDCLASSA wc = {};
   wc.lpfnWndProc = win32_process_message;
-  wc.hInstance = state->instance;
+  wc.hInstance = st.instance;
   wc.lpszClassName = "class";
 
   RegisterClassA(&wc);
+}
+void platform_init() {
+  w32_entry_point_caller();
+}
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
+  w32_entry_point_caller();
+  return 0;
 }
 
 void os_window_create(Arena* arena, WindowConfig config) {
   Window* window = push_struct(arena, Window);
 
-  state->window = window;
-  state->window->width = config.width;
-  state->window->height = config.height;
+  st.window = window;
+  st.window->width = config.width;
+  st.window->height = config.height;
   
   u32 client_x = config.position_x;
   u32 client_y = config.position_y;
@@ -100,7 +105,7 @@ void os_window_create(Arena* arena, WindowConfig config) {
   HWND handle = CreateWindowExA(
     window_ex_style, "class", (char*)config.name.str,
     window_style, window_x, window_y, window_width, window_height,
-    0, 0, state->instance, 0);
+    0, 0, st.instance, 0);
 
   if (handle == 0) {
     MessageBoxA(NULL, "window creating failed!", "Error!", MB_ICONEXCLAMATION | MB_OK);
@@ -112,9 +117,9 @@ void os_window_create(Arena* arena, WindowConfig config) {
 }
 
 void os_platform_shutdown() {
-  if (state->window->hwnd) {
-    DestroyWindow((HWND)state->window->hwnd);
-    state->window->hwnd = 0;
+  if (st.window->hwnd) {
+    DestroyWindow((HWND)st.window->hwnd);
+    st.window->hwnd = 0;
   }
 }
 
@@ -172,54 +177,54 @@ void os_sleep(u64 ms) {
 }
 
 void os_register_process_key(ProcessKeyCallback  callback) {
-  state->process_key = callback;
+  st.process_key = callback;
 }
 
 void os_register_process_mouse_move(ProcessMouseMoveCallback callback) {
-  state->process_mouse_move = callback;
+  st.process_mouse_move = callback;
 }
 
 void os_register_window_closed_callback(WindowClosedCallback callback) {
-  state->window_closed_callback = callback;
+  st.window_closed_callback = callback;
 }
 
 void os_register_window_resized_callback(WindowResizedCallback callback) {
-  state->window_resized_callback = callback;
+  st.window_resized_callback = callback;
 }
 
 void os_window_destroy() {
   Trace("Destroying window...");
-  DestroyWindow((HWND)state->window->hwnd);
-  state->window->hwnd = 0;
-  state->window = 0;
+  DestroyWindow((HWND)st.window->hwnd);
+  st.window->hwnd = 0;
+  st.window = 0;
 }
 
 void* os_get_handle_info() {
-  return state->instance;
+  return st.instance;
 }
 
 void* os_get_window_handle() {
-  return state->window->hwnd;
+  return st.window->hwnd;
 }
 
 v2i os_get_framebuffer_size() {
-  return v2i(state->window->width, state->window->height);
+  return v2i(st.window->width, st.window->height);
 }
 
 void os_mouse_enable() {
-  state->is_mouse = true; 
+  st.is_mouse = true; 
   ClipCursor(null);
   ShowCursor(true);
 }
 
 void os_mouse_disable() {
-  state->is_mouse = false;
+  st.is_mouse = false;
   POINT ul = {0, 0};
-  POINT lr = {state->window->width, state->window->height};
+  POINT lr = {st.window->width, st.window->height};
 
   // Convert client coords to screen coords
-  ClientToScreen((HWND)state->window->hwnd, &ul);
-  ClientToScreen((HWND)state->window->hwnd, &lr);
+  ClientToScreen((HWND)st.window->hwnd, &ul);
+  ClientToScreen((HWND)st.window->hwnd, &lr);
 
   RECT clipRect = {ul.x, ul.y, lr.x, lr.y};
   ClipCursor(&clipRect);
@@ -227,7 +232,7 @@ void os_mouse_disable() {
 }
 
 v2 os_get_mouse_delta() {
-  return v2(state->delta_x, state->delta_y);
+  return v2(st.delta_x, st.delta_y);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -519,7 +524,7 @@ internal LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_par
     case WM_PAINT: {
     } break;
     case WM_CLOSE: {
-      state->window_closed_callback();
+      st.window_closed_callback();
       return true;
     }
     case WM_DESTROY: {
@@ -533,28 +538,28 @@ internal LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_par
       u32 width = r.right - r.left;
       u32 height = r.bottom - r.top;
       
-      Window* w = state->window;
+      Window* w = st.window;
 
       if (width != w->width || height != w->height) {
         w->resizing = true;
         w->width = width;
         w->height = height;
-        state->window_resized_callback(state->window);
+        st.window_resized_callback(st.window);
       }
     } break;
     
     case WM_MOUSEMOVE: // within client area
     case WM_NCMOUSEMOVE: { // within non-client area
-      POINT center = {state->window->width / 2, state->window->height / 2};
-      ClientToScreen((HWND)state->window->hwnd, &center);
+      POINT center = {st.window->width / 2, st.window->height / 2};
+      ClientToScreen((HWND)st.window->hwnd, &center);
       
       u32 x = GET_X_LPARAM(l_param);
       u32 y = GET_Y_LPARAM(l_param);
-      if (!state->is_mouse) {
+      if (!st.is_mouse) {
         SetCursorPos(center.x, center.y);
       }
       
-      state->process_mouse_move(x, y);
+      st.process_mouse_move(x, y);
     } break;
     case WM_KEYDOWN:
     case WM_SYSKEYDOWN:
@@ -562,24 +567,24 @@ internal LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_par
     case WM_SYSKEYUP: {
       // Key pressed/released
       b32 pressed = (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN);
-      Keys key = (Keys)(u16)w_param;
+      Key key = (Key)(u16)w_param;
       
       // shift alt ctrl
       b32 is_extended = (HIWORD(l_param) & KF_EXTENDED) == KF_EXTENDED;
       // Keypress only determines if _any_ alt/ctrl/shift key is pressed. Determine which one if so.
       if (w_param == VK_MENU) {
-        key = is_extended ? KEY_RALT : KEY_LALT;
+        key = is_extended ? Key_RAlt : Key_LAlt;
       } else if (w_param == VK_SHIFT) {
         // Annoyingly, KF_EXTENDED is not set for shift keys.
         u32 left_shift = MapVirtualKey(VK_LSHIFT, MAPVK_VK_TO_VSC);
         u32 scancode = ((l_param & (0xFF << 16)) >> 16);
-        key = scancode == left_shift ? KEY_LSHIFT : KEY_RSHIFT;
+        key = scancode == left_shift ? Key_LShift : Key_RShift;
       } else if (w_param == VK_CONTROL) {
-        key = is_extended ? KEY_RCONTROL : KEY_LCONTROL;
+        key = is_extended ? Key_RControl : Key_LControl;
       }
       
       // Pass to the input subsytem for processing.
-      state->process_key(key, pressed);
+      st.process_key(key, pressed);
     } break;
     case WM_LBUTTONDOWN:
     case WM_MBUTTONDOWN:
@@ -594,9 +599,7 @@ internal LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_par
 }
 
 void os_show_window() {
-  ShowWindow((HWND)state->window->hwnd, SW_SHOW);
+  ShowWindow((HWND)st.window->hwnd, SW_SHOW);
 }
 
-///////////////////////////////////////////////////////////////////////////
-// Network
 #include "network_cpp.h"

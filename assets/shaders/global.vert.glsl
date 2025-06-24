@@ -1,9 +1,12 @@
 
-#define KB(n)  ((n) << 10)
+#define KB(n) ((n) << 10)
 
 struct Entity {
   vec3 color;
-  float specular_strength;
+  vec3 ambient;
+  // vec3 diffuse;
+  // vec3 specular;
+  // float shininess;
 };
 
 struct PointLight {
@@ -54,3 +57,5 @@ layout(push_constant) uniform PushConstants {
 vec3 norm;
 vec3 frag_pos;
 vec3 view_dir;
+Entity e;
+

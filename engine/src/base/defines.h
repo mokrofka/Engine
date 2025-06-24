@@ -117,6 +117,7 @@ ImplDefer<F> MakeDefer(F f) {
 }
 #define Defer(code) auto Glue(_defer_, __COUNTER__) = MakeDefer([&](){code;})
 #define DeferLoop(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
+#define IfDeferLoop(begin_call, end_call) for (b32 _once = (begin_call); _once; _once = false, (end_call))
 
 #define Func(a) struct a { static
 

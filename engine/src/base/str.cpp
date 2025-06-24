@@ -1,7 +1,7 @@
 #include "lib.h"
 
 #include <stdarg.h>
-#include <stdio.h>
+#include <stdio.h> // scanf
 
 ////////////////////////////////
 // C-String Measurement, Functions
@@ -28,7 +28,7 @@ internal u32 write_int(u8* dest, i32 value) {
   return count + write_uint(dest + count, value);
 }
 
-internal u32 write_float(u8* dest, float value, u32 precision) {
+internal u32 write_float(u8* dest, f32 value, u32 precision) {
   // Handle special cases
   if (value != value) { // NaN check
     const char* nan_str = "NaN";
@@ -58,8 +58,8 @@ internal u32 write_float(u8* dest, float value, u32 precision) {
   // Process the fractional part
   if (precision > 0) {
     dest[len++] = '.';
-    // value *= (float)(10 ^ precision); // Shift decimal point
-    value *= (float)Pow(10, precision); // Shift decimal point correctly
+    // value *= (f32)(10 ^ precision); // Shift decimal point
+    value *= (f32)Pow(10, precision); // Shift decimal point correctly
     u32 frac_part = (u32)value;
     len += write_int(dest + len, frac_part); // Reuse write_int for fractional part
   }
@@ -93,7 +93,7 @@ internal u32 int_length(i32 value) {
   return count + uint_length(value);
 }
 
-u32 float_length(float value, u32 precision) {
+u32 float_length(f32 value, u32 precision) {
   u32 len = 0;
   if (value < 0.0f) {
     ++len;

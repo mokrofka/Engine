@@ -1,6 +1,4 @@
 #pragma once
-#include "defines.h"
-#include "strings.h"
 
 #define LOG_WARN_ENABLED 1
 #define LOG_INFO_ENABLED 1
@@ -20,9 +18,6 @@ enum LogLevel {
   LOG_LEVEL_DEBUG = 4,
   LOG_LEVEL_TRACE = 5,
 };
-
-void logging_init(Arena* arena);
-void shutdown_logging();
 
 KAPI void _log_output(LogLevel level, String message);
 KAPI void _log_output(LogLevel level, const void* fmt, ...);

@@ -2,15 +2,11 @@
 #include "game.h"
 
 #include <engine.h>
-
 #include <render/r_frontend.h>
-#include "sys/geometry.h"
-#include "sys/shader.h"
-#include "sys/texture.h"
-#include "ui.h"
-
-#include <event.h>
-#include <input.h>
+#include <sys/geometry.h>
+#include <sys/shader.h>
+#include <sys/texture.h>
+#include <ui.h>
 #include <entity.h>
 
 #include "camera.h"
@@ -21,8 +17,9 @@ GameState* st;
 void cubes_position_update() {
   Loop (i, st->cubes.count) {
     Entity& cube = st->cubes.data[i];
-    cube.pos.y += 0.001;
-    cube.rot.x += 0.01;
+    // cube.pos.y += 0.001;
+    // cube.rot.x += 0.01;
+
   }
 }
 
@@ -39,6 +36,7 @@ void push_constant_update() {
   }
   Loop (i, st->lights.count) {
     Entity& e = st->lights.data[i];
+
     PushConstant* push = get_push_constant(e.id);
     push->model = mat4_transform({.pos = e.pos, .rot = e.rot, .scale = e.scale});
 
@@ -73,13 +71,14 @@ Entity light_create() {
     .id = entity_create(),
     .pos = v3_zero(),
     .scale = v3(1),
+    .color = v3(0.8),
   };
   st->lights.insert_data(e);
   entity_make_point_light(e.id);
   entity_make_renderable(e.id, geometry_get("cube"), shader_get("color_shader"));
 
-  e.dir_light = shader_get_point_light(e.id);
-  *e.dir_light = {
+  e.point_light = shader_get_point_light(e.id);
+  *e.point_light = {
     .color = v3(0),
     .pos = e.pos,
   };
@@ -246,6 +245,7 @@ void app_init(App* app) {
       .id = entity_create(),
       .pos = v3(1,1,1),
       .scale = v3(1),
+      .color = v3(0.8)
     };
     st->lights.insert_data(light);
     entity_make_point_light(light.id);
@@ -258,21 +258,17 @@ void app_init(App* app) {
     };
   }
   
-  u32 initial_cube_count = 2;
-  // Loop (i, initial_cube_count) {
-  //   f32 min = -1, max = 1;
-  //   Entity e = cube_create();
-  //   st->cubes.insert_data(e);
-  //   f32 x = rand_in_range_f32(min, max);
-  //   f32 y = rand_in_range_f32(min, max);
-  //   f32 z = rand_in_range_f32(min, max);
-
-  //   Entity& cube = st->cubes.data[e.id];
-  //   cube.pos = {x,y,z};
-  // }
+  // Scene
+  {
+    u32 cube_id = cube_create();
+    Entity* cube = st->cubes.get_data(cube_id);
+    cube->pos.y = -54;
+    cube->scale = v3(100);
+  }
 }
 
 f32 min = -30, max = 30;
+
 void app_update(App* app) {
   Assign(st, app->state);
   Scratch scratch;
@@ -285,7 +281,7 @@ void app_update(App* app) {
   st->shader_global_state->view = st->camera.view;
   st->shader_global_state->time += 0.01;
   
-  if (input_was_key_down(KEY_1)) {
+  if (input_was_key_down(Key_1)) {
     u32 id = cube_create();
     f32 x = rand_in_range_f32(min, max);
     f32 y = rand_in_range_f32(min, max);
@@ -294,7 +290,7 @@ void app_update(App* app) {
     Entity* e = st->cubes.get_data(id);
     e->pos = {x,y,z};
   }
-  if (input_was_key_down(KEY_2)) {
+  if (input_was_key_down(Key_2)) {
     Entity* e = &st->cubes.data[st->cubes.count - 1];
     cube_destroy(e);
   }
@@ -304,19 +300,18 @@ void app_update(App* app) {
   ImGui::SetNextWindowSize(viewport->WorkSize);
   ImGui::SetNextWindowViewport(viewport->ID);
   // UI_Window(ImGui::Begin("DockSpace", null, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
-  UI_Window(ImGui::Begin("DockSpace")) {
+  UI_Window("DockSpace") {
     // ImGui::DockSpace(ImGui::GetID("MyDockSpace"), ImVec2(0.0f, 0.0f), 0);
     ImGui::DockSpace(ImGui::GetID("MyDockSpace")) ;
   }
 
   ui_texture_render();
   
-  UI_Window(ImGui::Begin("Scene Editor")) {
+  UI_Window("Scene Editor") {
     ImGui::Text("Total cubes: %u", st->cubes.count);
 
-    if (ImGui::BeginTabBar("EntityTabs")) {
-
-      if (ImGui::BeginTabItem("Cubes")) {
+    UI_TabBar("EntityTabs") {
+      UI_TabItem("Cubes") {
         if (ImGui::Button("+ Create Cube")) {
           cube_create();
         }
@@ -325,10 +320,10 @@ void app_update(App* app) {
           Entity* e = &st->cubes.data[i];
 
           ImGui::PushID(i);
-          if (ImGui::CollapsingHeader("slider")) {
-            ImGui::Text("Transform");
-
-            ImGui::DragFloat3("Position", &e->pos.x, 0.1f);
+          if (ImGui::CollapsingHeader("slider", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::DragFloat3("Pos", &e->pos.x, 0.1f);
+            ImGui::DragFloat3("Scale", &e->scale.x, 0.1f);
+            ImGui::DragFloat3("Rot", &e->rot.x, 0.1f);
 
             if (ImGui::Button("Delete Cube")) {
               cube_destroy(e);
@@ -336,11 +331,9 @@ void app_update(App* app) {
           }
           ImGui::PopID();
         }
-
-        ImGui::EndTabItem();
       }
 
-      if (ImGui::BeginTabItem("Lights")) {
+      UI_TabItem("Lights") {
         if (ImGui::Button("+ Create Light")) {
           light_create();
         }
@@ -351,7 +344,7 @@ void app_update(App* app) {
           String entity_name_c = "light";
 
           ImGui::PushID(i);
-          if (ImGui::CollapsingHeader((char*)entity_name_c.str)) {
+          if (ImGui::CollapsingHeader((char*)entity_name_c.str), ImGuiTreeNodeFlags_DefaultOpen) {
             ImGui::Text("entity id %i", e->id);
             ImGui::DragFloat3("Position", &e->pos.x, 0.1f);
             ImGui::DragFloat3("scale", &e->scale.x, 0.1f);
@@ -364,10 +357,7 @@ void app_update(App* app) {
           ImGui::PopID();
         }
 
-        ImGui::EndTabItem();
       }
-
-      ImGui::EndTabBar();
     }
   }
 

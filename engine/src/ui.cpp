@@ -1,8 +1,6 @@
 #include "vendor/imgui/imgui.h"
 #include "vendor/imgui/imgui_impl_win32.h"
 #include "ui.h"
-#include "event.h"
-
 #include "render/vulkan/vk_types.h"
 
 struct UI_State {
@@ -58,8 +56,7 @@ void ui_end_frame() {
 }
 
 void ui_texture_render() {
-  UI_Window(ImGui::Begin("viewport")) {
-    
+  UI_Window("viewport") {
     ImVec2 current_viewport_size = ImGui::GetContentRegionAvail();
 
     if (vk.viewport_size != *(v2*)&current_viewport_size) {

@@ -1,7 +1,4 @@
 #pragma once
-#include "defines.h"
-#include "math_types.h"
-#include "memory.h"
 
 INLINE u64 cstr_length(void* c);
 struct String {

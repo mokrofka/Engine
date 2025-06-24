@@ -1,7 +1,4 @@
-#include "logger.h"
-#include "os.h"
-#include "memory.h"
-#include "strings.h"
+#include "lib.h"
 
 #include <stdarg.h>
 
@@ -13,17 +10,6 @@ global LoggerSystemState* state;
 
 internal void append_to_log_file(String message) {
   os_file_write(state->log_file_handle, message.size, message.str);
-}
-
-void logging_init(Arena* arena) {
-  state = push_struct(arena, LoggerSystemState);
-  
-  // state->log_file_handle = os_file_open("console.log", OS_AccessFlag_Write);
-  // Assert(state->log_file_handle.u64);
-}
-
-void shutdown_logging() {
-  // TODO: cleanup logging/write queued entries.
 }
 
 void _log_output(LogLevel level, String message) {

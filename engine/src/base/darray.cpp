@@ -1,4 +1,4 @@
-#include "darray.h"
+#include "lib.h"
 
 struct DarrayHeader {
   u32 capacity;

@@ -8,8 +8,6 @@
 #include "sys/shader.h"
 
 #include "asset_watch.h"
-#include "event.h"
-#include "input.h"
 #include "ui.h"
 #include "network.h"
 #include "test.h"
@@ -44,13 +42,9 @@ void engine_init(App* app) {
 
   st.arena = mem_arena_alloc(MB(10));
   app_create(app);
-  
-  {
-    logging_init(st.arena);
-  }
 
   {
-    platform_init(st.arena);
+    platform_init();
   }
   
   {
@@ -76,10 +70,6 @@ void engine_init(App* app) {
     event_register(EventCode_KeyPressed, 0, app_on_key);
     event_register(EventCode_KeyReleased, 0, app_on_key);
     event_register(EventCode_Resized, 0, app_on_resized);
-  }
-
-  {
-    input_init(st.arena);
   }
   
   {
@@ -152,18 +142,6 @@ void engine_run(App* app) {
       running_time += frame_elapsed_time;
       f64 remaining_seconds = target_frame_seconds - frame_elapsed_time;
 
-      // if (remaining_seconds > 0) {
-      //   u32 remaining_ms = (remaining_seconds * 1000);
-
-      //   // If there is time left, give it back to the OS.
-      //   b32 limit_frames = true;
-      //   if (remaining_ms > 0 && limit_frames) {
-      //     os_sleep(remaining_ms - 1);
-      //   }
-
-      //   ++frame_count;
-      // }
-
       input_update();
       asset_watch_update();
 
@@ -224,7 +202,7 @@ internal b32 app_on_event(u32 code, void* sender, void* listener_inst, EventCont
 internal b32 app_on_key(u32 code, void* sender, void* listener_inst, EventContext context) {
   if (code == EventCode_KeyPressed) {
     u16 key_code = context.data.u16[0];
-    if (key_code == KEY_ESCAPE) {
+    if (key_code == Key_Escape) {
       // NOTE: Technically firing an event to itself, but there may be other listeners.
       EventContext data = {};
       event_fire(EventCode_ApplicationQuit, 0, data);

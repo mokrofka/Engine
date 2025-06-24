@@ -1,8 +1,6 @@
 #pragma once
-#include "defines.h"
-#include "strings.h"
-#include "input_types.h"
-#include "math_types.h"
+#include "base/os/input.h"
+#include "base/os/event.h"
 
 struct WindowConfig {
   i32 position_x;
@@ -62,12 +60,12 @@ struct Buffer {
 
 using WindowClosedCallback = void (*)();
 using WindowResizedCallback = void (*)(Window* window);
-using ProcessKeyCallback = void (*)(Keys key, b32 pressed);
+using ProcessKeyCallback = void (*)(Key key, b32 pressed);
 using ProcessMouseMoveCallback = void (*)(u32 x, u32 y);
 
 void os_pump_messages();
 
-void platform_init(Arena* arena);
+void platform_init();
 void os_window_create(Arena* arena, WindowConfig config);
 void os_platform_shutdown();
 
@@ -92,7 +90,6 @@ KAPI v2 os_get_mouse_delta();
 
 //////////////////////////////////////////////////////////////////////////
 // Memory
-
 u8* os_reserve(u64 size);
 void os_commit(void* ptr, u64 size);
 void os_decommit(void* ptr, u64 size);

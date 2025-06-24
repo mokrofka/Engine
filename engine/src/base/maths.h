@@ -1,6 +1,4 @@
 #pragma once
-#include "defines.h"
-#include "math_types.h"
 
 #define PI            3.14159265358f
 #define Two_PI        6.28318530718f
@@ -23,6 +21,60 @@
 
 #define DegToRad_Multiplier PI / 180.0f
 #define RadToDeg_Multiplier 180.0f / PI
+
+union v2 {
+  f32 e[2];
+  struct {
+    f32 x;
+    f32 y;
+  };
+  v2 () = default;
+  INLINE v2(f32 x_, f32 y_) { x = x_, y = y_; }
+};
+
+union v2i {
+  i32 e[2];
+  struct {
+    i32 x;
+    i32 y;
+  };
+  v2i () = default;
+  INLINE v2i(i32 x_, i32 y_) { x = x_, y = y_; }
+};
+
+union v3 {
+  f32 e[3];
+  struct {
+    f32 x;
+    f32 y;
+    f32 z;
+  };
+  v3 () = default;
+  INLINE v3 (f32 scale) {
+    x = scale; y = scale; z = scale;
+  }
+  INLINE v3(f32 x_, f32 y_, f32 z_) { x = x_, y = y_, z = z_; }
+};
+
+union v4 {
+  f32 e[4];
+  struct {
+    f32 x;
+    f32 y;
+    f32 z;
+    f32 w;
+  };
+  v4 () = default;
+  INLINE v4(f32 x_, f32 y_, f32 z_, f32 w_) { x = x_, y = y_, z = z_, w = w_; }
+};
+
+typedef v4 quat;
+
+union mat4 {
+  f32 data[16];
+  
+  v4 rows[4];
+};
 
 INLINE f32 Sin(f32 a) {
   return __builtin_sinf(a);
@@ -697,6 +749,11 @@ INLINE mat4 mat4_euler_xyz(f32 x_radians, f32 y_radians, f32 z_radians) {
   return mat;
 }
 
+struct Transform { // TODO eliminate it
+  v3 pos;
+  v3 rot;
+  v3 scale;
+};
 INLINE mat4 mat4_transform(Transform trans) {
   return mat4_translation(trans.pos) * mat4_scale(trans.scale) * mat4_euler_xyz(trans.rot.x, trans.rot.y, trans.rot.z);
 }

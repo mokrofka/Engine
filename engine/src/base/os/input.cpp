@@ -1,5 +1,4 @@
-#include "input.h"
-#include "event.h"
+#include "lib.h"
 
 struct KeyboardState {
   b8 keys[256];
@@ -8,7 +7,7 @@ struct KeyboardState {
 struct MouseState {
   u16 x;
   u16 y;
-  b8 buttons[MOUSE_BUTTON_MAX];
+  b8 buttons[MouseButton_COUNT];
 };
 
 struct InputState {
@@ -20,42 +19,34 @@ struct InputState {
 
 global InputState st;
 
-void input_init(Arena* arena) {
-  Info("Input subsystem initialized.");
-}
-
-void input_shutdown() {
-  
-}
-
 void input_update() {
   // Copy current states to previous states.
   MemCopyStruct(&st.keyboard_previous, &st.keyboard_current);
   MemCopyStruct(&st.mouse_previous, &st.mouse_previous);
 }
 
-void input_process_key(Keys key, b32 pressed) {
+void input_process_key(Key key, b32 pressed) {
   // Only handle this if the state actually changed.
   
   if (st.keyboard_current.keys[key] != pressed) {
     // Update internal state.
     st.keyboard_current.keys[key] = pressed;
 
-    if (key == KEY_LALT) {
+    if (key == Key_LAlt) {
       Info("Left alt %s.", pressed ? str_lit("pressed") : str_lit("released"));
-    } else if (key == KEY_RALT) {
+    } else if (key == Key_RAlt) {
       Info("Right alt %s.", pressed ? str_lit("pressed") : str_lit("released"));
     }
 
-    if (key == KEY_LCONTROL) {
+    if (key == Key_LControl) {
       Info("Left ctrl %s.", pressed ? str_lit("pressed") : str_lit("released"));
-    } else if (key == KEY_RCONTROL) {
+    } else if (key == Key_RControl) {
       Info("Right ctrl %s.", pressed ? str_lit("pressed") : str_lit("released"));
     }
 
-    if (key == KEY_LSHIFT) {
+    if (key == Key_LShift) {
       Info("Left shift %s.", pressed ? str_lit("pressed") : str_lit("released"));
-    } else if (key == KEY_RSHIFT) {
+    } else if (key == Key_RShift) {
       Info("Right shift %s.", pressed ? str_lit("pressed") : str_lit("released"));
     }
 
@@ -104,27 +95,27 @@ void input_process_mouse_wheel(i32 z_delta) {
 }
 
 // keyboard input
-b32 input_is_key_down(Keys key) {
+b32 input_is_key_down(Key key) {
   return st.keyboard_current.keys[key] == true;
 }
 
-b32 input_is_key_up(Keys key) {
+b32 input_is_key_up(Key key) {
   return st.keyboard_current.keys[key] == false;
 }
 
-b32 input_was_key_down(Keys key) {
+b32 input_was_key_down(Key key) {
   return st.keyboard_previous.keys[key] == true;
 }
 
-b32 input_was_key_up(Keys key) {
+b32 input_was_key_up(Key key) {
   return st.keyboard_previous.keys[key] == false;
 }
 
-b32 input_was_key_pressed(Keys key) {
+b32 input_was_key_pressed(Key key) {
   return input_is_key_down(key) && input_was_key_up(key);
 }
 
-b32 input_was_key_released(Keys key) {
+b32 input_was_key_released(Key key) {
   return input_is_key_up(key) && input_was_key_down(key);
 }
 
