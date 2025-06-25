@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.5.0)
 project(BuildEverything)
 
-option(build_one_exe "" true)
+option(build_one_exe "" false)
 
 add_compile_options(-Wuninitialized -fno-exceptions -fno-rtti -Wno-writable-strings )
 
@@ -18,10 +18,10 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_SOURCE_DIR}/bin)
 # build
 if (build_one_exe)
   add_subdirectory(app)
-  message("yea")
+  message("one exe: true")
 else ()
-  message("false")
-  add_subdirectory(engine)
+  message("one exe: false")
+  add_subdirectory(library)
   add_subdirectory(game)
   add_subdirectory(app)
 endif()

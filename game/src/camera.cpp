@@ -1,5 +1,5 @@
 #include "camera.h"
-#include "game.h"
+#include "game_types.h"
 #include "engine.h"
 #include "render/r_frontend.h"
 

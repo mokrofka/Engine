@@ -78,3 +78,5 @@ struct GameState {
 
   b8 is_mouse_move;
 };
+
+extern GameState* st;

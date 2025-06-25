@@ -1,4 +1,5 @@
 #include <vendor/imgui/imgui.h>
+#include "game_types.h"
 #include "game.h"
 
 #include <engine.h>
@@ -17,7 +18,7 @@ GameState* st;
 void cubes_position_update() {
   Loop (i, st->cubes.count) {
     Entity& cube = st->cubes.data[i];
-    // cube.pos.y += 0.001;
+    cube.pos.y += 0.1;
     // cube.rot.x += 0.01;
 
   }
@@ -92,11 +93,11 @@ void light_destroy(Entity* e) {
   st->lights.remove_data(e->id);
 }
 
-void app_init(App* app) {
+void app_init(u8** state) {
   Scratch scratch;
 
-  app->state = mem_alloc(sizeof(GameState));
-  Assign(st, app->state);
+  *state = mem_alloc(sizeof(GameState));
+  Assign(st, *state);
   st->arena = mem_arena_alloc(MB(1));
 
   st->shader_global_state = shader_get_global_state();
@@ -110,8 +111,8 @@ void app_init(App* app) {
   st->camera.fov = 45;
 
   event_register(EventCode_ViewportResized, &st->camera, [](u32 code, void* sender, void* listener_inst, EventContext context)->b32 {
-    f32 width = context.data.u32[0];
-    f32 height = context.data.u32[1];
+    f32 width = context.u32[0];
+    f32 height = context.u32[1];
     st->camera.projection = mat4_perspective(deg_to_rad(st->camera.fov), width / height, 0.1f, 1000.0f);
     return false;
   });
@@ -269,8 +270,8 @@ void app_init(App* app) {
 
 f32 min = -30, max = 30;
 
-void app_update(App* app) {
-  Assign(st, app->state);
+void app_update(u8* state) {
+  Assign(st, state);
   Scratch scratch;
 
   cubes_position_update();
@@ -362,8 +363,4 @@ void app_update(App* app) {
   }
 
   // ImGui::ShowDemoWindow();
-}
-
-void app_on_resize(App* game_inst) {
-
 }
