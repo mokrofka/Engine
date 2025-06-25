@@ -4,16 +4,40 @@ project(Exe)
 # include
 include_directories(${CMAKE_SOURCE_DIR}/app/src)
 include_directories(${CMAKE_SOURCE_DIR}/engine/src)
+include_directories(${CMAKE_SOURCE_DIR}/game/src)
 
 # binary
-file(GLOB_RECURSE SOURCES ${CMAKE_SOURCE_DIR}/app/src/*.cpp)
-add_executable(app ${SOURCES}) # exe
+if (build_one_exe)
+  file(GLOB_RECURSE ExeSrc ${CMAKE_SOURCE_DIR}/app/src/*.cpp)
+  file(GLOB_RECURSE LibrarySrc ${CMAKE_SOURCE_DIR}/engine/src/*.cpp)
+  file(GLOB_RECURSE GameSrc ${CMAKE_SOURCE_DIR}/game/src/*.cpp)
 
-# define
-target_compile_definitions(app PRIVATE _DEBUG)
+  set(OneExe
+    ${ExeSrc}
+    ${LibrarySrc}
+    ${GameSrc}
+  )
 
-# library link
-target_link_libraries(app "${CMAKE_SOURCE_DIR}/bin/engine.lib")
+  add_executable(app ${OneExe}) # exe
+
+  find_package(Vulkan REQUIRED)
+  target_link_libraries(app Vulkan::Vulkan)
+  
+  add_compile_definitions(MONOLITHIC_BUILD)
+
+
+
+
+
+else ()
+  file(GLOB_RECURSE ExeSrc ${CMAKE_SOURCE_DIR}/app/src/*.cpp)
+  add_executable(app ${ExeSrc}) # exe
+
+  # library link
+  target_link_libraries(app "${CMAKE_SOURCE_DIR}/bin/engine.lib")
+
+  add_compile_definitions()
+endif()
 
 # link properties
 # set_target_properties(app PROPERTIES

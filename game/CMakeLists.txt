@@ -7,10 +7,10 @@ include_directories(${CMAKE_SOURCE_DIR}/engine/src)
 
 # binary
 file(GLOB_RECURSE SOURCES ${CMAKE_SOURCE_DIR}/game/src/*.cpp)
-add_library(game SHARED ${SOURCES}) #dll
+add_library(game SHARED ${SOURCES}) # dll
 
 # define
-target_compile_definitions(game PRIVATE _DEBUG)
+add_compile_definitions()
 
 # library link
 target_link_libraries(game "${CMAKE_SOURCE_DIR}/bin/engine.lib")

@@ -41,12 +41,15 @@ void engine_init(App* app) {
   tctx_init();
 
   st.arena = mem_arena_alloc(MB(10));
+  
+#ifndef MONOLITHIC_BUILD
   app_create(app);
+#endif
 
   {
     platform_init();
   }
-  
+
   {
     network_init(st.arena);
   }
@@ -129,7 +132,9 @@ void engine_run(App* app) {
       delta_time = (current_time - st.last_time);
       f64 frame_start_time = os_now_seconds();
 
+#ifndef MONOLITHIC_BUILD
       check_dll_changes(app);
+#endif
 
       r_begin_draw_frame();
 

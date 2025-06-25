@@ -59,7 +59,8 @@ void ui_texture_render() {
   UI_Window("viewport") {
     ImVec2 current_viewport_size = ImGui::GetContentRegionAvail();
 
-    if (vk.viewport_size != *(v2*)&current_viewport_size) {
+    // if (vk.viewport_size != *(v2*)&current_viewport_size) {
+    if (vk.viewport_size != Transmute(v2)current_viewport_size) {
       vk.viewport_size = *(v2*)&current_viewport_size;
       vk.is_viewport_resized = true;
 

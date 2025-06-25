@@ -10,7 +10,7 @@ file(GLOB_RECURSE SOURCES ${CMAKE_SOURCE_DIR}/engine/src/*.cpp)
 add_library(engine SHARED ${SOURCES}) # dll
 
 # define
-target_compile_definitions(engine PRIVATE _DEBUG KEXPORT)
+add_compile_definitions(KEXPORT)
 
 # library link
 find_package(Vulkan REQUIRED)
