@@ -92,7 +92,6 @@ typedef void VoidProc(void);
 #define IsBetween(lower, x, upper) (((lower) <= (x)) && ((x) <= (upper)))
 #define Assign(a,b) *((void**)(&(a))) = (void*)(b)
 #define Transmute(T) *(T*)&
-#define GetProcAddr(x,l,s) Assign((x), os_lib_get_proc((l), (s)))
 
 #define Bit(x) (1 << (x))
 #define SetBit(x, c) ((x) |= Bit(c))

@@ -301,9 +301,9 @@ OS_Handle os_file_open(String path, OS_AccessFlags mode) {
   return result;
 }
 
-OVERLAPPED overlapped[2];
-DWORD bytesReturned;
-u8 buffer[KB(1) * 2];
+#define MaxDirectoryWatches 20
+OVERLAPPED overlapped[MaxDirectoryWatches];
+u8 buffer[KB(1) * MaxDirectoryWatches];
 
 OS_Handle os_directory_open(String path) {
   Scratch scratch;
@@ -325,16 +325,27 @@ OS_Handle os_directory_open(String path) {
 }
 
 void os_directory_watch(OS_Handle dir_handle, u32 id) {
+  DWORD bytes_returned;
   BOOL success = ReadDirectoryChangesW(
       (HANDLE)dir_handle,
       &buffer[id * KB(1)],
       KB(1),
       false, // monitor subdirectories too
       FILE_NOTIFY_CHANGE_LAST_WRITE,
-      &bytesReturned,
+      &bytes_returned,
       &overlapped[id],
       NULL);
 
+  // NOTE twice because of windows
+  success = ReadDirectoryChangesW(
+      (HANDLE)dir_handle,
+      &buffer[id * KB(1)],
+      KB(1),
+      false,
+      FILE_NOTIFY_CHANGE_LAST_WRITE,
+      &bytes_returned,
+      &overlapped[id],
+      NULL);
   if (!success) {
     Error("ReadDirectoryChangesW failed. Error: %u", GetLastError());
     return;

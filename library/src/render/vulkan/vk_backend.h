@@ -12,7 +12,6 @@ void vk_r_begin_renderpass(u32 renderpass_id);
 void vk_r_end_renderpass(u32 renderpass_id);
 
 void vk_r_geometry_create(Geometry& geometry);
-void vk_r_destroy_geometry(Geometry& geometry);
 void vk_r_shader_create(Shader s);
 void vk_texture_load(Texture& t);
 
@@ -45,3 +44,5 @@ KAPI SpotLight* shader_get_spot_light(u32 entity_id);
 // Util
 KAPI PushConstant* get_push_constant(u32 id);
 KAPI ShaderGlobalState* shader_get_global_state();
+KAPI void shader_reload(String name, u32 id);
+

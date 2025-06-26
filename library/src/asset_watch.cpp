@@ -5,12 +5,13 @@
 struct FileWatch {
   String path;
   DenseTime modified;
-  void (*callback)(String filepath);
+  void (*callback)();
 };
 
 struct DirectoryWatch {
   String path;
-  void (*callback)(String filepath);
+  OS_Handle dir_handle;
+  void (*callback)(String name);
 };
 
 struct AssetWatcherState {
@@ -18,7 +19,7 @@ struct AssetWatcherState {
   u32 watches_count;
   FileWatch watches[128];
   u32 directories_count;
-  OS_Handle directories[128];
+  DirectoryWatch directories[128];
 
   // OS_Handle shader_dir_handle;
   // OS_Handle compiled_shader_dir_handle;
@@ -31,52 +32,49 @@ void asset_watch_init() {
   st = {
     .arena = mem_arena_alloc(KB(1)),
   };
-  // st.shader_dir_handle = os_directory_open("D:\\VS_Code\\Engine\\assets\\shaders");
-  // st.compiled_shader_dir_handle = os_directory_open("D:\\VS_Code\\Engine\\assets\\shaders\\compiled");
-  // os_directory_watch(st.shader_dir_handle, 0);
-  // os_directory_watch(st.compiled_shader_dir_handle, 1);
 }
 
-void asset_watch_add(String name, void (*callback)(String filepath)) {
-  st.watches[st.watches_count].callback = callback;
+void asset_watch_add(String watch_name, void (*callback)()) {
+  FileProperties props = os_properties_from_file_path(watch_name);
+  st.watches[st.watches_count] = {
+    .path = watch_name,
+    .modified = props.modified,
+    .callback = callback,
+  };
+  Info("%u", props.modified);
   ++st.watches_count;
 }
 
-void asset_watch_directory_add(String name, void (*reload_callback)(String filepath)) {
-
+void asset_watch_directory_add(String watch_name, void (*reload_callback)(String name)) {
+  String dir_path = push_strf(st.arena, "%s/%s", res_sys_base_path(), watch_name);
+  st.directories[st.directories_count] = {
+    .path = dir_path,
+    .dir_handle = os_directory_open(dir_path),
+    .callback = reload_callback,
+  };
+  os_directory_watch(st.directories[st.directories_count].dir_handle, st.directories_count);
+  ++st.directories_count;
 }
 
 void asset_watch_update() {
-  // Scratch scratch;
+  Scratch scratch;
 
-  // b32 ready = os_directory_check_change(st.shader_dir_handle, 0);
-  // if (ready) {
-  //   String name = os_directory_name_change(scratch, 0);
+  Loop (i, st.watches_count) {
+    FileProperties props = os_properties_from_file_path(st.watches[i].path);
+    u64 new_write_time = props.modified;
+    b32 game_modified = os_file_compare_time(new_write_time, st.watches[i].modified);
+    if (game_modified) {
+      st.watches[i].callback();
+      st.watches[i].modified = props.modified;
+    }
+  }
 
-  //   // twice because of windows
-  //   os_directory_watch(st.shader_dir_handle, 0);
-  //   os_directory_watch(st.shader_dir_handle, 0);
-    
-  //   String filepath = push_str_cat(scratch, "D:\\VS_Code\\Engine\\assets\\shaders\\", name);
-  //   String filepath_output = push_str_cat(scratch, "D:\\VS_Code\\Engine\\assets\\shaders\\compiled\\", name);
-  //   filepath_output = push_str_cat(scratch, filepath_output, ".spv");
-  //   String cmd = push_strf(scratch, "glslangValidator.exe -V \"%s\" -o \"%s\"", filepath, filepath_output);
-    
-  //   os_process_create(cmd);
-  // }
-  
-  // b32 ready_compile = os_directory_check_change(st.compiled_shader_dir_handle, 1);
-  // if (ready_compile) {
-  //   String name = os_directory_name_change(scratch, 1);
-
-  //   // twice because of windows
-  //   os_directory_watch(st.compiled_shader_dir_handle, 1);
-  //   os_directory_watch(st.compiled_shader_dir_handle, 1);
-  //   Info("%s", name);
-  //   String shader_name = str_chop_last_dot(name);
-  //   shader_name = str_chop_last_dot(shader_name);
-    
-  //   // String filepath = push_str_cat(scratch, "D:\\VS_Code\\Engine\\assets\\shaders\\compiled\\", name);
-  //   st.watch.callback(shader_name, shader_get(shader_name));
-  // }
+  Loop (i, st.directories_count) {
+    b32 yea = os_directory_check_change(st.directories[i].dir_handle, i);
+    if (yea) {
+      String name = os_directory_name_change(scratch, i);
+      os_directory_watch(st.directories[i].dir_handle, i);
+      st.directories[i].callback(name);
+    }
+  }
 }

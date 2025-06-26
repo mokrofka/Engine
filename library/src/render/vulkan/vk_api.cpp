@@ -1,5 +1,6 @@
 #include "vk_api.h"
 
+////////////////////////////////////////////////////////////////////////
 // Entity
 KAPI void entity_make_renderable(u32 entity_id, u32 geom_id, u32 shader_id) {
   VK_Shader* shader = &vk.shaders[shader_id];
@@ -25,6 +26,7 @@ KAPI ShaderEntity* shader_get_entity(u32 entity_id) {
   return &vk.entities_data[entity_id];
 }
 
+////////////////////////////////////////////////////////////////////////
 // Point light
 KAPI void entity_make_point_light(u32 entity_id) {
   vk.point_light_data.add(entity_id);
@@ -40,6 +42,7 @@ KAPI PointLight* shader_get_point_light(u32 entity_id) {
   return (PointLight*)vk.point_light_data.get_data(entity_id);
 }
 
+////////////////////////////////////////////////////////////////////////
 // Directional light
 KAPI void entity_make_dir_light(u32 entity_id) {
   vk.dir_light_data.add(entity_id);
@@ -55,6 +58,7 @@ KAPI DirLight* shader_get_dir_light(u32 entity_id) {
   return (DirLight*)vk.dir_light_data.get_data(entity_id);
 }
 
+////////////////////////////////////////////////////////////////////////
 // Spot light
 KAPI void entity_make_spot_light(u32 entity_id) {
   vk.spot_light_data.add(entity_id);
@@ -70,6 +74,7 @@ KAPI SpotLight* shader_get_spot_light(u32 entity_id) {
   return (SpotLight*)vk.spot_light_data.get_data(entity_id);
 }
 
+////////////////////////////////////////////////////////////////////////
 // Util
 KAPI PushConstant* get_push_constant(u32 entity_id) {
   return (PushConstant*)vk.push_constants.get_data(entity_id);

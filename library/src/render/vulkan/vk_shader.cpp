@@ -572,27 +572,6 @@ void vk_shader_init() {
     VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, vk.descriptor_sets));
   }
 
-  // Reload callback
-  asset_watch_add("ya", [](String shader_name) {
-    VK_Shader* shader = &vk.shaders[0];
-    vkDeviceWaitIdle(vkdevice);
-    
-    vkDestroyPipeline(vkdevice, shader->pipeline.handle, vk.allocator);
-    Loop (i, 2) {
-      vkDestroyShaderModule(vkdevice, shader->stages[i].module, vk.allocator);
-    }
-    
-    String stage_type_strs[2] = { "vert", "frag", };
-    VkShaderStageFlagBits stage_types[2] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
-    
-    Loop (i, 2) {
-      shader->stages[i] = vk_shader_module_create(shader_name, stage_type_strs[i], stage_types[i]);
-    }
-    
-    shader->pipeline = vk_pipeline_create(shader->vert_stride, shader->attribute_count, shader->attribute_desriptions,
-                                          2, shader->stages, shader->topology, true, shader->is_transparent); // TODO
-  });
-
   // Mem for shaders
   {
     Assign(vk.entities_data, Offset(vk.storage_buffer.maped_memory, AlignPow2(sizeof(ShaderGlobalState), alignof(ShaderEntity))));
@@ -622,4 +601,27 @@ void vk_shader_init() {
     vk.push_constants.element_size = sizeof(PushConstant);
     vk.push_constants.count = 0;
   }
+}
+
+////////////////////////////////////////////////////////////////////////
+// Reload callback
+
+KAPI void shader_reload(String name, u32 id) {
+  VK_Shader* shader = &vk.shaders[id];
+  vkDeviceWaitIdle(vkdevice);
+  
+  vkDestroyPipeline(vkdevice, shader->pipeline.handle, vk.allocator);
+  Loop (i, 2) {
+    vkDestroyShaderModule(vkdevice, shader->stages[i].module, vk.allocator);
+  }
+  
+  String stage_type_strs[2] = { "vert", "frag", };
+  VkShaderStageFlagBits stage_types[2] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
+  
+  Loop (i, 2) {
+    shader->stages[i] = vk_shader_module_create(name, stage_type_strs[i], stage_types[i]);
+  }
+  
+  shader->pipeline = vk_pipeline_create(shader->vert_stride, shader->attribute_count, shader->attribute_desriptions,
+                                        2, shader->stages, shader->topology, true, shader->is_transparent); // TODO
 }

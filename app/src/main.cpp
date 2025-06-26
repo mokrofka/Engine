@@ -22,7 +22,7 @@ internal b32 app_on_key(u32 code, void* sender, void* listener_inst, EventContex
 internal b32 app_on_resized(u32 code, void* sender, void* listener_inst, EventContext context);
 
 internal void check_dll_changes();
-internal void app_create();
+internal void lib_load();
 internal void load_game_lib_init();
 
 void entry_point();
@@ -34,15 +34,6 @@ void entry_point() {
   Scratch scratch;
   st.arena = mem_arena_alloc(KB(1));
   Info("%i", cstr_length("hell"));
-
-#ifdef MONOLITHIC_BUILD
-  st.init = app_init;
-  st.update = app_update;
-#endif
-  
-#ifndef MONOLITHIC_BUILD
-  app_create();
-#endif
   
   {
     ResSysConfig config = {
@@ -84,6 +75,19 @@ void entry_point() {
   ui_init();
 
   geometry_init(scratch);
+
+#ifdef MONOLITHIC_BUILD
+  st.init = app_init;
+  st.update = app_update;
+#else
+  lib_load();
+  asset_watch_add(st.lib_filepath, []() {
+    os_lib_close(st.lib);
+    os_copy_file_path(st.lib_temp_filepath, st.lib_filepath);
+    st.lib = os_lib_open(st.lib_temp_filepath);
+    Assign(st.update, os_lib_get_proc(st.lib, "app_update"));
+  });
+#endif
 
   st.init(&st.state);
 
@@ -195,44 +199,30 @@ internal b32 app_on_resized(u32 code, void* sender, void* listener_inst, EventCo
   return true;
 }
 
-internal void load_game_lib() {
-  FileProperties props = os_properties_from_file_path(st.lib_filepath);
-  st.modified = props.modified;
-  os_copy_file_path(st.lib_temp_filepath, st.lib_filepath);
-  st.lib = os_lib_open(st.lib_temp_filepath);
-  GetProcAddr(st.update, st.lib, "app_update");
-}
-
 internal void check_dll_changes() {
   FileProperties props = os_properties_from_file_path(st.lib_filepath);
   u64 new_write_time = props.modified;
   b32 game_modified = os_file_compare_time(new_write_time, st.modified);
 
   if (game_modified) {
-    os_lib_close(st.lib);
-    load_game_lib();
   }
 }
 
-internal void load_game_lib_init() {
-  FileProperties file_props = os_properties_from_file_path(st.lib_filepath);
-
-  st.modified = file_props.modified;
-  os_copy_file_path(st.lib_temp_filepath, st.lib_filepath);
-  
-  st.lib = os_lib_open("game_temp.dll");
-  GetProcAddr(st.update, st.lib, "app_update");
-  GetProcAddr(st.init, st.lib, "app_init");
-  
-  Assert(st.lib && st.init && st.update);
-}
-
-internal void app_create() {
+internal void lib_load() {
   Scratch scratch;
   
-  String current_path = os_get_current_directory();
-  st.lib_filepath = push_str_cat(st.arena, current_path, "\\game.dll");
-  st.lib_temp_filepath = push_str_cat(st.arena, current_path, "\\game_temp.dll");
+  String current_dir = os_get_current_directory();
+  st.lib_filepath = push_str_cat(st.arena, current_dir, "/game.dll");
+  st.lib_temp_filepath = push_str_cat(st.arena, current_dir, "/game_temp.dll");
+  
+  os_copy_file_path(st.lib_temp_filepath, st.lib_filepath);
+  st.lib = os_lib_open("game_temp.dll");
+  Assign(st.init, os_lib_get_proc(st.lib, "app_init"));
+  Assign(st.update, os_lib_get_proc(st.lib, "app_update"));
 
-  load_game_lib_init();
+  FileProperties props = os_properties_from_file_path(st.lib_filepath);
+  st.modified = props.modified;
+  Info("init %u", st.modified);
+  
+  Assert(st.lib && st.init && st.update);
 }
