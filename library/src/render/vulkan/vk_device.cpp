@@ -218,7 +218,7 @@ internal VK_Device select_physical_device() {
       requirements,
       &devices[i].swapchain_support);
 
-    Info("Available device: '%s'", str_cstr(properties.deviceName));
+    Info("Available device: '%s'", String(properties.deviceName));
     // GPU type, etc.
     switch (properties.deviceType) {
     default:
@@ -349,7 +349,7 @@ internal VK_PhysicalDeviceQueueFamilyInfo physical_device_meets_requirements(
         queue_info.present_family_index != -1,
         queue_info.compute_family_index != -1,
         queue_info.transfer_family_index != -1,
-        str_cstr(properties.deviceName));
+        String(properties.deviceName));
   if (
       (!requirements.graphics || (requirements.graphics && queue_info.graphics_family_index != -1)) &&
       (!requirements.present || (requirements.present && queue_info.present_family_index != -1)) &&
@@ -382,7 +382,7 @@ internal VK_PhysicalDeviceQueueFamilyInfo physical_device_meets_requirements(
         Loop (i, required_extension_count) {
           b32 found = false;
           Loop (j, available_extension_count) {
-            if (cstr_match(requirements.device_extension_names[i], available_extensions[j].extensionName)) {
+            if (str_match(requirements.device_extension_names[i], available_extensions[j].extensionName)) {
               found = true;
               break;
             }

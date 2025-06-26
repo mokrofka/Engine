@@ -102,7 +102,7 @@ KAPI void* os_reserve_large(u64 size);
 KAPI b32 os_commit_large(void* ptr, u64 size);
 
 //////////////////////////////////////////////////////////////////////////
-// files
+// Files
 KAPI OS_Handle      os_file_open(String path, OS_AccessFlags flags);
 KAPI OS_Handle      os_directory_open(String path);
 KAPI void           os_directory_watch(OS_Handle dir_handle, u32 id);
@@ -112,14 +112,16 @@ KAPI void           os_file_close(OS_Handle file);
 KAPI u64            os_file_read(OS_Handle file, u64 size, u8* out_data);
 KAPI u64            os_file_write(OS_Handle file, u64 size, u8* data);
 KAPI u64            os_file_size(OS_Handle file);
-KAPI KAPI FileProperties os_properties_from_file(OS_Handle file);
+KAPI FileProperties os_properties_from_file(OS_Handle file);
 KAPI FileProperties os_properties_from_file_path(String path);
 KAPI b32            os_copy_file_path(String dst, String src);
 KAPI b32            os_file_path_exists(String path);
 KAPI String         os_exe_filename(Arena* arena);
 KAPI b32            os_file_compare_time(u64 new_write_time, u64 last_write_time);
 
-KAPI String os_get_current_path(Arena* arena);
+KAPI String os_get_current_directory();
+KAPI String os_get_current_binary_name();
+KAPI String os_get_current_filepath();
 
 KAPI OS_Handle os_lib_open(String path);
 KAPI void      os_lib_close(OS_Handle lib);

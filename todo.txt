@@ -1,3 +1,4 @@
 growable arena
 event
 eliminate all pointers
+eliminate all references

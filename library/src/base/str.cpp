@@ -2,8 +2,7 @@
 
 #include <stdarg.h>
 
-////////////////////////////////
-// C-String Measurement, Functions
+////////////////////////////////////////////////////////////////////////
 
 internal u32 write_uint(u8* dest, u32 value) {
   u8 temp[10];
@@ -115,18 +114,16 @@ u32 float_length(f32 value, u32 precision) {
   return len;
 }
 
-u32 my_vsnprintf(void* buffer, u32 buffer_size, const void* format, void* argc_) {
-  va_list argc = (char*)argc_;
-  
-  u8* buff = (u8*)buffer;
-  u8* fmt = (u8*)format;
-  u32 written = 0;
-  if (buffer_size == 0) {
-    u32 length = {};
-    u8* p = (u8*)fmt;
-    for (; *p != 0; p += 1) {
+////////////////////////////////////////////////////////////////////////
+// Great sprintf
+u32 my_sprintf(u8* buff, String fmt, va_list argc) {
+
+  // Calculate length
+  if (buff == null) {
+    u32 length = 0;
+    for (u8* p = fmt.str; p < fmt.str+fmt.size; ++p) {
       if (*p == '%') {
-        ++p;
+        ++p; // skip '%'
         switch (*p) {
           case 'i': {
             i32 val = va_arg(argc, i32);
@@ -137,8 +134,9 @@ u32 my_vsnprintf(void* buffer, u32 buffer_size, const void* format, void* argc_)
             length += int_length(val);
           } break;
           case 'f': {
-            f32 val = va_arg(argc, f64);
-            length += float_length(val, 6);
+            f32 val = va_arg(argc, f64); // f64 - because of compiler
+            #define DefaultFloatAccuracy 6
+            length += float_length(val, DefaultFloatAccuracy);
           } break;
           case 's': {
             String val = va_arg(argc, String);
@@ -148,14 +146,12 @@ u32 my_vsnprintf(void* buffer, u32 buffer_size, const void* format, void* argc_)
             length += 1;
           } break;
           case '.': {
-            ++p; // skip .
-            u32 precision = *fmt - '0';
-            
-            ++p; // skip number
-            f32 val = va_arg(argc, f64);
+            ++p;                         // skip '.'
+            u32 precision = *p - '0';    // 'num' - '0'
+            ++p;                         // skip number
+            f32 val = va_arg(argc, f64); // f64 - because of compiler
+
             length += float_length(val, precision);
-            ++length; // plus .
-            // ++p; // don't skip because of for
           } break;
         }
       } else {
@@ -164,96 +160,73 @@ u32 my_vsnprintf(void* buffer, u32 buffer_size, const void* format, void* argc_)
     }
     return length;
   }
-  else {
-    while (written < buffer_size) {
-      if (*fmt == '%') {
-        ++fmt;
-        switch (*fmt) {
-          case 'i': {
-            i32 val = va_arg(argc, i32);
-            u32 len = write_int(buff + written, val);
-            ++fmt;
-            written += len;
-          } break;
-          case 'u': {
-            u32 val = va_arg(argc, u32);
-            u32 len = write_uint(buff + written, val);
-            ++fmt;
-            written += len;
-          } break;
-          case 'f': {
-            f32 val = va_arg(argc, f64);
-            u32 len = write_float(buff + written, val, 6);
-            ++fmt;
-            written += len;
-          } break;
-          case 's': {
-            String val = va_arg(argc, String);
-            u32 len = write_string(buff + written, val);
-            ++fmt;
-            written += len;
-          } break;
-          case 'c': {
-            char val = va_arg(argc, i32);
-            buff[written] = val;
-            ++fmt;
-            written += 1;
-          } break;
-          case '.': {
-            ++fmt; // skip .
-            u32 precision = *fmt - '0';
-            
-            f32 val = va_arg(argc, f64);
-            u32 len = write_float(buff + written, val, precision);
-            ++fmt; // skip number
-            ++fmt; // skip f
-            written += len;
-          } break;
-        }
-      } else {
-        buff[written++] = *fmt++;
-      };
-    }
+
+  // Write into buffer
+  u32 written = 0;
+  for (u8* p = fmt.str; p < fmt.str+fmt.size; ++p) {
+    if (*p == '%') {
+      ++p; // skip '%'
+      switch (*p) {
+        case 'i': {
+          i32 val = va_arg(argc, i32);
+          u32 len = write_int(buff + written, val);
+          written += len;
+        } break;
+        case 'u': {
+          u32 val = va_arg(argc, u32);
+          u32 len = write_uint(buff + written, val);
+          written += len;
+        } break;
+        case 'f': {
+          f32 val = va_arg(argc, f64); // f64 - because of compiler
+          u32 len = write_float(buff + written, val, DefaultFloatAccuracy);
+          written += len;
+        } break;
+        case 's': {
+          String val = va_arg(argc, String);
+          u32 len = write_string(buff + written, val);
+          written += len;
+        } break;
+        case 'c': {
+          char val = va_arg(argc, i32); // i32 - because of compiler
+          buff[written] = val;
+          written += 1;
+        } break;
+        case '.': {
+          ++p;                      // skip '.'
+          u32 precision = *p - '0'; // 'num' - '0'
+          ++p;                      // skip number
+
+          f32 val = va_arg(argc, f64);
+          u32 len = write_float(buff + written, val, precision);
+          written += len;
+        } break;
+      }
+    } else {
+      buff[written++] = *p;
+    };
   }
   return written;
 }
 
-////////////////////////////////
-// C-String Measurement, Functions
-
-b32 _strcmpi(const void* str0, const void* str1) {
-  u8* str_a = (u8*)str0;
-  u8* str_b = (u8*)str1;
-  while (*str_a && *str_b) {
-    u8 s0 = *str_a;
-    u8 s1 = *str_b;
-    s0 = char_to_lower(s0);
-    s1 = char_to_lower(s1);
-
-    if (s0 != s1) {
-      return s0 - s1;
-    }
-
-    ++str_a;
-    ++str_b;
-  }
-
-  return str_a - str_b;
-}
-
-////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 // String Constructors
 
-String str_cstr_capped(const void *str_cstr, const void *cap) {
-  u8* ptr = (u8*)str_cstr;
-  u8* opl = (u8*)cap;
-  for (;ptr < opl && *ptr != 0; ptr += 1);
-  u32 size = (u32)(ptr - (u8*)str_cstr);
-  String result = str((u8*)str_cstr, size);
+String str_range(u8* first, u8* one_past_last) {
+  String result = {first, (u32)(one_past_last - first)};
   return result;
 }
 
-////////////////////////////////
+String str_cstr_capped(const void *cstr, const void *cap) {
+  u8* ptr = (u8*)cstr;
+  u8* opl = (u8*)cap;
+  for (;ptr < opl && *ptr != 0; ptr += 1);
+  u32 size = (u32)(ptr - (u8*)cstr);
+  String result = String((u8*)cstr, size);
+  return result;
+}
+
+////////////////////////////////////////////////////////////////////////
 // String Stylization
 
 String upper_from_str(Arena *arena, String str) {
@@ -272,7 +245,7 @@ String lower_from_str(Arena *arena, String str) {
   return str;
 }
 
-////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 // String Matching
 
 b32 str_match(String str0, String str1) {
@@ -284,26 +257,21 @@ b32 str_match(String str0, String str1) {
     ++a;
     ++b;
   }
-
   return true;
 }
 
 b32 str_matchi(String str0, String str1) {
-  b32 result = false;
-  if (str0.size == str1.size) {
-    result = true;
-    Loop (i, str0.size) {
-      u8 s0 = str0.str[i];
-      u8 s1 = str1.str[i];;
-      s0 = char_to_lower(s0);
-      s1 = char_to_lower(s1);
-      if (s0 != s1) {
-        result = false;
-        break;
-      }
-    }
+  if (str0.size != str1.size) return false;
+  u8* a = str0.str;
+  u8* b = str1.str;
+  Loop (i, str0.size) {
+    u8 A = char_to_lower(*a);
+    u8 B = char_to_lower(*b);
+    if (A != B) return false;
+    ++a;
+    ++b;
   }
-  return result;
+  return true;
 }
 
 b32 str_ends_with(String string, String end) {
@@ -312,13 +280,49 @@ b32 str_ends_with(String string, String end) {
   return is_match;
 }
 
-////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+// String Slicing
+
+String str_substr(String str, Range range) {
+  range.offset = ClampTop(range.offset, str.size);
+  range.size = ClampTop(range.size, str.size);
+  str.str += range.offset;
+  str.size = range_size(range);
+  return str;
+}
+
+String str_prefix(String str, u64 size) {
+  str.size = ClampTop(size, str.size);
+  return str;
+}
+
+String str_skip(String str, u64 amt) {
+  amt = ClampTop(amt, str.size);
+  str.str += amt;
+  str.size -= amt;
+  return str;
+}
+
+String str_postfix(String str, u64 size) {
+  size = ClampTop(size, str.size);
+  str.str = (str.str + str.size) - size;
+  str.size = size;
+  return str;
+}
+
+String str_chop(String str, u64 amt) {
+  amt = ClampTop(amt, str.size);
+  str.size -= amt;
+  return str;
+}
+
+////////////////////////////////////////////////////////////////////////
 // String Formatting & Copying
 
 String push_str_cat(Arena* arena, String s1, String s2) {
   String str;
   str.size = s1.size + s2.size;
-  str.str = push_array(arena, u8, str.size + 1);
+  str.str = push_array(arena, u8, str.size + 1); // for C-str
   MemCopy(str.str, s1.str, s1.size);
   MemCopy(str.str + s1.size, s2.str, s2.size);
   str.str[str.size] = 0;
@@ -328,35 +332,38 @@ String push_str_cat(Arena* arena, String s1, String s2) {
 String push_str_copy(Arena* arena, String s) {
   String str;
   str.size = s.size;
-  str.str = push_array(arena, u8, str.size + 1);
+  str.str = push_array(arena, u8, str.size + 1); // for C-str
   MemCopy(str.str, s.str, s.size);
   str.str[str.size] = 0;
   return str;
 }
 
-String push_strfv(Arena* arena, const void* format, void* argc) {
-  va_list argc_copy = (va_list)argc;
-  u32 need_bytes = my_vsnprintf(0, 0, format, argc) + 1;
-  va_end(argc_copy);
+String push_strfv(Arena* arena, String fmt, void* argc) {
+  u32 need_bytes = my_sprintf(0, fmt, (va_list)argc);
   
-  u8* buffer = push_buffer(arena, need_bytes);
-  u32 final_size = my_vsnprintf(buffer, need_bytes, format, argc_copy);
+  u8* buff = push_buffer(arena, need_bytes + 1); // for C-str
+  u32 final_size = my_sprintf(buff, fmt, (va_list)argc);
   
-  String result = {buffer, final_size};
+  String result = {buff, final_size};
   result.str[result.size] = 0;
   return result;
 }
 
-String push_strf(Arena* arena, const void* format, ...) {
+String push_strf(Arena* arena, String fmt, ...) {
   va_list argc;
-  va_start(argc, format);
-  String result = push_strfv(arena, format, argc);
+  va_start(argc, fmt);
+  String result = push_strfv(arena, fmt, argc);
   va_end(argc);
   return result;
 }
 
-////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 // String utils
+
+void str_copy(String64& dest, String str) {
+  MemCopy(dest.str, str.str, str.size);
+  dest.size = str.size;
+}
 
 // should be little different on linux
 String str_read_line(StringCursor* cursor) { // TODO replace StringCursor by Range
@@ -417,7 +424,7 @@ i32 str_index_of(String string, u8 c) {
   return -1;
 }
 
-////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 // String <=> Integer Conversions
 
 // string -> integer
@@ -507,7 +514,7 @@ i32 str_index_of(String string, u8 c) {
 // integer -> string
 // ...
 
-////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 // String Path Helpers
 
 // one/two/three -> one/two/
@@ -577,8 +584,29 @@ String str_chop_last_dot(String string) {
   return result;
 }
 
+////////////////////////////////////////////////////////////////////////
+// Wchar stuff
 
-void str_copy(String64& dest, String str) {
-  MemCopy(dest.str, str.str, str.size);
-  dest.size = str.size;
+size_t wchar_to_char(char* out, const wchar_t* in, size_t out_size) {
+  size_t out_len = 0;
+
+  while (*in && out_len < out_size) {
+    u16 wc = *in++;
+    out[out_len++] = (char)wc;
+  }
+
+  if (out_len < out_size)
+    out[out_len] = '\0'; // null-terminate
+
+  return out_len;
 }
+
+String push_str_wchar(Arena* arena, const wchar_t* in, u32 wchar_length) {
+  u8* buff = push_buffer(arena, wchar_length + 1);
+  Loop (i , wchar_length) {
+    buff[i] = in[i];
+  }
+  buff[wchar_length] = 0;
+  return {buff, wchar_length};
+}
+

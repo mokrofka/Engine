@@ -123,14 +123,14 @@ INLINE constexpr u32 _component_get_id_internal(String component_name) {
   return ecs.hashed_id_to_component_id[hashed_id];
 }
 #define component_get_id(T) \
-  _component_get_id_internal(str_lit(Stringify(T)))
+  _component_get_id_internal(String(Stringify(T)))
 
 constexpr u32 _system_get_id_internal(String system_name) {
   u32 hashed_id = hash_name_at_compile(system_name);
   return ecs.hashed_id_to_system_id[hashed_id];
 }
 #define system_get_id(T) \
-  _system_get_id_internal(str_lit(Stringify(T)))
+  _system_get_id_internal(String(Stringify(T)))
 
 #define entity_has_component_id(entity, T) ((entity_get_signature(entity) & Bit(T)) == Bit(T))
 #define entity_has_component(entity, T) ((entity_get_signature(entity) & Bit(component_get_id(T))) == Bit(component_get_id(T)))
@@ -207,7 +207,7 @@ inline void _component_register_internal(String component_name, u32 element_size
   array->component_array = mem_alloc(MaxEntities * element_size);
 }
 #define component_register(T) \
-  _component_register_internal(str_lit(Stringify(T)), sizeof(T));
+  _component_register_internal(String(Stringify(T)), sizeof(T));
 
 inline ComponentArray* component_get_array(u32 component_id) {
   Assert(ecs.component_arrays[component_id]);
@@ -311,7 +311,7 @@ inline void* _system_register_internal(String system_name, Signature signature) 
   return system;
 }
 #define system_register(T, signature) \
-  (T*)_system_register_internal(str_lit(Stringify(T)), signature)
+  (T*)_system_register_internal(String(Stringify(T)), signature)
 
 inline void _set_system_signature_internal(Signature signature, u32 index) {
   Assert(ecs.systems[index]);
@@ -498,7 +498,7 @@ inline void ecs_init() {
 #define Component(T)                                       \
   struct Glue(__, T) {                                     \
     Glue(__, T)() {                                        \
-      component_enqueue(str_lit(Stringify(T)), sizeof(T)); \
+      component_enqueue(String(Stringify(T)), sizeof(T)); \
     }                                                      \
   };                                                       \
   static Glue(__, T) Glue(__variable, T);
@@ -506,7 +506,7 @@ inline void ecs_init() {
 #define System(T, ...)                                              \
   struct Glue(__, T) {                                              \
     Glue(__, T)() {                                                 \
-      system_enqueue(str_lit(Stringify(T)), str_lit(#__VA_ARGS__)); \
+      system_enqueue(String(Stringify(T)), String(#__VA_ARGS__)); \
     }                                                               \
   };                                                                \
   static Glue(__, T) Glue(__variable, T);
@@ -514,7 +514,7 @@ inline void ecs_init() {
 #define Tag(T)                                       \
   struct Glue(__, T) {                                     \
     Glue(__, T)() {                                        \
-      tag_enqueue(str_lit(Stringify(T))); \
+      tag_enqueue(String(Stringify(T))); \
     }                                                      \
   };                                                       \
   static Glue(__, T) Glue(__variable, T);

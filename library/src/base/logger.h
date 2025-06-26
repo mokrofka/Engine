@@ -19,8 +19,7 @@ enum LogLevel {
   LOG_LEVEL_TRACE = 5,
 };
 
-KAPI void _log_output(LogLevel level, String message);
-KAPI void _log_output(LogLevel level, const void* fmt, ...);
+KAPI void _log_output(LogLevel level, String fmt, ...);
 
 // Logs a fatal-level message.
 #define Fatal(message, ...) _log_output(LOG_LEVEL_FATAL, message, ##__VA_ARGS__)

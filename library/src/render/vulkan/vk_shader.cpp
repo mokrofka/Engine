@@ -17,6 +17,7 @@ internal VkPipelineShaderStageCreateInfo vk_shader_module_create(String name, St
   Buffer binary = res_binary_load(scratch, filepath);
   if (!binary.data) {
     Error("Unable to read shader module: %s", filepath);
+    return {};
   }
   
   VkShaderModuleCreateInfo shader_module_create_info = {
@@ -37,11 +38,11 @@ internal VkPipelineShaderStageCreateInfo vk_shader_module_create(String name, St
   return pipeline_shader_stage_create_info;
 }
 
-void vk_r_shader_create(Shader& s) {
+void vk_r_shader_create(Shader s) {
   VK_Shader* shader = &vk.shaders[vk.shader_count++];
 
   #define ShaderStageCount 2
-  String stage_type_strs[] = { "vert", "frag"};
+  String stage_type_strs[] = {"vert", "frag"};
   VkShaderStageFlagBits stage_types[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
   Loop (i, ShaderStageCount) {
     shader->stages[i] = vk_shader_module_create(s.name, stage_type_strs[i], stage_types[i]);
@@ -572,8 +573,8 @@ void vk_shader_init() {
   }
 
   // Reload callback
-  asset_watch_add([](String shader_name, u32 id) {
-    VK_Shader* shader = &vk.shaders[id];
+  asset_watch_add("ya", [](String shader_name) {
+    VK_Shader* shader = &vk.shaders[0];
     vkDeviceWaitIdle(vkdevice);
     
     vkDestroyPipeline(vkdevice, shader->pipeline.handle, vk.allocator);

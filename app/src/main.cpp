@@ -33,6 +33,7 @@ int main() {
 void entry_point() {
   Scratch scratch;
   st.arena = mem_arena_alloc(KB(1));
+  Info("%i", cstr_length("hell"));
 
 #ifdef MONOLITHIC_BUILD
   st.init = app_init;
@@ -229,7 +230,7 @@ internal void load_game_lib_init() {
 internal void app_create() {
   Scratch scratch;
   
-  String current_path = os_get_current_path(scratch);
+  String current_path = os_get_current_directory();
   st.lib_filepath = push_str_cat(st.arena, current_path, "\\game.dll");
   st.lib_temp_filepath = push_str_cat(st.arena, current_path, "\\game_temp.dll");
 

@@ -100,7 +100,7 @@ void instance_create() {
 #if _DEBUG
   Debug("Required extensions:");
   Loop (i, ArrayCount(required_extensions)) {
-    Debug(str_cstr(required_extensions[i]));
+    Debug(String(required_extensions[i]));
   }
 #endif
 
@@ -119,10 +119,10 @@ void instance_create() {
 
   // Verify all required layers are available.
   Loop (i, ArrayCount(required_validation_layer_names)) {
-    Info("Searching for layer: %s...", str_cstr(required_validation_layer_names[i]));
+    Info("Searching for layer: %s...", String(required_validation_layer_names[i]));
     b32 found = false;
     Loop (j, available_layer_count) {
-      if (cstr_match(required_validation_layer_names[i], available_layers[j].layerName)) {
+      if (str_match(required_validation_layer_names[i], available_layers[j].layerName)) {
         ++available_layer_count;
         found = true;
         Info("Found");
@@ -130,7 +130,7 @@ void instance_create() {
       }
     }
     if (!found) {
-      Fatal("Required validation layer is missing: %s", str_cstr(required_validation_layer_names[i]));
+      Fatal("Required validation layer is missing: %s", String(required_validation_layer_names[i]));
     }
   }
   Info("All required validation layers are present");
@@ -642,16 +642,16 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
       
   switch (message_severity) {
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: {
-      Error(str_cstr(callback_data->pMessage))
+      Error(String(callback_data->pMessage))
     } break;
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-      Warn(str_cstr(callback_data->pMessage));
+      Warn(String(callback_data->pMessage));
       break;
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
-      Info(str_cstr(callback_data->pMessage));
+      Info(String(callback_data->pMessage));
       break;
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
-      Trace(str_cstr(callback_data->pMessage));
+      Trace(String(callback_data->pMessage));
       break;
     default: break;
   }

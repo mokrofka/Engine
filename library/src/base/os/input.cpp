@@ -33,21 +33,21 @@ void input_process_key(Key key, b32 pressed) {
     st.keyboard_current.keys[key] = pressed;
 
     if (key == Key_LAlt) {
-      Info("Left alt %s.", pressed ? str_lit("pressed") : str_lit("released"));
+      Info("Left alt %s.", pressed ? String("pressed") : String("released"));
     } else if (key == Key_RAlt) {
-      Info("Right alt %s.", pressed ? str_lit("pressed") : str_lit("released"));
+      Info("Right alt %s.", pressed ? String("pressed") : String("released"));
     }
 
     if (key == Key_LControl) {
-      Info("Left ctrl %s.", pressed ? str_lit("pressed") : str_lit("released"));
+      Info("Left ctrl %s.", pressed ? String("pressed") : String("released"));
     } else if (key == Key_RControl) {
-      Info("Right ctrl %s.", pressed ? str_lit("pressed") : str_lit("released"));
+      Info("Right ctrl %s.", pressed ? String("pressed") : String("released"));
     }
 
     if (key == Key_LShift) {
-      Info("Left shift %s.", pressed ? str_lit("pressed") : str_lit("released"));
+      Info("Left shift %s.", pressed ? String("pressed") : String("released"));
     } else if (key == Key_RShift) {
-      Info("Right shift %s.", pressed ? str_lit("pressed") : str_lit("released"));
+      Info("Right shift %s.", pressed ? String("pressed") : String("released"));
     }
 
     // Fire off an event for immediate processing.

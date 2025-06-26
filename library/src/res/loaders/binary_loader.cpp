@@ -1,8 +1,8 @@
 #include "sys/res.h"
 
-Buffer res_binary_load(Arena* arena, String filename) {
+Buffer res_binary_load(Arena* arena, String name) {
   Scratch scratch(&arena);
-  String filepath = push_strf(scratch, "%s/%s", res_sys_base_path(), filename);
+  String filepath = push_strf(scratch, "%s/%s", res_sys_base_path(), name);
 
   OS_Handle f = os_file_open(filepath, OS_AccessFlag_Read);
   if (!f) {

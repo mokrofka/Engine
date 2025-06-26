@@ -44,7 +44,7 @@ void server_run() {
     // Handle the client connection here
     
     while (recv(client_socket, (char*)arr, sizeof(arr), 0) > 0) {
-      Info("Server read: %s", str_cstr(arr));
+      Info("Server read: %s", String(arr));
       
       u8 to_client[] = "hello client!";
       send(client_socket, (char*)to_client, sizeof(to_client), 0);
@@ -69,7 +69,7 @@ void connect_to_server() {
   send(net.s, (char*)arr, cstr_length(arr), 0);
   MemZeroArray(arr);
   recv(net.s, (char*)arr, sizeof(arr), 0);
-  Info("%s", str_cstr(arr));
+  Info("%s", String(arr));
   
   os_sleep(3000);
   

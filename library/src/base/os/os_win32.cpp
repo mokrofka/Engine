@@ -23,12 +23,15 @@ struct OS_State {
   f32 old_y;
   HINSTANCE instance;
   Window window;
+  
   WindowClosedCallback window_closed_callback;
   WindowResizedCallback window_resized_callback;
   ProcessKeyCallback process_key;
   ProcessMouseMoveCallback process_mouse_move;
 
-  String binary_path;
+  String binary_name;
+  String binary_filepath;
+  String binary_directory;
 };
 f32 delta_time; // maybe put somewhere else
 
@@ -66,8 +69,9 @@ void w32_entry_point_caller(void (*main)()) {
   u8* buff = push_buffer(scratch, 512);
   u32 size = GetModuleFileNameA(0, (char*)buff, 512);
 
-  String name_chopped = str_chop_last_slash(str(buff, size));
-  st.binary_path = name_chopped;
+  st.binary_filepath = String(buff, size);
+  st.binary_directory = str_chop_last_slash(String(buff, size));
+  st.binary_name = str_skip_last_slash(st.binary_filepath);
 
 #ifdef MONOLITHIC_BUILD
   entry_point();
@@ -141,17 +145,6 @@ void os_pump_messages() {
     DispatchMessageA(&message);
   }
 }
-
-#include <vulkan/vulkan.h>
-#include <vulkan/vulkan_win32.h>
-
-struct VK {
-  Arena* arena;
-  
-  VkInstance instance;
-  VkAllocationCallbacks* allocator;
-  VkSurfaceKHR surface;
-};
 
 void os_console_write(String message, u32 color) {
   HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -276,7 +269,7 @@ b32 os_commit_large(void* ptr, u64 size) {
 }
 
 //////////////////////////////////////////////////////////////////////////
-// file
+// File
 
 OS_Handle os_file_open(String path, OS_AccessFlags mode) {
   Scratch scratch;
@@ -325,7 +318,7 @@ OS_Handle os_directory_open(String path) {
       NULL);
 
   if (handle == INVALID_HANDLE_VALUE) {
-    Error(L"Failed to open directory handle. Error: %u\n", GetLastError());
+    Error("Failed to open directory handle. Error: %u\n", GetLastError());
     return 0;
   }
   return (OS_Handle)handle;
@@ -396,33 +389,29 @@ u64 os_file_size(OS_Handle file) {
 }
 
 FileProperties os_properties_from_file(OS_Handle file) {
-  if(!file) { FileProperties r = {0}; return r; }
-  FileProperties props = {};
   BY_HANDLE_FILE_INFORMATION info;
-  HANDLE handle = (HANDLE)file;
-  b32 info_good = GetFileInformationByHandle(handle, &info);
-  if (info_good) {
-    props.size = Compose64Bit(info.nFileSizeHigh, info.nFileSizeLow);
-    props.modified = Compose64Bit(info.ftLastWriteTime.dwHighDateTime, info.ftLastWriteTime.dwLowDateTime);
-    props.created = Compose64Bit(info.ftCreationTime.dwHighDateTime, info.ftCreationTime.dwLowDateTime);
-    props.flags = info.dwFileAttributes;
-  }
+  GetFileInformationByHandle((HANDLE)file, &info);
+  FileProperties props = {
+    .size = Compose64Bit(info.nFileSizeHigh, info.nFileSizeLow),
+    .modified = Compose64Bit(info.ftLastWriteTime.dwHighDateTime, info.ftLastWriteTime.dwLowDateTime),
+    .created = Compose64Bit(info.ftCreationTime.dwHighDateTime, info.ftCreationTime.dwLowDateTime),
+    .flags = info.dwFileAttributes,
+  };
   return props;
 }
 
 FileProperties os_properties_from_file_path(String path) {
   Scratch scratch;
-  FileProperties props = {};
   String path_c = push_str_copy(scratch, path);
-
+  
   WIN32_FILE_ATTRIBUTE_DATA info;
-  b32 success = GetFileAttributesExA((char*)path_c.str, GetFileExInfoStandard, &info);
-  if (success) {
-    props.size = Compose64Bit(info.nFileSizeHigh, info.nFileSizeLow);
-    props.modified = Compose64Bit(info.ftLastWriteTime.dwHighDateTime, info.ftLastWriteTime.dwLowDateTime);
-    props.created = Compose64Bit(info.ftCreationTime.dwHighDateTime, info.ftCreationTime.dwLowDateTime);
-    props.flags = info.dwFileAttributes;
-  }
+  GetFileAttributesExA((char*)path_c.str, GetFileExInfoStandard, &info);
+  FileProperties props = {
+    .size = Compose64Bit(info.nFileSizeHigh, info.nFileSizeLow),
+    .modified = Compose64Bit(info.ftLastWriteTime.dwHighDateTime, info.ftLastWriteTime.dwLowDateTime),
+    .created = Compose64Bit(info.ftCreationTime.dwHighDateTime, info.ftCreationTime.dwLowDateTime),
+    .flags = info.dwFileAttributes,
+  };
   return props;
 }
 
@@ -439,7 +428,7 @@ b32 os_file_path_exists(String path) {
 String os_exe_filename(Arena* arena) {
   u8* buff = push_buffer(arena, 512);
   DWORD size = GetModuleFileNameA(0, (char*)buff, 512);
-  return str(buff, size);
+  return String(buff, size);
 }
 
 b32 os_file_compare_time(u64 new_write_time, u64 last_write_time) {
@@ -449,10 +438,16 @@ b32 os_file_compare_time(u64 new_write_time, u64 last_write_time) {
   return false;
 }
 
-String os_get_current_path(Arena* arena) {
-  u8* buff = push_buffer(arena, 512);
-  u32 length = GetCurrentDirectoryA(512, (char*)buff);
-  return str(buff, length);
+String os_get_current_directory() {
+  return st.binary_directory;
+}
+
+String os_get_current_binary_name() {
+  return st.binary_name;
+}
+
+String os_get_current_filepath() {
+  return st.binary_filepath;
 }
 
 OS_Handle os_lib_open(String path) {
@@ -527,7 +522,7 @@ void clock_stop(Clock *clock) {
 }
 
 ///////////////////////////////////////////////////////////////////////////
-// Win proc
+// WinProc
 LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 internal LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARAM l_param) {
   ImGui_ImplWin32_WndProcHandler(hwnd, msg, w_param, l_param);
@@ -571,9 +566,9 @@ internal LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_par
       
       u32 x = GET_X_LPARAM(l_param);
       u32 y = GET_Y_LPARAM(l_param);
-      if (!st.is_mouse) {
-        SetCursorPos(center.x, center.y);
-      }
+      // if (!st.is_mouse) {
+      //   SetCursorPos(center.x, center.y);
+      // }
       
       st.process_mouse_move(x, y);
     } break;

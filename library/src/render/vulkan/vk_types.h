@@ -188,9 +188,7 @@ struct VK {
 
   v2 viewport_size;
   
-#ifdef _DEBUG
   VkDebugUtilsMessengerEXT debug_messenger;
-#endif
 };
 
 extern VK vk;

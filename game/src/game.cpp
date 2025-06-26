@@ -18,7 +18,7 @@ GameState* st;
 void cubes_position_update() {
   Loop (i, st->cubes.count) {
     Entity& cube = st->cubes.data[i];
-    cube.pos.y += 0.1;
+    // cube.pos.y += 0.1;
     // cube.rot.x += 0.01;
 
   }
@@ -120,9 +120,10 @@ void app_init(u8** state) {
 
   // Mesh
   {
+    u32 vert_count = sizeof(cube_vertices) / 32;
     Geometry cube_geom = {
       .name = "cube",
-      .vertex_count = sizeof(cube_vertices) / sizeof(Vertex3D),
+      .vertex_count = vert_count,
       .vertex_size = sizeof(Vertex3D),
       .vertices = cube_vertices,
     };

@@ -152,7 +152,7 @@ INLINE constexpr u32 _component_get_id(String component_name) {
   return ecs.hashed_id_to_component_id[hashed_id];
 }
 #define component_get_id(T) \
-  _component_get_id(str_lit(Stringify(T)))
+  _component_get_id(String(Stringify(T)))
 
 // entity
 
@@ -305,7 +305,7 @@ inline void _component_add(Entity e, String component_name) {
   move_entity(archetype, e, component_id);
 }
 #define component_add(entity, T) \
-  _component_add(entity, str_lit(Stringify(T)))
+  _component_add(entity, String(Stringify(T)))
 
 inline void new_component_enqueue(String component_name, u32 component_size) {
   u32 hashed_id = hash_name_at_compile(component_name);
@@ -329,7 +329,7 @@ inline void new_component_queue_register() {
 #define Component(T)                                           \
   struct Glue(__, T) {                                         \
     Glue(__, T)() {                                            \
-      new_component_enqueue(str_lit(Stringify(T)), sizeof(T)); \
+      new_component_enqueue(String(Stringify(T)), sizeof(T)); \
     }                                                          \
   };                                                           \
   static Glue(__, T) Glue(__variable, T);
@@ -349,7 +349,7 @@ inline void new_tag_queue_register() {
 #define Tag(T)                            \
   struct Glue(__, T) {                    \
     Glue(__, T)() {                       \
-      tag_enqueue(str_lit(Stringify(T))); \
+      tag_enqueue(String(Stringify(T))); \
     }                                     \
   };                                      \
   static Glue(__, T) Glue(__variable, T);
@@ -451,7 +451,7 @@ inline b32 query_next(QueryIter& it) {
 }
 
 #define query_get(...) \
-  _query_get(str_lit(#__VA_ARGS__))
+  _query_get(String(#__VA_ARGS__))
 
 inline void* _it_component_get(QueryIter& it, u32 component_id) {
   Archetype* archetype = &ecs.archetypes[it.archetypes_id[it.current-1]];

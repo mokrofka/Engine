@@ -13,3 +13,7 @@ struct Time {
     Info("%f", end - start);
   }
 };
+
+KAPI void test(String name) {
+  
+}
