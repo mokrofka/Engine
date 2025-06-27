@@ -1,4 +1,5 @@
 #pragma once
+#include "defines.h"
 
 KAPI void* _darray_create(u32 length, u32 stride);
 

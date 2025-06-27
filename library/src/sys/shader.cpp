@@ -5,15 +5,17 @@
 #include "res.h"
 
 struct ShaderSysState {
+  Arena* arena;
   HashMap hashmap;
   u32 shader_count;
 };
 
 global ShaderSysState st;
 
-#define MaxShaderCount KB(1)
-void shader_init(Arena* arena) {
-  st.hashmap = hashmap_create(arena, sizeof(u32), MaxShaderCount);
+#define MaxShaderCount 256
+void shader_init() {
+  st.arena = mem_arena_alloc(KB(1));
+  st.hashmap = hashmap_create(st.arena, sizeof(u32), MaxShaderCount);
   u32 invalid_id = INVALID_ID;
   hashmap_fill(st.hashmap, &invalid_id);
 

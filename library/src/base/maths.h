@@ -1,4 +1,5 @@
 #pragma once
+#include "defines.h"
 
 #define PI            3.14159265358f
 #define Two_PI        6.28318530718f

@@ -10,10 +10,10 @@ struct RendererSystemState {
 
 global RendererSystemState st;
 
-void r_init(Arena* arena) {
+void r_init() {
   st.is_render = true;
   
-  Arena* render_arena = arena_alloc(arena, MB(1));
+  Arena* render_arena = mem_arena_alloc(MB(1));
   vk_r_backend_init(render_arena);
 }
 

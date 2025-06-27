@@ -44,10 +44,9 @@ global LARGE_INTEGER start_time;
 
 void entry_point();
 internal LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARAM l_param);
-void w32_entry_point_caller(void (*main)()) {
-  global_allocator_init();
-  tctx_init();
-  
+
+KAPI void os_init() {
+  st.arena = mem_arena_alloc(KB(1));
   st.instance = GetModuleHandleA(null);
 
   // Clock
@@ -68,32 +67,26 @@ void w32_entry_point_caller(void (*main)()) {
   Scratch scratch;
   u8* buff = push_buffer(scratch, 512);
   u32 size = GetModuleFileNameA(0, (char*)buff, 512);
+  String name = push_str_copy(st.arena, String(buff, size));
 
-  st.binary_filepath = String(buff, size);
-  st.binary_directory = str_chop_last_slash(String(buff, size));
+  st.binary_filepath = name;
+  st.binary_directory = str_chop_last_slash(name);
   st.binary_name = str_skip_last_slash(st.binary_filepath);
+}
 
+void base_main_thread_entry(void (*entry)());
 #ifdef MONOLITHIC_BUILD
-  entry_point();
-#else
-  main();
-#endif
-}
-
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
-  w32_entry_point_caller(null);
+  base_main_thread_entry(entry_point);
 }
+#endif
 
-KAPI void os_entry_point(void (*main)()) {
-  w32_entry_point_caller(main);
+KAPI void os_entry_point(void (*entry)()) {
+  base_main_thread_entry(entry);
 }
 
 void os_window_create(WindowConfig config) {
-  st.window.name = config.name;
-
-  st.window.width = config.width;
-  st.window.height = config.height;
-  
+  Scratch scratch;
   u32 client_x = config.position_x;
   u32 client_y = config.position_y;
   u32 client_width = config.width;
@@ -124,18 +117,23 @@ void os_window_create(WindowConfig config) {
   window_width += border_rect.right - border_rect.left;
   window_height += border_rect.bottom - border_rect.top;
 
+  String window_name = os_get_current_binary_name();
+  String name_c = push_str_copy(scratch, window_name);
   HWND handle = CreateWindowExA(
-    window_ex_style, "class", (char*)config.name.str,
+    window_ex_style, "class", (char*)name_c.str,
     window_style, window_x, window_y, window_width, window_height,
     0, 0, st.instance, 0);
 
   if (handle == 0) {
     MessageBoxA(NULL, "window creating failed!", "Error!", MB_ICONEXCLAMATION | MB_OK);
-    
     Error("Window creating failed");
-  } else {
-    st.window.hwnd = handle;
-  }
+  } 
+  st.window = {
+    .name = config.name,
+    .width = config.width,
+    .height = config.height,
+    .hwnd = handle
+  };
 }
 
 void os_pump_messages() {
@@ -222,7 +220,7 @@ void os_mouse_enable() {
 void os_mouse_disable() {
   st.is_mouse = false;
   POINT ul = {0, 0};
-  POINT lr = {st.window.width, st.window.height};
+  POINT lr = {(i32)st.window.width, (i32)st.window.height};
 
   // Convert client coords to screen coords
   ClientToScreen((HWND)st.window.hwnd, &ul);
@@ -572,7 +570,7 @@ internal LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_par
     
     case WM_MOUSEMOVE: // within client area
     case WM_NCMOUSEMOVE: { // within non-client area
-      POINT center = {st.window.width / 2, st.window.height / 2};
+      POINT center = {(i32)st.window.width / 2, (i32)st.window.height / 2};
       ClientToScreen((HWND)st.window.hwnd, &center);
       
       u32 x = GET_X_LPARAM(l_param);

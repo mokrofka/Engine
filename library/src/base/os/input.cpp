@@ -1,3 +1,4 @@
+#include "input.h"
 #include "lib.h"
 
 struct KeyboardState {
@@ -94,6 +95,7 @@ void input_process_mouse_wheel(i32 z_delta) {
   event_fire(EventCode_MouseWheel, 0, context);
 }
 
+////////////////////////////////////////////////////////////////////////
 // keyboard input
 b32 input_is_key_down(Key key) {
   return st.keyboard_current.keys[key] == true;
@@ -119,6 +121,7 @@ b32 input_was_key_released(Key key) {
   return input_is_key_up(key) && input_was_key_down(key);
 }
 
+////////////////////////////////////////////////////////////////////////
 // mouse input
 b32 input_is_button_down(MouseButtons button) {
   return st.mouse_current.buttons[button] == true;

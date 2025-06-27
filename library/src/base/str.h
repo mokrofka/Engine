@@ -1,4 +1,6 @@
 #pragma once
+#include "defines.h"
+#include "mem.h"
 
 INLINE u64 cstr_length(const void* c) {
   const u8* p = (u8*)c;
@@ -138,23 +140,23 @@ KAPI i32 str_index_of(String str, u8 c);
 // ...
 
 // string -> integer
-KAPI b32 str_to_v4(void* str, v4* out_vector);
-KAPI b32 str_to_v3(const char* str, v3* out_vector);
-KAPI b32 str_to_v2(const char* str, v2* out_vector);
-KAPI b32 str_to_f32(const char* str, f32* f);
-KAPI b32 str_to_f64(const char* str, f64* f);
+// KAPI b32 str_to_v4(void* str, v4* out_vector);
+// KAPI b32 str_to_v3(const char* str, v3* out_vector);
+// KAPI b32 str_to_v2(const char* str, v2* out_vector);
+// KAPI b32 str_to_f32(const char* str, f32* f);
+// KAPI b32 str_to_f64(const char* str, f64* f);
 
-KAPI b32 str_to_i8(const char* str, i8* f);
-KAPI b32 str_to_i16(const char* str, i16* f);
-KAPI b32 str_to_i32(const char* str, i32* f);
-KAPI b32 str_to_i64(const char* str, i64* f);
+// KAPI b32 str_to_i8(const char* str, i8* f);
+// KAPI b32 str_to_i16(const char* str, i16* f);
+// KAPI b32 str_to_i32(const char* str, i32* f);
+// KAPI b32 str_to_i64(const char* str, i64* f);
 
-KAPI b32 str_to_u8(const char* str, u8* f);
-KAPI b32 str_to_u16(const char* str, u16* f);
-KAPI b32 str_to_u32(const char* str, u32* f);
-KAPI b32 str_to_u64(const char* str, u64* f);
+// KAPI b32 str_to_u8(const char* str, u8* f);
+// KAPI b32 str_to_u16(const char* str, u16* f);
+// KAPI b32 str_to_u32(const char* str, u32* f);
+// KAPI b32 str_to_u64(const char* str, u64* f);
 
-KAPI b32 str_to_bool(const char* str, b8* f);
+// KAPI b32 str_to_bool(const char* str, b8* f);
 
 // integer -> string
 // ...

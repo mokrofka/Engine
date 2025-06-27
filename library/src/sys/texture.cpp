@@ -13,10 +13,10 @@ struct TextureSystemState {
 
 global TextureSystemState st;
 
-#define MaxTextureCount KB(1)
-void texture_init(Arena* arena) {
-  st.arena = arena_alloc(arena, KB(1));
-  st.hashmap = hashmap_create(arena, sizeof(u32), MaxTextureCount);
+#define MaxTextureCount 256
+void texture_init() {
+  st.arena = mem_arena_alloc(KB(2));
+  st.hashmap = hashmap_create(st.arena, sizeof(u32), MaxTextureCount);
   u32 invalid_id = INVALID_ID;
   hashmap_fill(st.hashmap, &invalid_id);
 }

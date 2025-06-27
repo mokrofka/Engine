@@ -1,3 +1,6 @@
+#pragma once
+#include "base/defines.h"
+
 union EventContext {
   i64 i64[2];
   u64 u64[2];

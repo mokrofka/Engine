@@ -1,3 +1,4 @@
+#include "event.h"
 #include "lib.h"
 
 struct Array {

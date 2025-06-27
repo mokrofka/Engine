@@ -5,7 +5,7 @@
 
 #define DefaultTextureName "default"
 
-KAPI void texture_init(Arena* arena);
+KAPI void texture_init();
 
 KAPI void texture_load(String name);
 KAPI u32 texture_get(String name);

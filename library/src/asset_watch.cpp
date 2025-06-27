@@ -41,7 +41,6 @@ void asset_watch_add(String watch_name, void (*callback)()) {
     .modified = props.modified,
     .callback = callback,
   };
-  Info("%u", props.modified);
   ++st.watches_count;
 }
 

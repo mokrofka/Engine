@@ -8,9 +8,6 @@ struct App {
 
   b8 is_running;
   b8 is_suspended;
-
-  Clock clock;
-  f32 last_time;
   
   u8* state;
   

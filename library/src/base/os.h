@@ -1,4 +1,9 @@
 #pragma once
+#include "defines.h"
+#include "str.h"
+#include "mem.h"
+#include "maths.h"
+
 #include "base/os/input.h"
 #include "base/os/event.h"
 
@@ -15,8 +20,8 @@ struct Window {
   String name;
   String title;
 
-  u16 width;
-  u16 height;
+  u32 width;
+  u32 height;
 
   f32 device_pixel_ratio;
 
@@ -67,6 +72,7 @@ using WindowResizedCallback = void (*)(Window* window);
 using ProcessKeyCallback = void (*)(Key key, b32 pressed);
 using ProcessMouseMoveCallback = void (*)(u32 x, u32 y);
 
+KAPI void os_init();
 KAPI void os_pump_messages();
 
 KAPI void os_window_create(WindowConfig config);

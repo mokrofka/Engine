@@ -1,4 +1,5 @@
 #pragma once
+#include "defines.h"
 
 #define GUARD_MEMORY
 

@@ -2,7 +2,6 @@
 #include "game_types.h"
 #include "game.h"
 
-#include <engine.h>
 #include <render/r_frontend.h>
 #include <sys/geometry.h>
 #include <sys/shader.h>

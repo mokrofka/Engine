@@ -5,6 +5,6 @@
 
 KAPI u32 shader_get(String name);
 
-KAPI void shader_init(Arena* arena);
+KAPI void shader_init();
 
 KAPI u32 shader_create(Shader shader);

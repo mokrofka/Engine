@@ -169,3 +169,9 @@ struct Arena;
 #define quick_sort(ptr, count, element_size, cmp_function) qsort((ptr), (count), (element_size), (int (*)(const void *, const void *))(cmp_function))
 
 KAPI extern f32 delta_time;
+
+#define Main                     \
+  void entry_point();            \
+  int main() {                   \
+    os_entry_point(entry_point); \
+  } void

@@ -4,7 +4,7 @@
 
 #include "r_types.h"
 
-KAPI void r_init(Arena* arena);
+KAPI void r_init();
 KAPI void r_shutdown();
 
 KAPI void r_on_resized(u32 width, u32 height);

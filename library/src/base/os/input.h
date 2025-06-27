@@ -1,3 +1,5 @@
+#pragma once
+#include "base/defines.h"
 
 enum MouseButtons {
   MouseButton_Left,
@@ -162,6 +164,7 @@ enum Key {
 
 KAPI void input_update();
 
+////////////////////////////////////////////////////////////////////////
 // keyboard
 KAPI b32 input_is_key_down(Key key);
 KAPI b32 input_is_key_up(Key key);
@@ -172,6 +175,7 @@ KAPI b32 input_was_key_released(Key key);
 
 KAPI void input_process_key(Key key, b32 pressed);
 
+////////////////////////////////////////////////////////////////////////
 // mouse
 KAPI b32 input_is_button_down(MouseButtons button);
 KAPI b32 input_is_button_up(MouseButtons button);

@@ -1,17 +1,8 @@
 #include "camera.h"
 #include "game_types.h"
-#include "engine.h"
-#include "render/r_frontend.h"
 
 void view_matrix_update() {
   if (st->camera.view_dirty) {
-    // mat4 translation = mat4_translation(st->camera.position);
-    // mat4 rotaion = mat4_euler_xyz(st->camera.direction.x, st->camera.direction.y, st->camera.direction.z);
-    
-    // st->camera.view = translation * rotaion;
-    // st->camera.view = mat4_inverse(st->camera.view);
-    
-    
     Camera* camera = &st->camera;
     st->camera.pitch = Clamp(-89.0f, st->camera.pitch, 89.0f);
 
