@@ -18,8 +18,9 @@ struct Entity {
   v3 scale;
   v3 rot;
   v3 color;
-  v3 direction;
-  struct DirectionalLight* dir_light;
+  struct PointLight* point_light;
+  struct DirLight* dir_light;
+  struct SpotLight* spot_light;
 };
 
 struct SparseSetEntity {
@@ -77,3 +78,5 @@ struct GameState {
 
   b8 is_mouse_move;
 };
+
+extern GameState* st;

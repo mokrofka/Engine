@@ -3,8 +3,10 @@
   "tasks": [
     {
       "label": "Run My Batch File",
-      "type": "shell",
-      "command": "${workspaceFolder}\\post-build.bat",
+      // "type": "shell",
+      "type": "process",
+      // "command": "${workspaceFolder}\\post-build.bat",
+      "command": "${workspaceFolder}\\shader_compiler.exe",
       "problemMatcher": [],
       "group": {
         "kind": "build",
