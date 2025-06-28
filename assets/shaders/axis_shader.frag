@@ -7,9 +7,7 @@ layout(location = 0) in in_data {
   vec3 in_color;
 };
 
-
 void main() {
   out_color = vec4(in_color, 1);
 } 
-
 
