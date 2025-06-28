@@ -3,7 +3,7 @@
 
 #include "render/r_types.h"
 
-KAPI void geometry_init(Arena* arena);
+KAPI void geometry_init();
 
 KAPI u32 geometry_create(Geometry& geometry);
 KAPI void geometry_destroy(u32 id);

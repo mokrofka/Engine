@@ -61,16 +61,16 @@ void asset_watch_update() {
   Loop (i, st.watches_count) {
     FileProperties props = os_properties_from_file_path(st.watches[i].path);
     u64 new_write_time = props.modified;
-    b32 game_modified = os_file_compare_time(new_write_time, st.watches[i].modified);
-    if (game_modified) {
+    b32 is_modified = os_file_compare_time(new_write_time, st.watches[i].modified);
+    if (is_modified) {
       st.watches[i].callback();
       st.watches[i].modified = props.modified;
     }
   }
 
   Loop (i, st.directories_count) {
-    b32 yea = os_directory_check_change(st.directories[i].dir_handle, i);
-    if (yea) {
+    b32 is_modifed = os_directory_check_change(st.directories[i].dir_handle, i);
+    if (is_modifed) {
       String name = os_directory_name_change(scratch, i);
       os_directory_watch(st.directories[i].dir_handle, i);
       st.directories[i].callback(name);

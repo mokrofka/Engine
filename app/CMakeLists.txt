@@ -33,7 +33,3 @@ else ()
 
   add_compile_definitions()
 endif()
-
-# set_target_properties(app PROPERTIES
-#   WIN32_EXECUTABLE ON
-# )

@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.5.0)
 project(BuildEverything)
 
-option(build_one_exe "" false)
+option(build_one_exe "" false) # NOTE you need manually set it up
+# cmake -B build -S . -Dbuild_one_exe=true
 
 add_compile_options(-Wuninitialized -fno-exceptions -fno-rtti -Wno-writable-strings )
 
@@ -26,4 +27,6 @@ else ()
   add_subdirectory(app)
 endif()
 
-# cmake -B build -S . -Dbuild_one_exe=true
+set_target_properties(app PROPERTIES
+  WIN32_EXECUTABLE off
+)

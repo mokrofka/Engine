@@ -33,7 +33,8 @@ struct OS_State {
   String binary_filepath;
   String binary_directory;
 };
-f32 delta_time; // maybe put somewhere else
+
+f32 delta_time;
 
 global OS_State st;
 
@@ -46,7 +47,6 @@ void entry_point();
 internal LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARAM l_param);
 
 KAPI void os_init() {
-  st.arena = mem_arena_alloc(KB(1));
   st.instance = GetModuleHandleA(null);
 
   // Clock
@@ -64,6 +64,10 @@ KAPI void os_init() {
   };
   RegisterClassA(&wc);
 
+  global_allocator_init();
+  tctx_init();
+
+  st.arena = mem_arena_alloc(KB(1));
   Scratch scratch;
   u8* buff = push_buffer(scratch, 512);
   u32 size = GetModuleFileNameA(0, (char*)buff, 512);
@@ -128,12 +132,14 @@ void os_window_create(WindowConfig config) {
     MessageBoxA(NULL, "window creating failed!", "Error!", MB_ICONEXCLAMATION | MB_OK);
     Error("Window creating failed");
   } 
+
   st.window = {
     .name = config.name,
     .width = config.width,
     .height = config.height,
     .hwnd = handle
   };
+
 }
 
 void os_pump_messages() {

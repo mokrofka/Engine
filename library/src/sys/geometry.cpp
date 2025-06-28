@@ -3,15 +3,17 @@
 #include "render/r_frontend.h"
 
 struct GeometrySysState {
+  Arena* arena;
   u32 geom_count;
   HashMap hashmap;
 };
 
 GeometrySysState st;
 
-#define MaxGeometryCount 1024
-void geometry_init(Arena* arena) {
-  st.hashmap = hashmap_create(arena, sizeof(u32), MaxGeometryCount);
+#define MaxGeometryCount 256
+void geometry_init() {
+  st.arena = mem_arena_alloc(KB(1));
+  st.hashmap = hashmap_create(st.arena, sizeof(u32), MaxGeometryCount);
   u32 invalid_id = INVALID_ID;
   hashmap_fill(st.hashmap, &invalid_id);
 }

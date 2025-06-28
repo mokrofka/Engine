@@ -4,7 +4,6 @@
 #include "render/r_frontend.h"
 
 #include "asset_watch.h"
-#include "ui.h"
 #include "test.h"
 
 App st;
@@ -16,16 +15,26 @@ internal b32 app_on_key(u32 code, void* sender, void* listener_inst, EventContex
 internal b32 app_on_resized(u32 code, void* sender, void* listener_inst, EventContext context);
 
 Main entry_point() {
+  os_init();
+  st.is_running = true;
+
+  WindowConfig config = {
+    .position_x = 100,
+    .position_y = 100,
+    .width = 1000,
+    .height = 600,
+  };
+  os_window_create(config);
+  r_init();
   Scratch scratch;
-  st.arena = mem_arena_alloc(KB(1));
 
 #ifdef MONOLITHIC_BUILD
   st.init = app_init;
   st.update = app_update;
 #else
   String current_dir = os_get_current_directory();
-  st.lib_filepath = push_str_cat(st.arena, current_dir, "/game.dll");
-  st.lib_temp_filepath = push_str_cat(st.arena, current_dir, "/game_temp.dll");
+  st.lib_filepath = push_str_cat(scratch, current_dir, "/game.dll");
+  st.lib_temp_filepath = push_str_cat(scratch, current_dir, "/game_temp.dll");
   
   os_copy_file_path(st.lib_temp_filepath, st.lib_filepath);
   st.lib = os_lib_open("game_temp.dll");
@@ -54,16 +63,18 @@ Main entry_point() {
   st.init(&st.state);
 
   os_show_window();
-  st.is_running = true;
   
+  f32 last_time = 0;
   while (st.is_running) {
     os_pump_messages();
 
     if (!st.is_suspended) {
-      r_begin_draw_frame();
+      f32 current_time = os_now_seconds();
+      delta_time = current_time - last_time;
+      last_time = current_time;
 
+      r_begin_draw_frame();
       st.update(st.state);
-      
       r_end_draw_frame();
 
       input_update();

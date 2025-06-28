@@ -2,7 +2,6 @@
 #include "lib.h"
 
 struct App {
-  Arena* arena;
   void (*init)(u8** state);
   void (*update)(u8* state);
 

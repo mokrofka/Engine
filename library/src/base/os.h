@@ -67,6 +67,8 @@ struct Buffer {
   u64 size;
 };
 
+KAPI extern f32 delta_time;
+
 using WindowClosedCallback = void (*)();
 using WindowResizedCallback = void (*)(Window* window);
 using ProcessKeyCallback = void (*)(Key key, b32 pressed);
@@ -139,6 +141,5 @@ KAPI void os_is_process_alive();
 KAPI void clock_update(Clock* clock);
 KAPI void clock_start(Clock* clock);
 KAPI void clock_stop(Clock* clock);
-KAPI void os_set_delta_time_second(f64 delta_time);
 
 KAPI void os_show_window();
