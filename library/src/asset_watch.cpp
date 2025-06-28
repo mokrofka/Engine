@@ -14,18 +14,15 @@ struct DirectoryWatch {
   void (*callback)(String name);
 };
 
-struct AssetWatcherState {
+struct AssetWatchState {
   Arena* arena;
   u32 watches_count;
   FileWatch watches[128];
   u32 directories_count;
   DirectoryWatch directories[128];
-
-  // OS_Handle shader_dir_handle;
-  // OS_Handle compiled_shader_dir_handle;
 };
 
-AssetWatcherState st;
+AssetWatchState st;
 
 void asset_watch_init() {
   Scratch scracth;
@@ -71,8 +68,7 @@ void asset_watch_update() {
   Loop (i, st.directories_count) {
     b32 is_modifed = os_directory_check_change(st.directories[i].dir_handle, i);
     if (is_modifed) {
-      String name = os_directory_name_change(scratch, i);
-      os_directory_watch(st.directories[i].dir_handle, i);
+      String name = os_directory_watch_pop_name(scratch, st.directories[i].dir_handle, i);
       st.directories[i].callback(name);
     }
   }

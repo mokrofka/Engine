@@ -114,7 +114,7 @@ KAPI b32 os_commit_large(void* ptr, u64 size);
 KAPI OS_Handle      os_file_open(String path, OS_AccessFlags flags);
 KAPI OS_Handle      os_directory_open(String path);
 KAPI void           os_directory_watch(OS_Handle dir_handle, u32 id);
-KAPI String         os_directory_name_change(Arena* arena, u32 id);
+KAPI String         os_directory_watch_pop_name(Arena* arena, OS_Handle dir, u32 id);
 KAPI b32            os_directory_check_change(OS_Handle dir_handle, u32 id);
 KAPI void           os_file_close(OS_Handle file);
 KAPI u64            os_file_read(OS_Handle file, u64 size, u8* out_data);

@@ -24,12 +24,9 @@ if (build_one_exe)
   target_link_libraries(app Vulkan::Vulkan)
   
   add_compile_definitions(MONOLITHIC_BUILD)
-
 else ()
   file(GLOB_RECURSE ExeSrc ${CMAKE_SOURCE_DIR}/app/src/*.cpp)
   add_executable(app ${ExeSrc})
 
   target_link_libraries(app "${CMAKE_SOURCE_DIR}/bin/library.lib")
-
-  add_compile_definitions()
 endif()

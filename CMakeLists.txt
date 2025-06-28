@@ -28,5 +28,5 @@ else ()
 endif()
 
 set_target_properties(app PROPERTIES
-  WIN32_EXECUTABLE off
+  WIN32_EXECUTABLE false
 )

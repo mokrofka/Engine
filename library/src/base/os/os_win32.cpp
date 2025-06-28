@@ -306,8 +306,9 @@ OS_Handle os_file_open(String path, OS_AccessFlags mode) {
 }
 
 #define MaxDirectoryWatches 20
+#define DirectoryWatchSize 128
 OVERLAPPED overlapped[MaxDirectoryWatches];
-u8 buffer[KB(1) * MaxDirectoryWatches];
+u8 buffer[DirectoryWatchSize * MaxDirectoryWatches];
 
 OS_Handle os_directory_open(String path) {
   Scratch scratch;
@@ -330,34 +331,25 @@ OS_Handle os_directory_open(String path) {
 
 void os_directory_watch(OS_Handle dir_handle, u32 id) {
   DWORD bytes_returned;
+  // Start watching for directory changes
   BOOL success = ReadDirectoryChangesW(
       (HANDLE)dir_handle,
-      &buffer[id * KB(1)],
-      KB(1),
+      &buffer[id * DirectoryWatchSize],
+      DirectoryWatchSize,
       false, // monitor subdirectories too
       FILE_NOTIFY_CHANGE_LAST_WRITE,
       &bytes_returned,
       &overlapped[id],
       NULL);
 
-  // NOTE twice because of windows
-  success = ReadDirectoryChangesW(
-      (HANDLE)dir_handle,
-      &buffer[id * KB(1)],
-      KB(1),
-      false,
-      FILE_NOTIFY_CHANGE_LAST_WRITE,
-      &bytes_returned,
-      &overlapped[id],
-      NULL);
   if (!success) {
     Error("ReadDirectoryChangesW failed. Error: %u", GetLastError());
     return;
   }
 }
 
-String os_directory_name_change(Arena* arena, u32 id) {
-  FILE_NOTIFY_INFORMATION* info = (FILE_NOTIFY_INFORMATION*)&buffer[id*KB(1)];
+String os_directory_watch_pop_name(Arena* arena, OS_Handle dir, u32 id) {
+  FILE_NOTIFY_INFORMATION* info = (FILE_NOTIFY_INFORMATION*)&buffer[id*DirectoryWatchSize];
   String filename;
   do {
     filename = push_str_wchar(arena, info->FileName, info->FileNameLength / 2);
@@ -367,6 +359,30 @@ String os_directory_name_change(Arena* arena, u32 id) {
       break;
     info = (FILE_NOTIFY_INFORMATION*)((BYTE*)info + info->NextEntryOffset);
   } while (true);
+
+  // NOTE: first ReadDirectoryChangesW - rearm overlapped dinge
+  DWORD bytes_returned;
+  BOOL success = ReadDirectoryChangesW(
+      (HANDLE)dir,
+      &buffer[id * DirectoryWatchSize],
+      DirectoryWatchSize,
+      false, // monitor subdirectories too
+      FILE_NOTIFY_CHANGE_LAST_WRITE,
+      &bytes_returned,
+      &overlapped[id],
+      NULL);
+
+  // NOTE second ReadDirectoryChangesW - makes sure it's really rearmed since overlapped dinge several times returns true when only once rearmed
+  success = ReadDirectoryChangesW(
+      (HANDLE)dir,
+      &buffer[id * DirectoryWatchSize],
+      DirectoryWatchSize,
+      false,
+      FILE_NOTIFY_CHANGE_LAST_WRITE,
+      &bytes_returned,
+      &overlapped[id],
+      NULL);
+
   return filename;
 }
 
