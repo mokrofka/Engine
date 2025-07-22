@@ -81,8 +81,8 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
 internal void buffers_create();
 internal void vk_resize_viewport();
 
-void instance_create() {
-  v2i framebuffer_extent = os_get_framebuffer_size();
+void vk_instance_create() {
+  v2u framebuffer_extent = os_get_framebuffer_size();
   vk.frame.width =  framebuffer_extent.x;
   vk.frame.height = framebuffer_extent.y;
 
@@ -91,24 +91,21 @@ void instance_create() {
     .apiVersion = VK_API_VERSION_1_3
   };
   
-  // Obtain a list of required extensions
-  char* required_extensions[3] = {
+  const char* required_extensions[] = {
     VK_KHR_SURFACE_EXTENSION_NAME,
     VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-    "VK_KHR_win32_surface",
+    vk_surface_extension_name()
   };
+
+  const char* required_validation_layer_names[1];
+  u32 required_validation_layer_count = 0;
+
 #if _DEBUG
   Debug("Required extensions:");
   Loop (i, ArrayCount(required_extensions)) {
     Debug(String(required_extensions[i]));
   }
-#endif
 
-  char* required_validation_layer_names[1];
-  u32 required_validation_layer_count = 0;
-  
-#if defined(_DEBUG)
-  Info("Validation layers enabled. Enumerating...");
   required_validation_layer_names[0] = "VK_LAYER_KHRONOS_validation";
   
   u32 available_layer_count = 0;
@@ -117,23 +114,18 @@ void instance_create() {
   VkLayerProperties* available_layers = push_array(vk.arena, VkLayerProperties, available_layer_count);
   VK_CHECK(vkEnumerateInstanceLayerProperties(&available_layer_count, available_layers));
 
-  // Verify all required layers are available.
   Loop (i, ArrayCount(required_validation_layer_names)) {
-    Info("Searching for layer: %s...", String(required_validation_layer_names[i]));
     b32 found = false;
     Loop (j, available_layer_count) {
       if (str_match(required_validation_layer_names[i], available_layers[j].layerName)) {
         ++available_layer_count;
         found = true;
-        Info("Found");
+        Info("Validation layer %s found", String(required_validation_layer_names[i]));
         break;
       }
     }
-    if (!found) {
-      Fatal("Required validation layer is missing: %s", String(required_validation_layer_names[i]));
-    }
+    AssertMsg(found, "Required validation layer is missing: %s", String(required_validation_layer_names[i]));
   }
-  Info("All required validation layers are present");
 #endif
 
   VkInstanceCreateInfo instance_create_info = {
@@ -148,16 +140,12 @@ void instance_create() {
   VK_CHECK(vkCreateInstance(&instance_create_info, vk.allocator, &vk.instance));
   Info("Vulkan insance created");
 
-  // Debugger
-#ifdef _DEBUG
-  Debug("Creating Vulkan debugger...");
-  u32 log_severity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
-                     VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                     VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT;
-
+#if _DEBUG
   VkDebugUtilsMessengerCreateInfoEXT debug_create_info = {
     .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-    .messageSeverity = log_severity,
+    .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
+                       VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                       VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT,
     .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
                    VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT |
                    VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT,
@@ -175,7 +163,6 @@ void instance_create() {
 void vk_r_backend_init(Arena* arena) {
   vk.arena = arena;
   
-  // NOTE: custom allocator.
 #ifdef VulkanUseAllocator
   vk._allocator = vk_allocator_create();
   vk.allocator = &vk._allocator;
@@ -183,12 +170,9 @@ void vk_r_backend_init(Arena* arena) {
   vk.allocator = 0;
 #endif
 
-  instance_create();
-  
+  vk_instance_create();
   vk_surface_create();
-
   vk_device_create();
-
   vk_swapchain_create(vk.frame.width, vk.frame.height);
 
   Loop (i, FramesInFlight) {
@@ -214,62 +198,75 @@ void vk_r_backend_init(Arena* arena) {
   vk_shader_init();
   vk_draw_init();
 
-  Loop (i, ImagesInFlight) {
-    vk.texture_targets[i].image = vk_image_create(
+  // Target texture render
+  {
+    Loop (i, ImagesInFlight) {
+      vk.texture_targets[i].image = vk_image_create(
+        VK_IMAGE_TYPE_2D,
+        vk.frame.width, vk.frame.height,
+        VK_FORMAT_R8G8B8A8_UNORM,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        true,
+        VK_IMAGE_ASPECT_COLOR_BIT);
+
+      VkSamplerCreateInfo sampler_info = {
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .magFilter = VK_FILTER_LINEAR,
+        .minFilter = VK_FILTER_LINEAR,
+        .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+        .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+        .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+        .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+        .mipLodBias = 0.0f,
+        .anisotropyEnable = VK_FALSE,
+        .maxAnisotropy = 1,
+        .compareEnable = VK_FALSE,
+        .compareOp = VK_COMPARE_OP_ALWAYS,
+        .minLod = 0.0f,
+        .maxLod = 0.0f,
+        .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+        .unnormalizedCoordinates = VK_FALSE,
+      };
+      VK_CHECK(vkCreateSampler(vkdevice, &sampler_info, vk.allocator, &vk.texture_targets[i].sampler));
+    }
+
+    vk.offscreen_depth_buffer = vk_image_create(
       VK_IMAGE_TYPE_2D,
-      vk.frame.width, vk.frame.height,
-      VK_FORMAT_R8G8B8A8_UNORM,
+      vk.frame.width,
+      vk.frame.height,
+      vk.device.depth_format,
       VK_IMAGE_TILING_OPTIMAL,
-      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
       true,
-      VK_IMAGE_ASPECT_COLOR_BIT);
-
-    VkSamplerCreateInfo sampler_info = {
-      .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-      .magFilter = VK_FILTER_LINEAR,
-      .minFilter = VK_FILTER_LINEAR,
-      .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
-      .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-      .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-      .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-      .mipLodBias = 0.0f,
-      .anisotropyEnable = VK_FALSE,
-      .maxAnisotropy = 1,
-      .compareEnable = VK_FALSE,
-      .compareOp = VK_COMPARE_OP_ALWAYS,
-      .minLod = 0.0f,
-      .maxLod = 0.0f,
-      .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
-      .unnormalizedCoordinates = VK_FALSE,
-    };
-    VK_CHECK(vkCreateSampler(vkdevice, &sampler_info, vk.allocator, &vk.texture_targets[i].sampler));
+      VK_IMAGE_ASPECT_DEPTH_BIT);
   }
 
-  vk.offscreen_depth_buffer = vk_image_create(
-    VK_IMAGE_TYPE_2D,
-    vk.frame.width,
-    vk.frame.height,
-    vk.device.depth_format,
-    VK_IMAGE_TILING_OPTIMAL,
-    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    true,
-    VK_IMAGE_ASPECT_DEPTH_BIT);
-  vk.viewport_size = v2(vk.frame.width, vk.frame.height);
-  event_register(EventCode_ViewportResized, &vk.is_viewport_resized, [](u32 code, void* sender, void* listener_inst, EventContext context)->b32 {
-    f32 width = context.u32[0];
-    f32 height = context.u32[1];
-    vk.viewport_size = {width, height};
-    vk.is_viewport_resized = true;
-    return false;
-  });
+  // Viewport mode
+  vk.is_viewport_render = true;
+  {
+    auto event_reg = [](u32 code, void* sender, void* listener_inst, EventContext context)->b32 {
+      f32 width = context.u16[0];
+      f32 height = context.u16[1];
+      vk.viewport_size = {width, height};
+      vk.is_viewport_resized = true;
+      return false;
+    };
 
-  Info("Vulkan renderer initialized successfully");
+    if (vk.is_viewport_mode) {
+      event_register(EventCode_ViewportResized, &vk.is_viewport_resized, event_reg);
+    } else {
+      event_register(EventCode_Resized, &vk.is_viewport_resized, event_reg);
+    }
+  }
+
+  Info("Vulkan renderer initialized");
 }
 
 void vk_r_backend_shutdown() {
-  vkDeviceWaitIdle(vkdevice);
+  VK_CHECK(vkDeviceWaitIdle(vkdevice));
   
   // Sync objects
   Loop (i, FramesInFlight) {
@@ -306,21 +303,18 @@ void vk_r_backend_shutdown() {
   vkDestroyInstance(vk.instance, vk.allocator);
 }
 
-void vk_r_backend_on_resize(u32 width, u32 height) {
+void vk_r_on_resized(u32 width, u32 height) {
   vk.frame.width = width;
   vk.frame.height = height;
   ++vk.frame.size_generation;
   
-  Info("Vulkan renderer backend->resized: w/h/gen %i/%i/%i", width, height, vk.frame.size_generation);
+  // Debug("Vulkan renderer backend->resized: w/h/gen %i/%i/%i", width, height, vk.frame.size_generation);
 }
 
 void vk_r_backend_begin_frame() {
   if (vk.frame.size_generation != vk.frame.size_last_generation) {
     VK_CHECK(vkDeviceWaitIdle(vkdevice));
-    
     vk_swapchain_recreate(vk.frame.width, vk.frame.height);
-    
-    Info("Resized, booting");
   }
 
   if (vk.is_viewport_resized) {
@@ -328,6 +322,8 @@ void vk_r_backend_begin_frame() {
       vk.is_viewport_render = false;
     } else {
       vk_resize_viewport();
+
+      vk.is_viewport_resized = false;
       vk.is_viewport_render = true;
     }
   }
@@ -341,16 +337,16 @@ void vk_r_backend_begin_frame() {
   
   VkViewport viewport = {
     .x = 0.0f,
-    .y = vk.viewport_size.y,
-    .width = vk.viewport_size.x,
-    .height = -(f32)vk.viewport_size.y,
+    .y = (f32)vk.frame.height,
+    .width = (f32)vk.frame.width,
+    .height = -(f32)vk.frame.height,
     .minDepth = 0.0f,
     .maxDepth = 1.0f,
   };
   
   VkRect2D scissor = {
     .offset = {.x = 0, .y = 0},
-    .extent = { .width = (u32)vk.viewport_size.x, .height = (u32)vk.viewport_size.y },
+    .extent = {.width = (u32)vk.frame.width, .height = (u32)vk.frame.height},
   };
   
   vkCmdSetViewport(cmd, 0, 1, &viewport);
@@ -413,6 +409,7 @@ void vk_r_begin_renderpass(u32 renderpass_id) {
         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
         .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .image = vk.texture_targets[vk.frame.image_index].image.handle,
+        // .image = vk.swapchain.images[vk.frame.image_index],
         .subresourceRange = {
           .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
           .baseMipLevel = 0,
@@ -425,15 +422,18 @@ void vk_r_begin_renderpass(u32 renderpass_id) {
         cmd,
         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        0,
-        0, null, 0, null,
+        NoFlags,
+        0, null,
+        0, null,
         1, &barrier);
 
       VkRenderingAttachmentInfo color_attachment = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
         .imageView = vk.texture_targets[vk.frame.image_index].image.view,
+        // .imageView = vk.swapchain.views[vk.frame.image_index],
         .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        // .loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE, // NOTE: maybe when add cubemap
         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
         .clearValue = {
           .color = {0.1f, 0.1f, 0.1f, 1.0f}
@@ -441,13 +441,14 @@ void vk_r_begin_renderpass(u32 renderpass_id) {
       };
 
       // Depth
-      VkImageMemoryBarrier depthBarrier = {
+      VkImageMemoryBarrier depth_barrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .srcAccessMask = 0,
         .dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
         .newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
         .image = vk.offscreen_depth_buffer.handle,
+        // .image = vk.swapchain.depth_attachment.handle,
         .subresourceRange = {
           .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
           .baseMipLevel = 0,
@@ -460,14 +461,15 @@ void vk_r_begin_renderpass(u32 renderpass_id) {
         cmd,
         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
         VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-        0,
+        NoFlags,
         0, null,
         0, null,
-        1, &depthBarrier);
+        1, &depth_barrier);
 
       VkRenderingAttachmentInfo depth_attachment = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
         .imageView = vk.offscreen_depth_buffer.view,
+        // .imageView = vk.swapchain.depth_attachment.view,
         .imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
@@ -481,7 +483,8 @@ void vk_r_begin_renderpass(u32 renderpass_id) {
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
         .renderArea = {
           .offset = {.x = 0, .y = 0}, 
-          .extent = {.width = (u32)vk.viewport_size.x, .height = (u32)vk.viewport_size.y}
+          // .extent = {.width = (u32)vk.viewport_size.x, .height = (u32)vk.viewport_size.y}
+          .extent = {.width = (u32)vk.frame.width, .height = (u32)vk.frame.height}
         },
         .layerCount = 1,
         .colorAttachmentCount = 1,
@@ -493,7 +496,58 @@ void vk_r_begin_renderpass(u32 renderpass_id) {
     } break;
     case Renderpass_UI: {
 
-      // Color
+      // // Color
+      // VkImageMemoryBarrier barrier = {
+      //   .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+      //   .srcAccessMask = 0,
+      //   .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+      //   .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+      //   .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+      //   .image = vk.swapchain.images[vk.frame.image_index],
+      //   .subresourceRange = {
+      //     .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+      //     .baseMipLevel = 0,
+      //     .levelCount = 1,
+      //     .layerCount = 1,
+      //   },
+      // };
+
+      // vkCmdPipelineBarrier(
+      //   cmd,
+      //   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+      //   VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+      //   NoFlags,
+      //   0, null, 0, null,
+      //   1, &barrier);
+
+      // VkRenderingAttachmentInfo color_attachment = {
+      //   .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+      //   .imageView = vk.swapchain.views[vk.frame.image_index],
+      //   .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+      //   .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+      //   .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+      //   .clearValue = { 
+      //     .color = {0.01f, 0.01f, 0.01f, 1.0f},
+      //   },
+      // };
+
+      // // Start pass
+      // VkRenderingInfo render_info = {
+      //   .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+      //   .renderArea = {
+      //     .offset = {.x = 0, .y = 0}, 
+      //     .extent = { .width = vk.frame.width, .height = vk.frame.height }
+      //   },
+      //   .layerCount = 1,
+      //   .colorAttachmentCount = 1,
+      //   .pColorAttachments = &color_attachment,
+      // };
+
+
+      // vkCmdBeginRendering(cmd, &render_info);
+    } break;
+
+    case Renderpass_Screen: {
       VkImageMemoryBarrier barrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .srcAccessMask = 0,
@@ -502,7 +556,7 @@ void vk_r_begin_renderpass(u32 renderpass_id) {
         .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .image = vk.swapchain.images[vk.frame.image_index],
         .subresourceRange = {
-          .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+          .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
           .baseMipLevel = 0,
           .levelCount = 1,
           .layerCount = 1,
@@ -511,11 +565,13 @@ void vk_r_begin_renderpass(u32 renderpass_id) {
 
       vkCmdPipelineBarrier(
         cmd,
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-        0,
-        0, null, 0, null,
+        NoFlags,
+        0, null,
+        0, null,
         1, &barrier);
+
 
       VkRenderingAttachmentInfo color_attachment = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
@@ -558,7 +614,7 @@ void vk_r_end_renderpass(u32 renderpass_id) {
       VkImageMemoryBarrier barrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         .image = vk.texture_targets[vk.frame.image_index].image.handle,
@@ -574,35 +630,65 @@ void vk_r_end_renderpass(u32 renderpass_id) {
         cmd,
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-        0,
-        0, null, 0, null,
+        NoFlags,
+        0, null,
+        0, null,
         1, &barrier);
 
       // NOTE transition to present layout
-      // VkImageMemoryBarrier barrier2 = {};
-      // barrier2.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-      // barrier2.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-      // barrier2.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-      // barrier2.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-      // barrier2.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-      // barrier2.image = vk.swapchain.images[vk.frame.image_index];
-      // barrier2.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-      // barrier2.subresourceRange.levelCount = 1;
-      // barrier2.subresourceRange.layerCount = 1;
+      // VkImageMemoryBarrier barrier = {
+      //   .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+      //   .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+      //   .dstAccessMask = 0,
+      //   .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+      //   .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+      //   .image = vk.swapchain.images[vk.frame.image_index],
+      //   .subresourceRange = {
+      //     .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      //     .baseMipLevel = 0,
+      //     .levelCount = 1,
+      //     .layerCount = 1,
+      //   },
+      // };
 
       // vkCmdPipelineBarrier(
-      //     cmd,
-      //     VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-      //     VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-      //     0,
-      //     0, null, 0, null,
-      //     1, &barrier2);
+      //   cmd,
+      //   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+      //   VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+      //   0,
+      //   0, null, 0, null,
+      //   1, &barrier);
 
-      vkCmdEndRendering(cmd);
-    }
-      break;
+        vkCmdEndRendering(cmd);
+    } break;
     case Renderpass_UI: {
 
+      // VkImageMemoryBarrier barrier = {
+      //   .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+      //   .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+      //   .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT,
+      //   .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+      //   .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+      //   .image = vk.swapchain.images[vk.frame.image_index],
+      //   .subresourceRange = {
+      //     .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      //     .baseMipLevel = 0,
+      //     .levelCount = 1,
+      //     .layerCount = 1,
+      //   },
+      // };
+
+      // vkCmdPipelineBarrier(
+      //   cmd,
+      //   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+      //   VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+      //   NoFlags,
+      //   0, null, 0, null,
+      //   1, &barrier);
+          
+    } break;
+
+    case Renderpass_Screen: {
       VkImageMemoryBarrier barrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
@@ -621,12 +707,12 @@ void vk_r_end_renderpass(u32 renderpass_id) {
       vkCmdPipelineBarrier(
         cmd,
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-        0,
-        0, nullptr, 0, nullptr,
+        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+        NoFlags,
+        0, null,
+        0, null,
         1, &barrier);
-          
-      vkCmdEndRendering(cmd);
+
     } break;
     default:
       Assert(true && "wrong id");
@@ -691,8 +777,8 @@ internal void buffers_create() {
 }
 
 internal void vk_resize_viewport() {
-  vkDeviceWaitIdle(vkdevice);
-  Info("view port resize: x = %f y = %f", vk.viewport_size.x, vk.viewport_size.y);
+  VK_CHECK(vkDeviceWaitIdle(vkdevice));
+  Debug("texture target resized: x = %f y = %f", vk.viewport_size.x, vk.viewport_size.y);
 
   Loop (i, ImagesInFlight) {
     vk_image_destroy(vk.texture_targets[i].image);

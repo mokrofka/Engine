@@ -136,9 +136,9 @@ struct SparseSetE {
   u32 entity_to_index[MaxEntities];  
   u32 entities[MaxEntities];  
   u32 count;
+  u32 operator[](u32 i) { return entities[i]; }
   
   inline void add(u32 entity) {
-    // Put new entry at end and update the maps
     u32 new_index = count;
     entity_to_index[entity] = new_index;
     entities[new_index] = entity;

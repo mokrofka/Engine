@@ -17,8 +17,8 @@ GameState* st;
 void cubes_position_update() {
   Loop (i, st->cubes.count) {
     Entity& cube = st->cubes.data[i];
-    // cube.pos.y += 0.1;
-    // cube.rot.x += 0.01;
+    cube.pos.y += 0.001 * delta_time;
+    cube.rot.x += 0.001 * delta_time;
 
   }
 }
@@ -26,37 +26,37 @@ void cubes_position_update() {
 void push_constant_update() {
   Loop (i, st->cubes.count) {
     Entity& e = st->cubes.data[i];
-    PushConstant* push = get_push_constant(e.id);
-    push->model = mat4_transform({.pos = e.pos, .rot = e.rot, .scale = e.scale});
+    PushConstant& push = get_push_constant(e.id);
+    push.model = mat4_transform({.pos = e.pos, .rot = e.rot, .scale = e.scale});
   }
   Loop (i, st->entities.count) {
     Entity& e = st->entities.data[i];
-    PushConstant* push = get_push_constant(e.id);
-    push->model = mat4_transform({.pos = e.pos, .rot = e.rot, .scale = e.scale});
+    PushConstant& push = get_push_constant(e.id);
+    push.model = mat4_transform({.pos = e.pos, .rot = e.rot, .scale = e.scale});
   }
-  Loop (i, st->lights.count) {
-    Entity& e = st->lights.data[i];
+  Loop (i, st->point_lights.count) {
+    Entity& e = st->point_lights.data[i];
 
-    PushConstant* push = get_push_constant(e.id);
-    push->model = mat4_transform({.pos = e.pos, .rot = e.rot, .scale = e.scale});
+    PushConstant& push = get_push_constant(e.id);
+    push.model = mat4_transform({.pos = e.pos, .rot = e.rot, .scale = e.scale});
 
-    ShaderEntity* shader_e = shader_get_entity(e.id);
-    shader_e->color = e.color;
+    ShaderEntity& shader_e = shader_get_entity(e.id);
+    shader_e.color = e.color;
 
-    PointLight* point_light = shader_get_point_light(e.id);
-    point_light->color = e.color;
-    point_light->pos = e.pos;
+    PointLight& point_light = shader_get_point_light(e.id);
+    point_light.color = e.color;
+    point_light.pos = e.pos;
   }
 }
 
 u32 cube_create() {
   Entity e = {
     .id = entity_create(),
-    .pos = v3_zero(),
+    .pos = v3{},
     .scale = v3(1),
   };
   st->cubes.insert_data(e);
-  entity_make_renderable(e.id, geometry_get("cube"), shader_get("texture_shader"));
+  entity_make_renderable(e.id, geometry_get("cube").id, shader_get("texture_shader").id);
   return e.id;
 }
 
@@ -69,17 +69,17 @@ void cube_destroy(Entity* e) {
 Entity light_create() {
   Entity e = {
     .id = entity_create(),
-    .pos = v3_zero(),
+    .pos = v3{},
     .scale = v3(1),
     .color = v3(0.8),
   };
-  st->lights.insert_data(e);
+  st->point_lights.insert_data(e);
   entity_make_point_light(e.id);
-  entity_make_renderable(e.id, geometry_get("cube"), shader_get("color_shader"));
+  entity_make_renderable(e.id, geometry_get("cube").id, shader_get("color_shader").id);
 
-  e.point_light = shader_get_point_light(e.id);
-  *e.point_light = {
-    .color = v3(0),
+  shader_get_point_light(e.id);
+  e.point_light = {
+    .color = v3{},
     .pos = e.pos,
   };
   return e;
@@ -89,7 +89,7 @@ void light_destroy(Entity* e) {
   entity_destroy(e->id);
   entity_remove_renderable(e->id);
   entity_remove_point_light(e->id);
-  st->lights.remove_data(e->id);
+  st->point_lights.remove_data(e->id);
 }
 
 void app_init(u8** state) {
@@ -101,21 +101,26 @@ void app_init(u8** state) {
 
   st->shader_global_state = shader_get_global_state();
   st->cubes.count = 0;
-  st->lights.count = 0;
+  st->point_lights.count = 0;
   st->entities.count = 0;
 
   st->camera.view_dirty = true;
   st->camera.position = v3(0,0, 10);
   st->camera.yaw = -90;
+  // st->camera.pitch = 90;
   st->camera.fov = 45;
 
-  event_register(EventCode_ViewportResized, &st->camera, [](u32 code, void* sender, void* listener_inst, EventContext context)->b32 {
-    f32 width = context.u32[0];
-    f32 height = context.u32[1];
+  auto perspective_projection_event = [](u32 code, void* sender, void* listener_inst, EventContext context)->b32 {
+    f32 width = context.u16[0];
+    f32 height = context.u16[1];
     st->camera.projection = mat4_perspective(deg_to_rad(st->camera.fov), width / height, 0.1f, 1000.0f);
     return false;
-  });
-  entity_init();
+  };
+  if (vk_is_viewport_mode()) {
+    event_register(EventCode_ViewportResized, &st->camera, perspective_projection_event);
+  } else {
+    event_register(EventCode_Resized, &st->camera, perspective_projection_event);
+  }
 
   // Mesh
   {
@@ -131,11 +136,20 @@ void app_init(u8** state) {
   {
     Geometry triangle_geom = {
       .name = "triangle",
-      .vertex_count = ArrayCount(triangle_vertices) / 6,
-      .vertex_size = sizeof(v3) + sizeof(v3),
+      .vertex_count = ArrayCount(triangle_vertices) / 8,
+      .vertex_size = sizeof(v3) + sizeof(v3) + sizeof(v2),
       .vertices = triangle_vertices,
     };
     geometry_create(triangle_geom);
+  }
+  {
+    Geometry triangle_geom_pos = {
+      .name = "triangle_pos",
+      .vertex_count = ArrayCount(triangle_vertices_pos) / 3,
+      .vertex_size = sizeof(v3),
+      .vertices = triangle_vertices_pos,
+    };
+    geometry_create(triangle_geom_pos);
   }
   {
     u32 grid_size = 200;
@@ -170,7 +184,7 @@ void app_init(u8** state) {
   {
     Shader shader = {
       .name = "color_shader",
-      .attribut = {3,3,2},
+      .attribut = {3},
     };
     shader_create(shader);
   }
@@ -200,7 +214,7 @@ void app_init(u8** state) {
     };
     shader_create(shader);
   }
-  
+
   // Texture
   {
     texture_load("orange_lines_512.png");
@@ -211,10 +225,23 @@ void app_init(u8** state) {
     Entity e = {
       .id = entity_create(),
       .pos = v3(0,-1,0),
+      .scale = v3(1),
+    };
+    entity_make_renderable(e.id, geometry_get("grid").id, shader_get("grid_shader").id);
+    st->entities.insert_data(e);
+
+    st->grid_id = e.id;
+  }
+  {
+    Entity e = {
+      .id = entity_create(),
+      .pos = v3{},
       .scale = 1,
     };
-    entity_make_renderable(e.id, geometry_get("grid"), shader_get("grid_shader"));
+    entity_make_renderable(e.id, geometry_get("triangle_pos").id, shader_get("color_shader").id);
     st->entities.insert_data(e);
+
+    st->triangled_id = e.id;
   }
 
   {
@@ -230,72 +257,46 @@ void app_init(u8** state) {
     // push->model = mat4_translation(v3(0,0,0)) * mat4_scale(v3(100,100,100));
   }
 
-  {
-    Entity axis = {
-      .id = entity_create(),
-      .pos = v3_zero(),
-      .scale = v3(10),
-    };
-    st->entities.insert_data(axis);
-    entity_make_renderable(axis.id, geometry_get("axis"), shader_get("axis_shader"));
-  }
+  // {
+  //   Entity axis = {
+  //     .id = entity_create(),
+  //     .pos = v3_zero(),
+  //     .scale = v3(10),
+  //   };
+  //   st->entities.insert_data(axis);
+  //   entity_make_renderable(axis.id, geometry_get("axis").id, shader_get("axis_shader").id);
+  // }
 
   // Light
   {
-    Entity light = {
-      .id = entity_create(),
-      .pos = v3(1,1,1),
-      .scale = v3(1),
-      .color = v3(0.8)
-    };
-    st->lights.insert_data(light);
-    entity_make_point_light(light.id);
-    entity_make_renderable(light.id, geometry_get("cube"), shader_get("color_shader"));
+    // Entity light = {
+    //   .id = entity_create(),
+    //   .pos = v3(1,1,1),
+    //   .scale = v3(1),
+    //   .color = v3(0.8)
+    // };
+    // st->point_lights.insert_data(light);
+    // entity_make_point_light(light.id);
+    // entity_make_renderable(light.id, geometry_get("cube").id, shader_get("color_shader").id);
 
-    PointLight* light_data = shader_get_point_light(light.id);
-    *light_data = {
-      .color = {1,1,1},
-      .pos = light.pos,
-    };
+    // light.point_light = {
+    //   .color = {1,1,1},
+    //   .pos = light.pos,
+    // };
   }
   
   // Scene
-  {
-    u32 cube_id = cube_create();
-    Entity* cube = st->cubes.get_data(cube_id);
-    cube->pos.y = -54;
-    cube->scale = v3(100);
-  }
+  // {
+  //   u32 cube_id = cube_create();
+  //   Entity* cube = st->cubes.get_data(cube_id);
+  //   cube->pos.y = -54;
+  //   cube->scale = v3(100);
+  // }
 }
 
 f32 min = -30, max = 30;
 
-void app_update(u8* state) {
-  Assign(st, state);
-  Scratch scratch;
-
-  cubes_position_update();
-  push_constant_update();
-  camera_update();
-  
-  st->shader_global_state->projection_view = st->camera.projection * st->camera.view;
-  st->shader_global_state->view = st->camera.view;
-  st->shader_global_state->time += 0.01;
-  
-  if (input_was_key_down(Key_1)) {
-    u32 id = cube_create();
-    f32 x = rand_in_range_f32(min, max);
-    f32 y = rand_in_range_f32(min, max);
-    f32 z = rand_in_range_f32(min, max);
-
-    Entity* e = st->cubes.get_data(id);
-    e->pos = {x,y,z};
-  }
-  if (input_was_key_down(Key_2)) {
-    Entity* e = &st->cubes.data[st->cubes.count - 1];
-    cube_destroy(e);
-  }
-
+void debug_ui() {
   ImGuiViewport* viewport = ImGui::GetMainViewport();
   ImGui::SetNextWindowPos(viewport->WorkPos);
   ImGui::SetNextWindowSize(viewport->WorkSize);
@@ -339,9 +340,8 @@ void app_update(u8* state) {
           light_create();
         }
 
-        Loop (i, st->lights.count) {
-          Entity* e = &st->lights.data[i];
-          PointLight* light = shader_get_point_light(e->id);
+        Loop (i, st->point_lights.count) {
+          Entity* e = &st->point_lights.data[i];
           String entity_name_c = "light";
 
           ImGui::PushID(i);
@@ -363,4 +363,52 @@ void app_update(u8* state) {
   }
 
   // ImGui::ShowDemoWindow();
+
+}
+
+void app_update(u8* state) {
+  Assign(st, state);
+  Scratch scratch;
+  // Info("%i", ((vec1 += v2(1)) = {}).x);
+  
+  cubes_position_update();
+  push_constant_update();
+  camera_update();
+
+  st->shader_global_state->projection_view = st->camera.projection * st->camera.view;
+  st->shader_global_state->view = st->camera.view;
+  st->shader_global_state->time += 0.01;
+
+  if (input_is_key_down(Key_L)) {
+    Entity& e = st->entities.get_data(st->triangled_id);
+    e.pos.x += 0.1;
+  }
+  if (input_is_key_down(Key_H)) {
+    Entity& e = st->entities.get_data(st->triangled_id);
+    e.pos.x -= 0.1;
+  }
+  if (input_is_key_down(Key_I)) {
+    Entity& e = st->entities.get_data(st->triangled_id);
+    e.pos.y += 0.1;
+  }
+  if (input_is_key_down(Key_K)) {
+    Entity& e = st->entities.get_data(st->triangled_id);
+    e.pos.y -= 0.1;
+  }
+  
+  if (input_was_key_down(Key_1)) {
+    u32 id = cube_create();
+    f32 x = rand_range_f32(min, max);
+    f32 y = rand_range_f32(min, max);
+    f32 z = rand_range_f32(min, max);
+
+    Entity& e = st->cubes.get_data(id);
+    e.pos = {x,y,z};
+  }
+  if (input_was_key_down(Key_2)) {
+    Entity* e = &st->cubes.data[st->cubes.count - 1];
+    cube_destroy(e);
+  }
+
+  // debug_ui();
 }

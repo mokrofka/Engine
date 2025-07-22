@@ -6,8 +6,8 @@ struct VK_PhysicalDeviceRequirements {
   b8 transfer;
   b8 compute;
   b8 sampler_anisotropy;  
-  b8 discrete_gpu;
-  const char** device_extension_names;
+  b8 is_discrete_gpu;
+  String* device_extension_names;
 };
 
 struct VK_PhysicalDeviceQueueFamilyInfo {
@@ -31,10 +31,10 @@ internal b32 index_in_list(u32* list, u32 count, u32 value) {
   }
   return false;
 }
+
 void vk_device_create() {
   vk.device = select_physical_device();
   
-  Info("Creating logical device...");
   // NOTE: Do not create additional queues for shared indices.
   u32 indices[4];
   u32 index_count = 0;
@@ -87,33 +87,30 @@ void vk_device_create() {
     .pEnabledFeatures = &device_features,
   };
   
-  // Create the device.
   VK_CHECK(vkCreateDevice(vk.device.physical_device, &device_create_info, vk.allocator, &vk.device.logical_device));
 
   Info("Logical device created");
   
-  // Get queues.
   vkGetDeviceQueue(vk.device.logical_device, vk.device.graphics_queue_index, 0, &vk.device.graphics_queue);
   vkGetDeviceQueue(vk.device.logical_device, vk.device.present_queue_index, 0, &vk.device.present_queue);
   vkGetDeviceQueue(vk.device.logical_device, vk.device.transfer_queue_index, 0, &vk.device.transfer_queue);
   vkGetDeviceQueue(vk.device.logical_device, vk.device.compute_queue_index, 0, &vk.device.compute_queue);
-  
   Info("Queues obtained");
-  
-  VkCommandPoolCreateInfo graphics_pool_create_info = {
-    .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-    .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-    .queueFamilyIndex = vk.device.graphics_queue_index,
-  };
-  VK_CHECK(vkCreateCommandPool(vk.device.logical_device, &graphics_pool_create_info, vk.allocator, &vk.device.cmd_pool));
 
   VkCommandPoolCreateInfo transfer_pool_create_info = {
     .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
     .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
     .queueFamilyIndex = vk.device.transfer_queue_index,
   };
-  VK_CHECK(vkCreateCommandPool(vk.device.logical_device, &transfer_pool_create_info, vk.allocator, &vk.device.transient_cmd_pool));
-
+  VK_CHECK(vkCreateCommandPool(vkdevice, &transfer_pool_create_info, vk.allocator, &vk.device.transient_cmd_pool));
+  Info("transient command pool created");
+  
+  VkCommandPoolCreateInfo graphics_pool_create_info = {
+    .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+    .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+    .queueFamilyIndex = vk.device.graphics_queue_index,
+  };
+  VK_CHECK(vkCreateCommandPool(vkdevice, &graphics_pool_create_info, vk.allocator, &vk.device.cmd_pool));
   Info("Graphics command pool created");
 }
 
@@ -153,8 +150,6 @@ VK_SwapchainSupportInfo* vk_device_query_swapchain_support(VkPhysicalDevice phys
 }
 
 void vk_device_detect_depth_format(VK_Device* device) {
-  // Format candidates
-  u32 candidate_count = 3;
   VkFormat candidates[3] = {
     VK_FORMAT_D32_SFLOAT,
     VK_FORMAT_D32_SFLOAT_S8_UINT,
@@ -162,14 +157,11 @@ void vk_device_detect_depth_format(VK_Device* device) {
   };
 
   u32 flags = VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
-  Loop (i, candidate_count) {
+  Loop (i, ArrayCount(candidates)) {
     VkFormatProperties properties;
     vkGetPhysicalDeviceFormatProperties(device->physical_device, candidates[i], &properties);
 
-    if ((properties.linearTilingFeatures & flags) == flags) {
-      device->depth_format = candidates[i];
-      return;
-    } else if ((properties.optimalTilingFeatures & flags) == flags) {
+    if ((properties.optimalTilingFeatures & flags) == flags) {
       device->depth_format = candidates[i];
       return;
     }
@@ -180,7 +172,6 @@ void vk_device_detect_depth_format(VK_Device* device) {
 
 internal VK_Device select_physical_device() {
   Scratch scratch;
-  VK_Device result;
   u32 physical_device_count = 0;
   VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &physical_device_count, 0));
   VK_Device* devices = push_array(scratch, VK_Device, physical_device_count);
@@ -199,7 +190,7 @@ internal VK_Device select_physical_device() {
     VkPhysicalDeviceMemoryProperties memory;
     vkGetPhysicalDeviceMemoryProperties(physical_devices[i], &memory);
     
-    const char* extentions[] = {
+    String extentions[] = {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     };
     VK_PhysicalDeviceRequirements requirements = {
@@ -294,13 +285,13 @@ internal VK_PhysicalDeviceQueueFamilyInfo physical_device_meets_requirements(
     VkPhysicalDeviceFeatures features,
     VK_PhysicalDeviceRequirements requirements,
     VK_SwapchainSupportInfo* out_swapchain_support) {
+  Scratch scratch;
   VK_PhysicalDeviceQueueFamilyInfo queue_info = {};
   // Evalueate device properties to determina if it meets the needs of our application.
   queue_info.graphics_family_index = -1;  
   queue_info.present_family_index = -1;  
   queue_info.compute_family_index = -1;  
   queue_info.transfer_family_index = -1;  
-  Scratch scratch;
   
   u32 queue_family_count = 0;
   vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, 0);

@@ -17,7 +17,7 @@ KAPI void hashmap_set(HashMap& table, String name, void* value);
 
 KAPI void hashmap_set_ptr(HashMap& table, String name, void** value);
 
-KAPI void hashmap_get(HashMap& table, String name, void* out_value);
+KAPI void* hashmap_get(HashMap& table, String name);
 
 KAPI void hashmap_get_ptr(HashMap& table, String name, void** out_value);
 

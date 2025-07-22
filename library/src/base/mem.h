@@ -1,14 +1,12 @@
 #pragma once
 #include "defines.h"
 
-#define GUARD_MEMORY
-
 struct Range {
   u64 offset; 
   u64 size; 
 };
 
-////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 // Arena
 
 #define DEFAULT_ALIGNMENT (sizeof(void*))
@@ -60,7 +58,8 @@ KAPI Temp tctx_get_scratch(Arena** conflics, u64 counts);
 void _arena_move(Arena* arena, u64 size, u64 align);
 #define arena_move_array(a, T, c) _arena_move(a, sizeof(T)*c, Max(DEFAULT_ALIGNMENT, alignof(T)))
 
-#define GetScratch(conflicts, count) (tctx_get_scratch((conflicts), (count))) // deprecated
+// deprecated
+#define GetScratch(conflicts, count) (tctx_get_scratch((conflicts), (count)))
 #define ReleaseScratch(scratch) temp_end(scratch)
 
 INLINE Scratch::Scratch(Arena** conflics) {
@@ -72,7 +71,7 @@ INLINE Scratch::Scratch() {
   *this = *(Scratch*)&temp;
 }
 
-////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 // Pool
 
 struct PoolFreeNode {
@@ -97,7 +96,7 @@ KAPI MemPool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chun
 KAPI void pool_free(MemPool& p, void* ptr);
 KAPI void pool_free_all(MemPool& pool);
 
-////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 // Free list
 
 struct FreeListAllocationHeader {
@@ -128,7 +127,7 @@ KAPI FreeList freelist_create(Arena* arena, u64 size, u64 alignment = DEFAULT_AL
 KAPI void freelist_free(FreeList& fl, void* ptr);
 KAPI void freelist_free_all(FreeList& fl);
 
-////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 // Global Allocator
 
 KAPI void global_allocator_init();
@@ -138,7 +137,7 @@ KAPI u8* mem_alloc_zero(u64 size);
 KAPI u8* mem_realoc(void* origin, u64 size);
 KAPI void mem_free(void* ptr);
 
-////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 // Ring Buffer
 
 u64 ring_write(u8* ring_base, u64 ring_size, u64 ring_pos, void* src_data, u64 src_data_size);
@@ -146,8 +145,8 @@ u64 ring_read(u8* ring_base, u64 ring_size, u64 ring_pos, void* dst_data, u64 re
 #define ring_write_struct(ring_base, ring_size, ring_pos, ptr) ring_write((ring_base), (ring_size), (ring_pos), (ptr), sizeof(*(ptr)))
 #define ring_read_struct(ring_base, ring_size, ring_pos, ptr) ring_read((ring_base), (ring_size), (ring_pos), (ptr), sizeof(*(ptr)))
 
-////////////////////////////////
-// for Gpu freelist
+////////////////////////////////////////////////////////////////////////
+// Gpu Freelist
 
 struct FreelistGpuNode {
   u64 offset;

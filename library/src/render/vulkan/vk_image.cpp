@@ -12,12 +12,6 @@ VK_Image vk_image_create(
     b32 create_view,
     VkImageAspectFlags view_aspect_flags) {
 
-  VK_Image result = {
-    .width = width,
-    .height = height,
-  };
-
-  // Creation info.
   VkImageCreateInfo image_create_info = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
     .imageType = VK_IMAGE_TYPE_2D,
@@ -32,29 +26,34 @@ VK_Image vk_image_create(
     .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
   };
 
-  VK_CHECK(vkCreateImage(vkdevice, &image_create_info, vk.allocator, &result.handle));
+  VkImage handle;
+  VK_CHECK(vkCreateImage(vkdevice, &image_create_info, vk.allocator, &handle));
 
-  // Query memory requirements.
   VkMemoryRequirements memory_requirements;
-  vkGetImageMemoryRequirements(vkdevice, result.handle, &memory_requirements);
-
+  vkGetImageMemoryRequirements(vkdevice, handle, &memory_requirements);
   u32 memory_type = vk_find_memory_index(memory_requirements.memoryTypeBits, memory_flags);
-
-  // Allocate memory
   VkMemoryAllocateInfo memory_allocate_info = {
     .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
     .allocationSize = memory_requirements.size,
     .memoryTypeIndex = memory_type,
   };
-  VK_CHECK(vkAllocateMemory(vkdevice, &memory_allocate_info, vk.allocator, &result.memory));
 
-  // Bind the memory
-  VK_CHECK(vkBindImageMemory(vkdevice, result.handle, result.memory, 0));
+  VkDeviceMemory memory;
+  VK_CHECK(vkAllocateMemory(vkdevice, &memory_allocate_info, vk.allocator, &memory));
+  VK_CHECK(vkBindImageMemory(vkdevice, handle, memory, 0));
 
-  // Create view
+  VkImageView view = 0;
   if (create_view) {
-    result.view = vk_image_view_create(format, result.handle, view_aspect_flags);
+    view = vk_image_view_create(format, handle, view_aspect_flags);
   }
+
+  VK_Image result = {
+    .handle = handle,
+    .memory = memory,
+    .view = view,
+    .width = width,
+    .height = height,
+  };
   
   return result;
 }
@@ -99,38 +98,31 @@ void vk_image_transition_layout(VkCommandBuffer cmd, VK_Image image, VkImageLayo
   VkPipelineStageFlags source_stage;
   VkPipelineStageFlags dest_stage;
 
-  // Don't care about the old layout - transition to optimal layout (for the underlying implementation).
   if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED && new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
     barrier.srcAccessMask = 0;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
-    // Don't care what stage the pipeline is in at the start.
     source_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-
-    // Used for copying
     dest_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-  } else if (old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-    // Transitioning from a transfer destination layout to a shader-readonly layout.
+  }
+  else if (old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-    // From a copying stage to...
     source_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-
-    // The fragment stage.
     dest_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
   } else {
-    Fatal("unsupported layout transition");
+    Assert(false && "unsupported layout transition");
     return;
   }
 
   vkCmdPipelineBarrier(
-      cmd,
-      source_stage, dest_stage,
-      0,
-      0, null,
-      0, null,
-      1, &barrier);
+    cmd,
+    source_stage, dest_stage,
+    NoFlags,
+    0, null,
+    0, null,
+    1, &barrier);
 }
 
 void vk_upload_image_to_gpu(VkCommandBuffer cmd, VK_Image image) {
@@ -156,7 +148,7 @@ void vk_upload_image_to_gpu(VkCommandBuffer cmd, VK_Image image) {
     &region);
 }
 
-void vk_image_destroy(VK_Image& image) {
+void vk_image_destroy(VK_Image image) {
   if (image.view) {
     vkDestroyImageView(vkdevice, image.view, vk.allocator);
   }
@@ -168,44 +160,35 @@ void vk_image_destroy(VK_Image& image) {
   }
 }
 
-void vk_texture_load(Texture& t) {
-  VK_Texture* texture = &vk.texture;
+void vk_texture_load(Texture t) {
+  VK_Texture& texture = vk.texture;
   
-  u64 size = t.width * t.height * t.channel_count;
-  VkFormat image_format = VK_FORMAT_R8G8B8A8_UNORM;
+  u64 size = t.width*t.height*t.channel_count;
   
   MemCopy(vk.stage_buffer.maped_memory, t.data, size);
   
-  texture->image = vk_image_create(
+  texture.image = vk_image_create(
     VK_IMAGE_TYPE_2D, 
     t.width, 
     t.height, 
-    image_format, 
+    VK_FORMAT_R8G8B8A8_UNORM, 
     VK_IMAGE_TILING_OPTIMAL, 
     VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     true,
     VK_IMAGE_ASPECT_COLOR_BIT);
   
-  VkCommandBuffer cmd = vk_cmd_alloc_and_begin_single_use();
+  {
+    VkCommandBuffer cmd = vk_cmd_alloc_and_begin_single_use();
+
+    vk_image_transition_layout(cmd, texture.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    vk_upload_image_to_gpu(cmd, texture.image);
+    vk_image_transition_layout(cmd, texture.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    vk_cmd_end_single_use(cmd);
+  }
   
-  vk_image_transition_layout(
-    cmd, 
-    texture->image, 
-    VK_IMAGE_LAYOUT_UNDEFINED, 
-    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    
-  vk_upload_image_to_gpu(cmd, texture->image);
-  
-  vk_image_transition_layout(
-    cmd, 
-    texture->image, 
-    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
-    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    
-  vk_cmd_end_single_use(cmd);
-  
-  // Create a sampler for the texture
+  // Create a sampler for the texture TODO: centrelize samplers
   VkSamplerCreateInfo sampler_info = {
     .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
     .magFilter = VK_FILTER_LINEAR,
@@ -225,5 +208,5 @@ void vk_texture_load(Texture& t) {
     .unnormalizedCoordinates = VK_FALSE,
   };
   
-  VK_CHECK(vkCreateSampler(vkdevice, &sampler_info, vk.allocator, &texture->sampler));
+  VK_CHECK(vkCreateSampler(vkdevice, &sampler_info, vk.allocator, &texture.sampler));
 }

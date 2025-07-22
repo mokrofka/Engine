@@ -2,12 +2,12 @@
 
 global thread_local TCTX tctx_thread_local;
 
-////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 // Arena
 
 Arena* arena_alloc(Arena* arena, u64 size, u64 align) {
   PtrInt curr_ptr = (PtrInt)arena + ARENA_HEADER + arena->used;
-  PtrInt offset = AlignPow2(curr_ptr, align);
+  PtrInt offset = AlignUp(curr_ptr, align);
   PtrInt temp = (PtrInt)arena + ARENA_HEADER;
 	offset -= temp; // Change to relative offset
 
@@ -29,7 +29,7 @@ Arena* mem_arena_alloc(u64 size) {
 
 void* _arena_push(Arena* arena, u64 size, u64 align) {
   PtrInt curr_ptr = (PtrInt)arena + ARENA_HEADER + arena->used;
-  u64 offset = AlignPow2(curr_ptr, align);
+  u64 offset = AlignUp(curr_ptr, align);
   u64 temp = (PtrInt)arena + ARENA_HEADER;
 	offset -= temp;
 
@@ -44,7 +44,7 @@ void* _arena_push(Arena* arena, u64 size, u64 align) {
 
 void _arena_move(Arena* arena, u64 size, u64 align) {
   PtrInt curr_ptr = (PtrInt)arena + ARENA_HEADER + arena->used;
-  u64 offset = AlignPow2(curr_ptr, align);
+  u64 offset = AlignUp(curr_ptr, align);
   u64 temp = (PtrInt)arena + ARENA_HEADER;
 	offset -= temp;
   Assert(offset + size <= arena->size && "Arena is out of memory");
@@ -52,8 +52,8 @@ void _arena_move(Arena* arena, u64 size, u64 align) {
 }
 
 void tctx_init() {
-  tctx_thread_local.arenas[0] = mem_arena_alloc(MB(8));
-  tctx_thread_local.arenas[1] = mem_arena_alloc(MB(8));
+  tctx_thread_local.arenas[0] = mem_arena_alloc(MB(1));
+  tctx_thread_local.arenas[1] = mem_arena_alloc(MB(1));
 }
 
 Temp tctx_get_scratch(Arena** conflics, u64 counts) {
@@ -74,12 +74,12 @@ Temp tctx_get_scratch(Arena** conflics, u64 counts) {
   return {};
 }
 
-////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 // Pool
 #ifdef GUARD_MEMORY
 
 MemPool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignment) {
-  chunk_size = AlignPow2(chunk_size, chunk_alignment);
+  chunk_size = AlignUp(chunk_size, chunk_alignment);
   u64 stride = chunk_size + chunk_alignment;
   u8* data = push_buffer(arena, chunk_count*stride, chunk_alignment);
 
@@ -137,7 +137,7 @@ void pool_free_all(MemPool& p) {
 Pool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignment) {
   Assert(chunk_size >= sizeof(PoolFreeNode) && "Chunk size is too small");
 
-  chunk_size = AlignPow2(chunk_size, chunk_alignment);
+  chunk_size = AlignUp(chunk_size, chunk_alignment);
   u64 size = chunk_count* chunk_size;
   u8* data = push_buffer(arena, size, chunk_alignment);
 
@@ -181,7 +181,7 @@ void pool_free_all(Pool& p) {
 
 #endif
 
-////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 // Free list
 
 FreeList freelist_create(Arena* arena, u64 size, u64 alignment) {
@@ -234,7 +234,7 @@ FreeListNode* free_list_find_first(FreeList& fl, u64 size, u64 alignment, u64* p
   u64 padding = 0;
 
   while (node != null) {
-    padding = sizeof(FreeListAllocationHeader) + AlignPadPow2((PtrInt)node+sizeof(FreeListAllocationHeader), alignment);
+    padding = sizeof(FreeListAllocationHeader) + AlignPadUp((PtrInt)node+sizeof(FreeListAllocationHeader), alignment);
     u64 required_space = size + padding;
     if (node->block_size >= required_space) {
       break;
@@ -341,7 +341,7 @@ void free_list_coalescence(FreeList& fl, FreeListNode* prev_node, FreeListNode* 
   }
 }
 
-////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 // Global Allocator
 
 struct SegPool {
@@ -492,7 +492,7 @@ void global_allocator_init() {
   };
 }
 
-////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 // Ring Buffer
 
 u64 ring_write(u8* ring_base, u64 ring_size, u64 ring_pos, void* src_data, u64 src_data_size) {
@@ -520,6 +520,9 @@ u64 ring_read(u8* ring_base, u64 ring_size, u64 ring_pos, void* dst_data, u64 re
   MemCopy((u8*)dst_data + pre_split_bytes, ring_base + 0, pst_split_bytes);
   return read_size;
 }
+
+////////////////////////////////////////////////////////////////////////
+// Gpu free list
 
 FreelistGpuNode* get_node(FreelistGpu& list);
 void return_node(FreelistGpuNode* node);
@@ -617,7 +620,7 @@ void freelist_gpu_free(FreelistGpu& list, u64 size, u64 offset) {
       } else if (node->offset == offset) {
         // If there is an exact match, this means the exact block of memory
         // that is already free is being freed again.
-        Fatal("Attempting to free already-freed block of memory at offset %llu", node->offset);
+        Error("Attempting to free already-freed block of memory at offset %llu", node->offset);
         return;
       } else if (node->offset > offset) {
         // Iterated beyond the space to be freed. Need a new node.

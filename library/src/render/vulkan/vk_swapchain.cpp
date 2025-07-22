@@ -8,6 +8,7 @@ internal void destroy(VK_Swapchain* swapchain);
 
 void vk_swapchain_create(u32 width, u32 height) {
   vk.swapchain = create(width, height, false);
+  Info("Swapchain created");
 }
 
 void vk_swapchain_recreate(u32 width, u32 height) {
@@ -20,6 +21,7 @@ void vk_swapchain_recreate(u32 width, u32 height) {
   destroy(&vk.old_swapchain);
   
   vk.frame.size_last_generation = vk.frame.size_generation;
+  Info("Swapchain recreated");
 }
 
 void vk_swapchain_destroy() {
@@ -127,10 +129,8 @@ internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
   vk.frame.current_frame = 0;
   
   u32 image_count = ImagesInFlight;
-  // Images
   VK_CHECK(vkGetSwapchainImagesKHR(vkdevice, swapchain.handle, &image_count, swapchain.images));
 
-  // Views
   Loop (i, ImagesInFlight) {
     VkImageViewCreateInfo view_create_info = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -162,7 +162,6 @@ internal VK_Swapchain create(u32 width, u32 height, b32 reuse) {
     true,
     VK_IMAGE_ASPECT_DEPTH_BIT);
 
-  Info("Swapchain created successfully");
   return swapchain;
 }
 
@@ -192,4 +191,10 @@ void vk_surface_create() {
   };
 
   vkCreateWin32SurfaceKHR(vk.instance, &surface_create_info, vk.allocator, &vk.surface);
+
+  Info("Vulkan win32 surface created");
+}
+
+const char* vk_surface_extension_name() {
+  return VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
 }

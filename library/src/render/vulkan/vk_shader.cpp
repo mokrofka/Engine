@@ -1,9 +1,7 @@
 #include "vk_types.h"
 #include "vk_buffer.h"
 
-#include "sys/shader.h"
 #include "sys/res.h"
-#include "asset_watch.h"
 
 internal VK_Pipeline vk_pipeline_create(
     u32 vert_stride, u32 attribute_count,
@@ -16,7 +14,7 @@ internal VkPipelineShaderStageCreateInfo vk_shader_module_create(String name, St
   
   Buffer binary = res_binary_load(scratch, filepath);
   if (!binary.data) {
-    Error("Unable to read shader module: %s", filepath);
+    AssertMsg(false, "Unable to read shader module: %s", filepath);
     return {};
   }
   
@@ -39,50 +37,73 @@ internal VkPipelineShaderStageCreateInfo vk_shader_module_create(String name, St
 }
 
 void vk_r_shader_create(Shader s) {
-  VK_Shader* shader = &vk.shaders[vk.shader_count++];
+  Scratch scratch;
 
-  #define ShaderStageCount 2
-  String stage_type_strs[] = {"vert", "frag"};
-  VkShaderStageFlagBits stage_types[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
-  Loop (i, ShaderStageCount) {
-    shader->stages[i] = vk_shader_module_create(s.name, stage_type_strs[i], stage_types[i]);
-  }
+  VK_Shader* shader;
+  if (s.type == ShaderType_Gfx) {
+    // Graphics shader
+    shader = &vk.shaders[s.id];
+    ++vk.shader_count;
 
-  VkVertexInputAttributeDescription attribute_desriptions[10];
-  
-  VkFormat formats[] = {
-    VK_FORMAT_R32_SFLOAT,
-    VK_FORMAT_R32G32_SFLOAT,
-    VK_FORMAT_R32G32B32_SFLOAT,
-    VK_FORMAT_R32G32B32A32_SFLOAT
-  };
-  
-  u32 vert_stride = 0;
-  u32 attribute_count = 0;
-  for (u32 i = 0; s.attribut[i]; ++i) {
-    shader->attribute_desriptions[i] = {
-      .location = i,
-      .binding = 0,
-      .format = formats[s.attribut[i] - 1],
-      .offset = vert_stride,
-    };
-    vert_stride += s.attribut[i] * sizeof(f32);
-    ++attribute_count;
-  }
-  
-  VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-  if (s.primitive == ShaderTopology_Line) {
-    topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-  }
-  
-  shader->name = s.name;
-  shader->attribute_count = attribute_count;
-  shader->vert_stride = vert_stride;
-  shader->topology = topology;
-  shader->is_transparent = s.is_transparent;
+    String stage_type_strs[] = {"vert", "frag"};
+    VkShaderStageFlagBits stage_types[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
+    Loop(i, ArrayCount(stage_type_strs)) {
+      shader->stages[i] = vk_shader_module_create(s.name, stage_type_strs[i], stage_types[i]);
+    }
 
-  shader->pipeline = vk_pipeline_create(shader->vert_stride, shader->attribute_count, shader->attribute_desriptions,
-                                        2, shader->stages, shader->topology, true, shader->is_transparent);
+    VkVertexInputAttributeDescription attribute_desriptions[10];
+
+    VkFormat formats[] = {
+        VK_FORMAT_R32_SFLOAT,
+        VK_FORMAT_R32G32_SFLOAT,
+        VK_FORMAT_R32G32B32_SFLOAT,
+        VK_FORMAT_R32G32B32A32_SFLOAT};
+
+    u32 vert_stride = 0;
+    u32 attribute_count = 0;
+    for (u32 i = 0; s.attribut[i]; ++i) {
+      shader->attribute_desriptions[i] = {
+          .location = i,
+          .binding = 0,
+          .format = formats[s.attribut[i] - 1],
+          .offset = vert_stride,
+      };
+      vert_stride += s.attribut[i] * sizeof(f32);
+      ++attribute_count;
+    }
+
+    VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    if (s.primitive == ShaderTopology_Line) {
+      topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+    }
+
+    shader->name = s.name;
+    shader->attribute_count = attribute_count;
+    shader->vert_stride = vert_stride;
+    shader->topology = topology;
+    shader->is_transparent = s.is_transparent;
+
+    shader->pipeline = vk_pipeline_create(shader->vert_stride, shader->attribute_count, shader->attribute_desriptions,
+                                          2, shader->stages, shader->topology, true, shader->is_transparent);
+
+  } else if (s.type == ShaderType_Screen) {
+    // Screen Shader
+    shader = &vk.screen_shaders[s.id];
+
+    String stage_type_strs[] = {"vert", "frag"};
+    VkShaderStageFlagBits stage_types[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
+    Loop (i, ArrayCount(stage_type_strs)) {
+      shader->stages[i] = vk_shader_module_create(s.name, stage_type_strs[i], stage_types[i]);
+    }
+
+    vk.screen_shader.pipeline = vk_pipeline_create(0, 0, 0,
+                                                   2, vk.screen_shader.stages, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, false, false);
+    return;
+
+  } else if (s.type == ShaderType_Compute) {
+    // Compute Shader
+    shader = &vk.compute_shaders[s.id];
+  }
 }
 
 VK_Pipeline vk_pipeline_create(
@@ -289,13 +310,13 @@ void compute_shader() {
   
   Particle* particles = push_array(scratch, Particle, ParticleCount);
   
-  v2i frame = os_get_framebuffer_size();
+  // v2i frame = os_get_framebuffer_size();
   f32 min = 0, max = 1;
   
   Loop (i, ParticleCount) {
-    f32 r = 0.25f * rand_in_range_f32(min, max);
-    f32 theta = rand_in_range_f32(min, max) * Two_PI;          // angle around Y axis
-    f32 phi = Acos(2.0f * rand_in_range_f32(min, max) - 1.0f); // angle from Z axis (0..pi)
+    f32 r = 0.25f * rand_range_f32(min, max);
+    f32 theta = rand_range_f32(min, max) * Two_PI;          // angle around Y axis
+    f32 phi = Acos(2.0f * rand_range_f32(min, max) - 1.0f); // angle from Z axis (0..pi)
 
     f32 x = r * Sin(phi) * Cos(theta);
     f32 y = r * Sin(phi) * Sin(theta);
@@ -303,7 +324,7 @@ void compute_shader() {
 
     particles[i].pos = v3(x, y, z);
     particles[i].velocity = v3_normalize(v3(x, y, z)) * 0.25f;
-    particles[i].color = v4(rand_in_range_f32(min, max), rand_in_range_f32(min, max), rand_in_range_f32(min, max), 1.0f);
+    particles[i].color = v4(rand_range_f32(min, max), rand_range_f32(min, max), rand_range_f32(min, max), 1.0f);
   }
   
   u32 num_elipses = 14;
@@ -318,7 +339,7 @@ void compute_shader() {
   //   u32 stars_per_ellipse = ParticleCount / num_elipses;
   //   Loop (j, stars_per_ellipse) {
   //     f32 t = 2 * PI * j / stars_per_ellipse;
-  //     f32 rand = rand_in_range_f32(0,0.2);
+  //     f32 rand = rand_range_f32(0,0.2);
   //     f32 x = a * Cos(t) + rand;
   //     f32 y = b * Sin(t) + rand;
 
@@ -345,8 +366,8 @@ void compute_shader() {
   //     f32 y = b * Sin(t);
 
   //     // Add random jitter (scatter)
-  //     f32 rand_angle = rand_in_range_f32(-0.1f, 0.1f);  // scatter angle
-  //     f32 rand_radius = rand_in_range_f32(-0.1f, 0.2f); // scatter radius
+  //     f32 rand_angle = rand_range_f32(-0.1f, 0.1f);  // scatter angle
+  //     f32 rand_radius = rand_range_f32(-0.1f, 0.2f); // scatter radius
 
   //     x += rand_radius * Cos(t + rand_angle);
   //     y += rand_radius * Sin(t + rand_angle);
@@ -354,7 +375,7 @@ void compute_shader() {
   //     // Rotate ellipse
   //     f32 xr = Cos(angle_offset) * x - Sin(angle_offset) * y;
   //     f32 yr = Sin(angle_offset) * x + Cos(angle_offset) * y;
-  //     f32 z = rand_in_range_f32(-0.1, 0.1);
+  //     f32 z = rand_range_f32(-0.1, 0.1);
 
   //     particles[i * stars_per_ellipse + j].pos = {xr, yr, z};
 
@@ -524,7 +545,7 @@ void vk_shader_init() {
     VkDescriptorPoolCreateInfo pool_info = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
       .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
-      .maxSets = FramesInFlight,
+      .maxSets = FramesInFlight * 2,
       .poolSizeCount = ArrayCount(pool_sizes),
       .pPoolSizes = pool_sizes,
     };
@@ -570,24 +591,25 @@ void vk_shader_init() {
       .pSetLayouts = layouts,
     };
     VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, vk.descriptor_sets));
+    VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, vk.screen_descriptor_sets));
   }
 
   // Mem for shaders
   {
-    Assign(vk.entities_data, Offset(vk.storage_buffer.maped_memory, AlignPow2(sizeof(ShaderGlobalState), alignof(ShaderEntity))));
+    Assign(vk.entities_data, Offset(vk.storage_buffer.maped_memory, AlignUp(sizeof(ShaderGlobalState), alignof(ShaderEntity))));
     
     FillAllocStruct(&vk.point_light_data);
-    vk.point_light_data.data = Offset(vk.entities_data, AlignPow2(sizeof(ShaderEntity)*MaxEntities, alignof(PointLight)));
+    vk.point_light_data.data = Offset(vk.entities_data, AlignUp(sizeof(ShaderEntity)*MaxEntities, alignof(PointLight)));
     vk.point_light_data.element_size = sizeof(PointLight);
     vk.point_light_data.count = 0;
 
     FillAllocStruct(&vk.dir_light_data);
-    vk.dir_light_data.data = Offset(vk.point_light_data.data, AlignPow2(sizeof(PointLight)*MaxLights, alignof(DirLight)));
+    vk.dir_light_data.data = Offset(vk.point_light_data.data, AlignUp(sizeof(PointLight)*MaxLights, alignof(DirLight)));
     vk.dir_light_data.element_size = sizeof(DirLight);
     vk.dir_light_data.count = 0;
 
     FillAllocStruct(&vk.spot_light_data);
-    vk.spot_light_data.data = Offset(vk.dir_light_data.data, AlignPow2(sizeof(DirLight)*MaxLights, alignof(SpotLight)));
+    vk.spot_light_data.data = Offset(vk.dir_light_data.data, AlignUp(sizeof(DirLight)*MaxLights, alignof(SpotLight)));
     vk.spot_light_data.element_size = sizeof(SpotLight);
     vk.spot_light_data.count = 0;
     
@@ -601,6 +623,18 @@ void vk_shader_init() {
     vk.push_constants.element_size = sizeof(PushConstant);
     vk.push_constants.count = 0;
   }
+
+  // Screen shader
+  {
+    String stage_type_strs[] = {"vert", "frag"};
+    VkShaderStageFlagBits stage_types[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
+    Loop (i, 2) {
+      vk.screen_shader.stages[i] = vk_shader_module_create("screen_shader", stage_type_strs[i], stage_types[i]);
+    }
+    vk.screen_shader.pipeline = vk_pipeline_create(0, 0, 0,
+                                                   2, vk.screen_shader.stages, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, false, false);
+  }
+
 }
 
 ////////////////////////////////////////////////////////////////////////

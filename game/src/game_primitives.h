@@ -2,6 +2,7 @@
 #include "lib.h"
 
 f32 cube_vertices[] = {
+  // Pos                 // Normal           // Texcoord
   // Front face (0, 0, 1)
   -0.5f, -0.5f,  0.5f,   0.0f, 0.0f, 1.0f,   0.0f, 0.0f,
    0.5f, -0.5f,  0.5f,   0.0f, 0.0f, 1.0f,   1.0f, 0.0f,
@@ -53,21 +54,27 @@ f32 cube_vertices[] = {
 
 f32 triangle_vertices[] = {
   // position          // color
-  0.0f,  0.5f, 0.0f,   1.0f, 0.0f, 0.0f,  // Vertex3D 1: red
- -0.5f, -0.5f, 0.0f,   0.0f, 1.0f, 0.0f,  // Vertex3D 2: green
-  0.5f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f   // Vertex3D 3: blue
+  0.0f,  0.5f, 0.0f,   1.0f, 0.0f, 0.0f,  0,0,  // Vertex3D 1: red
+ -0.5f, -0.5f, 0.0f,   0.0f, 1.0f, 0.0f,  0,0,  // Vertex3D 2: green
+  0.5f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,  0,0,  // Vertex3D 3: blue
 };
 
 f32 axis_vertices[] = {
-  // Position        // Color
-   0, 0, 0,          1, 0, 0,  // Line from (0,0,0) to (1,0,0) - X axis (red)
-   1, 0, 0,          1, 0, 0,
+  // Position       // Color
+  0, 0, 0,          1, 0, 0,  // Line from (0,0,0) to (1,0,0) - X axis (red)
+  1, 0, 0,          1, 0, 0,
 
-   0, 0, 0,          0, 1, 0,  // Line from (0,0,0) to (0,1,0) - Y axis (green)
-   0, 1, 0,          0, 1, 0,
+  0, 0, 0,          0, 1, 0,  // Line from (0,0,0) to (0,1,0) - Y axis (green)
+  0, 1, 0,          0, 1, 0,
 
-   0, 0, 0,          0, 0, 1,  // Line from (0,0,0) to (0,0,1) - Z axis (blue)
-   0, 0, 1,          0, 0, 1,
+  0, 0, 0,          0, 0, 1,  // Line from (0,0,0) to (0,0,1) - Z axis (blue)
+  0, 0, 1,          0, 0, 1,
+};
+
+f32 triangle_vertices_pos[] = {
+ -1.0f, -1.0f, 0,
+  0.0f,  1.0f, 0,
+  1.0f, -1.0f, 0,
 };
 
 inline void* grid_create(Arena* arena, i32 grid_size, f32 grid_step) {

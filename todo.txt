@@ -1,5 +1,4 @@
 growable arena
-event
-eliminate all pointers
-eliminate all references
-
+if viewport is zero - stop rendering
+switch viewport/swapchain rendering
+in shader reload make hotreloading by type

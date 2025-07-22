@@ -1,5 +1,6 @@
 #include "lib.h"
 #include "entity.h"
+#include "render/r_types.h"
 
 struct Camera {
   mat4 view;
@@ -18,9 +19,9 @@ struct Entity {
   v3 scale;
   v3 rot;
   v3 color;
-  struct PointLight* point_light;
-  struct DirLight* dir_light;
-  struct SpotLight* spot_light;
+  PointLight point_light;
+  DirLight dir_light;
+  SpotLight spot_light;
 };
 
 struct SparseSetEntity {
@@ -60,8 +61,8 @@ struct SparseSetEntity {
 
     --count;
   }
-  inline Entity* get_data(u32 id) {
-    return &data[entity_to_index[id]];
+  inline Entity& get_data(u32 id) {
+    return data[entity_to_index[id]];
   }
 };
 
@@ -72,9 +73,13 @@ struct GameState {
   
   SparseSetEntity cubes;
   SparseSetEntity entities;
-  SparseSetEntity lights;
+  SparseSetEntity point_lights;
+  SparseSetEntity dir_lights;
+  SparseSetEntity spot_lights;
 
   struct ShaderGlobalState* shader_global_state;
+  u32 grid_id;
+  u32 triangled_id;
 
   b8 is_mouse_move;
 };

@@ -21,6 +21,8 @@ struct OS_State {
   f32 delta_y;
   f32 old_x;
   f32 old_y;
+  u32 screen_width;
+  u32 screen_height;
   HINSTANCE instance;
   Window window;
   
@@ -32,30 +34,27 @@ struct OS_State {
   String binary_name;
   String binary_filepath;
   String binary_directory;
+
+  f64 clock_frequency;
+  LARGE_INTEGER start_time;
 };
 
 f32 delta_time;
 
 global OS_State st;
 
-// Clock
-global f64 clock_frequency;
-global UINT min_period;
-global LARGE_INTEGER start_time;
-
 void entry_point();
 internal LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARAM l_param);
 
 KAPI void os_init() {
   st.instance = GetModuleHandleA(null);
+  st.screen_width  = GetSystemMetrics(SM_CXSCREEN);
+  st.screen_height = GetSystemMetrics(SM_CYSCREEN);
 
-  // Clock
-  {
-    LARGE_INTEGER frequency;
-    QueryPerformanceFrequency(&frequency);
-    clock_frequency = 1.0 / (f64)frequency.QuadPart;
-    QueryPerformanceCounter(&start_time);
-  }
+  LARGE_INTEGER frequency;
+  QueryPerformanceFrequency(&frequency);
+  st.clock_frequency = 1.0 / (f64)frequency.QuadPart;
+  QueryPerformanceCounter(&st.start_time);
   
   WNDCLASSA wc = {
     .lpfnWndProc = win32_process_message,
@@ -66,9 +65,9 @@ KAPI void os_init() {
 
   global_allocator_init();
   tctx_init();
+  Scratch scratch;
 
   st.arena = mem_arena_alloc(KB(1));
-  Scratch scratch;
   u8* buff = push_buffer(scratch, 512);
   u32 size = GetModuleFileNameA(0, (char*)buff, 512);
   String name = push_str_copy(st.arena, String(buff, size));
@@ -91,10 +90,15 @@ KAPI void os_entry_point(void (*entry)()) {
 
 void os_window_create(WindowConfig config) {
   Scratch scratch;
-  u32 client_x = config.position_x;
-  u32 client_y = config.position_y;
-  u32 client_width = config.width;
-  u32 client_height = config.height;
+  // u32 client_x = config.position_x;
+  // u32 client_y = config.position_y;
+  // u32 client_width = config.width;
+  // u32 client_height = config.height;
+
+  u32 client_x = (f32)st.screen_width / 2;
+  u32 client_y = 0;
+  u32 client_width = (f32)st.screen_width / 2;
+  u32 client_height = st.screen_height * 0.75;
   
   u32 window_x = client_x;
   u32 window_y = client_y;
@@ -139,7 +143,6 @@ void os_window_create(WindowConfig config) {
     .height = config.height,
     .hwnd = handle
   };
-
 }
 
 void os_pump_messages() {
@@ -152,22 +155,13 @@ void os_pump_messages() {
 
 void os_console_write(String message, u32 color) {
   HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
+
+  u32 levels[] = {8, 1, 2, 6, 4};
   // FATAL,ERROR,WARN,INFO,DEBUG,TRACE
-  u32 levels[6] = {64, 4, 6, 2, 1, 8};
   SetConsoleTextAttribute(console_handle, levels[color]);
   OutputDebugStringA((char*)message.str);
   LPDWORD number_written = 0;
   WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), message.str, message.size, number_written, 0);
-}
-
-void os_console_write_error(String message, u32 color) {
-  HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
-  // FATAL,ERROR,WARN,INFO,DEBUG,TRACE
-  u32 levels[6] = {64, 4, 6, 2, 1, 8};
-  SetConsoleTextAttribute(console_handle, levels[color]);
-  OutputDebugStringA((char*)message.str);
-  LPDWORD number_written = 0;
-  WriteConsoleA(GetStdHandle(STD_ERROR_HANDLE), message.str, message.size, number_written, 0);
 }
 
 void os_message_box(String message) {
@@ -177,7 +171,7 @@ void os_message_box(String message) {
 f32 os_now_seconds() {
   LARGE_INTEGER now_time;
   QueryPerformanceCounter(&now_time);
-  return (f32)now_time.QuadPart * clock_frequency;
+  return (f32)now_time.QuadPart * st.clock_frequency;
 }
 
 void os_sleep(u64 ms) {
@@ -213,8 +207,8 @@ void* os_get_window_handle() {
   return st.window.hwnd;
 }
 
-v2i os_get_framebuffer_size() {
-  return v2i(st.window.width, st.window.height);
+v2u os_get_framebuffer_size() {
+  return v2u(st.window.width, st.window.height);
 }
 
 void os_mouse_enable() {
@@ -373,15 +367,15 @@ String os_directory_watch_pop_name(Arena* arena, OS_Handle dir, u32 id) {
       NULL);
 
   // NOTE second ReadDirectoryChangesW - makes sure it's really rearmed since overlapped dinge several times returns true when only once rearmed
-  success = ReadDirectoryChangesW(
-      (HANDLE)dir,
-      &buffer[id * DirectoryWatchSize],
-      DirectoryWatchSize,
-      false,
-      FILE_NOTIFY_CHANGE_LAST_WRITE,
-      &bytes_returned,
-      &overlapped[id],
-      NULL);
+  // success = ReadDirectoryChangesW(
+  //     (HANDLE)dir,
+  //     &buffer[id * DirectoryWatchSize],
+  //     DirectoryWatchSize,
+  //     false,
+  //     FILE_NOTIFY_CHANGE_LAST_WRITE,
+  //     &bytes_returned,
+  //     &overlapped[id],
+  //     NULL);
 
   return filename;
 }
@@ -640,8 +634,6 @@ internal LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_par
   return DefWindowProcA(hwnd, msg, w_param, l_param);
 }
 
-void os_show_window() {
-  ShowWindow((HWND)st.window.hwnd, SW_SHOW);
-}
+void os_show_window() { ShowWindow((HWND)st.window.hwnd, SW_SHOW); }
 
 #include "network_cpp.h"

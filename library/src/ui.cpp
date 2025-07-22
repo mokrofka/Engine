@@ -38,13 +38,13 @@ void ui_begin_frame() {
   imgui_begin_frame();
   ImGui::NewFrame();
 
-  if (vk.is_viewport_resized) {
-    vk.is_viewport_resized = false;
-    Loop(i, ImagesInFlight) {
-      imgui_remove_texture(st.texture_ids[i]);
-      st.texture_ids[i] = imgui_add_texture(i);
-    }
-  }
+  // if (vk.is_viewport_resized) {
+  //   vk.is_viewport_resized = false;
+  //   Loop(i, ImagesInFlight) {
+  //     imgui_remove_texture(st.texture_ids[i]);
+  //     st.texture_ids[i] = imgui_add_texture(i);
+  //   }
+  // }
 }
 
 void ui_end_frame() {
@@ -60,18 +60,18 @@ void ui_texture_render() {
     ImVec2 current_viewport_size = ImGui::GetContentRegionAvail();
 
     // if (vk.viewport_size != *(v2*)&current_viewport_size) {
-    if (vk.viewport_size != Transmute(v2)current_viewport_size) {
-      vk.viewport_size = *(v2*)&current_viewport_size;
-      vk.is_viewport_resized = true;
+    // if (vk.viewport_size != Transmute(v2)current_viewport_size) {
+    //   vk.viewport_size = *(v2*)&current_viewport_size;
+    //   vk.is_viewport_resized = true;
 
-      EventContext context = {
-        context.u32[0] = current_viewport_size.x,
-        context.u32[1] = current_viewport_size.y,
-      };
-      event_fire(EventCode_ViewportResized, 0, context);
-    }
+    //   EventContext context = {
+    //     context.u32[0] = current_viewport_size.x,
+    //     context.u32[1] = current_viewport_size.y,
+    //   };
+    //   event_fire(EventCode_ViewportResized, 0, context);
+    // }
 
-    ImGui::Image(st.texture_ids[vk.frame.image_index], current_viewport_size);
+    // ImGui::Image(st.texture_ids[vk.frame.image_index], current_viewport_size);
     
   }
 }

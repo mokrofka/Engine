@@ -16,6 +16,7 @@ internal b32 app_on_resized(u32 code, void* sender, void* listener_inst, EventCo
 
 Main entry_point() {
   os_init();
+  Scratch scratch;
   st.is_running = true;
 
   WindowConfig config = {
@@ -26,7 +27,6 @@ Main entry_point() {
   };
   os_window_create(config);
   r_init();
-  Scratch scratch;
 
 #ifdef MONOLITHIC_BUILD
   st.init = app_init;
@@ -72,6 +72,11 @@ Main entry_point() {
       f32 current_time = os_now_seconds();
       delta_time = current_time - last_time;
       last_time = current_time;
+      local f32 timer = 0;
+      if ((timer += delta_time) >= 1) {
+        timer = 0;
+        Info("Frame rate %fms", delta_time);
+      }
 
       r_begin_draw_frame();
       st.update(st.state);
@@ -138,6 +143,6 @@ internal b32 app_on_resized(u32 code, void* sender, void* listener_inst, EventCo
   u32 height = context.u16[1];
   Debug("Window resize: %i, %i", width, height);
 
-  r_on_resized(width, height);
-  return true;
+  vk_r_on_resized(width, height);
+  return false;
 }

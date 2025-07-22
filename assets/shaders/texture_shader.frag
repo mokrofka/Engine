@@ -1,6 +1,7 @@
 #version 450 core
 #extension GL_GOOGLE_include_directive : enable
-#include "defines/global.vert.glsl"
+#include "defines/global.glsl"
+
 
 layout(location = 0) out vec4 out_color;
 
@@ -20,7 +21,7 @@ vec3 point_light_calculate(int light_id) {
   vec3 reflect_dir = reflect(-light_dir, norm);
 
   // float spec = pow(max(dot(view_dir, reflect_dir), 0.0), e.shininess);
-  float spec = pow(max(dot(view_dir, reflect_dir), 0.0), 0);
+  float spec = pow(max(dot(view_dir, reflect_dir), 0.0), 10);
   float diff = max(dot(norm, light_dir), 0.0);
 
   vec3 light_contrib = light.color * (diff + spec);

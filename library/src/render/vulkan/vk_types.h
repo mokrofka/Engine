@@ -84,7 +84,6 @@ struct VK_Frame {
 
   u32 image_index;
   u32 current_frame;
-  b8 recreating_swapchain;
 };
 
 struct VK_SyncObj {
@@ -107,7 +106,7 @@ struct VK_Shader {
   String name;
   VK_Pipeline pipeline;
   VkPipelineShaderStageCreateInfo stages[2];
-  SparseSetE sparse_set;
+  SparseSetE sparse_set_entities;
   u32 vert_stride;
   u32 attribute_count;
   VkVertexInputAttributeDescription attribute_desriptions[10];
@@ -154,6 +153,7 @@ struct VK {
   VkDescriptorPool descriptor_pool;
   VkDescriptorSetLayout descriptor_set_layout;
   VkDescriptorSet descriptor_sets[FramesInFlight];
+  VkDescriptorSet screen_descriptor_sets[FramesInFlight];
 
   VkDescriptorSetLayout compute_descriptor_set_layout;
   VkDescriptorSet compute_descriptor_sets[FramesInFlight];
@@ -177,14 +177,20 @@ struct VK {
   u32 entity_to_shader[MaxEntities];
   u32 shader_count;
   VK_Shader shaders[10];
+  u32 screen_shader_count;
+  VK_Shader screen_shaders[10];
+  u32 compute_shader_count;
+  VK_Shader compute_shaders[10];
   VK_ComputeShader compute_shader;
   ShaderGlobalState* global_shader_state;
+  VK_Shader screen_shader;
 
   // offscreen rendering
   VK_Texture texture_targets[ImagesInFlight];
   VK_Image offscreen_depth_buffer;
   b8 is_viewport_resized;
   b8 is_viewport_render; // TODO impelment
+  b8 is_viewport_mode;
 
   v2 viewport_size;
   

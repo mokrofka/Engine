@@ -94,7 +94,7 @@ KAPI void os_register_window_resized_callback(WindowResizedCallback callback);
 KAPI void os_window_destroy();
 KAPI void* os_get_handle_info();
 KAPI void* os_get_window_handle();
-KAPI v2i os_get_framebuffer_size();
+KAPI v2u os_get_framebuffer_size();
 KAPI void os_mouse_enable();
 KAPI void os_mouse_disable();
 KAPI v2 os_get_mouse_delta();

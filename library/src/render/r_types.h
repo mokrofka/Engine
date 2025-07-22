@@ -6,6 +6,7 @@
 enum {
   Renderpass_World,
   Renderpass_UI,
+  Renderpass_Screen,
 };
 
 struct PushConstant {
@@ -22,6 +23,13 @@ struct ShaderEntity {
 };
 
 struct PointLight {
+  v3 color;
+  v3 pos;
+  f32 intensity;
+  f32 rad;
+};
+
+struct ShaderPointLight {
   alignas(16) v3 color;
   alignas(16) v3 pos;
   alignas(4) f32 intensity;
@@ -29,12 +37,27 @@ struct PointLight {
 };
 
 struct DirLight {
+  v3 color;
+  v3 direction;
+  f32 intensity;
+};
+
+struct ShaderDirLight {
   alignas(16) v3 color;
   alignas(16) v3 direction;
   alignas(4) f32 intensity;
 };
 
 struct SpotLight {
+  v3 color;
+  v3 pos;
+  v3 dir;
+  f32 intensity;
+  f32 inner_cutoff;
+  f32 outer_cutoff;
+};
+
+struct ShaderSpotLight {
   alignas(16) v3 color;
   alignas(16) v3 pos;
   alignas(16) v3 dir;

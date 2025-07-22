@@ -3,7 +3,7 @@
 
 u32 mesh_count;
 
-void vk_r_geometry_create(Geometry& geom) {
+void vk_r_geometry_create(Geometry geom) {
   u64 size = geom.vertex_size * geom.vertex_count;
   u64 offset = freelist_gpu_alloc(vk.vert_buffer.freelist, size);
   

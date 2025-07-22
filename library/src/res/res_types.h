@@ -2,6 +2,7 @@
 #include "lib.h"
 
 struct Texture {
+  u32 id;
   String filepath;
   u32 width;
   u32 height;
@@ -11,6 +12,7 @@ struct Texture {
 };
 
 struct Geometry {
+  u32 id;
   String name;
   
   u32 vertex_count;
@@ -27,9 +29,17 @@ enum ShaderTopology {
   ShaderTopology_Point,
 };
 
+enum ShaderType {
+  ShaderType_Gfx,
+  ShaderType_Screen,
+  ShaderType_Compute,
+};
+
 struct Shader {
+  u32 id;
   String name;
   ShaderTopology primitive;
+  ShaderType type;
   u8 stages;
   b8 is_transparent;
   u8 attribut[10];

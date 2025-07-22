@@ -50,12 +50,13 @@ void hashmap_set_ptr(HashMap& table, String name, void** value) {
   ((void**)table.data)[hash] = value ? *value : 0;
 }
 
-void hashmap_get(HashMap& table, String name, void* out_value) {
-  Assert(name.str && out_value);
+void* hashmap_get(HashMap& table, String name) {
+  Assert(name.str);
   Assert(!table.is_pointer_type);
   
   u64 hash = hash_name(name, table.element_count);
-  MemCopy(out_value, table.data + (table.element_size * hash), table.element_size);
+  void* result = Offset(table.data, table.element_size*hash);
+  return result;
 }
 
 void hashmap_get_ptr(HashMap& table, String name, void** out_value) {

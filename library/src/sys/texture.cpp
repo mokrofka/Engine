@@ -26,7 +26,7 @@ Texture res_texture_load(String name) {
   Texture texture = {};
   
   u32 required_channel_count = 4;
-  stbi_set_flip_vertically_on_load(true);
+  // stbi_set_flip_vertically_on_load(true);
 
   String filepath = push_strf(scratch, "%s/%s/%s", res_sys_base_path(), String("textures"), name);
 
@@ -39,7 +39,7 @@ Texture res_texture_load(String name) {
     (i32*)&texture.channel_count,
     required_channel_count);
   if (!data) {
-    Error("Image resource loader failed to load file '%s'", filepath);
+    AssertMsg(false, "Image resource loader failed to load file '%s'", filepath);
     return {};
   }
 
@@ -64,9 +64,8 @@ void texture_load(String name) {
   vk_texture_load(texture);
 }
 
-KAPI u32 texture_get(String name) {
-  u32 id;
-  hashmap_get(st.hashmap, name, &id);
-  Assert(id != INVALID_ID);
-  return id;
+KAPI Texture& texture_get(String name) {
+  Texture* t; Assign(t, hashmap_get(st.hashmap, name));
+  Assert(t->id != INVALID_ID);
+  return *t;
 }

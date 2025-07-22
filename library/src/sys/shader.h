@@ -3,8 +3,8 @@
 
 #include "res/res_types.h"
 
-KAPI u32 shader_get(String name);
+KAPI Shader& shader_get(String name);
 
 KAPI void shader_init();
 
-KAPI u32 shader_create(Shader shader);
+KAPI void shader_create(Shader shader);

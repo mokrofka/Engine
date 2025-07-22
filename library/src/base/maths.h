@@ -8,20 +8,17 @@
 #define OneOver_PI    1.0f  / PI
 #define OneOverTwo_PI 1.0f  / Two_PI
 
-#define SqrtTwo          1.41421356237f
-#define SqrtThree        1.73205080756f
-#define SqrtOneOverTwo   0.70710678118f
-#define SqrtOneOverThree 0.57735026918f
-
 #define Euler     2.71828182846f
 #define GoldBig   1.61803398875f
 #define GoldSmall 0.61803398875f
 
-#define FloatEpsilon   1e-5
+#define FloatEpsilon   1e-5f
 #define MachineEpsilon 1.1920929e-7f
 
 #define DegToRad_Multiplier PI / 180.0f
 #define RadToDeg_Multiplier 180.0f / PI
+INLINE f32 deg_to_rad(f32 degrees) { return degrees * DegToRad_Multiplier; }
+INLINE f32 rad_to_deg(f32 radians) { return radians * RadToDeg_Multiplier; }
 
 union v2 {
   f32 e[2];
@@ -29,8 +26,13 @@ union v2 {
     f32 x;
     f32 y;
   };
-  v2 () = default;
-  INLINE v2(f32 x_, f32 y_) { x = x_, y = y_; }
+  f32& operator[](u32 a) {
+    return e[a];
+  }
+
+  v2 (){};
+  INLINE v2 (f32 x_, f32 y_) { x = x_, y = y_; }
+  INLINE v2 (f32 scale) { x = scale; y = scale; }
 };
 
 union v2i {
@@ -39,8 +41,28 @@ union v2i {
     i32 x;
     i32 y;
   };
-  v2i () = default;
-  INLINE v2i(i32 x_, i32 y_) { x = x_, y = y_; }
+  i32& operator[](u32 a) {
+    return e[a];
+  }
+
+  v2i (){};
+  INLINE v2i (i32 x_, i32 y_) { x = x_, y = y_; }
+  INLINE v2i (i32 scale) { x = scale; y = scale; }
+};
+
+union v2u {
+  u32 e[2];
+  struct {
+    u32 x;
+    u32 y;
+  };
+  u32& operator[](u32 a) {
+    return e[a];
+  }
+
+  v2u (){};
+  INLINE v2u (u32 x_, u32 y_) { x = x_, y = y_; }
+  INLINE v2u (u32 scale) { x = scale; y = scale; }
 };
 
 union v3 {
@@ -50,11 +72,13 @@ union v3 {
     f32 y;
     f32 z;
   };
-  v3 () = default;
-  INLINE v3 (f32 scale) {
-    x = scale; y = scale; z = scale;
+  f32& operator[](u32 a) {
+    return e[a];
   }
-  INLINE v3(f32 x_, f32 y_, f32 z_) { x = x_, y = y_, z = z_; }
+
+  v3 (){};
+  INLINE v3 (f32 x_, f32 y_, f32 z_) { x = x_, y = y_, z = z_; }
+  INLINE v3 (f32 scale) { x = scale; y = scale; z = scale; }
 };
 
 union v4 {
@@ -65,69 +89,40 @@ union v4 {
     f32 z;
     f32 w;
   };
-  v4 () = default;
-  INLINE v4(f32 x_, f32 y_, f32 z_, f32 w_) { x = x_, y = y_, z = z_, w = w_; }
+  f32& operator[](u32 a) {
+    return e[a];
+  }
+
+  v4 (){};
+  INLINE v4 (f32 x_, f32 y_, f32 z_, f32 w_) { x = x_, y = y_, z = z_, w = w_; }
+  INLINE v4 (f32 scale) { x = scale; y = scale; z = scale; w = scale; }
 };
 
 typedef v4 quat;
 
 union mat4 {
-  f32 data[16];
-  
-  v4 rows[4];
+  f32 e[16];
+  f32& operator[](u32 a) {
+    return e[a];
+  }
 };
 
-INLINE f32 Sin(f32 a) {
-  return __builtin_sinf(a);
-}
+INLINE f32 Sin(f32 a)                 { return __builtin_sinf(a); }
+INLINE f32 SinD(f32 a)                { return Sin(a * DegToRad_Multiplier); }
+INLINE f32 Cos(f32 a)                 { return __builtin_cosf(a); }
+INLINE f32 CosD(f32 a)                { return Cos(a * DegToRad_Multiplier); }
+INLINE f32 Tan(f32 a)                 { return __builtin_tanf(a); }
+INLINE f32 Asin(f32 a)                { return __builtin_asin(a); }
+INLINE f32 Acos(f32 a)                { return __builtin_acos(a); }
+INLINE f32 Sqrt(f32 a)                { return __builtin_sqrtf(a); }
+INLINE f32 Pow(f32 a, f32 b)          { return __builtin_powf(a, b); }
+INLINE f32 Floor(f32 a)               { return __builtin_floorf(a); }
+INLINE f32 Round(f32 a)               { return __builtin_roundf(a); }
+INLINE f32 Exp(f32 a)                 { return __builtin_expf(a); }
+INLINE f32 lerp(f32 a, f32 t, f32 b)  { return (1 - t)*a + t*b; }
 
-INLINE f32 SinD(f32 a) {
-  return Sin(a * DegToRad_Multiplier);
-}
-
-INLINE f32 Cos(f32 a) {
-  return __builtin_cosf(a);
-}
-
-INLINE f32 CosD(f32 a) {
-  return Cos(a * DegToRad_Multiplier);
-}
-
-INLINE f32 Tan(f32 a) {
-  return __builtin_tanf(a);
-}
-
-INLINE f32 Asin(f32 a) {
-  return __builtin_asin(a);
-}
-
-INLINE f32 Acos(f32 a) {
-  return __builtin_acos(a);
-}
-
-INLINE f32 Sqrt(f32 a) {
-  return __builtin_sqrtf(a);
-}
-
-INLINE f32 Pow(f32 a, f32 b) {
-  return __builtin_powf(a, b);
-}
-
-INLINE f32 Floor(f32 a) {
-  return __builtin_floorf(a);
-}
-
-INLINE f32 Round(f32 a) {
-  return __builtin_roundf(a);
-}
-
-INLINE f32 Exp(f32 a) {
-  return __builtin_expf(a);
-}
-
-INLINE f32 lerp(f32 a, f32 t, f32 b) {
-  return (1 - t) * a + t * b;
-}
+////////////////////////////////////////////////////////////////////////
+// Color
 
 INLINE v4 rgba_from_u32(u32 hex) {
   v4 result = v4(((hex & 0xff000000) >> 24) / 255.f,
@@ -146,13 +141,8 @@ INLINE u32 u32_from_rgba(v4 rgba) {
   return result;
 }
 
-INLINE f32 deg_to_rad(f32 degrees) {
-  return degrees * DegToRad_Multiplier;
-}
-
-INLINE f32 rad_to_deg(f32 radians) {
-  return radians * RadToDeg_Multiplier;
-}
+////////////////////////////////////////////////////////////////////////
+// Random
 
 INLINE u32 xorshift32(u32* seed) {
   u32 x = *seed;
@@ -162,418 +152,165 @@ INLINE u32 xorshift32(u32* seed) {
   return *seed = x;
 }
 
-thread_local global u32 g_seed = 1;
-INLINE u32 rand_u32() {
-  u32 x = xorshift32(&g_seed);
-  return x;
-}
-
-INLINE u32 rand_in_range_u32(u32 min, u32 max) {
-  u32 x = xorshift32(&g_seed);
-  return (x % (max - min + 1)) + min;
-}
-
-INLINE i32 rand_i32() {
-  u32 x = xorshift32(&g_seed);
-  return x;
-}
-
-INLINE i32 rand_in_range_i32(i32 min, i32 max) {
-  u32 x = xorshift32(&g_seed);
-  return min + (i32)(x % (u32)(max - min + 1));
-}
-
-INLINE f32 rand_f32_01() {
-  return (f32)rand_u32() / (f32)U32_MAX;
-}
-
-INLINE f32 rand_f32_11() {
-  return rand_f32_01() * 2.f - 1.f;
-}
-
-INLINE f32 rand_f32() {
-  f32 normalized = (f32)rand_u32() / (f32)U32_MAX;
-  return normalized * 2 * U16_MAX - U16_MAX;
-}
-
-INLINE f32 rand_in_range_f32(f32 min, f32 max) {
-  return min + (max - min) * rand_f32_01();
-}
-
-INLINE b32 rand_b32() {
-  return rand_u32()%2;
-}
-
-///////////////////////////////////////////////////////////////////////////////////////
-// Vector_2
-
-INLINE v2 v2_zero() {
-  return v2(0.0f, 0.0f);
-}
-
-INLINE v2 v2_one() {
-  return v2(1.0f, 1.0f);
-}
-
-INLINE v2 v2_up() {
-  return v2(0.0f, 1.0f);
-}
-
-INLINE v2 v2_down() {
-  return v2(0.0f, -1.0f);
-}
-
-INLINE v2 v2_left() {
-  return v2(-1.0f, 0.0f);
-}
-
-INLINE v2 v2_right() {
-  return v2(1.0f, 0.0f);
-}
-
-INLINE v2 operator+(v2 a, v2 b) {
-  return v2(a.x + b.x, a.y + b.y);
-}
-
-INLINE v2 operator-(v2 a, v2 b) {
-  return v2(a.x - b.x, a.y - b.y);
-}
-
-INLINE v2 operator*(v2 a, f32 scalar) {
-  return v2(a.x * scalar, a.y * scalar);
-}
-
-INLINE v2 operator*(f32 scalar, v2 a) {
-  return v2(a.x * scalar, a.y * scalar);
-}
-
-INLINE v2 operator/(v2 a, f32 scalar) {
-  return v2(a.x / scalar, a.y / scalar);
-}
-
-INLINE v2& operator+=(v2& a, v2 b) {
-  a = a + b;
-  return a;
-}
-
-INLINE v2& operator-=(v2& a, v2 b) {
-  a = a - b;
-  return a;
-}
-
-INLINE v2& operator*=(v2& a, f32 scalar) {
-  a = a * scalar;
-  return a;
-}
-
-INLINE v2& operator/=(v2& a, f32 scalar) {
-  a = a / scalar;
-  return a;
-}
-
-INLINE b32 operator==(v2 a, v2 b) {
-  return Abs(a.x - b.x) <= FloatEpsilon &&
-         Abs(a.y - b.y) <= FloatEpsilon;
-}
-
-INLINE b32 operator!=(v2 a, v2 b) {
-  return !(a == b);
-}
-
-INLINE v2 operator-(const v2& a) {
-  return v2(-a.x, -a.y);
-}
-
-INLINE f32 v2_length_squared(v2 a) {
-  return Sqr(a.x) + Sqr(a.y);
-}
-
-INLINE f32 v2_length(v2 a) {
-  return Sqrt(v2_length_squared(a));
-}
-
-INLINE v2 v2_normalize(v2 a) {
-  f32 length = v2_length(a);
-  a.x /= length;
-  a.y /= length;
-  return a;
-}
-
-INLINE b32 v2_compare(v2 a, v2 b, f32 tolerance) {
-  return Abs(a.x - b.x) <= tolerance &&
-         Abs(a.y - b.y) <= tolerance;
-}
-
-INLINE f32 v2_distance(v2 a, v2 b) {
-  v2 d = v2(a.x - b.x, a.y - b.y);
-  return v2_length(d);
-}
-
-INLINE f32 v2_dot(v2 a, v2 b) {
-  return a.x * b.x + a.y * b.y;
-}
-
-///////////////////////////////////////////////////////////////////////////////////////
-// Vector_3
-
-INLINE v4 v3_to_v4(v3 a, f32 w) {
-  return v4(a.x, a.y, a.z, w);
-}
-
-INLINE v3 v3_zero() {
-  return v3(0.0f, 0.0f, 0.0f);
-}
-
-INLINE v3 v3_one() {
-  return v3(1.0f, 1.0f, 1.0f);
-}
-
-INLINE v3 v3_up() {
-  return v3(0.0f, 1.0f, 0.0f);
-}
-
-INLINE v3 v3_down() {
-  return v3(0.0f, -1.0f, 0.0f);
-}
-
-INLINE v3 v3_left() {
-  return v3(-1.0f, 0.0f, 0.0f);
-}
-
-INLINE v3 v3_right() {
-  return v3(1.0f, 0.0f, 0.0f);
-}
-
-INLINE v3 v3_forward() {
-  return v3(0.0f, 0.0f, -1.0f);
-}
-
-INLINE v3 v3_back() {
-  return v3(0.0f, 0.0f, 1.0f);
-}
-
-INLINE v3 operator+(v3 a, v3 b) {
-  return v3(a.x + b.x, a.y + b.y, a.z + b.z);
-}
-
-INLINE v3 operator-(v3 a, v3 b) {
-  return v3(a.x - b.x, a.y - b.y, a.z - b.z);
-}
-
-INLINE v3 operator*(v3 a, f32 scalar) {
-  return v3(a.x * scalar, a.y * scalar, a.z * scalar);
-}
-
-INLINE v3 operator*(f32 scalar, v3 a) {
-  return v3(a.x * scalar, a.y * scalar, a.z * scalar);
-}
-
-INLINE v3 operator/(v3 a, f32 scalar) {
-  return v3(a.x / scalar, a.y / scalar, a.z / scalar);
-}
-
-INLINE v3 operator/(f32 scalar, v3 a) {
-  return v3(a.x / scalar, a.y / scalar, a.z / scalar);
-}
-
-INLINE v3& operator+=(v3& a, v3 b) {
-  a = a + b;
-  return a;
-}
-
-INLINE v3& operator-=(v3& a, v3 b) {
-  a = a - b;
-  return a;
-}
-
-INLINE v3& operator*=(v3& a, f32 scalar) {
-  a = a * scalar;
-  return a;
-}
-
-INLINE v3& operator/=(v3& a, f32 scalar) {
-  a = a / scalar;
-  return a;
-}
-
-INLINE b32 operator==(v3 a, v3 b) {
-  return Abs(a.x - b.x) <= FloatEpsilon &&
-         Abs(a.y - b.y) <= FloatEpsilon &&
-         Abs(a.z - b.z) <= FloatEpsilon;
-}
-
-INLINE b32 operator!=(v3 a, v3 b) {
-  return !(a == b);
-}
-
-INLINE v3 operator-(const v3& a) {
-    return v3(-a.x, -a.y, -a.z);
-}
-
-
-INLINE f32 v3_length_squared(v3 a) {
-  return Sqr(a.x) + Sqr(a.y) + Sqr(a.z);
-}
-
-INLINE f32 v3_length(v3 a) {
-  return Sqrt(v3_length_squared(a));
-}
-
-
-INLINE v3 v3_normalize(v3 a) {
-  f32 length = v3_length(a);
-  a.x /= length;
-  a.y /= length;
-  a.z /= length;
-  return a;
-}
-
-INLINE f32 v3_distance(v3 a, v3 b) {
-  v3 d = v3(a.x - b.x, a.y - b.y, a.z - b.z);
-  return v3_length(d);
-}
-
-INLINE f32 v3_dot(v3 a, v3 b) {
-  return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-
-INLINE v3 v3_cross(v3 a, v3 b) {
-  return v3(
-    a.y * b.z - a.z * b.y,
-    a.z * b.x - a.x * b.z,
-    a.x * b.y - a.y * b.x
-  );
-}
-
-///////////////////////////////////////////////////////////////////////////////////////
-// Vector_4
-
-INLINE v3 v4_to_v3(v4 a) {
-  return v3(a.x, a.y, a.z);
-}
-
-INLINE v4 v4_zero() {
-  return v4(0.0f, 0.0f, 0.0f, 0.0f);
-}
-
-INLINE v4 v4_one() {
-  return v4(1.0f, 1.0f, 1.0f, 1.0f);
-}
-
-INLINE v4 operator+(v4 a, v4 b) {
-  return v4(a.x + b.x, a.y + b.y, a.z + b.z, a.z + b.z);
-}
-
-INLINE v4 operator-(v4 a, v4 b) {
-  return v4(a.x - b.x, a.y - b.y, a.z - b.z, a.z - b.z);
-}
-
-INLINE v4 operator*(v4 a, f32 scalar) {
-  return v4(a.x * scalar, a.y * scalar, a.z * scalar, a.w * scalar);
-}
-
-INLINE v4& operator+=(v4& a, v4 b) {
-  a = a + b;
-  return a;
-}
-
-INLINE v4& operator-=(v4& a, v4 b) {
-  a = a - b;
-  return a;
-}
-
-INLINE v4 operator-(const v4& a) {
-    return v4(-a.x, -a.y, -a.z, -a.w);
-}
-
-INLINE f32 v4_length_squared(v4 a) {
-  return Sqr(a.x) + Sqr(a.y) + Sqr(a.z) + Sqr(a.w);
-}
-
-INLINE f32 v4_length(v4 a) {
-  return Sqrt(v4_length_squared(a));
-}
-
-INLINE v4 v4_normalize(v4 a) {
-  f32 length = v4_length(a);
-  a.x /= length;
-  a.y /= length;
-  a.z /= length;
-  a.w /= length;
-  return a;
-}
-
-///////////////////////////////////////////////////////////////////////////////////////
+KAPI extern u32 __seed;
+INLINE u32 rand_u32()                        { return xorshift32(&__seed); }
+INLINE u32 rand_range_u32(u32 min, u32 max)  { return (xorshift32(&__seed) % (max - min + 1)) + min; }
+INLINE i32 rand_i32()                        { return xorshift32(&__seed); }
+INLINE i32 rand_range_i32(i32 min, i32 max)  { return min + (i32)(xorshift32(&__seed) % (u32)(max - min + 1)); }
+INLINE f32 rand_f32_01()                     { return (f32)rand_u32() / (f32)U32_MAX; }
+INLINE f32 rand_f32_11()                     { return rand_f32_01() * 2.f - 1.f; }
+INLINE f32 rand_f32()                        { return (f32)rand_u32() / (f32)U32_MAX * 2 * U16_MAX - U16_MAX; }
+INLINE f32 rand_range_f32(f32 min, f32 max)  { return min + (max - min) * rand_f32_01(); }
+INLINE b32 rand_b32()                        { return rand_u32()%2; }
+
+////////////////////////////////////////////////////////////////////////
+// Vector2
+
+INLINE v2 v2_one()                      { return v2(1.0f, 1.0f); }
+INLINE v2 v2_up()                       { return v2(0.0f, 1.0f); }
+INLINE v2 v2_down()                     { return v2(0.0f, -1.0f); }
+INLINE v2 v2_left()                     { return v2(-1.0f, 0.0f); }
+INLINE v2 v2_right()                    { return v2(1.0f, 0.0f); }
+INLINE v2 v2_of_v3(v3 a)                { return v2(a.x, a.y); }
+INLINE v2 v2_of_v4(v4 a)                { return v2(a.x, a.y); }
+INLINE v3 v2_to_v3(v2 a, f32 b)         { return v3(a.x, a.y, b); }
+INLINE v4 v2_to_v4(v2 a, f32 b, f32 c)  { return v4(a.x, a.y, b, c); }
+
+INLINE v2  operator+(v2 a, v2 b)          { return v2(a.x + b.x, a.y + b.y); }
+INLINE v2  operator-(v2 a, v2 b)          { return v2(a.x - b.x, a.y - b.y); }
+INLINE v2  operator*(v2 a, f32 scalar)    { return v2(a.x*scalar, a.y*scalar); }
+INLINE v2  operator*(f32 scalar, v2 a)    { return v2(a.x*scalar, a.y*scalar); }
+INLINE v2  operator/(v2 a, f32 scalar)    { return v2(a.x/scalar, a.y/scalar); }
+INLINE v2  operator+=(v2& a, v2 b)        { return a = a + b; }
+INLINE v2  operator-=(v2& a, v2 b)        { return a = a - b; }
+INLINE v2  operator*=(v2& a, f32 scalar)  { return a = a*scalar; }
+INLINE v2  operator/=(v2& a, f32 scalar)  { return a = a/scalar; }
+INLINE b32 operator==(v2 a, v2 b)         { return (Abs(a.x - b.x) <= FloatEpsilon) && (Abs(a.y - b.y) <= FloatEpsilon); }
+INLINE b32 operator!=(v2 a, v2 b)         { return !(a == b); }
+INLINE v2  operator-(v2 a)               { return v2(-a.x, -a.y); }
+
+INLINE f32 v2_length_squared(v2 a)  { return Sqr(a.x) + Sqr(a.y); }
+INLINE f32 v2_length(v2 a)          { return Sqrt(v2_length_squared(a)); }
+INLINE v2  v2_normalize(v2 a)       { return a / v2_length(a); }
+INLINE f32 v2_distance(v2 a, v2 b)  { return v2_length(v2(a.x - b.x, a.y - b.y)); }
+INLINE f32 v2_dot(v2 a, v2 b)       { return a.x*b.x + a.y*b.y; }
+
+////////////////////////////////////////////////////////////////////////
+// Vector3
+
+INLINE v3 v3_up()                { return v3(0.0f, 1.0f, 0.0f); }
+INLINE v3 v3_down()              { return v3(0.0f, -1.0f, 0.0f); }
+INLINE v3 v3_left()              { return v3(-1.0f, 0.0f, 0.0f); }
+INLINE v3 v3_right()             { return v3(1.0f, 0.0f, 0.0f); }
+INLINE v3 v3_forward()           { return v3(0.0f, 0.0f, -1.0f); }
+INLINE v3 v3_back()              { return v3(0.0f, 0.0f, 1.0f); }
+INLINE v3 v3_of_v4(v4 a)         { return v3(a.x, a.y, a.z); }
+INLINE v4 v3_to_v4(v3 a, f32 b)  { return v4(a.x, a.y, a.z, b); }
+
+INLINE v3  operator+(v3 a, v3 b)          { return v3(a.x + b.x, a.y + b.y, a.z + b.z); }
+INLINE v3  operator-(v3 a, v3 b)          { return v3(a.x - b.x, a.y - b.y, a.z - b.z); }
+INLINE v3  operator*(v3 a, f32 scalar)    { return v3(a.x*scalar, a.y*scalar, a.z*scalar); }
+INLINE v3  operator*(f32 scalar, v3 a)    { return v3(a.x*scalar, a.y*scalar, a.z*scalar); }
+INLINE v3  operator/(v3 a, f32 scalar)    { return v3(a.x/scalar, a.y/scalar, a.z/scalar); }
+INLINE v3& operator+=(v3& a, v3 b)        { return a = a + b; }
+INLINE v3& operator-=(v3& a, v3 b)        { return a = a - b; }
+INLINE v3& operator*=(v3& a, f32 scalar)  { return a = a * scalar; }
+INLINE v3& operator/=(v3& a, f32 scalar)  { return a = a / scalar; }
+INLINE b32 operator==(v3 a, v3 b)         { return (Abs(a.x - b.x) <= FloatEpsilon) && (Abs(a.y - b.y) <= FloatEpsilon) && (Abs(a.z - b.z) <= FloatEpsilon); }
+INLINE b32 operator!=(v3 a, v3 b)         { return !(a == b); }
+INLINE v3  operator-(v3 a)               { return v3(-a.x, -a.y, -a.z); }
+
+INLINE f32 v3_length_squared(v3 a)  { return Sqr(a.x) + Sqr(a.y) + Sqr(a.z); }
+INLINE f32 v3_length(v3 a)          { return Sqrt(v3_length_squared(a)); }
+INLINE v3  v3_normalize(v3 a)       { return a / v3_length(a); }
+INLINE f32 v3_distance(v3 a, v3 b)  { return v3_length(v3(a.x - b.x, a.y - b.y, a.z - b.z)); }
+INLINE f32 v3_dot(v3 a, v3 b)       { return a.x*b.x + a.y*b.y + a.z*b.z; }
+INLINE v3  v3_cross(v3 a, v3 b)     { return v3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x); }
+
+////////////////////////////////////////////////////////////////////////
+// Vector4
+
+INLINE v4  operator+(v4 a, v4 b)          { return v4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w); }
+INLINE v4  operator-(v4 a, v4 b)          { return v4(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w); }
+INLINE v4  operator*(v4 a, f32 scalar)    { return v4(a.x*scalar, a.y*scalar, a.z*scalar, a.w*scalar); }
+INLINE v4  operator*(f32 scalar, v4 a)    { return v4(a.x*scalar, a.y*scalar, a.z*scalar, a.w*scalar); }
+INLINE v4  operator/(v4 a, f32 scalar)    { return v4(a.x/scalar, a.y/scalar, a.z/scalar, a.w/scalar); }
+INLINE v4  operator+=(v4& a, v4 b)        { return a = a + b; }
+INLINE v4  operator-=(v4& a, v4 b)        { return a = a - b; }
+INLINE v4  operator*=(v4& a, f32 scalar)  { return a = a * scalar; }
+INLINE v4  operator/=(v4& a, f32 scalar)  { return a = a / scalar; }
+INLINE v4  operator-(v4 a)                { return v4(-a.x, -a.y, -a.z, -a.w); }
+
+INLINE f32 v4_length_squared(v4 a)  { return Sqr(a.x) + Sqr(a.y) + Sqr(a.z) + Sqr(a.w); }
+INLINE f32 v4_length(v4 a)          { return Sqrt(v4_length_squared(a)); }
+INLINE v4  v4_normalize(v4 a)       { return a / v4_length(a); }
+
+////////////////////////////////////////////////////////////////////////
 // Matrix4
 
 INLINE mat4 mat4_identity() {
-  mat4 matrix = {
+  return mat4 {
     1,0,0,0,
     0,1,0,0,
     0,0,1,0,
-    0,0,0,1};
-  return matrix;
+    0,0,0,1
+  };
 }
 
-inline mat4 operator*(mat4 matrix_0, mat4 matrix_1) {
+inline mat4 operator*(mat4 a, mat4 b) {
   mat4 result = {};
   Loop (row, 4) {
     Loop (col, 4) {
-      result.data[row * 4 + col] =
-          matrix_1.data[row * 4 + 0] * matrix_0.data[0 * 4 + col] +
-          matrix_1.data[row * 4 + 1] * matrix_0.data[1 * 4 + col] +
-          matrix_1.data[row * 4 + 2] * matrix_0.data[2 * 4 + col] +
-          matrix_1.data[row * 4 + 3] * matrix_0.data[3 * 4 + col];
+      result[row * 4 + col] =
+        b[row*4 + 0] * a[0*4 + col] +
+        b[row*4 + 1] * a[1*4 + col] +
+        b[row*4 + 2] * a[2*4 + col] +
+        b[row*4 + 3] * a[3*4 + col];
     }
   }
+
   return result;
 }
 
-INLINE mat4& operator*=(mat4& a, mat4 b) {
-  a = b * a;
-  return a;
-}
+INLINE mat4& operator*=(mat4& a, mat4 b) { return a = b * a; }
 
-INLINE v4 operator*(const mat4& mat, const v4& vec) {
-    v4 result;
-    result.x = mat.data[0] * vec.x + mat.data[1] * vec.y + mat.data[2] * vec.z + mat.data[3] * vec.w;
-    result.y = mat.data[4] * vec.x + mat.data[5] * vec.y + mat.data[6] * vec.z + mat.data[7] * vec.w;
-    result.z = mat.data[8] * vec.x + mat.data[9] * vec.y + mat.data[10] * vec.z + mat.data[11] * vec.w;
-    result.w = mat.data[12] * vec.x + mat.data[13] * vec.y + mat.data[14] * vec.z + mat.data[15] * vec.w;
-    return result;
+INLINE v4 operator*(mat4& mat, v4& vec) {
+  v4 result;
+  result.x = mat.e[0 ]*vec.x + mat.e[1 ]*vec.y + mat.e[2 ]*vec.z + mat.e[3 ]*vec.w;
+  result.y = mat.e[4 ]*vec.x + mat.e[5 ]*vec.y + mat.e[6 ]*vec.z + mat.e[7 ]*vec.w;
+  result.z = mat.e[8 ]*vec.x + mat.e[9 ]*vec.y + mat.e[10]*vec.z + mat.e[11]*vec.w;
+  result.w = mat.e[12]*vec.x + mat.e[13]*vec.y + mat.e[14]*vec.z + mat.e[15]*vec.w;
+  return result;
 }
 
 inline mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 Near, f32 Far) {
   mat4 mat = {};
-  mat.data[0*4 + 0] = 2.0f / (right - left);
-  mat.data[1*4 + 1] = 2.0f / (bottom - top);
-  mat.data[2*4 + 2] = 1.0f / (Far - Near);
-
-  mat.data[3*4 + 2] = -Near / (Far - Near);
-
-  mat.data[3*4 + 3] = 1.0f;
-
+  mat.e[0*4 + 0] = 2.0f / (right - left);
+  mat.e[1*4 + 1] = 2.0f / (bottom - top);
+  mat.e[2*4 + 2] = 1.0f / (Far - Near);
+  mat.e[3*4 + 2] = -Near / (Far - Near);
+  mat.e[3*4 + 3] = 1.0f;
   return mat;
 }
 
 inline mat4 mat4_perspective1(f32 fov_radians, f32 aspect_ratio, f32 Near, f32 Far) {
   mat4 mat = {};
-  mat.data[0*4 + 0] = 1.0f / (Tan(fov_radians/2.0f) * aspect_ratio);
-  mat.data[1*4 + 1] = 1.0f / Tan(fov_radians/2.0f);
-  mat.data[2*4 + 2] = Far / (Far - Near);
-  mat.data[2*4 + 3] = 1.0f;
-  mat.data[3*4 + 2] = (-Far * Near) / (Far - Near);
+  mat.e[0*4 + 0] = 1.0f / (Tan(fov_radians/2.0f) * aspect_ratio);
+  mat.e[1*4 + 1] = 1.0f / Tan(fov_radians/2.0f);
+  mat.e[2*4 + 2] = Far / (Far - Near);
+  mat.e[2*4 + 3] = 1.0f;
+  mat.e[3*4 + 2] = (-Far * Near) / (Far - Near);
   
   return mat;
 }
 
 inline mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 Near, f32 Far) {
   mat4 mat = {};
-  mat.data[0*4 + 0] = 1.0f / (Tan(fov_radians / 2.0f) * aspect_ratio);
-  mat.data[1*4 + 1] = 1.0f / Tan(fov_radians / 2.0f);
-  mat.data[2 * 4 + 2] = -(Far + Near) / (Far - Near);        // Flip sign
-  mat.data[2 * 4 + 3] = -1.0f;                               // Flip sign
-  mat.data[3 * 4 + 2] = (-2.0f * Far * Near) / (Far - Near); // Flip sign
+  mat.e[0*4 + 0] = 1.0f / (Tan(fov_radians / 2.0f) * aspect_ratio);
+  mat.e[1*4 + 1] = 1.0f / Tan(fov_radians / 2.0f);
+  mat.e[2 * 4 + 2] = -(Far + Near) / (Far - Near);        // Flip sign
+  mat.e[2 * 4 + 3] = -1.0f;                               // Flip sign
+  mat.e[3 * 4 + 2] = (-2.0f * Far * Near) / (Far - Near); // Flip sign
   
   return mat;
 }
@@ -595,27 +332,27 @@ inline mat4 mat4_look_at(v3 position, v3 target, v3 up) {
 
 inline mat4 mat4_transposed(mat4 matrix) {
   mat4 out_matrix = mat4_identity();
-  out_matrix.data[0] = matrix.data[0];
-  out_matrix.data[1] = matrix.data[4];
-  out_matrix.data[2] = matrix.data[8];
-  out_matrix.data[3] = matrix.data[12];
-  out_matrix.data[4] = matrix.data[1];
-  out_matrix.data[5] = matrix.data[5];
-  out_matrix.data[6] = matrix.data[9];
-  out_matrix.data[7] = matrix.data[13];
-  out_matrix.data[8] = matrix.data[2];
-  out_matrix.data[9] = matrix.data[6];
-  out_matrix.data[10] = matrix.data[10];
-  out_matrix.data[11] = matrix.data[14];
-  out_matrix.data[12] = matrix.data[3];
-  out_matrix.data[13] = matrix.data[7];
-  out_matrix.data[14] = matrix.data[11];
-  out_matrix.data[15] = matrix.data[15];
+  out_matrix.e[0] = matrix.e[0];
+  out_matrix.e[1] = matrix.e[4];
+  out_matrix.e[2] = matrix.e[8];
+  out_matrix.e[3] = matrix.e[12];
+  out_matrix.e[4] = matrix.e[1];
+  out_matrix.e[5] = matrix.e[5];
+  out_matrix.e[6] = matrix.e[9];
+  out_matrix.e[7] = matrix.e[13];
+  out_matrix.e[8] = matrix.e[2];
+  out_matrix.e[9] = matrix.e[6];
+  out_matrix.e[10] = matrix.e[10];
+  out_matrix.e[11] = matrix.e[14];
+  out_matrix.e[12] = matrix.e[3];
+  out_matrix.e[13] = matrix.e[7];
+  out_matrix.e[14] = matrix.e[11];
+  out_matrix.e[15] = matrix.e[15];
   return out_matrix;
 }
 
 inline mat4 mat4_inverse(mat4 matrix) {
-  const f32* m = matrix.data;
+  const f32* m = matrix.e;
 
   f32 t0 = m[10] * m[15];
   f32 t1 = m[14] * m[11];
@@ -643,7 +380,7 @@ inline mat4 mat4_inverse(mat4 matrix) {
   f32 t23 = m[4] * m[1];
 
   mat4 out_matrix;
-  f32* o = out_matrix.data;
+  f32* o = out_matrix.e;
 
   o[0] = (t0 * m[5] + t3 * m[9] + t4 * m[13]) - (t1 * m[5] + t2 * m[9] + t5 * m[13]);
   o[1] = (t1 * m[1] + t6 * m[9] + t9 * m[13]) - (t0 * m[1] + t7 * m[9] + t8 * m[13]);
@@ -745,54 +482,54 @@ INLINE mat4 mat4_transform(Transform trans) {
 
 INLINE v3 mat4_forward(mat4 matrix) {
   v3 forward;
-  forward.x = -matrix.data[2];
-  forward.y = -matrix.data[6];
-  forward.z = -matrix.data[10];
+  forward.x = -matrix.e[2];
+  forward.y = -matrix.e[6];
+  forward.z = -matrix.e[10];
   forward = v3_normalize(forward);
   return forward;
 }
 
 INLINE v3 mat4_backward(mat4 matrix) {
   v3 backward;
-  backward.x = matrix.data[2];
-  backward.y = matrix.data[6];
-  backward.z = matrix.data[10];
+  backward.x = matrix.e[2];
+  backward.y = matrix.e[6];
+  backward.z = matrix.e[10];
   backward = v3_normalize(backward);
   return backward;
 }
 
 INLINE v3 mat4_up(mat4 matrix) {
   v3 up;
-  up.x = matrix.data[1];
-  up.y = matrix.data[5];
-  up.z = matrix.data[9];
+  up.x = matrix.e[1];
+  up.y = matrix.e[5];
+  up.z = matrix.e[9];
   up = v3_normalize(up);
   return up;
 }
 
 INLINE v3 mat4_down(mat4 matrix) {
   v3 down;
-  down.x = -matrix.data[1];
-  down.y = -matrix.data[5];
-  down.z = -matrix.data[9];
+  down.x = -matrix.e[1];
+  down.y = -matrix.e[5];
+  down.z = -matrix.e[9];
   down = v3_normalize(down);
   return down;
 }
 
 INLINE v3 mat4_left(mat4 matrix) {
   v3 right;
-  right.x = -matrix.data[0];
-  right.y = -matrix.data[4];
-  right.z = -matrix.data[8];
+  right.x = -matrix.e[0];
+  right.y = -matrix.e[4];
+  right.z = -matrix.e[8];
   right = v3_normalize(right);
   return right;
 }
 
 INLINE v3 mat4_right(mat4 matrix) {
   v3 left;
-  left.x = matrix.data[0];
-  left.y = matrix.data[4];
-  left.z = matrix.data[8];
+  left.x = matrix.e[0];
+  left.y = matrix.e[4];
+  left.z = matrix.e[8];
   left = v3_normalize(left);
   return left;
 }
@@ -809,12 +546,8 @@ INLINE f32 quat_normal(quat q) {
       q.w * q.w);
 }
 
-
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 // Quaternions
-
 
 INLINE quat quat_normalize(quat q) {
   f32 normal = quat_normal(q);
@@ -877,17 +610,17 @@ inline mat4 quat_to_mat4(quat q) {
 
   quat n = quat_normalize(q);
 
-  out_matrix.data[0] = 1.0f - 2.0f * n.y * n.y - 2.0f * n.z * n.z;
-  out_matrix.data[1] = 2.0f * n.x * n.y - 2.0f * n.z * n.w;
-  out_matrix.data[2] = 2.0f * n.x * n.z + 2.0f * n.y * n.w;
+  out_matrix.e[0] = 1.0f - 2.0f * n.y * n.y - 2.0f * n.z * n.z;
+  out_matrix.e[1] = 2.0f * n.x * n.y - 2.0f * n.z * n.w;
+  out_matrix.e[2] = 2.0f * n.x * n.z + 2.0f * n.y * n.w;
 
-  out_matrix.data[4] = 2.0f * n.x * n.y + 2.0f * n.z * n.w;
-  out_matrix.data[5] = 1.0f - 2.0f * n.x * n.x - 2.0f * n.z * n.z;
-  out_matrix.data[6] = 2.0f * n.y * n.z - 2.0f * n.x * n.w;
+  out_matrix.e[4] = 2.0f * n.x * n.y + 2.0f * n.z * n.w;
+  out_matrix.e[5] = 1.0f - 2.0f * n.x * n.x - 2.0f * n.z * n.z;
+  out_matrix.e[6] = 2.0f * n.y * n.z - 2.0f * n.x * n.w;
 
-  out_matrix.data[8] = 2.0f * n.x * n.z - 2.0f * n.y * n.w;
-  out_matrix.data[9] = 2.0f * n.y * n.z + 2.0f * n.x * n.w;
-  out_matrix.data[10] = 1.0f - 2.0f * n.x * n.x - 2.0f * n.y * n.y;
+  out_matrix.e[8] = 2.0f * n.x * n.z - 2.0f * n.y * n.w;
+  out_matrix.e[9] = 2.0f * n.y * n.z + 2.0f * n.x * n.w;
+  out_matrix.e[10] = 1.0f - 2.0f * n.x * n.x - 2.0f * n.y * n.y;
 
   return out_matrix;
 }
@@ -896,7 +629,7 @@ inline mat4 quat_to_mat4(quat q) {
 inline mat4 quat_to_rotation_matrix(quat q, v3 center) {
   mat4 out_matrix;
 
-  f32* o = out_matrix.data;
+  f32* o = out_matrix.e;
   o[0] = (q.x * q.x) - (q.y * q.y) - (q.z * q.z) + (q.w * q.w);
   o[1] = 2.0f * ((q.x * q.y) + (q.z * q.w));
   o[2] = 2.0f * ((q.x * q.z) - (q.y * q.w));

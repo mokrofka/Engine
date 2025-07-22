@@ -1,53 +1,46 @@
 #include "camera.h"
 #include "game_types.h"
 
+Camera* camera;
+
 void view_matrix_update() {
-  if (st->camera.view_dirty) {
-    Camera* camera = &st->camera;
-    st->camera.pitch = Clamp(-89.0f, st->camera.pitch, 89.0f);
+  camera->pitch = Clamp(-89.0f, camera->pitch, 89.0f);
 
-    st->camera.direction.x = CosD(camera->yaw) * CosD(camera->pitch);
-    st->camera.direction.z = SinD(camera->yaw) * CosD(camera->pitch);
-    st->camera.direction.y = SinD(camera->pitch);
-    st->camera.direction = v3_normalize(st->camera.direction);
-    st->camera.view_dirty = true;
-    
-    v3 target = st->camera.position + st->camera.direction;
-    st->camera.view = mat4_look_at(st->camera.position, target, v3(0,1,0));
+  camera->direction = {
+    CosD(camera->yaw) * CosD(camera->pitch),
+    SinD(camera->yaw) * CosD(camera->pitch),
+    SinD(camera->pitch),
+  };
 
-    st->camera.view_dirty = false;
-  }
+  camera->direction = v3_normalize(camera->direction);
+  // camera->view = mat4_look_at(camera->position, camera->position + camera->direction, v3_up());
+  camera->view = mat4_look_at(camera->position, v3{}, v3_up());
+  camera->view_dirty = false;
+
 }
 
 internal void camera_yaw(f32 amount) {
-  Camera* camera = &st->camera;
-  st->camera.yaw += amount;
-  st->camera.view_dirty = true;
+  camera->yaw += amount;
+  camera->view_dirty = true;
 }
 
 internal void camera_pitch(f32 amount) {
-  st->camera.pitch += amount;
+  // camera->pitch += amount;
   
-  // Clamp to avoid Gimball lock
-  f32 limit = deg_to_rad(89.0f);
-  st->camera.direction.x = Clamp(-limit, st->camera.direction.x, limit);
+  // // Clamp to avoid Gimball lock
+  // f32 limit = deg_to_rad(89.0f);
+  // camera->direction.x = Clamp(-limit, camera->direction.x, limit);
   
-  st->camera.view_dirty = true;
+  // camera->view_dirty = true;
+
+  camera->pitch += amount;
+  camera->pitch = Clamp(-89.0f, camera->pitch, 89.0f);
+  camera->view_dirty = true;
 }
 
 void camera_update() {
-  Camera* camera = &st->camera;
-  v2i frame_size = os_get_framebuffer_size();
+  camera = &st->camera;
   
-  if (input_was_key_pressed(Key_T)) {
-    st->is_mouse_move = !st->is_mouse_move;
-    if (st->is_mouse_move) {
-      os_mouse_enable();
-    } else {
-      os_mouse_disable();
-    }
-  }
-
   f32 rotation_speed = 180.0f;
   if (input_is_key_down(Key_A)) {
     camera_yaw(-rotation_speed * delta_time);
@@ -89,7 +82,8 @@ void camera_update() {
     velocity.y -= 1.0f;
   }
   
-  v3 z = v3_zero();
+  v3 z = {};
+
   if (z != velocity) {
     // Be sure to normalize the velocity before applying speed 
     velocity = v3_normalize(velocity);
@@ -97,5 +91,7 @@ void camera_update() {
     camera->view_dirty = true;
   }
   
-  view_matrix_update();
+  if (camera->view_dirty) {
+    view_matrix_update();
+  }
 }

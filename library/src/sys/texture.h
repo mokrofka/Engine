@@ -8,4 +8,4 @@
 KAPI void texture_init();
 
 KAPI void texture_load(String name);
-KAPI u32 texture_get(String name);
+KAPI Texture& texture_get(String name);
