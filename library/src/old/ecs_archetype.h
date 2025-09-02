@@ -193,12 +193,12 @@ inline void move_entity(Archetype* old_archetype, Entity e, u32 component_id) {
 
   u32 old_type = old_archetype->type;
   while (old_type) {
-    u32 component_id = LowestBit(old_type);
+    u32 component_id = ctz32(old_type);
     void* component = _component_get(e, component_id);
     old_archetype->components[component_id]->remove_data(e);
     next_archetype->components[component_id]->insert_data(e, component);
 
-    ClearBit(old_type, LowestBit(old_type));
+    FlagClear(old_type, ctz32(old_type));
   }
   --old_archetype->entity_count;
   ++next_archetype->entity_count;
@@ -226,7 +226,7 @@ inline void _component_add(Entity e, String component_name) {
     // Create archetype with previous components
     Archetype* new_archetype = &ecs.archetypes[ecs.archetype_count];
     while (type) {
-      u32 component_id = LowestBit(type);
+      u32 component_id = ctz32(type);
 
       new_archetype->component_names[component_id] = archetype->component_names[component_id];
       new_archetype->components[component_id] = mem_alloc_struct(Column);
@@ -235,7 +235,7 @@ inline void _component_add(Entity e, String component_name) {
         .component_name = archetype->component_names[component_id],
       };
 
-      ClearBit(type, LowestBit(type));
+      FlagClear(type, ctz32(type));
       ++new_archetype->component_count;
       ++tier;
     }
@@ -271,11 +271,11 @@ inline void _component_add(Entity e, String component_name) {
       if (type_is_subset_of(new_archetype->type, next_archetype->type) && type_is_subset_of(new_archetype->tag, next_archetype->tag)) {
         u32 type = next_archetype->type & ~new_archetype->type;
         if (type != 0) {
-          type = LowestBit(type);
+          type = ctz32(type);
         }
         u32 tag = next_archetype->tag & ~new_archetype->tag;
         if (tag != 0) {
-          tag = LowestBit(tag);
+          tag = ctz32(tag);
         }
         u32 id = type | tag;
         new_archetype->archetype_add[id] = next_archetype;
@@ -289,11 +289,11 @@ inline void _component_add(Entity e, String component_name) {
       if (type_is_subset_of(prev_archetype->type, new_archetype->type) && type_is_subset_of(prev_archetype->tag, new_archetype->tag)) {
         u32 type = new_archetype->type & ~prev_archetype->type;
         if (type != 0) {
-          type = LowestBit(type);
+          type = ctz32(type);
         }
         u32 tag = new_archetype->tag & ~prev_archetype->tag;
         if (tag != 0) {
-          tag = LowestBit(tag);
+          tag = ctz32(tag);
         }
         u32 id = type | tag;
         new_archetype->archetype_remove[id] = prev_archetype;

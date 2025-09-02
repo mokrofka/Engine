@@ -12,9 +12,5 @@ vec3 triangle[] = {
 };
 
 void main() {
-  // gl_Position = g.projection_view * u_model * vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
   gl_Position = g.projection_view * u_model * vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
-  // gl_Position = g.view * u_model * vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
-  // gl_Position = u_model * vec4(in_pos.x, in_pos.y, in_pos.z, 1.0);
-  // gl_Position = vec4(triangle[gl_VertexIndex], 1);
 }

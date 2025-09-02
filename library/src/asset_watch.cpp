@@ -1,6 +1,5 @@
 #include "asset_watch.h"
-#include "sys/res.h"
-#include "sys/shader.h"
+#include "render/renderer.h"
 
 struct FileWatch {
   String path;
@@ -22,13 +21,10 @@ struct AssetWatchState {
   DirectoryWatch directories[128];
 };
 
-AssetWatchState st;
+global AssetWatchState st;
 
 void asset_watch_init() {
-  Scratch scracth;
-  st = {
-    .arena = mem_arena_alloc(KB(1)),
-  };
+  st.arena = arena_alloc();
 }
 
 void asset_watch_add(String watch_name, void (*callback)()) {

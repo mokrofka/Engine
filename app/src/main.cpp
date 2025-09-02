@@ -1,47 +1,52 @@
-#include "game.h"
-#include "app.h"
-
-#include "render/r_frontend.h"
+#include "render/renderer.h"
 
 #include "asset_watch.h"
-#include "test.h"
+#include "event.h"
 
-App st;
+struct App {
+  void (*update)(u8** state);
 
-internal void engine_on_window_closed();
-internal void engine_on_window_resized(Window* window);
-internal b32 app_on_event(u32 code, void* sender, void* listener_inst, EventContext context);
-internal b32 app_on_key(u32 code, void* sender, void* listener_inst, EventContext context);
-internal b32 app_on_resized(u32 code, void* sender, void* listener_inst, EventContext context);
+  b8 is_running;
+  b8 is_suspended;
+  
+  u8* state;
+  
+  OS_Handle lib;
+  String lib_filepath;
+  String lib_temp_filepath;
+  DenseTime modified;
+};
 
-Main entry_point() {
+global App st;
+
+void app_update(u8* state);
+
+int main() {
+  global_allocator_init();
+  tctx_init();
   os_init();
-  Scratch scratch;
-  st.is_running = true;
-
-  WindowConfig config = {
-    .position_x = 100,
-    .position_y = 100,
-    .width = 1000,
-    .height = 600,
-  };
-  os_window_create(config);
+  os_gfx_init();
+  event_init();
+  asset_watch_init();
+  res_sys_init("../assets");
   r_init();
+
+  Scratch scratch;
 
 #ifdef MONOLITHIC_BUILD
   st.init = app_init;
   st.update = app_update;
 #else
   String current_dir = os_get_current_directory();
-  st.lib_filepath = push_str_cat(scratch, current_dir, "/game.dll");
-  st.lib_temp_filepath = push_str_cat(scratch, current_dir, "/game_temp.dll");
+  st.lib_filepath = push_str_cat(scratch, current_dir, "/libgame.so");
+  st.lib_temp_filepath = push_str_cat(scratch, current_dir, "/libgame_temp.so");
   
   os_copy_file_path(st.lib_temp_filepath, st.lib_filepath);
-  st.lib = os_lib_open("game_temp.dll");
-  Assign(st.init, os_lib_get_proc(st.lib, "app_init"));
+  st.lib = os_lib_open(st.lib_temp_filepath);
   Assign(st.update, os_lib_get_proc(st.lib, "app_update"));
   
-  Assert(st.lib && st.init && st.update);
+  // Assert(st.lib && st.init && st.update);
+  Assert(st.lib && st.update);
   asset_watch_add(st.lib_filepath, []() {
     os_lib_close(st.lib);
     os_copy_file_path(st.lib_temp_filepath, st.lib_filepath);
@@ -49,100 +54,40 @@ Main entry_point() {
     Assign(st.update, os_lib_get_proc(st.lib, "app_update"));
   });
 #endif
+  f64 target_fps = 1.0f / 60.0f;
+  f64 last_time = 0;
 
-  os_register_process_key(input_process_key);
-  os_register_process_mouse_move(input_process_mouse_move);
-  os_register_window_closed_callback(engine_on_window_closed);
-  os_register_window_resized_callback(engine_on_window_resized);
-  
-  event_register(EventCode_ApplicationQuit, 0, app_on_event);
-  event_register(EventCode_KeyPressed, 0, app_on_key);
-  event_register(EventCode_KeyReleased, 0, app_on_key);
-  event_register(EventCode_Resized, 0, app_on_resized);
-
-  st.init(&st.state);
-
-  os_show_window();
-  
-  f32 last_time = 0;
-  while (st.is_running) {
+  while (os_window_should_close()) {
     os_pump_messages();
-
+    f64 frame_start_time = os_now_seconds();
+    delta_time = frame_start_time - last_time;
+    last_time = frame_start_time;
+    
     if (!st.is_suspended) {
-      f32 current_time = os_now_seconds();
-      delta_time = current_time - last_time;
-      last_time = current_time;
-      local f32 timer = 0;
-      if ((timer += delta_time) >= 1) {
-        timer = 0;
-        Info("Frame rate %fms", delta_time);
-      }
 
       r_begin_draw_frame();
-      st.update(st.state);
+      st.update(&st.state);
       r_end_draw_frame();
 
-      input_update();
+      os_input_update();
       asset_watch_update();
     }
+
+    f64 frame_duration = os_now_seconds() - frame_start_time;
+    f64 sleep_time = target_fps - frame_duration;
+    if (sleep_time > 0.0f) {
+      // os_sleep(sleep_time * 1000);
+
+      local f64 timer = 0;
+      if ((timer += delta_time) >= 1) {
+        timer = 0;
+        Info("Frame rate: %f ms, %f fps", delta_time, 1/delta_time);
+      }
+    }
+
   }
+
+  // r_shutdown();
+  os_gfx_shutdown();
   
-}
-
-internal void engine_on_window_closed() {
-  event_fire(EventCode_ApplicationQuit, 0, (EventContext){});
-}
-
-internal void engine_on_window_resized(Window* window) {
-  // Handle minimization
-  if (window->width == 0 || window->height == 0) {
-    Info("Window minimized, suspending application.");
-    st.is_suspended = true;
-  } else {
-    if (st.is_suspended) {
-      Info("Window restored, resuming application.");
-      st.is_suspended = false;
-    }
-
-    // Fire an event for anything listening for window resizes.
-    EventContext context = {
-      .u16 = {(u16)window->width, (u16)window->height}
-    };
-    event_fire(EventCode_Resized, window, context);
-  }
-}
-
-internal b32 app_on_event(u32 code, void* sender, void* listener_inst, EventContext context) {
-  Info("EVENT_CORE_APPLICATION_QUIT received, shutting down.\n");
-  st.is_running = false;
-  return true;
-}
-
-internal b32 app_on_key(u32 code, void* sender, void* listener_inst, EventContext context) {
-  if (code == EventCode_KeyPressed) {
-    u16 key_code = context.u16[0];
-    if (key_code == Key_Escape) {
-      // NOTE: Technically firing an event to itself, but there may be other listeners.
-      EventContext data = {};
-      event_fire(EventCode_ApplicationQuit, 0, data);
-
-      // Block anything else from processing this.
-      return true;
-    } else {
-      Debug("'%c' key pressed in window.", key_code);
-    }
-  } else if (code == EventCode_KeyReleased) {
-    u16 key_code = context.u16[0];
-    Debug("'%c' key released in window.", key_code);
-  }
-  return false;
-}
-
-internal b32 app_on_resized(u32 code, void* sender, void* listener_inst, EventContext context) {
-  u32 width = context.u16[0];
-  u32 height = context.u16[1];
-  Debug("Window resize: %i, %i", width, height);
-
-  vk_r_on_resized(width, height);
-  return false;
 }

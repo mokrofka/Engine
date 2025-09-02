@@ -2964,8 +2964,8 @@ static bool ImFontAtlasBuildWithStbTruetype(ImFontAtlas* atlas)
                 // Add to avail set/counters
                 src_tmp.GlyphsCount++;
                 dst_tmp.GlyphsCount++;
-                src_tmp.GlyphsSet.SetBit(codepoint);
-                dst_tmp.GlyphsSet.SetBit(codepoint);
+                src_tmp.GlyphsSet.SetFlag(codepoint);
+                dst_tmp.GlyphsSet.SetFlag(codepoint);
                 total_glyphs_count++;
             }
     }

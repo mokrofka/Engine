@@ -1,12 +1,7 @@
 #pragma once
 #include "lib.h"
+
 #define MaxEntities KB(20)
-
-KAPI void entity_init();
-
-KAPI u32 entity_create();
-
-KAPI void entity_destroy(u32 entity);
 
 struct SparseSet {
   u8* data;

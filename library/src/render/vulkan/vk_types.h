@@ -12,7 +12,7 @@
   }
 #define vkdevice vk.device.logical_device
 #define FramesInFlight 2
-#define ImagesInFlight 3
+#define ImagesInFlight 4
 
 #define MaxLights KB(1)
 
@@ -87,9 +87,9 @@ struct VK_Frame {
 };
 
 struct VK_SyncObj {
-  VkSemaphore image_available_semaphores[FramesInFlight];
-  VkSemaphore queue_complete_semaphores[FramesInFlight];
-  VkSemaphore compute_complete_semaphores[FramesInFlight];
+  VkSemaphore image_available_semaphores[ImagesInFlight];
+  VkSemaphore render_complete_semaphores[ImagesInFlight];
+  VkSemaphore compute_complete_semaphores[ImagesInFlight];
   VkFence in_flight_fences[FramesInFlight];
 };
 
@@ -120,7 +120,7 @@ struct VK_ComputeShader {
 };
 
 struct VK_Mesh {
-  u64 offset;
+  VkDeviceSize offset;
   u64 vert_count;
 };
 
@@ -136,6 +136,7 @@ struct VK {
   VkAllocationCallbacks _allocator;
   VkInstance instance;
   VkSurfaceKHR surface;
+  u32 images_in_flight;
   
   VK_Device device;
   VK_Frame frame;
@@ -219,8 +220,8 @@ INLINE VkSemaphore vk_get_current_image_available_semaphore() {
   return vk.sync.image_available_semaphores[vk.frame.current_frame];
 }
 
-INLINE VkSemaphore vk_get_current_queue_complete_semaphore() {
-  return vk.sync.queue_complete_semaphores[vk.frame.current_frame];
+INLINE VkSemaphore vk_get_current_render_complete_semaphore() {
+  return vk.sync.render_complete_semaphores[vk.frame.image_index];
 }
 
 INLINE VkCommandBuffer& vk_get_current_cmd() {

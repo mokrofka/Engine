@@ -250,7 +250,7 @@ inline void components_entity_destroy(Entity entity) {
   while (mask) {
     u32 index = __builtin_ctz(mask); // index of lowest set bit
     Assert(ecs.component_arrays[index]);
-    ClearBit(mask, index);
+    FlagClear(mask, index);
     
     ComponentArray* component = ecs.component_arrays[index];
     component->remove_data(entity);
@@ -326,7 +326,7 @@ inline void system_entity_destroyed(Entity entity) {
   while (mask) {
     u32 index = __builtin_ctz(mask); // index of lowest set bit
     Assert(ecs.systems[index]);
-    ClearBit(mask, index);
+    FlagClear(mask, index);
     
     BaseSystem* system = ecs.systems[index];
     system->entity_remove(entity);
@@ -342,7 +342,7 @@ inline void entity_signature_changed(Entity entity, Signature entity_signature) 
       ecs.entity_system_masks[entity] |= Bit(i);
       system->entity_add(entity);
     } else {
-      ClearBit(ecs.entity_system_masks[entity], Bit(i));
+      FlagClear(ecs.entity_system_masks[entity], Bit(i));
       system->entity_remove(entity);
     }
   }
@@ -357,20 +357,20 @@ inline void entity_signature_changed(Entity entity, Signature entity_signature) 
 inline void __component_add(Entity entity, u32 component_id) {
   _component_add_internal(entity, component_id);
   Signature signature = entity_get_signature(entity);
-  SetBit(signature, component_id);
+  FlagSet(signature, component_id);
   entity_set_signature(entity, signature);
   entity_signature_changed(entity, signature);
 }
 inline void __component_set(Entity entity, u32 component_id, void* component) {
   _component_set_internal(entity, component_id, component);
   Signature signature = entity_get_signature(entity);
-  SetBit(signature, component_id);
+  FlagSet(signature, component_id);
   entity_set_signature(entity, signature);
   entity_signature_changed(entity, signature);
 }
 inline void __tag_add(Entity entity, u32 component_id) {
   Signature signature = entity_get_signature(entity);
-  SetBit(signature, component_id);
+  FlagSet(signature, component_id);
   entity_set_signature(entity, signature);
   entity_signature_changed(entity, signature);
 }
@@ -394,7 +394,7 @@ inline void __tag_add(Entity entity, u32 component_id) {
   {                                                          \
     _component_remove_internal(entity, component_get_id(T)); \
     Signature signature = entity_get_signature(entity);      \
-    ClearBit(signature, component_get_id(T));                \
+    FlagClear(signature, component_get_id(T));                \
     entity_set_signature(entity, signature);                 \
     entity_signature_changed(entity, signature);             \
   }

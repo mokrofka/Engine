@@ -1,9 +1,2 @@
 #pragma once
-#include "base/defines.h"
-#include "base/mem.h"
-#include "base/maths.h"
-#include "base/str.h"
-#include "base/logger.h"
-#include "base/os.h"
-#include "base/hashmap.h"
-#include "base/darray.h"
+#include "base/base_inc.h"

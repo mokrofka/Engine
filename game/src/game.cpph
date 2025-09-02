@@ -1,0 +1,401 @@
+#include "lib.h"
+
+struct Entity {
+  union {
+    struct {
+      f32 x;
+      f32 y;
+      f32 width;
+      f32 height;
+    };
+
+    Rect rect;
+  };
+  i32 tilemap_x;
+  i32 tilemap_y;
+
+  f32 vx, vy;
+  u32 color;
+};
+
+struct TileMap {
+  u32* tiles;
+};
+
+struct World {
+  i32 tile_width;
+  i32 tile_height;
+  v2i tile_size;
+  i32 tiles_x_count;
+  i32 tiles_y_count;
+  i32 tilemaps_x_count;
+  i32 tilemaps_y_count;
+
+  TileMap* tilemaps;
+};
+
+struct GameState {
+  Arena* arena;
+  u32* pixels;
+  i32 width;
+  i32 height;
+  Entity player;
+  Array<Entity, 1024> balls;
+  World world;
+};
+
+GameState* st;
+
+C_LINKAGE_BEGIN
+ExportAPI void app_update(u8** state);
+C_LINKAGE_END
+
+b32 resize_callback(u32 code, void* sender, void* listener_inst, EventContext data) {
+  v2i win_size = os_get_window_size();
+  f32 aspect = (f32)win_size.x / win_size.y;
+  st->width = st->height * aspect;
+  arena_clear(st->arena);
+  push_buffer(st->arena, st->width*4*st->height * 2);
+  return false;
+};
+
+////////////////////////////////////////////////////////////////////////
+// Drawing
+void pixel_draw(v2u pos, u32 hex) {
+  st->pixels[pos.y*st->width + pos.x] = hex;
+}
+
+void rect_draw(Rect rect, v3 rgb) {
+  if (rect.x < 0) {
+    rect.x = 0;
+  }
+  if(rect.y < 0) {
+    rect.y = 0;
+  }
+
+  if(rect.width > st->width) {
+    rect.width = st->width;
+  }
+  if(rect.height > st->height) {
+    rect.height = st->height;
+  }
+
+  u32 hex = u32_from_argb(v3_to_v4(rgb, 1));
+
+  Loop (y, rect.height) {
+    Loop (x, rect.width) {
+      pixel_draw(v2u(rect.x+x, rect.y+y), hex);
+    }
+  }
+
+}
+
+////////////////////////////////////////////////////////////////////////
+// Utils
+v2i mouse_get_pos() {
+  v2i win_size = os_get_window_size();
+  f32 scale_x = (f32)st->width / win_size.x;
+  f32 scale_y = (f32)st->height / win_size.y;
+
+  v2i mouse_pos = os_get_mouse_pos();
+  i32 buffer_x = (i32)(mouse_pos.x * scale_x);
+  i32 buffer_y = (i32)(mouse_pos.y * scale_y);
+  v2i pos = { buffer_x, buffer_y };
+  return pos;
+}
+
+void window_pixels_map() {
+  u32* win_buffer; Assign(win_buffer, os_window_get_buffer());
+  v2i win_size = os_get_window_size();
+  f32 scale_x = (f32)win_size.x / st->width;
+  f32 scale_y = (f32)win_size.y / st->height;
+
+  Loop (y , st->height) {
+    Loop (x, st->width) {
+      u32 color = st->pixels[y*st->width + x]; 
+      Loop (dy, scale_y) {
+        Loop (dx, scale_x) {
+          i32 wx = x*scale_x + dx;
+          i32 wy = y*scale_y + dy;
+          win_buffer[wy*win_size.x + wx] = color;
+        }
+      }
+    }
+  }
+}
+
+////////////////////////////////////////////////////////////////////////
+// Balls
+Entity ball_create() {
+  v2i mouse_pos = mouse_get_pos();
+  f32 speed = rand_f32_01() /10;
+  f32 angle = rand_f32_01() * Two_PI;
+
+  Entity ball = {
+    .rect = {
+      .x = (f32)mouse_pos.x,
+      .y = (f32)mouse_pos.y,
+      .width = 5,
+      .height = 5,
+    },
+    .vx = Cos(angle) * speed,
+    .vy = Sin(angle) * speed,
+    .color = u32_from_argb(v4(rand_f32_01(), rand_f32_01(), rand_f32_01(), rand_f32_01())),
+  };
+
+  return ball;
+}
+
+b32 box2d_is_collision(Rect a, Rect b) {
+  b32 result = (a.x < b.x + b.width)  && (a.x + a.width > b.x) &&
+               (a.y < b.y + b.height) && (a.y + a.height > b.y);
+  return result;
+}
+
+void balls_update() {
+  Loop (i, st->balls.count) {
+    Entity& ball = st->balls[i];
+
+    Loop (j, st->balls.count) {
+      if (i == j) continue;
+      Entity& ball_2 = st->balls[j];
+      if (box2d_is_collision(ball.rect, ball_2.rect)) {
+        if (Abs((ball.rect.x + ball.rect.width/2) - (ball_2.rect.x + ball_2.rect.width/2)) > Abs((ball.rect.y + ball.rect.y/2) - (ball_2.rect.y + ball_2.rect.y/2))) {
+          ball.vx = -ball.vx;
+        } else { // vertical collision
+          ball.vy = -ball.vy;
+        }
+      }
+    }
+
+    if (ball.rect.x - 1 < 0 || ball.rect.x + ball.rect.width >= st->width) {
+      ball.vx = -ball.vx;
+    }
+    if (ball.rect.y - 1 < 0 || ball.rect.y + ball.rect.height >= st->height) {
+      ball.vy = -ball.vy;
+    }
+
+    ball.rect.x += ball.vx;
+    ball.rect.y += ball.vy;
+
+    rect_draw(ball.rect, ball.color);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////
+// Tile Map
+b32 tile_map_is_empty_at_point(TileMap tilemap, v2 test) {
+  i32 player_tile_x = test.x / st->world.tile_width;
+  i32 player_tile_y = test.y / st->world.tile_height;
+
+  b32 is_valid = false;
+  if (player_tile_x >= 0 && player_tile_x < st->world.tiles_x_count &&
+      player_tile_y >= 0 && player_tile_y < st->world.tiles_y_count) 
+  {
+    // Info("%i", st->world.tile_width);
+    u32 tile_map_value = tilemap.tiles[player_tile_y*st->world.tiles_x_count + player_tile_x];
+    is_valid = (tile_map_value == 0);
+    if (is_valid == true) {
+      Info("true");
+    }
+  }
+  return is_valid;
+}
+
+b32 world_is_empty_at_point(TileMap tilemap, v2 test) {
+
+  i32 player_tile_x = test.x / st->world.tile_width;
+  i32 player_tile_y = test.y / st->world.tile_height;
+
+  b32 is_valid = false;
+  if (player_tile_x >= 0 && player_tile_x < st->world.tiles_x_count &&
+      player_tile_y >= 0 && player_tile_y < st->world.tiles_y_count) 
+  {
+    // Info("%i", st->world.tile_width);
+    u32 tile_map_value = tilemap.tiles[player_tile_y*st->world.tiles_x_count + player_tile_x];
+    is_valid = (tile_map_value == 0);
+    if (is_valid == true) {
+      Info("true");
+    }
+  }
+  return is_valid;
+
+}
+
+TileMap* tilemap_get(i32 tilemap_x, i32 tilemap_y) {
+  TileMap* tilemap = null;
+
+  if ((tilemap_x >= 0) && (tilemap_x < st->world.tiles_x_count) &&
+      (tilemap_y >= 0) && (tilemap_y < st->world.tiles_y_count))
+  {
+    tilemap = &st->world.tilemaps[tilemap_y*st->world.tilemaps_x_count + tilemap_x];
+  }
+  Assert(tilemap);
+
+  return tilemap;
+}
+
+void app_init(u8** state) {
+  Assign(*state, mem_alloc_zero(sizeof(GameState)));
+  Assign(st, *state);
+  st->arena = arena_alloc();
+
+  st->width = 200;
+  st->height = 220;
+  // st->height = st->width * (f32)16 / 10;
+  Assign(st->pixels, push_buffer(st->arena, st->width*4*st->height));
+
+  event_register(EventCode_Resized, null, resize_callback);
+
+  st->player = {
+    .x = 30,
+    .y = 30,
+    .width = 10,
+    .height = 10,
+  };
+}
+
+// /mnt/disk_d/VS_Code/hand_made/
+void app_update(u8** state) {
+  if (*state == null) {
+    app_init(state);
+  }
+  Assign(st, *state);
+
+#define TILE_MAP_COUNT_X 17
+#define TILE_MAP_COUNT_Y 9
+#define TileSize 10
+  u32 tiles00[TILE_MAP_COUNT_Y][TILE_MAP_COUNT_X] = {
+    {1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 1},
+    {1, 1, 0, 0,  0, 1, 0, 0,  0, 0, 0, 0,  0, 1, 0, 0, 1},
+    {1, 1, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 1, 0, 1},
+    {1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0, 1},
+    {1, 0, 0, 0,  0, 1, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0, 0},
+    {1, 1, 0, 0,  0, 1, 0, 0,  1, 0, 0, 0,  0, 1, 0, 0, 1},
+    {1, 0, 0, 0,  0, 1, 0, 0,  1, 0, 0, 0,  1, 0, 0, 0, 1},
+    {1, 1, 1, 1,  1, 0, 0, 0,  0, 0, 0, 0,  0, 1, 0, 0, 1},
+    {1, 1, 1, 1,  1, 1, 1, 1,  0, 1, 1, 1,  1, 1, 1, 1, 1},
+  };
+  
+  u32 tiles01[TILE_MAP_COUNT_Y][TILE_MAP_COUNT_X] = {
+    {1, 1, 1, 1,  1, 1, 1, 1,  0, 1, 1, 1,  1, 1, 1, 1, 1},
+    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
+    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
+    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
+    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
+    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
+    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
+    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
+    {1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 1},
+  };
+  
+  u32 tiles10[TILE_MAP_COUNT_Y][TILE_MAP_COUNT_X] = {
+    {1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 1},
+    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
+    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
+    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
+    {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
+    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
+    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
+    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
+    {1, 1, 1, 1,  1, 1, 1, 1,  0, 1, 1, 1,  1, 1, 1, 1, 1},
+  };
+  
+  u32 tiles11[TILE_MAP_COUNT_Y][TILE_MAP_COUNT_X] = {
+    {1, 1, 1, 1,  1, 1, 1, 1,  0, 1, 1, 1,  1, 1, 1, 1, 1},
+    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
+    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
+    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
+    {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
+    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
+    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
+    {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
+    {1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 1},
+  };
+
+  TileMap tilemaps[2][2] = {
+    { {.tiles = (u32*)tiles00}, {.tiles = (u32*)tiles01} },
+    { {.tiles = (u32*)tiles10}, {.tiles = (u32*)tiles11} }
+  };
+
+  st->world = {
+    .tile_width = TileSize,
+    .tile_height = TileSize,
+    .tiles_x_count = TILE_MAP_COUNT_X,
+    .tiles_y_count = TILE_MAP_COUNT_Y,
+    .tilemaps_x_count = 2,
+    .tilemaps_y_count = 2,
+    .tilemaps = (TileMap*)tilemaps,
+  };
+
+  TileMap tilemap = *tilemap_get(st->player.tilemap_x, st->player.tilemap_y);
+
+  {
+    Entity& player = st->player;
+    f32 speed = 30;
+    f32 dx = 0;
+    f32 dy = 0;
+    if (os_is_key_down(Key_LShift)) {
+      speed *= 4;
+    }
+    if (os_is_key_down(Key_W)) {
+      dy -= speed;
+    }
+    if (os_is_key_down(Key_S)) {
+      dy += speed;
+    }
+    if (os_is_key_down(Key_A)) {
+      dx -= speed;
+    }
+    if (os_is_key_down(Key_D)) {
+      dx += speed;
+    }
+    if (os_is_key_pressed(Key_Escape)) {
+      st->balls.count = 0;
+    }
+    if (os_is_button_pressed(MouseButton_Left)) {
+      player.rect.min = v2(mouse_get_pos().x, mouse_get_pos().y);
+    }
+    f32 dplayer_x = dx * delta_time;
+    f32 dplayer_y = dy * delta_time;
+
+    f32 new_player_x = player.x + dplayer_x;
+    f32 new_player_y = player.y + dplayer_y;
+
+    f32 half_of_player_width = 0.5f*player.width;
+    f32 half_of_player_height = 0.5f*player.height;
+    v2 bottom_player = v2(new_player_x + player.width/2, new_player_y + player.height);
+    if (tile_map_is_empty_at_point(tilemap, bottom_player) &&
+        tile_map_is_empty_at_point(tilemap, {bottom_player.x - half_of_player_width, bottom_player.y}) &&
+        tile_map_is_empty_at_point(tilemap, {bottom_player.x + half_of_player_width, bottom_player.y}))
+    {
+      st->player.x += dplayer_x;
+      st->player.y += dplayer_y;
+    }
+  }
+
+  {
+    rect_draw({.width = (f32)st->width,.height = (f32)st->height}, v3(0.1));
+    balls_update();
+
+    Loop (y, st->world.tiles_y_count) {
+      Loop (x, st->world.tiles_x_count) {
+        u32 tile_id = tilemap.tiles[y*st->world.tiles_x_count + x];
+        f32 gray = 0.5;
+        if (tile_id == 1) {
+          gray = 0.2;
+        }
+
+        f32 x_pos = x * st->world.tile_width;
+        f32 y_pos = y * st->world.tile_height;
+        rect_draw({x_pos,y_pos, (f32)st->world.tile_width,(f32)st->world.tile_height}, v3(gray));
+      }
+    }
+    
+    st->player.width = 0.75*10;
+    st->player.height = 10;
+    rect_draw(st->player.rect, v3(1,0,0));
+  }
+  
+  window_pixels_map();
+}

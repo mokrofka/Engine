@@ -4255,7 +4255,7 @@ void ImGui::Initialize()
             || key == ImGuiKey_Tab || key == ImGuiKey_Space || key == ImGuiKey_Apostrophe || key == ImGuiKey_Comma || key == ImGuiKey_Minus || key == ImGuiKey_Period
             || key == ImGuiKey_Slash || key == ImGuiKey_Semicolon || key == ImGuiKey_Equal || key == ImGuiKey_LeftBracket || key == ImGuiKey_RightBracket || key == ImGuiKey_GraveAccent
             || key == ImGuiKey_KeypadDecimal || key == ImGuiKey_KeypadDivide || key == ImGuiKey_KeypadMultiply || key == ImGuiKey_KeypadSubtract || key == ImGuiKey_KeypadAdd || key == ImGuiKey_KeypadEqual)
-            g.KeysMayBeCharInput.SetBit(key);
+            g.KeysMayBeCharInput.SetFlag(key);
 
 #ifdef IMGUI_HAS_DOCK
     // Initialize Docking
@@ -10507,7 +10507,7 @@ void ImGui::UpdateInputEvents(bool trickle_fast_inputs)
             if (key_data->Down != e->Key.Down) // Analog change only do not trigger this, so it won't block e.g. further mouse pos events testing key_changed.
             {
                 key_changed = true;
-                key_changed_mask.SetBit(key_data_index);
+                key_changed_mask.SetFlag(key_data_index);
                 if (trickle_interleaved_nonchar_keys_and_text && !key_is_potentially_for_char_input)
                     key_changed_nonchar = true;
             }

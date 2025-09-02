@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5.0)
+cmake_minimum_required(VERSION 3.10.0)
 project(Game)
 
 # include
@@ -13,4 +13,4 @@ add_library(game SHARED ${SOURCES}) # dll
 add_compile_definitions()
 
 # library link
-target_link_libraries(game "${CMAKE_SOURCE_DIR}/bin/library.lib")
+target_link_libraries(game "${CMAKE_SOURCE_DIR}/bin/liblibrary.so")

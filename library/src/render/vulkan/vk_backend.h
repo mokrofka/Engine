@@ -1,10 +1,9 @@
 #pragma once
+#include "lib.h"
 #include "render/r_types.h"
 
-void vk_r_backend_init(Arena* arena);
+void vk_r_backend_init();
 void vk_r_backend_shutdown();
-
-KAPI void vk_r_on_resized(u32 width, u32 height);
 
 void vk_r_backend_begin_frame();
 void vk_r_backend_end_frame();

@@ -2,6 +2,26 @@
 // (headers)
 
 #include "ui/imgui_helpers.h"
+
+#ifdef _MSC_VER
+  #ifdef MONOLITHIC_BUILD
+    #define IMGUI_API 
+  #else
+    #ifdef IMGUI_API
+      #define IMGUI_API __declspec(dllexport)
+    #else
+      #define IMGUI_API __declspec(dllimport)
+    #endif
+  #endif
+
+#elif defined(__clang__)
+  #ifdef MONOLITHIC_BUILD
+    #define IMGUI_API 
+  #else
+    #define IMGUI_API __attribute__((visibility("default")))
+  #endif
+
+#endif
 // Help:
 // - See links below.
 // - Call and read ImGui::ShowDemoWindow() in imgui_demo.cpp. All applications in examples/ are doing that.
@@ -82,16 +102,6 @@ Index of this file:
 // Define attributes of all API symbols declarations (e.g. for DLL under Windows)
 // IMGUI_API is used for core imgui functions, IMGUI_IMPL_API is used for the default backends files (imgui_impl_xxx.h)
 // Using dear imgui via a shared library is not recommended: we don't guarantee backward nor forward ABI compatibility + this is a call-heavy library and function call overhead adds up.
-
-#ifdef MONOLITHIC_BUILD
-  #define IMGUI_API 
-#else
-#ifndef IMGUI_API
-  #define IMGUI_API __declspec(dllexport)
-#else
-  #define IMGUI_API __declspec(dllimport)
-#endif
-#endif
 
 #ifndef IMGUI_IMPL_API
 #define IMGUI_IMPL_API              IMGUI_API
@@ -3462,8 +3472,8 @@ struct ImFontGlyphRangesBuilder
     ImFontGlyphRangesBuilder()              { Clear(); }
     inline void     Clear()                 { int size_in_bytes = (IM_UNICODE_CODEPOINT_MAX + 1) / 8; UsedChars.resize(size_in_bytes / (int)sizeof(ImU32)); memset(UsedChars.Data, 0, (size_t)size_in_bytes); }
     inline bool     GetBit(size_t n) const  { int off = (int)(n >> 5); ImU32 mask = 1u << (n & 31); return (UsedChars[off] & mask) != 0; }  // Get bit n in the array
-    inline void     SetBit(size_t n)        { int off = (int)(n >> 5); ImU32 mask = 1u << (n & 31); UsedChars[off] |= mask; }               // Set bit n in the array
-    inline void     AddChar(ImWchar c)      { SetBit(c); }                      // Add character
+    inline void     SetFlag(size_t n)        { int off = (int)(n >> 5); ImU32 mask = 1u << (n & 31); UsedChars[off] |= mask; }               // Set bit n in the array
+    inline void     AddChar(ImWchar c)      { SetFlag(c); }                      // Add character
     IMGUI_API void  AddText(const char* text, const char* text_end = NULL);     // Add string (each character of the UTF-8 string are added)
     IMGUI_API void  AddRanges(const ImWchar* ranges);                           // Add ranges, e.g. builder.AddRanges(ImFontAtlas::GetGlyphRangesDefault()) to force add all of ASCII/Latin+Ext
     IMGUI_API void  BuildRanges(ImVector<ImWchar>* out_ranges);                 // Output new ranges

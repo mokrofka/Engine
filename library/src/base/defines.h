@@ -16,6 +16,7 @@ typedef double f64;
 typedef char  b8;
 typedef int   b32;
 
+typedef u64 DenseTime;
 typedef unsigned char uchar;
 typedef u64 PtrInt;
 typedef void VoidProc(void);
@@ -41,41 +42,23 @@ typedef void VoidProc(void);
 #define Thousand(n)   ((n)*1000)
 #define Million(n)    ((n)*1000000)
 #define Billion(n)    ((n)*1000000000)
-#define BytesToKB(x)  (x / 1024.f)
-#define BytesToMB(x)  (BytesToKB(x) / 1024.f)
-#define BytesToGB(x)  (BytesToMB(x) / 1024.f)
-
-#define Min(a,b)      (((a)<(b))?(a):(b))
-#define Max(a,b)      (((a)>(b))?(a):(b))
-#define Max3(a,b,c)   Max(Max(a, b), c)
-#define Min3(a,b,c)   Min(Min(a, b), c)
-
-#define ClampTop(a,x)       Min(a,x)
-#define ClampBot(x,b)       Max(x,b)
-#define Clamp(a,x,b)        (((x)<(a))?(a):((x)>(b))?(b):(x))
-#define ReverseClamp(a,x,b) (((x)<(a))?(b):((b)<(x))?(a):(x))
-#define Wrap(a,x,b)         ReverseClamp(a,x,b)
-
-#define ArrayCount(a)       (sizeof(a) / sizeof((a)[0]))
-#define ElemSize(a)         (sizeof(a[0]))
+#define BytesToKB(x)  (x / 1024.0f)
+#define BytesToMB(x)  (BytesToKB(x) / 1024.0f)
+#define BytesToGB(x)  (BytesToMB(x) / 1024.0f)
 
 #define Member(T,m)                 (((T*)0)->m)
 #define OffsetOf(T,m)               PtrInt(&Member(T,m))
 #define MemberFromOffset(T,ptr,off) (T)((((u8 *)ptr)+(off)))
 #define CastFromMember(T,m,ptr)     (T*)(((u8*)ptr) - OffsetOf(T,m))
-#define PtrMatch(x, y)              ((u8*)(x) == (u8*)(y))
 
-#define MemSet(d, byte, c)    __builtin_memset((d), (byte), (c))
 #define MemZero(d,s)          MemSet(d,0,s)
-#define MemZeroStruct(a)      MemZero((a),sizeof(*(a)))
-#define MemZeroArray(a)       MemZero((a),sizeof(a))
+#define MemZeroStruct(x)      MemZero((x),sizeof(*(x)))
+#define MemZeroArray(x)       MemZero((x),sizeof(x))
 #define MemZeroTyped(d,c)     MemZero((d),sizeof(*(d))*(c))
 
-#define MemCopy(d, s, c)      __builtin_memcpy((d), (s), (c))
 #define MemCopyStruct(d, s)   MemCopy((d), (s), sizeof(*(d)))
 #define MemCopyTyped(d, s, c) MemCopy((d), (s), sizeof(*(d)) * (c))
 
-#define MemMatch(a, b, size)  __builtin_memcmp((a), (b), (size))
 #define MemMatchStruct(a,b)   MemMatch((a),(b),sizeof(*(a)))
 #define MemMatchArray(a,b)    MemMatch((a),(b),sizeof(a))
 
@@ -87,27 +70,55 @@ typedef void VoidProc(void);
 #define IsAligned(x, a)       ((((a) - 1)&(x)) == 0)
 #define Offset(x, a)          (u8*)(x) + (a)
 #define OffsetBack(x, a)      (u8*)(x) - (a)
+#define MemDiff(from, to)     (u8*)(from) - (u8*)(to)
+#define PtrMatch(a, y)        ((u8*)(a) == (u8*)(y))
 
-#define Sqr(x)                      ((x)*(x))
-#define Sign(x)                     ((x) < 0 ? -1 : (x) > 0 ? 1 : 0)
-#define Abs(x)                      ((x) < 0 ? -(x) : (x))
-#define Compose64Bit(a,b)           (((u64)a << 32) | (u64)b)
-#define CeilIntDiv(a,b)             (((a) + (b) - 1)/(b))
-#define IsBetween(lower, x, upper)  (((lower) <= (x)) && ((x) <= (upper)))
-#define Assign(a,b)                 *((void**)(&(a))) = (void*)(b)
-#define Transmute(T)                *(T*)&
+#define Min(a,b)                      (((a)<(b))?(a):(b))
+#define Max(a,b)                      (((a)>(b))?(a):(b))
+#define Max3(a,b,c)                   Max(Max(a, b), c)
+#define Min3(a,b,c)                   Min(Min(a, b), c)
+#define ClampTop(a,x)                 Min(a,x)
+#define ClampBot(x,b)                 Max(x,b)
+#define Clamp(a,x,b)                  (((x)<(a))?(a):((x)>(b))?(b):(x))
+#define ReverseClamp(a,x,b)           (((x)<(a))?(b):((b)<(x))?(a):(x))
+#define Wrap(a,x,b)                   ReverseClamp(a,x,b)
+#define ArrayCount(x)                 (sizeof(x) / sizeof((x)[0]))
+#define ElemSize(x)                   (sizeof(x[0]))
+#define Sqr(x)                        ((x)*(x))
+#define Sign(x)                       ((x) < 0 ? -1 : (x) > 0 ? 1 : 0)
+#define Abs(x)                        ((x) < 0 ? -(x) : (x))
+#define Compose64Bit(a,b)             (((u64)a << 32) | (u64)b)
+#define CeilIntDiv(a,b)               (((a) + (b) - 1)/(b))
+#define IsBetween(lower, x, upper)    (((lower) <= (x)) && ((x) <= (upper)))
+#define Assign(a,b)                   *((void**)(&(a))) = (void*)(b)
+#define As(T)                         *(T*)
+#define Transmute(T)                  *(T*)&
+#define cast(a)                       (a)
+#define Glue(A,B)                     A##B
+#define Stringify(S)                  #S
+#define Loop(i, c)                    for (i32 i = 0; i < c; ++i)
+#define Likely(expr)                  Expect(expr,1)
+#define Unlikely(expr)                Expect(expr,0)
+#define IndexOf(type, mtype, member)  (OffsetOf(type, member) / sizeof(mtype))
+#define TrunctPow2(a, b)              ((u64)(a) & ((u64)(b) - 1))
 
-#define Bit(x)              (1 << (x))
-#define SetBit(x, c)        ((x) |= Bit(c))
-#define ClearBit(x, c)      ((x) &= ~Bit(c))
-#define ToggleBit(x, c)     ((x) ^= Bit(c))
-#define ExtractBit(word, idx) (((word) >> (idx)) & 1)
-#define LowestBit(bitset)   __builtin_ctz(bitset)
+#define Bit(x)                 (1 << (x))
+#define HasBit(x, pos)         ((x) & (1 << (pos)))
+#define FlagSet(x, f)          ((x) | (f))
+#define FlagClear(x, f)        ((x) & ~(f))
+#define FlagToggle(x, f)       ((x) ^ (f))
+#define FlagExists(x, f)       (((x) & (f)) == (f))
+#define FlagEquals(x, f)       ((x) == (f))
+#define FlagIntersects(x,f)    (((x) & (f)) > 0)
 
-#define Glue(A,B) A##B
-#define Stringify(S) #S
+#define U64_MAX 18446744073709551615ull
+#define U32_MAX 4294967295u
+#define U16_MAX 65535
+#define U8_MAX  255
 
-#define Loop(i, c) for (i32 i = 0; i < c; ++i)
+#define INVALID_ID     U32_MAX
+#define INVALID_ID_U16 U16_MAX
+#define INVALID_ID_U8  U8_MAX
 
 template<typename F>
 struct ImplDefer {
@@ -119,63 +130,103 @@ template<typename F>
 ImplDefer<F> MakeDefer(F f) {
 	return ImplDefer<F>(f);
 }
-#define __CONCAT(a, b) Glue(a, b)
-#define Defer(code) auto __CONCAT(_defer_, __LINE__) = MakeDefer([&](){code;})
+#define _CONCAT(a, b) Glue(a, b)
+#define Defer(code) auto _CONCAT(_defer_, __LINE__) = MakeDefer([&](){code;})
 #define DeferLoop(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
 #define IfDeferLoop(begin, end) for (b32 _once = (begin); _once; _once = false, (end))
-
-#ifdef MONOLITHIC_BUILD
-  #define KAPI
-  #define ExportAPI
-#else
-  #define ExportAPI __declspec(dllexport)
-
-  #ifdef KEXPORT
-    #define KAPI __declspec(dllexport)
-  #else
-    #define KAPI __declspec(dllimport)
-  #endif
-
-#endif
 
 #define C_LINKAGE_BEGIN extern "C"{
 #define C_LINKAGE_END }
 #define C_LINKAGE extern "C"
 
-#define INLINE __forceinline
+#if _WIN64
+  #define OS_WINDOWS 1
+#elif __linux__
+  #define OS_LINUX 1
+#elif __APPLE__
+  #define OS_MAC 1
+#endif
 
-#define U64_MAX 18446744073709551615ull
-#define U32_MAX 4294967295u
-#define U16_MAX 65535
-#define U8_MAX  255
+#if _MSC_VER
+  #define COMPILER_MSVC 1
+#elif __clang__
+  #define COMPILER_CLANG 1
+#elif __GNUC__
+  #define COMPILER_GCC 1
+#endif
 
-#define INVALID_ID     U32_MAX
-#define INVALID_ID_U16 U16_MAX
-#define INVALID_ID_U8  U8_MAX
+#if __x86_64__ || _M_X64
+  #define ARCH_X64 1
+#elif __aarch64__ || _M_ARM64
+  #define ARCH_ARM64 1
+#endif
 
-#define ALLOC_HEADER_GUARD   0xA110C8
-#define DEALLOC_HEADER_GUARD 0xDE1E7E
-#define ALLOC_GUARD          0xA1
-#define DEALLOC_GUARD        0xDE
+#define BUILD_DEBUG 1
 
-#define GUARD_MEMORY
+////////////////////////////////////////////////////////////////////////
+// Compiler Specific
 
-#ifdef GUARD_MEMORY
-  #define FillAlloc(ptr, size)  MemSet(ptr, ALLOC_GUARD, size)
-  #define FillAllocStruct(ptr)  MemSet(ptr, ALLOC_GUARD, sizeof(*(ptr)))
-  #define FillDealoc(ptr, size) MemSet(ptr, DEALLOC_GUARD, size)
-  #define FillDealocStruct(ptr) MemSet(ptr, DEALLOC_GUARD, sizeof(*(ptr)))
+#if COMPILER_MSVC
+  #define INLINE             __forceinline
+  #define DebugBreak()       __debugbreak();
+  #define Expect(expr, val)  (expr)
+
+  #include <memory.h>
+  #define MemSet(d, byte, c)  memset((d), (byte), (c))
+  #define MemCopy(d, s, c)    memcpy((d), (s), (c))
+  #define MemMatch(a, b, c)   memcmp((a), (b), (c))
+
 #else
-  #define FillAlloc(ptr, size)
-  #define FillAllocStruct(ptr)
-  #define FillDealoc(ptr, size)
-  #define FillDealocStruct(ptr)
+  #define INLINE             __attribute__((nodebug)) inline __attribute__((always_inline))
+  #define DebugBreak()       __builtin_debugtrap()
+  #define Expect(expr, val)  __builtin_expect((expr), (val))
+
+  #define MemSet(d, byte, c)    __builtin_memset((d), (byte), (c))
+  #define MemCopy(d, s, c)      __builtin_memcpy((d), (s), (c))
+  #define MemMatch(a, b, c)     __builtin_memcmp((a), (b), (c))
+
+  INLINE u32 count_bits_set32(u32 val) { return __builtin_popcount(val); }
+  INLINE u32 count_bits_set64(u64 val) { return __builtin_popcountll(val); }
+  INLINE u32 ctz32(u32 val)            { return __builtin_ctz(val); }
+  INLINE u32 clz32(u32 val)            { return __builtin_clz(val); }
+  INLINE u32 ctz64(u64 val)            { return __builtin_ctzll(val); }
+  INLINE u32 clz64(u64 val)            { return __builtin_clzll(val); }
+
+#endif
+
+////////////////////////////////////////////////////////////////////////
+// OS Specific
+
+#if OS_WINDOWS
+  #if MONOLITHIC_BUILD
+    #define KAPI
+    #define ExportAPI
+  #else
+
+    #define ExportAPI __declspec(dllexport)
+    #ifdef KEXPORT
+      #define KAPI __declspec(dllexport)
+    #else
+      #define KAPI __declspec(dllimport)
+    #endif
+
+  #endif
+
+#else
+  #if MONOLITHIC_BUILD
+    #define KAPI
+    #define ExportAPI
+  #else
+
+    #define ExportAPI __attribute__((visibility("default")))
+    #ifdef KEXPORT
+      #define KAPI __attribute__((visibility("default")))
+    #else
+      #define KAPI
+    #endif
+
+  #endif
+
 #endif
 
 #define quick_sort(ptr, count, element_size, cmp_function) qsort((ptr), (count), (element_size), (int (*)(const void *, const void *))(cmp_function))
-
-#define Main                     \
-  void entry_point();            \
-  int main() {                   \
-    os_entry_point(entry_point); \
-  } void
