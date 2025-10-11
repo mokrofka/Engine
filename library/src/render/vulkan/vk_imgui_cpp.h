@@ -2,7 +2,7 @@
 #include "vk_types.h"
 #include "vk_command_buffer.h"
 
-internal VkDescriptorPool imgui_descriptor_pool;
+intern VkDescriptorPool imgui_descriptor_pool;
 
 typedef void* HINSTANCE;
 typedef void* HWND;

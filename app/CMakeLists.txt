@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10.0)
-project(Exe)
+project(App)
 
 # include
 include_directories(${CMAKE_SOURCE_DIR}/app/src)
@@ -20,8 +20,10 @@ if (build_one_exe)
 
   add_executable(app ${OneExe})
 
-  # boil
+  # define
+  add_compile_definitions(MONOLITHIC_BUILD)
 
+  # lib link
   find_package(Vulkan REQUIRED)
   target_link_libraries(app Vulkan::Vulkan)
   if (WIN32)
@@ -30,9 +32,10 @@ if (build_one_exe)
     target_link_libraries(app /usr/lib/libwayland-client.so)
   endif()
   
-  add_compile_definitions(MONOLITHIC_BUILD)
 else ()
   file(GLOB_RECURSE ExeSrc ${CMAKE_SOURCE_DIR}/app/src/*.cpp)
+
   add_executable(app ${ExeSrc})
+  
   target_link_libraries(app "${CMAKE_SOURCE_DIR}/bin/liblibrary.so")
 endif()

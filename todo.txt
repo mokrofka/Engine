@@ -1,4 +1,0 @@
-growable arena
-if viewport is zero - stop rendering
-switch viewport/swapchain rendering
-in shader reload make hotreloading by type

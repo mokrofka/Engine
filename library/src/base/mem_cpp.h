@@ -19,16 +19,15 @@ struct MemCtx {
 
 global MemCtx mem_ctx;
 
-#define PAGE_SIZE 4096
 #define MIN_CHUNKS_PER_COMMIT 32
 #define POOL_STEP GB(10)
 
-internal void pool_commit(SegPool& p, u64 commit_size) {
+intern void pool_commit(SegPool& p, u64 commit_size) {
   u8* end_pool = Offset(p.data, p.chunk_count*p.chunk_size);
   os_commit(end_pool, commit_size);
 }
 
-internal void pool_init_new_chunk(SegPool& p, u64 chunks_add) {
+intern void pool_init_new_chunk(SegPool& p, u64 chunks_add) {
   Loop (i, chunks_add) {
     u8* chunk = Offset(p.data, (p.chunk_count + i)*p.chunk_size);
     PoolFreeNode* node; Assign(node, chunk);
@@ -37,7 +36,7 @@ internal void pool_init_new_chunk(SegPool& p, u64 chunks_add) {
 	}
 }
 
-internal u8* segregated_pool_alloc(SegPool& p) {
+intern u8* segregated_pool_alloc(SegPool& p) {
   u64 commit_size = 0;
   if (p.head == null) {
     Assert(p.chunk_count_used + 1 > p.chunk_count);
@@ -58,7 +57,7 @@ internal u8* segregated_pool_alloc(SegPool& p) {
   return result;
 }
 
-internal void segregated_pool_free(SegPool& p, void* ptr) {
+intern void segregated_pool_free(SegPool& p, void* ptr) {
 	PoolFreeNode* node; Assign(node, ptr);
 	node->next = p.head;
 	p.head = node;
@@ -128,12 +127,36 @@ u8* mem_realloc(void* ptr, u64 size) {
   Loop (i, ArrayCount(mem_ctx.pools)) {
     u8* start = base + i*POOL_STEP;
     u8* end = start + POOL_STEP;
-
+    
     u64 base_size = 8;
     base_size <<= i;
     if ((u8*)ptr >= start && (u8*)ptr < end) {
       result = mem_alloc(size);
-      MemZero(result, 208);
+      MemCopy(result, ptr, base_size);
+      FillDealoc(ptr, base_size);
+      segregated_pool_free(mem_ctx.pools[i], ptr);
+      break;
+    }
+  }
+
+  Assert(result && "pointer doesn't belong to any pool");
+  return result;
+}
+
+u8* mem_realloc_zero(void* ptr, u64 size) {
+  Assert(ptr);
+  Assert(size > 0);
+  u8* result = 0;
+  u8* base = mem_ctx.data;
+
+  Loop (i, ArrayCount(mem_ctx.pools)) {
+    u8* start = base + i*POOL_STEP;
+    u8* end = start + POOL_STEP;
+
+    u64 base_size = 8;
+    base_size <<= i;
+    if ((u8*)ptr >= start && (u8*)ptr < end) {
+      result = mem_alloc_zero(size);
       MemCopy(result, ptr, base_size);
       FillDealoc(ptr, base_size);
       segregated_pool_free(mem_ctx.pools[i], ptr);
@@ -382,7 +405,7 @@ FreeListNode* free_list_find_first(FreeList& fl, u64 size, u64 alignment, u64* p
   u64 padding = 0;
 
   while (node != null) {
-    padding = sizeof(FreeListAllocationHeader) + AlignPadUp((PtrInt)node+sizeof(FreeListAllocationHeader), alignment);
+    padding = sizeof(FreeListAllocationHeader) + AlignPadUp((u64)node+sizeof(FreeListAllocationHeader), alignment);
     u64 required_space = size + padding;
     if (node->block_size >= required_space) {
       break;

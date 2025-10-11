@@ -8,7 +8,7 @@ struct LoggerSystemState {
 
 global LoggerSystemState st;
 
-internal void append_to_log_file(String message) {
+intern void append_to_log_file(String message) {
   os_file_write(st.log_file_handle, message.size, message.str);
 }
 

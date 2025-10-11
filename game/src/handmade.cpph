@@ -1,4 +1,5 @@
 #include "lib.h"
+#include "event.h"
 
 struct Entity {
   union {
@@ -23,13 +24,17 @@ struct TileMap {
 };
 
 struct World {
-  i32 tile_width;
-  i32 tile_height;
-  v2i tile_size;
+  i32 tile_size_in_meters;
+  i32 tile_side_in_pixels;
+
   i32 tiles_x_count;
   i32 tiles_y_count;
+
   i32 tilemaps_x_count;
   i32 tilemaps_y_count;
+
+  f32 upper_left_x;
+  f32 upper_left_y;
 
   TileMap* tilemaps;
 };
@@ -40,55 +45,10 @@ struct GameState {
   i32 width;
   i32 height;
   Entity player;
-  Array<Entity, 1024> balls;
   World world;
 };
 
 GameState* st;
-
-C_LINKAGE_BEGIN
-ExportAPI void app_update(u8** state);
-C_LINKAGE_END
-
-b32 resize_callback(u32 code, void* sender, void* listener_inst, EventContext data) {
-  v2i win_size = os_get_window_size();
-  f32 aspect = (f32)win_size.x / win_size.y;
-  st->width = st->height * aspect;
-  arena_clear(st->arena);
-  push_buffer(st->arena, st->width*4*st->height * 2);
-  return false;
-};
-
-////////////////////////////////////////////////////////////////////////
-// Drawing
-void pixel_draw(v2u pos, u32 hex) {
-  st->pixels[pos.y*st->width + pos.x] = hex;
-}
-
-void rect_draw(Rect rect, v3 rgb) {
-  if (rect.x < 0) {
-    rect.x = 0;
-  }
-  if(rect.y < 0) {
-    rect.y = 0;
-  }
-
-  if(rect.width > st->width) {
-    rect.width = st->width;
-  }
-  if(rect.height > st->height) {
-    rect.height = st->height;
-  }
-
-  u32 hex = u32_from_argb(v3_to_v4(rgb, 1));
-
-  Loop (y, rect.height) {
-    Loop (x, rect.width) {
-      pixel_draw(v2u(rect.x+x, rect.y+y), hex);
-    }
-  }
-
-}
 
 ////////////////////////////////////////////////////////////////////////
 // Utils
@@ -125,104 +85,39 @@ void window_pixels_map() {
 }
 
 ////////////////////////////////////////////////////////////////////////
-// Balls
-Entity ball_create() {
-  v2i mouse_pos = mouse_get_pos();
-  f32 speed = rand_f32_01() /10;
-  f32 angle = rand_f32_01() * Two_PI;
-
-  Entity ball = {
-    .rect = {
-      .x = (f32)mouse_pos.x,
-      .y = (f32)mouse_pos.y,
-      .width = 5,
-      .height = 5,
-    },
-    .vx = Cos(angle) * speed,
-    .vy = Sin(angle) * speed,
-    .color = u32_from_argb(v4(rand_f32_01(), rand_f32_01(), rand_f32_01(), rand_f32_01())),
-  };
-
-  return ball;
+// Drawing
+void pixel_draw(v2u pos, u32 hex) {
+  st->pixels[pos.y*st->width + pos.x] = hex;
 }
 
-b32 box2d_is_collision(Rect a, Rect b) {
-  b32 result = (a.x < b.x + b.width)  && (a.x + a.width > b.x) &&
-               (a.y < b.y + b.height) && (a.y + a.height > b.y);
-  return result;
-}
+void rect_draw(Rect rect, v3 rgb) {
+  if (rect.x < 0) {
+    rect.x = 0;
+  }
+  if(rect.y < 0) {
+    rect.y = 0;
+  }
 
-void balls_update() {
-  Loop (i, st->balls.count) {
-    Entity& ball = st->balls[i];
+  if(rect.width > st->width) {
+    rect.width = st->width;
+  }
+  if(rect.height > st->height) {
+    rect.height = st->height;
+  }
 
-    Loop (j, st->balls.count) {
-      if (i == j) continue;
-      Entity& ball_2 = st->balls[j];
-      if (box2d_is_collision(ball.rect, ball_2.rect)) {
-        if (Abs((ball.rect.x + ball.rect.width/2) - (ball_2.rect.x + ball_2.rect.width/2)) > Abs((ball.rect.y + ball.rect.y/2) - (ball_2.rect.y + ball_2.rect.y/2))) {
-          ball.vx = -ball.vx;
-        } else { // vertical collision
-          ball.vy = -ball.vy;
-        }
-      }
+  u32 hex = u32_from_argb(v3_to_v4(rgb, 1));
+
+  Loop (y, rect.height) {
+    Loop (x, rect.width) {
+      pixel_draw(v2u(rect.x+x, rect.y+y), hex);
     }
-
-    if (ball.rect.x - 1 < 0 || ball.rect.x + ball.rect.width >= st->width) {
-      ball.vx = -ball.vx;
-    }
-    if (ball.rect.y - 1 < 0 || ball.rect.y + ball.rect.height >= st->height) {
-      ball.vy = -ball.vy;
-    }
-
-    ball.rect.x += ball.vx;
-    ball.rect.y += ball.vy;
-
-    rect_draw(ball.rect, ball.color);
   }
 }
 
 ////////////////////////////////////////////////////////////////////////
 // Tile Map
-b32 tile_map_is_empty_at_point(TileMap tilemap, v2 test) {
-  i32 player_tile_x = test.x / st->world.tile_width;
-  i32 player_tile_y = test.y / st->world.tile_height;
 
-  b32 is_valid = false;
-  if (player_tile_x >= 0 && player_tile_x < st->world.tiles_x_count &&
-      player_tile_y >= 0 && player_tile_y < st->world.tiles_y_count) 
-  {
-    // Info("%i", st->world.tile_width);
-    u32 tile_map_value = tilemap.tiles[player_tile_y*st->world.tiles_x_count + player_tile_x];
-    is_valid = (tile_map_value == 0);
-    if (is_valid == true) {
-      Info("true");
-    }
-  }
-  return is_valid;
-}
-
-b32 world_is_empty_at_point(TileMap tilemap, v2 test) {
-
-  i32 player_tile_x = test.x / st->world.tile_width;
-  i32 player_tile_y = test.y / st->world.tile_height;
-
-  b32 is_valid = false;
-  if (player_tile_x >= 0 && player_tile_x < st->world.tiles_x_count &&
-      player_tile_y >= 0 && player_tile_y < st->world.tiles_y_count) 
-  {
-    // Info("%i", st->world.tile_width);
-    u32 tile_map_value = tilemap.tiles[player_tile_y*st->world.tiles_x_count + player_tile_x];
-    is_valid = (tile_map_value == 0);
-    if (is_valid == true) {
-      Info("true");
-    }
-  }
-  return is_valid;
-
-}
-
-TileMap* tilemap_get(i32 tilemap_x, i32 tilemap_y) {
+TileMap& get_tilemap(i32 tilemap_x, i32 tilemap_y) {
   TileMap* tilemap = null;
 
   if ((tilemap_x >= 0) && (tilemap_x < st->world.tiles_x_count) &&
@@ -232,7 +127,77 @@ TileMap* tilemap_get(i32 tilemap_x, i32 tilemap_y) {
   }
   Assert(tilemap);
 
-  return tilemap;
+  return *tilemap;
+}
+
+u32 get_tile_value_unchecked(TileMap tile_map, i32 tile_x, i32 tile_y) {
+  i32 tiles_x = st->world.tiles_x_count;
+  i32 tiles_y = st->world.tiles_y_count;
+  Assert((tile_x >= 0) && (tile_x < tiles_x) &&
+         (tile_y >= 0) && (tile_y < tiles_y));
+  u32 tile_map_value = tile_map.tiles[tile_y*tiles_x + tile_x];
+  return tile_map_value;
+}
+
+b32 is_tile_map_point_empty(TileMap tilemap, v2 test_tile) {
+  b32 empty = false;
+  if (test_tile.x >= 0 && test_tile.x < st->world.tiles_x_count &&
+      test_tile.y >= 0 && test_tile.y < st->world.tiles_y_count) 
+  {
+    u32 tile_map_value = get_tile_value_unchecked(tilemap, test_tile.x, test_tile.y);
+    empty = (tile_map_value == 0);
+  }
+  return empty;
+}
+
+// GetCanonicalPosition(world* World, raw_position Pos) {
+//   canonical_position Result;
+
+//   Result.TileMapX = Pos.TileMapX;
+//   Result.TileMapY = Pos.TileMapY;
+
+//   real32 X = Pos.X - World->UpperLeftX;
+//   real32 Y = Pos.Y - World->UpperLeftY;
+//   Result.TileX = FloorReal32ToInt32(X / World->TileSideInPixels);
+//   Result.TileY = FloorReal32ToInt32(Y / World->TileSideInPixels);
+
+//   Result.TileRelX = X - Result.TileX * World->TileSideInPixels;
+//   Result.TileRelY = Y - Result.TileY * World->TileSideInPixels;
+
+//   Assert(Result.TileRelX >= 0);
+//   Assert(Result.TileRelY >= 0);
+//   Assert(Result.TileRelX < World->TileSideInPixels);
+//   Assert(Result.TileRelY < World->TileSideInPixels);
+
+//   if (Result.TileX < 0) {
+//     Result.TileX = World->CountX + Result.TileX;
+//     --Result.TileMapX;
+//   }
+
+//   if (Result.TileY < 0) {
+//     Result.TileY = World->CountY + Result.TileY;
+//     --Result.TileMapY;
+//   }
+
+//   if (Result.TileX >= World->CountX) {
+//     Result.TileX = Result.TileX - World->CountX;
+//     ++Result.TileMapX;
+//   }
+
+//   if (Result.TileY >= World->CountY) {
+//     Result.TileY = Result.TileY - World->CountY;
+//     ++Result.TileMapY;
+//   }
+
+//   return (Result);
+// }
+
+b32 world_point_is_empty(TileMap tilemap, v2 test) {
+  b32 empty;
+
+  // empty = tile_map_is_empty_at_point(TileMap tilemap, v2 test_tile)
+  // TileMap tilemap = get_tilemap()
+
 }
 
 void app_init(u8** state) {
@@ -242,7 +207,6 @@ void app_init(u8** state) {
 
   st->width = 200;
   st->height = 220;
-  // st->height = st->width * (f32)16 / 10;
   Assign(st->pixels, push_buffer(st->arena, st->width*4*st->height));
 
   event_register(EventCode_Resized, null, resize_callback);
@@ -255,16 +219,54 @@ void app_init(u8** state) {
   };
 }
 
-// /mnt/disk_d/VS_Code/hand_made/
-void app_update(u8** state) {
+shared_function void app_update(u8** state) {
+
   if (*state == null) {
     app_init(state);
   }
   Assign(st, *state);
 
+  rect_draw({.width = (f32)st->width,.height = (f32)st->height}, v3(0.1));
+
+  {
+    f32 dx = 0, dy = 0;
+    if (os_is_key_down(Key_W)) dy -= 1;
+    if (os_is_key_down(Key_S)) dy += 1;
+    if (os_is_key_down(Key_A)) dx -= 1;
+    if (os_is_key_down(Key_D)) dx += 1;
+
+    f32 len = Sqrt(Sqr(dx)+Sqr(dy));
+    if (len > 0) {
+      dx /= len;
+      dx /= len;
+    }
+
+    f32 speed = 30;
+    if (os_is_key_down(Key_LShift)) speed *= 4;
+    
+    f32 dplayer_x = dx * speed * delta_time;
+    f32 dplayer_y = dy * speed * delta_time;
+
+    Entity& player = st->player;
+    // if (os_is_button_pressed(MouseButton_Left)) {
+    if (os_is_button_down(MouseButton_Left)) {
+      player.rect.min = v2(mouse_get_pos().x, mouse_get_pos().y);
+    }
+
+    f32 new_player_x = player.x + dplayer_x;
+    f32 new_player_y = player.y + dplayer_y;
+
+    player.x += dplayer_x;
+    player.y += dplayer_y;
+
+    st->player.width = 0.75*10;
+    st->player.height = 10;
+    rect_draw(st->player.rect, v3(1,0,0));
+  }
+
+#if 0
 #define TILE_MAP_COUNT_X 17
 #define TILE_MAP_COUNT_Y 9
-#define TileSize 10
   u32 tiles00[TILE_MAP_COUNT_Y][TILE_MAP_COUNT_X] = {
     {1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 1},
     {1, 1, 0, 0,  0, 1, 0, 0,  0, 0, 0, 0,  0, 1, 0, 0, 1},
@@ -313,51 +315,51 @@ void app_update(u8** state) {
     {1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 1},
   };
 
-  TileMap tilemaps[2][2] = {
-    { {.tiles = (u32*)tiles00}, {.tiles = (u32*)tiles01} },
-    { {.tiles = (u32*)tiles10}, {.tiles = (u32*)tiles11} }
-  };
+  TileMap tilemaps[2][2];
+  tilemaps[0][0].tiles = (u32*)tiles00;
+  tilemaps[0][1].tiles = (u32*)tiles01;
+  tilemaps[1][0].tiles = (u32*)tiles10;
+  tilemaps[1][1].tiles = (u32*)tiles11;
 
   st->world = {
-    .tile_width = TileSize,
-    .tile_height = TileSize,
+    .tile_side_in_pixels = 10,
     .tiles_x_count = TILE_MAP_COUNT_X,
     .tiles_y_count = TILE_MAP_COUNT_Y,
     .tilemaps_x_count = 2,
     .tilemaps_y_count = 2,
+    .upper_left_x = -(f32)st->world.tile_side_in_pixels/2,
+    .upper_left_y = 0,
     .tilemaps = (TileMap*)tilemaps,
   };
 
-  TileMap tilemap = *tilemap_get(st->player.tilemap_x, st->player.tilemap_y);
+  st->player.width = 0.75f*st->world.tile_side_in_pixels;
+  st->player.height = st->world.tile_side_in_pixels;
+
+  TileMap tilemap = get_tilemap(st->player.tilemap_x, st->player.tilemap_y);
 
   {
-    Entity& player = st->player;
+    f32 dx = 0, dy = 0;
+    if (os_is_key_down(Key_W)) dy -= 1;
+    if (os_is_key_down(Key_S)) dy += 1;
+    if (os_is_key_down(Key_A)) dx -= 1;
+    if (os_is_key_down(Key_D)) dx += 1;
+
+    f32 len = Sqrt(Sqr(dx)+Sqr(dy));
+    if (len > 0) {
+      dx /= len;
+      dx /= len;
+    }
+
     f32 speed = 30;
-    f32 dx = 0;
-    f32 dy = 0;
-    if (os_is_key_down(Key_LShift)) {
-      speed *= 4;
-    }
-    if (os_is_key_down(Key_W)) {
-      dy -= speed;
-    }
-    if (os_is_key_down(Key_S)) {
-      dy += speed;
-    }
-    if (os_is_key_down(Key_A)) {
-      dx -= speed;
-    }
-    if (os_is_key_down(Key_D)) {
-      dx += speed;
-    }
-    if (os_is_key_pressed(Key_Escape)) {
-      st->balls.count = 0;
-    }
+    if (os_is_key_down(Key_LShift)) speed *= 4;
+    
+    f32 dplayer_x = dx * speed * delta_time;
+    f32 dplayer_y = dy * speed * delta_time;
+
+    Entity& player = st->player;
     if (os_is_button_pressed(MouseButton_Left)) {
       player.rect.min = v2(mouse_get_pos().x, mouse_get_pos().y);
     }
-    f32 dplayer_x = dx * delta_time;
-    f32 dplayer_y = dy * delta_time;
 
     f32 new_player_x = player.x + dplayer_x;
     f32 new_player_y = player.y + dplayer_y;
@@ -365,18 +367,17 @@ void app_update(u8** state) {
     f32 half_of_player_width = 0.5f*player.width;
     f32 half_of_player_height = 0.5f*player.height;
     v2 bottom_player = v2(new_player_x + player.width/2, new_player_y + player.height);
-    if (tile_map_is_empty_at_point(tilemap, bottom_player) &&
-        tile_map_is_empty_at_point(tilemap, {bottom_player.x - half_of_player_width, bottom_player.y}) &&
-        tile_map_is_empty_at_point(tilemap, {bottom_player.x + half_of_player_width, bottom_player.y}))
+    if (is_tile_map_point_empty(tilemap, bottom_player) &&
+        is_tile_map_point_empty(tilemap, {bottom_player.x - half_of_player_width, bottom_player.y}) &&
+        is_tile_map_point_empty(tilemap, {bottom_player.x + half_of_player_width, bottom_player.y}))
     {
-      st->player.x += dplayer_x;
-      st->player.y += dplayer_y;
+      player.x += dplayer_x;
+      player.y += dplayer_y;
     }
   }
 
   {
     rect_draw({.width = (f32)st->width,.height = (f32)st->height}, v3(0.1));
-    balls_update();
 
     Loop (y, st->world.tiles_y_count) {
       Loop (x, st->world.tiles_x_count) {
@@ -386,9 +387,9 @@ void app_update(u8** state) {
           gray = 0.2;
         }
 
-        f32 x_pos = x * st->world.tile_width;
-        f32 y_pos = y * st->world.tile_height;
-        rect_draw({x_pos,y_pos, (f32)st->world.tile_width,(f32)st->world.tile_height}, v3(gray));
+        // f32 x_pos = x * st->world.tile_width;
+        // f32 y_pos = y * st->world.tile_height;
+        // rect_draw({x_pos,y_pos, (f32)st->world.tile_width,(f32)st->world.tile_height}, v3(gray));
       }
     }
     
@@ -396,6 +397,7 @@ void app_update(u8** state) {
     st->player.height = 10;
     rect_draw(st->player.rect, v3(1,0,0));
   }
+  #endif
   
   window_pixels_map();
 }

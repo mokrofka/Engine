@@ -1,18 +1,7 @@
 #pragma once
 #include "lib.h"
 #include "render/r_types.h"
-#include "vulkan/vk_api.h"
-
-struct Vertex {
-  v3 pos;
-  v3 norm;
-  v3 texcoord;
-};
-
-struct Mesh {
-  Vertex* vertices;
-  u32* indexes;
-};
+#include "vulkan/vk.h"
 
 ////////////////////////////////////////////////////////////////////////
 // Renderer
@@ -22,12 +11,11 @@ KAPI void r_begin_draw_frame();
 KAPI void r_end_draw_frame();
 
 ////////////////////////////////////////////////////////////////////////
-// Geometry
-KAPI void geometry_init();
-KAPI void geometry_create(Geometry geometry);
-KAPI void geometry_destroy(u32 id);
-KAPI Geometry& geometry_get(String name);
-KAPI void mesh_upload(Mesh mesh);
+// Mesh
+KAPI void mesh_init();
+KAPI u32 mesh_create(String name);
+KAPI void mesh_destroy(u32 id);
+KAPI Mesh mesh_get(String name);
 
 ////////////////////////////////////////////////////////////////////////
 // Resource

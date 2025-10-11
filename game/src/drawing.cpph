@@ -1,0 +1,59 @@
+#include "common.h"
+
+void app_init(u8** state) {
+  Assign(*state, mem_alloc_zero(sizeof(GameState)));
+  Assign(st, *state);
+  st->arena = arena_alloc();
+
+  st->width = 200;
+  st->height = 220;
+  Assign(st->pixels, push_buffer(st->arena, st->width*4*st->height));
+
+  event_register(EventCode_Resized, null, resize_callback);
+
+  st->player = {
+    .x = 30,
+    .y = 30,
+    .width = 10,
+    .height = 10,
+  };
+}
+
+void pixel_draw(v2u pos, u32 hex) {
+  st->pixels[pos.y*st->width + pos.x] = hex;
+}
+
+void rect_draw(Rect rect, v3 rgb) {
+  if (rect.x < 0) {
+    rect.x = 0;
+  }
+  if(rect.y < 0) {
+    rect.y = 0;
+  }
+
+  if(rect.width > st->width) {
+    rect.width = st->width;
+  }
+  if(rect.height > st->height) {
+    rect.height = st->height;
+  }
+
+  u32 hex = u32_from_argb(v3_to_v4(rgb, 1));
+
+  Loop (y, rect.height) {
+    Loop (x, rect.width) {
+      pixel_draw(v2u(rect.x+x, rect.y+y), hex);
+    }
+  }
+}
+
+shared_function void app_update(u8** state) {
+  if (*state == null) {
+    app_init(state);
+  }
+  Assign(st, *state);
+
+  rect_draw({.width = (f32)st->width,.height = (f32)st->height}, v3(0.1));
+
+
+}

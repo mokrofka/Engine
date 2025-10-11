@@ -1,7 +1,10 @@
+#include "base/defines.h"
+#include "base/logger.h"
 #include "render/renderer.h"
 
 #include "asset_watch.h"
 #include "event.h"
+#include "test.h"
 
 struct App {
   void (*update)(u8** state);
@@ -29,7 +32,10 @@ int main() {
   event_init();
   asset_watch_init();
   res_sys_init("../assets");
+#ifndef SOFTWARE_RENDERING
   r_init();
+#endif
+  test();
 
   Scratch scratch;
 
@@ -44,7 +50,7 @@ int main() {
   os_copy_file_path(st.lib_temp_filepath, st.lib_filepath);
   st.lib = os_lib_open(st.lib_temp_filepath);
   Assign(st.update, os_lib_get_proc(st.lib, "app_update"));
-  
+
   // Assert(st.lib && st.init && st.update);
   Assert(st.lib && st.update);
   asset_watch_add(st.lib_filepath, []() {
@@ -65,9 +71,13 @@ int main() {
     
     if (!st.is_suspended) {
 
+#if SOFTWARE_RENDERING
+      st.update(&st.state);
+#else
       r_begin_draw_frame();
       st.update(&st.state);
       r_end_draw_frame();
+#endif
 
       os_input_update();
       asset_watch_update();
@@ -91,3 +101,5 @@ int main() {
   os_gfx_shutdown();
   
 }
+
+

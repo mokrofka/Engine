@@ -2,10 +2,7 @@
 
 #include "render/renderer.h"
 #include "event.h"
-
-C_LINKAGE_BEGIN
-ExportAPI void app_update(u8** state);
-C_LINKAGE_END
+#include "test.h"
 
 #define MaxEntities KB(20)
 
@@ -602,83 +599,42 @@ C_LINKAGE_END
 // }
 
 struct Entity {
-  
+  v3 pos;
+  u32 render_id;
+  u32 mesh_id;
+  u32 shader_id;
 };
 
 struct GameState {
   Arena* arena;
+  Map<String, Mesh> meshes;
 };
 
 GameState* st;
-
-Mesh load_obj(String name) {
-  Scratch scratch;
-
-  DarrayArena<v3> vertices(scratch);
-  DarrayArena<u32> indexes(scratch);
-  u32 vert_count = 0;
-  u32 index_count = 0;
-
-  Buffer buff = res_binary_load(scratch, name);
-  Range range = {.offset = (u64)buff.data, .size = buff.size + (u64)buff.data};
-
-  String line;
-  while ((line = str_read_line(&range))) {
-    if (line.str[0] == 'v' && line.str[1] == ' ') { // vertex
-      ++vert_count;
-      u32 start = 2;
-      v3 v = {
-        f32_from_str(str_next_word(line, start)),
-        f32_from_str(str_next_word(line, start)),
-        f32_from_str(str_next_word(line, start)),
-      };
-      append(vertices, v);
-    } else if (line.str[0] == 'f') {
-      ++index_count;
-      Loop (i, line.size) {
-        if (line.str[i] == ' ') {
-          String start_on_num = str_skip(line, i+1);
-          i32 num_length = str_index_of(start_on_num, '/');
-          String num = str_prefix(start_on_num, num_length);
-          append(indexes, u32_from_str(num));
-        }
-      }
-    }
-  }
-
-  Mesh mesh = {
-    .vertices = push_array(st->arena, Vertex, vert_count),
-    .indexes = indexes.data,
-  };
-  Loop (i, vert_count) {
-    mesh.vertices[i] = {
-      .pos = vertices[i],
-    };
-  }
-
-  return mesh;
-}
 
 void app_init(u8** state) {
   Scratch scratch;
   Assign(*state, mem_alloc_zero(sizeof(GameState)));
   Assign(st, *state);
   st->arena = arena_alloc();
+  
+  // Mesh mesh = mesh_get("models/cube.obj");
+  u32 mesh = mesh_create("models/cube.obj");
+  u32 shader = vk_shader_load("color_shader");
+  Entity e = {
+    // .render_id = entity_make_renderable(mesh, shader),
+    .mesh_id = mesh,
+    .shader_id = shader,
+  };
 
-  Mesh cube = load_obj("models/cube.obj");
-  mesh_upload(cube);
+  yes_render();
 }
 
-void app_update(u8** state) {
+shared_function void app_update(u8** state) {
   if (*state == null) {
     app_init(state);
   }
   Assign(st, *state);
-
-
-
-  // Info("%i", i64_from_str("-1234"));
-  // Info("%f", f64_from_str("1.234"));
-
-
+  
 }
+

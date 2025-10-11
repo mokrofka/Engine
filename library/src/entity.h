@@ -1,49 +1,49 @@
 #pragma once
 #include "lib.h"
 
-#define MaxEntities KB(20)
+#define MaxEntities 20000
 
-struct SparseSet {
-  u8* data;
-  u32 entity_to_index[MaxEntities];
-  u32 entities[MaxEntities];
-  u32 count;
-  u32 element_size;
+// struct SparseSet {
+//   u8* data;
+//   u32 entity_to_index[MaxEntities];
+//   u32 entities[MaxEntities];
+//   u32 count;
+//   u32 element_size;
   
-  inline void insert_data(u32 id, void* component) {
-    entity_to_index[id] = count;
-    entities[count] = id;
-    MemCopy(Offset(data, element_size*count), component, element_size);
-    ++count;
-  }
-  inline void add(u32 id) {
-    entity_to_index[id] = count;
-    entities[count] = id;
-    FillAlloc(Offset(data, element_size*count), element_size);
-    ++count;
-  }
-  inline void remove_data(u32 id) {
-    u32 index_of_removed_entity = entity_to_index[id];
-    u32 index_of_last_element = count - 1;
+//   inline void insert_data(u32 id, void* component) {
+//     entity_to_index[id] = count;
+//     entities[count] = id;
+//     MemCopy(Offset(data, element_size*count), component, element_size);
+//     ++count;
+//   }
+//   inline void add(u32 id) {
+//     entity_to_index[id] = count;
+//     entities[count] = id;
+//     FillAlloc(Offset(data, element_size*count), element_size);
+//     ++count;
+//   }
+//   inline void remove_data(u32 id) {
+//     u32 index_of_removed_entity = entity_to_index[id];
+//     u32 index_of_last_element = count - 1;
 
-    u8* dst = Offset(data, element_size*index_of_removed_entity);
-    u8* src = Offset(data, element_size*index_of_last_element);
-    MemCopy(dst, src, element_size);
+//     u8* dst = Offset(data, element_size*index_of_removed_entity);
+//     u8* src = Offset(data, element_size*index_of_last_element);
+//     MemCopy(dst, src, element_size);
 
-    u32 last_entity = entities[index_of_last_element];
+//     u32 last_entity = entities[index_of_last_element];
 
-    entity_to_index[last_entity] = index_of_removed_entity;
-    entities[index_of_removed_entity] = last_entity;
+//     entity_to_index[last_entity] = index_of_removed_entity;
+//     entities[index_of_removed_entity] = last_entity;
 
-    entity_to_index[id] = INVALID_ID;
-    entities[index_of_last_element] = INVALID_ID;
+//     entity_to_index[id] = INVALID_ID;
+//     entities[index_of_last_element] = INVALID_ID;
 
-    --count;
-  }
-  inline void* get_data(u32 id) {
-    return Offset(data, entity_to_index[id]*element_size);
-  }
-};
+//     --count;
+//   }
+//   inline void* get_data(u32 id) {
+//     return Offset(data, entity_to_index[id]*element_size);
+//   }
+// };
 
 struct SparseSetStatic {
   u8 data[KB(1)];

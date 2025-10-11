@@ -20,7 +20,7 @@ enum LogLevel {
 
 KAPI void _log_output(LogLevel level, String fmt, ...);        // with \n
 KAPI void _log_output_inline(LogLevel level, String fmt, ...); // without \n
-KAPI void _log_output_raw(LogLevel level, String fmt, ...);    // only text
+KAPI void _log_output_raw(LogLevel level, String fmt, ...);    // without tag
 KAPI void print(String fmt, ...);
 KAPI void println(String fmt, ...);
 
@@ -75,12 +75,13 @@ KAPI void println(String fmt, ...);
 #endif
 
 #if ASSERTIONS_ENABLED
-  #define Assert(expr) \
-    {                  \
-      if (expr) {      \
-      } else {         \
-        DebugBreak();  \
-      }                \
+  #define Assert(expr)  \
+    {                   \
+      if (expr) {       \
+      } else {          \
+        Error("Assert") \
+        DebugBreak();   \
+      }                 \
     }
 
   #define AssertMsg(expr, message, ...)                      \

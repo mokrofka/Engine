@@ -4,7 +4,6 @@
 
 #include "entity.h"
 #include "ui.h"
-#include "vulkan/vk_backend.h"
 
 struct RendererSystemState {
   b8 is_render;
@@ -15,28 +14,28 @@ global RendererSystemState st;
 void r_init() {
   shader_init();
   texture_init();
-  geometry_init();
+  mesh_init();
 
   st.is_render = true;
   
-  vk_r_backend_init();
+  vk_init();
   
   // ui_init();
 }
 
 void r_shutdown() {
-  vk_r_backend_shutdown();
+  vk_shutdown();
 }
 
 void r_begin_draw_frame() {
-  vk_r_backend_begin_frame();
+  vk_begin_frame();
 
   // World
   // if (vk_is_viewport_render()) {
     {
-      vk_r_begin_renderpass(Renderpass_World);
+      vk_begin_renderpass(Renderpass_World);
       vk_draw();
-      vk_r_end_renderpass(Renderpass_World);
+      vk_end_renderpass(Renderpass_World);
     }
   // }
 
@@ -56,48 +55,88 @@ void r_end_draw_frame() {
   }
 
   {
-    vk_r_begin_renderpass(Renderpass_Screen);
+    vk_begin_renderpass(Renderpass_Screen);
     vk_draw_screen();
-    vk_r_end_renderpass(Renderpass_Screen);
+    vk_end_renderpass(Renderpass_Screen);
   }
 
-  vk_r_backend_end_frame();
+  vk_end_frame();
 }
 
 ////////////////////////////////////////////////////////////////////////
 // Geometry
-struct GeometrySysState {
+struct MeshState {
   Arena* arena;
   u32 geom_count;
-  // HashMap hashmap;
 };
 
-global GeometrySysState geom_st;
+global MeshState mesh_st;
 
-#define MaxGeometryCount 256
-void geometry_init() {
-  geom_st.arena = arena_alloc();
-  // geom_st.hashmap = hashmap_create(geom_st.arena, sizeof(u32), MaxGeometryCount);
-  u32 invalid_id = INVALID_ID;
-  // hashmap_fill(geom_st.hashmap, &invalid_id);
+intern Mesh load_obj(String name) {
+  Scratch scratch;
 
-  // geom_st.hashmap = hashmap_create(geom_st.arena, sizeof(Geometry), MaxGeometryCount);
-  Geometry geom = {
-    .id = INVALID_ID,
+  DarrayArena<v3> vertices(scratch);
+  DarrayArena<u32> indexes(scratch);
+  u32 vert_count = 0;
+  u32 index_count = 0;
+
+  Buffer buff = res_binary_load(scratch, name);
+  Range range = {.offset = (u64)buff.data, .size = buff.size + (u64)buff.data};
+
+  String line;
+  while ((line = str_read_line(&range))) {
+    if (line.str[0] == 'v' && line.str[1] == ' ') { // vertex
+      ++vert_count;
+      u32 start = 2;
+      v3 v = {
+        f32_from_str(str_next_word(line, start)),
+        f32_from_str(str_next_word(line, start)),
+        f32_from_str(str_next_word(line, start)),
+      };
+      append(vertices, v);
+    } else if (line.str[0] == 'f') {
+      ++index_count;
+      Loop (i, line.size) {
+        if (line.str[i] == ' ') {
+          String start_on_num = str_skip(line, i+1);
+          i32 num_length = str_index_of(start_on_num, '/');
+          String num = str_prefix(start_on_num, num_length);
+          append(indexes, u32_from_str(num));
+        }
+      }
+    }
+  }
+
+  Mesh mesh = {
+    .vertices = push_array(mesh_st.arena, Vertex, vert_count),
+    .indexes = push_array(mesh_st.arena, u32, index_count),
+    .vert_count = vert_count,
+    .index_count = index_count,
   };
-  // hashmap_fill(geom_st.hashmap, &geom);
+  Loop (i, vert_count) {
+    mesh.vertices[i] = {
+      .pos = vertices[i],
+    };
+  }
+  MemCopyTyped(mesh.indexes, indexes.data, index_count);
+
+  push_buffer(scratch, 10, 4);
+
+  return mesh;
 }
 
-void geometry_create(Geometry geometry) {
-  geometry.id = geom_st.geom_count++;
-  // hashmap_set(geom_st.hashmap, geometry.name, &geometry);
-  vk_r_geometry_create(geometry);
+void mesh_init() {
+  mesh_st.arena = arena_alloc();
 }
 
-Geometry& geometry_get(String name) {
-  // Geometry* geom; Assign(geom, hashmap_get(geom_st.hashmap, name));
-  // Assert(geom->id != INVALID_ID);
-  // return *geom;
+u32 mesh_create(String name) {
+  Mesh mesh = load_obj(name);
+  u32 id = vk_mesh_load(mesh);
+  return id;
+}
+
+Mesh geometry_get(String name) {
+
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -178,14 +217,14 @@ void shader_init() {
     String shader_compiled_filepath = push_strf(scratch, "%s/%s%s", shader_compiled_dir, name, String(".spv"));
 
     String cmd = push_strf(scratch, "glslangValidator.exe -V \"%s\" -o \"%s\"", shader_filepath, shader_compiled_filepath);
-    os_process_create(cmd);
+    // os_process_create(cmd);
   });
   
   asset_watch_directory_add("shaders/compiled", [](String name) {
     Scratch scratch;
     String choped = str_chop_last_dot(name);
     String choped_choped = str_chop_last_dot(choped);
-    shader_reload(choped_choped, shader_get(choped_choped).id);
+    vk_shader_reload(choped_choped, shader_get(choped_choped).id);
   });
 }
 
@@ -201,7 +240,7 @@ void shader_create(Shader shader) {
     // hashmap_set(shader_st.hashmap, shader.name, &shader);
   }
 
-  vk_r_shader_create(shader);
+  // vk_r_shader_create(shader);
 }
 
 Shader& shader_get(String name) {
@@ -265,7 +304,7 @@ void res_texture_unload(void* data) {
   stbi_image_free(data);
 }
 
-internal void destroy_texture(Texture* t) {
+intern void destroy_texture(Texture* t) {
   res_texture_unload(t->data);
 }
 

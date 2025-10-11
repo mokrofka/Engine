@@ -5,6 +5,7 @@
 #define DEALLOC_HEADER_GUARD 0xDE1E7E
 #define ALLOC_GUARD          0xA1
 #define DEALLOC_GUARD        0xDE
+#define PAGE_SIZE            4096
 
 #define GUARD_MEMORY 1
 
@@ -38,7 +39,12 @@ KAPI void global_allocator_init();
 KAPI u8* mem_alloc(u64 size);
 KAPI u8* mem_alloc_zero(u64 size);
 #define mem_alloc_struct(T) (T*)mem_alloc(sizeof(T))
+#define mem_alloc_typed(T, c) (T*)mem_alloc(sizeof(T)*c)
+#define mem_alloc_typed_zero(T, c) (T*)mem_alloc_zero(sizeof(T)*c)
 KAPI u8* mem_realloc(void* ptr, u64 size);
+KAPI u8* mem_realloc_zero(void* ptr, u64 size);
+#define mem_realloc_typed(a, T, c) (T*)mem_realloc(a, sizeof(T)*c)
+#define mem_realloc_typed_zero(a, T, c) (T*)mem_realloc_zero(a, sizeof(T)*c)
 KAPI void mem_free(void* ptr);
 
 ////////////////////////////////////////////////////////////////////////
@@ -69,9 +75,6 @@ KAPI void* _arena_push(Arena* arena, u64 size, u64 align = DEFAULT_ALIGNMENT);
 
 KAPI void arena_release(Arena* arena);
 
-// void _arena_move(Arena* arena, u64 size, u64 align);
-// #define arena_move_array(a, T, c) _arena_move(a, sizeof(T)*c, alignof(T))
-
 ////////////////////////////////////////////////////////////////////////
 // Pool
 
@@ -95,6 +98,18 @@ KAPI u8* pool_alloc(MemPool& p);
 KAPI MemPool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignment = DEFAULT_ALIGNMENT);
 KAPI void pool_free(MemPool& p, void* ptr);
 KAPI void pool_free_all(MemPool& pool);
+
+template<typename T>
+struct ObjectPool {
+  T* data;
+  u64 count;
+  u64 cap;
+  PoolFreeNode* head;
+
+  T* alloc() {
+    
+  }
+};
 
 ////////////////////////////////////////////////////////////////////////
 // Free list

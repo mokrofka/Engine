@@ -14,46 +14,42 @@
 
 #include "event.h"
 
-internal u32 keycode_translate(u32 code);
-internal u32 mouse_buttoncode_translate(u32 code);
+intern u32 keycode_translate(u32 code);
+intern u32 mouse_buttoncode_translate(u32 code);
 
-internal void wl_seat_capabilities(void* data, wl_seat* seat, u32 capabilities);
+intern void wl_seat_capabilities(void* data, wl_seat* seat, u32 capabilities);
 
-internal void xdg_shell_ping(void* data, xdg_wm_base* shell, u32 serial);
+intern void xdg_shell_ping(void* data, xdg_wm_base* shell, u32 serial);
 
 struct WaylandState {
-  // Global interfaces
   wl_display* wl_display;
   wl_registry* wl_registry;
-
-  // Global interfaces
-  wl_compositor* wl_compositor;
-  wl_shm* wl_shm;
-  wl_seat* wl_seat;
-  xdg_wm_base* xdg_wm_base;
-
-  // Callbaacks
-  // wl_callback_listener wl_callback_listener;
-
-  // Input
-  wl_pointer* wl_pointer;
-  wl_keyboard* wl_keyboard;
-
   wl_surface* wl_surface;
   xdg_surface* xdg_surface;
   xdg_toplevel* xdg_toplevel;
 
-  // wl_buffer* wl_buffer;
-  // Arena* resize_arena;
-  // OS_Handle fd;
+  wl_compositor* wl_compositor;
+  wl_seat* wl_seat;
+  xdg_wm_base* xdg_wm_base;
+
+  // Input
+  wl_pointer* wl_pointer;
+  wl_keyboard* wl_keyboard;
   
   i32 width = 900;
   i32 height = 900;
-  i32 channel = 4;
-  i32 stride = width*channel;
-  u8* pixels;
   b8 is_running = true;
-  b8 is_showned;
+  b8 is_showned = false;
+
+#if SOFTWARE_RENDERING
+  wl_shm* wl_shm;
+  wl_buffer* wl_buffer;
+  wl_callback_listener wl_callback_listener;
+  Arena* wl_buffer_arena;
+  OS_Handle fd;
+  i32 channel = 4;
+#endif
+  u8* pixels;
   
   ////////////////////////////////////////////////////////////////////////
   // Input
@@ -76,14 +72,9 @@ struct WaylandState {
 global WaylandState st;
 #undef global // because of: wl_registry_listener.global;
 
-internal void wl_registry_global_handler(void* data, wl_registry* registry, u32 name, const char* interface, u32 version) {
-  // Info("Compositor says: interface %s (ver %u) with id %u", String(interface), version, name);
-
+intern void wl_registry_global_handler(void* data, wl_registry* registry, u32 name, const char* interface, u32 version) {
   if (str_match(interface, wl_compositor_interface.name)) {
     Assign(st.wl_compositor, wl_registry_bind(registry, name, &wl_compositor_interface, version));
-  }
-  else if (str_match(interface, wl_shm_interface.name)) {
-    // Assign(st.wl_shm, wl_registry_bind(registry, name, &wl_shm_interface, 1));
   }
   else if (str_match(interface, wl_seat_interface.name)) {
     Assign(st.wl_seat, wl_registry_bind(registry, name, &wl_seat_interface, 1));
@@ -100,98 +91,105 @@ internal void wl_registry_global_handler(void* data, wl_registry* registry, u32 
     };
     xdg_wm_base_add_listener(st.xdg_wm_base, &xdg_wm_base_listener, 0);
   }
+#if SOFTWARE_RENDERING
+  else if (str_match(interface, wl_shm_interface.name)) {
+    Assign(st.wl_shm, wl_registry_bind(registry, name, &wl_shm_interface, 1));
+  }
+#endif
 }
 
-internal void wl_key(void* data, wl_keyboard* keyboard, u32 serial, u32 time, u32 key, u32 state) {
-  u32 my_key = keycode_translate(key);
-  // Info("key '%c' %s.\n", (char)my_key, state ? String("pressed") : String("released"));
-  st.input.keyboard_current.keys[my_key] = state;
-}
-
-void wl_pointer_motion(void* data, wl_pointer* pointer, u32 time, wl_fixed_t sx, wl_fixed_t sy) {
-  f32 x = wl_fixed_to_double(sx);
-  f32 y = wl_fixed_to_double(sy);
-  st.input.mouse_current.x = x;
-  st.input.mouse_current.y = y;
-
-  // Info("prev x: %i", st.input.mouse_previous.x);
-
-  // Info("x = %f, y = %f", x, y);
-}
-
-void wl_mouse_button(void* data, struct wl_pointer* wl_pointer, uint32_t serial, uint32_t time, uint32_t button, uint32_t state) {
-  #define WL_LBUTTON 272
-  #define WL_RBUTTON 273
-  u32 my_button = mouse_buttoncode_translate(button);
-  st.input.mouse_current.buttons[my_button] = state;
-  // if (my_button == MouseButton_Left) {
-  //   Info("Left button was pressed");
-  // }
-  // if (my_button == MouseButton_Right) {
-  //   Info("Right button was pressed");
-  // }
-}
-
-internal void wl_seat_capabilities(void* data, wl_seat* seat, u32 capabilities) {
+intern void wl_seat_capabilities(void* data, wl_seat* seat, u32 capabilities) {
   if (capabilities & WL_SEAT_CAPABILITY_KEYBOARD) {
     st.wl_keyboard = wl_seat_get_keyboard(seat);
     local wl_keyboard_listener wl_keyboard_listener = {
       .keymap = [](void* data, wl_keyboard* keyboard, u32 format, i32 fd, u32 size){},
       .enter = [](void* data, wl_keyboard* keyboard, u32 serial, wl_surface* surface, wl_array* keys){},
       .leave = [](void* data, wl_keyboard* keyboard, u32 serial, wl_surface* surface){},
-      .key = wl_key,
+////////////////////////////////////////////////////////////////////////
+// Key handling
+      .key = [](void* data, wl_keyboard* keyboard, u32 serial, u32 time, u32 key, u32 state) {
+        u32 my_key = keycode_translate(key);
+        // Info("key '%c' %s", (char)my_key, state ? String("pressed") : String("released"));
+        st.input.keyboard_current.keys[my_key] = state;
+      },
       .modifiers = [](void* data, wl_keyboard* keyboard, u32 serial, u32 mods_depressed, u32 mods_latched, u32 mods_locked, u32 group){},
     };
     wl_keyboard_add_listener(st.wl_keyboard, &wl_keyboard_listener, data);
   }
+
   if (capabilities & WL_SEAT_CAPABILITY_POINTER) {
     st.wl_pointer = wl_seat_get_pointer(seat);
     local wl_pointer_listener pointer_listener = {
       .enter = [](void* data, struct wl_pointer* wl_pointer, uint32_t serial, struct wl_surface* surface, wl_fixed_t surface_x, wl_fixed_t surface_y){},
       .leave = [](void* data, struct wl_pointer* wl_pointer, uint32_t serial, struct wl_surface* surface){},
-      .motion = wl_pointer_motion,
-      .button = wl_mouse_button,
+////////////////////////////////////////////////////////////////////////
+// Mouse handling
+      .motion = [](void* data, wl_pointer* pointer, u32 time, wl_fixed_t sx, wl_fixed_t sy) {
+        f32 x = wl_fixed_to_double(sx);
+        f32 y = wl_fixed_to_double(sy);
+        st.input.mouse_current.x = x;
+        st.input.mouse_current.y = y;
+        // Info("x = %f, y = %f", x, y);
+      },
+      .button = [](void* data, struct wl_pointer* wl_pointer, uint32_t serial, uint32_t time, uint32_t button, uint32_t state) {
+        #define WL_LBUTTON 272
+        #define WL_RBUTTON 273
+        u32 my_button = mouse_buttoncode_translate(button);
+        st.input.mouse_current.buttons[my_button] = state;
+        // if (my_button == MouseButton_Left) {
+        //   Info("Left button was pressed");
+        // }
+        // if (my_button == MouseButton_Right) {
+        //   Info("Right button was pressed");
+        // }
+      },
     };
     wl_pointer_add_listener(st.wl_pointer, &pointer_listener, data);
   }
 }
 
-// internal void wl_draw() {
-//   wl_surface_attach(st.wl_surface, st.wl_buffer, 0, 0);
-//   wl_surface_damage(st.wl_surface, 0, 0, st.width, st.height);
-//   wl_surface_commit(st.wl_surface);
-// }
-
-// internal void wl_frame_new(void* data, wl_callback* callback, u32 a) {
-//   wl_callback_destroy(callback);
-//   callback = wl_surface_frame(st.wl_surface);
-//   wl_callback_add_listener(callback, &st.wl_callback_listener, null);
-//   wl_draw();
-// }
-
-internal void resize() {
-  // u64 size = st.stride * st.height;
-
-  // arena_clear(st.resize_arena);
-  // push_buffer(st.resize_arena, size);
-
-  // wl_shm_pool* pool = wl_shm_create_pool(st.wl_shm, st.fd, size + ARENA_HEADER_SIZE);
-  // st.wl_buffer = wl_shm_pool_create_buffer(pool, ARENA_HEADER_SIZE, st.width, st.height, st.stride, WL_SHM_FORMAT_ARGB8888);
-  // wl_shm_pool_destroy(pool);
+#if SOFTWARE_RENDERING
+intern void wl_draw() {
+  wl_surface_attach(st.wl_surface, st.wl_buffer, 0, 0);
+  wl_surface_damage(st.wl_surface, 0, 0, st.width, st.height);
+  wl_surface_commit(st.wl_surface);
 }
 
-internal void xdg_surface_configure(void* data, xdg_surface* xdg_surface, u32 serial) {
+intern void wl_frame_new(void* data, wl_callback* callback, u32 a) {
+  wl_callback_destroy(callback);
+  callback = wl_surface_frame(st.wl_surface);
+  wl_callback_add_listener(callback, &st.wl_callback_listener, null);
+  wl_draw();
+}
+
+intern void resize() {
+  u64 size = st.stride * st.height;
+  
+  arena_clear(st.wl_buffer_arena);
+  push_buffer(st.wl_buffer_arena, size);
+  
+  wl_shm_pool* pool = wl_shm_create_pool(st.wl_shm, st.fd, size + ARENA_HEADER_SIZE);
+  st.wl_buffer = wl_shm_pool_create_buffer(pool, ARENA_HEADER_SIZE, st.width, st.height, st.stride, WL_SHM_FORMAT_ARGB8888);
+  wl_shm_pool_destroy(pool);
+}
+#endif
+
+intern void xdg_surface_configure(void* data, xdg_surface* xdg_surface, u32 serial) {
   xdg_surface_ack_configure(xdg_surface, serial);
 
   if (!st.is_showned) {
     st.is_showned = true;
+#if SOFTWARE_RENDERING
     resize();
+#endif
   }
 
-  // wl_draw();
+#if SOFTWARE_RENDERING
+  wl_draw();
+#endif
 }
 
-internal void xdg_top_configure(void* data, xdg_toplevel* top, i32 width, i32 height, wl_array* stat) {
+intern void xdg_top_configure(void* data, xdg_toplevel* top, i32 width, i32 height, wl_array* stat) {
   if (!width || !height) {
     return;
   }
@@ -199,8 +197,10 @@ internal void xdg_top_configure(void* data, xdg_toplevel* top, i32 width, i32 he
   if (st.width != width || st.height != height) {
     st.width = width;
     st.height = height;
+#if SOFTWARE_RENDERING
     st.stride = st.width*st.channel;
     resize();
+#endif
     EventContext data = {
       .i32[0] = width,
       .i32[1] = height,
@@ -212,39 +212,50 @@ internal void xdg_top_configure(void* data, xdg_toplevel* top, i32 width, i32 he
 void os_gfx_init() {
   Scratch scratch;
 
-  // st.resize_arena = arena_shm_alloc(&st.fd);
-  // st.pixels = push_buffer(st.resize_arena, st.height*st.stride);
+#if SOFTWARE_RENDERING
+  st.wl_buffer_arena = arena_shm_alloc(&st.fd);
+  st.pixels = push_buffer(st.wl_buffer_arena, st.height*st.stride);
+#endif
 
-  st.wl_display = wl_display_connect(null);
-  st.wl_registry = wl_display_get_registry(st.wl_display);
-  local wl_registry_listener wl_registry_listener = {
-    .global = wl_registry_global_handler,
-  };
-  wl_registry_add_listener(st.wl_registry, &wl_registry_listener, null);
-  wl_display_roundtrip(st.wl_display);
+  {
+    st.wl_display = wl_display_connect(null);
+    st.wl_registry = wl_display_get_registry(st.wl_display);
+    local wl_registry_listener wl_registry_listener = {
+      .global = wl_registry_global_handler,
+    };
+    wl_registry_add_listener(st.wl_registry, &wl_registry_listener, null);
+    wl_display_roundtrip(st.wl_display);
+  }
 
   st.wl_surface = wl_compositor_create_surface(st.wl_compositor);
-  // wl_callback* callback = wl_surface_frame(st.wl_surface);
-  // st.wl_callback_listener = {
-  //   .done = wl_frame_new,
-  // };
-  // wl_callback_add_listener(callback, &st.wl_callback_listener, null);
+  {
+#if SOFTWARE_RENDERING
+    wl_callback* callback = wl_surface_frame(st.wl_surface);
+    st.wl_callback_listener = {
+      .done = wl_frame_new,
+    };
+    wl_callback_add_listener(callback, &st.wl_callback_listener, null);
+#endif
+  }
 
-  st.xdg_surface = xdg_wm_base_get_xdg_surface(st.xdg_wm_base, st.wl_surface);
-  local xdg_surface_listener xdg_surface_listener = {
-    .configure = xdg_surface_configure
-  };
-  xdg_surface_add_listener(st.xdg_surface, &xdg_surface_listener, null);
+  {
+    st.xdg_surface = xdg_wm_base_get_xdg_surface(st.xdg_wm_base, st.wl_surface);
+    local xdg_surface_listener xdg_surface_listener = {
+      .configure = xdg_surface_configure
+    };
+    xdg_surface_add_listener(st.xdg_surface, &xdg_surface_listener, null);
+  }
 
-  st.xdg_toplevel = xdg_surface_get_toplevel(st.xdg_surface);
-  local xdg_toplevel_listener xdg_toplevel_listener = {
-    .configure = xdg_top_configure,
-    .close = [](void* data, xdg_toplevel* top){ st.is_running = false; },
-  };
-  xdg_toplevel_add_listener(st.xdg_toplevel, &xdg_toplevel_listener, null);
+  {
+    st.xdg_toplevel = xdg_surface_get_toplevel(st.xdg_surface);
+    local xdg_toplevel_listener xdg_toplevel_listener = {
+      .configure = xdg_top_configure,
+      .close = [](void* data, xdg_toplevel* top){ st.is_running = false; },
+    };
+    xdg_toplevel_add_listener(st.xdg_toplevel, &xdg_toplevel_listener, null);
+  }
 
   xdg_toplevel_set_title(st.xdg_toplevel, "wayland client");
-
   wl_surface_commit(st.wl_surface);
 }
 
@@ -262,7 +273,14 @@ void os_gfx_shutdown() {
   wl_display_disconnect(st.wl_display);
 }
 
-void os_pump_messages()            { wl_display_dispatch(st.wl_display); }
+void os_pump_messages() { 
+#if SOFTWARE_RENDERING
+  wl_display_dispatch(st.wl_display); 
+#else
+  wl_display_dispatch_pending(st.wl_display); 
+#endif
+}
+
 b32 os_window_should_close()       { return st.is_running; }
 
 u8*  os_window_get_buffer()        { return st.pixels; }
@@ -294,7 +312,7 @@ b32 os_was_button_up(MouseButtons button)           { return st.input.mouse_prev
 b32 os_is_button_pressed(MouseButtons button)       { return os_is_button_down(button) && os_was_button_up(button); }
 b32 os_is_button_released(MouseButtons button)      { return os_is_button_up(button) && os_was_button_down(button); }
 
-internal u32 keycode_translate(u32 code) {
+intern u32 keycode_translate(u32 code) {
   switch (code) {
     // Control keys
     case KEY_BACKSPACE:   return Key_Backspace;
@@ -401,7 +419,7 @@ internal u32 keycode_translate(u32 code) {
   }
 }
 
-internal u32 mouse_buttoncode_translate(u32 code) {
+intern u32 mouse_buttoncode_translate(u32 code) {
   switch (code) {
     case WL_LBUTTON: return MouseButton_Left;
     case WL_RBUTTON: return MouseButton_Right;

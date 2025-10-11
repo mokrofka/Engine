@@ -17,9 +17,6 @@ typedef char  b8;
 typedef int   b32;
 
 typedef u64 DenseTime;
-typedef unsigned char uchar;
-typedef u64 PtrInt;
-typedef void VoidProc(void);
 
 #define null 0
 #define NoFlags 0
@@ -31,9 +28,9 @@ typedef void VoidProc(void);
     b = temp;      \
   }
 
-#define internal static
-#define global   static
-#define local    static
+#define intern static
+#define global static
+#define local  static
 
 #define KB(n)         (((u64)(n)) << 10)
 #define MB(n)         (((u64)(n)) << 20)
@@ -41,13 +38,26 @@ typedef void VoidProc(void);
 #define TB(n)         (((u64)(n)) << 40)
 #define Thousand(n)   ((n)*1000)
 #define Million(n)    ((n)*1000000)
-#define Billion(n)    ((n)*1000000000)
+#define Billion(n)    ((n)*1000000000ull)
 #define BytesToKB(x)  (x / 1024.0f)
 #define BytesToMB(x)  (BytesToKB(x) / 1024.0f)
 #define BytesToGB(x)  (BytesToMB(x) / 1024.0f)
 
+#define SecToMs(x)    (x * Thousand(1))
+#define SecToUs(x)    (x * Million(1))
+#define SecToNs(x)    (x * Billion(1))
+#define MsToSec(x)    (x / Thousand(1))
+#define MsToUs(x)     (x * Thousand(1))
+#define MsToNs(x)     (x * Million(1))
+#define UsToSec(x)    (x / Million(1))
+#define UsToMs(x)     (x / Thousand(1))
+#define UsToNs(x)     (x * Thousand(1))
+#define NsToSec(x)    (x / Billion(1))
+#define NsToMs(x)     (x / Million(1))
+#define NsToUs(x)     (x / Thousand(1))
+
 #define Member(T,m)                 (((T*)0)->m)
-#define OffsetOf(T,m)               PtrInt(&Member(T,m))
+#define OffsetOf(T,m)               (u64)(&Member(T,m))
 #define MemberFromOffset(T,ptr,off) (T)((((u8 *)ptr)+(off)))
 #define CastFromMember(T,m,ptr)     (T*)(((u8*)ptr) - OffsetOf(T,m))
 
@@ -57,6 +67,7 @@ typedef void VoidProc(void);
 #define MemZeroTyped(d,c)     MemZero((d),sizeof(*(d))*(c))
 
 #define MemCopyStruct(d, s)   MemCopy((d), (s), sizeof(*(d)))
+#define MemCopyArray(d, s)    MemCopy((d), (s), sizeof(x))
 #define MemCopyTyped(d, s, c) MemCopy((d), (s), sizeof(*(d)) * (c))
 
 #define MemMatchStruct(a,b)   MemMatch((a),(b),sizeof(*(a)))
@@ -74,7 +85,7 @@ typedef void VoidProc(void);
 #define PtrMatch(a, y)        ((u8*)(a) == (u8*)(y))
 
 #define Min(a,b)                      (((a)<(b))?(a):(b))
-#define Max(a,b)                      (((a)>(b))?(a):(b))
+#define Max(a,b)                      (((a)>=(b))?(a):(b))
 #define Max3(a,b,c)                   Max(Max(a, b), c)
 #define Min3(a,b,c)                   Min(Min(a, b), c)
 #define ClampTop(a,x)                 Min(a,x)
@@ -97,8 +108,6 @@ typedef void VoidProc(void);
 #define Glue(A,B)                     A##B
 #define Stringify(S)                  #S
 #define Loop(i, c)                    for (i32 i = 0; i < c; ++i)
-#define Likely(expr)                  Expect(expr,1)
-#define Unlikely(expr)                Expect(expr,0)
 #define IndexOf(type, mtype, member)  (OffsetOf(type, member) / sizeof(mtype))
 #define TrunctPow2(a, b)              ((u64)(a) & ((u64)(b) - 1))
 
@@ -111,10 +120,21 @@ typedef void VoidProc(void);
 #define FlagEquals(x, f)       ((x) == (f))
 #define FlagIntersects(x,f)    (((x) & (f)) > 0)
 
-#define U64_MAX 18446744073709551615ull
-#define U32_MAX 4294967295u
-#define U16_MAX 65535
-#define U8_MAX  255
+#define quick_sort(ptr, count, element_size, cmp_function) qsort((ptr), (count), (element_size), (int (*)(const void *, const void *))(cmp_function))
+
+#define CheckNil(nil,p) ((p) == 0 || (p) == nil)
+#define SetNil(nil,p) ((p) = nil)
+//- rjf: singly-linked, doubly-headed lists (queues)
+#define SLLQueuePush_NZ(nil,f,l,n,next) (CheckNil(nil,f) ?                                 \
+                                        ((f)=(l)=(n), SetNil(nil, (n)->next)) :            \
+                                        ((l)->next=(n), (l)=(n), SetNil(nil, (n)->next)))
+
+#define SLLQueuePush(f,l,n) SLLQueuePush_NZ(0,f,l,n,next)
+
+#define U8_MAX  0xFF
+#define U16_MAX 0xFFFF
+#define U32_MAX 0xFFFFFFFF
+#define U64_MAX 0xFFFFFFFFFFFFFFFF
 
 #define INVALID_ID     U32_MAX
 #define INVALID_ID_U16 U16_MAX
@@ -161,12 +181,33 @@ ImplDefer<F> MakeDefer(F f) {
   #define ARCH_ARM64 1
 #endif
 
-#define BUILD_DEBUG 1
+#if BUILD_DEBUG
+  #define DebugDo(...) __VA_ARGS__
+#else
+  #define DebugDo(...)
+#endif
+
+////////////////////////////////////////////////////////////////////////
+// Address Sanitizer
+
+#if ASAN_ENABLED
+  C_LINKAGE void __asan_poison_memory_region(void const volatile* addr, u64 size);
+  C_LINKAGE void __asan_unpoison_memory_region(void const volatile* addr, u64 size);
+  #define AsanPoisonMemRegion(addr, size)   __asan_poison_memory_region((addr), (size))
+  #define AsanUnpoisonMemRegion(addr, size) __asan_unpoison_memory_region((addr), (size))
+#else
+  #define AsanPoisonMemRegion(addr, size)   ((void)(addr), (void)(size))
+  #define AsanUnpoisonMemRegion(addr, size) ((void)(addr), (void)(size))
+#endif
 
 ////////////////////////////////////////////////////////////////////////
 // Compiler Specific
 
+#define Likely(expr)           Expect(expr,1)
+#define Unlikely(expr)         Expect(expr,0)
+
 #if COMPILER_MSVC
+  #define NO_DEBUG
   #define INLINE             __forceinline
   #define DebugBreak()       __debugbreak();
   #define Expect(expr, val)  (expr)
@@ -174,23 +215,35 @@ ImplDefer<F> MakeDefer(F f) {
   #include <memory.h>
   #define MemSet(d, byte, c)  memset((d), (byte), (c))
   #define MemCopy(d, s, c)    memcpy((d), (s), (c))
-  #define MemMatch(a, b, c)   memcmp((a), (b), (c))
+  #define MemMatch(a, b, c)  (memcmp((a), (b), (c)) == 0)
 
-#else
-  #define INLINE             __attribute__((nodebug)) inline __attribute__((always_inline))
+  #if __SANITIZE_ADDRESS__
+    #define ASAN_ENABLED 1
+    #define NO_ASAN __declspec(no_sanitize_address)
+  #else
+    #define NO_ASAN
+  #endif
+
+#elif COMPILER_CLANG
+  #define NO_DEBUG           __attribute__((nodebug))
+  #define INLINE             NO_DEBUG inline __attribute__((always_inline))
   #define DebugBreak()       __builtin_debugtrap()
   #define Expect(expr, val)  __builtin_expect((expr), (val))
 
   #define MemSet(d, byte, c)    __builtin_memset((d), (byte), (c))
   #define MemCopy(d, s, c)      __builtin_memcpy((d), (s), (c))
-  #define MemMatch(a, b, c)     __builtin_memcmp((a), (b), (c))
+  #define MemMatch(a, b, c)    (__builtin_memcmp((a), (b), (c)) == 0)
 
+  //ctz(0b00101000) = 3
+  //clz(0b00101000) = 2
   INLINE u32 count_bits_set32(u32 val) { return __builtin_popcount(val); }
   INLINE u32 count_bits_set64(u64 val) { return __builtin_popcountll(val); }
   INLINE u32 ctz32(u32 val)            { return __builtin_ctz(val); }
   INLINE u32 clz32(u32 val)            { return __builtin_clz(val); }
   INLINE u32 ctz64(u64 val)            { return __builtin_ctzll(val); }
   INLINE u32 clz64(u64 val)            { return __builtin_clzll(val); }
+
+  #define NO_ASAN __attribute__((no_sanitize("address")))
 
 #endif
 
@@ -200,10 +253,10 @@ ImplDefer<F> MakeDefer(F f) {
 #if OS_WINDOWS
   #if MONOLITHIC_BUILD
     #define KAPI
-    #define ExportAPI
+    #define shared_function
   #else
 
-    #define ExportAPI __declspec(dllexport)
+    #define shared_function C_LINKAGE __declspec(dllexport)
     #ifdef KEXPORT
       #define KAPI __declspec(dllexport)
     #else
@@ -215,10 +268,10 @@ ImplDefer<F> MakeDefer(F f) {
 #else
   #if MONOLITHIC_BUILD
     #define KAPI
-    #define ExportAPI
+    #define shared_function
   #else
 
-    #define ExportAPI __attribute__((visibility("default")))
+    #define shared_function C_LINKAGE __attribute__((visibility("default")))
     #ifdef KEXPORT
       #define KAPI __attribute__((visibility("default")))
     #else
@@ -229,4 +282,15 @@ ImplDefer<F> MakeDefer(F f) {
 
 #endif
 
-#define quick_sort(ptr, count, element_size, cmp_function) qsort((ptr), (count), (element_size), (int (*)(const void *, const void *))(cmp_function))
+////////////////////////////////////////////////////////////////////////
+// ARCH Specific
+
+#if ARCH_X64
+  #define ReadTimestampCounter() __rdtsc() 
+
+#else 
+  #define ReadTimestampCounter()
+
+#endif
+
+// #define SOFTWARE_RENDERING 1

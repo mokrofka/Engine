@@ -13,14 +13,22 @@ struct String {
   u8* str;
   u64 size;
   String() = default;
-  INLINE String(u8* str_, u64 size_) { str = str_; size = size_; }
-  INLINE String(const char* str_) : str((u8*)str_), size(cstr_length(str_)) {}
-  INLINE String(u8* str_) : str((u8*)str_), size(cstr_length(str_)) {}
+  INLINE String(u8* str_, u64 size_) {
+    str = str_; size = size_; 
+  }
+  INLINE String(const char* str_) { 
+    str = (u8*)str_;
+    size = cstr_length(str);
+  }
+  INLINE String(u8* str_){
+    str = (u8*)str_;
+    size = cstr_length(str_) ;
+  }
   INLINE operator bool() { return str; }
 };
 
 struct StringArray {
-  String *v;
+  String* v;
   u64 count;
 };
 
@@ -120,6 +128,11 @@ KAPI String push_str_cat(Arena* arena, String s1, String s2);
 KAPI String push_str_copy(Arena *arena, String s);
 KAPI String push_strfv(Arena* arena, String fmt, va_list argc);
 KAPI String push_strf(Arena* arena, String fmt, ...);
+
+////////////////////////////////////////////////////////////////////////
+// String List Construction Functions
+KAPI StringNode* str_list_push_node(StringList* list, StringNode* node);
+KAPI StringNode* str_list_push(Arena* arena, StringList* list, String string);
 
 ////////////////////////////////////////////////////////////////////////
 // String utils

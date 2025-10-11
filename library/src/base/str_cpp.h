@@ -2,7 +2,7 @@
 
 ////////////////////////////////////////////////////////////////////////
 
-internal u32 write_uint(u8* dest, u32 value) {
+intern u32 write_uint(u8* dest, u32 value) {
   u8 temp[10];
   u32 count = 0;
   do {
@@ -15,7 +15,7 @@ internal u32 write_uint(u8* dest, u32 value) {
   return count;
 }
 
-internal u32 write_int(u8* dest, i32 value) {
+intern u32 write_int(u8* dest, i32 value) {
   u32 count = 0;
   if (value < 0) {
     dest[count++] = '-';
@@ -24,7 +24,7 @@ internal u32 write_int(u8* dest, i32 value) {
   return count + write_uint(dest + count, value);
 }
 
-internal u32 write_float(u8* dest, f32 value, u32 precision) {
+intern u32 write_float(u8* dest, f32 value, u32 precision) {
   // Handle special cases
   if (value != value) { // NaN check
     const char* nan_str = "NaN";
@@ -63,7 +63,7 @@ internal u32 write_float(u8* dest, f32 value, u32 precision) {
   return len;
 }
 
-internal u32 write_string(u8* dest, String val) {
+intern u32 write_string(u8* dest, String val) {
   u32 len = 0;
   Loop (i, val.size) {
     dest[len++] = val.str[i]; // Copy each character from the String to the buffer
@@ -71,7 +71,7 @@ internal u32 write_string(u8* dest, String val) {
   return len;  // Return the number of characters written
 }
 
-internal u32 uint_length(u32 value) {
+intern u32 uint_length(u32 value) {
   u32 count = 0;
   do {
     ++count;
@@ -80,7 +80,7 @@ internal u32 uint_length(u32 value) {
   return count;
 }
 
-internal u32 int_length(i32 value) {
+intern u32 int_length(i32 value) {
   u32 count = 0;
   if (value < 0) {
     ++count;
@@ -357,6 +357,29 @@ String push_strf(Arena* arena, String fmt, ...) {
 }
 
 ////////////////////////////////////////////////////////////////////////
+// String List Construction Functions
+StringNode* str_list_push_node(StringList* list, StringNode* node) {
+  SLLQueuePush(list->first, list->last, node);
+  list->node_count += 1;
+  list->total_size += node->string.size;
+  return node;
+}
+
+StringNode* str_list_push_node_set_string(StringList* list, StringNode* node, String string) {
+  SLLQueuePush(list->first, list->last, node);
+  list->node_count += 1;
+  list->total_size += string.size;
+  node->string = string;
+  return node;
+}
+
+StringNode* str_list_push(Arena* arena, StringList* list, String string) {
+  StringNode* node = push_struct(arena, StringNode);
+  str_list_push_node_set_string(list, node, string);
+  return node;
+}
+
+////////////////////////////////////////////////////////////////////////
 // String utils
 
 void str_copy(String64& dest, String str) {
@@ -533,38 +556,50 @@ String str_chop_after_last_slash(String string){
   return string;
 }
 
+// one/two/three -> two/three
+String str_skip_slash(String string) {
+  u8* ptr = string.str + string.size - 1;
+  for (; ptr >= string.str; --ptr) {
+    if (*ptr == '/' || *ptr == '\\') {
+      break;
+    }
+  }
+  if (ptr >= string.str) {
+    string.size = (u32)(ptr - string.str);
+  } else {
+    string.size = 0;
+  }
+  return string;
+}
+
 // one/two/three -> one/two
 String str_chop_last_slash(String string) {
-  if (string.size > 0) {
-    u8* ptr = string.str + string.size - 1;
-    for (; ptr >= string.str; --ptr) {
-      if (*ptr == '/' || *ptr == '\\') {
-        break;
-      }
+  u8* ptr = string.str + string.size - 1;
+  for (; ptr >= string.str; --ptr) {
+    if (*ptr == '/' || *ptr == '\\') {
+      break;
     }
-    if (ptr >= string.str) {
-      string.size = (u32)(ptr - string.str);
-    } else {
-      string.size = 0;
-    }
+  }
+  if (ptr >= string.str) {
+    string.size = (u32)(ptr - string.str);
+  } else {
+    string.size = 0;
   }
   return string;
 }
 
 // one/two/three -> three
 String str_skip_last_slash(String string) {
-  if (string.size > 0) {
-    u8* ptr = string.str + string.size - 1;
-    for (; ptr >= string.str; --ptr) {
-      if (*ptr == '/' || *ptr == '\\') {
-        break;
-      }
+  u8* ptr = string.str + string.size - 1;
+  for (; ptr >= string.str; --ptr) {
+    if (*ptr == '/' || *ptr == '\\') {
+      break;
     }
-    if (ptr >= string.str) {
-      ptr += 1;
-      string.size = (u32)(string.str + string.size - ptr);
-      string.str = ptr;
-    }
+  }
+  if (ptr >= string.str) {
+    ptr += 1;
+    string.size = (u32)(string.str + string.size - ptr);
+    string.str = ptr;
   }
   return string;
 }

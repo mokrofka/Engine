@@ -96,18 +96,6 @@ struct Texture {
   u8* data;
 };
 
-struct Geometry {
-  u32 id;
-  String name;
-  
-  u32 vertex_count;
-  u32 vertex_size;
-  void* vertices;
-  u32 index_size;
-  u32 index_count;
-  void* indices;
-};
-
 enum ShaderTopology {
   ShaderTopology_Triangle,
   ShaderTopology_Line,
@@ -129,3 +117,18 @@ struct Shader {
   b8 is_transparent;
   u8 attribut[10];
 };
+
+#define VertexAttributeCount 3
+struct Vertex {
+  v3 pos;
+  v3 norm;
+  v2 texcoord;
+};
+
+struct Mesh {
+  Vertex* vertices;
+  u32* indexes;
+  u32 vert_count;
+  u32 index_count;
+};
+

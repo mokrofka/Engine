@@ -1,5 +1,7 @@
 
 #define KB(n) ((n) << 10)
+#define v2 vec2
+#define v3 vec3
 
 struct Entity {
   vec3 color;

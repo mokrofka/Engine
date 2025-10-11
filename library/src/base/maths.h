@@ -100,6 +100,7 @@ union RectI {
   INLINE f32 Tan(f32 a)                 { return tanf(a); }
   INLINE f32 Asin(f32 a)                { return asinf(a); }
   INLINE f32 Acos(f32 a)                { return acosf(a); }
+  INLINE f32 Atan2(f32 y, f32 x)        { return atan2f(y,x); }
   INLINE f32 Sqrt(f32 a)                { return sqrtf(a); }
   INLINE f32 Pow(f32 a, f32 b)          { return powf(a, b); }
   INLINE f32 Floor(f32 a)               { return floorf(a); }
@@ -116,6 +117,7 @@ union RectI {
   INLINE f32 Tan(f32 a)                 { return __builtin_tanf(a); }
   INLINE f32 Asin(f32 a)                { return __builtin_asinf(a); }
   INLINE f32 Acos(f32 a)                { return __builtin_acosf(a); }
+  INLINE f32 Atan2(f32 y, f32 x)        { return __builtin_atan2f(y,x); }
   INLINE f32 Sqrt(f32 a)                { return __builtin_sqrtf(a); }
   INLINE f32 Pow(f32 a, f32 b)          { return __builtin_powf(a, b); }
   INLINE f32 Floor(f32 a)               { return __builtin_floorf(a); }
@@ -131,6 +133,26 @@ union RectI {
 INLINE f32 SinD(f32 a)                { return Sin(deg_to_rad(a)); }
 INLINE f32 CosD(f32 a)                { return Cos(deg_to_rad(a)); }
 INLINE f32 Lerp(f32 a, f32 t, f32 b)  { return (1 - t)*a + t*b; }
+INLINE f32 Atan2_360(f32 y, f32 x)    { return Atan2(-y, -x) + PI; }
+
+inline u32 next_pow2(u32 v) {
+  v--;
+  v |= v >> 1;
+  v |= v >> 2;
+  v |= v >> 4;
+  v |= v >> 8;
+  v |= v >> 16;
+  v++;
+  return v;
+}
+inline u32 prev_pow2(u32 n) {
+	n |= n >> 1;
+	n |= n >> 2;
+	n |= n >> 4;
+	n |= n >> 8;
+	n |= n >> 16;
+	return n - (n >> 1);
+}
 
 ////////////////////////////////////////////////////////////////////////
 // Color
@@ -200,9 +222,9 @@ inline u64 hash(String str) {
 
 KAPI extern u32 _seed;
 INLINE u32 rand_u32()                        { return xorshift32(&_seed); }
-INLINE u32 rand_range_u32(u32 min, u32 max)  { return (xorshift32(&_seed) % (max - min + 1)) + min; }
-INLINE i32 rand_i32()                        { return xorshift32(&_seed); }
-INLINE i32 rand_range_i32(i32 min, i32 max)  { return (i32)(xorshift32(&_seed) % (u32)(max - min + 1)) + min; }
+INLINE u32 rand_range_u32(u32 min, u32 max)  { return (rand_u32() % (max - min + 1)) + min; }
+INLINE i32 rand_i32()                        { return rand_u32(); }
+INLINE i32 rand_range_i32(i32 min, i32 max)  { return (i32)(rand_u32() % (u32)(max - min + 1)) + min; }
 INLINE f32 rand_f32_01()                     { return rand_u32() / (f32)U32_MAX; }
 INLINE f32 rand_f32_11()                     { return rand_f32_01() * 2.f - 1.f; }
 INLINE f32 rand_f32()                        { return rand_f32_01() * 2 * U16_MAX - U16_MAX; }
@@ -238,11 +260,24 @@ INLINE v2  operator-(v2 a)                { return v2(-a.x, -a.y); }
 
 INLINE f32 v2_length_squared(v2 a)    { return Sqr(a.x) + Sqr(a.y); }
 INLINE f32 v2_length(v2 a)            { return Sqrt(v2_length_squared(a)); }
-INLINE v2  v2_normalize(v2 a)         { return a * (1.0f/v2_length(a)); }
+INLINE v2  v2_norm(v2 a)              { return a * (1.0f/v2_length(a)); }
 INLINE f32 v2_distance(v2 a, v2 b)    { return v2_length(v2(a.x - b.x, a.y - b.y)); }
 INLINE f32 v2_dot(v2 a, v2 b)         { return a.x*b.x + a.y*b.y; }
-INLINE f32 v2_cross(v2 a, v2 b)       { return a.x*b.y - a.y*b.x; }
+INLINE f32 v2_cross(v2 a, v2 b)       { return a.x*b.y - a.y*b.x; } // if > 0 (b is to the left of a), if < 0 (b is to the right of a), if == 0 (collinear)
 INLINE v2  v2_lerp(v2 a, f32 t, v2 b) { return v2(Lerp(a.x, t, b.x), Lerp(a.y, t, b.y));}
+INLINE v2  v2_skew(v2 a)              { return v2(-a.y, a.x); }
+inline f32 v2_shortest_arc(v2 a, v2 b) {
+	a = v2_norm(a);
+	b = v2_norm(b);
+	f32 c = v2_dot(a, b);
+	f32 s = v2_cross(a, b);
+	f32 theta = Acos(c);
+	if (s > 0) {
+		return theta;
+	} else {
+		return -theta;
+	}
+}
 
 ////////////////////////////////////////////////////////////////////////
 // Vector3
@@ -419,8 +454,8 @@ inline mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 Near, f32 Fa
   mat4 result = {
     1/(Tan(fov_radians/2.0f)*aspect_ratio), 0,                       0,                           0,
     0,                                      1/Tan(fov_radians/2.0f), 0,                           0,
-    0,                                      0,                     -(Far + Near)/(Far - Near),   -1, // Flip sign
-    0,                                      0,                     (-2.0f*Far*Near)/(Far - Near), 0  // Flip sign
+    0,                                      0,                     -(Far + Near)/(Far - Near),   -1, // Fliped sign
+    0,                                      0,                     (-2.0f*Far*Near)/(Far - Near), 0  // Fliped sign
   };
   return result;
 }

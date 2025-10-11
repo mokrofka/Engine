@@ -8,7 +8,10 @@
       "program": "${workspaceFolder}/bin/app",
       "args": [],
       "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal"
+      "console": "integratedTerminal",
+      "initCommands": [
+        "settings set target.x86-disassembly-flavor intel"
+      ]
     }
   ]
 }

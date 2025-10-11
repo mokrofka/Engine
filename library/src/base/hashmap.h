@@ -1,8 +1,7 @@
 #pragma once
 #include "defines.h"
-#include "str.h"
-#include "logger.h"
 #include "maths.h"
+#include "array.h"
 
 enum SlotState {
   MapSlot_Empty,
@@ -14,22 +13,11 @@ template<typename Key, typename T>
 struct Map {
   static constexpr f32 LF = 0.7;
 
-  Arena* arena;
   u32 count;
   u32 cap;
   T* data;
   Key* keys;
   u8* is_ocuppied;
-
-  Map(Arena* arena_, u32 cap_ = 8) {
-    arena = arena_;
-    count = 0;
-    cap = cap_;
-    data = push_array(arena, T, cap);
-    keys = push_array(arena, Key, cap);
-    is_ocuppied = push_array(arena, u8, cap);
-    MemSet(is_ocuppied, MapSlot_Empty, cap);
-  }
 
   void insert(Key key, T val) {
     if (count > cap*LF) { grow(); }
@@ -69,6 +57,16 @@ struct Map {
     }
   }
 
+  Map(Arena* arena_, u32 cap_ = 8) {
+    // arena = arena_;
+    // count = 0;
+    // cap = cap_;
+    // data = push_array(arena, T, cap);
+    // keys = push_array(arena, Key, cap);
+    // is_ocuppied = push_array(arena, u8, cap);
+    // MemSet(is_ocuppied, MapSlot_Empty, cap);
+  }
+
   void grow() {
     u64 old_cap = cap;
     T* old_data = data;
@@ -76,9 +74,9 @@ struct Map {
     u8* old_occupied = is_ocuppied;
     count = 0;
     cap *= 2;
-    data = push_array(arena, T, cap);
-    keys = push_array(arena, Key, cap);
-    is_ocuppied = push_array(arena, u8, cap);
+    // data = push_array(arena, T, cap);
+    // keys = push_array(arena, Key, cap);
+    // is_ocuppied = push_array(arena, u8, cap);
     MemSet(is_ocuppied, MapSlot_Empty, cap);
     Loop (i, old_cap) {
       if (old_occupied[i] == MapSlot_Occupied) {
@@ -99,3 +97,5 @@ struct Map {
   }
 
 };
+
+

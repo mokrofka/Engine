@@ -4,7 +4,8 @@
     {
       "label": "Run My Batch File",
       "type": "process",
-      "command": "${workspaceFolder}\\shader_compiler.exe",
+      "command": "${workspaceFolder}/bin/shader_compiler",
+      "args": ["../assets/shaders", "../assets/shaders/compiled"],
       "group": {
         "kind": "build",
         "isDefault": true
