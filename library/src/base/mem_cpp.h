@@ -5,10 +5,9 @@
 
 struct SegPool {
   u8* data;
-	u64 chunk_count;
-	u64 chunk_size;
-  u64 chunk_count_used;
-
+	u32 cap;
+  u32 count;
+	u32 chunk_size;
   PoolFreeNode* head;
 };
 
@@ -22,35 +21,45 @@ global MemCtx mem_ctx;
 #define MIN_CHUNKS_PER_COMMIT 32
 #define POOL_STEP GB(10)
 
-intern void pool_commit(SegPool& p, u64 commit_size) {
-  u8* end_pool = Offset(p.data, p.chunk_count*p.chunk_size);
-  os_commit(end_pool, commit_size);
-}
+#define MEM_POOL_BATCH 16
 
-intern void pool_init_new_chunk(SegPool& p, u64 chunks_add) {
-  Loop (i, chunks_add) {
-    u8* chunk = Offset(p.data, (p.chunk_count + i)*p.chunk_size);
-    PoolFreeNode* node; Assign(node, chunk);
-    node->next = p.head;
-    p.head = node;
-	}
+void global_allocator_init() {
+  mem_ctx.data = os_reserve(TB(1));
+  u64 offset = 0;
+  
+  u64 pow_num = 1;
+  Loop (i, ArrayCount(mem_ctx.pools)) {
+    mem_ctx.pools[i].data = Offset(mem_ctx.data, offset);
+    mem_ctx.pools[i].chunk_size = 8 * pow_num;
+    pow_num *= 2;
+    offset += POOL_STEP;
+  };
 }
 
 intern u8* segregated_pool_alloc(SegPool& p) {
-  u64 commit_size = 0;
   if (p.head == null) {
-    Assert(p.chunk_count_used + 1 > p.chunk_count);
-    if (p.chunk_size > MB(1)) {
+    Assert(p.count+1 > p.cap);
+
+    u32 commit_size;
+    if (p.chunk_size > MB(1)) 
       commit_size = p.chunk_size;
-    } else {
-      commit_size = Clamp(PAGE_SIZE, p.chunk_size*MIN_CHUNKS_PER_COMMIT, MB(1));
+    else 
+      commit_size = Clamp(PAGE_SIZE, p.chunk_size * MIN_CHUNKS_PER_COMMIT, MB(1));
+
+    u8* end_of_pool = Offset(p.data, p.cap*p.chunk_size);
+    os_commit(end_of_pool, commit_size);
+
+    u32 chunks_add = u32DivPow2(commit_size, p.chunk_size);
+    for (i32 i = p.cap; i < p.cap + chunks_add; ++i) {
+      u8* chunk =  Offset(p.data, i*p.chunk_size);
+      PoolFreeNode* node; Assign(node, chunk);
+      node->next = p.head;
+      p.head = node;
     }
-    u64 chunks_add = commit_size / p.chunk_size;
-    pool_commit(p, commit_size);
-    pool_init_new_chunk(p, chunks_add);
-    p.chunk_count += chunks_add;
+
+    p.cap += chunks_add;
   }
-  ++p.chunk_count_used;
+  ++p.count;
   
   u8* result; Assign(result, p.head);
   p.head = p.head->next;
@@ -61,40 +70,25 @@ intern void segregated_pool_free(SegPool& p, void* ptr) {
 	PoolFreeNode* node; Assign(node, ptr);
 	node->next = p.head;
 	p.head = node;
-  --p.chunk_count_used;
+  --p.count;
 }
 
 u8* mem_alloc(u64 size) {
   Assert(size > 0);
-  u8* result = 0;
+  u64 pow2 = next_pow2(size);
   u64 base_size = 8;
+  u64 exp = ctz64(pow2) - ctz64(base_size);
 
-  Loop (i, ArrayCount(mem_ctx.pools)) {
-    if (size <= base_size << i) {
-      result = segregated_pool_alloc(mem_ctx.pools[i]);
-      FillAlloc(result, size);
-      break;
-    }
-  }
+  u8* result = segregated_pool_alloc(mem_ctx.pools[exp]);
+  FillAlloc(result, size);
 
   Assert(result);
   return result;
 }
 
 u8* mem_alloc_zero(u64 size) {
-  Assert(size > 0);
-  u8* result = 0;
-  u64 base_size = 8;
-
-  Loop (i, ArrayCount(mem_ctx.pools)) {
-    if (size <= base_size << i) {
-      result = segregated_pool_alloc(mem_ctx.pools[i]);
-      MemZero(result, size);
-      break;
-    }
-  }
-
-  Assert(result);
+  u8* result = mem_alloc(size);
+  MemZero(result, size);
   return result;
 }
 
@@ -108,7 +102,7 @@ void mem_free(void* ptr) {
 
     u64 base_size = 8;
     base_size <<= i;
-    if ((u8*)ptr >= start && (u8*)ptr < end) {
+    if (IsBetween(start, ptr, end)) {
       FillDealoc(ptr, base_size);
       segregated_pool_free(mem_ctx.pools[i], ptr);
       return;
@@ -130,7 +124,7 @@ u8* mem_realloc(void* ptr, u64 size) {
     
     u64 base_size = 8;
     base_size <<= i;
-    if ((u8*)ptr >= start && (u8*)ptr < end) {
+    if (IsBetween(start, ptr, end)) {
       result = mem_alloc(size);
       MemCopy(result, ptr, base_size);
       FillDealoc(ptr, base_size);
@@ -168,19 +162,6 @@ u8* mem_realloc_zero(void* ptr, u64 size) {
   return result;
 }
 
-void global_allocator_init() {
-  mem_ctx.data = os_reserve(TB(1));
-  u64 offset = 0;
-  
-  u64 pow_num = 1;
-  Loop (i, ArrayCount(mem_ctx.pools)) {
-    mem_ctx.pools[i].data = Offset(mem_ctx.data, offset);
-    mem_ctx.pools[i].chunk_size = 8 * pow_num;
-    pow_num *= 2;
-    offset += POOL_STEP;
-  };
-}
-
 ////////////////////////////////////////////////////////////////////////
 // Arena
 
@@ -205,16 +186,12 @@ void* _arena_push(Arena* arena, u64 size, u64 align) {
   size = AlignUp(size, align);
 
   if (arena->pos + size + ARENA_HEADER_SIZE > arena->cmt) {
-    u64 commit_size = size;
-    
-    commit_size += ARENA_DEFAULT_COMMIT_SIZE - 1;
-    commit_size -= commit_size % ARENA_DEFAULT_COMMIT_SIZE;
+    u64 commit_size = AlignUp(size, ARENA_DEFAULT_COMMIT_SIZE);
     
     Assert((arena->pos + commit_size + ARENA_HEADER_SIZE) <= arena->res && "Arena is out of memory");
 
-    if (os_commit(Offset(arena, arena->cmt), commit_size)) {
-      Assert(0);
-    }
+    b32 err = os_commit(Offset(arena, arena->cmt), commit_size);
+    Assert(err == 0);
     arena->cmt += commit_size;
   }
 
@@ -247,9 +224,9 @@ void arena_release(Arena* arena) {
 
 ////////////////////////////////////////////////////////////////////////
 // Pool
-#ifdef GUARD_MEMORY
+#if GUARD_MEMORY
 
-MemPool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignment) {
+MemPool pool_create(Arena* arena, u64 chunk_size, u64 chunk_alignment) {
   chunk_size = AlignUp(chunk_size, chunk_alignment);
   u64 stride = chunk_size + chunk_alignment;
   u8* data = push_buffer(arena, chunk_count*stride, chunk_alignment);
@@ -305,49 +282,72 @@ void pool_free_all(MemPool& p) {
 
 #else
 
-Pool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignment) {
-  Assert(chunk_size >= sizeof(PoolFreeNode) && "Chunk size is too small");
+intern void pool_grow(MemPool& p) {
+  u64 old_cap = p.cap;
+  u64 old_size = p.chunk_size * p.cap;
+  u64 new_cap = old_cap * DEFAULT_RESIZE_FACTOR;
+  u64 new_size = new_cap * p.chunk_size;
 
+  u8* new_data = push_buffer(p.arena, new_size);
+  MemCopy(new_data, p.data, old_size);
+  p.data = new_data;
+
+  for (i32 i = old_cap; i < new_cap; ++i) {
+    u8* chunk =  Offset(p.data, i*p.chunk_size);
+    PoolFreeNode* node; Assign(node, chunk);
+    node->next = p.head;
+    p.head = node;
+  }
+  p.cap = new_cap;
+}
+
+void mem_pool_free_all(MemPool& p) {
+  FillDealoc(p.data, p.cap*p.chunk_size);
+  p.head = null;
+  Loop (i, p.cap) {
+    u8* chunk = Offset(p.data, i*p.chunk_size);
+    PoolFreeNode* node; Assign(node, chunk);
+    node->next = p.head;
+    p.head = node;
+	}
+  p.count = 0;
+}
+
+MemPool mem_pool_create(Arena* arena, u64 chunk_size, u64 chunk_alignment) {
   chunk_size = AlignUp(chunk_size, chunk_alignment);
-  u64 size = chunk_count* chunk_size;
-  u8* data = push_buffer(arena, size, chunk_alignment);
+  u8* data = push_buffer(arena, chunk_size*DEFAULT_CAPACITY, chunk_alignment);
 
-  Pool result {
+  MemPool result {
+    .arena = arena,
     .data = data,
-    .chunk_count = chunk_count,
+    .cap = DEFAULT_CAPACITY,
     .chunk_size = chunk_size,
-    .head = null,
   };
 
-  pool_free_all(result);
+  mem_pool_free_all(result);
   return result;
 }
 
-u8* pool_alloc(Pool& p) {
-  PoolFreeNode* result = p.head;
-  Assert(result && "Pool allocator has no free memory");
+u8* mem_pool_alloc(MemPool& p) {
+  if (p.head == null) {
+    pool_grow(p);
+  }
 
+  PoolFreeNode* result = p.head;
   p.head = p.head->next;
+  ++p.count;
 
   FillAlloc(result, p.chunk_size);
   return (u8*)result;
 }
 
-void pool_free(Pool& p, void* ptr) {
+void mem_pool_free(MemPool& p, void* ptr) {
   FillDealoc(ptr, p.chunk_size);
 
   PoolFreeNode* node; Assign(node, ptr);
 	node->next = p.head;
 	p.head = node;
-}
-
-void pool_free_all(Pool& p) {
-  FillDealoc(p.data, p.chunk_count*p.chunk_size);
-  Loop (i, p.chunk_count) {
-		PoolFreeNode *node; Assign(node, p.data + i*p.chunk_size);
-		node->next = p.head;
-		p.head = node;
-	}
+  --p.count;
 }
 
 #endif

@@ -7,7 +7,7 @@
 #define DEALLOC_GUARD        0xDE
 #define PAGE_SIZE            4096
 
-#define GUARD_MEMORY 1
+#define GUARD_MEMORY 0
 
 #if GUARD_MEMORY
   #define FillAlloc(ptr, size)  MemSet(ptr, ALLOC_GUARD, size)
@@ -79,25 +79,23 @@ KAPI void arena_release(Arena* arena);
 // Pool
 
 struct PoolFreeNode {
-	PoolFreeNode *next;
+  PoolFreeNode* next;
 };
 
 struct MemPool {
+  Arena* arena;
   u8* data;
-	u64 chunk_count;
+  u64 cap;
+	u64 count;
 	u64 chunk_size;
-
 	PoolFreeNode *head;
-
-#ifdef GUARD_MEMORY
-  u64 guard_size;
-#endif
+  IfDo(GUARD_MEMORY, u64 guard_size);
 };
 
-KAPI u8* pool_alloc(MemPool& p);
-KAPI MemPool pool_create(Arena* arena, u64 chunk_count, u64 chunk_size, u64 chunk_alignment = DEFAULT_ALIGNMENT);
-KAPI void pool_free(MemPool& p, void* ptr);
-KAPI void pool_free_all(MemPool& pool);
+KAPI void mem_pool_free_all(MemPool& pool);
+KAPI MemPool mem_pool_create(Arena* arena, u64 chunk_size, u64 chunk_alignment = DEFAULT_ALIGNMENT);
+KAPI u8* mem_pool_alloc(MemPool& p);
+KAPI void mem_pool_free(MemPool& p, void* ptr);
 
 template<typename T>
 struct ObjectPool {

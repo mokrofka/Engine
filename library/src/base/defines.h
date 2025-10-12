@@ -83,6 +83,7 @@ typedef u64 DenseTime;
 #define OffsetBack(x, a)      (u8*)(x) - (a)
 #define MemDiff(from, to)     (u8*)(from) - (u8*)(to)
 #define PtrMatch(a, y)        ((u8*)(a) == (u8*)(y))
+#define AlignUpTo(x, a)       (((x) + ((a) - 1)) - (((x) + ((a) - 1)) % (a)))
 
 #define Min(a,b)                      (((a)<(b))?(a):(b))
 #define Max(a,b)                      (((a)>=(b))?(a):(b))
@@ -110,6 +111,8 @@ typedef u64 DenseTime;
 #define Loop(i, c)                    for (i32 i = 0; i < c; ++i)
 #define IndexOf(type, mtype, member)  (OffsetOf(type, member) / sizeof(mtype))
 #define TrunctPow2(a, b)              ((u64)(a) & ((u64)(b) - 1))
+#define u32DivPow2(a, b)              a >> ctz32(b)
+#define u64DivPow2(a, b)              a >> ctz64(b)
 
 #define Bit(x)                 (1 << (x))
 #define HasBit(x, pos)         ((x) & (1 << (pos)))
@@ -186,6 +189,17 @@ ImplDefer<F> MakeDefer(F f) {
 #else
   #define DebugDo(...)
 #endif
+
+#define IfDo(flag, ...)  _IfDo(flag, __VA_ARGS__)
+#define _IfDo(flag, ...)  IfDo_##flag(__VA_ARGS__)
+
+#define IfDo_1(code) code
+#define IfDo_0(code)
+
+// #define IfDo(prep, code) \
+// #if prep \
+// code \
+// #endif
 
 ////////////////////////////////////////////////////////////////////////
 // Address Sanitizer
