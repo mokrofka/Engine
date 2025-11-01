@@ -1,0 +1,47 @@
+#pragma once
+#include "lib.h"
+#include "r_types.h"
+
+u32 vk_mesh_load(Mesh mesh);
+
+void vk_init();
+void vk_shutdown();
+
+void vk_begin_frame();
+void vk_end_frame();
+void vk_begin_renderpass(u32 renderpass_id);
+void vk_end_renderpass(u32 renderpass_id);
+
+KAPI u32 vk_shader_load(String name);
+KAPI void vk_texture_load(Texture t);
+
+void vk_draw();
+void vk_draw_compute();
+
+// Entity
+KAPI u32 vk_make_renderable(u32 mesh_id, u32 shader_id);
+KAPI void vk_remove_renderable(u32 entity_id);
+KAPI ShaderEntity& vk_shader_get_entity(u32 entity_id);
+
+// Point light
+KAPI void vk_point_light_create(u32 entity_id);
+KAPI void vk_point_light_remoove(u32 entity_id);
+KAPI PointLight& vk_get_point_light_shader(u32 entity_id);
+
+// Directional light
+KAPI void vk_dir_light_make(u32 entity_id);
+KAPI void vk_dir_light_remove(u32 entity_id);
+KAPI DirLight& vk_dir_light_get(u32 entity_id);
+
+// Spot light
+KAPI void vk_spot_light_create(u32 entity_id);
+KAPI void vk_spot_light_destroy(u32 entity_id);
+KAPI SpotLight& vk_spot_light_get(u32 entity_id);
+
+// Util
+KAPI PushConstant& vk_push_constant_get(u32 id);
+KAPI ShaderGlobalState* vk_get_global_state();
+KAPI void vk_shader_reload(String name, u32 id);
+
+void vk_draw_screen();
+

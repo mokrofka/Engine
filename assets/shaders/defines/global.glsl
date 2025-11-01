@@ -1,49 +1,56 @@
 
 #define KB(n) ((n) << 10)
+
+#define i32 int
+#define u32 uint
+
+#define f32 float
+
 #define v2 vec2
 #define v3 vec3
+#define v4 vec4
 
 struct Entity {
-  vec3 color;
-  // vec3 ambient;
-  // vec3 diffuse;
-  // vec3 specular;
-  // float shininess;
+  v3 color;
+  // v3 ambient;
+  // v3 diffuse;
+  // v3 specular;
+  // f32 shininess;
 };
 
 struct PointLight {
-  vec3 color;
-  vec3 pos;
-  float intensity;
-  float rad;
+  v3 color;
+  v3 pos;
+  f32 intensity;
+  f32 rad;
 };
 
 struct DirLight {
-  vec3 color;
-  vec3 direction;
-  float intensity;
+  v3 color;
+  v3 direction;
+  f32 intensity;
 };
 
 struct SpotLight {
-  vec3 color;
-  vec3 pos;
-  vec3 direction;
-  float intensity;
-  float inner_cutoff; // Cosine of inner cone angle
-  float outer_cutoff; // Cosine of outer cone angle
+  v3 color;
+  v3 pos;
+  v3 direction;
+  f32 intensity;
+  f32 inner_cutoff; // Cosine of inner cone angle
+  f32 outer_cutoff; // Cosine of outer cone angle
 };
 
 // Global state
 layout(std430, set = 0, binding = 0) readonly buffer Buffer {
   mat4 projection_view;
   mat4 view;
-  vec4 ambient_color;
-  float time;
-  uint point_light_count;
-  uint dir_light_count;
-  uint spot_light_count;
+  v4 ambient_color;
+  f32 time;
+  u32 point_light_count;
+  u32 dir_light_count;
+  u32 spot_light_count;
 
-  Entity entities[KB(20)];
+  Entity entities[KB(1)];
 
   PointLight point_lights[KB(1)];
   DirLight dir_lights[KB(1)];
@@ -53,11 +60,11 @@ layout(std430, set = 0, binding = 0) readonly buffer Buffer {
 
 layout(push_constant) uniform PushConstants {
   mat4 u_model;
-  uint u_entity_id;
+  u32 u_entity_id;
 };
 
-vec3 norm;
-vec3 frag_pos;
-vec3 view_dir;
+v3 norm;
+v3 frag_pos;
+v3 view_dir;
 Entity e;
 

@@ -5,7 +5,7 @@
       "name": "Debugging",
       "type": "lldb",
       "request": "launch",
-      "program": "${workspaceFolder}/bin/app",
+      "program": "${workspaceFolder}/bin/exe",
       "args": [],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
