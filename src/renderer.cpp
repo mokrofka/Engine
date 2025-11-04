@@ -2,7 +2,6 @@
 
 #include "asset_watch.h"
 
-#include "entity.h"
 #include "ui.h"
 
 struct RendererSystemState {
@@ -32,7 +31,9 @@ void r_begin_draw_frame() {
 }
 
 void r_end_draw_frame() {
-  vk_begin_frame();
+  if (!vk_begin_frame()) {
+    return;
+  }
 
   // World
   {

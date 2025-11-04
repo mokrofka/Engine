@@ -7,7 +7,7 @@ u32 vk_mesh_load(Mesh mesh);
 void vk_init();
 void vk_shutdown();
 
-void vk_begin_frame();
+b32 vk_begin_frame();
 void vk_end_frame();
 void vk_begin_renderpass(u32 renderpass_id);
 void vk_end_renderpass(u32 renderpass_id);

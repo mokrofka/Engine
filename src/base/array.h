@@ -118,12 +118,14 @@ template<typename T> void free(Darray<T>& a) {
 // DarrayArena
 template <typename T>
 struct DarrayArena {
-  i32 count = 0;
-  i32 cap = 0;
+  u32 count = 0;
+  u32 cap = 0;
   T* data = null;
   Arena* arena;
+
   T* begin() { return data; }
   T* end()   { return data + count; }
+
   DarrayArena() = default;
   DarrayArena(Arena* arena_) {
     arena = arena_;
@@ -153,20 +155,23 @@ template<typename T> void remove(DarrayArena<T>& a, i32 idx) {
   a.data[idx] = a.data[--a.count];
 }
 
+// TODO: make array index
+
 ////////////////////////////////////////////////////////////////////////
 // SparseSet
 template <typename T>
 struct SparseSet {
-  i32 count;
-  i32 cap;
-  i32* entity_to_index;
-  i32* entities;
+  u32 count = 0;
+  u32 cap = 0;
+  u32* entity_to_index = null;
+  u32* entities = null;
   T* data;
+
+  T* begin() { return data; }
+  T* end()   { return data + count; }
+
   void add(u32 id) {
-    if (!data) {
-      init();
-    }
-    else if (count + 1 >= cap) {
+    if (count >= cap) {
       grow();
     }
     Assert(count < cap);
@@ -175,10 +180,7 @@ struct SparseSet {
     ++count;
   }
   void add(u32 id, T element) {
-    if (!data) {
-      init();
-    }
-    else if (count + 1 >= cap) {
+    if (count >= cap) {
       grow();
     }
     Assert(count < cap);
@@ -203,20 +205,75 @@ struct SparseSet {
     u32 index = entity_to_index[id];
     return &data[index];
   }
-  void init() {
-    Assign(entity_to_index, mem_alloc(sizeof(i32) * DEFAULT_CAPACITY));
-    Assign(entities, mem_alloc(sizeof(i32) * DEFAULT_CAPACITY));
-    Assign(data, mem_alloc(sizeof(T) * DEFAULT_CAPACITY));
-    count = 0;
-    cap = DEFAULT_CAPACITY;
+  void grow() {
+    if (data) {
+      cap *= DEFAULT_RESIZE_FACTOR;
+      u64 size = (sizeof(i32) + sizeof(i32) + sizeof(T)) * cap;
+      u8* buff = mem_realloc(entity_to_index, size);
+
+      entity_to_index = (u32*)buff;
+      entities = (u32*)Offset(entity_to_index, sizeof(u32) * cap);
+      data = (T*)Offset(entities, sizeof(u32) * cap);
+    }
+    else {
+      cap = DEFAULT_CAPACITY;
+      u64 size = (sizeof(i32) + sizeof(i32) + sizeof(T)) * cap;
+      u8* buff = mem_alloc(size);
+
+      entity_to_index = (u32*)buff;
+      entities = (u32*)Offset(entity_to_index, sizeof(u32) * cap);
+      data = (T*)Offset(entities, sizeof(u32) * cap);
+    }
+  }
+};
+
+// TODO: make id check to grow entity_to_index array 
+struct SparseSetIndex {
+  u32 count = 0;
+  u32 cap = 0;
+  u32* entity_to_index = null;
+  u32* entities = null;
+
+  u32* begin() { return entities; }
+  u32* end()   { return entities + count; }
+
+  void add(u32 id) {
+    if (count >= cap) {
+      grow();
+    }
+    Assert(count < cap);
+    entity_to_index[id] = count;
+    entities[count] = id;
+    ++count;
+  }
+  void remove(u32 id) {
+    u32 idx_of_removed_entity = entity_to_index[id];
+    u32 idx_of_last_element = count - 1;
+
+    u32 last_entity = entities[idx_of_last_element];
+
+    entity_to_index[last_entity] = idx_of_removed_entity;
+    entities[idx_of_removed_entity] = last_entity;
+
+    --count;
   }
   void grow() {
-    u64 indexes_realoc_size = sizeof(i32) * cap * DEFAULT_RESIZE_FACTOR;
-    Assign(entity_to_index, mem_realloc(entity_to_index, indexes_realoc_size));
-    Assign(entities, mem_realloc(entities, indexes_realoc_size));
+    if (entity_to_index) {
+      cap *= DEFAULT_RESIZE_FACTOR;
+      u64 size = (sizeof(u32) + sizeof(u32)) * cap;
+      u8* buff = mem_realloc(entity_to_index, size);
 
-    u64 data_realoc_size = sizeof(T) * cap * DEFAULT_RESIZE_FACTOR;
-    Assign(data, mem_realloc(data, data_realoc_size));
+      entity_to_index = (u32*)buff;
+      entities = (u32*)Offset(entity_to_index, sizeof(u32) * cap);
+    }
+    else {
+      cap = DEFAULT_CAPACITY;
+      u64 size = (sizeof(u32) + sizeof(u32)) * cap;
+      u8* buff = mem_alloc(size);
+
+      entity_to_index = (u32*)buff;
+      entities = (u32*)Offset(entity_to_index, sizeof(u32) * cap);
+    }
   }
 };
 

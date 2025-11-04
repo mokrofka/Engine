@@ -251,9 +251,9 @@ void os_gfx_init() {
     local xdg_surface_listener xdg_surface_listener = {
       .configure = [](void* data, xdg_surface* xdg_surface, u32 serial) {
         xdg_surface_ack_configure(xdg_surface, serial);
-        if (!st.is_showned) {
-          st.is_showned = true;
-        }
+        // if (!st.is_showned) {
+        //   st.is_showned = true;
+        // }
         // wl_surface_commit(st.wl_surface);
       }
     };
@@ -304,7 +304,7 @@ b32 os_window_should_close()       { return st.should_close; }
 
 v2i   os_get_window_size()          { return v2i(st.width, st.height); }
 v2i   os_get_mouse_pos()            { return v2i(st.input.mouse_current.x, st.input.mouse_current.y); }
-void* os_get_vk_surface() {
+void* os_get_gfx_api_thing() {
   st.vk_surface = {.wl_display = st.wl_display, .wl_surface = st.wl_surface};
   return &st.vk_surface;
 }

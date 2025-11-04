@@ -79,9 +79,9 @@ typedef u64 DenseTime;
 #define AlignPadDown(x, a)    ((x) & ((a) - 1))
 #define IsPow2(x)             ((((x) - 1)&(x)) == 0)
 #define IsAligned(x, a)       ((((a) - 1)&(x)) == 0)
-#define Offset(x, a)          (u8*)(x) + (a)
-#define OffsetBack(x, a)      (u8*)(x) - (a)
-#define MemDiff(from, to)     (u8*)(from) - (u8*)(to)
+#define Offset(x, a)          ((u8*)(x) + (a))
+#define OffsetBack(x, a)      ((u8*)(x) - (a))
+#define MemDiff(from, to)     ((u8*)(from) - (u8*)(to))
 #define PtrMatch(a, y)        ((u8*)(a) == (u8*)(y))
 #define AlignUpTo(x, a)       (((x) + ((a) - 1)) - (((x) + ((a) - 1)) % (a)))
 
@@ -102,7 +102,7 @@ typedef u64 DenseTime;
 #define Compose64Bit(a,b)             (((u64)a << 32) | (u64)b)
 #define CeilIntDiv(a,b)               (((a) + (b) - 1)/(b))
 #define IsBetween(lower, x, upper)    (((lower) <= (x)) && ((x) <= (upper)))
-#define Assign(a,b)                   *((void**)(&(a))) = (void*)(b)
+#define Assign(a,b)                   (*((void**)(&(a))) = (void*)(b))
 #define As(T)                         *(T*)
 #define Transmute(T)                  *(T*)&
 #define cast(a)                       (a)
@@ -111,8 +111,8 @@ typedef u64 DenseTime;
 #define Loop(i, c)                    for (i32 i = 0; i < c; ++i)
 #define IndexOf(type, mtype, member)  (OffsetOf(type, member) / sizeof(mtype))
 #define TrunctPow2(a, b)              ((u64)(a) & ((u64)(b) - 1))
-#define u32DivPow2(a, b)              a >> ctz32(b)
-#define u64DivPow2(a, b)              a >> ctz64(b)
+#define u32DivPow2(a, b)              (a >> ctz32(b))
+#define u64DivPow2(a, b)              (a >> ctz64(b))
 
 #define Bit(x)                 (1 << (x))
 #define HasBit(x, pos)         ((x) & (1 << (pos)))

@@ -25,20 +25,22 @@ global MemCtx mem_ctx;
 
 void global_allocator_init() {
   mem_ctx.data = os_reserve(TB(1));
+
   u64 offset = 0;
+  u64 chunk_size = 8;
   
-  u64 pow_num = 1;
   Loop (i, ArrayCount(mem_ctx.pools)) {
     mem_ctx.pools[i].data = Offset(mem_ctx.data, offset);
-    mem_ctx.pools[i].chunk_size = 8 * pow_num;
-    pow_num *= 2;
+    mem_ctx.pools[i].chunk_size = chunk_size;
+
     offset += POOL_STEP;
+    chunk_size *= 2;
   };
 }
 
 intern u8* segregated_pool_alloc(SegPool& p) {
   if (p.head == null) {
-    Assert(p.count+1 > p.cap);
+    Assert(p.count >= p.cap);
 
     u32 commit_size;
     if (p.chunk_size > MB(1)) 

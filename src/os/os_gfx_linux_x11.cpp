@@ -2,12 +2,11 @@
 
 #if OS_LINUX && GFX_X11
 
-// #include <X11/Xlib.h>
-// #include <X11/Xutil.h>
-// #include <X11/Xatom.h>
 #include <X11/keysym.h>
 #include <xcb/xcb.h>
 #include <xcb/xcb_keysyms.h>
+
+#include "stdlib.h"
 
 #include "event.h"
 
@@ -16,6 +15,8 @@ struct X11State {
   xcb_screen_t* screen;
   xcb_window_t window;
   xcb_key_symbols_t* key_symbols;
+
+  xcb_atom_t wm_delete_window;
 
   // Input
   i32 width = 1;
@@ -38,67 +39,21 @@ struct X11State {
   } input;
 
   struct {
-    // Display* display;
-    // Window window;
+    xcb_connection_t* connection;
+    xcb_window_t window;
   } vk_surface;
 };
 
 global X11State st;
 
-intern u32 x11_mouse_button_translate(u32 button) {
-  // switch (button) {
-  //   case Button1: return MouseButton_Left;
-  //   case Button3: return MouseButton_Right;
-  //   default: return MouseButton_COUNT;
-  // }
+intern u32 lnx_mouse_button_translate(u32 button) {
+  switch (button) {
+    // case Button1: return MouseButton_Left;
+    // case Button3: return MouseButton_Right;
+    default: return MouseButton_COUNT;
+  }
   return 0;
 }
-
-// void os_gfx_init() {
-//   st.display = XOpenDisplay(null);
-//   Display* display = st.display;
-//   AssertMsg(display, "failed to open display");
-
-//   i32 screen = DefaultScreen(display);
-//   Window root = RootWindow(display, screen);
-//   Window window = XCreateSimpleWindow(
-//     display, root,
-//     100, 100,                // x, y position
-//     800, 600,                // width, height
-//     1,                       // border width
-//     BlackPixel(display, screen),
-//     WhitePixel(display, screen));
-//   XStoreName(display, window, "X11 Window Example");
-//   XSelectInput(display, window, ExposureMask | KeyPressMask | StructureNotifyMask);
-//   XMapWindow(display, window);
-// }
-
-// void os_gfx_shutdown() {
-// }
-
-// // Process pending X11 events (non-blocking)
-// void os_pump_messages() {
-//   Display* display = st.display;
-
-//   XEvent event;
-//   while (XPending(display)) {
-//     XNextEvent(display, &event);
-
-//     switch (event.type) {
-//       case KeyPress: {
-//         KeySym key_x11 = XLookupKeysym(&event.xkey, 0);
-//         Key key = lnx_keycode_translate(key_x11);
-//         st.input.keyboard_current.keys[key] = true;
-//       } break;
-//       case KeyRelease: {
-//         KeySym key_x11 = XLookupKeysym(&event.xkey, 0);
-//         Key key = lnx_keycode_translate(key_x11);
-//         st.input.keyboard_current.keys[key] = false;
-//       } break;
-//     }
-//   }
-
-// }
 
 Key lnx_keycode_translate(u32 keysym) {
   switch (keysym) {
@@ -198,25 +153,22 @@ Key lnx_keycode_translate(u32 keysym) {
 }
 
 void os_gfx_init() {
-  /* Connect to the X server */
   int screen_number;
-  st.connection = xcb_connect(NULL, &screen_number);
+  st.connection = xcb_connect(null, &screen_number);
   if (xcb_connection_has_error(st.connection)) {
     AssertMsg(false, "Failed to connect to X server");
   }
 
-  /* Get the screen */
   const xcb_setup_t* setup = xcb_get_setup(st.connection);
   xcb_screen_iterator_t iter = xcb_setup_roots_iterator(setup);
   for (int i = 0; i < screen_number; ++i)
     xcb_screen_next(&iter);
   st.screen = iter.data;
 
-  /* Create the window */
   st.window = xcb_generate_id(st.connection);
-  uint32_t mask = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK;
-  uint32_t values[] = {
-    st.screen->white_pixel,
+  u32 mask = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK;
+  u32 values[] = {
+    st.screen->black_pixel,
     XCB_EVENT_MASK_EXPOSURE |
     XCB_EVENT_MASK_KEY_PRESS |
     XCB_EVENT_MASK_KEY_RELEASE |
@@ -235,7 +187,6 @@ void os_gfx_init() {
     mask, values                  // masks
   );
 
-  /* Set window title */
   const char* title = "XCB Window Example";
   xcb_change_property(
     st.connection,
@@ -248,12 +199,11 @@ void os_gfx_init() {
     title
   );
 
-  /* Handle window close (WM_DELETE_WINDOW) */
   xcb_intern_atom_cookie_t protocols_cookie = xcb_intern_atom(st.connection, 1, 12, "WM_PROTOCOLS");
+  xcb_intern_atom_reply_t* protocols_reply = xcb_intern_atom_reply(st.connection, protocols_cookie, null);
   xcb_intern_atom_cookie_t delete_cookie = xcb_intern_atom(st.connection, 0, 16, "WM_DELETE_WINDOW");
-  xcb_intern_atom_reply_t* protocols_reply = xcb_intern_atom_reply(st.connection, protocols_cookie, NULL);
-  xcb_intern_atom_reply_t* delete_reply = xcb_intern_atom_reply(st.connection, delete_cookie, NULL);
-
+  xcb_intern_atom_reply_t* delete_reply = xcb_intern_atom_reply(st.connection, delete_cookie, null);
+  st.wm_delete_window = delete_reply->atom;
   xcb_change_property(
     st.connection,
     XCB_PROP_MODE_REPLACE,
@@ -265,7 +215,6 @@ void os_gfx_init() {
     &delete_reply->atom
   );
 
-  /* Map (show) the window */
   xcb_map_window(st.connection, st.window);
   xcb_flush(st.connection);
   st.key_symbols = xcb_key_symbols_alloc(st.connection);
@@ -281,32 +230,63 @@ void os_pump_messages() {
     switch (event->response_type & ~0x80) {
       case XCB_KEY_PRESS: {
         xcb_key_press_event_t* kp = (xcb_key_press_event_t*)event;
-        // xcb_keysym_t sym = xcb_key_symbols_get_keysym(st.key_symbols, kp->detail, 0);
-        xcb_keysym_t sym = xcb_key_press_lookup_keysym(st.key_symbols, kp, 0);
+        xcb_keysym_t sym = xcb_key_symbols_get_keysym(st.key_symbols, kp->detail, 0);
         Key key = lnx_keycode_translate(sym);
         st.input.keyboard_current.keys[key] = true;
-        Info("Key pressed: %c", key);
-
       } break;
       case XCB_KEY_RELEASE: {
         xcb_key_press_event_t* kp = (xcb_key_press_event_t*)event;
-        // xcb_keysym_t sym = xcb_key_symbols_get_keysym(st.key_symbols, kp->detail, 0);
-        xcb_keysym_t sym = xcb_key_press_lookup_keysym(st.key_symbols, kp, 0);
+        xcb_keysym_t sym = xcb_key_symbols_get_keysym(st.key_symbols, kp->detail, 0);
         Key key = lnx_keycode_translate(sym);
         st.input.keyboard_current.keys[key] = false;
-        Info("Key released: %c", key);
+      } break;
+      case XCB_CONFIGURE_NOTIFY: {
+        xcb_configure_notify_event_t* cfg = (xcb_configure_notify_event_t*)event;
+
+        i32 width = cfg->width;
+        i32 height = cfg->height;
+
+        if (!width || !height) {
+          return;
+        }
+        if (st.width != width || st.height != height) {
+          st.width = width;
+          st.height = height;
+          EventContext data = {
+            .i32[0] = width,
+            .i32[1] = height,
+          };
+          event_fire(EventCode_Resized, null, data);
+        }
+      } break;
+      case XCB_CLIENT_MESSAGE: {
+        xcb_client_message_event_t* cm = (xcb_client_message_event_t*)event;
+        if (cm->data.data32[0] == st.wm_delete_window) {
+          st.should_close = true; // mark window for closing
+        }
       } break;
     }
   }
 }
 
-
 b32 os_window_should_close() { return st.should_close; }
 v2i os_get_window_size() { return v2i(st.width, st.height); }
+v2i os_get_immediate_window_size() { 
+  v2i result = {};
+  xcb_get_geometry_cookie_t geom_cookie = xcb_get_geometry(st.connection, st.window);
+  xcb_get_geometry_reply_t* geom_reply = xcb_get_geometry_reply(st.connection, geom_cookie, null);
+  if (geom_reply) {
+    result.x = geom_reply->width;
+    result.y = geom_reply->height;
+    free(geom_reply);
+  }
+  return result;
+}
 v2i os_get_mouse_pos() { return v2i(st.input.mouse_current.x, st.input.mouse_current.y); }
 
-void* os_get_vk_surface() {
-  return {};
+void* os_get_gfx_api_thing() {
+  st.vk_surface = {st.connection, st.window};
+  return &st.vk_surface;
 }
 
 ////////////////////////////////////////////////////////////////////////

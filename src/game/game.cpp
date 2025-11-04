@@ -630,12 +630,6 @@ void app_init(u8** state) {
 
 }
 
-struct Con {
-  Con() {
-    Info("call");
-  }
-};
-
 shared_function void app_update(u8** state) {
   if (*state == null) {
     app_init(state);

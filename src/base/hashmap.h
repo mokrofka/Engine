@@ -2,7 +2,6 @@
 #include "defines.h"
 #include "maths.h"
 #include "logger.h"
-#include <type_traits>
 
 enum {
   MapSlot_Empty,
@@ -70,12 +69,12 @@ struct Map {
       u32 old_cap = cap;
 
       cap *= DEFAULT_RESIZE_FACTOR;
-      u32 size = (sizeof(T) + sizeof(Key) + sizeof(u8)) * cap;
-      u8* buff = mem_alloc_zero(size);
+      u64 size = (sizeof(T) + sizeof(Key) + sizeof(u8)) * cap;
+      u8* buff = mem_realoc_zero(data, size);
 
       data = (T*)buff;
-      keys = (Key*)Offset(data, sizeof(T)*cap);
-      is_occupied = (u8*)(Offset(keys, sizeof(Key)*cap));
+      keys = (Key*)Offset(data, sizeof(T) * cap);
+      is_occupied = (u8*)(Offset(keys, sizeof(Key) * cap));
 
       Loop (i, old_cap) {
         if (old_is_occupied[i] == MapSlot_Occupied) {
@@ -87,7 +86,7 @@ struct Map {
     }
     else {
       cap = DEFAULT_CAPACITY;
-      u32 size = (sizeof(T) + sizeof(Key) + sizeof(u8)) * cap;
+      u64 size = (sizeof(T) + sizeof(Key) + sizeof(u8)) * cap;
       u8* buff = mem_alloc_zero(size);
 
       Assign(data, buff);

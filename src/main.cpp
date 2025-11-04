@@ -88,7 +88,7 @@ i32 main(i32 count, char* arr[]) {
     }
   }
 
-  r_shutdown();
+  // r_shutdown();
   os_gfx_shutdown();
   os_exit(0);
   
