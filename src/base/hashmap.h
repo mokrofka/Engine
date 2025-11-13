@@ -27,9 +27,9 @@ struct Map {
   void insert(Key key, T val) {
     if (count >= cap*LF) { grow(); }
     u64 hash_idx = hash(key);
-    u64 index = TrunctPow2(hash_idx, cap);
+    u64 index = ModPow2(hash_idx, cap);
     while (is_occupied[index] == MapSlot_Occupied) {
-      index = TrunctPow2(index + 1, cap);
+      index = ModPow2(index + 1, cap);
     }
     keys[index] = key;
     data[index] = val;
@@ -39,11 +39,11 @@ struct Map {
 
   T& get(Key key) {
     u64 hash_idx = hash(key);
-    u64 index = TrunctPow2(hash_idx, cap);
+    u64 index = ModPow2(hash_idx, cap);
     while (is_occupied[index] != MapSlot_Empty) {
       if ((is_occupied[index] == MapSlot_Occupied) && (keys[index] == key))
         return data[index];
-      index = TrunctPow2(index + 1, cap);
+      index = ModPow2(index + 1, cap);
     }
     Assert(true);
     return data[index];
@@ -51,14 +51,14 @@ struct Map {
 
   void erase(Key key) {
     u64 hash_idx = hash(key);
-    u64 index = TrunctPow2(hash_idx, cap);
+    u64 index = ModPow2(hash_idx, cap);
     while (is_occupied[index] != MapSlot_Empty) {
       if ((is_occupied[index] == MapSlot_Occupied) && (keys[index] == key)) {
         is_occupied[index] = MapSlot_Deleted;
         --count;
         return;
       }
-      index = TrunctPow2(index + 1, cap);
+      index = ModPow2(index + 1, cap);
     }
   }
 

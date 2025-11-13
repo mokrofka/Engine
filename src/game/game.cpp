@@ -740,6 +740,9 @@ Vertex triangle[] = {
   {v3(0.5, 0.0, 0)},
   {v3(0.0, 0.5, 0)},
 };
+ShaderInfo shader_type_get(u32 id) {
+  return shader_types[id];
+}
 
 void app_init(u8** state) {
   Scratch scratch;
@@ -759,7 +762,7 @@ void app_init(u8** state) {
     .vert_count = 3,
   };
   u32 mesh_id = vk_mesh_load(mesh);
-  u32 shader = shader_create("color_shader");
+  u32 shader = shader_create("color_shader", ShaderType_Drawing);
   Entity e = {
     .pos = {},
     .scale = v3_one(),
@@ -783,6 +786,5 @@ shared_function void app_update(u8** state) {
     st->camera.fov -= 5;
   }
   camera_update();
-
   gpu_data_update();
 }

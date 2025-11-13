@@ -16,7 +16,6 @@ struct App {
   OS_Handle lib;
   String lib_filepath;
   String lib_temp_filepath;
-  DenseTime modified;
 };
 
 global App st;

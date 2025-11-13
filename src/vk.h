@@ -12,7 +12,7 @@ void vk_end_frame();
 void vk_begin_renderpass(u32 renderpass_id);
 void vk_end_renderpass(u32 renderpass_id);
 
-KAPI u32 vk_shader_load(String name);
+KAPI u32 vk_shader_load(String name, ShaderType type);
 KAPI void vk_texture_load(Texture t);
 
 void vk_draw();

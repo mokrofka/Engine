@@ -33,6 +33,14 @@ typedef u64 DenseTime;
 #define global static
 #define local  static
 
+#define U8_MAX  0xFF
+#define U16_MAX 0xFFFF
+#define U32_MAX 0xFFFFFFFF
+#define U64_MAX 0xFFFFFFFFFFFFFFFF
+#define INVALID_ID     U32_MAX
+#define INVALID_ID_U16 U16_MAX
+#define INVALID_ID_U8  U8_MAX
+
 #define KB(n)         (((u64)(n)) << 10)
 #define MB(n)         (((u64)(n)) << 20)
 #define GB(n)         (((u64)(n)) << 30)
@@ -57,26 +65,25 @@ typedef u64 DenseTime;
 #define NsToMs(x)     (x / Million(1))
 #define NsToUs(x)     (x / Thousand(1))
 
-#define Member(T,m)                 (((T*)0)->m)
-#define OffsetOf(T,m)               (u64)(&Member(T,m))
-#define MemberFromOffset(T,ptr,off) (T)((((u8*)ptr)+(off)))
-#define CastFromMember(T,m,ptr)     (T*)(((u8*)ptr) - OffsetOf(T,m))
+#define Member(T,m)                   (((T*)0)->m)
+#define OffsetOf(T,m)                 (u64)(&((T*)0)->m)
+#define MemberFromOffset(T,ptr,off)   (T)(Offset(ptr, off))
+#define CastFromMember(T,m,ptr)       (T*)(OffsetBack(ptr, OffsetOf(T,m)))
+#define MemberIndexOf(type, mtype, member)  (OffsetOf(type, member) / sizeof(mtype))
 
 #define MemZero(d,s)          MemSet(d,0,s)
 #define MemZeroStruct(x)      MemZero((x),sizeof(*(x)))
 #define MemZeroArray(x)       MemZero((x),sizeof(x))
 #define MemZeroTyped(d,c)     MemZero((d),sizeof(*(d))*(c))
-
 #define MemCopyStruct(d, s)   MemCopy((d), (s), sizeof(*(d)))
 #define MemCopyArray(d, s)    MemCopy((d), (s), sizeof(x))
 #define MemCopyTyped(d, s, c) MemCopy((d), (s), sizeof(*(d)) * (c))
-
 #define MemMatchStruct(a,b)   MemMatch((a),(b),sizeof(*(a)))
 #define MemMatchArray(a,b)    MemMatch((a),(b),sizeof(a))
 
 #define AlignUp(x,a)          (((x) + (a) - 1)&(~((a) - 1)))
 #define AlignDown(x,a)        ((x)&(~((a) - 1)))
-#define AlignPadUp(x,a)       ((0-(x)) & ((a) - 1))
+#define AlignPadUp(x,a)       ((-(x)) & ((a) - 1))
 #define AlignPadDown(x, a)    ((x) & ((a) - 1))
 #define IsPow2(x)             ((((x) - 1)&(x)) == 0)
 #define IsAligned(x, a)       ((((a) - 1)&(x)) == 0)
@@ -84,7 +91,6 @@ typedef u64 DenseTime;
 #define OffsetBack(x, a)      ((u8*)(x) - (a))
 #define MemDiff(from, to)     ((u8*)(from) - (u8*)(to))
 #define PtrMatch(a, y)        ((u8*)(a) == (u8*)(y))
-#define AlignUpTo(x, a)       (((x) + ((a) - 1)) - (((x) + ((a) - 1)) % (a)))
 
 #define Min(a,b)                      (((a)<(b))?(a):(b))
 #define Max(a,b)                      (((a)>=(b))?(a):(b))
@@ -95,26 +101,30 @@ typedef u64 DenseTime;
 #define Clamp(a,x,b)                  (((x)<(a))?(a):((x)>(b))?(b):(x))
 #define ReverseClamp(a,x,b)           (((x)<(a))?(b):((b)<(x))?(a):(x))
 #define Wrap(a,x,b)                   ReverseClamp(a,x,b)
-#define ArrayCount(x)                 (sizeof(x) / sizeof((x)[0]))
-#define ElemSize(x)                   (sizeof(x[0]))
 #define Sqr(x)                        (x*x)
 #define Cube(x)                       (x*x*x)
 #define Sign(x)                       ((x) < 0 ? -1 : (x) > 0 ? 1 : 0)
 #define Abs(x)                        ((x) < 0 ? -(x) : (x))
+#define IsBetweenIncl(l, x, up)       (((l) <= (x)) && ((x) <= (up)))
+#define IsBetweenExcl(l, x, up)       (((l) < (x)) && ((x) < (up)))
+#define IsInsideBound(x, up)          (((0) <= (x)) && ((x) < (up)))
+#define IsInsideBounds(l, x, up)      (((l) <= (x)) && ((x) < (up)))
+#define RoundUp(x, a)                 ((((x) + (a) - 1) / (a)) * (a))
+#define RoundDown(x, a)               ((x) - ((x) % (a)))
+#define ModPow2(a, b)                 ((a) & ((b) - 1))
+#define u32DivPow2(a, b)              (a >> ctz32(b))
+#define u64DivPow2(a, b)              (a >> ctz64(b))
+#define CeilIntDiv(a,b)               (((a) + (b) - 1)/(b)) // 11/5 = 3
 #define Compose64Bit(a,b)             (((u64)a << 32) | (u64)b)
-#define CeilIntDiv(a,b)               (((a) + (b) - 1)/(b))
-#define IsBetween(lower, x, upper)    (((lower) <= (x)) && ((x) <= (upper)))
+
+#define ArrayCount(x)                 (sizeof(x) / sizeof((x)[0]))
+#define ElemSize(x)                   (sizeof(x[0]))
 #define Assign(a,b)                   (*((void**)(&(a))) = (void*)(b))
 #define As(T)                         *(T*)
-#define Transmute(T)                  *(T*)&
 #define cast(a)                       (a)
 #define Glue(A,B)                     A##B
 #define Stringify(S)                  #S
 #define Loop(i, c)                    for (i32 i = 0; i < c; ++i)
-#define IndexOf(type, mtype, member)  (OffsetOf(type, member) / sizeof(mtype))
-#define TrunctPow2(a, b)              ((u64)(a) & ((u64)(b) - 1))
-#define u32DivPow2(a, b)              (a >> ctz32(b))
-#define u64DivPow2(a, b)              (a >> ctz64(b))
 
 #define Bit(x)                 (1 << (x))
 #define HasBit(x, pos)         ((x) & (1 << (pos)))
@@ -136,15 +146,6 @@ typedef u64 DenseTime;
 
 #define SLLQueuePush(f,l,n) SLLQueuePush_NZ(0,f,l,n,next)
 
-#define U8_MAX  0xFF
-#define U16_MAX 0xFFFF
-#define U32_MAX 0xFFFFFFFF
-#define U64_MAX 0xFFFFFFFFFFFFFFFF
-
-#define INVALID_ID     U32_MAX
-#define INVALID_ID_U16 U16_MAX
-#define INVALID_ID_U8  U8_MAX
-
 template<typename F>
 struct ImplDefer {
 	F f;
@@ -160,6 +161,16 @@ ImplDefer<F> MakeDefer(F f) {
 #define DeferLoop(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
 #define IfDeferLoop(begin, end) for (b32 _once = (begin); _once; _once = false, (end))
 
+#if BUILD_DEBUG
+  #define DebugDo(...) __VA_ARGS__
+#else
+  #define DebugDo(...)
+#endif
+#define IfDo(flag, ...)  _IfDo(flag, __VA_ARGS__)
+#define _IfDo(flag, ...)  IfDo_##flag(__VA_ARGS__)
+#define IfDo_1(code) code
+#define IfDo_0(code)
+
 #define C_LINKAGE_BEGIN extern "C"{
 #define C_LINKAGE_END }
 #define C_LINKAGE extern "C"
@@ -171,7 +182,6 @@ ImplDefer<F> MakeDefer(F f) {
 #elif __APPLE__
   #define OS_MAC 1
 #endif
-
 #if _MSC_VER
   #define COMPILER_MSVC 1
 #elif __clang__
@@ -179,24 +189,11 @@ ImplDefer<F> MakeDefer(F f) {
 #elif __GNUC__
   #define COMPILER_GCC 1
 #endif
-
 #if __x86_64__ || _M_X64
   #define ARCH_X64 1
 #elif __aarch64__ || _M_ARM64
   #define ARCH_ARM64 1
 #endif
-
-#if BUILD_DEBUG
-  #define DebugDo(...) __VA_ARGS__
-#else
-  #define DebugDo(...)
-#endif
-
-#define IfDo(flag, ...)  _IfDo(flag, __VA_ARGS__)
-#define _IfDo(flag, ...)  IfDo_##flag(__VA_ARGS__)
-
-#define IfDo_1(code) code
-#define IfDo_0(code)
 
 ////////////////////////////////////////////////////////////////////////
 // Address Sanitizer
@@ -212,7 +209,7 @@ ImplDefer<F> MakeDefer(F f) {
 #endif
 
 ////////////////////////////////////////////////////////////////////////
-// Compiler Specific
+// Compiler
 
 #define Likely(expr)           Expect(expr,1)
 #define Unlikely(expr)         Expect(expr,0)
@@ -253,11 +250,10 @@ ImplDefer<F> MakeDefer(F f) {
   INLINE u32 clz64(u64 val)            { return __builtin_clzll(val); }
 
   #define NO_ASAN __attribute__((no_sanitize("address")))
-
 #endif
 
 ////////////////////////////////////////////////////////////////////////
-// OS Specific
+// OS
 
 #if OS_WINDOWS
   #if HOTRELOAD_BUILD
@@ -271,7 +267,6 @@ ImplDefer<F> MakeDefer(F f) {
     #define KAPI
     #define shared_function
   #endif
-
 #elif OS_LINUX
   #if HOTRELOAD_BUILD
     #define shared_function C_LINKAGE __attribute__((visibility("default")))
@@ -287,14 +282,12 @@ ImplDefer<F> MakeDefer(F f) {
 #endif
 
 ////////////////////////////////////////////////////////////////////////
-// ARCH Specific
+// ARCH
 
 #if ARCH_X64
   #define ReadTimestampCounter() __rdtsc() 
-
 #else 
   #define ReadTimestampCounter()
-
 #endif
 
 #define DEFAULT_CAPACITY      8

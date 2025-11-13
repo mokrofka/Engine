@@ -104,7 +104,7 @@ void mem_free(void* ptr) {
 
     u64 base_size = 8;
     base_size <<= i;
-    if (IsBetween(start, ptr, end)) {
+    if (IsInsideBounds(start, ptr, end)) {
       FillDealoc(ptr, base_size);
       segregated_pool_free(mem_ctx.pools[i], ptr);
       return;
@@ -126,7 +126,7 @@ u8* mem_realloc(void* ptr, u64 size) {
     
     u64 base_size = 8;
     base_size <<= i;
-    if (IsBetween(start, ptr, end)) {
+    if (IsInsideBounds(start, ptr, end)) {
       result = mem_alloc(size);
       MemCopy(result, ptr, base_size);
       FillDealoc(ptr, base_size);

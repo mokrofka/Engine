@@ -6,9 +6,10 @@
 
 #include <initializer_list>
 
-#define IsInsideArray(x, upper) (((0) <= (x)) && ((x) < (upper)))
 
 ////////////////////////////////////////////////////////////////////////
+// Array
+
 template<typename T, i32 N>
 struct Array {
   static constexpr i32 cap = N;
@@ -30,7 +31,7 @@ struct Array {
   }
 
   T& operator[](u32 idx) {
-    Assert(IsInsideArray(idx, cap));
+    Assert(IsInsideBound(idx, cap));
     return data[idx];
   }
 };
@@ -44,7 +45,7 @@ template<typename T, i32 N, typename... Args> void append(Array<T, N>& a, T firs
   (append(a, rest), ...);
 }
 template<typename T, i32 N> void remove(Array<T, N>& a, i32 idx) { 
-  Assert(IsInsideArray(idx, len(a)));
+  Assert(IsInsideBound(idx, len(a)));
   a.data[idx] = a.data[--a.count];
 }
 template<typename T, i32 N> b32 exists(Array<T, N>& a, T e) { 
@@ -56,6 +57,7 @@ template<typename T, i32 N> b32 exists(Array<T, N>& a, T e) {
 
 ////////////////////////////////////////////////////////////////////////
 // Darray
+
 template <typename T>
 struct Darray {
   u32 count = 0;
@@ -78,7 +80,7 @@ struct Darray {
   }
   
   T& operator[](u32 idx) {
-    Assert(IsInsideArray(idx, cap));
+    Assert(IsInsideBound(idx, cap));
     return data[idx];
   }
 };
@@ -100,7 +102,7 @@ template<typename T, typename... Args> void append(Darray<T>& a, T first, Args..
   (append(a, rest), ...);
 }
 template<typename T> void remove(Darray<T>& a, u32 idx) { 
-  Assert(IsInsideArray(idx, a.cap));
+  Assert(IsInsideBound(idx, a.cap));
   a.data[idx] = a.data[--a.count];
 }
 template<typename T> void reserve(Darray<T>& a, u32 size) { 
@@ -321,7 +323,7 @@ static u32 append(HandlerPool& h) {
   return id;
 }
 static void remove(HandlerPool& h, u32 id) {
-  Assert(IsBetween(0, id, h.cap-1));
+  Assert(IsInsideBound(id, h.cap));
   DebugDo(
     Assert(h.used[id])
     h.used[id] = false;

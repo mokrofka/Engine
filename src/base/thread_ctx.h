@@ -11,11 +11,11 @@ struct Scratch {
 
   INLINE Scratch() {
     Temp temp = tctx_get_scratch(null, 0);
-    *this = Transmute(Scratch)temp;
+    *this = As(Scratch)&temp;
   }
   INLINE Scratch(Arena** conflics) {
     Temp temp = tctx_get_scratch(conflics, 1);
-    *this = Transmute(Scratch)temp;
+    *this = As(Scratch)&temp;
   }
   INLINE ~Scratch() { arena->pos = pos; };
 };

@@ -177,14 +177,21 @@ Buffer res_binary_load(Arena* arena, String name) {
 
 ////////////////////////////////////////////////////////////////////////
 // Shader
-struct ShaderSysState {
+
+struct ShaderState {
   Arena* arena;
   String shader_dir;
   String shader_compiled_dir;
   Map<String, u32> map;
 };
 
-global ShaderSysState shader_st;
+global ShaderState shader_st;
+
+u32 shader_create(String name, ShaderType type) {
+  u32 id = vk_shader_load(name, type);
+  shader_st.map.insert(name, id);
+  return id;
+}
 
 void shader_init() {
   shader_st.arena = arena_alloc();
@@ -206,12 +213,6 @@ void shader_init() {
   }, OS_WatchFlag_Modify);
 }
 
-u32 shader_create(String name) {
-  u32 id = vk_shader_load(name);
-  shader_st.map.insert(name, id);;
-  return id;
-}
-
 Shader& shader_get(String name) {
   // Shader* shader; Assign(shader, hashmap_get(shader_st.hashmap, name));
   // Assert(shader->id != INVALID_ID);
@@ -225,13 +226,13 @@ Shader& shader_get(String name) {
 
 #include "vendor/stb_image.h"
 
-struct TextureSystemState {
+struct TextureState {
   Arena* arena;
   // HashMap hashmap;
   u32 texture_count;
 };
 
-global TextureSystemState texture_st;
+global TextureState texture_st;
 
 void texture_init() {
   texture_st.arena = arena_alloc();
