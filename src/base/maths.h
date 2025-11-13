@@ -3,7 +3,7 @@
 #include "str.h"
 
 #define PI             3.14159265358f
-#define Tau            PI * 2
+#define Tau            (PI * 2)
 
 #define EulerNumber  2.71828182846f
 #define GoldBig      1.61803398875f
@@ -12,8 +12,8 @@
 #define FloatEpsilon   1e-5f
 #define MachineEpsilon 1.1920929e-7f
 
-INLINE f32 deg_to_rad(f32 degrees) { return degrees * PI / 180.0f; }
-INLINE f32 rad_to_deg(f32 radians) { return radians * 180.0f / PI; }
+inline f32 deg_to_rad(f32 degrees) { return degrees * PI / 180.0f; }
+inline f32 rad_to_deg(f32 radians) { return radians * 180.0f / PI; }
 
 struct v2 {
   f32 x;
@@ -65,14 +65,14 @@ struct v4 {
 
 union mat3 {
   f32 e[9];
-  f32& operator[](u32 a) { return e[a]; }
+  INLINE f32& operator[](u32 a) { return e[a]; }
 };
 
 typedef v4 quat;
 
 union mat4 {
   f32 e[16];
-  f32& operator[](u32 a) { return e[a]; }
+  INLINE f32& operator[](u32 a) { return e[a]; }
 };
 
 union Rect {
@@ -91,6 +91,12 @@ union RectI {
   };
   v2i min;
   v2i max;
+};
+
+struct Transform {
+  v3 pos;
+  v3 rot;
+  v3 scale;
 };
 
 #if COMPILER_MSVC
@@ -130,10 +136,10 @@ union RectI {
   INLINE f32 Log10(f32 a)               { return __builtin_log10f(a); }
 #endif
 
-INLINE f32 SinD(f32 a)                { return Sin(deg_to_rad(a)); }
-INLINE f32 CosD(f32 a)                { return Cos(deg_to_rad(a)); }
-INLINE f32 Lerp(f32 a, f32 t, f32 b)  { return (1 - t)*a + t*b; }
-INLINE f32 Atan2_360(f32 y, f32 x)    { return Atan2(-y, -x) + PI; }
+NO_DEBUG inline f32 SinD(f32 a)                { return Sin(deg_to_rad(a)); }
+NO_DEBUG inline f32 CosD(f32 a)                { return Cos(deg_to_rad(a)); }
+NO_DEBUG inline f32 Lerp(f32 a, f32 t, f32 b)  { return (1 - t)*a + t*b; }
+NO_DEBUG inline f32 Atan2_360(f32 y, f32 x)    { return Atan2(-y, -x) + PI; }
 
 inline u32 next_pow2(u32 v) {
   v--;
@@ -156,16 +162,14 @@ inline u32 prev_pow2(u32 n) {
 
 ////////////////////////////////////////////////////////////////////////
 // Color
-
-INLINE v4 rgba_from_u32(u32 hex) {
+inline v4 rgba_from_u32(u32 hex) {
   v4 result = v4(((hex & 0xff000000) >> 24) / 255.f,
                  ((hex & 0x00ff0000) >> 16) / 255.f,
                  ((hex & 0x0000ff00) >> 8)  / 255.f,
                  ((hex & 0x000000ff) >> 0)  / 255.f);
   return result;
 }
-
-INLINE u32 u32_from_rgba(v4 rgba) {
+inline u32 u32_from_rgba(v4 rgba) {
   u32 result = 0;
   result |= ((u32)((u8)(rgba.x*255.f))) << 24;
   result |= ((u32)((u8)(rgba.y*255.f))) << 16;
@@ -173,8 +177,7 @@ INLINE u32 u32_from_rgba(v4 rgba) {
   result |= ((u32)((u8)(rgba.w*255.f))) <<  0;
   return result;
 }
-
-INLINE u32 u32_from_argb(v4 argb) {
+inline u32 u32_from_argb(v4 argb) {
   u32 result = 0;
   result |= ((u32)((u8)(argb.w*255.f))) << 24;
   result |= ((u32)((u8)(argb.x*255.f))) << 16;
@@ -184,17 +187,9 @@ INLINE u32 u32_from_argb(v4 argb) {
 }
 
 ////////////////////////////////////////////////////////////////////////
-// Random
+// Hash
 
-INLINE u32 xorshift32(u32* seed) {
-  u32 x = *seed;
-  x ^= x << 13;
-  x ^= x >> 17;
-  x ^= x << 5;
-  return *seed = x;
-}
-
-INLINE u64 squirrel3(u64 at) {
+inline u64 squirrel3(u64 at) {
   constexpr u64 BIT_NOISE1 = 0x9E3779B185EBCA87ULL;
   constexpr u64 BIT_NOISE2 = 0xC2B2AE3D27D4EB4FULL;
   constexpr u64 BIT_NOISE3 = 0x27D4EB2F165667C5ULL;
@@ -206,137 +201,149 @@ INLINE u64 squirrel3(u64 at) {
   at ^= (at >> 8);
   return at;
 }
-
-INLINE u64 hash(u64 x) {
+inline u64 hash(u64 x) {
   return squirrel3(x);
 }
-
-// FNV-1a
-inline u64 hash(String str) {
+inline u64 str_hash_FNV(String str) {
   u32 hash = 0x811c9dc5;
   Loop (i, str.size) {
-    hash ^= (u8)(*str.str++);
-    hash *= 0x01000193;
+    hash = (*str.str++ ^ hash) * 0x01000193;
   }
   return hash;
 }
+inline u64 hash(String str) {
+  return str_hash_FNV(str);
+}
+
+////////////////////////////////////////////////////////////////////////
+// Random
+
+inline u32 xorshift32(u32* seed) {
+  u32 x = *seed;
+  x ^= x << 13;
+  x ^= x >> 17;
+  x ^= x << 5;
+  return *seed = x;
+}
 
 KAPI extern u32 _seed;
-INLINE u32 rand_u32()                        { return xorshift32(&_seed); }
-INLINE u32 rand_range_u32(u32 min, u32 max)  { return (rand_u32() % (max - min + 1)) + min; }
-INLINE i32 rand_i32()                        { return rand_u32(); }
-INLINE i32 rand_range_i32(i32 min, i32 max)  { return (i32)(rand_u32() % (u32)(max - min + 1)) + min; }
-INLINE f32 rand_f32_01()                     { return rand_u32() / (f32)U32_MAX; }
-INLINE f32 rand_f32_11()                     { return rand_f32_01() * 2.f - 1.f; }
-INLINE f32 rand_f32()                        { return rand_f32_01() * 2 * U16_MAX - U16_MAX; }
-INLINE f32 rand_range_f32(f32 min, f32 max)  { return rand_f32_01() * (max - min) + min ; }
-INLINE b32 rand_b32()                        { return rand_u32()%2; }
+NO_DEBUG inline u32 rand_u32()                        { return xorshift32(&_seed); }
+NO_DEBUG inline u32 rand_range_u32(u32 min, u32 max)  { return (rand_u32() % (max - min + 1)) + min; }
+NO_DEBUG inline i32 rand_i32()                        { return rand_u32(); }
+NO_DEBUG inline i32 rand_range_i32(i32 min, i32 max)  { return (i32)(rand_u32() % (u32)(max - min + 1)) + min; }
+NO_DEBUG inline f32 rand_f32_01()                     { return rand_u32() / (f32)U32_MAX; }
+NO_DEBUG inline f32 rand_f32_11()                     { return rand_f32_01() * 2.f - 1.f; }
+NO_DEBUG inline f32 rand_f32()                        { return rand_f32_01() * 2 * U16_MAX - U16_MAX; }
+NO_DEBUG inline f32 rand_range_f32(f32 min, f32 max)  { return rand_f32_01() * (max - min) + min ; }
+NO_DEBUG inline b32 rand_b32()                        { return rand_u32()%2; }
 
 ////////////////////////////////////////////////////////////////////////
 // Vector2
 
-INLINE v2 v2_zero()                     { return v2{}; }
-INLINE v2 v2_one()                      { return v2(1.0f, 1.0f); }
-INLINE v2 v2_up()                       { return v2(0.0f, 1.0f); }
-INLINE v2 v2_down()                     { return v2(0.0f, -1.0f); }
-INLINE v2 v2_left()                     { return v2(-1.0f, 0.0f); }
-INLINE v2 v2_right()                    { return v2(1.0f, 0.0f); }
-INLINE v2 v2_of_v3(v3 a)                { return v2(a.x, a.y); }
-INLINE v2 v2_of_v4(v4 a)                { return v2(a.x, a.y); }
-INLINE v3 v2_to_v3(v2 a, f32 b)         { return v3(a.x, a.y, b); }
-INLINE v4 v2_to_v4(v2 a, f32 b, f32 c)  { return v4(a.x, a.y, b, c); }
+NO_DEBUG inline v2 v2_zero()                     { return v2{}; }
+NO_DEBUG inline v2 v2_one()                      { return v2(1.0f, 1.0f); }
+NO_DEBUG inline v2 v2_up()                       { return v2(0.0f, 1.0f); }
+NO_DEBUG inline v2 v2_down()                     { return v2(0.0f, -1.0f); }
+NO_DEBUG inline v2 v2_left()                     { return v2(-1.0f, 0.0f); }
+NO_DEBUG inline v2 v2_right()                    { return v2(1.0f, 0.0f); }
+NO_DEBUG inline v2 v2_of_v3(v3 a)                { return v2(a.x, a.y); }
+NO_DEBUG inline v2 v2_of_v4(v4 a)                { return v2(a.x, a.y); }
+NO_DEBUG inline v3 v2_to_v3(v2 a, f32 b)         { return v3(a.x, a.y, b); }
+NO_DEBUG inline v4 v2_to_v4(v2 a, f32 b, f32 c)  { return v4(a.x, a.y, b, c); }
+NO_DEBUG inline v2 v2_of_v2i(v2i a)              { return v2(a.x, a.y); }
+NO_DEBUG inline v2i v2i_of_v2(v2 a)              { return v2i(a.x, a.y); }
 
-INLINE v2  operator+(v2 a, v2 b)          { return v2(a.x + b.x, a.y + b.y); }
-INLINE v2  operator-(v2 a, v2 b)          { return v2(a.x - b.x, a.y - b.y); }
-INLINE v2  operator*(v2 a, f32 scalar)    { return v2(a.x*scalar, a.y*scalar); }
-INLINE v2  operator*(f32 scalar, v2 a)    { return v2(a.x*scalar, a.y*scalar); }
-INLINE v2  operator/(v2 a, f32 scalar)    { return v2(a.x/scalar, a.y/scalar); }
-INLINE v2  operator+=(v2& a, v2 b)        { return a = a + b; }
-INLINE v2  operator-=(v2& a, v2 b)        { return a = a - b; }
-INLINE v2  operator*=(v2& a, f32 scalar)  { return a = a*scalar; }
-INLINE v2  operator/=(v2& a, f32 scalar)  { return a = a/scalar; }
-INLINE b32 operator==(v2 a, v2 b)         { return (Abs(a.x - b.x) <= FloatEpsilon) && (Abs(a.y - b.y) <= FloatEpsilon); }
-INLINE b32 operator!=(v2 a, v2 b)         { return !(a == b); }
-INLINE v2  operator-(v2 a)                { return v2(-a.x, -a.y); }
+NO_DEBUG inline v2  operator+(v2 a, v2 b)          { return v2(a.x + b.x, a.y + b.y); }
+NO_DEBUG inline v2  operator-(v2 a, v2 b)          { return v2(a.x - b.x, a.y - b.y); }
+NO_DEBUG inline v2  operator*(v2 a, f32 scalar)    { return v2(a.x*scalar, a.y*scalar); }
+NO_DEBUG inline v2  operator*(f32 scalar, v2 a)    { return v2(a.x*scalar, a.y*scalar); }
+NO_DEBUG inline v2  operator/(v2 a, f32 scalar)    { return v2(a.x/scalar, a.y/scalar); }
+NO_DEBUG inline v2  operator+=(v2& a, v2 b)        { return a = a + b; }
+NO_DEBUG inline v2  operator-=(v2& a, v2 b)        { return a = a - b; }
+NO_DEBUG inline v2  operator*=(v2& a, f32 scalar)  { return a = a*scalar; }
+NO_DEBUG inline v2  operator/=(v2& a, f32 scalar)  { return a = a/scalar; }
+NO_DEBUG inline b32 operator==(v2 a, v2 b)         { return (Abs(a.x - b.x) <= FloatEpsilon) && (Abs(a.y - b.y) <= FloatEpsilon); }
+NO_DEBUG inline b32 operator!=(v2 a, v2 b)         { return !(a == b); }
+NO_DEBUG inline v2  operator-(v2 a)                { return v2(-a.x, -a.y); }
 
-INLINE f32 v2_length_squared(v2 a)    { return Sqr(a.x) + Sqr(a.y); }
-INLINE f32 v2_length(v2 a)            { return Sqrt(v2_length_squared(a)); }
-INLINE v2  v2_norm(v2 a)              { return a * (1.0f/v2_length(a)); }
-INLINE f32 v2_distance(v2 a, v2 b)    { return v2_length(v2(a.x - b.x, a.y - b.y)); }
-INLINE f32 v2_dot(v2 a, v2 b)         { return a.x*b.x + a.y*b.y; }
-INLINE f32 v2_cross(v2 a, v2 b)       { return a.x*b.y - a.y*b.x; } // if > 0 (b is to the left of a), if < 0 (b is to the right of a), if == 0 (collinear)
-INLINE v2  v2_lerp(v2 a, f32 t, v2 b) { return v2(Lerp(a.x, t, b.x), Lerp(a.y, t, b.y));}
-INLINE v2  v2_skew(v2 a)              { return v2(-a.y, a.x); }
-inline f32 v2_shortest_arc(v2 a, v2 b) {
+NO_DEBUG inline f32 v2_length_squared(v2 a)    { return Sqr(a.x) + Sqr(a.y); }
+NO_DEBUG inline f32 v2_length(v2 a)            { return Sqrt(v2_length_squared(a)); }
+NO_DEBUG inline v2  v2_norm(v2 a)              { return a * (1.0f/v2_length(a)); }
+NO_DEBUG inline f32 v2_distance(v2 a, v2 b)    { return v2_length(v2(a.x - b.x, a.y - b.y)); }
+NO_DEBUG inline f32 v2_dot(v2 a, v2 b)         { return a.x*b.x + a.y*b.y; }
+NO_DEBUG inline f32 v2_cross(v2 a, v2 b)       { return a.x*b.y - a.y*b.x; } // if > 0 (b is to the left of a), if < 0 (b is to the right of a), if == 0 (collinear)
+NO_DEBUG inline v2  v2_lerp(v2 a, f32 t, v2 b) { return v2(Lerp(a.x, t, b.x), Lerp(a.y, t, b.y));}
+NO_DEBUG inline v2  v2_skew(v2 a)              { return v2(-a.y, a.x); }
+
+NO_DEBUG inline f32 v2_shortest_arc(v2 a, v2 b) {
 	a = v2_norm(a);
 	b = v2_norm(b);
 	f32 c = v2_dot(a, b);
 	f32 s = v2_cross(a, b);
 	f32 theta = Acos(c);
-	if (s > 0) {
+	if (s > 0)
 		return theta;
-	} else {
+	else
 		return -theta;
-	}
 }
 
 ////////////////////////////////////////////////////////////////////////
 // Vector3
 
-INLINE v3 v3_zero()              { return v3{}; }
-INLINE v3 v3_one()               { return v3(1, 1, 1); }
-INLINE v3 v3_up()                { return v3(0.0f, 1.0f, 0.0f); }
-INLINE v3 v3_down()              { return v3(0.0f, -1.0f, 0.0f); }
-INLINE v3 v3_left()              { return v3(-1.0f, 0.0f, 0.0f); }
-INLINE v3 v3_right()             { return v3(1.0f, 0.0f, 0.0f); }
-INLINE v3 v3_forward()           { return v3(0.0f, 0.0f, -1.0f); }
-INLINE v3 v3_back()              { return v3(0.0f, 0.0f, 1.0f); }
-INLINE v3 v3_of_v4(v4 a)         { return v3(a.x, a.y, a.z); }
-INLINE v4 v3_to_v4(v3 a, f32 b)  { return v4(a.x, a.y, a.z, b); }
+NO_DEBUG inline v3 v3_zero()              { return v3{}; }
+NO_DEBUG inline v3 v3_one()               { return v3(1, 1, 1); }
+NO_DEBUG inline v3 v3_up()                { return v3(0.0f, 1.0f, 0.0f); }
+NO_DEBUG inline v3 v3_down()              { return v3(0.0f, -1.0f, 0.0f); }
+NO_DEBUG inline v3 v3_left()              { return v3(-1.0f, 0.0f, 0.0f); }
+NO_DEBUG inline v3 v3_right()             { return v3(1.0f, 0.0f, 0.0f); }
+NO_DEBUG inline v3 v3_forward()           { return v3(0.0f, 0.0f, -1.0f); }
+NO_DEBUG inline v3 v3_back()              { return v3(0.0f, 0.0f, 1.0f); }
+NO_DEBUG inline v3 v3_of_v4(v4 a)         { return v3(a.x, a.y, a.z); }
+NO_DEBUG inline v4 v3_to_v4(v3 a, f32 b)  { return v4(a.x, a.y, a.z, b); }
 
-INLINE v3  operator+(v3 a, v3 b)          { return v3(a.x + b.x, a.y + b.y, a.z + b.z); }
-INLINE v3  operator-(v3 a, v3 b)          { return v3(a.x - b.x, a.y - b.y, a.z - b.z); }
-INLINE v3  operator*(v3 a, f32 scalar)    { return v3(a.x*scalar, a.y*scalar, a.z*scalar); }
-INLINE v3  operator*(f32 scalar, v3 a)    { return v3(a.x*scalar, a.y*scalar, a.z*scalar); }
-INLINE v3  operator/(v3 a, f32 scalar)    { return v3(a.x/scalar, a.y/scalar, a.z/scalar); }
-INLINE v3  operator+=(v3& a, v3 b)        { return a = a + b; }
-INLINE v3  operator-=(v3& a, v3 b)        { return a = a - b; }
-INLINE v3  operator*=(v3& a, f32 scalar)  { return a = a * scalar; }
-INLINE v3  operator/=(v3& a, f32 scalar)  { return a = a / scalar; }
-INLINE b32 operator==(v3 a, v3 b)         { return (Abs(a.x - b.x) <= FloatEpsilon) && (Abs(a.y - b.y) <= FloatEpsilon) && (Abs(a.z - b.z) <= FloatEpsilon); }
-INLINE b32 operator!=(v3 a, v3 b)         { return !(a == b); }
-INLINE v3  operator-(v3 a)                { return v3(-a.x, -a.y, -a.z); }
+NO_DEBUG inline v3  operator+(v3 a, v3 b)          { return v3(a.x + b.x, a.y + b.y, a.z + b.z); }
+NO_DEBUG inline v3  operator-(v3 a, v3 b)          { return v3(a.x - b.x, a.y - b.y, a.z - b.z); }
+NO_DEBUG inline v3  operator*(v3 a, f32 scalar)    { return v3(a.x*scalar, a.y*scalar, a.z*scalar); }
+NO_DEBUG inline v3  operator*(f32 scalar, v3 a)    { return v3(a.x*scalar, a.y*scalar, a.z*scalar); }
+NO_DEBUG inline v3  operator/(v3 a, f32 scalar)    { return v3(a.x/scalar, a.y/scalar, a.z/scalar); }
+NO_DEBUG inline v3  operator+=(v3& a, v3 b)        { return a = a + b; }
+NO_DEBUG inline v3  operator-=(v3& a, v3 b)        { return a = a - b; }
+NO_DEBUG inline v3  operator*=(v3& a, f32 scalar)  { return a = a * scalar; }
+NO_DEBUG inline v3  operator/=(v3& a, f32 scalar)  { return a = a / scalar; }
+NO_DEBUG inline b32 operator==(v3 a, v3 b)         { return (Abs(a.x - b.x) <= FloatEpsilon) && (Abs(a.y - b.y) <= FloatEpsilon) && (Abs(a.z - b.z) <= FloatEpsilon); }
+NO_DEBUG inline b32 operator!=(v3 a, v3 b)         { return !(a == b); }
+NO_DEBUG inline v3  operator-(v3 a)                { return v3(-a.x, -a.y, -a.z); }
 
-INLINE f32 v3_length_squared(v3 a)    { return Sqr(a.x) + Sqr(a.y) + Sqr(a.z); }
-INLINE f32 v3_length(v3 a)            { return Sqrt(v3_length_squared(a)); }
-INLINE v3  v3_normalize(v3 a)         { return a * (1.0f/v3_length(a)); }
-INLINE f32 v3_distance(v3 a, v3 b)    { return v3_length(v3(a.x - b.x, a.y - b.y, a.z - b.z)); }
-INLINE f32 v3_dot(v3 a, v3 b)         { return a.x*b.x + a.y*b.y + a.z*b.z; }
-INLINE v3  v3_cross(v3 a, v3 b)       { return v3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x); }
-INLINE v3  v3_lerp(v3 a, f32 t, v3 b) { return v3(Lerp(a.x, t, b.x), Lerp(a.y, t, b.y), Lerp(a.z, t, b.z));}
+NO_DEBUG inline f32 v3_length_squared(v3 a)    { return Sqr(a.x) + Sqr(a.y) + Sqr(a.z); }
+NO_DEBUG inline f32 v3_length(v3 a)            { return Sqrt(v3_length_squared(a)); }
+NO_DEBUG inline v3  v3_normalize(v3 a)         { return a * (1.0f/v3_length(a)); }
+NO_DEBUG inline f32 v3_distance(v3 a, v3 b)    { return v3_length(v3(a.x - b.x, a.y - b.y, a.z - b.z)); }
+NO_DEBUG inline f32 v3_dot(v3 a, v3 b)         { return a.x*b.x + a.y*b.y + a.z*b.z; }
+NO_DEBUG inline v3  v3_cross(v3 a, v3 b)       { return v3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x); }
+NO_DEBUG inline v3  v3_lerp(v3 a, f32 t, v3 b) { return v3(Lerp(a.x, t, b.x), Lerp(a.y, t, b.y), Lerp(a.z, t, b.z));}
 
 ////////////////////////////////////////////////////////////////////////
 // Vector4
 
-INLINE v4  operator+(v4 a, v4 b)          { return v4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w); }
-INLINE v4  operator-(v4 a, v4 b)          { return v4(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w); }
-INLINE v4  operator*(v4 a, f32 scalar)    { return v4(a.x*scalar, a.y*scalar, a.z*scalar, a.w*scalar); }
-INLINE v4  operator*(f32 scalar, v4 a)    { return v4(a.x*scalar, a.y*scalar, a.z*scalar, a.w*scalar); }
-INLINE v4  operator/(v4 a, f32 scalar)    { return v4(a.x/scalar, a.y/scalar, a.z/scalar, a.w/scalar); }
-INLINE v4  operator+=(v4& a, v4 b)        { return a = a + b; }
-INLINE v4  operator-=(v4& a, v4 b)        { return a = a - b; }
-INLINE v4  operator*=(v4& a, f32 scalar)  { return a = a * scalar; }
-INLINE v4  operator/=(v4& a, f32 scalar)  { return a = a / scalar; }
-INLINE v4  operator-(v4 a)                { return v4(-a.x, -a.y, -a.z, -a.w); }
+NO_DEBUG inline v4  operator+(v4 a, v4 b)          { return v4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w); }
+NO_DEBUG inline v4  operator-(v4 a, v4 b)          { return v4(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w); }
+NO_DEBUG inline v4  operator*(v4 a, f32 scalar)    { return v4(a.x*scalar, a.y*scalar, a.z*scalar, a.w*scalar); }
+NO_DEBUG inline v4  operator*(f32 scalar, v4 a)    { return v4(a.x*scalar, a.y*scalar, a.z*scalar, a.w*scalar); }
+NO_DEBUG inline v4  operator/(v4 a, f32 scalar)    { return v4(a.x/scalar, a.y/scalar, a.z/scalar, a.w/scalar); }
+NO_DEBUG inline v4  operator+=(v4& a, v4 b)        { return a = a + b; }
+NO_DEBUG inline v4  operator-=(v4& a, v4 b)        { return a = a - b; }
+NO_DEBUG inline v4  operator*=(v4& a, f32 scalar)  { return a = a * scalar; }
+NO_DEBUG inline v4  operator/=(v4& a, f32 scalar)  { return a = a / scalar; }
+NO_DEBUG inline v4  operator-(v4 a)                { return v4(-a.x, -a.y, -a.z, -a.w); }
 
-INLINE f32 v4_length_squared(v4 a)  { return Sqr(a.x) + Sqr(a.y) + Sqr(a.z) + Sqr(a.w); }
-INLINE f32 v4_length(v4 a)          { return Sqrt(v4_length_squared(a)); }
-INLINE v4  v4_normalize(v4 a)       { return a * (1.0f / v4_length(a)); }
+NO_DEBUG inline f32 v4_length_squared(v4 a)  { return Sqr(a.x) + Sqr(a.y) + Sqr(a.z) + Sqr(a.w); }
+NO_DEBUG inline f32 v4_length(v4 a)          { return Sqrt(v4_length_squared(a)); }
+NO_DEBUG inline v4  v4_normalize(v4 a)       { return a * (1.0f / v4_length(a)); }
 
 ////////////////////////////////////////////////////////////////////////
 // Matrix3
 
-INLINE mat3 mat3_identity() {
+NO_DEBUG inline mat3 mat3_identity() {
   mat3 result = {
     1,0,0,
     0,1,0,
@@ -345,7 +352,7 @@ INLINE mat3 mat3_identity() {
   return result;
 }
 
-INLINE mat3 mat3_translate(v2 pos) {
+NO_DEBUG inline mat3 mat3_translate(v2 pos) {
   mat3 result = {
     1,     0,     0,
     0,     1,     0,
@@ -354,7 +361,7 @@ INLINE mat3 mat3_translate(v2 pos) {
   return result;
 }
 
-INLINE mat3 mat3_scale(v2 scale) {
+NO_DEBUG inline mat3 mat3_scale(v2 scale) {
   mat3 result = {
     scale.x, 0,       0,
     0,       scale.y, 0,
@@ -363,7 +370,7 @@ INLINE mat3 mat3_scale(v2 scale) {
   return result;
 }
 
-inline mat3 operator*(mat3 a, mat3 b) {
+NO_DEBUG inline mat3 operator*(mat3 a, mat3 b) {
   mat3 c = {};
   Loop (row, 3) {
     Loop (col, 3) {
@@ -374,9 +381,9 @@ inline mat3 operator*(mat3 a, mat3 b) {
   }
   return c;
 }
-INLINE mat3& operator*=(mat3& a, mat3 b) { return a = b * a; }
+NO_DEBUG inline mat3& operator*=(mat3& a, mat3 b) { return a = b * a; }
 
-INLINE v3 operator*(mat3 mat, v3 vec) {
+NO_DEBUG inline v3 operator*(mat3 mat, v3 vec) {
   v3 result = {
     mat.e[0]*vec.x + mat.e[1]*vec.y + mat.e[2]*vec.z,
     mat.e[3]*vec.x + mat.e[4]*vec.y + mat.e[5]*vec.z,
@@ -388,7 +395,7 @@ INLINE v3 operator*(mat3 mat, v3 vec) {
 ////////////////////////////////////////////////////////////////////////
 // Matrix4
 
-INLINE mat4 mat4_identity() {
+NO_DEBUG inline mat4 mat4_identity() {
   mat4 result = {
     1,0,0,0,
     0,1,0,0,
@@ -398,7 +405,7 @@ INLINE mat4 mat4_identity() {
   return result;
 }
 
-INLINE mat4 mat4_translate(v3 pos) {
+NO_DEBUG inline mat4 mat4_translate(v3 pos) {
   mat4 result = {
     1,     0,     0,     0,
     0,     1,     0,     0,
@@ -408,7 +415,7 @@ INLINE mat4 mat4_translate(v3 pos) {
   return result;
 }
 
-INLINE mat4 mat4_scale(v3 scale) {
+NO_DEBUG inline mat4 mat4_scale(v3 scale) {
   mat4 mat = {
     scale.x, 0,       0,       0,
     0,       scale.y, 0,       0,
@@ -417,7 +424,7 @@ INLINE mat4 mat4_scale(v3 scale) {
   return mat;
 }
 
-inline mat4 operator*(mat4 a, mat4 b) {
+NO_DEBUG inline mat4 operator*(mat4 a, mat4 b) {
   mat4 c = {};
   Loop (row, 4) {
     Loop (col, 4) {
@@ -429,9 +436,9 @@ inline mat4 operator*(mat4 a, mat4 b) {
   }
   return c;
 }
-inline mat4& operator*=(mat4& a, mat4 b) { return a = b * a; }
+NO_DEBUG inline mat4& operator*=(mat4& a, mat4 b) { return a = b * a; }
 
-inline v4 operator*(mat4 mat, v4 vec) {
+NO_DEBUG inline v4 operator*(mat4 mat, v4 vec) {
   v4 result = {
     mat.e[0 ]*vec.x + mat.e[1 ]*vec.y + mat.e[2 ]*vec.z + mat.e[3 ]*vec.w,
     mat.e[4 ]*vec.x + mat.e[5 ]*vec.y + mat.e[6 ]*vec.z + mat.e[7 ]*vec.w,
@@ -441,7 +448,7 @@ inline v4 operator*(mat4 mat, v4 vec) {
   return result;
 }
 
-inline mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far) {
+NO_DEBUG inline mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far) {
   mat4 result = {
     2/(right - left), 0,                0,                  0,
     0,                2/(top - bottom), 0,                  0,
@@ -451,7 +458,7 @@ inline mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near
   return result;
 }
 
-inline mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 Near, f32 Far) {
+NO_DEBUG inline mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 Near, f32 Far) {
   mat4 result = {
     1/(Tan(fov_radians/2.0f)*aspect_ratio), 0,                       0,                           0,
     0,                                      1/Tan(fov_radians/2.0f), 0,                           0,
@@ -461,7 +468,7 @@ inline mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 Near, f32 Fa
   return result;
 }
 
-inline mat4 mat4_look_at(v3 position, v3 target, v3 up) {
+NO_DEBUG inline mat4 mat4_look_at(v3 position, v3 target, v3 up) {
   v3 z = v3_normalize(position - target);
   v3 x = v3_normalize(v3_cross(up, z));
   v3 y = v3_cross(z, x);
@@ -474,7 +481,7 @@ inline mat4 mat4_look_at(v3 position, v3 target, v3 up) {
   return camera_view;
 }
 
-inline mat4 mat4_transpose(mat4 matrix) {
+NO_DEBUG inline mat4 mat4_transpose(mat4 matrix) {
   mat4 out_matrix = mat4_identity();
   out_matrix.e[0] = matrix.e[0];
   out_matrix.e[1] = matrix.e[4];
@@ -495,7 +502,7 @@ inline mat4 mat4_transpose(mat4 matrix) {
   return out_matrix;
 }
 
-inline mat4 mat4_inverse(mat4 matrix) {
+NO_DEBUG inline mat4 mat4_inverse(mat4 matrix) {
   const f32* m = matrix.e;
 
   f32 t0 = m[10] * m[15];
@@ -553,7 +560,7 @@ inline mat4 mat4_inverse(mat4 matrix) {
   return out_matrix;
 }
 
-INLINE mat4 mat4_rotate_x(f32 angle_radians) {
+NO_DEBUG inline mat4 mat4_rotate_x(f32 angle_radians) {
   f32 cos = Cos(angle_radians);
   f32 sin = Sin(angle_radians);
   mat4 mat = {
@@ -565,7 +572,7 @@ INLINE mat4 mat4_rotate_x(f32 angle_radians) {
   return mat;
 }
 
-INLINE mat4 mat4_rotate_y(f32 angle_radians) {
+NO_DEBUG inline mat4 mat4_rotate_y(f32 angle_radians) {
   f32 cos = Cos(angle_radians);
   f32 sin = Sin(angle_radians);
   mat4 mat = {
@@ -577,7 +584,7 @@ INLINE mat4 mat4_rotate_y(f32 angle_radians) {
   return mat;
 }
 
-INLINE mat4 mat4_rotate_z(f32 angle_radians) {
+NO_DEBUG inline mat4 mat4_rotate_z(f32 angle_radians) {
   f32 cos = Cos(angle_radians);
   f32 sin = Sin(angle_radians);
   mat4 mat = {
@@ -589,7 +596,7 @@ INLINE mat4 mat4_rotate_z(f32 angle_radians) {
   return mat;
 }
 
-INLINE mat4 mat4_rotate_xyz(v3 rot) {
+NO_DEBUG inline mat4 mat4_rotate_xyz(v3 rot) {
   mat4 rx = mat4_rotate_x(rot.x);
   mat4 ry = mat4_rotate_y(rot.y);
   mat4 rz = mat4_rotate_z(rot.z);
@@ -597,12 +604,12 @@ INLINE mat4 mat4_rotate_xyz(v3 rot) {
   return mat;
 }
 
-INLINE mat4 mat4_transform(v3 pos, v3 rot, v3 scale) {
+NO_DEBUG inline mat4 mat4_transform(v3 pos, v3 rot, v3 scale) {
   mat4 result = mat4_translate(pos) * mat4_rotate_xyz(rot) * mat4_scale(scale);
   return result;
 }
 
-INLINE v3 mat4_forward(mat4 matrix) {
+NO_DEBUG inline v3 mat4_forward(mat4 matrix) {
   v3 forward = {
     -matrix.e[2],
     -matrix.e[6],
@@ -612,7 +619,7 @@ INLINE v3 mat4_forward(mat4 matrix) {
   return forward;
 }
 
-INLINE v3 mat4_backward(mat4 matrix) {
+NO_DEBUG inline v3 mat4_backward(mat4 matrix) {
   v3 forward = {
     matrix.e[2],
     matrix.e[6],
@@ -622,7 +629,7 @@ INLINE v3 mat4_backward(mat4 matrix) {
   return forward;
 }
 
-INLINE v3 mat4_up(mat4 matrix) {
+NO_DEBUG inline v3 mat4_up(mat4 matrix) {
   v3 up = {
     matrix.e[1],
     matrix.e[5],
@@ -632,7 +639,7 @@ INLINE v3 mat4_up(mat4 matrix) {
   return up;
 }
 
-INLINE v3 mat4_down(mat4 matrix) {
+NO_DEBUG inline v3 mat4_down(mat4 matrix) {
   v3 down = {
     -matrix.e[1],
     -matrix.e[5],
@@ -642,7 +649,7 @@ INLINE v3 mat4_down(mat4 matrix) {
   return down;
 }
 
-INLINE v3 mat4_left(mat4 matrix) {
+NO_DEBUG inline v3 mat4_left(mat4 matrix) {
   v3 right = {
     -matrix.e[0],
     -matrix.e[4],
@@ -652,7 +659,7 @@ INLINE v3 mat4_left(mat4 matrix) {
   return right;
 }
 
-INLINE v3 mat4_right(mat4 matrix) {
+NO_DEBUG inline v3 mat4_right(mat4 matrix) {
   v3 left = {
     matrix.e[0],
     matrix.e[4],
@@ -665,11 +672,11 @@ INLINE v3 mat4_right(mat4 matrix) {
 ////////////////////////////////////////////////////////////////////////
 // Quaternions
 
-inline quat quat_identity() {
+NO_DEBUG inline quat quat_identity() {
   return quat{0, 0, 0, 1.0f};
 }
 
-inline f32 quat_normal(quat q) {
+NO_DEBUG inline f32 quat_normal(quat q) {
   return Sqrt(
       q.x * q.x +
       q.y * q.y +
@@ -677,7 +684,7 @@ inline f32 quat_normal(quat q) {
       q.w * q.w);
 }
 
-inline quat quat_normalize(quat q) {
+NO_DEBUG inline quat quat_normalize(quat q) {
   f32 normal = quat_normal(q);
   return quat{
       q.x / normal,
@@ -686,7 +693,7 @@ inline quat quat_normalize(quat q) {
       q.w / normal};
 }
 
-inline quat quat_conjugate(quat q) {
+NO_DEBUG inline quat quat_conjugate(quat q) {
   return quat{
       -q.x,
       -q.y,
@@ -694,11 +701,11 @@ inline quat quat_conjugate(quat q) {
       q.w};
 }
 
-inline quat quat_inverse(quat q) {
+NO_DEBUG inline quat quat_inverse(quat q) {
   return quat_normalize(quat_conjugate(q));
 }
 
-inline quat quat_mul(quat q_0, quat q_1) {
+NO_DEBUG inline quat quat_mul(quat q_0, quat q_1) {
   quat out_quaternion;
 
   out_quaternion.x = q_0.x * q_1.w +
@@ -724,14 +731,14 @@ inline quat quat_mul(quat q_0, quat q_1) {
   return out_quaternion;
 }
 
-inline f32 quat_dot(quat q_0, quat q_1) {
+NO_DEBUG inline f32 quat_dot(quat q_0, quat q_1) {
   return q_0.x * q_1.x +
          q_0.y * q_1.y +
          q_0.z * q_1.z +
          q_0.w * q_1.w;
 }
 
-inline mat4 quat_to_mat4(quat q) {
+NO_DEBUG inline mat4 quat_to_mat4(quat q) {
   mat4 out_matrix = mat4_identity();
 
   // https://stackoverflow.com/questions/1556260/convert-quaternion-rotation-to-rotation-matrix
@@ -754,7 +761,7 @@ inline mat4 quat_to_mat4(quat q) {
 }
 
 // Calculates a rotation matrix based on the quaternion and the passed in center point.
-inline mat4 quat_to_rotation_matrix(quat q, v3 center) {
+NO_DEBUG inline mat4 quat_to_rotation_matrix(quat q, v3 center) {
   mat4 out_matrix;
 
   f32* o = out_matrix.e;
@@ -780,7 +787,7 @@ inline mat4 quat_to_rotation_matrix(quat q, v3 center) {
   return out_matrix;
 }
 
-inline quat quat_from_axis_angle(v3 axis, f32 angle, b32 normalize) {
+NO_DEBUG inline quat quat_from_axis_angle(v3 axis, f32 angle, b32 normalize) {
   const f32 half_angle = 0.5f * angle;
   f32 s = Sin(half_angle);
   f32 c = Cos(half_angle);
@@ -792,7 +799,7 @@ inline quat quat_from_axis_angle(v3 axis, f32 angle, b32 normalize) {
   return q;
 }
 
-inline quat quat_slerp(quat q_0, quat q_1, f32 percentage) {
+NO_DEBUG inline quat quat_slerp(quat q_0, quat q_1, f32 percentage) {
   quat out_quaternion;
   // Source: https://en.wikipedia.org/wiki/Slerp
   // Only unit quaternions are valid rotations.

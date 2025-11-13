@@ -298,6 +298,7 @@ VK_State vk;
 
 ////////////////////////////////////////////////////////////////////////
 // @Utils
+
 intern VkSemaphore vk_get_current_image_available_semaphore() { return vk.sync.image_available_semaphores[vk.current_frame]; }
 intern VkSemaphore vk_get_current_render_complete_semaphore() { return vk.sync.render_complete_semaphores[vk.image_index]; }
 intern VkCommandBuffer& vk_get_current_cmd()                  { return vk.cmds[vk.current_frame]; }
@@ -374,6 +375,7 @@ intern String vk_result_string(VkResult result) {
 
 ////////////////////////////////////////////////////////////////////////
 // @Cmd
+
 intern VkCommandBuffer vk_cmd_alloc(VkCommandPool pool) {
   VkCommandBufferAllocateInfo allocate_info = {
     .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -425,6 +427,7 @@ intern void vk_cmd_end_single_use(VkCommandBuffer cmd) {
 
 ////////////////////////////////////////////////////////////////////////
 // @Buffer
+
 intern VK_Buffer vk_buffer_create(u64 size, u32 usage, u32 memory_property_flags) {
   VkBufferCreateInfo buffer_create_info = {
     .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -490,6 +493,7 @@ intern void vk_buffer_upload_to_gpu(VK_Buffer buffer, Range range, void* data) {
 
 ////////////////////////////////////////////////////////////////////////
 // @Shader
+
 intern VkPipelineShaderStageCreateInfo vk_shader_module_create(String name, String type_str, VkShaderStageFlagBits shader_stage_flag) {
   Scratch scratch;
   String filepath = push_strf(scratch, "shaders/compiled/%s.%s.spv", name, type_str);
@@ -927,6 +931,7 @@ void vk_shader_reload(String name, u32 id) {
 
 ////////////////////////////////////////////////////////////////////////
 // @Image
+
 intern VkImageView vk_image_view_create(VkFormat format, VkImage image, VkImageAspectFlags aspect_flags) {
   VkImageViewCreateInfo view_create_info = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -1170,6 +1175,7 @@ intern void vk_resize_texture_target() {
 
 ////////////////////////////////////////////////////////////////////////
 // @Device
+
 struct VK_DevicePhysicalRequirements {
   b8 graphics; 
   b8 present;
@@ -1505,6 +1511,7 @@ intern void vk_device_detect_depth_format(VK_Device* device) {
 
 ////////////////////////////////////////////////////////////////////////
 // @Swapchain
+
 intern void vk_swapchain_create(b32 reuse) {
   vk.device.swapchain_support = vk_device_query_swapchain_support(vk.device.physical_device);
   vk.current_frame = 0;
@@ -1625,30 +1632,10 @@ intern void vk_swapchain_recreate() {
 
 intern u32 vk_swapchain_acquire_next_image_index(VkSemaphore image_available_semaphore) {
   u32 image_index;
-  // VK_CHECK(vkAcquireNextImageKHR(vkdevice, vk.swapchain.handle, U64_MAX,
-  //                                image_available_semaphore, null, &image_index));
   VkResult result = vkAcquireNextImageKHR(vkdevice, vk.swapchain.handle, U64_MAX,
                                           image_available_semaphore, null, &image_index);
-  if (result == VK_SUBOPTIMAL_KHR) {
-    // Warn("vkAcquireNextImageKHR failed with: %s", vk_result_string(result));
-
-    // vkDestroySemaphore(vkdevice, vk_get_current_image_available_semaphore(), vk.allocator);
-    // VkSemaphoreCreateInfo semaphore_create_info = { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-    // vkCreateSemaphore(vkdevice, &semaphore_create_info, vk.allocator, &vk.sync.image_available_semaphores[vk.current_frame]);
-    // VkSemaphore new_semaphore = vk.sync.image_available_semaphores[vk.current_frame];
-
-    // return INVALID_ID;
-
-    // v2i size = os_get_immediate_window_size();
-    // vk.width = size.x;
-    // vk.height = size.y;
-    // vk_swapchain_recreate();
-    // vk_resize_texture_target();
-
-
-    // VkResult result = vkAcquireNextImageKHR(vkdevice, vk.swapchain.handle, U64_MAX,
-    //                                         new_semaphore, null, &image_index);
-    
+  if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+    AssertMsg(false, "vkAcquireNextImageKHR failed with: %s", vk_result_string(result));
   }
   return image_index;
 }
@@ -1673,6 +1660,7 @@ intern void vk_swapchain_present(VkSemaphore render_complete_semaphore, u32 pres
 
 ////////////////////////////////////////////////////////////////////////
 // @Mesh
+
 u32 vk_mesh_load(Mesh mesh) {
   VK_Buffer& vert_buff = vk.vert_buffer;
   u64 vert_size = mesh.vert_count*sizeof(Vertex);
@@ -1692,7 +1680,9 @@ u32 vk_mesh_load(Mesh mesh) {
   };
 
   vk_buffer_upload_to_gpu(vk.vert_buffer, vert_range, mesh.vertices);
-  vk_buffer_upload_to_gpu(vk.index_buffer, index_range, mesh.indexes);
+  if (mesh.indexes) {
+    vk_buffer_upload_to_gpu(vk.index_buffer, index_range, mesh.indexes);
+  }
 
   u32 id = len(vk.meshes);
   append(vk.meshes, vk_mesh);
@@ -1701,6 +1691,7 @@ u32 vk_mesh_load(Mesh mesh) {
 
 ////////////////////////////////////////////////////////////////////////
 // @Drawing
+
 void vk_draw_init() {
   VkDescriptorSet descriptor_set = vk.descriptor_sets;
   
@@ -1787,9 +1778,10 @@ void vk_draw() {
 
       vkCmdPushConstants(cmd, shader.pipeline.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstant), push);
       vkCmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, &mesh.vert_offset);
-      vkCmdBindIndexBuffer(cmd, vk.index_buffer.handle, mesh.index_offset, VK_INDEX_TYPE_UINT32);
+      // vkCmdBindIndexBuffer(cmd, vk.index_buffer.handle, mesh.index_offset, VK_INDEX_TYPE_UINT32);
 
-      vkCmdDrawIndexed(cmd, mesh.index_count, 1, 0, 0, 0);
+      // vkCmdDrawIndexed(cmd, mesh.index_count, 1, 0, 0, 0);
+      vkCmdDraw(cmd, mesh.vert_count, 1, 0, 0);
     }
   }
 
@@ -2204,7 +2196,7 @@ void vk_shutdown() {
   vkDestroyInstance(vk.instance, vk.allocator);
 }
 
-b32 vk_begin_frame() {
+void vk_begin_frame() {
   VK_CHECK(vkWaitForFences(vkdevice, 1, &vk.sync.in_flight_fences[vk.current_frame], true, U64_MAX));
 
   if (vk.size_generation != vk.size_last_generation) {
@@ -2214,9 +2206,6 @@ b32 vk_begin_frame() {
   }
 
   vk.image_index = vk_swapchain_acquire_next_image_index(vk_get_current_image_available_semaphore());
-  if (vk.image_index == INVALID_ID) {
-    return false;
-  }
 
   VkCommandBuffer cmd = vk_get_current_cmd();
   vk_cmd_begin(cmd);
@@ -2239,8 +2228,6 @@ b32 vk_begin_frame() {
     },
   };
   vkCmdSetScissor(cmd, 0, 1, &scissor);
-
-  return true;
 }
 
 void vk_end_frame() {
@@ -2583,10 +2570,15 @@ void vk_end_renderpass(u32 renderpass_id) {
   }
 }
 
+void vk_update_transform(u32 entity_id, Transform trans) {
+  PushConstant& push = vk_get_push_constant(entity_id);
+  push.model = mat4_transform(trans.pos, trans.rot, trans.scale);
+}
 
 ////////////////////////////////////////////////////////////////////////
 // Entity
-KAPI u32 vk_make_renderable(u32 mesh_id, u32 shader_id) {
+
+u32 vk_make_renderable(u32 mesh_id, u32 shader_id) {
   u32 entity_id = append(vk.entity_handlers);
 
   VK_Shader& shader = vk.shaders[shader_id];
@@ -2602,14 +2594,14 @@ KAPI u32 vk_make_renderable(u32 mesh_id, u32 shader_id) {
   return entity_id;
 }
 
-KAPI void vk_remove_renderable(u32 entity_id) {
+void vk_remove_renderable(u32 entity_id) {
   // u32 shader_id = vk.entities_to_shader[entity_id];
   // VK_Shader& shader = vk.shaders[shader_id];
   // remove(shader.entities, entity_id);
   // vk.push_constants.remove(entity_id);
 }
 
-KAPI ShaderEntity& vk_get_entity(u32 entity_id) {
+ShaderEntity& vk_get_entity(u32 entity_id) {
   return vk.entities_data[entity_id];
 }
 
@@ -2661,17 +2653,15 @@ KAPI ShaderEntity& vk_get_entity(u32 entity_id) {
 //   // return *(SpotLight*)vk.spot_light_data.get_data(entity_id);
 // }
 
-// ////////////////////////////////////////////////////////////////////////
-// // Util
-// KAPI PushConstant& vk_push_constant_get(u32 entity_id) {
-//   // return *(PushConstant*)vk.push_constants.get_data(entity_id);
-// }
-
-// KAPI ShaderGlobalState* vk_get_global_state() {
-//   // return (ShaderGlobalState*)vk.storage_buffer.maped_memory;
-// }
-
 ////////////////////////////////////////////////////////////////////////
+// Util
+PushConstant& vk_get_push_constant(u32 entity_id) {
+  return *vk.push_constants.get(entity_id);
+}
+
+ShaderGlobalState* vk_get_shader_state() {
+  return (ShaderGlobalState*)vk.storage_buffer.maped_memory;
+}
 
 f32 ease_in_exp(f32 x) {
 	return x <= 0.0 ? 0.0 : Pow(2, 10.0 * x - 10.0);

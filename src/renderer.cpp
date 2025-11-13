@@ -8,6 +8,8 @@ struct RendererSystemState {
   b8 is_render;
 };
 
+f32 delta_time;
+
 global RendererSystemState st;
 
 void r_init() {
@@ -31,9 +33,7 @@ void r_begin_draw_frame() {
 }
 
 void r_end_draw_frame() {
-  if (!vk_begin_frame()) {
-    return;
-  }
+  vk_begin_frame();
 
   // World
   {
@@ -68,15 +68,12 @@ global MeshState mesh_st;
 
 intern Mesh load_obj(String name) {
   Scratch scratch;
-
   DarrayArena<v3> vertices(scratch);
   DarrayArena<u32> indexes(scratch);
   u32 vert_count = 0;
   u32 index_count = 0;
-
   Buffer buff = res_binary_load(scratch, name);
   Range range = {.offset = (u64)buff.data, .size = buff.size + (u64)buff.data};
-
   String line;
   while ((line = str_read_line(&range))) {
     if (line.str[0] == 'v' && line.str[1] == ' ') { // vertex
@@ -100,7 +97,6 @@ intern Mesh load_obj(String name) {
       }
     }
   }
-
   Mesh mesh = {
     .vertices = push_array(mesh_st.arena, Vertex, vert_count),
     .indexes = push_array(mesh_st.arena, u32, index_count),
@@ -113,9 +109,7 @@ intern Mesh load_obj(String name) {
     };
   }
   MemCopyTyped(mesh.indexes, indexes.data, index_count);
-
   push_buffer(scratch, 10, 4);
-
   return mesh;
 }
 
@@ -136,25 +130,25 @@ Mesh mesh_get(String name) {
 
 ////////////////////////////////////////////////////////////////////////
 // Resource
-struct ResSysState {
+struct ResState {
   Arena* arena;
   String asset_path;
 };
 
-global ResSysState res_st;
+global ResState res_st;
 
-void res_sys_init(String asset_path) {
+void res_init(String asset_path) {
   res_st.arena = arena_alloc();
   res_st.asset_path = push_strf(res_st.arena, "%s/%s", os_get_current_directory(), asset_path);
 }
 
-String res_sys_base_path() {
+String res_base_path() {
   return res_st.asset_path;
 }
 
 Buffer res_binary_load(Arena* arena, String name) {
   Scratch scratch(&arena);
-  String filepath = push_strf(scratch, "%s/%s", res_sys_base_path(), name);
+  String filepath = push_strf(scratch, "%s/%s", res_base_path(), name);
 
   OS_Handle f = os_file_open(filepath, OS_AccessFlag_Read);
   if (!f) {
@@ -185,57 +179,37 @@ Buffer res_binary_load(Arena* arena, String name) {
 // Shader
 struct ShaderSysState {
   Arena* arena;
-  // HashMap hashmap;
-  u32 shader_count;
-  u32 screen_shader_count;
-  u32 compute_shader_count;
+  String shader_dir;
+  String shader_compiled_dir;
+  Map<String, u32> map;
 };
 
 global ShaderSysState shader_st;
 
-#define MaxShaderCount 256
 void shader_init() {
   shader_st.arena = arena_alloc();
-  u8* buff = push_buffer(shader_st.arena, MB(4));
-  MemSet(buff, 0, 1);
-  // shader_st.hashmap = hashmap_create(shader_st.arena, sizeof(Shader), MaxShaderCount);
-  Shader shader = {
-    .id = INVALID_ID,
-  };
-  // hashmap_fill(shader_st.hashmap, &shader);
-
+  shader_st.shader_dir = push_str_cat(shader_st.arena, res_base_path(), "/shaders");
+  shader_st.shader_compiled_dir = push_str_cat(shader_st.arena, shader_st.shader_dir, "/compiled");
   asset_watch_directory_add("shaders", [](String name) {
     Scratch scratch;
-    String shader_dir = push_str_cat(scratch, res_sys_base_path(), "/shaders");
-    String shader_filepath = push_strf(scratch, "%s/%s", shader_dir, name);
-    String shader_compiled_dir = push_str_cat(scratch, shader_dir, "/compiled");
-    String shader_compiled_filepath = push_strf(scratch, "%s/%s%s", shader_compiled_dir, name, String(".spv"));
-
-    String cmd = push_strf(scratch, "glslangValidator.exe -V \"%s\" -o \"%s\"", shader_filepath, shader_compiled_filepath);
-    // os_process_create(cmd);
-  });
-  
+    String shader_filepath = push_strf(scratch, "%s/%s", shader_st.shader_dir, name);
+    String shader_compiled_filepath = push_strf(scratch, "%s/%s%s", shader_st.shader_compiled_dir, name, String(".spv"));
+    String cmd = push_strf(scratch, "glslangValidator -V %s -o %s", shader_filepath, shader_compiled_filepath);
+    os_process_launch(cmd);
+  }, OS_WatchFlag_Modify);
   asset_watch_directory_add("shaders/compiled", [](String name) {
     Scratch scratch;
-    String choped = str_chop_last_dot(name);
-    String choped_choped = str_chop_last_dot(choped);
-    vk_shader_reload(choped_choped, shader_get(choped_choped).id);
-  });
+    String shader_name_with_format = str_chop_last_dot(name);
+    String shader_name = str_chop_last_dot(shader_name_with_format);
+    u32 id = shader_st.map.get(shader_name);
+    vk_shader_reload(shader_name, id);
+  }, OS_WatchFlag_Modify);
 }
 
-void shader_create(Shader shader) {
-  if (shader.type == ShaderType_Gfx) {
-    shader.id = shader_st.shader_count++;
-    // hashmap_set(shader_st.hashmap, shader.name, &shader);
-  } else if (shader.type == ShaderType_Screen) {
-    shader.id = shader_st.screen_shader_count++;
-    // hashmap_set(shader_st.hashmap, shader.name, &shader);
-  } else if (shader.type == ShaderType_Compute) {
-    shader.id = shader_st.compute_shader_count++;
-    // hashmap_set(shader_st.hashmap, shader.name, &shader);
-  }
-
-  // vk_r_shader_create(shader);
+u32 shader_create(String name) {
+  u32 id = vk_shader_load(name);
+  shader_st.map.insert(name, id);;
+  return id;
 }
 
 Shader& shader_get(String name) {
@@ -246,9 +220,9 @@ Shader& shader_get(String name) {
   return a;
 }
 
-
 ////////////////////////////////////////////////////////////////////////
 // Texture
+
 #include "vendor/stb_image.h"
 
 struct TextureSystemState {
@@ -259,25 +233,17 @@ struct TextureSystemState {
 
 global TextureSystemState texture_st;
 
-#define MaxTextureCount 256
 void texture_init() {
   texture_st.arena = arena_alloc();
-  // texture_st.hashmap = hashmap_create(texture_st.arena, sizeof(u32), MaxTextureCount);
-  u32 invalid_id = INVALID_ID;
-  // hashmap_fill(texture_st.hashmap, &invalid_id);
 }
 
 Texture res_texture_load(String name) {
   Scratch scratch;
   Texture texture = {};
-  
   u32 required_channel_count = 4;
   // stbi_set_flip_vertically_on_load(true);
-
-  String filepath = push_strf(scratch, "%s/%s/%s", res_sys_base_path(), String("textures"), name);
-
+  String filepath = push_strf(scratch, "%s/%s/%s", res_base_path(), String("textures"), name);
   String filepath_c = push_str_copy(scratch, filepath);
-
   u8* data = stbi_load(
     (char*)filepath_c.str,
     (i32*)&texture.width,
@@ -288,12 +254,9 @@ Texture res_texture_load(String name) {
     AssertMsg(false, "Image resource loader failed to load file '%s'", filepath);
     return {};
   }
-
   texture.filepath = push_str_copy(texture_st.arena, filepath);
-
   texture.data = data;
   texture.channel_count = required_channel_count;
-  
   return texture;
 }
 

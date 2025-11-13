@@ -599,35 +599,173 @@
 // }
 
 struct Entity {
-  v3 pos;
+  union {
+    Transform trans;
+    struct {
+      v3 pos;
+      v3 rot;
+      v3 scale;
+    };
+  };
   u32 r_id;
   u32 mesh_id;
   u32 shader_id;
 };
 
+struct Camera {
+  mat4 view;
+  mat4 projection;
+  v3 pos;
+  v3 dir;
+  f32 yaw;
+  f32 pitch;
+  f32 fov;
+  b8 view_dirty;
+};
+
 struct GameState {
   Arena* arena;
   Map<String, Mesh> meshes;
+  ShaderGlobalState* shader_state;
+  Array<Entity, 100> entities;
+  Camera camera;
 };
 
 GameState* st;
 
-void app_init(u8** state) {
+////////////////////////////////////////////////////////////////////////
+// Utils
 
+b32 perspective_projection_callback(u32 code, void* sender, void* listener_inst, EventContext context) {
+  f32 width = context.i32[0];
+  f32 height = context.i32[1];
+  st->camera.projection = mat4_perspective(deg_to_rad(st->camera.fov), width / height, 0.1f, 1000.0f);
+  return false;
+};
+
+void camera_update() {
+  Camera& cam = st->camera;
+
+  v2 win_size = v2_of_v2i(os_get_window_size());
+  cam.projection = mat4_perspective(deg_to_rad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
+  // Camera Rotation
+  {
+    f32 rotation_speed = 180.0f;
+    auto camera_yaw = [&](f32 amount) {
+      cam.yaw += amount;
+      cam.view_dirty = true;
+    };
+    if (os_is_key_down(Key_A)) {
+      camera_yaw(-rotation_speed * delta_time);
+    }
+    if (os_is_key_down(Key_D)) {
+      camera_yaw(rotation_speed * delta_time);
+    }
+    auto camera_pitch = [&](f32 amount) {
+      cam.pitch += amount;
+      cam.view_dirty = true;
+    };
+    if (os_is_key_down(Key_R)) {
+      camera_pitch(rotation_speed * delta_time);
+    }
+    if (os_is_key_down(Key_F)) {
+      camera_pitch(-rotation_speed * delta_time);
+    }
+  }
+
+  // Camera movement
+  {
+    f32 speed = 10.0f;
+    v3 velocity = {};
+    if (os_is_key_down(Key_W)) {
+      v3 forward = mat4_forward(cam.view);
+      velocity += forward;
+    }
+    if (os_is_key_down(Key_S)) {
+      v3 backward = mat4_backward(cam.view);
+      velocity += backward;
+    }
+    if (os_is_key_down(Key_Q)) {
+      v3 left = mat4_left(cam.view);
+      velocity += left;
+    }
+    if (os_is_key_down(Key_E)) {
+      v3 right = mat4_right(cam.view);
+      velocity += right;
+    }
+    if (os_is_key_down(Key_Space)) {
+      velocity.y += 1.0f;
+    }
+    if (os_is_key_down(Key_X)) {
+      velocity.y -= 1.0f;
+    }
+    if (velocity != v3_zero()) {
+      velocity = v3_normalize(velocity);
+      cam.pos += velocity * speed * delta_time;
+      cam.view_dirty = true;
+    }
+    // if (os_is_key_pressed(Key_1)) {
+    //   cam.pos = v3_zero();
+    //   cam.view_dirty = true;
+    // }
+  }
+  
+  // Camera Update
+  if (cam.view_dirty) {
+    cam.pitch = Clamp(-89.0f, cam.pitch, 89.0f);
+    cam.dir = {
+      CosD(cam.yaw) * CosD(cam.pitch),
+      SinD(cam.pitch),
+      SinD(cam.yaw) * CosD(cam.pitch)
+    };
+    // cam.view = mat4_look_at(cam.pos, cam.pos + cam.dir, v3_up());
+    cam.view = mat4_translate(cam.pos);
+    cam.view_dirty = false;
+  }
+}
+
+void gpu_data_update() {
+  ShaderGlobalState& shader_st = *st->shader_state;
+  Camera& cam = st->camera;
+  shader_st.projection_view = cam.projection * cam.view;
+  shader_st.projection = cam.projection;
+  shader_st.view = cam.view;
+  for (Entity x : st->entities) {
+    vk_update_transform(x.r_id, x.trans);
+  }
+}
+
+Vertex triangle[] = {
+  {v3(-0.5, 0.0, 0)},
+  {v3(0.5, 0.0, 0)},
+  {v3(0.0, 0.5, 0)},
+};
+
+void app_init(u8** state) {
   Scratch scratch;
   Assign(*state, mem_alloc_zero(sizeof(GameState)));
   Assign(st, *state);
   st->arena = arena_alloc();
-  
-  u32 mesh = mesh_create("models/cube.obj");
-  u32 shader = vk_shader_load("color_shader");
-  Entity e = {
-    .r_id = vk_make_renderable(mesh, shader),
-    .mesh_id = mesh,
-    .shader_id = shader,
+  st->shader_state = vk_get_shader_state();
+  st->camera = {
+    .pos = v3(0,0,-3),
+    // .yaw = -90,
+    .fov = 45,
+    .view_dirty = true,
   };
-  // vk_remove_renderable(e.render_id);
-
+  // u32 mesh = mesh_create("models/cube.obj");
+  Mesh mesh = {
+    .vertices = triangle,
+    .vert_count = 3,
+  };
+  u32 mesh_id = vk_mesh_load(mesh);
+  u32 shader = shader_create("color_shader");
+  Entity e = {
+    .pos = {},
+    .scale = v3_one(),
+    .r_id = vk_make_renderable(mesh_id, shader),
+  };
+  append(st->entities, e);
 }
 
 shared_function void app_update(u8** state) {
@@ -635,11 +773,16 @@ shared_function void app_update(u8** state) {
     app_init(state);
   }
   Assign(st, *state);
-
-  if (os_is_key_pressed(Key_1)) {
-    Info("no");
+  if (os_is_key_down(Key_Escape)) {
+    os_close_window();
   }
+  if (os_is_key_pressed(Key_1)) {
+    st->camera.fov += 5;
+  }
+  if (os_is_key_pressed(Key_2)) {
+    st->camera.fov -= 5;
+  }
+  camera_update();
 
-  Arena* arena = arena_alloc();
-
+  gpu_data_update();
 }

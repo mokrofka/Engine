@@ -1,20 +1,21 @@
 #pragma once
 
-typedef unsigned char      u8;
-typedef unsigned short     u16;
-typedef unsigned int       u32;
-typedef unsigned long long u64;
+#include "stdint.h"
+typedef uint8_t  u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef uint64_t u64;
 
-typedef char      i8;
-typedef short     i16;
-typedef int	      i32;
-typedef long long i64;
+typedef int8_t  i8;
+typedef int16_t i16;
+typedef int32_t	i32;
+typedef int64_t i64;
 
 typedef float  f32;
 typedef double f64;
 
-typedef char  b8;
-typedef int   b32;
+typedef u8  b8;
+typedef i32 b32;
 
 typedef u64 DenseTime;
 
@@ -96,7 +97,8 @@ typedef u64 DenseTime;
 #define Wrap(a,x,b)                   ReverseClamp(a,x,b)
 #define ArrayCount(x)                 (sizeof(x) / sizeof((x)[0]))
 #define ElemSize(x)                   (sizeof(x[0]))
-#define Sqr(x)                        ((x)*(x))
+#define Sqr(x)                        (x*x)
+#define Cube(x)                       (x*x*x)
 #define Sign(x)                       ((x) < 0 ? -1 : (x) > 0 ? 1 : 0)
 #define Abs(x)                        ((x) < 0 ? -(x) : (x))
 #define Compose64Bit(a,b)             (((u64)a << 32) | (u64)b)
@@ -243,8 +245,6 @@ ImplDefer<F> MakeDefer(F f) {
   #define MemCopy(d, s, c)      __builtin_memcpy((d), (s), (c))
   #define MemMatch(a, b, c)    (__builtin_memcmp((a), (b), (c)) == 0)
 
-  //ctz(0b00101000) = 3
-  //clz(0b00101000) = 2
   INLINE u32 count_bits_set32(u32 val) { return __builtin_popcount(val); }
   INLINE u32 count_bits_set64(u64 val) { return __builtin_popcountll(val); }
   INLINE u32 ctz32(u32 val)            { return __builtin_ctz(val); }

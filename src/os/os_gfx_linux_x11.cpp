@@ -289,6 +289,8 @@ void* os_get_gfx_api_thing() {
   return &st.vk_surface;
 }
 
+void  os_close_window() { st.should_close = true; }
+
 ////////////////////////////////////////////////////////////////////////
 // keyboard
 void os_input_update() {

@@ -43,6 +43,7 @@ struct SpotLight {
 // Global state
 layout(std430, set = 0, binding = 0) readonly buffer Buffer {
   mat4 projection_view;
+  mat4 projection;
   mat4 view;
   v4 ambient_color;
   f32 time;
@@ -56,12 +57,12 @@ layout(std430, set = 0, binding = 0) readonly buffer Buffer {
   DirLight dir_lights[KB(1)];
   SpotLight spot_lights[KB(1)];
   
-} g;
+} st;
 
 layout(push_constant) uniform PushConstants {
-  mat4 u_model;
-  u32 u_entity_id;
-};
+  mat4 model;
+  u32 id;
+} push;
 
 v3 norm;
 v3 frag_pos;

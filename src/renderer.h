@@ -3,6 +3,8 @@
 #include "r_types.h"
 #include "vk.h"
 
+KAPI extern f32 delta_time; // I dond't want where it should be
+
 ////////////////////////////////////////////////////////////////////////
 // Renderer
 KAPI void r_init();
@@ -19,15 +21,15 @@ KAPI Mesh mesh_get(String name);
 
 ////////////////////////////////////////////////////////////////////////
 // Resource
-KAPI void res_sys_init(String asset_path);
-String res_sys_base_path();
+KAPI void res_init(String asset_path);
+String res_base_path();
 Buffer res_binary_load(Arena* arena, String filename);
 
 ////////////////////////////////////////////////////////////////////////
 // Shader
 KAPI Shader& shader_get(String name);
 KAPI void shader_init();
-KAPI void shader_create(Shader shader);
+KAPI u32 shader_create(String shader);
 
 ////////////////////////////////////////////////////////////////////////
 // Texture

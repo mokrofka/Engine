@@ -35,6 +35,7 @@ KAPI u8*   os_window_get_buffer();
 KAPI v2i   os_get_window_size();
 KAPI v2i   os_get_immediate_window_size();
 KAPI void* os_get_gfx_api_thing();
+KAPI void  os_close_window();
 
 enum MouseButtons {
   MouseButton_Left,

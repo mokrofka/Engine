@@ -29,8 +29,9 @@ i32 main(i32 count, char* arr[]) {
   os_init();
   os_gfx_init();
   asset_watch_init();
-  res_sys_init("../assets");
+  res_init("../assets");
   r_init();
+
   test();
   
   Scratch scratch;
@@ -40,14 +41,14 @@ i32 main(i32 count, char* arr[]) {
   st.lib_filepath = push_str_cat(scratch, current_dir, "/libgame.so");
   st.lib_temp_filepath = push_str_cat(scratch, current_dir, "/libgame_temp.so");
   
-  os_copy_file_path(st.lib_temp_filepath, st.lib_filepath);
+  os_file_path_copy(st.lib_temp_filepath, st.lib_filepath);
   st.lib = os_lib_open(st.lib_temp_filepath);
   Assign(st.update, os_lib_get_proc(st.lib, "app_update"));
 
   Assert(st.lib && st.update);
   asset_watch_add(st.lib_filepath, []() {
     os_lib_close(st.lib);
-    os_copy_file_path(st.lib_temp_filepath, st.lib_filepath);
+    os_file_path_copy(st.lib_temp_filepath, st.lib_filepath);
     st.lib = os_lib_open(st.lib_temp_filepath);
     Assign(st.update, os_lib_get_proc(st.lib, "app_update"));
   });

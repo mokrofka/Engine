@@ -66,6 +66,7 @@ struct ShaderSpotLight {
 
 struct ShaderGlobalState {
   alignas(16) mat4 projection_view;
+  alignas(16) mat4 projection;
   alignas(16) mat4 view;
   alignas(16) v4 ambient_color;
   alignas(4) f32 time;
@@ -109,13 +110,12 @@ enum ShaderType {
 };
 
 struct Shader {
-  u32 id;
   String name;
+  u32 id;
   ShaderTopology primitive;
   ShaderType type;
   u8 stages;
   b8 is_transparent;
-  u8 attribut[10];
 };
 
 #define VertexAttributeCount 3

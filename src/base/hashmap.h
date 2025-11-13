@@ -2,6 +2,7 @@
 #include "defines.h"
 #include "maths.h"
 #include "logger.h"
+#include "mem.h"
 
 enum {
   MapSlot_Empty,
@@ -70,7 +71,7 @@ struct Map {
 
       cap *= DEFAULT_RESIZE_FACTOR;
       u64 size = (sizeof(T) + sizeof(Key) + sizeof(u8)) * cap;
-      u8* buff = mem_realoc_zero(data, size);
+      u8* buff = mem_realloc_zero(data, size);
 
       data = (T*)buff;
       keys = (Key*)Offset(data, sizeof(T) * cap);

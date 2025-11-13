@@ -7,7 +7,7 @@ u32 vk_mesh_load(Mesh mesh);
 void vk_init();
 void vk_shutdown();
 
-b32 vk_begin_frame();
+void vk_begin_frame();
 void vk_end_frame();
 void vk_begin_renderpass(u32 renderpass_id);
 void vk_end_renderpass(u32 renderpass_id);
@@ -18,10 +18,12 @@ KAPI void vk_texture_load(Texture t);
 void vk_draw();
 void vk_draw_compute();
 
+KAPI void vk_update_transform(u32 entity_id, Transform trans);
+
 // Entity
 KAPI u32 vk_make_renderable(u32 mesh_id, u32 shader_id);
 KAPI void vk_remove_renderable(u32 entity_id);
-KAPI ShaderEntity& vk_shader_get_entity(u32 entity_id);
+KAPI ShaderEntity& vk_get_entity(u32 entity_id);
 
 // Point light
 KAPI void vk_point_light_create(u32 entity_id);
@@ -39,8 +41,8 @@ KAPI void vk_spot_light_destroy(u32 entity_id);
 KAPI SpotLight& vk_spot_light_get(u32 entity_id);
 
 // Util
-KAPI PushConstant& vk_push_constant_get(u32 id);
-KAPI ShaderGlobalState* vk_get_global_state();
+KAPI PushConstant& vk_get_push_constant(u32 id);
+KAPI ShaderGlobalState* vk_get_shader_state();
 KAPI void vk_shader_reload(String name, u32 id);
 
 void vk_draw_screen();
