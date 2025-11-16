@@ -12,8 +12,8 @@
 #define FloatEpsilon   1e-5f
 #define MachineEpsilon 1.1920929e-7f
 
-inline f32 deg_to_rad(f32 degrees) { return degrees * PI / 180.0f; }
-inline f32 rad_to_deg(f32 radians) { return radians * 180.0f / PI; }
+inline f32 degtorad(f32 degrees) { return degrees * PI / 180.0f; }
+inline f32 radtodeg(f32 radians) { return radians * 180.0f / PI; }
 
 struct v2 {
   f32 x;
@@ -136,8 +136,8 @@ struct Transform {
   INLINE f32 Log10(f32 a)               { return __builtin_log10f(a); }
 #endif
 
-NO_DEBUG inline f32 SinD(f32 a)                { return Sin(deg_to_rad(a)); }
-NO_DEBUG inline f32 CosD(f32 a)                { return Cos(deg_to_rad(a)); }
+NO_DEBUG inline f32 SinD(f32 a)                { return Sin(degtorad(a)); }
+NO_DEBUG inline f32 CosD(f32 a)                { return Cos(degtorad(a)); }
 NO_DEBUG inline f32 Lerp(f32 a, f32 t, f32 b)  { return (1 - t)*a + t*b; }
 NO_DEBUG inline f32 Atan2_360(f32 y, f32 x)    { return Atan2(-y, -x) + PI; }
 
@@ -459,12 +459,22 @@ NO_DEBUG inline mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top,
 }
 
 NO_DEBUG inline mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 Near, f32 Far) {
+  f32 fov = Tan(fov_radians/2.0f);
   mat4 result = {
-    1/(Tan(fov_radians/2.0f)*aspect_ratio), 0,                       0,                           0,
-    0,                                      1/Tan(fov_radians/2.0f), 0,                           0,
-    0,                                      0,                     -(Far + Near)/(Far - Near),   -1, // Fliped sign
-    0,                                      0,                     (-2.0f*Far*Near)/(Far - Near), 0  // Fliped sign
+    1/(fov*aspect_ratio),                   0,                       0,                    0,
+    0,                                      1/fov,                   0,                    0,
+    0,                                      0,                       Far/(Far-Near),       1,
+    0,                                      0,                       -Far*Near/(Far-Near), 0
   };
+
+  // NOTE: This flips z value
+  // mat4 result = {
+  //   1/(fov*aspect_ratio), 0,                0,                             0,
+  //   0,                    1/(fov),          0,                             0,
+  //   0,                    0,                -(Far + Near)/(Far - Near),   -1,
+  //   0,                    0,                (-2.0f*Far*Near)/(Far - Near), 0
+  // };
+
   return result;
 }
 

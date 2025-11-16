@@ -376,7 +376,7 @@
 // b32 perspective_projection_callback(u32 code, void* sender, void* listener_inst, EventContext context) {
 //   f32 width = context.i32[0];
 //   f32 height = context.i32[1];
-//   st->camera.projection = mat4_perspective(deg_to_rad(st->camera.fov), width / height, 0.1f, 1000.0f);
+//   st->camera.projection = mat4_perspective(deg2rad(st->camera.fov), width / height, 0.1f, 1000.0f);
 //   return false;
 // };
 
@@ -402,7 +402,7 @@
 //   // auto perspective_projection_callback = [](u32 code, void* sender, void* listener_inst, EventContext context)->b32 {
 //   //   f32 width = context.i32[0];
 //   //   f32 height = context.i32[1];
-//   //   st->camera.projection = mat4_perspective(deg_to_rad(st->camera.fov), width / height, 0.1f, 1000.0f);
+//   //   st->camera.projection = mat4_perspective(deg2rad(st->camera.fov), width / height, 0.1f, 1000.0f);
 //   //   return false;
 //   // };
 
@@ -639,89 +639,129 @@ GameState* st;
 b32 perspective_projection_callback(u32 code, void* sender, void* listener_inst, EventContext context) {
   f32 width = context.i32[0];
   f32 height = context.i32[1];
-  st->camera.projection = mat4_perspective(deg_to_rad(st->camera.fov), width / height, 0.1f, 1000.0f);
+  st->camera.projection = mat4_perspective(degtorad(st->camera.fov), width / height, 0.1f, 1000.0f);
   return false;
 };
 
+// void camera_update() {
+//   Camera& cam = st->camera;
+
+//   v2 win_size = v2_of_v2i(os_get_window_size());
+//   cam.projection = mat4_perspective(deg2rad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
+//   // Camera Rotation
+//   {
+//     f32 rotation_speed = 180.0f;
+//     auto camera_yaw = [&](f32 amount) {
+//       cam.yaw += amount;
+//       cam.view_dirty = true;
+//     };
+//     if (os_is_key_down(Key_A)) {
+//       camera_yaw(-rotation_speed * delta_time);
+//     }
+//     if (os_is_key_down(Key_D)) {
+//       camera_yaw(rotation_speed * delta_time);
+//     }
+//     auto camera_pitch = [&](f32 amount) {
+//       cam.pitch += amount;
+//       cam.view_dirty = true;
+//     };
+//     if (os_is_key_down(Key_R)) {
+//       camera_pitch(rotation_speed * delta_time);
+//     }
+//     if (os_is_key_down(Key_F)) {
+//       camera_pitch(-rotation_speed * delta_time);
+//     }
+//   }
+
+//   // Camera movement
+//   {
+//     f32 speed = 10.0f;
+//     v3 velocity = {};
+//     if (os_is_key_down(Key_W)) {
+//       v3 forward = mat4_forward(cam.view);
+//       velocity += forward;
+//     }
+//     if (os_is_key_down(Key_S)) {
+//       v3 backward = mat4_backward(cam.view);
+//       velocity += backward;
+//     }
+//     if (os_is_key_down(Key_Q)) {
+//       v3 left = mat4_left(cam.view);
+//       velocity += left;
+//     }
+//     if (os_is_key_down(Key_E)) {
+//       v3 right = mat4_right(cam.view);
+//       velocity += right;
+//     }
+//     if (os_is_key_down(Key_Space)) {
+//       velocity.y += 1.0f;
+//     }
+//     if (os_is_key_down(Key_X)) {
+//       velocity.y -= 1.0f;
+//     }
+//     if (velocity != v3_zero()) {
+//       velocity = v3_normalize(velocity);
+//       cam.pos += velocity * speed * delta_time;
+//       cam.view_dirty = true;
+//     }
+//     // if (os_is_key_pressed(Key_1)) {
+//     //   cam.pos = v3_zero();
+//     //   cam.view_dirty = true;
+//     // }
+//   }
+  
+//   // Camera Update
+//   if (cam.view_dirty) {
+//     cam.pitch = Clamp(-89.0f, cam.pitch, 89.0f);
+//     cam.dir = {
+//       CosD(cam.yaw) * CosD(cam.pitch),
+//       SinD(cam.pitch),
+//       SinD(cam.yaw) * CosD(cam.pitch)
+//     };
+//     // cam.view = mat4_look_at(cam.pos, cam.pos + cam.dir, v3_up());
+//     cam.view = mat4_translate(cam.pos);
+//     cam.view_dirty = false;
+//   }
+// }
+
 void camera_update() {
   Camera& cam = st->camera;
+  f32 speed = 0.1;
+  if (os_is_key_down(Key_W)) {
+    cam.pos.z += speed;
+    // st->entities[0].pos.z += speed;
+  }
+  if (os_is_key_down(Key_S)) {
+    cam.pos.z -= speed;
+    // st->entities[0].pos.z -= speed;
+  }
+  if (os_is_key_down(Key_A)) {
+    cam.pos.x -= speed;
+  }
+  if (os_is_key_down(Key_D)) {
+    cam.pos.x += speed;
+  }
+  if (os_is_key_down(Key_Space)) {
+    cam.pos.y += speed;
+  }
+  if (os_is_key_down(Key_X)) {
+    cam.pos.y -= speed;
+  }
+  cam.view = mat4_inverse(mat4_translate(cam.pos));
+  // cam.view = mat4_translate(cam.pos);
+
+  {
+    local f32 timer;
+    timer += delta_time;
+    if (timer >= 0.3) {
+      timer = 0;
+      Info("x: %f z: %f", cam.pos.x, cam.pos.z);
+      // Info("x: %f z: %f", st->entities[0].pos.x, st->entities[0].pos.z);
+    }
+  }
 
   v2 win_size = v2_of_v2i(os_get_window_size());
-  cam.projection = mat4_perspective(deg_to_rad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
-  // Camera Rotation
-  {
-    f32 rotation_speed = 180.0f;
-    auto camera_yaw = [&](f32 amount) {
-      cam.yaw += amount;
-      cam.view_dirty = true;
-    };
-    if (os_is_key_down(Key_A)) {
-      camera_yaw(-rotation_speed * delta_time);
-    }
-    if (os_is_key_down(Key_D)) {
-      camera_yaw(rotation_speed * delta_time);
-    }
-    auto camera_pitch = [&](f32 amount) {
-      cam.pitch += amount;
-      cam.view_dirty = true;
-    };
-    if (os_is_key_down(Key_R)) {
-      camera_pitch(rotation_speed * delta_time);
-    }
-    if (os_is_key_down(Key_F)) {
-      camera_pitch(-rotation_speed * delta_time);
-    }
-  }
-
-  // Camera movement
-  {
-    f32 speed = 10.0f;
-    v3 velocity = {};
-    if (os_is_key_down(Key_W)) {
-      v3 forward = mat4_forward(cam.view);
-      velocity += forward;
-    }
-    if (os_is_key_down(Key_S)) {
-      v3 backward = mat4_backward(cam.view);
-      velocity += backward;
-    }
-    if (os_is_key_down(Key_Q)) {
-      v3 left = mat4_left(cam.view);
-      velocity += left;
-    }
-    if (os_is_key_down(Key_E)) {
-      v3 right = mat4_right(cam.view);
-      velocity += right;
-    }
-    if (os_is_key_down(Key_Space)) {
-      velocity.y += 1.0f;
-    }
-    if (os_is_key_down(Key_X)) {
-      velocity.y -= 1.0f;
-    }
-    if (velocity != v3_zero()) {
-      velocity = v3_normalize(velocity);
-      cam.pos += velocity * speed * delta_time;
-      cam.view_dirty = true;
-    }
-    // if (os_is_key_pressed(Key_1)) {
-    //   cam.pos = v3_zero();
-    //   cam.view_dirty = true;
-    // }
-  }
-  
-  // Camera Update
-  if (cam.view_dirty) {
-    cam.pitch = Clamp(-89.0f, cam.pitch, 89.0f);
-    cam.dir = {
-      CosD(cam.yaw) * CosD(cam.pitch),
-      SinD(cam.pitch),
-      SinD(cam.yaw) * CosD(cam.pitch)
-    };
-    // cam.view = mat4_look_at(cam.pos, cam.pos + cam.dir, v3_up());
-    cam.view = mat4_translate(cam.pos);
-    cam.view_dirty = false;
-  }
+  cam.projection = mat4_perspective(degtorad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
 }
 
 void gpu_data_update() {
@@ -736,9 +776,9 @@ void gpu_data_update() {
 }
 
 Vertex triangle[] = {
-  {v3(-0.5, 0.0, 0)},
-  {v3(0.5, 0.0, 0)},
-  {v3(0.0, 0.5, 0)},
+  {v3( 0.0,   0.5, 0)},
+  {v3(-0.5,  -0.5, 0)},
+  {v3( 0.5,  -0.5, 0)},
 };
 ShaderInfo shader_type_get(u32 id) {
   return shader_types[id];
@@ -751,7 +791,7 @@ void app_init(u8** state) {
   st->arena = arena_alloc();
   st->shader_state = vk_get_shader_state();
   st->camera = {
-    .pos = v3(0,0,-3),
+    .pos = v3(0,0,3),
     // .yaw = -90,
     .fov = 45,
     .view_dirty = true,

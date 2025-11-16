@@ -21,6 +21,7 @@ void r_init() {
   
   vk_init();
   
+  shader_create("screen_shader", ShaderType_Screen);
   // ui_init();
 }
 
@@ -50,9 +51,9 @@ void r_end_draw_frame() {
   // }
 
   {
-    vk_begin_renderpass(Renderpass_Screen);
-    vk_draw_screen();
-    vk_end_renderpass(Renderpass_Screen);
+    // vk_begin_renderpass(Renderpass_Screen);
+    // vk_draw_screen();
+    // vk_end_renderpass(Renderpass_Screen);
   }
 
   vk_end_frame();

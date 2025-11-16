@@ -32,10 +32,6 @@ struct OS_FileInfo {
   FileProperties props;
 };
 
-struct OS_ProcessInfo {
-  String binary_path;
-};
-
 enum OS_AccessFlags {
   OS_AccessFlag_Read       = Bit(0),
   OS_AccessFlag_Write      = Bit(1),

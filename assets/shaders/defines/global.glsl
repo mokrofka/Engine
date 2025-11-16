@@ -56,7 +56,6 @@ layout(std430, set = 0, binding = 0) readonly buffer Buffer {
   PointLight point_lights[KB(1)];
   DirLight dir_lights[KB(1)];
   SpotLight spot_lights[KB(1)];
-  
 } st;
 
 layout(push_constant) uniform PushConstants {

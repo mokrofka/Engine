@@ -1,31 +1,6 @@
 #pragma once
 #include "lib.h"
 
-// struct WindowConfig {
-//   i32 position_x;
-//   i32 position_y;
-//   u32 width;
-//   u32 height;
-//   String title;
-//   String name;
-// };
-
-// struct Window {
-//   String name;
-//   String title;
-
-//   Rect a;
-//   u32 width;
-//   u32 height;
-
-//   f32 device_pixel_ratio;
-//   u32 frames_since_resize;
-
-//   b8 resizing;
-
-//   OS_Handle hwnd;
-// };
-
 KAPI void os_gfx_init();
 KAPI void os_gfx_shutdown();
 
@@ -33,7 +8,6 @@ KAPI void  os_pump_messages();
 KAPI b32   os_window_should_close();
 KAPI u8*   os_window_get_buffer();
 KAPI v2i   os_get_window_size();
-KAPI v2i   os_get_immediate_window_size();
 KAPI void* os_get_gfx_api_thing();
 KAPI void  os_close_window();
 
@@ -169,6 +143,7 @@ KAPI void os_process_key(Key key, b32 pressed);
 
 ////////////////////////////////////////////////////////////////////////
 // mouse
+
 KAPI b32 os_is_button_down(MouseButtons button);
 KAPI b32 os_is_button_up(MouseButtons button);
 KAPI b32 os_was_button_down(MouseButtons button);

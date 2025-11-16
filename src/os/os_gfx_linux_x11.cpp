@@ -271,17 +271,6 @@ void os_pump_messages() {
 
 b32 os_window_should_close() { return st.should_close; }
 v2i os_get_window_size() { return v2i(st.width, st.height); }
-v2i os_get_immediate_window_size() { 
-  v2i result = {};
-  xcb_get_geometry_cookie_t geom_cookie = xcb_get_geometry(st.connection, st.window);
-  xcb_get_geometry_reply_t* geom_reply = xcb_get_geometry_reply(st.connection, geom_cookie, null);
-  if (geom_reply) {
-    result.x = geom_reply->width;
-    result.y = geom_reply->height;
-    free(geom_reply);
-  }
-  return result;
-}
 v2i os_get_mouse_pos() { return v2i(st.input.mouse_current.x, st.input.mouse_current.y); }
 
 void* os_get_gfx_api_thing() {

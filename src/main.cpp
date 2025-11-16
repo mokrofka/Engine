@@ -84,7 +84,7 @@ i32 main(i32 count, char* arr[]) {
     timer += delta_time;
     if (timer >= 1.0) {
       timer = 0;
-      Info("Frame rate: %f ms, %f fps", delta_time, 1/delta_time);
+      // Info("Frame rate: %f ms, %f fps", delta_time, 1/delta_time);
     }
   }
 
