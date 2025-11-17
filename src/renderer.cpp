@@ -73,7 +73,7 @@ intern Mesh load_obj(String name) {
   DarrayArena<u32> indexes(scratch);
   u32 vert_count = 0;
   u32 index_count = 0;
-  Buffer buff = res_binary_load(scratch, name);
+  Buffer buff = os_file_all_read(scratch, name);
   Range range = {.offset = (u64)buff.data, .size = buff.size + (u64)buff.data};
   String line;
   while ((line = str_read_line(&range))) {
@@ -125,55 +125,26 @@ u32 mesh_create(String name) {
 }
 
 Mesh mesh_get(String name) {
-
   return {};
 }
 
 ////////////////////////////////////////////////////////////////////////
-// Resource
-struct ResState {
+// Asset
+
+struct AssetState {
   Arena* arena;
   String asset_path;
 };
 
-global ResState res_st;
+global AssetState asset_st;
 
-void res_init(String asset_path) {
-  res_st.arena = arena_alloc();
-  res_st.asset_path = push_strf(res_st.arena, "%s/%s", os_get_current_directory(), asset_path);
+void asset_init(String asset_path) {
+  asset_st.arena = arena_alloc();
+  asset_st.asset_path = push_strf(asset_st.arena, "%s/%s", os_get_current_directory(), asset_path);
 }
 
-String res_base_path() {
-  return res_st.asset_path;
-}
-
-Buffer res_binary_load(Arena* arena, String name) {
-  Scratch scratch(&arena);
-  String filepath = push_strf(scratch, "%s/%s", res_base_path(), name);
-
-  OS_Handle f = os_file_open(filepath, OS_AccessFlag_Read);
-  if (!f) {
-    Error("res_binary_load - unable to open file: '%s'", filepath);
-    os_file_close(f);
-    return {};
-  }
-
-  u64 file_size = os_file_size(f);
-  u8* buffer = push_buffer(arena, file_size);
-  u64 read_size = os_file_read(f, file_size, buffer);
-  if (read_size == 0) {
-    Error("Unable to binary read file: %s", filepath);
-    os_file_close(f);
-    return {};
-  }
-
-  Buffer result = {
-    .data = buffer,
-    .size = file_size,
-  };
-
-  os_file_close(f);
-  return result;
+String asset_base_path() {
+  return asset_st.asset_path;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -196,7 +167,7 @@ u32 shader_create(String name, ShaderType type) {
 
 void shader_init() {
   shader_st.arena = arena_alloc();
-  shader_st.shader_dir = push_str_cat(shader_st.arena, res_base_path(), "/shaders");
+  shader_st.shader_dir = push_str_cat(shader_st.arena, asset_base_path(), "/shaders");
   shader_st.shader_compiled_dir = push_str_cat(shader_st.arena, shader_st.shader_dir, "/compiled");
   asset_watch_directory_add("shaders", [](String name) {
     Scratch scratch;
@@ -235,44 +206,34 @@ struct TextureState {
 
 global TextureState texture_st;
 
+intern Texture image_load(String name) {
+  Scratch scratch;
+  Texture texture = {};
+  u32 required_channel_count = 4;
+  u32 channel_count;
+  String filepath = push_strf(scratch, "%s/%s/%s", asset_base_path(), String("textures"), name);
+  u8* data = stbi_load(
+    (char*)filepath.str,
+    (i32*)&texture.width,
+    (i32*)&texture.height,
+    (i32*)&channel_count,
+    required_channel_count);
+
+  Assert(data);
+
+  texture.channel_count = required_channel_count;
+  texture.data = data;
+  return texture;
+}
+
 void texture_init() {
   texture_st.arena = arena_alloc();
 }
 
-Texture res_texture_load(String name) {
-  Scratch scratch;
-  Texture texture = {};
-  u32 required_channel_count = 4;
-  // stbi_set_flip_vertically_on_load(true);
-  String filepath = push_strf(scratch, "%s/%s/%s", res_base_path(), String("textures"), name);
-  String filepath_c = push_str_copy(scratch, filepath);
-  u8* data = stbi_load(
-    (char*)filepath_c.str,
-    (i32*)&texture.width,
-    (i32*)&texture.height,
-    (i32*)&texture.channel_count,
-    required_channel_count);
-  if (!data) {
-    AssertMsg(false, "Image resource loader failed to load file '%s'", filepath);
-    return {};
-  }
-  texture.filepath = push_str_copy(texture_st.arena, filepath);
-  texture.data = data;
-  texture.channel_count = required_channel_count;
-  return texture;
-}
-
-void res_texture_unload(void* data) {
-  stbi_image_free(data);
-}
-
-intern void destroy_texture(Texture* t) {
-  res_texture_unload(t->data);
-}
-
-void texture_load(String name) {
-  Texture texture = res_texture_load(name);
+u32 texture_load(String name) {
+  Texture texture = image_load(name);
   vk_texture_load(texture);
+  return 0;
 }
 
 KAPI Texture& texture_get(String name) {

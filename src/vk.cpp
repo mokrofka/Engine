@@ -147,8 +147,10 @@ struct VK_State {
   
   VkDescriptorPool descriptor_pool;
   VkDescriptorSetLayout descriptor_set_layout;
+  VkDescriptorSetLayout screen_descriptor_set_layout;
   VkDescriptorSet descriptor_sets;
-  VkDescriptorSet screen_descriptor_sets[FramesInFlight];
+  // VkDescriptorSet screen_descriptor_sets[FramesInFlight];
+  VkDescriptorSet screen_descriptor_sets;
 
   VkDescriptorSetLayout compute_descriptor_set_layout;
   VkDescriptorSet compute_descriptor_sets[FramesInFlight];
@@ -709,8 +711,8 @@ intern Array<VkPipelineShaderStageCreateInfo, 2> vk_shader_module_create(String 
   Loop (i, 2) {
     String stage_type_strs[] = {"vert", "frag"};
     VkShaderStageFlagBits stage_types[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
-    String filepath = push_strf(scratch, "shaders/compiled/%s.%s.spv", name, stage_type_strs[i]);
-    Buffer binary = res_binary_load(scratch, filepath);
+    String filepath = push_strf(scratch, "%s/shaders/compiled/%s.%s.spv", asset_base_path(), name, stage_type_strs[i]);
+    Buffer binary = os_file_all_read(scratch, filepath);
     if (!binary.data) {
       AssertMsg(false, "Unable to read shader module: %s", filepath);
     }
@@ -792,15 +794,19 @@ intern void vk_shader_init() {
   Scratch scratch;
 
   // Pool
+  // #define TextureMax vk.frames_in_flight + 1 // and one for triangle
+  #define TextureMax 1 // and one for triangle
+  #define StorageBufferMax 1                 // one huge buffer
+  #define SetsMax 1                          // for rendering and screen target
   {
     VkDescriptorPoolSize pool_sizes[] = {
-      {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 256},
-      {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 256},
+      {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, TextureMax},
+      {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, StorageBufferMax},
     };
     VkDescriptorPoolCreateInfo pool_info = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
       .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
-      .maxSets = vk.frames_in_flight,
+      .maxSets = SetsMax,
       .poolSizeCount = ArrayCount(pool_sizes),
       .pPoolSizes = pool_sizes,
     };
@@ -829,28 +835,42 @@ intern void vk_shader_init() {
       .pBindings = layout_bindings,
     };
     VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &layout_info, vk.allocator, &vk.descriptor_set_layout));
+    
+    VkDescriptorSetLayoutBinding screen_layout_bindings[] = {
+      {
+        .binding = 0,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .descriptorCount = vk.frames_in_flight,
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+      },
+    };
+    VkDescriptorSetLayoutCreateInfo screen_layout_info = {
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+      .bindingCount = ArrayCount(screen_layout_bindings),
+      .pBindings = screen_layout_bindings,
+    };
+    VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &screen_layout_info, vk.allocator, &vk.screen_descriptor_set_layout));
   }
 
   // Descriptor
   {
-    VkDescriptorSetLayout* layouts = push_array(scratch, VkDescriptorSetLayout, vk.frames_in_flight);
-    Loop (i, vk.frames_in_flight) {
-      layouts[i] = vk.descriptor_set_layout;
-    }
     VkDescriptorSetAllocateInfo alloc_info = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
       .descriptorPool = vk.descriptor_pool,
-      .descriptorSetCount = vk.frames_in_flight,
-      .pSetLayouts = layouts,
+      .descriptorSetCount = 1,
+      .pSetLayouts = &vk.descriptor_set_layout,
     };
-    VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, vk.screen_descriptor_sets));
-    VkDescriptorSetAllocateInfo alloc_info1 = {
+    VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, &vk.descriptor_sets));
+
+    VkDescriptorSetAllocateInfo screen_alloc_info = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
       .descriptorPool = vk.descriptor_pool,
       .descriptorSetCount = 1,
-      .pSetLayouts = layouts,
+      .pSetLayouts = &vk.screen_descriptor_set_layout,
     };
-    VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, &vk.descriptor_sets));
+    // VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, vk.screen_descriptor_sets));
+    // VkResult r = vkAllocateDescriptorSets(vkdevice, &alloc_info, &vk.screen_descriptor_sets);
+    // vk_result_string(r);
   }
 
   // Mem for shaders
@@ -1075,6 +1095,23 @@ void vk_texture_load(Texture t) {
   };
   
   VK_CHECK(vkCreateSampler(vkdevice, &sampler_info, vk.allocator, &texture.sampler));
+
+  VkDescriptorImageInfo image_info = {
+    .sampler = vk.texture.sampler,
+    .imageView = vk.texture.image.view,
+    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+  };
+  VkWriteDescriptorSet texture_descriptor = {
+    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+    .dstSet = vk.descriptor_sets,
+    .dstBinding = 1,
+    .dstArrayElement = 0,
+    .descriptorCount = 1,
+    .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+    .pImageInfo = &image_info,
+  };
+  VkWriteDescriptorSet descriptors[] = {texture_descriptor};
+  vkUpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
 }
 
 intern void vk_resize_texture_target() {
@@ -1644,48 +1681,30 @@ void vk_draw_init() {
     .pBufferInfo = &buffer_info,
   };
   
-  // // Texture
-  // VkDescriptorImageInfo image_info = {
-  //   .sampler = vk.texture.sampler,
-  //   .imageView = vk.texture.image.view,
-  //   .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-  // };
-  // VkWriteDescriptorSet texture_descriptor = {
-  //   .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-  //   .dstSet = descriptor_set,
-  //   .dstBinding = 1,
-  //   .descriptorCount = 1,
-  //   .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-  //   .pImageInfo = &image_info,
-  // };
-  // VkWriteDescriptorSet descriptors[] = {ubo_descriptor, texture_descriptor};
   VkWriteDescriptorSet descriptors[] = {ubo_descriptor};
   vkUpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
 }
 
 void vk_screen_descriptor_update(u32 id) {
-  // Loop (i, FramesInFlight) {
-    VkDescriptorSet descriptor_set = vk.screen_descriptor_sets[vk.current_frame];
-    
-    // Texture
-    VkDescriptorImageInfo image_info = {
-      .sampler = vk.texture_targets[id].sampler,
-      .imageView = vk.texture_targets[id].image.view,
-      .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    };
+  VkDescriptorSet descriptor_set = vk.screen_descriptor_sets;
+  
+  VkDescriptorImageInfo image_info = {
+    .sampler = vk.texture_targets[id].sampler,
+    .imageView = vk.texture_targets[id].image.view,
+    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+  };
 
-    VkWriteDescriptorSet texture_descriptor = {
-      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-      .dstSet = descriptor_set,
-      .dstBinding = 1,
-      .descriptorCount = 1,
-      .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .pImageInfo = &image_info,
-    };
+  VkWriteDescriptorSet texture_descriptor = {
+    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+    .dstSet = descriptor_set,
+    .dstBinding = 1,
+    .descriptorCount = 1,
+    .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+    .pImageInfo = &image_info,
+  };
 
-    VkWriteDescriptorSet descriptors[] = {texture_descriptor};
-    vkUpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
-  // }
+  VkWriteDescriptorSet descriptors[] = {texture_descriptor};
+  vkUpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
 }
 
 void vk_draw() {
@@ -1693,13 +1712,6 @@ void vk_draw() {
 
   VK_Shader& shader = vk.shaders[0];
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader.pipeline.pipeline_layout, 0, 1, &vk.descriptor_sets, 0, null);
-
-  // u8 arr[100];
-  // vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader.pipeline.handle);
-  // vkCmdPushConstants(cmd, shader.pipeline.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 8, arr);
-  // VkDeviceSize offset = {};
-  // vkCmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, &offset);
-  // vkCmdDraw(cmd, 3, 1, 0, 0);
 
   for (VK_Shader shader : vk.shaders) {
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader.pipeline.handle);
@@ -1727,7 +1739,7 @@ void vk_draw_screen() {
   VkPipelineLayout pipeline_layout = vk.screen_shader.pipeline.pipeline_layout;
   VkPipeline pipeline = vk.screen_shader.pipeline.handle;
 
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &vk.screen_descriptor_sets[vk.current_frame], 0, null);
+  // vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &vk.screen_descriptor_sets[vk.current_frame], 0, null);
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
   vkCmdDraw(cmd, 3, 1, 0, 0);
   
@@ -2025,49 +2037,49 @@ void vk_init() {
 
   // Target texture render
   {
-    Loop (i, vk.images_in_flight) {
-      vk.texture_targets[i].image = vk_image_create(
-        VK_IMAGE_TYPE_2D,
-        vk.width, vk.height,
-        VK_FORMAT_B8G8R8A8_UNORM,
-        // VK_FORMAT_R8G8B8A8_UNORM,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        true,
-        VK_IMAGE_ASPECT_COLOR_BIT);
+    // Loop (i, vk.images_in_flight) {
+    //   vk.texture_targets[i].image = vk_image_create(
+    //     VK_IMAGE_TYPE_2D,
+    //     vk.width, vk.height,
+    //     VK_FORMAT_B8G8R8A8_UNORM,
+    //     // VK_FORMAT_R8G8B8A8_UNORM,
+    //     VK_IMAGE_TILING_OPTIMAL,
+    //     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+    //     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    //     true,
+    //     VK_IMAGE_ASPECT_COLOR_BIT);
 
-      VkSamplerCreateInfo sampler_info = {
-        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-        .magFilter = VK_FILTER_LINEAR,
-        .minFilter = VK_FILTER_LINEAR,
-        .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
-        .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-        .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-        .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-        .mipLodBias = 0.0f,
-        .anisotropyEnable = VK_FALSE,
-        .maxAnisotropy = 1,
-        .compareEnable = VK_FALSE,
-        .compareOp = VK_COMPARE_OP_ALWAYS,
-        .minLod = 0.0f,
-        .maxLod = 0.0f,
-        .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
-        .unnormalizedCoordinates = VK_FALSE,
-      };
-      VK_CHECK(vkCreateSampler(vkdevice, &sampler_info, vk.allocator, &vk.texture_targets[i].sampler));
-    }
+    //   VkSamplerCreateInfo sampler_info = {
+    //     .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+    //     .magFilter = VK_FILTER_LINEAR,
+    //     .minFilter = VK_FILTER_LINEAR,
+    //     .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+    //     .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+    //     .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+    //     .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+    //     .mipLodBias = 0.0f,
+    //     .anisotropyEnable = VK_FALSE,
+    //     .maxAnisotropy = 1,
+    //     .compareEnable = VK_FALSE,
+    //     .compareOp = VK_COMPARE_OP_ALWAYS,
+    //     .minLod = 0.0f,
+    //     .maxLod = 0.0f,
+    //     .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+    //     .unnormalizedCoordinates = VK_FALSE,
+    //   };
+    //   VK_CHECK(vkCreateSampler(vkdevice, &sampler_info, vk.allocator, &vk.texture_targets[i].sampler));
+    // }
 
-    vk.offscreen_depth_buffer = vk_image_create(
-      VK_IMAGE_TYPE_2D,
-      vk.width,
-      vk.height,
-      vk.device.depth_format,
-      VK_IMAGE_TILING_OPTIMAL,
-      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-      true,
-      VK_IMAGE_ASPECT_DEPTH_BIT);
+    // vk.offscreen_depth_buffer = vk_image_create(
+    //   VK_IMAGE_TYPE_2D,
+    //   vk.width,
+    //   vk.height,
+    //   vk.device.depth_format,
+    //   VK_IMAGE_TILING_OPTIMAL,
+    //   VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+    //   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    //   true,
+    //   VK_IMAGE_ASPECT_DEPTH_BIT);
   }
 
   Info("Vulkan renderer initialized");
@@ -2135,7 +2147,7 @@ void vk_begin_frame() {
   if (vk.size_generation != vk.size_last_generation) {
     VK_CHECK(vkDeviceWaitIdle(vkdevice));
     vk_swapchain_recreate();
-    vk_resize_texture_target();
+    // vk_resize_texture_target();
   }
 
   vk.image_index = vk_swapchain_acquire_next_image_index(vk_get_current_image_available_semaphore());
@@ -2143,6 +2155,15 @@ void vk_begin_frame() {
   VkCommandBuffer cmd = vk_get_current_cmd();
   vk_cmd_begin(cmd);
   
+  // VkViewport viewport = {
+  //   .x = 0.0f,
+  //   .y = 0,
+  //   .width = (f32)vk.width,
+  //   .height = (f32)vk.height,
+  //   .minDepth = 0.0f,
+  //   .maxDepth = 1.0f,
+  // };
+  // NOTE: we flip Y coordinate so positive Y is on top of screen
   VkViewport viewport = {
     .x = 0.0f,
     .y = (f32)vk.height,

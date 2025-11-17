@@ -84,12 +84,9 @@ struct Vertex2D {
 };
 
 struct Texture {
-  u32 id;
-  String filepath;
   u32 width;
   u32 height;
   u8 channel_count;
-  b8 has_transparency;
   u8* data;
 };
 

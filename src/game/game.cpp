@@ -647,7 +647,7 @@ b32 perspective_projection_callback(u32 code, void* sender, void* listener_inst,
 //   Camera& cam = st->camera;
 
 //   v2 win_size = v2_of_v2i(os_get_window_size());
-//   cam.projection = mat4_perspective(deg2rad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
+//   cam.projection = mat4_perspective(degtorad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
 //   // Camera Rotation
 //   {
 //     f32 rotation_speed = 180.0f;
@@ -718,22 +718,40 @@ b32 perspective_projection_callback(u32 code, void* sender, void* listener_inst,
 //       SinD(cam.pitch),
 //       SinD(cam.yaw) * CosD(cam.pitch)
 //     };
-//     // cam.view = mat4_look_at(cam.pos, cam.pos + cam.dir, v3_up());
-//     cam.view = mat4_translate(cam.pos);
+//     cam.view = mat4_look_at(cam.pos, cam.pos + cam.dir, v3_up());
 //     cam.view_dirty = false;
 //   }
 // }
+
+struct Timer {
+  f32 passed;
+  f32 interval;
+};
+
+Timer timer_create(f32 interval) {
+  Timer timer = {
+    .interval = interval,
+  };
+  return timer;
+}
+
+b32 timer_tick(Timer& t, f32 dt) {
+  t.passed += dt;
+  if (t.passed >= t.interval) {
+    t.passed = 0;
+    return true;
+  }
+  return false;
+}
 
 void camera_update() {
   Camera& cam = st->camera;
   f32 speed = 0.1;
   if (os_is_key_down(Key_W)) {
     cam.pos.z += speed;
-    // st->entities[0].pos.z += speed;
   }
   if (os_is_key_down(Key_S)) {
     cam.pos.z -= speed;
-    // st->entities[0].pos.z -= speed;
   }
   if (os_is_key_down(Key_A)) {
     cam.pos.x -= speed;
@@ -751,12 +769,9 @@ void camera_update() {
   // cam.view = mat4_translate(cam.pos);
 
   {
-    local f32 timer;
-    timer += delta_time;
-    if (timer >= 0.3) {
-      timer = 0;
+    local Timer t = timer_create(0.3);
+    if (timer_tick(t, delta_time)) {
       Info("x: %f z: %f", cam.pos.x, cam.pos.z);
-      // Info("x: %f z: %f", st->entities[0].pos.x, st->entities[0].pos.z);
     }
   }
 
@@ -776,9 +791,9 @@ void gpu_data_update() {
 }
 
 Vertex triangle[] = {
-  {v3( 0.0,   0.5, 0)},
-  {v3(-0.5,  -0.5, 0)},
-  {v3( 0.5,  -0.5, 0)},
+  {v3( 0.0,   0.5, 0), v3(), v2(0.5, 1)},
+  {v3(-0.5,  -0.5, 0), v3(), v2(0.0, 0)},
+  {v3( 0.5,  -0.5, 0), v3(), v2(1.0, 0)},
 };
 ShaderInfo shader_type_get(u32 id) {
   return shader_types[id];
@@ -791,7 +806,7 @@ void app_init(u8** state) {
   st->arena = arena_alloc();
   st->shader_state = vk_get_shader_state();
   st->camera = {
-    .pos = v3(0,0,3),
+    .pos = v3(0,0,-3),
     // .yaw = -90,
     .fov = 45,
     .view_dirty = true,
@@ -803,6 +818,7 @@ void app_init(u8** state) {
   };
   u32 mesh_id = vk_mesh_load(mesh);
   u32 shader = shader_create("color_shader", ShaderType_Drawing);
+  u32 image_id = texture_load("orange_lines_512.png");
   Entity e = {
     .pos = {},
     .scale = v3_one(),

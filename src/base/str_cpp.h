@@ -1,7 +1,5 @@
 #include "base_inc.h"
 
-////////////////////////////////////////////////////////////////////////
-
 intern u32 write_uint(u8* dest, u32 value) {
   u8 temp[10];
   u32 count = 0;
@@ -141,7 +139,7 @@ u32 my_sprintf(u8* buff, String fmt, va_list argc) {
             length += val.size;
           } break;
           case 'c': {
-            i32 val = va_arg(argc, i32);
+            i32 val = va_arg(argc, i32); // because of compiler
             length += 1;
           } break;
           case '.': {
@@ -149,7 +147,6 @@ u32 my_sprintf(u8* buff, String fmt, va_list argc) {
             u32 precision = *p - '0';    // 'num' - '0'
             ++p;                         // skip number
             f32 val = va_arg(argc, f64); // f64 - because of compiler
-
             length += float_length(val, precision);
           } break;
         }
@@ -195,7 +192,6 @@ u32 my_sprintf(u8* buff, String fmt, va_list argc) {
           ++p;                      // skip '.'
           u32 precision = *p - '0'; // 'num' - '0'
           ++p;                      // skip number
-
           f32 val = va_arg(argc, f64);
           u32 len = write_float(buff + written, val, precision);
           written += len;

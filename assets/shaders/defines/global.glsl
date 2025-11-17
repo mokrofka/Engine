@@ -10,8 +10,13 @@
 #define v3 vec3
 #define v4 vec4
 
+#define SomeTexture 0
+#define AmbientTexture 1
+#define MaterialTexture 2
+
 struct Entity {
   v3 color;
+  u32 textures[4]
   // v3 ambient;
   // v3 diffuse;
   // v3 specular;

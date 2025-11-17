@@ -18,9 +18,8 @@ KAPI void mesh_destroy(u32 id);
 KAPI Mesh mesh_get(String name);
 
 // Resource
-KAPI void res_init(String asset_path);
-String res_base_path();
-Buffer res_binary_load(Arena* arena, String filename);
+KAPI void asset_init(String asset_path);
+String asset_base_path();
 
 // Shader
 KAPI u32 shader_create(String shader, ShaderType type);
@@ -30,6 +29,5 @@ KAPI void shader_init();
 // Texture
 #define DefaultTextureName "default"
 KAPI void texture_init();
-Texture res_texture_load(String name);
-KAPI void texture_load(String name);
+KAPI u32 texture_load(String name);
 KAPI Texture& texture_get(String name);

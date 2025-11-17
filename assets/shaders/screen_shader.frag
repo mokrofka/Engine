@@ -9,9 +9,9 @@ layout(location = 0) in in_data {
   v2 in_texcoord;
 };
 
-layout(set = 0, binding = 1) uniform sampler2D screen;
+layout(set = 0, binding = 1) uniform sampler2D texture_target[];
 
 void main() {
-  v4 texture_color = texture(screen, in_texcoord);
+  v4 texture_color = texture(texture_target[0], in_texcoord);
   out_color = texture_color;
 }

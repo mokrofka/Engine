@@ -213,6 +213,24 @@ FileProperties os_file_path_properties(String path) {
   return props;
 }
 
+Buffer os_file_all_read(Arena* arena, String path) {
+  Scratch scratch(&arena);
+  OS_Handle f = os_file_open(path, OS_AccessFlag_Read);
+  Assert(f);
+
+  u64 file_size = os_file_size(f);
+  u8* buffer = push_buffer(arena, file_size);
+  u64 read_size = os_file_read(f, file_size, buffer);
+  Assert(read_size);
+  os_file_close(f);
+
+  Buffer result = {
+    .data = buffer,
+    .size = file_size,
+  };
+  return result;
+}
+
 // Directory
 
 OS_Handle os_directory_open(String path) {

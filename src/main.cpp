@@ -28,7 +28,7 @@ i32 main(i32 count, char* arr[]) {
   os_init();
   os_gfx_init();
   asset_watch_init();
-  res_init("../assets");
+  asset_init("../assets");
   r_init();
 
   test();
