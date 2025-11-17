@@ -10,6 +10,7 @@ enum {
 struct PushConstant {
   mat4 model;
   u32 entity_index;
+  u32 texture_id;
 };
 
 struct ShaderEntity {

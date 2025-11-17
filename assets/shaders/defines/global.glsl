@@ -1,4 +1,6 @@
 
+#extension GL_EXT_nonuniform_qualifier : enable
+
 #define KB(n) ((n) << 10)
 
 #define i32 int
@@ -10,13 +12,8 @@
 #define v3 vec3
 #define v4 vec4
 
-#define SomeTexture 0
-#define AmbientTexture 1
-#define MaterialTexture 2
-
 struct Entity {
   v3 color;
-  u32 textures[4]
   // v3 ambient;
   // v3 diffuse;
   // v3 specular;
@@ -66,6 +63,7 @@ layout(std430, set = 0, binding = 0) readonly buffer Buffer {
 layout(push_constant) uniform PushConstants {
   mat4 model;
   u32 id;
+  u32 tex_id;
 } push;
 
 v3 norm;

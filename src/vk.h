@@ -13,7 +13,7 @@ void vk_begin_renderpass(u32 renderpass_id);
 void vk_end_renderpass(u32 renderpass_id);
 
 KAPI u32 vk_shader_load(String name, ShaderType type);
-KAPI void vk_texture_load(Texture t);
+KAPI u32 vk_texture_load(Texture t);
 
 void vk_draw();
 void vk_draw_compute();
@@ -21,7 +21,7 @@ void vk_draw_compute();
 KAPI void vk_update_transform(u32 entity_id, Transform trans);
 
 // Entity
-KAPI u32 vk_make_renderable(u32 mesh_id, u32 shader_id);
+KAPI u32 vk_make_renderable(u32 mesh_id, u32 shader_id, u32 texture_id);
 KAPI void vk_remove_renderable(u32 entity_id);
 KAPI ShaderEntity& vk_get_entity(u32 entity_id);
 

@@ -232,8 +232,8 @@ void texture_init() {
 
 u32 texture_load(String name) {
   Texture texture = image_load(name);
-  vk_texture_load(texture);
-  return 0;
+  u32 id = vk_texture_load(texture);
+  return id;
 }
 
 KAPI Texture& texture_get(String name) {

@@ -159,6 +159,8 @@ struct VK_State {
   VkCommandBuffer compute_cmds[FramesInFlight];
 
   VK_Texture texture;
+  u32 texture_count;
+  Array<u32, 10> entities_to_texture;
 
   HandlerPool entity_handlers;
   ShaderEntity* entities_data;
@@ -795,7 +797,7 @@ intern void vk_shader_init() {
 
   // Pool
   // #define TextureMax vk.frames_in_flight + 1 // and one for triangle
-  #define TextureMax 1 // and one for triangle
+  #define TextureMax 10 // and one for triangle
   #define StorageBufferMax 1                 // one huge buffer
   #define SetsMax 1                          // for rendering and screen target
   {
@@ -805,7 +807,7 @@ intern void vk_shader_init() {
     };
     VkDescriptorPoolCreateInfo pool_info = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-      .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+      .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT | VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT_EXT,
       .maxSets = SetsMax,
       .poolSizeCount = ArrayCount(pool_sizes),
       .pPoolSizes = pool_sizes,
@@ -825,31 +827,43 @@ intern void vk_shader_init() {
       {
         .binding = 1,
         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        .descriptorCount = 1,
+        .descriptorCount = 10,
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
       },
     };
+    VkDescriptorBindingFlags flags[] = {
+      VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
+      VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
+    };
+    VkDescriptorSetLayoutBindingFlagsCreateInfo binding_flags = {
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+      .pNext = null,
+      .bindingCount = ArrayCount(flags),
+      .pBindingFlags = flags,
+    };
     VkDescriptorSetLayoutCreateInfo layout_info = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+      .pNext = &binding_flags,
+      .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT,
       .bindingCount = ArrayCount(layout_bindings),
       .pBindings = layout_bindings,
     };
     VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &layout_info, vk.allocator, &vk.descriptor_set_layout));
     
-    VkDescriptorSetLayoutBinding screen_layout_bindings[] = {
-      {
-        .binding = 0,
-        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        .descriptorCount = vk.frames_in_flight,
-        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-      },
-    };
-    VkDescriptorSetLayoutCreateInfo screen_layout_info = {
-      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-      .bindingCount = ArrayCount(screen_layout_bindings),
-      .pBindings = screen_layout_bindings,
-    };
-    VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &screen_layout_info, vk.allocator, &vk.screen_descriptor_set_layout));
+    // VkDescriptorSetLayoutBinding screen_layout_bindings[] = {
+    //   {
+    //     .binding = 0,
+    //     .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+    //     .descriptorCount = vk.frames_in_flight,
+    //     .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+    //   },
+    // };
+    // VkDescriptorSetLayoutCreateInfo screen_layout_info = {
+    //   .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+    //   .bindingCount = ArrayCount(screen_layout_bindings),
+    //   .pBindings = screen_layout_bindings,
+    // };
+    // VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &screen_layout_info, vk.allocator, &vk.screen_descriptor_set_layout));
   }
 
   // Descriptor
@@ -882,6 +896,49 @@ intern void vk_shader_init() {
   // Screen shader
   {
     // vk_shader_load("screen_shader", ShaderType_Screen);
+  }
+
+  {
+    // // Create three bindings: storage buffer,
+    // // uniform buffer, and combined image sampler
+    // std::array<VkDescriptorSetLayoutBinding, 3> bindings{};
+    // std::array<VkDescriptorBindingFlags, 3> flags{};
+    // std::array<VkDescriptorType, 3> types{
+    //     VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+    //     VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+    //     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER};
+
+    // for (uint32_t i = 0; i < 3; ++i) {
+    //   bindings.at(i).binding = i;
+    //   bindings.at(i).descriptorType = types.at(i);
+    //   // Due to partially bound bit, this value
+    //   // is used as an upper bound, which we have set to
+    //   // 1000 to keep it simple for the sake of this post
+    //   bindings.at(i).descriptorCount = 1000;
+    //   bindings.at(i).stageFlags = VK_SHADER_STAGE_ALL;
+    //   flags.at(i) = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
+    // }
+
+    // VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlags{};
+    // bindingFlags.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+    // bindingFlags.pNext = nullptr;
+    // bindingFlags.pBindingFlags = flags.data();
+    // bindingFlags.bindingCount = 3;
+
+    // VkDescriptorSetLayoutCreateInfo createInfo{};
+    // createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    // createInfo.bindingCount = 3;
+    // createInfo.pBindings = bindings.data();
+    // // Create if from a descriptor pool that has update after bind
+    // // flag set
+    // createInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+
+    // // Set binding flags
+    // createInfo.pNext = &bindingFlags;
+
+    // // Create layout
+    // VkDescriptorSetLayout bindlessLayout = VK_NULL_HANDLE;
+    // vkCreateDescriptorSetLayout(mDevice, &createInfo, nullptr, &bindlessLayout);
   }
 }
 
@@ -1046,7 +1103,7 @@ intern void vk_image_upload_to_gpu(VkCommandBuffer cmd, VK_Image image) {
     &region);
 }
 
-void vk_texture_load(Texture t) {
+u32 vk_texture_load(Texture t) {
   VK_Texture& texture = vk.texture;
   
   u64 size = t.width*t.height*t.channel_count;
@@ -1105,13 +1162,14 @@ void vk_texture_load(Texture t) {
     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
     .dstSet = vk.descriptor_sets,
     .dstBinding = 1,
-    .dstArrayElement = 0,
+    .dstArrayElement = vk.texture_count,
     .descriptorCount = 1,
     .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
     .pImageInfo = &image_info,
   };
   VkWriteDescriptorSet descriptors[] = {texture_descriptor};
   vkUpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
+  return vk.texture_count++;
 }
 
 intern void vk_resize_texture_target() {
@@ -1407,9 +1465,17 @@ intern VK_Device vk_device_select_physical() {
 intern void vk_device_create() {
   vk.device = vk_device_select_physical();
   
+  VkPhysicalDeviceDescriptorIndexingFeatures indexingFeatures = {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES,
+    .shaderSampledImageArrayNonUniformIndexing = VK_TRUE,     // allows runtime indexing
+    .descriptorBindingSampledImageUpdateAfterBind = VK_TRUE,  // allows update image descriptors
+    .descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE, // allows storage descriptrs TODO: I don't use this
+    .descriptorBindingPartiallyBound = VK_TRUE,               // allows not updated descriptors
+    .runtimeDescriptorArray = VK_TRUE,                        // allows not specified size of descriptor array in shader
+  };
   VkPhysicalDeviceDynamicRenderingFeatures dynamic_rendering_features = {
     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES,
-    .pNext = null,
+    .pNext = &indexingFeatures,
     .dynamicRendering = true
   };
   
@@ -2604,7 +2670,7 @@ void vk_update_transform(u32 entity_id, Transform trans) {
 ////////////////////////////////////////////////////////////////////////
 // Entity
 
-u32 vk_make_renderable(u32 mesh_id, u32 shader_id) {
+u32 vk_make_renderable(u32 mesh_id, u32 shader_id, u32 texture_id) {
   u32 entity_id = append(vk.entity_handlers);
 
   VK_Shader& shader = vk.shaders[shader_id];
@@ -2612,10 +2678,12 @@ u32 vk_make_renderable(u32 mesh_id, u32 shader_id) {
 
   vk.entities_to_mesh[entity_id] = mesh_id;
   vk.entities_to_shader[entity_id] = shader_id;
+  vk.entities_to_texture[entity_id] = texture_id;
 
   vk.push_constants.add(entity_id);
   PushConstant* push = vk.push_constants.get(entity_id);
   push->entity_index = entity_id;
+  push->texture_id = texture_id;
 
   return entity_id;
 }
