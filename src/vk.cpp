@@ -2707,7 +2707,7 @@ void compute_shader() {
     f32 z = r * Cos(phi);
 
     particles[i].pos = v3(x, y, z);
-    particles[i].velocity = v3_normalize(v3(x, y, z)) * 0.25f;
+    particles[i].velocity = v3_norm(v3(x, y, z)) * 0.25f;
     particles[i].color = v4(rand_range_f32(min, max), rand_range_f32(min, max), rand_range_f32(min, max), 1.0f);
   }
   

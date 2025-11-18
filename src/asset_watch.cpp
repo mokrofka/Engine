@@ -47,7 +47,7 @@ void asset_watch_directory_add(String watch_name, void (*reload_callback)(String
 
 void asset_watch_update() {
   Scratch scratch;
-  for (FileWatch x : st.watches) {
+  for (FileWatch& x : st.watches) {
     FileProperties props = os_file_path_properties(x.path);
     if (props.modified > x.modified) {
       x.callback();

@@ -334,11 +334,36 @@ NO_DEBUG inline v3  operator-(v3 a)                { return v3(-a.x, -a.y, -a.z)
 
 NO_DEBUG inline f32 v3_length_squared(v3 a)    { return Sqr(a.x) + Sqr(a.y) + Sqr(a.z); }
 NO_DEBUG inline f32 v3_length(v3 a)            { return Sqrt(v3_length_squared(a)); }
-NO_DEBUG inline v3  v3_normalize(v3 a)         { return a * (1.0f/v3_length(a)); }
+NO_DEBUG inline v3  v3_norm(v3 a)              { return a * (1.0f/v3_length(a)); }
 NO_DEBUG inline f32 v3_distance(v3 a, v3 b)    { return v3_length(v3(a.x - b.x, a.y - b.y, a.z - b.z)); }
 NO_DEBUG inline f32 v3_dot(v3 a, v3 b)         { return a.x*b.x + a.y*b.y + a.z*b.z; }
 NO_DEBUG inline v3  v3_cross(v3 a, v3 b)       { return v3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x); }
 NO_DEBUG inline v3  v3_lerp(v3 a, f32 t, v3 b) { return v3(Lerp(a.x, t, b.x), Lerp(a.y, t, b.y), Lerp(a.z, t, b.z));}
+
+NO_DEBUG inline v3 v3_pos_of_mat4(mat4 mat) {
+  v3 vec = {
+    mat[9],
+    mat[10],
+    mat[11],
+  };
+  return vec;
+};
+NO_DEBUG inline v3 v3_rot_of_mat4(mat4 mat) {
+  v3 vec = {
+    mat[9],
+    mat[10],
+    mat[11],
+  };
+  return vec;
+};
+NO_DEBUG inline v3 v3_scale_of_mat4(mat4 mat) {
+  v3 vec = {
+    mat[9],
+    mat[10],
+    mat[11],
+  };
+  return vec;
+};
 
 ////////////////////////////////////////////////////////////////////////
 // Vector4
@@ -442,6 +467,42 @@ NO_DEBUG inline mat4 mat4_scale(v3 scale) {
   return mat;
 }
 
+NO_DEBUG inline mat4 mat4_rotate_x(f32 angle_radians) {
+  f32 cos = Cos(angle_radians);
+  f32 sin = Sin(angle_radians);
+  mat4 mat = {
+    1,   0,    0,   0,
+    0, cos,  sin,   0,
+    0,-sin,  cos,   0,
+    0,   0,    0,   1,
+  };
+  return mat;
+}
+
+NO_DEBUG inline mat4 mat4_rotate_y(f32 angle_radians) {
+  f32 cos = Cos(angle_radians);
+  f32 sin = Sin(angle_radians);
+  mat4 mat = {
+    cos, 0,  -sin, 0,
+    0,   1,   0,   0,
+    sin, 0,   cos, 0,
+    0,   0,   0,   1
+  };
+  return mat;
+}
+
+NO_DEBUG inline mat4 mat4_rotate_z(f32 angle_radians) {
+  f32 cos = Cos(angle_radians);
+  f32 sin = Sin(angle_radians);
+  mat4 mat = {
+    cos, sin, 0,   0,
+   -sin, cos, 0,   0,
+    0,   0,   1,   0,
+    0,   0,   0,   1
+  };
+  return mat;
+}
+
 NO_DEBUG inline mat4 operator*(mat4 a, mat4 b) {
   mat4 c = {};
   Loop (row, 4) {
@@ -463,6 +524,23 @@ NO_DEBUG inline v4 operator*(mat4 mat, v4 vec) {
     mat.e[8 ]*vec.x + mat.e[9 ]*vec.y + mat.e[10]*vec.z + mat.e[11]*vec.w,
     mat.e[12]*vec.x + mat.e[13]*vec.y + mat.e[14]*vec.z + mat.e[15]*vec.w,
   };
+  return result;
+}
+
+NO_DEBUG inline mat4 mat4_rotate_xyz(v3 rot) {
+  mat4 rx = mat4_rotate_x(rot.x);
+  mat4 ry = mat4_rotate_y(rot.y);
+  mat4 rz = mat4_rotate_z(rot.z);
+  mat4 mat = rx * ry * rz;
+  return mat;
+}
+
+NO_DEBUG inline mat4 mat4_transform(v3 pos, v3 rot, v3 scale) {
+  mat4 result = mat4_translate(pos) * mat4_rotate_xyz(rot) * mat4_scale(scale);
+  return result;
+}
+NO_DEBUG inline mat4 mat4_transform(Transform trans) {
+  mat4 result = mat4_translate(trans.pos) * mat4_rotate_xyz(trans.rot) * mat4_scale(trans.scale);
   return result;
 }
 
@@ -496,15 +574,17 @@ NO_DEBUG inline mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 Nea
   return result;
 }
 
-NO_DEBUG inline mat4 mat4_look_at(v3 position, v3 target, v3 up) {
-  v3 z = v3_normalize(position - target);
-  v3 x = v3_normalize(v3_cross(up, z));
+NO_DEBUG inline mat4 mat4_look_at(v3 pos, v3 dir, v3 up) {
+  // v3 z = v3_normalize(position - dir);
+  v3 z = v3_norm(dir);
+  v3 x = v3_norm(v3_cross(up, z));
   v3 y = v3_cross(z, x);
   mat4 camera_view = {
     x.x, y.x, z.x, 0,
     x.y, y.y, z.y, 0,
     x.z, y.z, z.z, 0,
-   -v3_dot(x, position), -v3_dot(y, position), -v3_dot(z, position), 1
+  //  -v3_dot(x, pos), -v3_dot(y, pos), -v3_dot(z, pos), 1
+   -v3_dot(x, pos), -v3_dot(y, pos), -v3_dot(z, pos), 1
   };
   return camera_view;
 }
@@ -588,72 +668,23 @@ NO_DEBUG inline mat4 mat4_inverse(mat4 matrix) {
   return out_matrix;
 }
 
-NO_DEBUG inline mat4 mat4_rotate_x(f32 angle_radians) {
-  f32 cos = Cos(angle_radians);
-  f32 sin = Sin(angle_radians);
-  mat4 mat = {
-    1,   0,    0,   0,
-    0, cos,  sin,   0,
-    0,-sin,  cos,   0,
-    0,   0,    0,   1,
-  };
-  return mat;
-}
-
-NO_DEBUG inline mat4 mat4_rotate_y(f32 angle_radians) {
-  f32 cos = Cos(angle_radians);
-  f32 sin = Sin(angle_radians);
-  mat4 mat = {
-    cos, 0,  -sin, 0,
-    0,   1,   0,   0,
-    sin, 0,   cos, 0,
-    0,   0,   0,   1
-  };
-  return mat;
-}
-
-NO_DEBUG inline mat4 mat4_rotate_z(f32 angle_radians) {
-  f32 cos = Cos(angle_radians);
-  f32 sin = Sin(angle_radians);
-  mat4 mat = {
-    cos, sin, 0,   0,
-   -sin, cos, 0,   0,
-    0,   0,   1,   0,
-    0,   0,   0,   1
-  };
-  return mat;
-}
-
-NO_DEBUG inline mat4 mat4_rotate_xyz(v3 rot) {
-  mat4 rx = mat4_rotate_x(rot.x);
-  mat4 ry = mat4_rotate_y(rot.y);
-  mat4 rz = mat4_rotate_z(rot.z);
-  mat4 mat = rx * ry * rz;
-  return mat;
-}
-
-NO_DEBUG inline mat4 mat4_transform(v3 pos, v3 rot, v3 scale) {
-  mat4 result = mat4_translate(pos) * mat4_rotate_xyz(rot) * mat4_scale(scale);
-  return result;
-}
-
 NO_DEBUG inline v3 mat4_forward(mat4 matrix) {
-  v3 forward = {
-    -matrix.e[2],
-    -matrix.e[6],
-    -matrix.e[10],
-  };
-  forward = v3_normalize(forward);
-  return forward;
-}
-
-NO_DEBUG inline v3 mat4_backward(mat4 matrix) {
   v3 forward = {
     matrix.e[2],
     matrix.e[6],
     matrix.e[10],
   };
-  forward = v3_normalize(forward);
+  forward = v3_norm(forward);
+  return forward;
+}
+
+NO_DEBUG inline v3 mat4_backward(mat4 matrix) {
+  v3 forward = {
+    -matrix.e[2],
+    -matrix.e[6],
+    -matrix.e[10],
+  };
+  forward = v3_norm(forward);
   return forward;
 }
 
@@ -663,7 +694,7 @@ NO_DEBUG inline v3 mat4_up(mat4 matrix) {
     matrix.e[5],
     matrix.e[9],
   };
-  up = v3_normalize(up);
+  up = v3_norm(up);
   return up;
 }
 
@@ -673,7 +704,7 @@ NO_DEBUG inline v3 mat4_down(mat4 matrix) {
     -matrix.e[5],
     -matrix.e[9],
   };
-  down = v3_normalize(down);
+  down = v3_norm(down);
   return down;
 }
 
@@ -683,7 +714,7 @@ NO_DEBUG inline v3 mat4_left(mat4 matrix) {
     -matrix.e[4],
     -matrix.e[8],
   };
-  right = v3_normalize(right);
+  right = v3_norm(right);
   return right;
 }
 
@@ -693,7 +724,7 @@ NO_DEBUG inline v3 mat4_right(mat4 matrix) {
     matrix.e[4],
     matrix.e[8],
   };
-  left = v3_normalize(left);
+  left = v3_norm(left);
   return left;
 }
 

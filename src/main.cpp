@@ -31,7 +31,7 @@ i32 main(i32 count, char* arr[]) {
   asset_init("../assets");
   r_init();
 
-  test();
+  // test();
   
   Scratch scratch;
 
@@ -48,6 +48,7 @@ i32 main(i32 count, char* arr[]) {
   asset_watch_add(st.lib_filepath, []() {
     os_lib_close(st.lib);
     os_file_path_copy(st.lib_temp_filepath, st.lib_filepath);
+    os_sleep(10);
     st.lib = os_lib_open(st.lib_temp_filepath);
     Assign(st.update, os_lib_get_proc(st.lib, "app_update"));
   });

@@ -187,6 +187,7 @@ b32 os_file_path_copy(String dst, String src) {
   int src_fd = src_h;
   int dst_fd = dst_h;
   sendfile(dst_fd, src_fd, null, props.size);
+  props = os_file_properties(src_h);
   os_file_close(src_h);
   os_file_close(dst_h);
   return true;

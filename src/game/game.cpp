@@ -643,85 +643,100 @@ b32 perspective_projection_callback(u32 code, void* sender, void* listener_inst,
   return false;
 };
 
-// void camera_update() {
-//   Camera& cam = st->camera;
+NO_DEBUG inline mat4 mat4_look_at_test(v3 pos, v3 dir, v3 up) {
+  v3 z = v3_norm(dir);
+  v3 x = v3_norm(v3_cross(up, z));
+  v3 y = v3_cross(z, x);
+  mat4 camera_view = {
+    x.x, y.x, z.x, 0,
+    x.y, y.y, z.y, 0,
+    x.z, y.z, z.z, 0,
+   -v3_dot(x, pos), -v3_dot(y, pos), -v3_dot(z, pos), 1
+  };
+  return camera_view;
+}
 
-//   v2 win_size = v2_of_v2i(os_get_window_size());
-//   cam.projection = mat4_perspective(degtorad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
-//   // Camera Rotation
-//   {
-//     f32 rotation_speed = 180.0f;
-//     auto camera_yaw = [&](f32 amount) {
-//       cam.yaw += amount;
-//       cam.view_dirty = true;
-//     };
-//     if (os_is_key_down(Key_A)) {
-//       camera_yaw(-rotation_speed * delta_time);
-//     }
-//     if (os_is_key_down(Key_D)) {
-//       camera_yaw(rotation_speed * delta_time);
-//     }
-//     auto camera_pitch = [&](f32 amount) {
-//       cam.pitch += amount;
-//       cam.view_dirty = true;
-//     };
-//     if (os_is_key_down(Key_R)) {
-//       camera_pitch(rotation_speed * delta_time);
-//     }
-//     if (os_is_key_down(Key_F)) {
-//       camera_pitch(-rotation_speed * delta_time);
-//     }
-//   }
+void camera_update() {
+  Camera& cam = st->camera;
 
-//   // Camera movement
-//   {
-//     f32 speed = 10.0f;
-//     v3 velocity = {};
-//     if (os_is_key_down(Key_W)) {
-//       v3 forward = mat4_forward(cam.view);
-//       velocity += forward;
-//     }
-//     if (os_is_key_down(Key_S)) {
-//       v3 backward = mat4_backward(cam.view);
-//       velocity += backward;
-//     }
-//     if (os_is_key_down(Key_Q)) {
-//       v3 left = mat4_left(cam.view);
-//       velocity += left;
-//     }
-//     if (os_is_key_down(Key_E)) {
-//       v3 right = mat4_right(cam.view);
-//       velocity += right;
-//     }
-//     if (os_is_key_down(Key_Space)) {
-//       velocity.y += 1.0f;
-//     }
-//     if (os_is_key_down(Key_X)) {
-//       velocity.y -= 1.0f;
-//     }
-//     if (velocity != v3_zero()) {
-//       velocity = v3_normalize(velocity);
-//       cam.pos += velocity * speed * delta_time;
-//       cam.view_dirty = true;
-//     }
-//     // if (os_is_key_pressed(Key_1)) {
-//     //   cam.pos = v3_zero();
-//     //   cam.view_dirty = true;
-//     // }
-//   }
+  v2 win_size = v2_of_v2i(os_get_window_size());
+  cam.projection = mat4_perspective(degtorad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
+  // Camera Rotation
+  {
+    f32 rotation_speed = 180.0f;
+    auto camera_yaw = [&](f32 amount) {
+      cam.yaw += amount;
+      cam.view_dirty = true;
+    };
+    if (os_is_key_down(Key_A)) {
+      camera_yaw(rotation_speed * delta_time);
+    }
+    if (os_is_key_down(Key_D)) {
+      camera_yaw(-rotation_speed * delta_time);
+    }
+    auto camera_pitch = [&](f32 amount) {
+      cam.pitch += amount;
+      cam.view_dirty = true;
+    };
+    if (os_is_key_down(Key_R)) {
+      camera_pitch(rotation_speed * delta_time);
+    }
+    if (os_is_key_down(Key_F)) {
+      camera_pitch(-rotation_speed * delta_time);
+    }
+  }
+
+  // Camera movement
+  {
+    f32 speed = 10.0f;
+    v3 velocity = {};
+    if (os_is_key_down(Key_W)) {
+      v3 forward = mat4_forward(cam.view);
+      velocity += forward;
+    }
+    if (os_is_key_down(Key_S)) {
+      v3 backward = mat4_backward(cam.view);
+      velocity += backward;
+    }
+    if (os_is_key_down(Key_Q)) {
+      v3 left = mat4_left(cam.view);
+      velocity += left;
+    }
+    if (os_is_key_down(Key_E)) {
+      v3 right = mat4_right(cam.view);
+      velocity += right;
+    }
+    if (os_is_key_down(Key_Space)) {
+      velocity.y += 1.0f;
+    }
+    if (os_is_key_down(Key_X)) {
+      velocity.y -= 1.0f;
+    }
+    if (velocity != v3_zero()) {
+      velocity = v3_norm(velocity);
+      cam.pos += velocity * speed * delta_time;
+      cam.view_dirty = true;
+    }
+    // if (os_is_key_pressed(Key_1)) {
+    //   cam.pos = v3_zero();
+    //   cam.view_dirty = true;
+    // }
+  }
   
-//   // Camera Update
-//   if (cam.view_dirty) {
-//     cam.pitch = Clamp(-89.0f, cam.pitch, 89.0f);
-//     cam.dir = {
-//       CosD(cam.yaw) * CosD(cam.pitch),
-//       SinD(cam.pitch),
-//       SinD(cam.yaw) * CosD(cam.pitch)
-//     };
-//     cam.view = mat4_look_at(cam.pos, cam.pos + cam.dir, v3_up());
-//     cam.view_dirty = false;
-//   }
-// }
+  // Camera Update
+  // if (cam.view_dirty) {
+    cam.pitch = Clamp(-89.0f, cam.pitch, 89.0f);
+    cam.dir = {
+      CosD(cam.yaw) * CosD(cam.pitch),
+      SinD(cam.pitch),
+      SinD(cam.yaw) * CosD(cam.pitch)
+    };
+    cam.view = mat4_look_at_test(cam.pos, cam.dir, v3_up());
+    // cam.view = mat4_look_at_test(cam.pos, -cam.pos, v3_up());
+    cam.view_dirty = false;
+  // }
+
+}
 
 struct Timer {
   f32 passed;
@@ -744,40 +759,40 @@ b32 timer_tick(Timer& t, f32 dt) {
   return false;
 }
 
-void camera_update() {
-  Camera& cam = st->camera;
-  f32 speed = 0.1;
-  if (os_is_key_down(Key_W)) {
-    cam.pos.z += speed;
-  }
-  if (os_is_key_down(Key_S)) {
-    cam.pos.z -= speed;
-  }
-  if (os_is_key_down(Key_A)) {
-    cam.pos.x -= speed;
-  }
-  if (os_is_key_down(Key_D)) {
-    cam.pos.x += speed;
-  }
-  if (os_is_key_down(Key_Space)) {
-    cam.pos.y += speed;
-  }
-  if (os_is_key_down(Key_X)) {
-    cam.pos.y -= speed;
-  }
-  cam.view = mat4_inverse(mat4_translate(cam.pos));
-  // cam.view = mat4_translate(cam.pos);
+// void camera_update() {
+//   Camera& cam = st->camera;
+//   f32 speed = 0.1;
+//   if (os_is_key_down(Key_W)) {
+//     cam.pos.z += speed;
+//   }
+//   if (os_is_key_down(Key_S)) {
+//     cam.pos.z -= speed;
+//   }
+//   if (os_is_key_down(Key_A)) {
+//     cam.pos.x -= speed;
+//   }
+//   if (os_is_key_down(Key_D)) {
+//     cam.pos.x += speed;
+//   }
+//   if (os_is_key_down(Key_Space)) {
+//     cam.pos.y += speed;
+//   }
+//   if (os_is_key_down(Key_X)) {
+//     cam.pos.y -= speed;
+//   }
+//   cam.view = mat4_inverse(mat4_translate(cam.pos));
+//   // cam.view = mat4_translate(cam.pos);
 
-  {
-    local Timer t = timer_create(0.3);
-    if (timer_tick(t, delta_time)) {
-      Info("x: %f z: %f", cam.pos.x, cam.pos.z);
-    }
-  }
+//  // {
+//   //   local Timer t = timer_create(0.3);
+//   //   if (timer_tick(t, delta_time)) {
+//   //     Info("x: %f z: %f", cam.pos.x, cam.pos.z);
+//   //   }
+//   // }
 
-  v2 win_size = v2_of_v2i(os_get_window_size());
-  cam.projection = mat4_perspective(degtorad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
-}
+//   v2 win_size = v2_of_v2i(os_get_window_size());
+//   cam.projection = mat4_perspective(degtorad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
+// }
 
 void gpu_data_update() {
   ShaderGlobalState& shader_st = *st->shader_state;
@@ -806,8 +821,8 @@ void app_init(u8** state) {
   st->arena = arena_alloc();
   st->shader_state = vk_get_shader_state();
   st->camera = {
-    .pos = v3(0,0,-3),
-    // .yaw = -90,
+    .pos = v3(0,0,-5),
+    .yaw = 90,
     .fov = 45,
     .view_dirty = true,
   };
@@ -833,7 +848,7 @@ void app_init(u8** state) {
   }
   {
     Entity e = {
-      .pos = {-1,0,1},
+      .pos = {-3,0,1},
       .scale = v3_one(),
       .r_id = vk_make_renderable(mesh_id, shader_id, texture_id1),
     };
@@ -855,6 +870,30 @@ shared_function void app_update(u8** state) {
   if (os_is_key_pressed(Key_2)) {
     st->camera.fov -= 5;
   }
+  local Timer timer = timer_create(0.3);
+  if (timer_tick(timer, delta_time)) {
+    Info("%f", Mod(st->camera.yaw, 360));
+  }
+
+  Entity& e = st->entities[0];
+  // e.pos.x += 0.1 * delta_time;
+
+  // e.pos.x -= 0.01;
+  // e.rot.z += 0.01;
+  // e.scale = 1;
+  // mat4 model = mat4_transform(e.trans);
+  // local f32 time;
+  // model *= mat4_rotate_x(time) * mat4_translate(v3(10, 0, 0));
+  // e.pos = v3_pos_of_mat4(model);
+  // time += 0.01;
+
+  // model *= mat4_rotate_xyz(time) * mat4_translate(v3(1,0,0));
+  // time += 0.01;
+  // e.pos = v3_pos_of_mat4(model);
   camera_update();
+
   gpu_data_update();
+
+
+
 }
