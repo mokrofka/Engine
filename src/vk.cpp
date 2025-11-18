@@ -530,7 +530,7 @@ intern VK_Pipeline vk_shader_pipeline_create(ShaderInfo shader_info, Array<VkPip
       .location = 2,
       .binding = 0,
       .format = VK_FORMAT_R32G32_SFLOAT,
-      .offset = (u32)OffsetOf(Vertex, texcoord),
+      .offset = (u32)OffsetOf(Vertex, uv),
     },
   };
   VkPipelineVertexInputStateCreateInfo vertex_input_info = {
@@ -796,10 +796,9 @@ intern void vk_shader_init() {
   Scratch scratch;
 
   // Pool
-  // #define TextureMax vk.frames_in_flight + 1 // and one for triangle
-  #define TextureMax 10 // and one for triangle
-  #define StorageBufferMax 1                 // one huge buffer
-  #define SetsMax 1                          // for rendering and screen target
+  #define TextureMax 10     
+  #define StorageBufferMax 1
+  #define SetsMax 1
   {
     VkDescriptorPoolSize pool_sizes[] = {
       {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, TextureMax},
@@ -849,21 +848,6 @@ intern void vk_shader_init() {
       .pBindings = layout_bindings,
     };
     VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &layout_info, vk.allocator, &vk.descriptor_set_layout));
-    
-    // VkDescriptorSetLayoutBinding screen_layout_bindings[] = {
-    //   {
-    //     .binding = 0,
-    //     .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-    //     .descriptorCount = vk.frames_in_flight,
-    //     .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-    //   },
-    // };
-    // VkDescriptorSetLayoutCreateInfo screen_layout_info = {
-    //   .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-    //   .bindingCount = ArrayCount(screen_layout_bindings),
-    //   .pBindings = screen_layout_bindings,
-    // };
-    // VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &screen_layout_info, vk.allocator, &vk.screen_descriptor_set_layout));
   }
 
   // Descriptor
@@ -875,70 +859,12 @@ intern void vk_shader_init() {
       .pSetLayouts = &vk.descriptor_set_layout,
     };
     VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, &vk.descriptor_sets));
-
-    VkDescriptorSetAllocateInfo screen_alloc_info = {
-      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-      .descriptorPool = vk.descriptor_pool,
-      .descriptorSetCount = 1,
-      .pSetLayouts = &vk.screen_descriptor_set_layout,
-    };
-    // VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, vk.screen_descriptor_sets));
-    // VkResult r = vkAllocateDescriptorSets(vkdevice, &alloc_info, &vk.screen_descriptor_sets);
-    // vk_result_string(r);
   }
 
   // Mem for shaders
   {
     u64 entities_start = AlignUp(sizeof(ShaderGlobalState), alignof(ShaderEntity));
     Assign(vk.entities_data, Offset(vk.storage_buffer.maped_memory, entities_start));
-  }
-
-  // Screen shader
-  {
-    // vk_shader_load("screen_shader", ShaderType_Screen);
-  }
-
-  {
-    // // Create three bindings: storage buffer,
-    // // uniform buffer, and combined image sampler
-    // std::array<VkDescriptorSetLayoutBinding, 3> bindings{};
-    // std::array<VkDescriptorBindingFlags, 3> flags{};
-    // std::array<VkDescriptorType, 3> types{
-    //     VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-    //     VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-    //     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER};
-
-    // for (uint32_t i = 0; i < 3; ++i) {
-    //   bindings.at(i).binding = i;
-    //   bindings.at(i).descriptorType = types.at(i);
-    //   // Due to partially bound bit, this value
-    //   // is used as an upper bound, which we have set to
-    //   // 1000 to keep it simple for the sake of this post
-    //   bindings.at(i).descriptorCount = 1000;
-    //   bindings.at(i).stageFlags = VK_SHADER_STAGE_ALL;
-    //   flags.at(i) = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
-    // }
-
-    // VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlags{};
-    // bindingFlags.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
-    // bindingFlags.pNext = nullptr;
-    // bindingFlags.pBindingFlags = flags.data();
-    // bindingFlags.bindingCount = 3;
-
-    // VkDescriptorSetLayoutCreateInfo createInfo{};
-    // createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    // createInfo.bindingCount = 3;
-    // createInfo.pBindings = bindings.data();
-    // // Create if from a descriptor pool that has update after bind
-    // // flag set
-    // createInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-
-    // // Set binding flags
-    // createInfo.pNext = &bindingFlags;
-
-    // // Create layout
-    // VkDescriptorSetLayout bindlessLayout = VK_NULL_HANDLE;
-    // vkCreateDescriptorSetLayout(mDevice, &createInfo, nullptr, &bindlessLayout);
   }
 }
 
@@ -1789,10 +1715,9 @@ void vk_draw() {
 
       vkCmdPushConstants(cmd, shader.pipeline.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstant), push);
       vkCmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, &mesh.vert_offset);
-      // vkCmdBindIndexBuffer(cmd, vk.index_buffer.handle, mesh.index_offset, VK_INDEX_TYPE_UINT32);
-
-      // vkCmdDrawIndexed(cmd, mesh.index_count, 1, 0, 0, 0);
-      vkCmdDraw(cmd, mesh.vert_count, 1, 0, 0);
+      vkCmdBindIndexBuffer(cmd, vk.index_buffer.handle, mesh.index_offset, VK_INDEX_TYPE_UINT32);
+      vkCmdDrawIndexed(cmd, mesh.index_count, 1, 0, 0, 0);
+      // vkCmdDraw(cmd, mesh.vert_count, 1, 0, 0);
     }
   }
 

@@ -42,14 +42,30 @@ struct v2u {
   INLINE v2u (u32 scale) { x = scale; y = scale; }
 };
 
-struct v3 {
-  f32 x;
-  f32 y;
-  f32 z;
+union v3 {
+  struct {
+    f32 x;
+    f32 y;
+    f32 z;
+  };
+  f32 e[3];
 
   v3 () = default;
   INLINE v3 (f32 x_, f32 y_, f32 z_) { x = x_, y = y_, z = z_; }
   INLINE v3 (f32 scale) { x = scale; y = scale; z = scale; }
+};
+
+union v3u {
+  struct {
+    u32 x;
+    u32 y;
+    u32 z;
+  };
+  u32 e[3];
+
+  v3u () = default;
+  INLINE v3u (u32 x_, u32 y_, u32 z_) { x = x_, y = y_, z = z_; }
+  INLINE v3u (u32 scale) { x = scale; y = scale; z = scale; }
 };
 
 struct v4 {
@@ -162,6 +178,7 @@ inline u32 prev_pow2(u32 n) {
 
 ////////////////////////////////////////////////////////////////////////
 // Color
+
 inline v4 rgba_from_u32(u32 hex) {
   v4 result = v4(((hex & 0xff000000) >> 24) / 255.f,
                  ((hex & 0x00ff0000) >> 16) / 255.f,
@@ -311,6 +328,7 @@ NO_DEBUG inline v3  operator-=(v3& a, v3 b)        { return a = a - b; }
 NO_DEBUG inline v3  operator*=(v3& a, f32 scalar)  { return a = a * scalar; }
 NO_DEBUG inline v3  operator/=(v3& a, f32 scalar)  { return a = a / scalar; }
 NO_DEBUG inline b32 operator==(v3 a, v3 b)         { return (Abs(a.x - b.x) <= FloatEpsilon) && (Abs(a.y - b.y) <= FloatEpsilon) && (Abs(a.z - b.z) <= FloatEpsilon); }
+NO_DEBUG inline b32 operator==(v3u a, v3u b)       { return a.x == b.x && a.y == b.y && a.z == b.z; }
 NO_DEBUG inline b32 operator!=(v3 a, v3 b)         { return !(a == b); }
 NO_DEBUG inline v3  operator-(v3 a)                { return v3(-a.x, -a.y, -a.z); }
 

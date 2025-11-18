@@ -811,29 +811,31 @@ void app_init(u8** state) {
     .fov = 45,
     .view_dirty = true,
   };
-  // u32 mesh = mesh_create("models/cube.obj");
-  
+  u32 mesh_id = mesh_create("cube.obj");
+
   Mesh mesh = {
     .vertices = triangle,
     .vert_count = 3,
   };
-  u32 mesh_id = vk_mesh_load(mesh);
-  u32 shader = shader_create("color_shader", ShaderType_Drawing);
+
+  // u32 mesh_id = vk_mesh_load(mesh);
+  u32 shader_id = shader_create("color_shader", ShaderType_Drawing);
   u32 texture_id = texture_load("orange_lines_512.png");
+  u32 texture_id1 = texture_load("container.jpg");
+
   {
     Entity e = {
       .pos = {},
       .scale = v3_one(),
-      .r_id = vk_make_renderable(mesh_id, shader, texture_id),
+      .r_id = vk_make_renderable(mesh_id, shader_id, texture_id),
     };
     append(st->entities, e);
   }
-  u32 texture_id1 = texture_load("container.jpg");
   {
     Entity e = {
       .pos = {-1,0,1},
       .scale = v3_one(),
-      .r_id = vk_make_renderable(mesh_id, shader, texture_id1),
+      .r_id = vk_make_renderable(mesh_id, shader_id, texture_id1),
     };
     append(st->entities, e);
   }

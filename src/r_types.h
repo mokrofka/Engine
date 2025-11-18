@@ -145,8 +145,9 @@ inline ShaderInfo shader_types[] = {
 struct Vertex {
   v3 pos;
   v3 norm;
-  v2 texcoord;
+  v2 uv;
 };
+NO_DEBUG inline b32 operator==(Vertex a, Vertex b) { return a.pos == b.pos && a.norm == b.norm && a.uv == b.uv; }
 
 struct Mesh {
   Vertex* vertices;

@@ -133,19 +133,20 @@ struct DarrayArena {
     arena = arena_;
   }
   T& operator[](i32 idx) {
-    Assert(idx >= 0 && "idx negative!");
-    Assert(idx < count && "idx out of bounds!");
+    Assert(IsInsideBound(idx, count));
     return data[idx];
   }
 };
 
 template<typename T> void append(DarrayArena<T>& a, T b) { 
   if (len(a) >= a.cap) {
-    a.cap = a.cap ? a.cap*DEFAULT_RESIZE_FACTOR : DEFAULT_CAPACITY;
     if (a.data) {
+      a.cap *= DEFAULT_RESIZE_FACTOR;
       T* new_data = push_array(a.arena, T, a.cap);
       MemCopyTyped(new_data, a.data, a.count);
+      a.data = new_data;
     } else {
+      a.cap = DEFAULT_CAPACITY;
       a.data = push_array(a.arena, T, a.cap);
     }
   }
@@ -155,6 +156,30 @@ template<typename T> void remove(DarrayArena<T>& a, i32 idx) {
   Assert(idx >= 0 && "idx negative!");
   Assert(idx < len(a) && "idx out of bounds!");
   a.data[idx] = a.data[--a.count];
+}
+template<typename T> void reserve(DarrayArena<T>& a, u32 size) { 
+  a.cap += size;
+  if (a.data) {
+    T* new_data = push_array(a.arena, T, a.cap);
+    MemCopyTyped(new_data, a.data, a.count);
+  } else {
+    a.data = push_array(a.arena, T, a.cap);
+  }
+}
+template<typename T> b32 exists(DarrayArena<T>& a, T e) { 
+  for (T x : a) {
+    if (x == e) return true;
+  }
+  return false;
+}
+template<typename T> b32 exists_at(DarrayArena<T>& a, T e, u32* index) { 
+  Loop (i, len(a)) {
+    if (a[i] == e) {
+      *index = i;
+      return true;
+    }
+  }
+  return false;
 }
 
 // TODO: make array index

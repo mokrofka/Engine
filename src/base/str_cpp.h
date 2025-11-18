@@ -385,11 +385,11 @@ void str_copy(String64& dest, String str) {
 
 String str_next_word(String line, u32& start) {
   // skip spaces
-  while (start < line.size && line.str[start] == ' ')
+  while (start < line.size && char_is_space(line.str[start]))
     start++;
 
   u32 token_start = start;
-  while (start < line.size && line.str[start] != ' ')
+  while (start < line.size && !char_is_space(line.str[start]))
     start++;
 
   return {line.str + token_start, start - token_start};
