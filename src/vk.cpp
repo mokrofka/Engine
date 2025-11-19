@@ -1,7 +1,6 @@
 #include "vk.h"
 #include "event.h"
 #include "renderer.h"
-#include "r_types.h"
 #include <vulkan/vulkan.h>
 
 #if BUILD_DEBUG
@@ -18,6 +17,7 @@
 #define ImagesInFlight 4
 
 #define MaxLights KB(1)
+#define MaxEntities KB(4)
 
 struct VK_Buffer {
   VkBuffer handle;
@@ -160,14 +160,14 @@ struct VK_State {
 
   VK_Texture texture;
   u32 texture_count;
-  Array<u32, 10> entities_to_texture;
+  Array<u32, MaxEntities> entities_to_texture;
 
-  HandlerPool entity_handlers;
+  IdPool entity_handlers;
   ShaderEntity* entities_data;
   SparseSet<PushConstant> push_constants;
-  Array<u32, 10> entities_to_mesh;
-  Array<VK_Mesh, 10> meshes;
-  Array<u32, 10> entities_to_shader;
+  Array<u32, MaxEntities> entities_to_mesh;
+  Array<VK_Mesh, MaxEntities> meshes;
+  Array<u32, MaxEntities> entities_to_shader;
 
   SparseSet<PointLight> point_light_data;
   SparseSet<DirLight> dir_light_data;
@@ -737,7 +737,7 @@ intern Array<VkPipelineShaderStageCreateInfo, 2> vk_shader_module_create(String 
 
 u32 vk_shader_load(String name, ShaderType type) {
   Scratch scratch;
-  ShaderInfo shader_info = shader_types[type];
+  ShaderInfo shader_info = shader_type[type];
 
   if (IsInsideBounds(ShaderType_Drawing, type, ShaderType_Drawing_COUNT)) {
     VK_Shader shader = {
@@ -779,7 +779,7 @@ void vk_shader_reload(String name, u32 id) {
       vkDestroyShaderModule(vkdevice, shader.stages[i].module, vk.allocator);
     }
     shader.stages = vk_shader_module_create(name);
-    shader.pipeline = vk_shader_pipeline_create(shader_types[shader.type], shader.stages);
+    shader.pipeline = vk_shader_pipeline_create(shader_type[shader.type], shader.stages);
   } else {
     VK_Shader& shader = vk.shaders[id];
     vkDeviceWaitIdle(vkdevice);
@@ -788,7 +788,7 @@ void vk_shader_reload(String name, u32 id) {
       vkDestroyShaderModule(vkdevice, shader.stages[i].module, vk.allocator);
     }
     shader.stages = vk_shader_module_create(name);
-    shader.pipeline = vk_shader_pipeline_create(shader_types[shader.type], shader.stages);
+    shader.pipeline = vk_shader_pipeline_create(shader_type[shader.type], shader.stages);
   }
 }
 
@@ -1627,11 +1627,13 @@ u32 vk_mesh_load(Mesh mesh) {
   VK_Buffer& vert_buff = vk.vert_buffer;
   u64 vert_size = mesh.vert_count*sizeof(Vertex);
   u64 vert_offset = vert_buff.size;
+  vert_buff.size += vert_size;
   Range vert_range = { .offset = vert_offset, .size = vert_size };
 
   VK_Buffer& index_buff = vk.index_buffer;
   u64 index_size = mesh.index_count*sizeof(u32);
   u64 index_offset = index_buff.size;
+  index_offset += index_size;
   Range index_range = { .offset = index_offset, .size = index_size };
 
   VK_Mesh vk_mesh = {
@@ -2008,7 +2010,7 @@ void vk_init() {
       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     // Stage
     vk.stage_buffer = vk_buffer_create(
-      MB(1),
+      MB(10),
       VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     vk_buffer_map_memory(vk.stage_buffer, 0, vk.stage_buffer.cap);

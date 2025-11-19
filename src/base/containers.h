@@ -36,9 +36,11 @@ struct Array {
   }
 };
 
-template<typename T, i32 N> void append(Array<T, N>& a, T b) { 
+template<typename T, i32 N> T& append(Array<T, N>& a, T b) { 
   Assert(len(a) < a.cap && "array full");
+  T& e = a.data[a.count];
   a.data[a.count++] = b;
+  return e;
 }
 template<typename T, i32 N, typename... Args> void append(Array<T, N>& a, T first, Args... rest) {
   append(a, first);
@@ -118,6 +120,7 @@ template<typename T> void free(Darray<T>& a) {
 
 ////////////////////////////////////////////////////////////////////////
 // DarrayArena
+
 template <typename T>
 struct DarrayArena {
   u32 count = 0;
@@ -186,6 +189,7 @@ template<typename T> b32 exists_at(DarrayArena<T>& a, T e, u32* index) {
 
 ////////////////////////////////////////////////////////////////////////
 // SparseSet
+
 template <typename T>
 struct SparseSet {
   u32 count = 0;
@@ -306,16 +310,17 @@ struct SparseSetIndex {
 };
 
 ////////////////////////////////////////////////////////////////////////
-// HandlerPool
-struct HandlerPool {
+// IdPool
+
+struct IdPool {
   u32 count;
   u32 cap;
   u32* handlers;
   DebugDo(b8* used);
 };
 
-static HandlerPool make_handle_pool() {
-  HandlerPool result = {
+static IdPool make_handle_pool() {
+  IdPool result = {
     .cap = DEFAULT_CAPACITY,
     .handlers = mem_alloc_typed(u32, DEFAULT_CAPACITY),
   };
@@ -328,7 +333,7 @@ static HandlerPool make_handle_pool() {
   );
   return result;
 }
-static u32 append(HandlerPool& h) {
+static u32 append(IdPool& h) {
   u32 cap_old = h.cap;
   if (h.count >= h.cap) {
     h.cap *= DEFAULT_RESIZE_FACTOR;
@@ -347,7 +352,7 @@ static u32 append(HandlerPool& h) {
   ++h.count;
   return id;
 }
-static void remove(HandlerPool& h, u32 id) {
+static void remove(IdPool& h, u32 id) {
   Assert(IsInsideBound(id, h.cap));
   DebugDo(
     Assert(h.used[id])
@@ -437,3 +442,101 @@ template<typename T>        INLINE u32 len(DarrayArena<T> a) { return a.count; }
 // 	B2_UNUSED( pool, id );
 // }
 // #endif
+
+////////////////////////////////////////////////////////////////////////
+// Hashmap
+
+enum {
+  MapSlot_Empty,
+  MapSlot_Occupied,
+  MapSlot_Deleted
+};
+
+template<typename Key, typename T>
+struct Map {
+  static constexpr f32 LF = 0.7;
+
+  u32 count;
+  u32 cap;
+  T* data;
+  Key* keys;
+  u8* is_occupied;
+
+  Map() {
+    MemZeroStruct(this);
+  }
+
+  void insert(Key key, T val) {
+    if (count >= cap*LF) { grow(); }
+    u64 hash_idx = hash(key);
+    u64 index = ModPow2(hash_idx, cap);
+    while (is_occupied[index] == MapSlot_Occupied) {
+      index = ModPow2(index + 1, cap);
+    }
+    keys[index] = key;
+    data[index] = val;
+    is_occupied[index] = MapSlot_Occupied;
+    ++count;
+  }
+
+  T& get(Key key) {
+    u64 hash_idx = hash(key);
+    u64 index = ModPow2(hash_idx, cap);
+    while (is_occupied[index] != MapSlot_Empty) {
+      if ((is_occupied[index] == MapSlot_Occupied) && (keys[index] == key))
+        return data[index];
+      index = ModPow2(index + 1, cap);
+    }
+    Assert(true);
+    return data[index];
+  }
+
+  void erase(Key key) {
+    u64 hash_idx = hash(key);
+    u64 index = ModPow2(hash_idx, cap);
+    while (is_occupied[index] != MapSlot_Empty) {
+      if ((is_occupied[index] == MapSlot_Occupied) && (keys[index] == key)) {
+        is_occupied[index] = MapSlot_Deleted;
+        --count;
+        return;
+      }
+      index = ModPow2(index + 1, cap);
+    }
+  }
+
+  void grow() {
+    if (data) {
+      T* old_data = data;
+      Key* old_keys = keys;
+      u8* old_is_occupied = is_occupied;
+      u32 old_cap = cap;
+
+      cap *= DEFAULT_RESIZE_FACTOR;
+      u64 size = (sizeof(T) + sizeof(Key) + sizeof(u8)) * cap;
+      u8* buff = mem_realloc_zero(data, size);
+
+      data = (T*)buff;
+      keys = (Key*)Offset(data, sizeof(T) * cap);
+      is_occupied = (u8*)(Offset(keys, sizeof(Key) * cap));
+
+      Loop (i, old_cap) {
+        if (old_is_occupied[i] == MapSlot_Occupied) {
+          insert(old_keys[i], old_data[i]);
+        }
+      }
+
+      mem_free(old_data);
+    }
+    else {
+      cap = DEFAULT_CAPACITY;
+      u64 size = (sizeof(T) + sizeof(Key) + sizeof(u8)) * cap;
+      u8* buff = mem_alloc_zero(size);
+
+      Assign(data, buff);
+      Assign(keys, Offset(data, sizeof(T)*cap));
+      Assign(is_occupied, (Offset(keys, sizeof(Key)*cap)));
+    }
+  }
+
+};
+

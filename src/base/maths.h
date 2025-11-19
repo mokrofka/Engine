@@ -253,6 +253,7 @@ NO_DEBUG inline f32 rand_f32_11()                     { return rand_f32_01() * 2
 NO_DEBUG inline f32 rand_f32()                        { return rand_f32_01() * 2 * U16_MAX - U16_MAX; }
 NO_DEBUG inline f32 rand_range_f32(f32 min, f32 max)  { return rand_f32_01() * (max - min) + min ; }
 NO_DEBUG inline b32 rand_b32()                        { return rand_u32()%2; }
+NO_DEBUG inline void srand()                          { _seed = ReadTimestampCounter(); }
 
 ////////////////////////////////////////////////////////////////////////
 // Vector2
@@ -364,6 +365,15 @@ NO_DEBUG inline v3 v3_scale_of_mat4(mat4 mat) {
   };
   return vec;
 };
+
+NO_DEBUG inline v3 v3_rand_range(v3 a, v3 b) {
+  v3 vec = {
+    rand_range_f32(a.x, b.x),
+    rand_range_f32(a.y, b.y),
+    rand_range_f32(a.z, b.z),
+  };
+  return vec;
+}
 
 ////////////////////////////////////////////////////////////////////////
 // Vector4
@@ -575,7 +585,6 @@ NO_DEBUG inline mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 Nea
 }
 
 NO_DEBUG inline mat4 mat4_look_at(v3 pos, v3 dir, v3 up) {
-  // v3 z = v3_normalize(position - dir);
   v3 z = v3_norm(dir);
   v3 x = v3_norm(v3_cross(up, z));
   v3 y = v3_cross(z, x);
@@ -583,7 +592,6 @@ NO_DEBUG inline mat4 mat4_look_at(v3 pos, v3 dir, v3 up) {
     x.x, y.x, z.x, 0,
     x.y, y.y, z.y, 0,
     x.z, y.z, z.z, 0,
-  //  -v3_dot(x, pos), -v3_dot(y, pos), -v3_dot(z, pos), 1
    -v3_dot(x, pos), -v3_dot(y, pos), -v3_dot(z, pos), 1
   };
   return camera_view;

@@ -22,7 +22,7 @@ intern u32 write_int(u8* dest, i32 value) {
   return count + write_uint(dest + count, value);
 }
 
-intern u32 write_float(u8* dest, f32 value, u32 precision) {
+intern u32 write_float(u8* dest, f64 value, u32 precision) {
   // Handle special cases
   if (value != value) { // NaN check
     const char* nan_str = "NaN";
@@ -53,7 +53,7 @@ intern u32 write_float(u8* dest, f32 value, u32 precision) {
   if (precision > 0) {
     dest[len++] = '.';
     // value *= (f32)(10 ^ precision); // Shift decimal point
-    value *= (f32)Pow(10, precision); // Shift decimal point correctly
+    value *= (f64)Pow(10, precision); // Shift decimal point correctly
     u32 frac_part = (u32)value;
     len += write_int(dest + len, frac_part); // Reuse write_int for fractional part
   }
@@ -174,7 +174,7 @@ u32 my_sprintf(u8* buff, String fmt, va_list argc) {
           written += len;
         } break;
         case 'f': {
-          f32 val = va_arg(argc, f64); // f64 - because of compiler
+          f64 val = va_arg(argc, f64); // f64 - because of compiler
           u32 len = write_float(buff + written, val, DefaultFloatAccuracy);
           written += len;
         } break;
@@ -192,7 +192,7 @@ u32 my_sprintf(u8* buff, String fmt, va_list argc) {
           ++p;                      // skip '.'
           u32 precision = *p - '0'; // 'num' - '0'
           ++p;                      // skip number
-          f32 val = va_arg(argc, f64);
+          f64 val = va_arg(argc, f64);
           u32 len = write_float(buff + written, val, precision);
           written += len;
         } break;

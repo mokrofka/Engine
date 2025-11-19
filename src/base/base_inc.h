@@ -1,8 +1,7 @@
 #pragma once
 
-#include "array.h"
+#include "containers.h"
 #include "defines.h"
-#include "hashmap.h"
 #include "logger.h"
 #include "maths.h"
 #include "mem.h"
@@ -11,3 +10,5 @@
 
 #include "os/os_core.h"
 #include "os/os_gfx.h"
+
+#include "utils.h"

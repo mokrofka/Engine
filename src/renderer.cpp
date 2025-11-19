@@ -4,6 +4,10 @@
 
 #include "ui.h"
 
+KAPI u32 shaders[Shader_COUNT];
+KAPI u32 meshes[Mesh_COUNT];
+KAPI u32 textures[Texture_COUNT];
+
 struct RendererSystemState {
   b8 is_render;
 };
@@ -116,6 +120,7 @@ global MeshState mesh_st;
 
 intern Mesh load_obj(String name) {
   Scratch scratch;
+
   DarrayArena<v3> positions(scratch);
   DarrayArena<v3> normals(scratch);
   DarrayArena<v2> uvs(scratch);

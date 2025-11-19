@@ -27,7 +27,58 @@ KAPI Shader& shader_get(String name);
 KAPI void shader_init();
 
 // Texture
-#define DefaultTextureName "default"
 KAPI void texture_init();
 KAPI u32 texture_load(String name);
 KAPI Texture& texture_get(String name);
+
+////////////////////////////////////////////////////////////////////////
+// Shaders
+
+struct ShaderDefinition {
+  String path;
+  ShaderType type;
+};
+
+enum {
+  Shader_Color,
+  Shader_COUNT,
+};
+
+inline ShaderDefinition shaders_definition[Shader_COUNT] = {
+  [Shader_Color] = "color_shader", ShaderType_Drawing,
+};
+
+KAPI extern u32 shaders[Shader_COUNT];
+
+////////////////////////////////////////////////////////////////////////
+// Meshes
+enum {
+  Mesh_Cube,
+  Mesh_Room,
+  Mesh_COUNT,
+};
+
+inline String meshs_path[Mesh_COUNT] = {
+  [Mesh_Cube] = "cube.obj",
+  [Mesh_Room] = "room.obj",
+};
+
+KAPI extern u32 meshes[Mesh_COUNT];
+
+////////////////////////////////////////////////////////////////////////
+// Textures
+enum {
+  Texture_OrangeLines,
+  Texture_Container,
+  Texture_Room,
+  Texture_COUNT,
+};
+
+inline String textures_path[Texture_COUNT] = {
+  [Texture_OrangeLines] = "orange_lines_512.png",
+  [Texture_Container] = "container.jpg",
+  [Texture_Room] = "image.png",
+};
+
+KAPI extern u32 textures[Texture_COUNT];
+

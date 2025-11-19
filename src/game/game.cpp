@@ -598,6 +598,18 @@
 
 // }
 
+Vertex triangle[] = {
+  {v3( 0.0,   0.5, 0), v3(), v2(0.5, 1)},
+  {v3(-0.5,  -0.5, 0), v3(), v2(0.0, 0)},
+  {v3( 0.5,  -0.5, 0), v3(), v2(1.0, 0)},
+};
+
+struct EntityDescription {
+  u32 mesh;
+  u32 shader;
+  u32 texture;
+};
+
 struct Entity {
   union {
     Transform trans;
@@ -607,9 +619,9 @@ struct Entity {
       v3 scale;
     };
   };
-  u32 r_id;
-  u32 mesh_id;
-  u32 shader_id;
+  u32 r_handle;
+  u32 mesh;
+  u32 shader;
 };
 
 struct Camera {
@@ -621,6 +633,10 @@ struct Camera {
   f32 pitch;
   f32 fov;
   b8 view_dirty;
+};
+
+struct AssetLoader {
+
 };
 
 struct GameState {
@@ -643,24 +659,66 @@ b32 perspective_projection_callback(u32 code, void* sender, void* listener_inst,
   return false;
 };
 
-NO_DEBUG inline mat4 mat4_look_at_test(v3 pos, v3 dir, v3 up) {
-  v3 z = v3_norm(dir);
-  v3 x = v3_norm(v3_cross(up, z));
-  v3 y = v3_cross(z, x);
-  mat4 camera_view = {
-    x.x, y.x, z.x, 0,
-    x.y, y.y, z.y, 0,
-    x.z, y.z, z.z, 0,
-   -v3_dot(x, pos), -v3_dot(y, pos), -v3_dot(z, pos), 1
-  };
-  return camera_view;
+void gpu_data_update() {
+  ShaderGlobalState& shader_st = *st->shader_state;
+  Camera& cam = st->camera;
+  shader_st.projection_view = cam.projection * cam.view;
+  shader_st.projection = cam.projection;
+  shader_st.view = cam.view;
+  for (Entity x : st->entities) {
+    vk_update_transform(x.r_handle, x.trans);
+  }
 }
+
+void* grid_create(Arena* arena, i32 grid_size, f32 grid_step) {
+  v3* grid = push_array(arena, v3, grid_size*4);
+
+  i32 i = 0;
+  f32 half = (grid_size / 2.0f) * grid_step;
+  // horizontal from left to right
+  {
+    f32 z = 0;
+    f32 x = grid_size * grid_step;
+    Loop (j, grid_size) {
+      grid[i++] = v3(0 - half, 0, z + half);
+      grid[i++] = v3(x - half, 0, z + half);
+      z -= grid_step;
+    }
+  }
+
+  // vertical from top to down
+  {
+    f32 z = -grid_size * grid_step;
+    f32 x = 0;
+    Loop (j, grid_size) {
+      grid[i++] = v3(x - half, 0, 0 + half);
+      grid[i++] = v3(x - half, 0, z + half);
+      x += grid_step;
+    }
+  }
+  return grid;
+}
+
+Entity& entity_create(u32 mesh, u32 shader, u32 texture) {
+  Entity e = {
+    .pos = {},
+    .scale = v3_one(),
+    .r_handle = vk_make_renderable(mesh, shader, texture),
+  };
+  return append(st->entities, e);
+}
+Entity& entity_create() {
+
+}
+
+////////////////////////////////////////////////////////////////////////
+// Camera
 
 void camera_update() {
   Camera& cam = st->camera;
-
   v2 win_size = v2_of_v2i(os_get_window_size());
   cam.projection = mat4_perspective(degtorad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
+
   // Camera Rotation
   {
     f32 rotation_speed = 180.0f;
@@ -717,102 +775,21 @@ void camera_update() {
       cam.pos += velocity * speed * delta_time;
       cam.view_dirty = true;
     }
-    // if (os_is_key_pressed(Key_1)) {
-    //   cam.pos = v3_zero();
-    //   cam.view_dirty = true;
-    // }
   }
   
   // Camera Update
-  // if (cam.view_dirty) {
-    cam.pitch = Clamp(-89.0f, cam.pitch, 89.0f);
-    cam.dir = {
-      CosD(cam.yaw) * CosD(cam.pitch),
-      SinD(cam.pitch),
-      SinD(cam.yaw) * CosD(cam.pitch)
-    };
-    cam.view = mat4_look_at_test(cam.pos, cam.dir, v3_up());
-    // cam.view = mat4_look_at_test(cam.pos, -cam.pos, v3_up());
-    cam.view_dirty = false;
-  // }
-
-}
-
-struct Timer {
-  f32 passed;
-  f32 interval;
-};
-
-Timer timer_create(f32 interval) {
-  Timer timer = {
-    .interval = interval,
+  cam.pitch = Clamp(-89.0f, cam.pitch, 89.0f);
+  cam.dir = {
+    CosD(cam.yaw) * CosD(cam.pitch),
+    SinD(cam.pitch),
+    SinD(cam.yaw) * CosD(cam.pitch)
   };
-  return timer;
+  cam.view = mat4_look_at(cam.pos, cam.dir, v3_up());
+  cam.view_dirty = false;
 }
 
-b32 timer_tick(Timer& t, f32 dt) {
-  t.passed += dt;
-  if (t.passed >= t.interval) {
-    t.passed = 0;
-    return true;
-  }
-  return false;
-}
-
-// void camera_update() {
-//   Camera& cam = st->camera;
-//   f32 speed = 0.1;
-//   if (os_is_key_down(Key_W)) {
-//     cam.pos.z += speed;
-//   }
-//   if (os_is_key_down(Key_S)) {
-//     cam.pos.z -= speed;
-//   }
-//   if (os_is_key_down(Key_A)) {
-//     cam.pos.x -= speed;
-//   }
-//   if (os_is_key_down(Key_D)) {
-//     cam.pos.x += speed;
-//   }
-//   if (os_is_key_down(Key_Space)) {
-//     cam.pos.y += speed;
-//   }
-//   if (os_is_key_down(Key_X)) {
-//     cam.pos.y -= speed;
-//   }
-//   cam.view = mat4_inverse(mat4_translate(cam.pos));
-//   // cam.view = mat4_translate(cam.pos);
-
-//  // {
-//   //   local Timer t = timer_create(0.3);
-//   //   if (timer_tick(t, delta_time)) {
-//   //     Info("x: %f z: %f", cam.pos.x, cam.pos.z);
-//   //   }
-//   // }
-
-//   v2 win_size = v2_of_v2i(os_get_window_size());
-//   cam.projection = mat4_perspective(degtorad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
-// }
-
-void gpu_data_update() {
-  ShaderGlobalState& shader_st = *st->shader_state;
-  Camera& cam = st->camera;
-  shader_st.projection_view = cam.projection * cam.view;
-  shader_st.projection = cam.projection;
-  shader_st.view = cam.view;
-  for (Entity x : st->entities) {
-    vk_update_transform(x.r_id, x.trans);
-  }
-}
-
-Vertex triangle[] = {
-  {v3( 0.0,   0.5, 0), v3(), v2(0.5, 1)},
-  {v3(-0.5,  -0.5, 0), v3(), v2(0.0, 0)},
-  {v3( 0.5,  -0.5, 0), v3(), v2(1.0, 0)},
-};
-ShaderInfo shader_type_get(u32 id) {
-  return shader_types[id];
-}
+////////////////////////////////////////////////////////////////////////
+// Init
 
 void app_init(u8** state) {
   Scratch scratch;
@@ -824,37 +801,28 @@ void app_init(u8** state) {
     .pos = v3(0,0,-5),
     .yaw = 90,
     .fov = 45,
-    .view_dirty = true,
-  };
-  u32 mesh_id = mesh_create("cube.obj");
-
-  Mesh mesh = {
-    .vertices = triangle,
-    .vert_count = 3,
   };
 
-  // u32 mesh_id = vk_mesh_load(mesh);
-  u32 shader_id = shader_create("color_shader", ShaderType_Drawing);
-  u32 texture_id = texture_load("orange_lines_512.png");
-  u32 texture_id1 = texture_load("container.jpg");
+  Loop (i, Shader_COUNT) {
+    shaders[i] = shader_create(shaders_definition[i].path, shaders_definition[i].type);
+  }
+  Loop (i, Mesh_COUNT) {
+    meshes[i] = mesh_create(meshs_path[i]);
+  }
+  Loop (i, Texture_COUNT) {
+    textures[i] = texture_load(textures_path[i]);
+  }
 
-  {
-    Entity e = {
-      .pos = {},
-      .scale = v3_one(),
-      .r_id = vk_make_renderable(mesh_id, shader_id, texture_id),
-    };
-    append(st->entities, e);
-  }
-  {
-    Entity e = {
-      .pos = {-3,0,1},
-      .scale = v3_one(),
-      .r_id = vk_make_renderable(mesh_id, shader_id, texture_id1),
-    };
-    append(st->entities, e);
-  }
+  Entity& cube = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_OrangeLines]);
+  Entity& cube1 = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_Container]);
+  cube1.pos = {-3,0,1};
+  Entity& room = entity_create(meshes[Mesh_Room], shaders[Shader_Color], textures[Texture_Room]);
+  room.pos = {0,0,10};
+
 }
+
+////////////////////////////////////////////////////////////////////////
+// Update
 
 shared_function void app_update(u8** state) {
   if (*state == null) {
@@ -870,30 +838,21 @@ shared_function void app_update(u8** state) {
   if (os_is_key_pressed(Key_2)) {
     st->camera.fov -= 5;
   }
+
+  local Timer timer_to_create = timer_create(0.3);
+  if (timer_tick(timer_to_create, delta_time)) {
+    // entity_create()
+    // Info("entity created %i", len(st->entities));
+    // Entity& cube1 = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_Container]);
+    // cube1.pos = v3_rand_range(v3(-10), v3(10));
+  }
+
   local Timer timer = timer_create(0.3);
   if (timer_tick(timer, delta_time)) {
     Info("%f", Mod(st->camera.yaw, 360));
   }
+  // st->entities[2].scale += 0.01;
 
-  Entity& e = st->entities[0];
-  // e.pos.x += 0.1 * delta_time;
-
-  // e.pos.x -= 0.01;
-  // e.rot.z += 0.01;
-  // e.scale = 1;
-  // mat4 model = mat4_transform(e.trans);
-  // local f32 time;
-  // model *= mat4_rotate_x(time) * mat4_translate(v3(10, 0, 0));
-  // e.pos = v3_pos_of_mat4(model);
-  // time += 0.01;
-
-  // model *= mat4_rotate_xyz(time) * mat4_translate(v3(1,0,0));
-  // time += 0.01;
-  // e.pos = v3_pos_of_mat4(model);
   camera_update();
-
   gpu_data_update();
-
-
-
 }

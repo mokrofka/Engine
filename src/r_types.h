@@ -91,6 +91,21 @@ struct Texture {
   u8* data;
 };
 
+#define VertexAttributeCount 3
+struct Vertex {
+  v3 pos;
+  v3 norm;
+  v2 uv;
+};
+NO_DEBUG inline b32 operator==(Vertex a, Vertex b) { return a.pos == b.pos && a.norm == b.norm && a.uv == b.uv; }
+
+struct Mesh {
+  Vertex* vertices;
+  u32* indexes;
+  u32 vert_count;
+  u32 index_count;
+};
+
 enum ShaderTopology {
   ShaderTopology_Triangle,
   ShaderTopology_Line,
@@ -125,7 +140,7 @@ struct Shader {
   ShaderType type;
 };
 
-inline ShaderInfo shader_types[] = {
+inline ShaderInfo shader_type[] = {
   // Drawing
   [ShaderType_Drawing] = {},
   [ShaderType_DrawingTransparent] = {
@@ -140,19 +155,3 @@ inline ShaderInfo shader_types[] = {
   // Compute
   [ShaderType_Compute] = {},
 };
-
-#define VertexAttributeCount 3
-struct Vertex {
-  v3 pos;
-  v3 norm;
-  v2 uv;
-};
-NO_DEBUG inline b32 operator==(Vertex a, Vertex b) { return a.pos == b.pos && a.norm == b.norm && a.uv == b.uv; }
-
-struct Mesh {
-  Vertex* vertices;
-  u32* indexes;
-  u32 vert_count;
-  u32 index_count;
-};
-

@@ -22,6 +22,7 @@ global App st;
 
 void app_update(u8** state);
 
+#include "stdlib.h"
 i32 main(i32 count, char* arr[]) {
   global_allocator_init();
   tctx_init();
