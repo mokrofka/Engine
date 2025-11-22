@@ -50,6 +50,68 @@ void test_mem_pool() {
   Info("=== Test: mem pool works ===");
 }
 
+
+#include <vector>
+#include <random>
+#include <algorithm>
+#include <cstdio>
+
+void test_general_allocator() {
+  Arena* arena = arena_alloc();
+  Allocator allocator = { .arena = arena  };
+
+  const int ITER = 20000;      // total operations
+  const int MAX_ACTIVE = 5000; // number of live allocations
+
+  std::vector<void*> ptrs;
+  ptrs.reserve(MAX_ACTIVE);
+
+  std::mt19937 rng(123456); // deterministic
+  std::uniform_int_distribution<int> size_dist(1, 5000);
+  std::uniform_int_distribution<int> index_dist(0, MAX_ACTIVE - 1);
+
+  for (int i = 0; i < ITER; i++) {
+
+    // 50% alloc, 50% free (if any live pointers exist)
+    bool do_alloc = (ptrs.empty()) || (rng() & 1);
+
+    if (do_alloc) {
+      // generate random allocation size
+      int size = size_dist(rng);
+      void* p = mem_alloc(allocator, size);
+      if (!p) {
+        printf("ALLOC FAILED at iter %d\n", i);
+        return;
+      }
+
+      // fill memory with a recognizable pattern
+      MemSet(p, (i & 255), size);
+
+      ptrs.push_back(p);
+    } else {
+      // free a random existing pointer
+      int idx = index_dist(rng) % ptrs.size();
+      void* p = ptrs[idx];
+
+      mem_free(allocator, p);
+
+      // remove from vector
+      ptrs[idx] = ptrs.back();
+      ptrs.pop_back();
+    }
+
+    // Occasionally shuffle the vector to make access patterns messy
+    if ((i % 2000) == 0)
+      std::shuffle(ptrs.begin(), ptrs.end(), rng);
+  }
+
+  // free remaining
+  for (void* p : ptrs)
+    mem_free(allocator, p);
+
+  printf("Stress test finished.\n");
+}
+
 void test() {
   test_mem_pool();
 }

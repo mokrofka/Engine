@@ -4,7 +4,7 @@ project(Engine)
 
   set(hotreload true)
   set(X11_use true)
-  set(sanitize_address false)
+  set(sanitize_address true)
   set(binary_dir "${CMAKE_SOURCE_DIR}/bin")
 
   message("hotreload: ${hotreload}")

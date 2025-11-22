@@ -822,6 +822,31 @@ void app_init(u8** state) {
 ////////////////////////////////////////////////////////////////////////
 // Update
 
+void foo() {
+  Arena* arena = arena_alloc();
+  Allocator allocatr = { .arena = arena };
+  Darray<u8*> arr;
+  append(arr, mem_alloc(allocatr, 8));
+  append(arr, mem_alloc(allocatr, 17));
+  append(arr, mem_alloc(allocatr, 19));
+  append(arr, mem_alloc(allocatr, 53));
+  append(arr, mem_alloc(allocatr, 6));
+
+  *arr[0] = 1;
+  *arr[1] = 1;
+  *arr[2] = 1;
+  *arr[3] = 1;
+  *arr[4] = 1;
+
+  mem_free(allocatr, arr[0]);
+  mem_free(allocatr, arr[2]);
+  mem_free(allocatr, arr[1]);
+  mem_free(allocatr, arr[4]);
+  mem_free(allocatr, arr[3]);
+
+
+}
+
 shared_function void app_update(u8** state) {
   if (*state == null) {
     app_init(state);

@@ -38,18 +38,19 @@ struct Range {
 
 ////////////////////////////////////////////////////////////////////////
 // Global Allocator
-// TODO: Make this allocator usesable per system with linked list
 
 KAPI void global_allocator_init();
-KAPI u8* mem_alloc(u64 size);
-KAPI u8* mem_alloc_zero(u64 size);
-#define mem_alloc_struct(T) (T*)mem_alloc(sizeof(T))
-#define mem_alloc_typed(T, c) (T*)mem_alloc(sizeof(T)*c)
-#define mem_alloc_typed_zero(T, c) (T*)mem_alloc_zero(sizeof(T)*c)
-KAPI u8* mem_realloc(void* ptr, u64 size);
-KAPI u8* mem_realloc_zero(void* ptr, u64 size);
-#define mem_realloc_typed(a, T, c) (T*)mem_realloc(a, sizeof(T)*c)
-#define mem_realloc_typed_zero(a, T, c) (T*)mem_realloc_zero(a, sizeof(T)*c)
+KAPI u8*  mem_alloc(u64 size);
+KAPI u8*  mem_alloc_zero(u64 size);
+#define   mem_alloc_struct(T)        (T*)mem_alloc(sizeof(T))
+#define   mem_alloc_typed(T, c)      (T*)mem_alloc(sizeof(T)*c)
+#define   mem_alloc_typed_zero(T, c) (T*)mem_alloc_zero(sizeof(T)*c)
+
+KAPI u8*  mem_realloc(void* ptr, u64 size);
+KAPI u8*  mem_realloc_zero(void* ptr, u64 size);
+#define   mem_realloc_typed(a, T, c)      (T*)mem_realloc(a, sizeof(T)*c)
+#define   mem_realloc_typed_zero(a, T, c) (T*)mem_realloc_zero(a, sizeof(T)*c)
+
 KAPI void mem_free(void* ptr);
 
 ////////////////////////////////////////////////////////////////////////
@@ -71,21 +72,36 @@ KAPI Arena* arena_shm_alloc(void* handler);
 INLINE void arena_clear(Arena* arena) { arena->pos = 0; };
 
 INLINE Temp temp_begin(Arena* arena) { return Temp{arena, arena->pos}; };
-INLINE void temp_end(Temp temp) { temp.arena->pos = temp.pos; }
+INLINE void temp_end(Temp temp)      { temp.arena->pos = temp.pos; }
 
 KAPI void* _arena_push(Arena* arena, u64 size, u64 align = DEFAULT_ALIGNMENT);
-#define push_array(a, T, c) (T*)_arena_push(a, sizeof(T)*c, alignof(T))
-#define push_struct(a, T) (T*)_arena_push(a, sizeof(T), alignof(T))
-#define push_buffer(a, c, ...) (u8*)_arena_push(a, c, ##__VA_ARGS__)
+#define    push_array(a, T, c)    (T*) _arena_push(a, sizeof(T)*c, alignof(T))
+#define    push_struct(a, T)      (T*) _arena_push(a, sizeof(T), alignof(T))
+#define    push_buffer(a, c, ...) (u8*)_arena_push(a, c, ##__VA_ARGS__)
 
 KAPI void arena_release(Arena* arena);
 
 ////////////////////////////////////////////////////////////////////////
-// Pool
+// General allocator
 
 struct PoolFreeNode {
   PoolFreeNode* next;
 };
+
+struct MemPoolPow2 {
+  PoolFreeNode* head;
+};
+
+struct Allocator{
+  Arena* arena;
+  MemPoolPow2 pools[32];
+};
+
+u8*  mem_alloc(Allocator& allocator, u64 size);
+void mem_free(Allocator& allocator, void* ptr);
+
+////////////////////////////////////////////////////////////////////////
+// Pool
 
 struct MemPool {
   Arena* arena;
@@ -96,11 +112,11 @@ struct MemPool {
   PoolFreeNode* head;
 };
 
-KAPI void mem_pool_free_all(MemPool& pool);
 KAPI MemPool mem_pool_create(Arena* arena, u64 chunk_size, u64 chunk_alignment = DEFAULT_ALIGNMENT);
-KAPI void mem_pool_grow(MemPool& p);
-KAPI u8* mem_pool_alloc(MemPool& p);
-KAPI void mem_pool_free(MemPool& p, void* ptr);
+KAPI u8*     mem_pool_alloc(MemPool& p);
+KAPI void    mem_pool_free(MemPool& p, void* ptr);
+KAPI void    mem_pool_free_all(MemPool& pool);
+KAPI void    mem_pool_grow(MemPool& p);
 
 template<typename T>
 struct ObjectPool {

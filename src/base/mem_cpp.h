@@ -225,23 +225,40 @@ void arena_release(Arena* arena) {
 }
 
 ////////////////////////////////////////////////////////////////////////
-// Pool
+// General allocator
 
-void mem_pool_free_all(MemPool& p) {
-  FillDealoc(p.data, p.cap*p.chunk_size);
-  p.head = null;
-  Loop (i, p.cap) {
-    u8* chunk  = Offset(p.data, i*p.chunk_size);
-    PoolFreeNode* node; Assign(node, chunk);
-    node->next = p.head;
-    p.head = node;
-    IfDo(MEMORY_GUARD,
-      u32* guard; Assign(guard, Offset(chunk, p.chunk_size - sizeof(u32))); 
-      *guard = DEALLOC_HEADER_GUARD;
-    );
+u8* mem_alloc(Allocator& allocator, u64 size) {
+  Assert(size > 0);
+  size = AlignUp(size, sizeof(u64));
+  u64 pow2_size = next_pow2(size);
+  u64 pool_index = ctz64(pow2_size) - ctz64(8);
+  MemPoolPow2& p = allocator.pools[pool_index];
+
+  if (p.head == null) {
+    u32 header_size = sizeof(u64);
+    u64* header = (u64*)push_buffer(allocator.arena, pow2_size+header_size);
+    *(u64*)header = pool_index;
+    u8* chunk = Offset(header, header_size);
+    return chunk;
   }
-  p.count = 0;
+  PoolFreeNode* result = p.head;
+  p.head = p.head->next;
+
+  return (u8*)result;
+};
+
+void mem_free(Allocator& allocator, void* ptr) {
+  u64* header = (u64*)OffsetBack(ptr, sizeof(u64));
+  MemPoolPow2& p = allocator.pools[*header];
+
+  PoolFreeNode* node = (PoolFreeNode*)ptr;
+	node->next = p.head;
+	p.head = node;
 }
+
+
+////////////////////////////////////////////////////////////////////////
+// Pool
 
 MemPool mem_pool_create(Arena* arena, u64 chunk_size, u64 chunk_alignment) {
   IfDo(MEMORY_GUARD, chunk_size += sizeof(u32));
@@ -257,31 +274,6 @@ MemPool mem_pool_create(Arena* arena, u64 chunk_size, u64 chunk_alignment) {
 
   mem_pool_free_all(result);
   return result;
-}
-
-void mem_pool_grow(MemPool& p) {
-  u64 old_cap = p.cap;
-  u64 new_cap = old_cap * DEFAULT_RESIZE_FACTOR;
-  u64 old_size = old_cap * p.chunk_size;
-  u64 new_size = new_cap * p.chunk_size;
-
-  u8* new_data = push_buffer(p.arena, new_size);
-  MemCopy(new_data, p.data, old_size);
-  p.data = new_data;
-
-  FillDealoc(p.data+old_cap, old_size);
-
-  for (i32 i = old_cap; i < new_cap; ++i) {
-    u8* chunk =  Offset(p.data, i*p.chunk_size);
-    PoolFreeNode* node; Assign(node, chunk);
-    node->next = p.head;
-    p.head = node;
-    IfDo(MEMORY_GUARD,
-      u32* guard; Assign(guard, Offset(chunk, p.chunk_size - sizeof(u32))); 
-      *guard = DEALLOC_HEADER_GUARD
-    );
-  }
-  p.cap = new_cap;
 }
 
 // NOTE: realocate memory as dynamic array to keep indexes valid. TODO: make other mem pools to keep pointers valid
@@ -320,6 +312,47 @@ void mem_pool_free(MemPool& p, void* ptr) {
 	node->next = p.head;
 	p.head = node;
   --p.count;
+}
+
+void mem_pool_free_all(MemPool& p) {
+  FillDealoc(p.data, p.cap*p.chunk_size);
+  p.head = null;
+  Loop (i, p.cap) {
+    u8* chunk  = Offset(p.data, i*p.chunk_size);
+    PoolFreeNode* node; Assign(node, chunk);
+    node->next = p.head;
+    p.head = node;
+    IfDo(MEMORY_GUARD,
+      u32* guard; Assign(guard, Offset(chunk, p.chunk_size - sizeof(u32))); 
+      *guard = DEALLOC_HEADER_GUARD;
+    );
+  }
+  p.count = 0;
+}
+
+void mem_pool_grow(MemPool& p) {
+  u64 old_cap = p.cap;
+  u64 new_cap = old_cap * DEFAULT_RESIZE_FACTOR;
+  u64 old_size = old_cap * p.chunk_size;
+  u64 new_size = new_cap * p.chunk_size;
+
+  u8* new_data = push_buffer(p.arena, new_size);
+  MemCopy(new_data, p.data, old_size);
+  p.data = new_data;
+
+  FillDealoc(p.data+old_cap, old_size);
+
+  for (i32 i = old_cap; i < new_cap; ++i) {
+    u8* chunk =  Offset(p.data, i*p.chunk_size);
+    PoolFreeNode* node; Assign(node, chunk);
+    node->next = p.head;
+    p.head = node;
+    IfDo(MEMORY_GUARD,
+      u32* guard; Assign(guard, Offset(chunk, p.chunk_size - sizeof(u32))); 
+      *guard = DEALLOC_HEADER_GUARD
+    );
+  }
+  p.cap = new_cap;
 }
 
 ////////////////////////////////////////////////////////////////////////
