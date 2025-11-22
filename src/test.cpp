@@ -3,10 +3,10 @@
 void test_mem_pool() {
   Info("=== Running mem pool tests ===");
 
-  Arena* arena = arena_alloc();
+  Scratch scratch;
   struct A { u32 x, y, z; };
 
-  MemPool p = mem_pool_create(arena, sizeof(A), alignof(A));
+  MemPool p = mem_pool_create(scratch, sizeof(A), alignof(A));
 
   // Allocate several chunks
   A* a0; Assign(a0, mem_pool_alloc(p));
@@ -45,8 +45,6 @@ void test_mem_pool() {
   test_equal(p.count, 0);
   test_true(p.head != nullptr);
 
-  arena_release(arena);
-
   Info("=== Test: mem pool works ===");
 }
 
@@ -57,8 +55,8 @@ void test_mem_pool() {
 #include <cstdio>
 
 void test_general_allocator() {
-  Arena* arena = arena_alloc();
-  Allocator allocator(arena);
+  Scratch scratch;
+  Allocator allocator(scratch);
 
   const int ITER = 20000;      // total operations
   const int MAX_ACTIVE = 5000; // number of live allocations
@@ -109,9 +107,10 @@ void test_general_allocator() {
   for (void* p : ptrs)
     mem_free(allocator, p);
 
-  printf("Stress test finished.\n");
+  Info("=== Test: mem general allocator works ===");
 }
 
 void test() {
   test_mem_pool();
+  test_general_allocator();
 }

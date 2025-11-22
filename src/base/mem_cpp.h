@@ -68,19 +68,21 @@ intern void global_pool_free(SegPool& p, void* ptr) {
 	p.head = node;
 }
 
+// NOTE: Header: header_size -> u32 header_guard -> u8* memory
 u8* mem_alloc(u64 size, u64 alignment) {
   Assert(size > 0);
-#ifdef MEM_GUARD
+#if MEM_GUARD
   u64 alloc_size = size + alignment;
   u64 pow2 = next_pow2(alloc_size);
   u64 pool_idx = ctz64(pow2) - ctz64(8);
-  u8* result = global_pool_alloc(mem_ctx.pools[pool_idx]);
+  SegPool& p = mem_ctx.pools[pool_idx];
+  u8* result = global_pool_alloc(p);
   result = Offset(result, alignment);
-  MemGuardAlloc(result, size);
-  u32* header = (u32*)OffsetBack(result, sizeof(u32));
-  *header = MEM_ALLOC_HEADER_GUARD;
-  u32* header_alignment = (u32*)OffsetBack(header, sizeof(u32));
-  *header_alignment = alignment;
+  u32* header_guard = (u32*)OffsetBack(result, sizeof(u32));
+  *header_guard = MEM_ALLOC_HEADER_GUARD;
+  u32* header_size = (u32*)OffsetBack(header_guard, sizeof(u32));
+  *header_size = alignment;
+  MemGuardAlloc(result, p.chunk_size - *header_size);
 #else
   u64 pow2 = next_pow2(size);
   u64 pool_idx = ctz64(pow2) - ctz64(8);
@@ -106,13 +108,13 @@ void mem_free(void* ptr) {
     u64 base_size = 8;
     base_size <<= i;
     if (IsInsideBounds(start, ptr, end)) {
-#ifdef MEM_GUARD
-      u32* header = (u32*)OffsetBack(ptr,sizeof(u32));
-      AssertMsg(*header == MEM_ALLOC_HEADER_GUARD, "Double free memory");
-      *header = MEM_DEALLOC_HEADER_GUARD;
-      u32* alignment = (u32*)OffsetBack(header, sizeof(u32));
-      MemGuardDealloc(ptr, base_size - *alignment);
-      ptr = OffsetBack(ptr, *alignment);
+#if MEM_GUARD
+      u32* header_guard = (u32*)OffsetBack(ptr,sizeof(u32));
+      AssertMsg(*header_guard == MEM_ALLOC_HEADER_GUARD, "Double free memory");
+      *header_guard = MEM_DEALLOC_HEADER_GUARD;
+      u32* header_size = (u32*)OffsetBack(header_guard, sizeof(u32));
+      MemGuardDealloc(ptr, base_size - *header_size);
+      ptr = OffsetBack(ptr, *header_size);
 #endif
       global_pool_free(mem_ctx.pools[i], ptr);
       return;
@@ -135,11 +137,11 @@ u8* mem_realloc(void* ptr, u64 size) {
     u64 base_size = 8;
     base_size <<= i;
     if (IsInsideBounds(start, ptr, end)) {
-#ifdef MEM_GUARD
+#if MEM_GUARD
       result = mem_alloc(size);
-      u32* alignment = (u32*)OffsetBack(result, sizeof(u32)*2);
-      MemCopy(result, ptr, base_size - *alignment);
-      MemGuardDealloc(ptr, base_size - *alignment);
+      u32* header_size = (u32*)OffsetBack(result, sizeof(u32)*2);
+      MemCopy(result, ptr, base_size - *header_size);
+      MemGuardDealloc(ptr, base_size - *header_size);
       mem_free(ptr);
 #else
       result = mem_alloc(size);
@@ -167,11 +169,11 @@ u8* mem_realloc_zero(void* ptr, u64 size) {
     u64 base_size = 8;
     base_size <<= i;
     if ((u8*)ptr >= start && (u8*)ptr < end) {
-#ifdef MEM_GUARD
+#if MEM_GUARD
       result = mem_alloc(size);
-      u32* alignment = (u32*)OffsetBack(result, sizeof(u32)*2);
-      MemCopy(result, ptr, base_size - *alignment);
-      MemGuardDealloc(ptr, base_size - *alignment);
+      u32* header_size = (u32*)OffsetBack(result, sizeof(u32)*2);
+      MemCopy(result, ptr, base_size - *header_size);
+      MemGuardDealloc(ptr, base_size - *header_size);
       mem_free(ptr);
 #else
       result = mem_alloc_zero(size);
@@ -202,7 +204,8 @@ Arena* arena_alloc() {
     .cmt = commit_size,
     .res = reserve_size,
   };
-
+  AsanPoisonMemRegion(base, commit_size);
+  AsanUnpoisonMemRegion(base, sizeof(Arena));
   return arena;
 }
 
@@ -217,9 +220,11 @@ void* _arena_push(Arena* arena, u64 size, u64 align) {
     b32 err = os_commit(Offset(arena, arena->cmt), commit_size);
     Assert(err == 0);
     arena->cmt += commit_size;
+    AsanPoisonMemRegion(Offset(arena, arena->pos + sizeof(Arena)), commit_size);
   }
 
   u8* result = Offset(arena, arena->pos + sizeof(Arena));
+  AsanUnpoisonMemRegion(Offset(arena, arena->pos + sizeof(Arena)), size);
   arena->pos += size;
 
   return result;
@@ -232,35 +237,73 @@ void arena_release(Arena* arena) {
 ////////////////////////////////////////////////////////////////////////
 // General allocator
 
-u8* mem_alloc(Allocator& allocator, u64 size) {
+// NOTE: Header: u32 header_size -> u32 header_guard -> u32 pool_index -> u8* memory
+u8* mem_alloc(Allocator& allocator, u64 size, u64 alignment) {
   Assert(size > 0);
-  size = AlignUp(size, sizeof(u64));
+#if MEM_GUARD
+  u32 header_size = AlignUp(sizeof(u32)*3, alignment);
+  size = size + header_size;
   u64 pow2_size = next_pow2(size);
   u64 pool_index = ctz64(pow2_size) - ctz64(8);
   MemPoolPow2& p = allocator.pools[pool_index];
 
   if (p.head == null) {
-    u32 header_size = sizeof(u64);
-    u64* header = (u64*)push_buffer(allocator.arena, pow2_size+header_size);
-    *(u64*)header = pool_index;
-    u8* chunk = Offset(header, header_size);
-    return chunk;
+    u8* result = push_buffer(allocator.arena, pow2_size, alignment);
+    result = Offset(result, header_size);
+    u32* index = (u32*)OffsetBack(result, sizeof(u32));
+    *index = pool_index;
+    u32* header_guard = (u32*)OffsetBack(index, sizeof(u32));
+    *header_guard = MEM_ALLOC_HEADER_GUARD;
+    u32* header_size_ = (u32*)OffsetBack(header_guard, sizeof(u32));
+    *header_size_ = header_size;
+    MemGuardAlloc(result, pow2_size - header_size);
+    return result;
   }
   PoolFreeNode* result = p.head;
   p.head = p.head->next;
+
+  MemGuardAlloc(result, pow2_size - header_size);
+  u32* header_guard = (u32*)OffsetBack(result, sizeof(u32)*2);
+  Assert(*header_guard == MEM_DEALLOC_HEADER_GUARD);
+  *header_guard = MEM_ALLOC_HEADER_GUARD;
+  
+#else
+  size = size + alignment;
+  u64 pow2_size = next_pow2(size);
+  u64 pool_index = ctz64(pow2_size) - ctz64(8);
+  MemPoolPow2& p = allocator.pools[pool_index];
+
+  if (p.head == null) {
+    u8* result = push_buffer(allocator.arena, pow2_size, alignment);
+    *(u32*)result = pool_index;
+    u32* index = (u32*)OffsetBack(result, sizeof(u32));
+    *index = pool_index;
+    return result;
+  }
+  PoolFreeNode* result = p.head;
+  p.head = p.head->next;
+#endif
 
   return (u8*)result;
 };
 
 void mem_free(Allocator& allocator, void* ptr) {
-  u64* header = (u64*)OffsetBack(ptr, sizeof(u64));
-  MemPoolPow2& p = allocator.pools[*header];
+  u32* pool_index = (u32*)OffsetBack(ptr, sizeof(u32));
+  MemPoolPow2& p = allocator.pools[*pool_index];
+
+#if MEM_GUARD
+  u32* header_guard = (u32*)OffsetBack(pool_index, sizeof(u32));
+  Assert(*header_guard == MEM_ALLOC_HEADER_GUARD);
+  *header_guard = MEM_DEALLOC_HEADER_GUARD;
+  u32* header_size = (u32*)OffsetBack(header_guard, sizeof(u32));
+  u64 size = 8 << *pool_index;
+  MemGuardDealloc(ptr, size - *header_size);
+#endif
 
   PoolFreeNode* node = (PoolFreeNode*)ptr;
 	node->next = p.head;
 	p.head = node;
 }
-
 
 ////////////////////////////////////////////////////////////////////////
 // Pool
@@ -291,7 +334,7 @@ u8* mem_pool_alloc(MemPool& p) {
   p.head = p.head->next;
   ++p.count;
 
-  #if (MEM_GUARD)
+  #if MEM_GUARD
     u32* guard; Assign(guard, Offset(result, p.chunk_size - sizeof(u32)));
     Assert(*guard == MEM_DEALLOC_HEADER_GUARD);
     *guard = MEM_ALLOC_HEADER_GUARD;

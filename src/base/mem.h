@@ -67,7 +67,7 @@ struct Temp {
 };
 
 KAPI Arena* arena_alloc();
-INLINE void arena_clear(Arena* arena) { arena->pos = 0; };
+INLINE void arena_clear(Arena* arena) { arena->pos = 0; AsanPoisonMemRegion(Offset(arena, sizeof(Arena)), arena->cmt); };
 
 INLINE Temp temp_begin(Arena* arena) { return Temp{arena, arena->pos}; };
 INLINE void temp_end(Temp temp)      { temp.arena->pos = temp.pos; }
@@ -91,13 +91,13 @@ struct MemPoolPow2 {
 };
 
 struct Allocator{
-  Arena* arena;
-  MemPoolPow2 pools[32];
+  Arena* arena = null;
+  MemPoolPow2 pools[32] = {};
   Allocator() = default;
   Allocator(Arena* arena_) { arena = arena_; }
 };
 
-u8*  mem_alloc(Allocator& allocator, u64 size);
+u8*  mem_alloc(Allocator& allocator, u64 size, u64 alignment = DEFAULT_ALIGNMENT);
 void mem_free(Allocator& allocator, void* ptr);
 
 ////////////////////////////////////////////////////////////////////////
