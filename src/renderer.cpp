@@ -291,13 +291,13 @@ void shader_init() {
   }, OS_WatchFlag_Modify);
 }
 
-Shader& shader_get(String name) {
-  // Shader* shader; Assign(shader, hashmap_get(shader_st.hashmap, name));
-  // Assert(shader->id != INVALID_ID);
-  // return *shader;
-  Shader a;
-  return a;
-}
+// Shader& shader_get(String name) {
+//   // Shader* shader; Assign(shader, hashmap_get(shader_st.hashmap, name));
+//   // Assert(shader->id != INVALID_ID);
+//   // return *shader;
+//   Shader a;
+//   return a;
+// }
 
 ////////////////////////////////////////////////////////////////////////
 // Texture
@@ -342,10 +342,10 @@ u32 texture_load(String name) {
   return id;
 }
 
-KAPI Texture& texture_get(String name) {
-  // Texture* t; Assign(t, hashmap_get(texture_st.hashmap, name));
-  // Assert(t->id != INVALID_ID);
-  // return *t;
-  Texture a;
-  return a;
-}
+// KAPI Texture& texture_get(String name) {
+//   // Texture* t; Assign(t, hashmap_get(texture_st.hashmap, name));
+//   // Assert(t->id != INVALID_ID);
+//   // return *t;
+//   Texture a;
+//   return a;
+// }

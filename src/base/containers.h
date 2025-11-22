@@ -31,11 +31,12 @@ struct Array {
   }
 
   T& operator[](u32 idx) {
-    Assert(IsInsideBound(idx, cap));
+    Assert(idx < cap);
     return data[idx];
   }
 };
 
+template<typename T, i32 N> INLINE u32 len(Array<T, N> a) { return a.count; }
 template<typename T, i32 N> T& append(Array<T, N>& a, T b) { 
   Assert(len(a) < a.cap && "array full");
   T& e = a.data[a.count];
@@ -46,8 +47,8 @@ template<typename T, i32 N, typename... Args> void append(Array<T, N>& a, T firs
   append(a, first);
   (append(a, rest), ...);
 }
-template<typename T, i32 N> void remove(Array<T, N>& a, i32 idx) { 
-  Assert(IsInsideBound(idx, len(a)));
+template<typename T, i32 N> void remove(Array<T, N>& a, u32 idx) { 
+  Assert(idx < len(a));
   a.data[idx] = a.data[--a.count];
 }
 template<typename T, i32 N> b32 exists(Array<T, N>& a, T e) { 
@@ -82,12 +83,17 @@ struct Darray {
   }
   
   T& operator[](u32 idx) {
-    Assert(IsInsideBound(idx, cap));
+    Assert(idx < cap);
     return data[idx];
+  }
+
+  T pop() {
+    return data[--count];
   }
 };
 
-template<typename T> void append(Darray<T>& a, T b) { 
+template<typename T> INLINE u32 len(Darray<T> a) { return a.count; }
+template<typename T> T& append(Darray<T>& a, T b) { 
   if (len(a) >= a.cap) {
     if (a.data) {
       a.cap *= DEFAULT_RESIZE_FACTOR;
@@ -97,19 +103,27 @@ template<typename T> void append(Darray<T>& a, T b) {
       Assign(a.data, mem_alloc(sizeof(T)*a.cap));
     }
   }
+  T& e = a.data[a.count];
   a.data[a.count++] = b;
+  return e;
 }
 template<typename T, typename... Args> void append(Darray<T>& a, T first, Args... rest) {
   append(a, first);
   (append(a, rest), ...);
 }
 template<typename T> void remove(Darray<T>& a, u32 idx) { 
-  Assert(IsInsideBound(idx, a.cap));
+  Assert(idx < a.cap);
   a.data[idx] = a.data[--a.count];
 }
 template<typename T> void reserve(Darray<T>& a, u32 size) { 
   a.cap += size;
   Assign(a.data, mem_realloc(a.data, sizeof(T)*a.cap));
+}
+template<typename T> b32 exists(Darray<T>& a, T e) { 
+  for (T x : a) {
+    if (x == e) return true;
+  }
+  return false;
 }
 template<typename T> void free(Darray<T>& a) {
   mem_free(a.data);
@@ -118,9 +132,7 @@ template<typename T> void free(Darray<T>& a) {
   a.data = null;
 }
 
-////////////////////////////////////////////////////////////////////////
-// DarrayArena
-
+// Darray Arena
 template <typename T>
 struct DarrayArena {
   u32 count = 0;
@@ -135,12 +147,13 @@ struct DarrayArena {
   DarrayArena(Arena* arena_) {
     arena = arena_;
   }
-  T& operator[](i32 idx) {
-    Assert(IsInsideBound(idx, count));
+  T& operator[](u32 idx) {
+    Assert(idx < count);
     return data[idx];
   }
 };
 
+template<typename T> INLINE u32 len(DarrayArena<T> a) { return a.count; }
 template<typename T> void append(DarrayArena<T>& a, T b) { 
   if (len(a) >= a.cap) {
     if (a.data) {
@@ -155,9 +168,8 @@ template<typename T> void append(DarrayArena<T>& a, T b) {
   }
   a.data[a.count++] = b;
 }
-template<typename T> void remove(DarrayArena<T>& a, i32 idx) { 
-  Assert(idx >= 0 && "idx negative!");
-  Assert(idx < len(a) && "idx out of bounds!");
+template<typename T> void remove(DarrayArena<T>& a, u32 idx) { 
+  Assert(idx < len(a));
   a.data[idx] = a.data[--a.count];
 }
 template<typename T> void reserve(DarrayArena<T>& a, u32 size) { 
@@ -185,8 +197,6 @@ template<typename T> b32 exists_at(DarrayArena<T>& a, T e, u32* index) {
   return false;
 }
 
-// TODO: make array index
-
 ////////////////////////////////////////////////////////////////////////
 // SparseSet
 
@@ -194,18 +204,27 @@ template <typename T>
 struct SparseSet {
   u32 count = 0;
   u32 cap = 0;
+  u32 sparse_count = 0;
   u32* entity_to_index = null;
   u32* entities = null;
-  T* data;
+  T* data = null;
 
   T* begin() { return data; }
   T* end()   { return data + count; }
 
+  T& operator[](u32 idx) {
+    Assert(idx < cap);
+    DebugDo(Assert(entity_to_index[idx] != INVALID_ID));
+    u32 index = entity_to_index[idx];
+    return data[index];
+  }
   void add(u32 id) {
     if (count >= cap) {
       grow();
     }
-    Assert(count < cap);
+    if (id >= sparse_count) {
+      grow_max_index(id);
+    }
     entity_to_index[id] = count;
     entities[count] = id;
     ++count;
@@ -214,13 +233,16 @@ struct SparseSet {
     if (count >= cap) {
       grow();
     }
-    Assert(count < cap);
+    if (id >= sparse_count) {
+      grow_max_index(id);
+    }
     entity_to_index[id] = count;
     entities[count] = id;
     data[count] = element;
     ++count;
   }
   void remove(u32 id) {
+    DebugDo(Assert(entity_to_index[id] != INVALID_ID));
     u32 idx_of_removed_entity = entity_to_index[id];
     u32 idx_of_last_element = count - 1;
     data[idx_of_removed_entity] = data[idx_of_last_element];
@@ -231,56 +253,113 @@ struct SparseSet {
     entities[idx_of_removed_entity] = last_entity;
 
     --count;
-  }
-  T* get(u32 id) {
-    u32 index = entity_to_index[id];
-    return &data[index];
+
+    DebugDo(entity_to_index[id] = INVALID_ID);
   }
   void grow() {
     if (data) {
       cap *= DEFAULT_RESIZE_FACTOR;
-      u64 size = (sizeof(i32) + sizeof(i32) + sizeof(T)) * cap;
-      u8* buff = mem_realloc(entity_to_index, size);
-
-      entity_to_index = (u32*)buff;
-      entities = (u32*)Offset(entity_to_index, sizeof(u32) * cap);
-      data = (T*)Offset(entities, sizeof(u32) * cap);
-
+      entities = mem_realloc_typed(entities, u32, cap);
+      data = mem_realloc_typed(entities, T, cap);
     }
     else {
       cap = DEFAULT_CAPACITY;
-      u64 size = (sizeof(i32) + sizeof(i32) + sizeof(T)) * cap;
-      u8* buff = mem_alloc(size);
-
-      entity_to_index = (u32*)buff;
-      entities = (u32*)Offset(entity_to_index, sizeof(u32) * cap);
-      data = (T*)Offset(entities, sizeof(u32) * cap);
+      entities = mem_alloc_typed(u32, cap);
+      data = mem_alloc_typed(T, cap);
+      sparse_count = cap;
+      entity_to_index = mem_alloc_typed(u32, sparse_count);
     }
+  }
+  void grow_max_index(u32 id) {
+    u32 modifier = CeilIntDiv(id+1, sparse_count);
+    sparse_count *= modifier;
+    data = mem_realloc_typed(data, u32, sparse_count);
   }
 };
 
-// TODO: make id check to grow entity_to_index array 
+// Just stores ids
 struct SparseSetIndex {
   u32 count = 0;
   u32 cap = 0;
-  u32* entity_to_index = null;
-  u32* entities = null;
+  u32 sparse_count = 0;
+  u32* dense = null;
+  u32* sparse = null;
 
-  u32* begin() { return entities; }
-  u32* end()   { return entities + count; }
+  u32* begin() { return dense; }
+  u32* end()   { return dense + count; }
 
   void add(u32 id) {
     if (count >= cap) {
       grow();
     }
-    Assert(count < cap);
-    entity_to_index[id] = count;
-    entities[count] = id;
+    if (id >= sparse_count) {
+      grow_max_index(id);
+    }
+    sparse[id] = count;
+    dense[count] = id;
     ++count;
   }
   void remove(u32 id) {
+    u32 idx_of_removed_entity = sparse[id];
+    u32 idx_of_last_element = count - 1;
+
+    u32 last_entity = dense[idx_of_last_element];
+
+    sparse[last_entity] = idx_of_removed_entity;
+    dense[idx_of_removed_entity] = last_entity;
+
+    --count;
+  }
+  void grow() {
+    if (dense) {
+      cap *= DEFAULT_RESIZE_FACTOR;
+      dense = mem_realloc_typed(dense, u32, cap);
+    }
+    else {
+      cap = DEFAULT_CAPACITY;
+      dense = mem_alloc_typed(u32, cap);
+      sparse_count = cap;
+      sparse = mem_alloc_typed(u32, sparse_count);
+    }
+  }
+  void grow_max_index(u32 id) {
+    u32 modifier = CeilIntDiv(id+1, sparse_count);
+    sparse_count *= modifier;
+    sparse = mem_realloc_typed(sparse, u32, sparse_count);
+  }
+};
+
+template<typename T, i32 N>
+struct SparseArray {
+  static constexpr i32 cap = N;
+  u32 count = 0;
+  u32 entity_to_index[N] = {};
+  u32 entities[N] = {};
+  T data[N] = {};
+
+  T* begin() { return data; }
+  T* end()   { return data + count; }
+
+  SparseArray() = default;
+
+  T& operator[](u32 idx) {
+    Assert(idx < cap);
+    DebugDo(Assert(entity_to_index[idx] != INVALID_ID));
+    u32 index = entity_to_index[idx];
+    return data[index];
+  }
+  u32 add(T e) {
+    u32 id = count++;
+    entity_to_index[id] = id;
+    entities[id] = id;
+    data[id] = e;
+    return id;
+  }
+  void remove(u32 id) {
+    DebugDo(Assert(entity_to_index[id] != INVALID_ID));
     u32 idx_of_removed_entity = entity_to_index[id];
     u32 idx_of_last_element = count - 1;
+    data[idx_of_removed_entity] = data[idx_of_last_element];
 
     u32 last_entity = entities[idx_of_last_element];
 
@@ -288,23 +367,65 @@ struct SparseSetIndex {
     entities[idx_of_removed_entity] = last_entity;
 
     --count;
+
+    DebugDo(entity_to_index[id] = INVALID_ID);
+  }
+};
+
+template <typename T>
+struct SparseDarray {
+  u32 count = 0;
+  u32 cap = 0;
+  u32* entity_to_index = null;
+  u32* entities = null;
+  T* data = null;
+
+  T* begin() { return data; }
+  T* end()   { return data + count; }
+
+  T& operator[](u32 idx) {
+    Assert(idx < cap);
+    DebugDo(Assert(entity_to_index[idx] != INVALID_ID));
+    u32 index = entity_to_index[idx];
+    return data[index];
+  }
+  u32 add(T e) {
+    if (count >= cap) {
+      grow();
+    }
+    u32 id = count++;
+    entity_to_index[id] = id;
+    entities[id] = id;
+    data[id] = e;
+    return id;
+  }
+  void remove(u32 id) {
+    DebugDo(Assert(entity_to_index[id] != INVALID_ID));
+    u32 idx_of_removed_entity = entity_to_index[id];
+    u32 idx_of_last_element = count - 1;
+    data[idx_of_removed_entity] = data[idx_of_last_element];
+
+    u32 last_entity = entities[idx_of_last_element];
+
+    entity_to_index[last_entity] = idx_of_removed_entity;
+    entities[idx_of_removed_entity] = last_entity;
+
+    --count;
+
+    DebugDo(entity_to_index[id] = INVALID_ID);
   }
   void grow() {
-    if (entity_to_index) {
+    if (data) {
       cap *= DEFAULT_RESIZE_FACTOR;
-      u64 size = (sizeof(u32) + sizeof(u32)) * cap;
-      u8* buff = mem_realloc(entity_to_index, size);
-
-      entity_to_index = (u32*)buff;
-      entities = (u32*)Offset(entity_to_index, sizeof(u32) * cap);
+      entities = mem_realloc_typed(entities, u32, cap);
+      entity_to_index = mem_realloc_typed(entity_to_index, u32, cap);
+      data = mem_realloc_typed(entities, T, cap);
     }
     else {
       cap = DEFAULT_CAPACITY;
-      u64 size = (sizeof(u32) + sizeof(u32)) * cap;
-      u8* buff = mem_alloc(size);
-
-      entity_to_index = (u32*)buff;
-      entities = (u32*)Offset(entity_to_index, sizeof(u32) * cap);
+      entities = mem_alloc_typed(u32, cap);
+      data = mem_alloc_typed(T, cap);
+      entity_to_index = mem_alloc_typed(u32, cap);
     }
   }
 };
@@ -313,139 +434,29 @@ struct SparseSetIndex {
 // IdPool
 
 struct IdPool {
-  u32 count;
-  u32 cap;
-  u32* handlers;
-  DebugDo(b8* used);
+  u32 next_idx;
+  Darray<u32> array;
 };
 
-static IdPool make_handle_pool() {
-  IdPool result = {
-    .cap = DEFAULT_CAPACITY,
-    .handlers = mem_alloc_typed(u32, DEFAULT_CAPACITY),
-  };
-  Loop (i, DEFAULT_CAPACITY) {
-    result.handlers[i] = i;
+inline u32 alloc_id(IdPool& p) {
+  if (len(p.array) > 0) {
+    return p.array.pop();
   }
-  DebugDo(
-    result.used = mem_alloc_typed(b8, DEFAULT_CAPACITY);
-    MemZero(result.used, DEFAULT_CAPACITY);
-  );
-  return result;
-}
-static u32 append(IdPool& h) {
-  u32 cap_old = h.cap;
-  if (h.count >= h.cap) {
-    h.cap *= DEFAULT_RESIZE_FACTOR;
-    h.handlers = mem_realloc_typed(h.handlers, u32, h.cap);
-    for (i32 i = cap_old; i < h.cap; ++i) {
-      h.handlers[i] = i;
-    }
-  }
-  DebugDo(
-    if (h.count >= cap_old) {
-      h.used = mem_realloc_typed_zero(h.used, b8, h.cap);
-    }
-    h.used[h.count] = true
-  );
-  u32 id = h.handlers[h.count];
-  ++h.count;
+  u32 id = p.next_idx++;
   return id;
 }
-static void remove(IdPool& h, u32 id) {
-  Assert(IsInsideBound(id, h.cap));
-  DebugDo(
-    Assert(h.used[id])
-    h.used[id] = false;
-  );
-  h.handlers[--h.count] = id;
+
+inline void free_id(IdPool& p, u32 id) {
+  Assert(p.next_idx > 0);
+  Assert(IsInsideBound(id, p.next_idx));
+  Assert(!exists(p.array, id));
+  append(p.array, id);
 }
-
-template<typename T, i32 N> INLINE u32 len(Array<T, N> a)    { return a.count; }
-template<typename T>        INLINE u32 len(Darray<T> a)      { return a.count; }
-template<typename T>        INLINE u32 len(DarrayArena<T> a) { return a.count; }
-                            INLINE u32 len(const char* a)    { return String(a).size; }
-
-
-
-// b2IdPool b2CreateIdPool( void )
-// {
-// 	b2IdPool pool = { 0 };
-// 	pool.freeArray = b2IntArray_Create( 32 );
-// 	return pool;
-// }
-
-// void b2DestroyIdPool( b2IdPool* pool )
-// {
-// 	b2IntArray_Destroy( &pool->freeArray );
-// 	*pool = ( b2IdPool ){ 0 };
-// }
-
-// int b2AllocId( b2IdPool* pool )
-// {
-// 	int count = pool->freeArray.count;
-// 	if ( count > 0 )
-// 	{
-// 		int id = b2IntArray_Pop( &pool->freeArray );
-// 		return id;
-// 	}
-
-// 	int id = pool->nextIndex;
-// 	pool->nextIndex += 1;
-// 	return id;
-// }
-
-// void b2FreeId( b2IdPool* pool, int id )
-// {
-// 	B2_ASSERT( pool->nextIndex > 0 );
-// 	B2_ASSERT( 0 <= id && id < pool->nextIndex );
-// 	b2IntArray_Push( &pool->freeArray, id );
-// }
-
-// #if B2_VALIDATE
-
-// void b2ValidateFreeId( b2IdPool* pool, int id )
-// {
-// 	int freeCount = pool->freeArray.count;
-// 	for ( int i = 0; i < freeCount; ++i )
-// 	{
-// 		if ( pool->freeArray.data[i] == id )
-// 		{
-// 			return;
-// 		}
-// 	}
-
-// 	B2_ASSERT( 0 );
-// }
-
-// void b2ValidateUsedId( b2IdPool* pool, int id )
-// {
-// 	int freeCount = pool->freeArray.count;
-// 	for ( int i = 0; i < freeCount; ++i )
-// 	{
-// 		if ( pool->freeArray.data[i] == id )
-// 		{
-// 			B2_ASSERT( 0 );
-// 		}
-// 	}
-// }
-
-// #else
-
-// void b2ValidateFreeId( b2IdPool* pool, int id )
-// {
-// 	B2_UNUSED( pool, id );
-// }
-
-// void b2ValidateUsedId( b2IdPool* pool, int id )
-// {
-// 	B2_UNUSED( pool, id );
-// }
-// #endif
 
 ////////////////////////////////////////////////////////////////////////
 // Hashmap
 
+// TODO: fix mem
 enum {
   MapSlot_Empty,
   MapSlot_Occupied,

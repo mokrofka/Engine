@@ -4,8 +4,6 @@
 #include "event.h"
 #include "test.h"
 
-#define MaxEntities KB(20)
-
 // f32 cube_vertices[] = {
 //   // Pos                 // Normal           // Texcoord
 //   // Front face (0, 0, 1)
@@ -643,7 +641,7 @@ struct GameState {
   Arena* arena;
   Map<String, Mesh> meshes;
   ShaderGlobalState* shader_state;
-  Array<Entity, 100> entities;
+  Darray<Entity> entities;
   Camera camera;
 };
 
@@ -707,9 +705,9 @@ Entity& entity_create(u32 mesh, u32 shader, u32 texture) {
   };
   return append(st->entities, e);
 }
-Entity& entity_create() {
-
-}
+// Entity& entity_create() {
+//   return 0;
+// }
 
 ////////////////////////////////////////////////////////////////////////
 // Camera
@@ -816,8 +814,8 @@ void app_init(u8** state) {
   Entity& cube = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_OrangeLines]);
   Entity& cube1 = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_Container]);
   cube1.pos = {-3,0,1};
-  Entity& room = entity_create(meshes[Mesh_Room], shaders[Shader_Color], textures[Texture_Room]);
-  room.pos = {0,0,10};
+  // Entity& room = entity_create(meshes[Mesh_Room], shaders[Shader_Color], textures[Texture_Room]);
+  // room.pos = {0,0,10};
 
 }
 
@@ -839,12 +837,11 @@ shared_function void app_update(u8** state) {
     st->camera.fov -= 5;
   }
 
-  local Timer timer_to_create = timer_create(0.3);
+  local Timer timer_to_create = timer_create(0.1);
   if (timer_tick(timer_to_create, delta_time)) {
-    // entity_create()
-    // Info("entity created %i", len(st->entities));
-    // Entity& cube1 = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_Container]);
-    // cube1.pos = v3_rand_range(v3(-10), v3(10));
+    Info("entity created %i", len(st->entities));
+    Entity& cube1 = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_Container]);
+    cube1.pos = v3_rand_range(v3(-10), v3(10));
   }
 
   local Timer timer = timer_create(0.3);

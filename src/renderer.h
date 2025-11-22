@@ -3,6 +3,12 @@
 #include "r_types.h"
 #include "vk.h"
 
+#define MaxLights KB(1)
+#define MaxEntities KB(4)
+#define MaxMeshes KB(1)
+#define MaxShaders KB(1)
+#define MaxTextures KB(1)
+
 KAPI extern f32 delta_time; // I dond't want where it should be
 
 // Renderer
@@ -60,7 +66,7 @@ enum {
 
 inline String meshs_path[Mesh_COUNT] = {
   [Mesh_Cube] = "cube.obj",
-  [Mesh_Room] = "room.obj",
+  // [Mesh_Room] = "room.obj",
 };
 
 KAPI extern u32 meshes[Mesh_COUNT];

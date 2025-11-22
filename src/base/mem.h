@@ -38,6 +38,7 @@ struct Range {
 
 ////////////////////////////////////////////////////////////////////////
 // Global Allocator
+// TODO: Make this allocator usesable per system with linked list
 
 KAPI void global_allocator_init();
 KAPI u8* mem_alloc(u64 size);

@@ -16,9 +16,6 @@
 #define FramesInFlight 3
 #define ImagesInFlight 4
 
-#define MaxLights KB(1)
-#define MaxEntities KB(4)
-
 struct VK_Buffer {
   VkBuffer handle;
   VkDeviceMemory memory;
@@ -119,11 +116,11 @@ struct VK_SyncObj {
 struct VK_State {
   Arena* arena;
   
-  OS_Handle lib;
   VkAllocationCallbacks* allocator;
   VkAllocationCallbacks _allocator;
   VkInstance instance;
   VkSurfaceKHR surface;
+  VkDebugUtilsMessengerEXT debug_messenger;
   
   VK_Device device;
   VK_SyncObj sync;
@@ -147,44 +144,39 @@ struct VK_State {
   
   VkDescriptorPool descriptor_pool;
   VkDescriptorSetLayout descriptor_set_layout;
-  VkDescriptorSetLayout screen_descriptor_set_layout;
   VkDescriptorSet descriptor_sets;
-  // VkDescriptorSet screen_descriptor_sets[FramesInFlight];
-  VkDescriptorSet screen_descriptor_sets;
 
   VkDescriptorSetLayout compute_descriptor_set_layout;
   VkDescriptorSet compute_descriptor_sets[FramesInFlight];
   
-  VkCommandBuffer cmds[FramesInFlight];
-  VkCommandBuffer compute_cmds[FramesInFlight];
-
-  VK_Texture texture;
-  u32 texture_count;
-  Array<u32, MaxEntities> entities_to_texture;
+  VkCommandBuffer* cmds;
+  VkCommandBuffer* compute_cmds;
 
   IdPool entity_handlers;
   ShaderEntity* entities_data;
-  SparseSet<PushConstant> push_constants;
-  Array<u32, MaxEntities> entities_to_mesh;
-  Array<VK_Mesh, MaxEntities> meshes;
+
   Array<u32, MaxEntities> entities_to_shader;
+  Array<u32, MaxEntities> entities_to_mesh;
+  Array<u32, MaxEntities> entities_to_texture;
+
+  Array<PushConstant, MaxEntities> push_constants;
+  Array<VK_Shader, MaxShaders> shaders;
+  Array<VK_Mesh, MaxMeshes> meshes;
+  Array<VK_Texture, MaxTextures> texture;
 
   SparseSet<PointLight> point_light_data;
   SparseSet<DirLight> dir_light_data;
   SparseSet<SpotLight> spot_light_data;
- 
+
   // Shader
   // VK_Shader shaders[10];
   VK_ShaderCompute compute_shader;
   ShaderGlobalState* global_shader_state;
   VK_Shader screen_shader;
-  Array<VK_Shader, 10> shaders;
 
   // offscreen rendering
   VK_Texture texture_targets[ImagesInFlight];
   VK_Image offscreen_depth_buffer;
-
-  VkDebugUtilsMessengerEXT debug_messenger;
 };
 
 #define ParticleCount KB(40)
@@ -369,6 +361,7 @@ intern String vk_result_string(VkResult result) {
     case VK_ERROR_NOT_ENOUGH_SPACE_KHR:                         return "VK_ERROR_NOT_ENOUGH_SPACE_KHR";
     case VK_RESULT_MAX_ENUM:                                    break;
     }
+  return "NO IDEA";
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -1030,7 +1023,7 @@ intern void vk_image_upload_to_gpu(VkCommandBuffer cmd, VK_Image image) {
 }
 
 u32 vk_texture_load(Texture t) {
-  VK_Texture& texture = vk.texture;
+  VK_Texture texture = {};
   
   u64 size = t.width*t.height*t.channel_count;
   
@@ -1080,22 +1073,25 @@ u32 vk_texture_load(Texture t) {
   VK_CHECK(vkCreateSampler(vkdevice, &sampler_info, vk.allocator, &texture.sampler));
 
   VkDescriptorImageInfo image_info = {
-    .sampler = vk.texture.sampler,
-    .imageView = vk.texture.image.view,
+    .sampler = texture.sampler,
+    .imageView = texture.image.view,
     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
   };
   VkWriteDescriptorSet texture_descriptor = {
     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
     .dstSet = vk.descriptor_sets,
     .dstBinding = 1,
-    .dstArrayElement = vk.texture_count,
+    .dstArrayElement = len(vk.texture),
     .descriptorCount = 1,
     .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
     .pImageInfo = &image_info,
   };
+
   VkWriteDescriptorSet descriptors[] = {texture_descriptor};
   vkUpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
-  return vk.texture_count++;
+  u32 id = len(vk.texture);
+  append(vk.texture, texture);
+  return id;
 }
 
 intern void vk_resize_texture_target() {
@@ -1679,28 +1675,6 @@ void vk_draw_init() {
   vkUpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
 }
 
-void vk_screen_descriptor_update(u32 id) {
-  VkDescriptorSet descriptor_set = vk.screen_descriptor_sets;
-  
-  VkDescriptorImageInfo image_info = {
-    .sampler = vk.texture_targets[id].sampler,
-    .imageView = vk.texture_targets[id].image.view,
-    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-  };
-
-  VkWriteDescriptorSet texture_descriptor = {
-    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    .dstSet = descriptor_set,
-    .dstBinding = 1,
-    .descriptorCount = 1,
-    .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-    .pImageInfo = &image_info,
-  };
-
-  VkWriteDescriptorSet descriptors[] = {texture_descriptor};
-  vkUpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
-}
-
 void vk_draw() {
   VkCommandBuffer cmd = vk_get_current_cmd();
 
@@ -1713,13 +1687,12 @@ void vk_draw() {
     for (u32 id : shader.entities) {
       u32 mesh_id = vk.entities_to_mesh[id];
       VK_Mesh mesh = vk.meshes[mesh_id];
-      PushConstant* push = vk.push_constants.get(id);
+      PushConstant* push = &vk.push_constants[id];
 
       vkCmdPushConstants(cmd, shader.pipeline.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstant), push);
       vkCmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, &mesh.vert_offset);
       vkCmdBindIndexBuffer(cmd, vk.index_buffer.handle, mesh.index_offset, VK_INDEX_TYPE_UINT32);
       vkCmdDrawIndexed(cmd, mesh.index_count, 1, 0, 0, 0);
-      // vkCmdDraw(cmd, mesh.vert_count, 1, 0, 0);
     }
   }
 
@@ -1728,7 +1701,6 @@ void vk_draw() {
 void vk_draw_screen() {
   VkCommandBuffer cmd = vk_get_current_cmd();
 
-  vk_screen_descriptor_update(vk.image_index);
   VkPipelineLayout pipeline_layout = vk.screen_shader.pipeline.pipeline_layout;
   VkPipeline pipeline = vk.screen_shader.pipeline.handle;
 
@@ -1965,6 +1937,8 @@ void vk_init() {
     vk_swapchain_create(false);
     Info("Swapchain created");
   
+    vk.cmds = push_array(vk.arena, VkCommandBuffer, vk.frames_in_flight);
+    vk.compute_cmds = push_array(vk.arena, VkCommandBuffer, vk.frames_in_flight);
     Loop (i, vk.frames_in_flight) {
       vk.cmds[i] = vk_cmd_alloc(vk.device.cmd_pool);
       vk.compute_cmds[i] = vk_cmd_alloc(vk.device.cmd_pool);
@@ -2024,9 +1998,9 @@ void vk_init() {
 
   vk_shader_init();
   vk_draw_init();
-  {
-    vk.entity_handlers = make_handle_pool();
-  }
+  // {
+  //   vk.entity_handlers = make_handle_pool();
+  // }
 
   // Target texture render
   {
@@ -2598,7 +2572,7 @@ void vk_update_transform(u32 entity_id, Transform trans) {
 // Entity
 
 u32 vk_make_renderable(u32 mesh_id, u32 shader_id, u32 texture_id) {
-  u32 entity_id = append(vk.entity_handlers);
+  u32 entity_id = alloc_id(vk.entity_handlers);
 
   VK_Shader& shader = vk.shaders[shader_id];
   shader.entities.add(entity_id); // look up table
@@ -2607,10 +2581,9 @@ u32 vk_make_renderable(u32 mesh_id, u32 shader_id, u32 texture_id) {
   vk.entities_to_shader[entity_id] = shader_id;
   vk.entities_to_texture[entity_id] = texture_id;
 
-  vk.push_constants.add(entity_id);
-  PushConstant* push = vk.push_constants.get(entity_id);
-  push->entity_index = entity_id;
-  push->texture_id = texture_id;
+  PushConstant& push = vk.push_constants[entity_id];
+  push.entity_index = entity_id;
+  push.texture_id = texture_id;
 
   return entity_id;
 }
@@ -2677,7 +2650,7 @@ ShaderEntity& vk_get_entity(u32 entity_id) {
 ////////////////////////////////////////////////////////////////////////
 // Util
 PushConstant& vk_get_push_constant(u32 entity_id) {
-  return *vk.push_constants.get(entity_id);
+  return vk.push_constants[entity_id];
 }
 
 ShaderGlobalState* vk_get_shader_state() {

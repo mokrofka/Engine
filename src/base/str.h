@@ -26,6 +26,7 @@ struct String {
   }
   INLINE operator bool() { return str; }
 };
+INLINE u32 len(const char* a) { return String(a).size; }
 
 struct StringArray {
   String* v;
