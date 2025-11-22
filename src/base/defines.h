@@ -290,5 +290,3 @@ ImplDefer<F> MakeDefer(F f) {
   #define ReadTimestampCounter()
 #endif
 
-#define DEFAULT_CAPACITY      8
-#define DEFAULT_RESIZE_FACTOR 2

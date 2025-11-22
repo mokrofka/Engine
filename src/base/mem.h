@@ -1,32 +1,31 @@
 #pragma once
 #include "defines.h"
 
-#define ALLOC_HEADER_GUARD   0xA110C8
-#define DEALLOC_HEADER_GUARD 0xDE1E7E
-#define ALLOC_GUARD          0xA1
-#define DEALLOC_GUARD        0xDE
-#define PAGE_SIZE            4096
+#define MEM_ALLOC_HEADER_GUARD   0xA110C8
+#define MEM_DEALLOC_HEADER_GUARD 0xDE1E7E
+#define MEM_ALLOC_GUARD          0xA1
+#define MEM_DEALLOC_GUARD        0xDE
+#define PAGE_SIZE                4096
 
-#define MEMORY_GUARD 1
+#define MEM_GUARD 1
 
-#if MEMORY_GUARD
-  #define FillAlloc(d, c)        MemSet(d, ALLOC_GUARD, c)
-  #define FillAllocStruct(d)     MemSet(d, ALLOC_GUARD, sizeof(*(d)))
-  #define FillAllocTyped(d, c)   MemSet(d, ALLOC_GUARD, sizeof(*(d) * (c)))
-  #define FillDealoc(d, c)       MemSet(d, DEALLOC_GUARD, c)
-  #define FillDealocTyped(d, c)  MemSet(d, DEALLOC_GUARD, sizeof(*(d) * (c)))
-  #define FillDealocStruct(d)    MemSet(d, DEALLOC_GUARD, sizeof(*(d)))
+#if MEM_GUARD
+  #define MemGuardAlloc(d, c)         MemSet(d, MEM_ALLOC_GUARD, c)
+  #define MemGuardAllocStruct(d)      MemSet(d, MEM_ALLOC_GUARD, sizeof(*(d)))
+  #define MemGuardAllocTyped(d, c)    MemSet(d, MEM_ALLOC_GUARD, sizeof(*(d) * (c)))
+  #define MemGuardDealloc(d, c)       MemSet(d, MEM_DEALLOC_GUARD, c)
+  #define MemGuardDeallocTyped(d, c)  MemSet(d, MEM_DEALLOC_GUARD, sizeof(*(d) * (c)))
+  #define MemGuardDeallocStruct(d)    MemSet(d, MEM_DEALLOC_GUARD, sizeof(*(d)))
 #else
-  #define FillAlloc(d, c)
-  #define FillAllocStruct(d)
-  #define FillAllocTyped(d, c)
-  #define FillDealoc(d, c)
-  #define FillDealocStruct(d)
-  #define FillDealocTyped(d, c)
+  #define MemGuardAlloc(d, c)
+  #define MemGuardAllocStruct(d)
+  #define MemGuardAllocTyped(d, c)
+  #define MemGuardDealloc(d, c)
+  #define MemGuardDeallocStruct(d)
+  #define MemGuardDeallocTyped(d, c)
 #endif
 
 #define DEFAULT_ALIGNMENT sizeof(void*)
-#define ARENA_HEADER_SIZE sizeof(Arena)
 
 #define ARENA_DEFAULT_RESERVE_SIZE MB(64)
 #define ARENA_DEFAULT_COMMIT_SIZE  KB(4)
@@ -40,7 +39,7 @@ struct Range {
 // Global Allocator
 
 KAPI void global_allocator_init();
-KAPI u8*  mem_alloc(u64 size);
+KAPI u8*  mem_alloc(u64 size, u64 alignment = DEFAULT_ALIGNMENT);
 KAPI u8*  mem_alloc_zero(u64 size);
 #define   mem_alloc_struct(T)        (T*)mem_alloc(sizeof(T))
 #define   mem_alloc_typed(T, c)      (T*)mem_alloc(sizeof(T)*c)
@@ -68,7 +67,6 @@ struct Temp {
 };
 
 KAPI Arena* arena_alloc();
-KAPI Arena* arena_shm_alloc(void* handler);
 INLINE void arena_clear(Arena* arena) { arena->pos = 0; };
 
 INLINE Temp temp_begin(Arena* arena) { return Temp{arena, arena->pos}; };
@@ -95,6 +93,8 @@ struct MemPoolPow2 {
 struct Allocator{
   Arena* arena;
   MemPoolPow2 pools[32];
+  Allocator() = default;
+  Allocator(Arena* arena_) { arena = arena_; }
 };
 
 u8*  mem_alloc(Allocator& allocator, u64 size);
@@ -148,7 +148,7 @@ struct FreeListAllocationHeader {
   u64 block_size;
   u64 padding;
   
-#ifdef MEMORY_GUARD
+#ifdef MEM_GUARD
   u64 guard;
 #endif
 };

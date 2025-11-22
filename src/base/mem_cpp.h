@@ -3,10 +3,13 @@
 ////////////////////////////////////////////////////////////////////////
 // Global Allocator
 
+#define MIN_CHUNKS_PER_COMMIT 32
+#define POOL_STEP GB(10)
+#define MEM_POOL_BATCH 16
+
 struct SegPool {
   u8* data;
-	u32 cap;
-  u32 count;
+	u32 count;
 	u32 chunk_size;
   PoolFreeNode* head;
 };
@@ -18,73 +21,72 @@ struct MemCtx {
 
 global MemCtx mem_ctx;
 
-#define MIN_CHUNKS_PER_COMMIT 32
-#define POOL_STEP GB(10)
-
-#define MEM_POOL_BATCH 16
-
 void global_allocator_init() {
   mem_ctx.data = os_reserve(TB(1));
-
   u64 offset = 0;
   u64 chunk_size = 8;
-  
   Loop (i, ArrayCount(mem_ctx.pools)) {
     mem_ctx.pools[i].data = Offset(mem_ctx.data, offset);
     mem_ctx.pools[i].chunk_size = chunk_size;
-
     offset += POOL_STEP;
     chunk_size *= 2;
   };
 }
 
-intern u8* segregated_pool_alloc(SegPool& p) {
+intern u8* global_pool_alloc(SegPool& p) {
   if (p.head == null) {
-    Assert(p.count >= p.cap);
-
     u32 commit_size;
     if (p.chunk_size > MB(1)) 
       commit_size = p.chunk_size;
     else 
       commit_size = Clamp(PAGE_SIZE, p.chunk_size * MIN_CHUNKS_PER_COMMIT, MB(1));
 
-    u8* end_of_pool = Offset(p.data, p.cap*p.chunk_size);
+    u8* end_of_pool = Offset(p.data, p.count*p.chunk_size);
     os_commit(end_of_pool, commit_size);
 
     u32 chunks_add = u32DivPow2(commit_size, p.chunk_size);
-    for (i32 i = p.cap; i < p.cap + chunks_add; ++i) {
+    for (u32 i = p.count; i < p.count + chunks_add; ++i) {
       u8* chunk =  Offset(p.data, i*p.chunk_size);
-      PoolFreeNode* node; Assign(node, chunk);
+      PoolFreeNode* node = (PoolFreeNode*)chunk;
       node->next = p.head;
       p.head = node;
+      AsanPoisonMemRegion(Offset(chunk, sizeof(void*)), p.chunk_size - sizeof(void*));
     }
-
-    p.cap += chunks_add;
+    p.count += chunks_add;
   }
-  ++p.count;
   
-  u8* result; Assign(result, p.head);
+  u8* result = (u8*)p.head;
   p.head = p.head->next;
+  AsanUnpoisonMemRegion(Offset(result, sizeof(void*)), p.chunk_size - sizeof(void*));
   return result;
 }
 
-intern void segregated_pool_free(SegPool& p, void* ptr) {
-	PoolFreeNode* node; Assign(node, ptr);
+intern void global_pool_free(SegPool& p, void* ptr) {
+	PoolFreeNode* node = (PoolFreeNode*)ptr;
 	node->next = p.head;
+  AsanPoisonMemRegion(Offset(node, sizeof(void*)), p.chunk_size - sizeof(void*));
 	p.head = node;
-  --p.count;
 }
 
-u8* mem_alloc(u64 size) {
+u8* mem_alloc(u64 size, u64 alignment) {
   Assert(size > 0);
+#ifdef MEM_GUARD
+  u64 alloc_size = size + alignment;
+  u64 pow2 = next_pow2(alloc_size);
+  u64 pool_idx = ctz64(pow2) - ctz64(8);
+  u8* result = global_pool_alloc(mem_ctx.pools[pool_idx]);
+  result = Offset(result, alignment);
+  MemGuardAlloc(result, size);
+  u32* header = (u32*)OffsetBack(result, sizeof(u32));
+  *header = MEM_ALLOC_HEADER_GUARD;
+  u32* header_alignment = (u32*)OffsetBack(header, sizeof(u32));
+  *header_alignment = alignment;
+#else
   u64 pow2 = next_pow2(size);
-  u64 base_size = 8;
-  u64 exp = ctz64(pow2) - ctz64(base_size);
-
-  u8* result = segregated_pool_alloc(mem_ctx.pools[exp]);
-  FillAlloc(result, size);
-
-  Assert(result);
+  u64 pool_idx = ctz64(pow2) - ctz64(8);
+  u8* result = global_pool_alloc(mem_ctx.pools[pool_idx]);
+  MemGuardAlloc(result, size);
+#endif
   return result;
 }
 
@@ -101,12 +103,18 @@ void mem_free(void* ptr) {
   Loop (i, ArrayCount(mem_ctx.pools)) {
     u8* start = base + i*POOL_STEP;
     u8* end = start + POOL_STEP;
-
     u64 base_size = 8;
     base_size <<= i;
     if (IsInsideBounds(start, ptr, end)) {
-      FillDealoc(ptr, base_size);
-      segregated_pool_free(mem_ctx.pools[i], ptr);
+#ifdef MEM_GUARD
+      u32* header = (u32*)OffsetBack(ptr,sizeof(u32));
+      AssertMsg(*header == MEM_ALLOC_HEADER_GUARD, "Double free memory");
+      *header = MEM_DEALLOC_HEADER_GUARD;
+      u32* alignment = (u32*)OffsetBack(header, sizeof(u32));
+      MemGuardDealloc(ptr, base_size - *alignment);
+      ptr = OffsetBack(ptr, *alignment);
+#endif
+      global_pool_free(mem_ctx.pools[i], ptr);
       return;
     }
   }
@@ -127,10 +135,17 @@ u8* mem_realloc(void* ptr, u64 size) {
     u64 base_size = 8;
     base_size <<= i;
     if (IsInsideBounds(start, ptr, end)) {
+#ifdef MEM_GUARD
+      result = mem_alloc(size);
+      u32* alignment = (u32*)OffsetBack(result, sizeof(u32)*2);
+      MemCopy(result, ptr, base_size - *alignment);
+      MemGuardDealloc(ptr, base_size - *alignment);
+      mem_free(ptr);
+#else
       result = mem_alloc(size);
       MemCopy(result, ptr, base_size);
-      FillDealoc(ptr, base_size);
-      segregated_pool_free(mem_ctx.pools[i], ptr);
+      global_pool_free(mem_ctx.pools[i], ptr);
+#endif
       break;
     }
   }
@@ -152,10 +167,17 @@ u8* mem_realloc_zero(void* ptr, u64 size) {
     u64 base_size = 8;
     base_size <<= i;
     if ((u8*)ptr >= start && (u8*)ptr < end) {
+#ifdef MEM_GUARD
+      result = mem_alloc(size);
+      u32* alignment = (u32*)OffsetBack(result, sizeof(u32)*2);
+      MemCopy(result, ptr, base_size - *alignment);
+      MemGuardDealloc(ptr, base_size - *alignment);
+      mem_free(ptr);
+#else
       result = mem_alloc_zero(size);
       MemCopy(result, ptr, base_size);
-      FillDealoc(ptr, base_size);
-      segregated_pool_free(mem_ctx.pools[i], ptr);
+      global_pool_free(mem_ctx.pools[i], ptr);
+#endif
       break;
     }
   }
@@ -187,37 +209,20 @@ Arena* arena_alloc() {
 void* _arena_push(Arena* arena, u64 size, u64 align) {
   size = AlignUp(size, align);
 
-  if (arena->pos + size + ARENA_HEADER_SIZE > arena->cmt) {
+  if (arena->pos + size + sizeof(Arena) > arena->cmt) {
     u64 commit_size = AlignUp(size, ARENA_DEFAULT_COMMIT_SIZE);
     
-    Assert((arena->pos + commit_size + ARENA_HEADER_SIZE) <= arena->res && "Arena is out of memory");
+    Assert((arena->pos + commit_size + sizeof(Arena)) <= arena->res && "Arena is out of memory");
 
     b32 err = os_commit(Offset(arena, arena->cmt), commit_size);
     Assert(err == 0);
     arena->cmt += commit_size;
   }
 
-  u8* result = Offset(arena, arena->pos + ARENA_HEADER_SIZE);
+  u8* result = Offset(arena, arena->pos + sizeof(Arena));
   arena->pos += size;
 
   return result;
-}
-
-Arena* arena_shm_alloc(void* handler) {
-  u64 reserve_size = ARENA_DEFAULT_RESERVE_SIZE;
-  u64 commit_size = ARENA_DEFAULT_COMMIT_SIZE;
-
-  u8* base = os_shm_reserve(reserve_size, (OS_Handle*)handler);
-  os_commit(base, commit_size);
-  
-  Arena* arena; Assign(arena, base);
-  *arena = {
-    .pos = 0,
-    .cmt = commit_size,
-    .res = reserve_size,
-  };
-
-  return arena;
 }
 
 void arena_release(Arena* arena) {
@@ -261,7 +266,7 @@ void mem_free(Allocator& allocator, void* ptr) {
 // Pool
 
 MemPool mem_pool_create(Arena* arena, u64 chunk_size, u64 chunk_alignment) {
-  IfDo(MEMORY_GUARD, chunk_size += sizeof(u32));
+  IfDo(MEM_GUARD, chunk_size += sizeof(u32));
   chunk_size = AlignUp(chunk_size, chunk_alignment);
   u8* data = push_buffer(arena, DEFAULT_CAPACITY*chunk_size, chunk_alignment);
 
@@ -286,26 +291,26 @@ u8* mem_pool_alloc(MemPool& p) {
   p.head = p.head->next;
   ++p.count;
 
-  #if (MEMORY_GUARD)
+  #if (MEM_GUARD)
     u32* guard; Assign(guard, Offset(result, p.chunk_size - sizeof(u32)));
-    Assert(*guard == DEALLOC_HEADER_GUARD);
-    *guard = ALLOC_HEADER_GUARD;
-    FillAlloc(result, p.chunk_size - sizeof(u32));
+    Assert(*guard == MEM_DEALLOC_HEADER_GUARD);
+    *guard = MEM_ALLOC_HEADER_GUARD;
+    MemGuardAlloc(result, p.chunk_size - sizeof(u32));
   #else
-    FillAlloc(result, p.chunk_size);
+    MemGuardAlloc(result, p.chunk_size);
   #endif
 
   return (u8*)result;
 }
 
 void mem_pool_free(MemPool& p, void* ptr) {
-  #if (MEMORY_GUARD)
+  #if (MEM_GUARD)
     u32* guard; Assign(guard, Offset(ptr, p.chunk_size - sizeof(u32)));
-    Assert(*guard == ALLOC_HEADER_GUARD);
-    *guard = DEALLOC_HEADER_GUARD;
-    FillDealoc(ptr, p.chunk_size - sizeof(u32));
+    Assert(*guard == MEM_ALLOC_HEADER_GUARD);
+    *guard = MEM_DEALLOC_HEADER_GUARD;
+    MemGuardDealloc(ptr, p.chunk_size - sizeof(u32));
   #else
-    FillDealoc(ptr, p.chunk_size);
+    MemGuardDealloc(ptr, p.chunk_size);
   #endif
 
   PoolFreeNode* node; Assign(node, ptr);
@@ -315,16 +320,16 @@ void mem_pool_free(MemPool& p, void* ptr) {
 }
 
 void mem_pool_free_all(MemPool& p) {
-  FillDealoc(p.data, p.cap*p.chunk_size);
+  MemGuardDealloc(p.data, p.cap*p.chunk_size);
   p.head = null;
   Loop (i, p.cap) {
     u8* chunk  = Offset(p.data, i*p.chunk_size);
     PoolFreeNode* node; Assign(node, chunk);
     node->next = p.head;
     p.head = node;
-    IfDo(MEMORY_GUARD,
+    IfDo(MEM_GUARD,
       u32* guard; Assign(guard, Offset(chunk, p.chunk_size - sizeof(u32))); 
-      *guard = DEALLOC_HEADER_GUARD;
+      *guard = MEM_DEALLOC_HEADER_GUARD;
     );
   }
   p.count = 0;
@@ -340,16 +345,16 @@ void mem_pool_grow(MemPool& p) {
   MemCopy(new_data, p.data, old_size);
   p.data = new_data;
 
-  FillDealoc(p.data+old_cap, old_size);
+  MemGuardDealloc(p.data+old_cap, old_size);
 
   for (i32 i = old_cap; i < new_cap; ++i) {
     u8* chunk =  Offset(p.data, i*p.chunk_size);
     PoolFreeNode* node; Assign(node, chunk);
     node->next = p.head;
     p.head = node;
-    IfDo(MEMORY_GUARD,
+    IfDo(MEM_GUARD,
       u32* guard; Assign(guard, Offset(chunk, p.chunk_size - sizeof(u32))); 
-      *guard = DEALLOC_HEADER_GUARD
+      *guard = MEM_DEALLOC_HEADER_GUARD
     );
   }
   p.cap = new_cap;
@@ -446,13 +451,13 @@ u8* freelist_alloc(FreeList& fl, u64 size, u64 alignment) {
   FreeListAllocationHeader* header_ptr; Assign(header_ptr, Offset(node, mem_alignment));
   header_ptr->block_size = required_space;
   header_ptr->padding = mem_alignment;
-#ifdef MEMORY_GUARD
-  header_ptr->guard = ALLOC_HEADER_GUARD;
+#ifdef MEM_GUARD
+  header_ptr->guard = MEM_ALLOC_HEADER_GUARD;
 #endif
 
   fl.used += required_space;
   u8* result = (u8*)header_ptr + sizeof(FreeListAllocationHeader);
-  FillAlloc(result, size);
+  MemGuardAlloc(result, size);
 
   return result;
 }
@@ -468,9 +473,9 @@ void freelist_free(FreeList& fl, void* ptr) {
   FreeListNode* prev_node = null;
 
   Assign(header, (u8*)ptr-sizeof(FreeListAllocationHeader));
-#ifdef MEMORY_GUARD
-  Assert(header->guard == ALLOC_HEADER_GUARD && "double free memory");
-  header->guard = DEALLOC_HEADER_GUARD;
+#ifdef MEM_GUARD
+  Assert(header->guard == MEM_ALLOC_HEADER_GUARD && "double free memory");
+  header->guard = MEM_DEALLOC_HEADER_GUARD;
 #endif
 
   u64 padding = header->padding;
@@ -495,7 +500,7 @@ void freelist_free(FreeList& fl, void* ptr) {
 
   free_list_coalescence(fl, prev_node, free_node);
 
-  FillDealoc(ptr, free_node->block_size - padding - sizeof(FreeListAllocationHeader));
+  MemGuardDealloc(ptr, free_node->block_size - padding - sizeof(FreeListAllocationHeader));
 }
 
 void free_list_coalescence(FreeList& fl, FreeListNode* prev_node, FreeListNode* free_node) {

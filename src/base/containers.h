@@ -6,6 +6,8 @@
 
 #include <initializer_list>
 
+#define DEFAULT_CAPACITY      8
+#define DEFAULT_RESIZE_FACTOR 2
 
 ////////////////////////////////////////////////////////////////////////
 // Array

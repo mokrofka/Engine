@@ -80,7 +80,6 @@ KAPI void os_decommit(void* ptr, u64 size);
 KAPI void os_release(void* ptr, u64 size);
 KAPI u8*  os_reserve_large(u64 size);
 KAPI b32  os_commit_large(void* ptr, u64 size);
-KAPI u8*  os_shm_reserve(u64 size, OS_Handle* handler);
 
 //////////////////////////////////////////////////////////////////////////
 // Files

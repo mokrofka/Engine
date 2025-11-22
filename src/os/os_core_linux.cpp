@@ -97,24 +97,6 @@ void os_release(void* ptr, u64 size)       { munmap(ptr, size);}
 u8*  os_reserve_large(u64 size)            { return 0; }
 b32  os_commit_large(void* ptr, u64 size)  { return 1; }
 
-u8*  os_shm_reserve(u64 size, OS_Handle* handler) { 
-  Scratch scratch;
-  String name = String(push_buffer(scratch, 7), 7);
-  name.str[0] = '/';
-  name.str[7] = 0;
-  for (i32 i = 1; i < 6; ++i) {
-    name.str[i] = rand_u32();
-  }
-  String name_c = push_str_copy(scratch, name);
-  int fd = shm_open((char*)name_c.str, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
-  shm_unlink((char*)name_c.str);
-  if (fd < 0) Assert(0);
-  if (ftruncate(fd, size) < 0) Assert(0);
-  As(int)handler = fd;
-  void* ptr = mmap(NULL, size, PROT_NONE, MAP_SHARED, fd, 0);
-  return (u8*)ptr;
-}
-
 //////////////////////////////////////////////////////////////////////////
 // Files
 

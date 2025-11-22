@@ -58,7 +58,7 @@ void test_mem_pool() {
 
 void test_general_allocator() {
   Arena* arena = arena_alloc();
-  Allocator allocator = { .arena = arena  };
+  Allocator allocator(arena);
 
   const int ITER = 20000;      // total operations
   const int MAX_ACTIVE = 5000; // number of live allocations

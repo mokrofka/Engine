@@ -824,7 +824,7 @@ void app_init(u8** state) {
 
 void foo() {
   Arena* arena = arena_alloc();
-  Allocator allocatr = { .arena = arena };
+  Allocator allocatr(arena);
   Darray<u8*> arr;
   append(arr, mem_alloc(allocatr, 8));
   append(arr, mem_alloc(allocatr, 17));
