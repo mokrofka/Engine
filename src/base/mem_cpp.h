@@ -262,6 +262,7 @@ u8* mem_alloc(Allocator& allocator, u64 size, u64 alignment) {
   PoolFreeNode* result = p.head;
   p.head = p.head->next;
 
+  AsanUnpoisonMemRegion(result, pow2_size - header_size);
   MemGuardAlloc(result, pow2_size - header_size);
   u32* header_guard = (u32*)OffsetBack(result, sizeof(u32)*2);
   Assert(*header_guard == MEM_DEALLOC_HEADER_GUARD);
@@ -288,6 +289,7 @@ u8* mem_alloc(Allocator& allocator, u64 size, u64 alignment) {
 };
 
 void mem_free(Allocator& allocator, void* ptr) {
+  Assert(ptr);
   u32* pool_index = (u32*)OffsetBack(ptr, sizeof(u32));
   MemPoolPow2& p = allocator.pools[*pool_index];
 
@@ -298,6 +300,7 @@ void mem_free(Allocator& allocator, void* ptr) {
   u32* header_size = (u32*)OffsetBack(header_guard, sizeof(u32));
   u64 size = 8 << *pool_index;
   MemGuardDealloc(ptr, size - *header_size);
+  AsanPoisonMemRegion(ptr, size - *header_size);
 #endif
 
   PoolFreeNode* node = (PoolFreeNode*)ptr;
@@ -324,7 +327,6 @@ MemPool mem_pool_create(Arena* arena, u64 chunk_size, u64 chunk_alignment) {
   return result;
 }
 
-// NOTE: realocate memory as dynamic array to keep indexes valid. TODO: make other mem pools to keep pointers valid
 u8* mem_pool_alloc(MemPool& p) {
   if (p.head == null) {
     mem_pool_grow(p);
@@ -335,7 +337,7 @@ u8* mem_pool_alloc(MemPool& p) {
   ++p.count;
 
   #if MEM_GUARD
-    u32* guard; Assign(guard, Offset(result, p.chunk_size - sizeof(u32)));
+    u32* guard = (u32*)Offset(result, p.chunk_size - sizeof(u32));
     Assert(*guard == MEM_DEALLOC_HEADER_GUARD);
     *guard = MEM_ALLOC_HEADER_GUARD;
     MemGuardAlloc(result, p.chunk_size - sizeof(u32));

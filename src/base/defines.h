@@ -285,8 +285,8 @@ ImplDefer<F> MakeDefer(F f) {
 // ARCH
 
 #if ARCH_X64
-  #define ReadTimestampCounter() __rdtsc() 
+  #define CpuTimerNow() __rdtsc()
 #else 
-  #define ReadTimestampCounter()
+  #define CpuTimerNow()
 #endif
 

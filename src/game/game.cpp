@@ -823,31 +823,36 @@ void app_init(u8** state) {
 // Update
 
 void foo() {
-  Arena* arena = arena_alloc();
-  Allocator allocatr(arena);
-  Darray<u8*> arr;
-  append(arr, mem_alloc(allocatr, 8));
-  append(arr, mem_alloc(allocatr, 17));
-  append(arr, mem_alloc(allocatr, 19));
-  append(arr, mem_alloc(allocatr, 53));
-  append(arr, mem_alloc(allocatr, 6));
+  u64 os_freq = os_timer_frequency();
+  u64 cpu_start = CpuTimerNow();
+  u64 os_start = os_timer_now();
 
-  *arr[0] = 1;
-  *arr[1] = 1;
-  *arr[2] = 1;
-  *arr[3] = 1;
-  *arr[4] = 1;
+  u64 seconds = 1;
+  u64 os_end = 0;
+  u64 os_elapsed = 0;
+  u64 os_wait_time = os_freq * seconds;
+  while (os_elapsed < os_wait_time) {
+    os_end = os_timer_now();
+    os_elapsed = os_end - os_start;
+  }
 
-  mem_free(allocatr, arr[0]);
-  mem_free(allocatr, arr[2]);
-  mem_free(allocatr, arr[1]);
-  mem_free(allocatr, arr[4]);
-  mem_free(allocatr, arr[3]);
-
-
+  u64 cpu_end = CpuTimerNow();
+  u64 cpu_elapsed = cpu_end - cpu_start;
+  u64 cpu_freq = 0;
+  if (cpu_elapsed) {
+    cpu_freq = os_freq * cpu_elapsed / os_elapsed;
+  }
 }
 
 shared_function void app_update(u8** state) {
+  u32 var = 0;
+  u32* p = &var;
+  Info("%p", p);
+  Info("%p", p+1);
+  Info("%p", p+2);
+  // Info("%i64", );
+  Info("x = %f,", 2.2132);
+  Info("x = %f,", 1000.1212);
   if (*state == null) {
     app_init(state);
   }
@@ -864,9 +869,9 @@ shared_function void app_update(u8** state) {
 
   local Timer timer_to_create = timer_create(0.1);
   if (timer_tick(timer_to_create, delta_time)) {
-    Info("entity created %i", len(st->entities));
-    Entity& cube1 = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_Container]);
-    cube1.pos = v3_rand_range(v3(-10), v3(10));
+    // Info("entity created %i", len(st->entities));
+    // Entity& cube1 = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_Container]);
+    // cube1.pos = v3_rand_range(v3(-10), v3(10));
   }
 
   local Timer timer = timer_create(0.3);

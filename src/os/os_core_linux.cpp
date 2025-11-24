@@ -12,6 +12,7 @@
 #include <sys/sendfile.h>
 #include <sys/wait.h>
 #include <sys/inotify.h>
+#include <sys/time.h>
 #include <dirent.h>
 
 struct OS_LNX_FileIter {
@@ -48,6 +49,17 @@ void os_init() {
     .binary_filepath = name,
     .binary_directory = str_chop_last_slash(name),
   };
+}
+
+u64 os_timer_frequency() {
+  return Million(1);
+}
+
+u64 os_timer_now() {
+  struct timeval time;
+  gettimeofday(&time, null);
+  u64 result = os_timer_frequency()*time.tv_sec + time.tv_usec;
+  return result;
 }
 
 f64 os_now_seconds() {

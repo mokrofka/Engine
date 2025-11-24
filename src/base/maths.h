@@ -253,7 +253,7 @@ NO_DEBUG inline f32 rand_f32_11()                     { return rand_f32_01() * 2
 NO_DEBUG inline f32 rand_f32()                        { return rand_f32_01() * 2 * U16_MAX - U16_MAX; }
 NO_DEBUG inline f32 rand_range_f32(f32 min, f32 max)  { return rand_f32_01() * (max - min) + min ; }
 NO_DEBUG inline b32 rand_b32()                        { return rand_u32()%2; }
-NO_DEBUG inline void rand_seed()                      { _seed = ReadTimestampCounter(); }
+NO_DEBUG inline void rand_seed()                      { _seed = CpuTimerNow(); }
 
 ////////////////////////////////////////////////////////////////////////
 // Vector2

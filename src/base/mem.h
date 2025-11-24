@@ -103,6 +103,7 @@ void mem_free(Allocator& allocator, void* ptr);
 ////////////////////////////////////////////////////////////////////////
 // Pool
 
+// NOTE: realocates memory to keep indexes valid
 struct MemPool {
   Arena* arena;
   u8* data;
