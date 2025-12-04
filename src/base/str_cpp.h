@@ -36,70 +36,6 @@ intern u32 u64_length(u64 v) {
   return 20;
 }
 
-intern u32 i32_length(i32 v) {
-  if (v < 0)
-    return 1+u32_length(-v);
-  else
-    return u32_length(v);
-}
-
-intern u32 i64_length(i64 v) {
-  if (v < 0)
-    return 1+u64_length(-v);
-  else
-    return u64_length(v);
-}
-
-intern u32 f32_length(f32 value, u32 precision) {
-  u32 len = 0;
-  if (value < 0.0f) {
-    ++len;
-    value = -value;
-  }
-  
-  // Process the integer part
-  u32 integer_part = (u32)value;
-  value -= integer_part; // Remove the integer part
-  len += u32_length(integer_part);
-
-  // Process the fractional part
-  if (precision > 0) {
-    ++len; // for '.'
-    u32 multiplier = 1;
-    for (u32 i = 0; i < precision; ++i) multiplier *= 10;
-    value *= (f32)multiplier;
-    u32 frac_part = (u32)value;
-    len += u32_length(frac_part);
-  }
-
-  return len;
-}
-
-intern u32 f64_length(f64 value, u32 precision) {
-  u32 len = 0;
-  if (value < 0.0f) {
-    ++len;
-    value = -value;
-  }
-  
-  // Process the integer part
-  u64 integer_part = (u32)value;
-  value -= integer_part; // Remove the integer part
-  len += u64_length(integer_part);
-
-  // Process the fractional part
-  if (precision > 0) {
-    ++len; // for '.'
-    u32 multiplier = 1;
-    for (u32 i = 0; i < precision; ++i) multiplier *= 10;
-    value *= (f64)multiplier;
-    u64 frac_part = (u64)value;
-    len += u64_length(frac_part);
-  }
-
-  return len;
-}
-
 intern u32 u32_write(u8* dest, u32 value) {
   u32 length = u32_length(value);
   u32 i = length;
@@ -118,6 +54,20 @@ intern u32 u64_write(u8* dest, u64 value) {
     value /= 10;
   } while (value);
   return length;
+}
+
+intern u32 i32_length(i32 v) {
+  if (v < 0)
+    return 1+u32_length(-v);
+  else
+    return u32_length(v);
+}
+
+intern u32 i64_length(i64 v) {
+  if (v < 0)
+    return 1+u64_length(-v);
+  else
+    return u64_length(v);
 }
 
 intern u32 i32_write(u8* dest, i32 value) {
@@ -140,7 +90,49 @@ intern u32 i64_write(u8* dest, i64 value) {
   }
 }
 
-intern u32 write_f32(u8* dest, f32 value, u32 precision) {
+intern u32 f32_length(f32 value, u32 precision) {
+  u32 len = 0;
+  if (value < 0.0f) {
+    ++len;
+    value = -value;
+  }
+  
+  // Process the integer part
+  u32 integer_part = value;
+  value -= integer_part; // Remove the integer part
+  len += u32_length(integer_part);
+
+  // Process the fractional part
+  if (precision > 0) {
+    ++len; // for '.'
+    len += precision;
+  }
+
+  return len;
+}
+
+intern u32 f64_length(f64 value, u32 precision) {
+  u32 len = 0;
+  if (value < 0.0f) {
+    ++len;
+    value = -value;
+  }
+  
+  // Process the integer part
+  u64 integer_part = value;
+  value -= integer_part; // Remove the integer part
+  len += u64_length(integer_part);
+
+  // Process the fractional part
+  if (precision > 0) {
+    ++len; // for '.'
+    len += precision;
+  }
+
+  return len;
+}
+
+intern u32 f32_write(u8* dest, f32 value, u32 precision) {
   u32 len = 0;
   if (value < 0.0f) {
     dest[len++] = '-';
@@ -156,17 +148,18 @@ intern u32 write_f32(u8* dest, f32 value, u32 precision) {
   if (precision > 0) {
     dest[len++] = '.';
 
-    u32 multiplier = 1;
-    for (u32 i = 0; i < precision; ++i) multiplier *= 10;
-    value *= multiplier;
-    u32 frac_part = value;
-    len += u32_write(dest + len, frac_part);
+    for (u32 i = 0; i < precision; ++i) {
+      value *= 10;
+      u32 integer = value;
+      value -= integer;
+      dest[len++] = '0' + integer;
+    }
   }
 
   return len;
 }
 
-intern u32 write_f64(u8* dest, f64 value, u32 precision) {
+intern u32 f64_write(u8* dest, f64 value, u32 precision) {
   u32 len = 0;
   if (value < 0.0f) {
     dest[len++] = '-';
@@ -182,10 +175,21 @@ intern u32 write_f64(u8* dest, f64 value, u32 precision) {
   if (precision > 0) {
     dest[len++] = '.';
 
+    // for (u32 i = 0; i < precision; ++i) {
+    //   value *= 10;
+    //   u32 integer = value;
+    //   value -= integer;
+    //   dest[len++] = '0' + integer;
+    // }
+
+    // NOTE: feels more accurate
     u64 multiplier = 1;
     for (u32 i = 0; i < precision; ++i) multiplier *= 10;
-    value *= multiplier;
-    u64 frac_part = value;
+    u64 frac_part = (u64)(value * multiplier + 0.5); // rounding since possible 0.02 * multi = 1.999...
+    u32 frac_len = u64_length(frac_part);
+    for (u32 i = 0; i < precision - frac_len; ++i) {
+      dest[len++] = '0';
+    }
     len += u64_write(dest + len, frac_part);
   }
 
@@ -240,7 +244,7 @@ u32 my_sprintf(u8* buff, String fmt, va_list argc) {
           case 'f': {
             f64 val = va_arg(argc, f64); // f64 - because of compiler
             #define DefaultFloatPrecision 6
-            length += f32_length(val, DefaultFloatPrecision);
+            length += f64_length(val, DefaultFloatPrecision);
           } break;
           case 's': {
             String val = va_arg(argc, String);
@@ -254,14 +258,19 @@ u32 my_sprintf(u8* buff, String fmt, va_list argc) {
             ++p;                         // skip '.'
             u32 precision = *p - '0';    // 'num' - '0'
             ++p;                         // skip number
-            f32 val = va_arg(argc, f64); // f64 - because of compiler
-            length += f32_length(val, precision);
+            Assert(*p == 'f');
+            f64 val = va_arg(argc, f64); // f64 - because of compiler
+            length += f64_length(val, precision);
           } break;
           case 'p': {
             length += HEX_LENGTH;
           }; break;
+          case '%': {
+            length += 1;
+          }; break;
         }
-      } else {
+      }
+      else {
         ++length;
       }
     }
@@ -300,7 +309,7 @@ u32 my_sprintf(u8* buff, String fmt, va_list argc) {
         } break;
         case 'f': {
           f64 val = va_arg(argc, f64); // f64 - because of compiler
-          u32 len = write_f64(buff + written, val, DefaultFloatPrecision);
+          u32 len = f64_write(buff + written, val, DefaultFloatPrecision);
           written += len;
         } break;
         case 's': {
@@ -317,14 +326,19 @@ u32 my_sprintf(u8* buff, String fmt, va_list argc) {
           ++p;                      // skip '.'
           u32 precision = *p - '0'; // 'num' - '0'
           ++p;                      // skip number
+          // ++p; // skip f
           f64 val = va_arg(argc, f64);
-          u32 len = write_f32(buff + written, val, precision);
+          u32 len = f64_write(buff + written, val, precision);
           written += len;
         } break;
         case 'p': {
           u64 val = va_arg(argc, u64);
           u32 len = hex_u64_write(buff + written, val);
           written += len;
+        }; break;
+        case '%': {
+          buff[written] = '%';
+          written += 1;
         }; break;
       }
     } else {

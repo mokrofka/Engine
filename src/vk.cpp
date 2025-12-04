@@ -2573,7 +2573,7 @@ void vk_update_transform(u32 entity_id, Transform trans) {
 // Entity
 
 u32 vk_make_renderable(u32 mesh_id, u32 shader_id, u32 texture_id) {
-  u32 entity_id = alloc_id(vk.entity_handlers);
+  u32 entity_id = id_pool_alloc(vk.entity_handlers);
 
   VK_Shader& shader = vk.shaders[shader_id];
   shader.entities.add(entity_id); // look up table

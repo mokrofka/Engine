@@ -56,7 +56,7 @@ void test_mem_pool() {
 
 void test_general_allocator() {
   Scratch scratch;
-  Allocator allocator(scratch);
+  AllocSegList allocator(scratch);
 
   const int ITER = 20000;      // total operations
   const int MAX_ACTIVE = 5000; // number of live allocations
@@ -76,7 +76,7 @@ void test_general_allocator() {
     if (do_alloc) {
       // generate random allocation size
       int size = size_dist(rng);
-      void* p = mem_alloc(allocator, size);
+      void* p = seglist_alloc(allocator, size);
       if (!p) {
         printf("ALLOC FAILED at iter %d\n", i);
         return;
@@ -91,7 +91,7 @@ void test_general_allocator() {
       int idx = index_dist(rng) % ptrs.size();
       void* p = ptrs[idx];
 
-      mem_free(allocator, p);
+      seglist_free(allocator, p);
 
       // remove from vector
       ptrs[idx] = ptrs.back();
@@ -105,7 +105,7 @@ void test_general_allocator() {
 
   // free remaining
   for (void* p : ptrs)
-    mem_free(allocator, p);
+    seglist_free(allocator, p);
 
   Info("=== Test: mem general allocator works ===");
 }

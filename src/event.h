@@ -2,6 +2,7 @@
 #include "base/defines.h"
 
 union EventContext {
+  void* data;
   i64 i64[2];
   u64 u64[2];
   f64 f64[2];

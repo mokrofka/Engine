@@ -4,20 +4,17 @@
 KAPI Temp tctx_get_scratch(Arena** conflics, u64 counts);
 
 struct Scratch {
-  Arena* arena;
-  u64 pos;
+  Temp temp;
   
-  INLINE operator Arena*() { return this->arena; }
+  INLINE operator Arena*() { return temp.arena; }
 
   INLINE Scratch() {
-    Temp temp = tctx_get_scratch(null, 0);
-    *this = As(Scratch)&temp;
+    temp = tctx_get_scratch(null, 0);
   }
   INLINE Scratch(Arena** conflics) {
-    Temp temp = tctx_get_scratch(conflics, 1);
-    *this = As(Scratch)&temp;
+    temp = tctx_get_scratch(conflics, 1);
   }
-  INLINE ~Scratch() { arena->pos = pos; };
+  INLINE ~Scratch() { temp.arena->pos = temp.pos; };
 };
 
 KAPI void tctx_init();

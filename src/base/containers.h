@@ -9,6 +9,8 @@
 #define DEFAULT_CAPACITY      8
 #define DEFAULT_RESIZE_FACTOR 2
 
+// TODO: implement object pool indexes through u32 freelist with handler generation
+
 ////////////////////////////////////////////////////////////////////////
 // Array
 
@@ -45,9 +47,10 @@ template<typename T, i32 N> T& append(Array<T, N>& a, T b) {
   a.data[a.count++] = b;
   return e;
 }
-template<typename T, i32 N, typename... Args> void append(Array<T, N>& a, T first, Args... rest) {
-  append(a, first);
-  (append(a, rest), ...);
+template<typename T, i32 N> void append(Array<T, N>& a, std::initializer_list<T> slice) {
+  for (T x : slice) {
+    append(a, x);
+  }
 }
 template<typename T, i32 N> void remove(Array<T, N>& a, u32 idx) { 
   Assert(idx < len(a));
@@ -75,20 +78,17 @@ struct Darray {
   Darray() = default;
 
   Darray(std::initializer_list<T> init) {
-    count = init.size();
-    cap = next_pow2(count);
-    Assign(data, mem_alloc_typed(T, cap));
+    cap = next_pow2(init.size());
+    data = global_alloc_array(T, cap);
     u32 i = 0;
     for (T x : init) {
       data[i++] = x;
     }
   }
-  
   T& operator[](u32 idx) {
     Assert(idx < cap);
     return data[idx];
   }
-
   T pop() {
     return data[--count];
   }
@@ -99,19 +99,20 @@ template<typename T> T& append(Darray<T>& a, T b) {
   if (len(a) >= a.cap) {
     if (a.data) {
       a.cap *= DEFAULT_RESIZE_FACTOR;
-      Assign(a.data, mem_realloc(a.data, sizeof(T)*a.cap));
+      Assign(a.data, global_realloc(a.data, sizeof(T)*a.cap));
     } else {
       a.cap = DEFAULT_CAPACITY;
-      Assign(a.data, mem_alloc(sizeof(T)*a.cap));
+      Assign(a.data, global_alloc(sizeof(T)*a.cap));
     }
   }
   T& e = a.data[a.count];
   a.data[a.count++] = b;
   return e;
 }
-template<typename T, typename... Args> void append(Darray<T>& a, T first, Args... rest) {
-  append(a, first);
-  (append(a, rest), ...);
+template<typename T> void append(Darray<T>& a, std::initializer_list<T> slice) {
+  for (T x : slice) {
+    append(a, x);
+  }
 }
 template<typename T> void remove(Darray<T>& a, u32 idx) { 
   Assert(idx < a.cap);
@@ -119,7 +120,7 @@ template<typename T> void remove(Darray<T>& a, u32 idx) {
 }
 template<typename T> void reserve(Darray<T>& a, u32 size) { 
   a.cap += size;
-  Assign(a.data, mem_realloc(a.data, sizeof(T)*a.cap));
+  Assign(a.data, global_realloc(a.data, sizeof(T)*a.cap));
 }
 template<typename T> b32 exists(Darray<T>& a, T e) { 
   for (T x : a) {
@@ -128,7 +129,7 @@ template<typename T> b32 exists(Darray<T>& a, T e) {
   return false;
 }
 template<typename T> void free(Darray<T>& a) {
-  mem_free(a.data);
+  seglist_free(a.data);
   a.count = 0;
   a.cap = 0;
   a.data = null;
@@ -157,11 +158,11 @@ struct DarrayArena {
 
 template<typename T> INLINE u32 len(DarrayArena<T> a) { return a.count; }
 template<typename T> void append(DarrayArena<T>& a, T b) { 
-  if (len(a) >= a.cap) {
+  if (a.count >= a.cap) {
     if (a.data) {
       a.cap *= DEFAULT_RESIZE_FACTOR;
       T* new_data = push_array(a.arena, T, a.cap);
-      MemCopyTyped(new_data, a.data, a.count);
+      MemCopyArray(new_data, a.data, a.count);
       a.data = new_data;
     } else {
       a.cap = DEFAULT_CAPACITY;
@@ -178,7 +179,7 @@ template<typename T> void reserve(DarrayArena<T>& a, u32 size) {
   a.cap += size;
   if (a.data) {
     T* new_data = push_array(a.arena, T, a.cap);
-    MemCopyTyped(new_data, a.data, a.count);
+    MemCopyArray(new_data, a.data, a.count);
   } else {
     a.data = push_array(a.arena, T, a.cap);
   }
@@ -261,21 +262,21 @@ struct SparseSet {
   void grow() {
     if (data) {
       cap *= DEFAULT_RESIZE_FACTOR;
-      entities = mem_realloc_typed(entities, u32, cap);
-      data = mem_realloc_typed(entities, T, cap);
+      entities = global_realloc_array(entities, u32, cap);
+      data = global_realloc_array(entities, T, cap);
     }
     else {
       cap = DEFAULT_CAPACITY;
-      entities = mem_alloc_typed(u32, cap);
-      data = mem_alloc_typed(T, cap);
+      entities = global_alloc_array(u32, cap);
+      data = global_alloc_array(T, cap);
       sparse_count = cap;
-      entity_to_index = mem_alloc_typed(u32, sparse_count);
+      entity_to_index = global_alloc_array(u32, sparse_count);
     }
   }
   void grow_max_index(u32 id) {
     u32 modifier = CeilIntDiv(id+1, sparse_count);
     sparse_count *= modifier;
-    data = mem_realloc_typed(data, u32, sparse_count);
+    data = global_realloc_array(data, u32, sparse_count);
   }
 };
 
@@ -315,19 +316,19 @@ struct SparseSetIndex {
   void grow() {
     if (dense) {
       cap *= DEFAULT_RESIZE_FACTOR;
-      dense = mem_realloc_typed(dense, u32, cap);
+      dense = global_realloc_array(dense, u32, cap);
     }
     else {
       cap = DEFAULT_CAPACITY;
-      dense = mem_alloc_typed(u32, cap);
+      dense = global_alloc_array(u32, cap);
       sparse_count = cap;
-      sparse = mem_alloc_typed(u32, sparse_count);
+      sparse = global_alloc_array(u32, sparse_count);
     }
   }
   void grow_max_index(u32 id) {
     u32 modifier = CeilIntDiv(id+1, sparse_count);
     sparse_count *= modifier;
-    sparse = mem_realloc_typed(sparse, u32, sparse_count);
+    sparse = global_realloc_array(sparse, u32, sparse_count);
   }
 };
 
@@ -419,15 +420,15 @@ struct SparseDarray {
   void grow() {
     if (data) {
       cap *= DEFAULT_RESIZE_FACTOR;
-      entities = mem_realloc_typed(entities, u32, cap);
-      entity_to_index = mem_realloc_typed(entity_to_index, u32, cap);
-      data = mem_realloc_typed(entities, T, cap);
+      entities = global_realloc_array(entities, u32, cap);
+      entity_to_index = global_realloc_array(entity_to_index, u32, cap);
+      data = global_realloc_array(entities, T, cap);
     }
     else {
       cap = DEFAULT_CAPACITY;
-      entities = mem_alloc_typed(u32, cap);
-      data = mem_alloc_typed(T, cap);
-      entity_to_index = mem_alloc_typed(u32, cap);
+      entities = global_alloc_array(u32, cap);
+      data = global_alloc_array(T, cap);
+      entity_to_index = global_alloc_array(u32, cap);
     }
   }
 };
@@ -440,7 +441,7 @@ struct IdPool {
   Darray<u32> array;
 };
 
-inline u32 alloc_id(IdPool& p) {
+inline u32 id_pool_alloc(IdPool& p) {
   if (len(p.array) > 0) {
     return p.array.pop();
   }
@@ -448,7 +449,7 @@ inline u32 alloc_id(IdPool& p) {
   return id;
 }
 
-inline void free_id(IdPool& p, u32 id) {
+inline void id_pool_free(IdPool& p, u32 id) {
   Assert(p.next_idx > 0);
   Assert(IsInsideBound(id, p.next_idx));
   Assert(!exists(p.array, id));
@@ -458,7 +459,6 @@ inline void free_id(IdPool& p, u32 id) {
 ////////////////////////////////////////////////////////////////////////
 // Hashmap
 
-// TODO: fix mem
 enum {
   MapSlot_Empty,
   MapSlot_Occupied,
@@ -526,7 +526,7 @@ struct Map {
 
       cap *= DEFAULT_RESIZE_FACTOR;
       u64 size = (sizeof(T) + sizeof(Key) + sizeof(u8)) * cap;
-      u8* buff = mem_realloc_zero(data, size);
+      u8* buff = global_realloc_zero(data, size);
 
       data = (T*)buff;
       keys = (Key*)Offset(data, sizeof(T) * cap);
@@ -538,16 +538,16 @@ struct Map {
         }
       }
 
-      mem_free(old_data);
+      global_free(old_data);
     }
     else {
       cap = DEFAULT_CAPACITY;
       u64 size = (sizeof(T) + sizeof(Key) + sizeof(u8)) * cap;
-      u8* buff = mem_alloc_zero(size);
+      u8* buff = global_alloc_zero(size);
 
-      Assign(data, buff);
-      Assign(keys, Offset(data, sizeof(T)*cap));
-      Assign(is_occupied, (Offset(keys, sizeof(Key)*cap)));
+      data = (T*)buff;
+      keys = (Key*)Offset(data, sizeof(T)*cap);
+      is_occupied = (u8*)Offset(keys, sizeof(Key)*cap);
     }
   }
 

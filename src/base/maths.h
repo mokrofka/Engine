@@ -115,42 +115,22 @@ struct Transform {
   v3 scale;
 };
 
-#if COMPILER_MSVC
-  #include <math.h>
-  INLINE f32 Sin(f32 a)                 { return sinf(a); }
-  INLINE f32 Cos(f32 a)                 { return cosf(a); }
-  INLINE f32 Tan(f32 a)                 { return tanf(a); }
-  INLINE f32 Asin(f32 a)                { return asinf(a); }
-  INLINE f32 Acos(f32 a)                { return acosf(a); }
-  INLINE f32 Atan2(f32 y, f32 x)        { return atan2f(y,x); }
-  INLINE f32 Sqrt(f32 a)                { return sqrtf(a); }
-  INLINE f32 Pow(f32 a, f32 b)          { return powf(a, b); }
-  INLINE f32 Floor(f32 a)               { return floorf(a); }
-  INLINE f32 Ceil(f32 a)                { return ceilf(a); }
-  INLINE f32 Round(f32 a)               { return roundf(a); }
-  INLINE f32 Mod(f32 a, f32 b)          { return fmodf(a, b); }
-  INLINE f32 Exp(f32 a)                 { return expf(a); }
-  INLINE f32 LogE(f32 a)                { return logf(a); }
-  INLINE f32 Log2(f32 a)                { return log10f(a); }
-  INLINE f32 Log10(f32 a)               { return log2f(a); }
-#else
-  INLINE f32 Sin(f32 a)                 { return __builtin_sinf(a); }
-  INLINE f32 Cos(f32 a)                 { return __builtin_cosf(a); }
-  INLINE f32 Tan(f32 a)                 { return __builtin_tanf(a); }
-  INLINE f32 Asin(f32 a)                { return __builtin_asinf(a); }
-  INLINE f32 Acos(f32 a)                { return __builtin_acosf(a); }
-  INLINE f32 Atan2(f32 y, f32 x)        { return __builtin_atan2f(y,x); }
-  INLINE f32 Sqrt(f32 a)                { return __builtin_sqrtf(a); }
-  INLINE f32 Pow(f32 a, f32 b)          { return __builtin_powf(a, b); }
-  INLINE f32 Floor(f32 a)               { return __builtin_floorf(a); }
-  INLINE f32 Ceil(f32 a)                { return __builtin_ceilf(a); }
-  INLINE f32 Round(f32 a)               { return __builtin_roundf(a); }
-  INLINE f32 Mod(f32 a, f32 b)          { return __builtin_fmodf(a, b); }
-  INLINE f32 Exp(f32 a)                 { return __builtin_expf(a); }
-  INLINE f32 LogE(f32 a)                { return __builtin_logf(a); }
-  INLINE f32 Log2(f32 a)                { return __builtin_log2f(a); }
-  INLINE f32 Log10(f32 a)               { return __builtin_log10f(a); }
-#endif
+INLINE f32 Sin(f32 a)           { return __builtin_sinf(a); }
+INLINE f32 Cos(f32 a)           { return __builtin_cosf(a); }
+INLINE f32 Tan(f32 a)           { return __builtin_tanf(a); }
+INLINE f32 Asin(f32 a)          { return __builtin_asinf(a); }
+INLINE f32 Acos(f32 a)          { return __builtin_acosf(a); }
+INLINE f32 Atan2(f32 y, f32 x)  { return __builtin_atan2f(y,x); }
+INLINE f32 Sqrt(f32 a)          { return __builtin_sqrtf(a); }
+INLINE f32 Pow(f32 a, f32 b)    { return __builtin_powf(a, b); }
+INLINE f32 Floor(f32 a)         { return __builtin_floorf(a); }
+INLINE f32 Ceil(f32 a)          { return __builtin_ceilf(a); }
+INLINE f32 Round(f32 a)         { return __builtin_roundf(a); }
+INLINE f32 Mod(f32 a, f32 b)    { return __builtin_fmodf(a, b); }
+INLINE f32 Exp(f32 a)           { return __builtin_expf(a); }
+INLINE f32 LogE(f32 a)          { return __builtin_logf(a); }
+INLINE f32 Log2(f32 a)          { return __builtin_log2f(a); }
+INLINE f32 Log10(f32 a)         { return __builtin_log10f(a); }
 
 NO_DEBUG inline f32 SinD(f32 a)                { return Sin(degtorad(a)); }
 NO_DEBUG inline f32 CosD(f32 a)                { return Cos(degtorad(a)); }

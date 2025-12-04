@@ -3,6 +3,7 @@
 #include "renderer.h"
 #include "event.h"
 #include "test.h"
+// #include <new>
 
 // f32 cube_vertices[] = {
 //   // Pos                 // Normal           // Texcoord
@@ -609,6 +610,7 @@ struct EntityDescription {
 };
 
 struct Entity {
+  u32 id;
   union {
     Transform trans;
     struct {
@@ -789,9 +791,34 @@ void camera_update() {
 ////////////////////////////////////////////////////////////////////////
 // Init
 
+void foo(u32& a);
+
+void bar(u32& a) {
+  TimeFunction;
+  os_sleep(10);
+  if (a--) {
+    foo(a);
+  }
+}
+
+void foo(u32& a) {
+  TimeFunction;
+  os_sleep(10);
+  if (a--) {
+    bar(a);
+  }
+}
+
 void app_init(u8** state) {
+  // TLSF_Allocator all = {};
+
+  // u8* buff = tlsf_alloc(all, 13);
+
+  begin_profile();
+  u32 a = 5;
+  foo(a);
   Scratch scratch;
-  Assign(*state, mem_alloc_zero(sizeof(GameState)));
+  Assign(*state, global_alloc_zero(sizeof(GameState)));
   Assign(st, *state);
   st->arena = arena_alloc();
   st->shader_state = vk_get_shader_state();
@@ -810,6 +837,7 @@ void app_init(u8** state) {
   Loop (i, Texture_COUNT) {
     textures[i] = texture_load(textures_path[i]);
   }
+  end_and_print_profile();
 
   Entity& cube = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_OrangeLines]);
   Entity& cube1 = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_Container]);
@@ -822,37 +850,43 @@ void app_init(u8** state) {
 ////////////////////////////////////////////////////////////////////////
 // Update
 
-void foo() {
-  u64 os_freq = os_timer_frequency();
-  u64 cpu_start = CpuTimerNow();
-  u64 os_start = os_timer_now();
+struct Container {
+  AllocSegList allocator;
+  u8* data;
+};
 
-  u64 seconds = 1;
-  u64 os_end = 0;
-  u64 os_elapsed = 0;
-  u64 os_wait_time = os_freq * seconds;
-  while (os_elapsed < os_wait_time) {
-    os_end = os_timer_now();
-    os_elapsed = os_end - os_start;
-  }
+v3 vec;
+v3& get_pos_component(u32 id) {
+  return vec;
+}
 
-  u64 cpu_end = CpuTimerNow();
-  u64 cpu_elapsed = cpu_end - cpu_start;
-  u64 cpu_freq = 0;
-  if (cpu_elapsed) {
-    cpu_freq = os_freq * cpu_elapsed / os_elapsed;
-  }
+v3& get_pos(Entity& e) {
+  return get_pos_component(e.id);
 }
 
 shared_function void app_update(u8** state) {
-  u32 var = 0;
-  u32* p = &var;
-  Info("%p", p);
-  Info("%p", p+1);
-  Info("%p", p+2);
-  // Info("%i64", );
-  Info("x = %f,", 2.2132);
-  Info("x = %f,", 1000.1212);
+  Scratch scratch;
+  Entity e;
+  Darray<i32> arr;
+  append(arr, 1);
+  Loop (i, len(arr)) {
+
+  }
+  Loop (i, arr.count) {
+    
+  }
+
+  // arr.add(1);
+
+  v3& pos = get_pos(e);
+
+  // u8* buff = push_buffer(scratch, KB(1));
+  // BufferOffset offsetter = offset_make(buff);
+  // u8* buff1 = push_offset(offsetter, 256);
+  // u8* buff2 = push_offset(offsetter, 256);
+  // u8* buff3 = push_offset(offsetter, 256);
+  // u8* buff4 = push_offset(offsetter, 256);
+
   if (*state == null) {
     app_init(state);
   }

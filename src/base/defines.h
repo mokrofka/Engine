@@ -41,99 +41,97 @@ typedef u64 DenseTime;
 #define INVALID_ID_U16 U16_MAX
 #define INVALID_ID_U8  U8_MAX
 
-#define KB(n)         (((u64)(n)) << 10)
-#define MB(n)         (((u64)(n)) << 20)
-#define GB(n)         (((u64)(n)) << 30)
-#define TB(n)         (((u64)(n)) << 40)
-#define Thousand(n)   ((n)*1000)
-#define Million(n)    ((n)*1000000)
-#define Billion(n)    ((n)*1000000000ull)
-#define BytesToKB(x)  (x / 1024.0f)
-#define BytesToMB(x)  (BytesToKB(x) / 1024.0f)
-#define BytesToGB(x)  (BytesToMB(x) / 1024.0f)
+#define KB(n)         ((u64)(n) << 10)
+#define MB(n)         ((u64)(n) << 20)
+#define GB(n)         ((u64)(n) << 30)
+#define TB(n)         ((u64)(n) << 40)
+#define Thousand(n)   ((n) * 1000)
+#define Million(n)    ((n) * 1000000)
+#define Billion(n)    ((n) * 1000000000ull)
+#define BytesToKB(x)  ((f64)(x) / 1024)
+#define BytesToMB(x)  ((f64)BytesToKB(x) / 1024)
+#define BytesToGB(x)  ((f64)BytesToMB(x) / 1024)
 
-#define SecToMs(x)    (x * Thousand(1))
-#define SecToUs(x)    (x * Million(1))
-#define SecToNs(x)    (x * Billion(1))
-#define MsToSec(x)    (x / Thousand(1))
-#define MsToUs(x)     (x * Thousand(1))
-#define MsToNs(x)     (x * Million(1))
-#define UsToSec(x)    (x / Million(1))
-#define UsToMs(x)     (x / Thousand(1))
-#define UsToNs(x)     (x * Thousand(1))
-#define NsToSec(x)    (x / Billion(1))
-#define NsToMs(x)     (x / Million(1))
-#define NsToUs(x)     (x / Thousand(1))
+#define SecToMs(x)  ((x) * Thousand(1))
+#define SecToUs(x)  ((x) * Million (1))
+#define SecToNs(x)  ((x) * Billion (1))
+#define MsToSec(x)  ((f64)(x) / Thousand(1))
+#define MsToUs(x)   ((x) * Thousand(1))
+#define MsToNs(x)   ((x) * Million (1))
+#define UsToSec(x)  ((f64)(x) / Million (1))
+#define UsToMs(x)   ((f64)(x) / Thousand(1))
+#define UsToNs(x)   ((x) * Thousand(1))
+#define NsToSec(x)  ((f64)(x) / Billion (1))
+#define NsToMs(x)   ((f64)(x) / Million (1))
+#define NsToUs(x)   ((f64)(x) / Thousand(1))
 
-#define Member(T,m)                   (((T*)0)->m)
-#define OffsetOf(T,m)                 (u64)(&((T*)0)->m)
-#define MemberFromOffset(T,ptr,off)   (T)(Offset(ptr, off))
-#define CastFromMember(T,m,ptr)       (T*)(OffsetBack(ptr, OffsetOf(T,m)))
-#define MemberIndexOf(type, mtype, member)  (OffsetOf(type, member) / sizeof(mtype))
+#define OffsetOf(T,m)                (u64)(&((T*)0)->m)
+#define MemberFromOffset(T,ptr,off)  (T)(Offset(ptr, off))
+#define CastFromMember(T,m,ptr)      (T*)(OffsetBack(ptr, OffsetOf(T,m)))
+#define MemberIndexOf(T,mT,m)        (OffsetOf(T,m) / sizeof(mT))
 
-#define MemZero(d,s)          MemSet(d,0,s)
-#define MemZeroStruct(x)      MemZero((x),sizeof(*(x)))
-#define MemZeroArray(x)       MemZero((x),sizeof(x))
-#define MemZeroTyped(d,c)     MemZero((d),sizeof(*(d))*(c))
-#define MemCopyStruct(d, s)   MemCopy((d), (s), sizeof(*(d)))
-#define MemCopyArray(d, s)    MemCopy((d), (s), sizeof(x))
-#define MemCopyTyped(d, s, c) MemCopy((d), (s), sizeof(*(d)) * (c))
-#define MemMatchStruct(a,b)   MemMatch((a),(b),sizeof(*(a)))
-#define MemMatchArray(a,b)    MemMatch((a),(b),sizeof(a))
+#define MemZero(x,z)          MemSet(x,0,z)
+#define MemZeroStruct(x)      MemZero(x,sizeof(*(x)))
+#define MemZeroArray(x,c)     MemZero(x,sizeof(*(x)) * (c))
+#define MemCopyStruct(d,s)    MemCopy(d,s,sizeof(*(d)))
+#define MemCopyArray(d,s,c)   MemCopy(d,s,sizeof(*(d)) * (c))
+#define MemMatchStruct(a,b)   MemMatch(a,b,sizeof(*(a)))
+#define MemMatchArray(a,b,c)  MemMatch(a,b,sizeof(*(a)) * (c))
 
-#define AlignUp(x,a)          (((x) + (a) - 1)&(~((a) - 1)))
-#define AlignDown(x,a)        ((x)&(~((a) - 1)))
-#define AlignPadUp(x,a)       ((-(x)) & ((a) - 1))
-#define AlignPadDown(x, a)    ((x) & ((a) - 1))
-#define IsPow2(x)             ((((x) - 1)&(x)) == 0)
-#define IsAligned(x, a)       ((((a) - 1)&(x)) == 0)
-#define Offset(x, a)          ((u8*)(x) + (a))
-#define OffsetBack(x, a)      ((u8*)(x) - (a))
-#define MemDiff(from, to)     ((u8*)(from) - (u8*)(to))
-#define PtrMatch(a, y)        ((u8*)(a) == (u8*)(y))
+#define AlignUp(x,a)       (((x) + (a) - 1) & ~((a) - 1))
+#define AlignDown(x,a)     ((x) & ~((a) - 1))
+#define AlignPadUp(x,a)    (-(x) & ((a) - 1))
+#define AlignPadDown(x,a)  ((x) & ((a) - 1))
+#define IsPow2(x)          ((((x) - 1) & (x)) == 0)
+#define IsAligned(x,a)     ((((a) - 1) & (x)) == 0)
+#define Offset(x,a)        ((u8*)(x) + (a))
+#define OffsetBack(x,a)    ((u8*)(x) - (a))
+#define MemDiff(x,a)       ((u8*)(x) - (u8*)(a))
+#define PtrMatch(a,b)      ((u8*)(a) == (u8*)(b))
 
-#define Min(a,b)                      (((a)<(b))?(a):(b))
-#define Max(a,b)                      (((a)>=(b))?(a):(b))
-#define Max3(a,b,c)                   Max(Max(a, b), c)
-#define Min3(a,b,c)                   Min(Min(a, b), c)
-#define ClampTop(a,x)                 Min(a,x)
-#define ClampBot(x,b)                 Max(x,b)
-#define Clamp(a,x,b)                  (((x)<(a))?(a):((x)>(b))?(b):(x))
-#define ReverseClamp(a,x,b)           (((x)<(a))?(b):((b)<(x))?(a):(x))
-#define Wrap(a,x,b)                   ReverseClamp(a,x,b)
-#define Sqr(x)                        (x*x)
-#define Cube(x)                       (x*x*x)
-#define Sign(x)                       ((x) < 0 ? -1 : (x) > 0 ? 1 : 0)
-#define Abs(x)                        ((x) < 0 ? -(x) : (x))
-#define IsBetweenIncl(l, x, up)       (((l) <= (x)) && ((x) <= (up)))
-#define IsBetweenExcl(l, x, up)       (((l) < (x)) && ((x) < (up)))
-#define IsInsideBound(x, up)          (((0) <= (x)) && ((x) < (up)))
-#define IsInsideBounds(l, x, up)      (((l) <= (x)) && ((x) < (up)))
-#define RoundUp(x, a)                 ((((x) + (a) - 1) / (a)) * (a))
-#define RoundDown(x, a)               ((x) - ((x) % (a)))
-#define ModPow2(a, b)                 ((a) & ((b) - 1))
-#define u32DivPow2(a, b)              (a >> ctz32(b))
-#define u64DivPow2(a, b)              (a >> ctz64(b))
-#define CeilIntDiv(a,b)               (((a) + (b) - 1)/(b)) // 11/5 = 3
-#define Compose64Bit(a,b)             (((u64)a << 32) | (u64)b)
+#define Min(a,b)               (((a) < (b)) ? (a) : (b))
+#define Max(a,b)               (((a) > (b)) ? (a) : (b))
+#define Max3(a,b,c)            Max(Max(a,b),c)
+#define Min3(a,b,c)            Min(Min(a,b),c)
+#define ClampTop(x,a)          Min(x,a)
+#define ClampBot(x,a)          Max(x,a)
+#define Clamp(a,x,b)           (((x) < (a)) ? (a) : ((x) > (b)) ? (b) : (x))
+#define ReverseClamp(a,x,b)    (((x) < (a)) ? (b) : ((b) < (x)) ? (a) : (x))
+#define Wrap(a,x,b)            ReverseClamp(a,x,b)
+#define Sqr(x)                 ((x)*(x))
+#define Cube(x)                ((x)*(x)*(x))
+#define Sign(x)                ((x) < 0 ? -1 : (x) > 0 ? 1 : 0)
+#define Abs(x)                 ((x) < 0 ? -(x) : (x))
+#define IsInsideIncl(a,x,b)    (((a) <= (x)) && ((x) <= (b)))
+#define IsInsideExcl(a,x,b)    (((a) < (x)) && ((x) < (b)))
+#define IsInsideBound(x,a)     ((0 <= (x)) && ((x) < a))
+#define IsInsideBounds(a,x,b)  (((a) <= (x)) && ((x) < (b)))
+#define RoundUp(x,a)           ((((x) + (a) - 1) / (a)) * (a))
+#define RoundDown(x, a)        ((x) - ((x) % (a)))
+#define ModPow2(a,b)           ((a) & ((b) - 1))
+#define DivPow2(a,b)           ((a) >> ctz(b))
+#define CeilIntDiv(a,b)        (((a) + (b) - 1) / (b))
+#define Compose64Bit(a,b)      (((u64)(a) << 32) | (u64)(b))
 
-#define ArrayCount(x)                 (sizeof(x) / sizeof((x)[0]))
-#define ElemSize(x)                   (sizeof(x[0]))
-#define Assign(a,b)                   (*((void**)(&(a))) = (void*)(b))
-#define As(T)                         *(T*)
-#define cast(a)                       (a)
-#define Glue(A,B)                     A##B
-#define Stringify(S)                  #S
-#define Loop(i, c)                    for (i32 i = 0; i < c; ++i)
+#define ArrayCount(x)  (sizeof((x)) / sizeof((x)[0]))
+#define ElemSize(x)    (sizeof((x)[0]))
+#define Assign(a,b)    (*((u8**)(&(a))) = (u8*)(b))
+#define As(T)          *(T*)
+#define cast(a)        (a)
+#define Loop(i, c)     for (i32 i = 0; i < c; ++i)
+#define _Stringify(S)  #S
+#define Stringify(S)   _Stringify(S)
+#define _Glue(A,B)     A##B
+#define Glue(A,B)      _Glue(A,B)
 
-#define Bit(x)                 (1 << (x))
-#define HasBit(x, pos)         ((x) & (1 << (pos)))
-#define FlagSet(x, f)          ((x) | (f))
-#define FlagClear(x, f)        ((x) & ~(f))
-#define FlagToggle(x, f)       ((x) ^ (f))
-#define FlagExists(x, f)       (((x) & (f)) == (f))
-#define FlagEquals(x, f)       ((x) == (f))
-#define FlagIntersects(x,f)    (((x) & (f)) > 0)
+#define Bit(x)               (1 << (x))
+#define HasBit(x, pos)       ((x) & (1 << (pos)))
+#define FlagSet(x, f)        ((x) | (f))
+#define FlagClear(x, f)      ((x) & ~(f))
+#define FlagToggle(x, f)     ((x) ^ (f))
+#define FlagExists(x, f)     (((x) & (f)) == (f))
+#define FlagEquals(x, f)     ((x) == (f))
+#define FlagIntersects(x,f)  (((x) & (f)) > 0)
 
 #define quick_sort(ptr, count, element_size, cmp_function) qsort((ptr), (count), (element_size), (int (*)(const void *, const void *))(cmp_function))
 
@@ -156,8 +154,7 @@ template<typename F>
 ImplDefer<F> MakeDefer(F f) {
 	return ImplDefer<F>(f);
 }
-#define _CONCAT(a, b) Glue(a, b)
-#define Defer(code) auto _CONCAT(_defer_, __LINE__) = MakeDefer([&](){code;})
+#define Defer(code) auto Glue(_defer_, __LINE__) = MakeDefer([&](){code})
 #define DeferLoop(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
 #define IfDeferLoop(begin, end) for (b32 _once = (begin); _once; _once = false, (end))
 
@@ -166,10 +163,6 @@ ImplDefer<F> MakeDefer(F f) {
 #else
   #define DebugDo(...)
 #endif
-#define IfDo(flag, ...)  _IfDo(flag, __VA_ARGS__)
-#define _IfDo(flag, ...)  IfDo_##flag(__VA_ARGS__)
-#define IfDo_1(code) code
-#define IfDo_0(code)
 
 #define C_LINKAGE_BEGIN extern "C"{
 #define C_LINKAGE_END }
@@ -214,42 +207,23 @@ ImplDefer<F> MakeDefer(F f) {
 #define Likely(expr)           Expect(expr,1)
 #define Unlikely(expr)         Expect(expr,0)
 
-#if COMPILER_MSVC
-  #define NO_DEBUG
-  #define INLINE             __forceinline
-  #define DebugBreak()       __debugbreak();
-  #define Expect(expr, val)  (expr)
-
-  #include <memory.h>
-  #define MemSet(d, byte, c)  memset((d), (byte), (c))
-  #define MemCopy(d, s, c)    memcpy((d), (s), (c))
-  #define MemMatch(a, b, c)  (memcmp((a), (b), (c)) == 0)
-
-  #if __SANITIZE_ADDRESS__
-    #define ASAN_ENABLED 1
-    #define NO_ASAN __declspec(no_sanitize_address)
-  #else
-    #define NO_ASAN
-  #endif
-
-#elif COMPILER_CLANG
+#if COMPILER_CLANG
   #define NO_DEBUG           __attribute__((nodebug))
   #define INLINE             NO_DEBUG inline __attribute__((always_inline))
   #define DebugBreak()       __builtin_debugtrap()
   #define Expect(expr, val)  __builtin_expect((expr), (val))
 
-  #define MemSet(d, byte, c)    __builtin_memset((d), (byte), (c))
-  #define MemCopy(d, s, c)      __builtin_memcpy((d), (s), (c))
-  #define MemMatch(a, b, c)    (__builtin_memcmp((a), (b), (c)) == 0)
+  #define MemSet(d,byte,z)      __builtin_memset(d,byte,z)
+  #define MemCopy(d,s,z)        __builtin_memcpy(d,s,z)
+  #define MemMatch(a,b,z)       (__builtin_memcmp((a), (b), (z)) == 0)
 
-  INLINE u32 count_bits_set32(u32 val) { return __builtin_popcount(val); }
-  INLINE u32 count_bits_set64(u64 val) { return __builtin_popcountll(val); }
-  INLINE u32 ctz32(u32 val)            { return __builtin_ctz(val); }
-  INLINE u32 clz32(u32 val)            { return __builtin_clz(val); }
-  INLINE u32 ctz64(u64 val)            { return __builtin_ctzll(val); }
-  INLINE u32 clz64(u64 val)            { return __builtin_clzll(val); }
+  INLINE u32 count_bits_set(u64 val)   { return __builtin_popcountll(val); }
+  INLINE u32 clz(u64 val)              { return __builtin_clzll(val); }
+  INLINE u32 ctz(i64 val)              { return __builtin_ctzll(val); }
 
   #define NO_ASAN __attribute__((no_sanitize("address")))
+#else
+  #error Compiler not supported.
 #endif
 
 ////////////////////////////////////////////////////////////////////////
@@ -279,6 +253,8 @@ ImplDefer<F> MakeDefer(F f) {
     #define KAPI
     #define shared_function
   #endif
+#else
+  #error OS not supported.
 #endif
 
 ////////////////////////////////////////////////////////////////////////
@@ -287,6 +263,14 @@ ImplDefer<F> MakeDefer(F f) {
 #if ARCH_X64
   #define CpuTimerNow() __rdtsc()
 #else 
-  #define CpuTimerNow()
+  #error Architecture not supported
 #endif
 
+inline u32 most_significant_bit(u64 size) {
+  return 63 - clz(size);
+}
+
+struct Range {
+  u64 offset; 
+  u64 size; 
+};

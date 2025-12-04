@@ -114,7 +114,7 @@ b32  os_commit_large(void* ptr, u64 size)  { return 1; }
 
 OS_Handle os_file_open(String path, OS_AccessFlags flags) {
   Scratch scratch;
-  String path_c = push_str_copy(scratch.arena, path);
+  String path_c = push_str_copy(scratch, path);
   int lnx_flags = 0;
   if(flags & OS_AccessFlag_Read && flags & OS_AccessFlag_Write) {
     lnx_flags = O_RDWR;

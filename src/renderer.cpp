@@ -17,6 +17,11 @@ f32 delta_time;
 global RendererSystemState st;
 
 void r_init() {
+  // u8* buff = mem_alloc(MB(32));
+  // tlsf_t allocator = tlsf_create_with_pool(buff, MB(32));
+  // void* data = tlsf_malloc(allocator, MB(16));
+  // MemZero(data, MB(16));
+  
   shader_init();
   texture_init();
   mesh_init();
@@ -113,13 +118,15 @@ global MeshState mesh_st;
 //       .pos = vertices[i],
 //     };
 //   }
-//   MemCopyTyped(mesh.indexes, indexes.data, index_count);
+//   MemCopyArray(mesh.indexes, indexes.data, index_count);
 //   push_buffer(scratch, 10, 4);
 //   return mesh;
 // }
 
 intern Mesh load_obj(String name) {
   Scratch scratch;
+  static ProfileAnchor anchor123;
+  ProfileBlock Block123(__func__, anchor123);
 
   DarrayArena<v3> positions(scratch);
   DarrayArena<v3> normals(scratch);
@@ -130,6 +137,7 @@ intern Mesh load_obj(String name) {
   Range range = {(u64)buff.data, buff.size + (u64)buff.data};
   String line;
   while ((line = str_read_line(&range))) {
+    TimeBlock("parsing obj");
     // Vert
     if (line.str[0] == 'v' && char_is_space(line.str[1])) {
       u32 start = 2;
@@ -189,33 +197,37 @@ intern Mesh load_obj(String name) {
     }
   }
 
-  DarrayArena<Vertex> vertices(mesh_st.arena);
-  DarrayArena<u32> final_indices(mesh_st.arena);
-
-  for (v3u idx : indexes) {
-    u32 pos_idx = idx.x;
-    u32 norm_idx = idx.y;
-    u32 uv_idx = idx.z;
-    Vertex vertex = {
-      .pos = positions[pos_idx],
-      .norm = normals[norm_idx],
-      .uv = uvs[uv_idx],
-    };
-
-    u32 vertex_index;
-    if (!exists_at(vertices, vertex, &vertex_index)) {
-      vertex_index = len(vertices);
-      append(vertices, vertex);
+  {
+    TimeBlock("forming vertex buffer");
+    DarrayArena<Vertex> vertices(mesh_st.arena);
+    DarrayArena<u32> final_indices(mesh_st.arena);
+  
+    // TODO: use hash
+    for (v3u idx : indexes) {
+      u32 pos_idx = idx.x;
+      u32 norm_idx = idx.y;
+      u32 uv_idx = idx.z;
+      Vertex vertex = {
+        .pos = positions[pos_idx],
+        .norm = normals[norm_idx],
+        .uv = uvs[uv_idx],
+      };
+  
+      u32 vertex_index;
+      if (!exists_at(vertices, vertex, &vertex_index)) {
+        vertex_index = len(vertices);
+        append(vertices, vertex);
+      }
+      append(final_indices, vertex_index);
     }
-    append(final_indices, vertex_index);
+    Mesh mesh = {
+      .vertices = vertices.data,
+      .indexes = (u32*)final_indices.data,
+      .vert_count = len(vertices),
+      .index_count = len(final_indices),
+    };
+    return mesh;
   }
-  Mesh mesh = {
-    .vertices = vertices.data,
-    .indexes = (u32*)final_indices.data,
-    .vert_count = len(vertices),
-    .index_count = len(final_indices),
-  };
-  return mesh;
 }
 
 void mesh_init() {
@@ -223,6 +235,7 @@ void mesh_init() {
 }
 
 u32 mesh_create(String name) {
+  TimeFunction;
   Scratch scratch;
   String filepath = push_strf(scratch, "%s/%s/%s", asset_base_path(), String("models"), name);
   Mesh mesh = load_obj(filepath);
@@ -266,6 +279,7 @@ struct ShaderState {
 global ShaderState shader_st;
 
 u32 shader_create(String name, ShaderType type) {
+  TimeFunction;
   u32 id = vk_shader_load(name, type);
   shader_st.map.insert(name, id);
   return id;
@@ -337,6 +351,7 @@ void texture_init() {
 }
 
 u32 texture_load(String name) {
+  TimeFunction;
   Texture texture = image_load(name);
   u32 id = vk_texture_load(texture);
   return id;
