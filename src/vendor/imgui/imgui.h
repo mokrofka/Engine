@@ -2179,9 +2179,9 @@ IM_MSVC_RUNTIME_CHECKS_OFF
 template<typename T>
 struct ImVector
 {
-    int                 Size;
-    int                 Capacity;
-    T*                  Data;
+    int                 Size = 0;
+    int                 Capacity = 0;
+    T*                  Data = 0;
 
     // Provide standard typedefs but we don't use them ourselves.
     typedef T                   value_type;
@@ -2189,7 +2189,7 @@ struct ImVector
     typedef const value_type*   const_iterator;
 
     // Constructors, destructor
-    inline ImVector()                                       { Size = Capacity = 0; Data = NULL; }
+    ImVector() = default;
     inline ImVector(const ImVector<T>& src)                 { Size = Capacity = 0; Data = NULL; operator=(src); }
     inline ImVector<T>& operator=(const ImVector<T>& src)   { clear(); resize(src.Size); if (src.Data) memcpy(Data, src.Data, (size_t)Size * sizeof(T)); return *this; }
     inline ~ImVector()                                      { if (Data) IM_FREE(Data); } // Important: does not destruct anything
@@ -2744,7 +2744,6 @@ struct ImGuiTextBuffer
     ImVector<char>      Buf;
     IMGUI_API static char EmptyString[1];
 
-    ImGuiTextBuffer()   { }
     inline char         operator[](int i) const { IM_ASSERT(Buf.Data != NULL); return Buf.Data[i]; }
     const char*         begin() const           { return Buf.Data ? &Buf.front() : EmptyString; }
     const char*         end() const             { return Buf.Data ? &Buf.back() : EmptyString; } // Buf is zero-terminated, so end() will point on the zero-terminator
@@ -3068,15 +3067,14 @@ struct ImGuiSelectionRequest
 struct ImGuiSelectionBasicStorage
 {
     // Members
-    int             Size;           //          // Number of selected items, maintained by this helper.
-    bool            PreserveOrder;  // = false  // GetNextSelectedItem() will return ordered selection (currently implemented by two additional sorts of selection. Could be improved)
-    void*           UserData;       // = NULL   // User data for use by adapter function        // e.g. selection.UserData = (void*)my_items;
-    ImGuiID         (*AdapterIndexToStorageId)(ImGuiSelectionBasicStorage* self, int idx);      // e.g. selection.AdapterIndexToStorageId = [](ImGuiSelectionBasicStorage* self, int idx) { return ((MyItems**)self->UserData)[idx]->ID; };
-    int             _SelectionOrder;// [Internal] Increasing counter to store selection order
+    int             Size = 0;           //          // Number of selected items, maintained by this helper.
+    bool            PreserveOrder = false;  // = false  // GetNextSelectedItem() will return ordered selection (currently implemented by two additional sorts of selection. Could be improved)
+    void*           UserData = NULL;       // = NULL   // User data for use by adapter function        // e.g. selection.UserData = (void*)my_items;
+    ImGuiID         (*AdapterIndexToStorageId)(ImGuiSelectionBasicStorage* self, int idx) = [](ImGuiSelectionBasicStorage*, int idx) { return (ImGuiID)idx; };      // e.g. selection.AdapterIndexToStorageId = [](ImGuiSelectionBasicStorage* self, int idx) { return ((MyItems**)self->UserData)[idx]->ID; };
+    int             _SelectionOrder = 1;// [Internal] Increasing counter to store selection order
     ImGuiStorage    _Storage;       // [Internal] Selection set. Think of this as similar to e.g. std::set<ImGuiID>. Prefer not accessing directly: iterate with GetNextSelectedItem().
 
     // Methods
-    IMGUI_API ImGuiSelectionBasicStorage();
     IMGUI_API void  ApplyRequests(ImGuiMultiSelectIO* ms_io);   // Apply selection requests coming from BeginMultiSelect() and EndMultiSelect() functions. It uses 'items_count' passed to BeginMultiSelect()
     IMGUI_API bool  Contains(ImGuiID id) const;                 // Query if an item id is in selection.
     IMGUI_API void  Clear();                                    // Clear selection

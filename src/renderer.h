@@ -50,10 +50,7 @@ enum {
   Shader_COUNT,
 };
 
-inline ShaderDefinition shaders_definition[Shader_COUNT] = {
-  [Shader_Color] = "color_shader", ShaderType_Drawing,
-};
-
+KAPI extern ShaderDefinition shaders_definition[Shader_COUNT];
 KAPI extern u32 shaders[Shader_COUNT];
 
 ////////////////////////////////////////////////////////////////////////
@@ -64,10 +61,7 @@ enum {
   Mesh_COUNT,
 };
 
-inline String meshs_path[Mesh_COUNT] = {
-  [Mesh_Cube] = "cube.obj",
-  // [Mesh_Room] = "room.obj",
-};
+extern String meshs_path[Mesh_COUNT];
 
 KAPI extern u32 meshes[Mesh_COUNT];
 
@@ -80,11 +74,7 @@ enum {
   Texture_COUNT,
 };
 
-inline String textures_path[Texture_COUNT] = {
-  [Texture_OrangeLines] = "orange_lines_512.png",
-  [Texture_Container] = "container.jpg",
-  [Texture_Room] = "image.png",
-};
+extern String textures_path[Texture_COUNT];
 
 KAPI extern u32 textures[Texture_COUNT];
 

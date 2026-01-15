@@ -2,16 +2,14 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debugging",
-      "type": "lldb",
+      "name": "Debug",
+      "type": "lldb-dap",
       "request": "launch",
       "program": "${workspaceFolder}/bin/exe",
-      "args": [],
       "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
-      "initCommands": [
-        "settings set target.x86-disassembly-flavor intel"
-      ]
+      "console": "internalConsole",
+      "initCommands": [ "settings set target.x86-disassembly-flavor intel" ]
+
     }
   ]
 }

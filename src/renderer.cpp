@@ -17,11 +17,6 @@ f32 delta_time;
 global RendererSystemState st;
 
 void r_init() {
-  // u8* buff = mem_alloc(MB(32));
-  // tlsf_t allocator = tlsf_create_with_pool(buff, MB(32));
-  // void* data = tlsf_malloc(allocator, MB(16));
-  // MemZero(data, MB(16));
-  
   shader_init();
   texture_init();
   mesh_init();
@@ -71,7 +66,7 @@ void r_end_draw_frame() {
 ////////////////////////////////////////////////////////////////////////
 // Geometry
 struct MeshState {
-  Arena* arena;
+  Arena arena;
 };
 
 global MeshState mesh_st;
@@ -125,19 +120,16 @@ global MeshState mesh_st;
 
 intern Mesh load_obj(String name) {
   Scratch scratch;
-  static ProfileAnchor anchor123;
-  ProfileBlock Block123(__func__, anchor123);
 
-  DarrayArena<v3> positions(scratch);
-  DarrayArena<v3> normals(scratch);
-  DarrayArena<v2> uvs(scratch);
-  DarrayArena<v3u> indexes(scratch);
+  Darray<v3> positions(scratch);
+  Darray<v3> normals(scratch);
+  Darray<v2> uvs(scratch);
+  Darray<v3u> indexes(scratch);
   Buffer buff = os_file_all_read(scratch, name);
 
   Range range = {(u64)buff.data, buff.size + (u64)buff.data};
   String line;
-  while ((line = str_read_line(&range))) {
-    TimeBlock("parsing obj");
+  while ((line = str_read_line(&range)).size) {
     // Vert
     if (line.str[0] == 'v' && char_is_space(line.str[1])) {
       u32 start = 2;
@@ -148,7 +140,7 @@ intern Mesh load_obj(String name) {
       };
 
       // Info("v %f, %f, %f", v.x, v.y, v.z);
-      append(positions, v);
+      positions.append(v);
     }
     // Norm
     else if (line.str[0] == 'v' && line.str[1] == 'n') {
@@ -159,7 +151,7 @@ intern Mesh load_obj(String name) {
         f32_from_str(str_next_word(line, start)),
       };
       // Info("vn %f, %f, %f", v.x, v.y, v.z);
-      append(normals, v);
+      normals.append(v);
     }
     // UV
     else if (line.str[0] == 'v' && line.str[1] == 't') {
@@ -169,7 +161,7 @@ intern Mesh load_obj(String name) {
         f32_from_str(str_next_word(line, start)),
       };
       // Info("vt %f, %f", v.x, v.y);
-      append(uvs, v);
+      uvs.append(v);
     }
     // Indexes
     else if (line.str[0] == 'f') {
@@ -192,15 +184,14 @@ intern Mesh load_obj(String name) {
           u32_from_str(second_num) - 1,
         };
         // Info("%i, %i, %i", v.x, v.y, v.z);
-        append(indexes, v);
+        indexes.append(v);
       }
     }
   }
 
   {
-    TimeBlock("forming vertex buffer");
-    DarrayArena<Vertex> vertices(mesh_st.arena);
-    DarrayArena<u32> final_indices(mesh_st.arena);
+    Darray<Vertex> vertices(mesh_st.arena);
+    Darray<u32> final_indices(mesh_st.arena);
   
     // TODO: use hash
     for (v3u idx : indexes) {
@@ -214,28 +205,27 @@ intern Mesh load_obj(String name) {
       };
   
       u32 vertex_index;
-      if (!exists_at(vertices, vertex, &vertex_index)) {
-        vertex_index = len(vertices);
-        append(vertices, vertex);
+      if (!vertices.exists_at(vertex, &vertex_index, EqualMem)) {
+        vertex_index = vertices.count;
+        vertices.append(vertex);
       }
-      append(final_indices, vertex_index);
+      final_indices.append(vertex_index);
     }
     Mesh mesh = {
       .vertices = vertices.data,
       .indexes = (u32*)final_indices.data,
-      .vert_count = len(vertices),
-      .index_count = len(final_indices),
+      .vert_count = vertices.count,
+      .index_count = final_indices.count,
     };
     return mesh;
   }
 }
 
 void mesh_init() {
-  mesh_st.arena = arena_alloc();
+  mesh_st.arena = arena_init();
 }
 
 u32 mesh_create(String name) {
-  TimeFunction;
   Scratch scratch;
   String filepath = push_strf(scratch, "%s/%s/%s", asset_base_path(), String("models"), name);
   Mesh mesh = load_obj(filepath);
@@ -251,14 +241,14 @@ Mesh mesh_get(String name) {
 // Asset
 
 struct AssetState {
-  Arena* arena;
+  Arena arena;
   String asset_path;
 };
 
 global AssetState asset_st;
 
 void asset_init(String asset_path) {
-  asset_st.arena = arena_alloc();
+  asset_st.arena = arena_init();
   asset_st.asset_path = push_strf(asset_st.arena, "%s/%s", os_get_current_directory(), asset_path);
 }
 
@@ -270,7 +260,7 @@ String asset_base_path() {
 // Shader
 
 struct ShaderState {
-  Arena* arena;
+  Arena arena;
   String shader_dir;
   String shader_compiled_dir;
   Map<String, u32> map;
@@ -279,14 +269,13 @@ struct ShaderState {
 global ShaderState shader_st;
 
 u32 shader_create(String name, ShaderType type) {
-  TimeFunction;
   u32 id = vk_shader_load(name, type);
   shader_st.map.insert(name, id);
   return id;
 }
 
 void shader_init() {
-  shader_st.arena = arena_alloc();
+  shader_st.arena = arena_init();
   shader_st.shader_dir = push_str_cat(shader_st.arena, asset_base_path(), "/shaders");
   shader_st.shader_compiled_dir = push_str_cat(shader_st.arena, shader_st.shader_dir, "/compiled");
   asset_watch_directory_add("shaders", [](String name) {
@@ -319,7 +308,7 @@ void shader_init() {
 #include "vendor/stb_image.h"
 
 struct TextureState {
-  Arena* arena;
+  Arena arena;
   // HashMap hashmap;
   u32 texture_count;
 };
@@ -340,18 +329,16 @@ intern Texture image_load(String name) {
     required_channel_count);
 
   Assert(data);
-
   texture.channel_count = required_channel_count;
   texture.data = data;
   return texture;
 }
 
 void texture_init() {
-  texture_st.arena = arena_alloc();
+  texture_st.arena = arena_init();
 }
 
 u32 texture_load(String name) {
-  TimeFunction;
   Texture texture = image_load(name);
   u32 id = vk_texture_load(texture);
   return id;
@@ -364,3 +351,18 @@ u32 texture_load(String name) {
 //   Texture a;
 //   return a;
 // }
+
+ShaderDefinition shaders_definition[Shader_COUNT] = {
+  [Shader_Color] = "color_shader", ShaderType_Drawing,
+};
+
+String meshs_path[Mesh_COUNT] = {
+  [Mesh_Cube] = "cube.obj",
+  // [Mesh_Room] = "room.obj",
+};
+
+String textures_path[Texture_COUNT] = {
+  [Texture_OrangeLines] = "orange_lines_512.png",
+  [Texture_Container] = "container.jpg",
+  [Texture_Room] = "image.png",
+};

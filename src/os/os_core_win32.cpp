@@ -76,9 +76,7 @@ void os_toggle_fullscreen() {
   local WINDOWPLACEMENT window_position;
   local i32 fullscreen_switch;
   fullscreen_switch = (fullscreen_switch+1) % 2;
-
-  HWND hwnd; Assign(hwnd, st.window.hwnd);
-  
+  HWND hwnd = (HWND)st.window.hwnd;
   if (fullscreen_switch) {
     GetWindowPlacement(hwnd, &window_position);
     SetWindowPos(hwnd, null, 0, 0, st.screen_width,st.screen_height, NoFlags);

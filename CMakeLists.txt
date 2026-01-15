@@ -39,6 +39,7 @@ project(Engine)
 
 # Linker
   set(CMAKE_EXE_LINKER_FLAGS "-fuse-ld=lld")
+  add_link_options(-nostdlib++)
   message("Linker path: ${CMAKE_LINKER}")
 
 # OS

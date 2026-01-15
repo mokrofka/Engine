@@ -1,10 +1,9 @@
 #pragma once
 #include "defines.h"
 #include "mem.h"
-#include <stdarg.h>
 
-INLINE u64 cstr_length(const void* c) {
-  u8* p; Assign(p, c);
+NO_DEBUG inline u64 cstr_length(const void* c) {
+  u8* p = (u8*)c;
   for (; *p != 0; ++p);
   return (u64)(p - (u8*)c);
 }
@@ -14,7 +13,8 @@ struct String {
   u64 size;
   String() = default;
   INLINE String(u8* str_, u64 size_) {
-    str = str_; size = size_; 
+    str = str_;
+    size = size_; 
   }
   INLINE String(const char* str_) { 
     str = (u8*)str_;
@@ -24,9 +24,7 @@ struct String {
     str = (u8*)str_;
     size = cstr_length(str_) ;
   }
-  INLINE operator bool() { return str; }
 };
-INLINE u32 len(const char* a) { return String(a).size; }
 
 struct StringArray {
   String* v;
@@ -81,8 +79,8 @@ KAPI String str_cstr_capped(const void* String, const void* cap);
 ////////////////////////////////////////////////////////////////////////
 // String Stylization
 
-KAPI String upper_from_str(Arena *arena, String string);
-KAPI String lower_from_str(Arena *arena, String string);
+KAPI String upper_from_str(Allocator*arena, String string);
+KAPI String lower_from_str(Allocator*arena, String string);
 
 ////////////////////////////////////////////////////////////////////////
 // String Matching
@@ -90,7 +88,8 @@ KAPI String lower_from_str(Arena *arena, String string);
 KAPI b32 str_match(String str0, String str1);
 KAPI b32 str_matchi(String str0, String str1);
 KAPI b32 str_ends_with(String string, String end);
-INLINE b32 operator==(String a, String b) { return str_match(a, b); }
+
+inline b32 equal(String a, String b) { return str_match(a, b); }
 
 ////////////////////////////////////////////////////////////////////////
 // String Slicing
@@ -123,15 +122,15 @@ KAPI String str_chop(String str, u64 amt);
 ////////////////////////////////////////////////////////////////////////
 // String Formatting & Copying
 
-KAPI String push_str_cat(Arena* arena, String s1, String s2);
-KAPI String push_str_copy(Arena *arena, String s);
-KAPI String push_strfv(Arena* arena, String fmt, va_list argc);
-KAPI String push_strf(Arena* arena, String fmt, ...);
+KAPI String push_str_cat(Allocator arena, String s1, String s2);
+KAPI String push_str_copy(Allocator arena, String s);
+KAPI String push_strfv(Allocator arena, String fmt, va_list argc);
+KAPI String push_strf(Allocator arena, String fmt, ...);
 
 ////////////////////////////////////////////////////////////////////////
 // String List Construction Functions
 KAPI StringNode* str_list_push_node(StringList* list, StringNode* node);
-KAPI StringNode* str_list_push(Arena* arena, StringList* list, String string);
+KAPI StringNode* str_list_push(Allocator arena, StringList* list, String string);
 
 ////////////////////////////////////////////////////////////////////////
 // String utils
@@ -169,4 +168,4 @@ KAPI String str_chop_last_dot(String string);
 // Wchar stuff
 
 KAPI u64 wchar_to_char(char* out, const wchar_t* in, u64 out_size);
-KAPI String push_str_wchar(Arena* arena, const wchar_t* in, u32 wchar_length);
+KAPI String push_str_wchar(Allocator arena, const wchar_t* in, u32 wchar_length);

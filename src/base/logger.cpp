@@ -1,6 +1,6 @@
-#include "base_inc.h"
-
-#include <stdarg.h>
+#include "logger.h"
+#include "thread_ctx.h"
+#include "os/os_core.h"
 
 struct LoggerSystemState {
   OS_Handle log_file_handle;

@@ -1,5 +1,4 @@
-#include "base/defines.h"
-#include "base/logger.h"
+#include "lib.h"
 #include "renderer.h"
 
 #include "asset_watch.h"
@@ -22,17 +21,16 @@ global App st;
 
 void app_update(u8** state);
 
-i32 main(i32 count, char* arr[]) {
+i32 main(i32 count, char* args[]) {
   global_alloc_init();
   tctx_init();
+  test();
+
   os_init();
   os_gfx_init();
   asset_watch_init();
   asset_init("../assets");
   r_init();
-
-  // test();
-  
   Scratch scratch;
 
 #if HOTRELOAD_BUILD

@@ -6,7 +6,7 @@ struct Timer {
   f32 interval;
 };
 
-inline Timer timer_create(f32 interval) {
+inline Timer timer_init(f32 interval) {
   Timer timer = {
     .interval = interval,
   };
@@ -69,8 +69,8 @@ struct ProfileBlock {
   u64 old_TSC_elapsed_at_root;
 
   ProfileBlock(String label_, ProfileAnchor& anchor_) {
-    if (!anchor_.label) {
-      append(global_profiler.anchors, &anchor_);
+    if (!anchor_.label.size) {
+      global_profiler.anchors.append(&anchor_);
     }
     parent = global_profiler_parent;
 

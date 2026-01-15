@@ -1,6 +1,8 @@
 #pragma once
-
 #include "stdint.h"
+#include "stdarg.h"
+#include <initializer_list>
+
 typedef uint8_t  u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
@@ -21,6 +23,7 @@ typedef u64 DenseTime;
 
 #define null 0
 #define NoFlags 0
+#define var auto
 
 #define Swap(a, b) \
   {                \
@@ -106,11 +109,11 @@ typedef u64 DenseTime;
 #define IsInsideExcl(a,x,b)    (((a) < (x)) && ((x) < (b)))
 #define IsInsideBound(x,a)     ((0 <= (x)) && ((x) < a))
 #define IsInsideBounds(a,x,b)  (((a) <= (x)) && ((x) < (b)))
-#define RoundUp(x,a)           ((((x) + (a) - 1) / (a)) * (a))
-#define RoundDown(x, a)        ((x) - ((x) % (a)))
-#define ModPow2(a,b)           ((a) & ((b) - 1))
-#define DivPow2(a,b)           ((a) >> ctz(b))
-#define CeilIntDiv(a,b)        (((a) + (b) - 1) / (b))
+#define ModPow2(x,b)           ((x) & ((b) - 1))
+#define DivPow2(x,b)           ((x) >> ctz(b))
+#define CeilIntDiv(x,b)        (((x) + (b) - 1) / (b))
+#define RoundUp(x,a)           (CeilIntDiv(x,a) * (a))
+#define RoundDown(x,a)         ((x) / (y) * (a))
 #define Compose64Bit(a,b)      (((u64)(a) << 32) | (u64)(b))
 
 #define ArrayCount(x)  (sizeof((x)) / sizeof((x)[0]))
@@ -125,11 +128,11 @@ typedef u64 DenseTime;
 #define Glue(A,B)      _Glue(A,B)
 
 #define Bit(x)               (1 << (x))
-#define HasBit(x, pos)       ((x) & (1 << (pos)))
+#define BitHas(x, pos)       ((x) & (1 << (pos)))
 #define FlagSet(x, f)        ((x) | (f))
 #define FlagClear(x, f)      ((x) & ~(f))
 #define FlagToggle(x, f)     ((x) ^ (f))
-#define FlagExists(x, f)     (((x) & (f)) == (f))
+#define FlagHas(x, f)        (((x) & (f)) == (f))
 #define FlagEquals(x, f)     ((x) == (f))
 #define FlagIntersects(x,f)  (((x) & (f)) > 0)
 
@@ -144,19 +147,39 @@ typedef u64 DenseTime;
 
 #define SLLQueuePush(f,l,n) SLLQueuePush_NZ(0,f,l,n,next)
 
+#define Local(T, x, fn) \
+  local T x; \
+  local b32 Glue(is_init, __LINE__); \
+  if (!Glue(is_init, __LINE__)) { \
+    x = fn; \
+    Glue(is_init, __LINE__) = true; \
+  }
+
 template<typename F>
-struct ImplDefer {
-	F f;
-	ImplDefer(F f_) : f(f_) {}
-	~ImplDefer() { f(); }
+struct _Defer {
+  F f;
+  ~_Defer() { f(); }
 };
-template<typename F>
-ImplDefer<F> MakeDefer(F f) {
-	return ImplDefer<F>(f);
-}
-#define Defer(code) auto Glue(_defer_, __LINE__) = MakeDefer([&](){code})
+#define defer(code) auto Glue(_defer_, __LINE__) = _Defer([&](){ code; })
 #define DeferLoop(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
 #define IfDeferLoop(begin, end) for (b32 _once = (begin); _once; _once = false, (end))
+
+template <typename T>
+struct Ret {
+  T v;
+  b32 err;
+};
+template <>
+struct Ret<void> {
+  b32 err;
+};
+template <typename T>
+inline T _result_return(Ret<T> res) { 
+  return res.v; 
+}
+inline void _result_return(Ret<void> res) {
+}
+#define Try(expr) ({ auto r = expr; if (r.err) return {.err = r.err}; _result_return(r); })
 
 #if BUILD_DEBUG
   #define DebugDo(...) __VA_ARGS__
@@ -219,7 +242,7 @@ ImplDefer<F> MakeDefer(F f) {
 
   INLINE u32 count_bits_set(u64 val)   { return __builtin_popcountll(val); }
   INLINE u32 clz(u64 val)              { return __builtin_clzll(val); }
-  INLINE u32 ctz(i64 val)              { return __builtin_ctzll(val); }
+  INLINE u32 ctz(u64 val)              { return __builtin_ctzll(val); }
 
   #define NO_ASAN __attribute__((no_sanitize("address")))
 #else
@@ -228,6 +251,8 @@ ImplDefer<F> MakeDefer(F f) {
 
 ////////////////////////////////////////////////////////////////////////
 // OS
+
+#define PAGE_SIZE 4096
 
 #if OS_WINDOWS
   #if HOTRELOAD_BUILD
@@ -274,3 +299,4 @@ struct Range {
   u64 offset; 
   u64 size; 
 };
+

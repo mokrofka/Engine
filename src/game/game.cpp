@@ -3,7 +3,7 @@
 #include "renderer.h"
 #include "event.h"
 #include "test.h"
-// #include <new>
+#include "profiler.h"
 
 // f32 cube_vertices[] = {
 //   // Pos                 // Normal           // Texcoord
@@ -640,11 +640,13 @@ struct AssetLoader {
 };
 
 struct GameState {
-  Arena* arena;
+  Arena arena;
   Map<String, Mesh> meshes;
   ShaderGlobalState* shader_state;
   Darray<Entity> entities;
   Camera camera;
+
+  Timer timer_to_create;
 };
 
 GameState* st;
@@ -670,7 +672,7 @@ void gpu_data_update() {
   }
 }
 
-void* grid_create(Arena* arena, i32 grid_size, f32 grid_step) {
+void* grid_create(Allocator arena, i32 grid_size, f32 grid_step) {
   v3* grid = push_array(arena, v3, grid_size*4);
 
   i32 i = 0;
@@ -705,7 +707,7 @@ Entity& entity_create(u32 mesh, u32 shader, u32 texture) {
     .scale = v3_one(),
     .r_handle = vk_make_renderable(mesh, shader, texture),
   };
-  return append(st->entities, e);
+  return st->entities.append(e);
 }
 // Entity& entity_create() {
 //   return 0;
@@ -791,36 +793,16 @@ void camera_update() {
 ////////////////////////////////////////////////////////////////////////
 // Init
 
-void foo(u32& a);
-
-void bar(u32& a) {
-  TimeFunction;
-  os_sleep(10);
-  if (a--) {
-    foo(a);
-  }
-}
-
-void foo(u32& a) {
-  TimeFunction;
-  os_sleep(10);
-  if (a--) {
-    bar(a);
-  }
-}
-
 void app_init(u8** state) {
   // TLSF_Allocator all = {};
 
   // u8* buff = tlsf_alloc(all, 13);
 
-  begin_profile();
   u32 a = 5;
-  foo(a);
   Scratch scratch;
-  Assign(*state, global_alloc_zero(sizeof(GameState)));
+  Assign(*state, global_alloc_struct_zero(GameState));
   Assign(st, *state);
-  st->arena = arena_alloc();
+  st->arena = arena_init();
   st->shader_state = vk_get_shader_state();
   st->camera = {
     .pos = v3(0,0,-5),
@@ -837,7 +819,6 @@ void app_init(u8** state) {
   Loop (i, Texture_COUNT) {
     textures[i] = texture_load(textures_path[i]);
   }
-  end_and_print_profile();
 
   Entity& cube = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_OrangeLines]);
   Entity& cube1 = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_Container]);
@@ -845,47 +826,16 @@ void app_init(u8** state) {
   // Entity& room = entity_create(meshes[Mesh_Room], shaders[Shader_Color], textures[Texture_Room]);
   // room.pos = {0,0,10};
 
+
+  st->timer_to_create = timer_init(0.1);
+
 }
 
 ////////////////////////////////////////////////////////////////////////
 // Update
 
-struct Container {
-  AllocSegList allocator;
-  u8* data;
-};
-
-v3 vec;
-v3& get_pos_component(u32 id) {
-  return vec;
-}
-
-v3& get_pos(Entity& e) {
-  return get_pos_component(e.id);
-}
-
 shared_function void app_update(u8** state) {
   Scratch scratch;
-  Entity e;
-  Darray<i32> arr;
-  append(arr, 1);
-  Loop (i, len(arr)) {
-
-  }
-  Loop (i, arr.count) {
-    
-  }
-
-  // arr.add(1);
-
-  v3& pos = get_pos(e);
-
-  // u8* buff = push_buffer(scratch, KB(1));
-  // BufferOffset offsetter = offset_make(buff);
-  // u8* buff1 = push_offset(offsetter, 256);
-  // u8* buff2 = push_offset(offsetter, 256);
-  // u8* buff3 = push_offset(offsetter, 256);
-  // u8* buff4 = push_offset(offsetter, 256);
 
   if (*state == null) {
     app_init(state);
@@ -901,17 +851,17 @@ shared_function void app_update(u8** state) {
     st->camera.fov -= 5;
   }
 
-  local Timer timer_to_create = timer_create(0.1);
-  if (timer_tick(timer_to_create, delta_time)) {
-    // Info("entity created %i", len(st->entities));
-    // Entity& cube1 = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_Container]);
-    // cube1.pos = v3_rand_range(v3(-10), v3(10));
+  Local(Timer, timer, timer_init(1));
+  if (timer_tick(timer, delta_time)) {
+    Info("entity created %i", st->entities.count);
+    Entity& cube1 = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_Container]);
+    cube1.pos = v3_rand_range(v3(-10), v3(10));
   }
 
-  local Timer timer = timer_create(0.3);
-  if (timer_tick(timer, delta_time)) {
-    Info("%f", Mod(st->camera.yaw, 360));
-  }
+  // local Timer timer = timer_create(0.3);
+  // if (timer_tick(timer, delta_time)) {
+  //   Info("%f", Mod(st->camera.yaw, 360));
+  // }
   // st->entities[2].scale += 0.01;
 
   camera_update();

@@ -1,4 +1,5 @@
-#include "base_inc.h"
+#include "str.h"
+#include "logger.h"
 
 intern u32 u32_length(u32 v) {
   if (v < 10) return 1;
@@ -148,12 +149,14 @@ intern u32 f32_write(u8* dest, f32 value, u32 precision) {
   if (precision > 0) {
     dest[len++] = '.';
 
-    for (u32 i = 0; i < precision; ++i) {
-      value *= 10;
-      u32 integer = value;
-      value -= integer;
-      dest[len++] = '0' + integer;
+    u32 multiplier = 1;
+    for (u32 i = 0; i < precision; ++i) multiplier *= 10;
+    u32 frac_part = (u32)(value * multiplier + 0.5); // rounding since possible 0.02 * multi = 1.999...
+    u32 frac_len = u32_length(frac_part);
+    for (u32 i = 0; i < precision - frac_len; ++i) {
+      dest[len++] = '0';
     }
+    len += u32_write(dest + len, frac_part);
   }
 
   return len;
@@ -326,7 +329,6 @@ u32 my_sprintf(u8* buff, String fmt, va_list argc) {
           ++p;                      // skip '.'
           u32 precision = *p - '0'; // 'num' - '0'
           ++p;                      // skip number
-          // ++p; // skip f
           f64 val = va_arg(argc, f64);
           u32 len = f64_write(buff + written, val, precision);
           written += len;
@@ -368,7 +370,7 @@ String str_cstr_capped(const void *cstr, const void *cap) {
 ////////////////////////////////////////////////////////////////////////
 // String Stylization
 
-String upper_from_str(Arena *arena, String str) {
+String upper_from_str(Allocator arena, String str) {
   str = push_str_copy(arena, str);
   Loop (i, str.size) {
     str.str[i] = char_to_upper(str.str[i]);
@@ -376,7 +378,7 @@ String upper_from_str(Arena *arena, String str) {
   return str;
 }
 
-String lower_from_str(Arena *arena, String str) {
+String lower_from_str(Allocator arena, String str) {
   str = push_str_copy(arena, str);
   Loop (i, str.size) {
     str.str[i] = char_to_lower(str.str[i]);
@@ -452,7 +454,7 @@ String str_chop(String str, u64 amt) {
 ////////////////////////////////////////////////////////////////////////
 // String Formatting & Copying
 
-String push_str_cat(Arena* arena, String s1, String s2) {
+String push_str_cat(Allocator arena, String s1, String s2) {
   String str;
   str.size = s1.size + s2.size;
   str.str = push_array(arena, u8, str.size + 1); // for C-str
@@ -462,7 +464,7 @@ String push_str_cat(Arena* arena, String s1, String s2) {
   return str;
 }
 
-String push_str_copy(Arena* arena, String s) {
+String push_str_copy(Allocator arena, String s) {
   String str;
   str.size = s.size;
   str.str = push_array(arena, u8, str.size + 1); // for C-str
@@ -471,7 +473,7 @@ String push_str_copy(Arena* arena, String s) {
   return str;
 }
 
-String push_strfv(Arena* arena, String fmt, va_list argc) {
+String push_strfv(Allocator arena, String fmt, va_list argc) {
   va_list va_list_argc;
   va_copy(va_list_argc, argc); 
   u32 need_bytes = my_sprintf(null, fmt, va_list_argc);
@@ -488,7 +490,7 @@ String push_strfv(Arena* arena, String fmt, va_list argc) {
   return result;
 }
 
-String push_strf(Arena* arena, String fmt, ...) {
+String push_strf(Allocator arena, String fmt, ...) {
   va_list argc;
   va_start(argc, fmt);
   String result = push_strfv(arena, fmt, argc);
@@ -513,7 +515,7 @@ StringNode* str_list_push_node_set_string(StringList* list, StringNode* node, St
   return node;
 }
 
-StringNode* str_list_push(Arena* arena, StringList* list, String string) {
+StringNode* str_list_push(Allocator arena, StringList* list, String string) {
   StringNode* node = push_struct(arena, StringNode);
   str_list_push_node_set_string(list, node, string);
   return node;
@@ -774,7 +776,7 @@ u64 wchar_to_char(char* out, const wchar_t* in, u64 out_size) {
   return out_len;
 }
 
-String push_str_wchar(Arena* arena, const wchar_t* in, u32 wchar_length) {
+String push_str_wchar(Allocator arena, const wchar_t* in, u32 wchar_length) {
   u8* buff = push_buffer(arena, wchar_length + 1);
   Loop (i , wchar_length) {
     buff[i] = in[i];

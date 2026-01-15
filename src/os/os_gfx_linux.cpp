@@ -308,6 +308,9 @@ void* os_get_gfx_api_thing() {
   st.vk_surface = {.wl_display = st.wl_display, .wl_surface = st.wl_surface};
   return &st.vk_surface;
 }
+void  os_close_window() {
+  st.should_close = true; 
+}
 
 ////////////////////////////////////////////////////////////////////////
 // keyboard

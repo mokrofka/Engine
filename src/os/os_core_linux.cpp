@@ -7,13 +7,13 @@
 #include <unistd.h>
 #include <time.h>
 #include <dlfcn.h>
+#include <dirent.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/sendfile.h>
 #include <sys/wait.h>
 #include <sys/inotify.h>
 #include <sys/time.h>
-#include <dirent.h>
 
 struct OS_LNX_FileIter {
   DIR* dir;
@@ -22,7 +22,7 @@ struct OS_LNX_FileIter {
 };
 
 struct OS_State {
-  Arena* arena;
+  Allocator arena;
 
   String binary_name;
   String binary_filepath;
@@ -38,7 +38,7 @@ String os_get_current_filepath()     { return st.binary_filepath; }
 void os_exit(i32 exit_code) { _exit(exit_code); }
 
 void os_init() {
-  Arena* arena = arena_alloc();
+  Arena arena = arena_init();
   const u32 max_path_length = 512;
   u8* buff[max_path_length];
   u32 size = readlink("/proc/self/exe", (char*)buff, max_path_length);
@@ -208,8 +208,8 @@ FileProperties os_file_path_properties(String path) {
   return props;
 }
 
-Buffer os_file_all_read(Arena* arena, String path) {
-  Scratch scratch(&arena);
+Buffer os_file_all_read(Allocator arena, String path) {
+  Scratch scratch(arena);
   OS_Handle f = os_file_open(path, OS_AccessFlag_Read);
   Assert(f);
 
@@ -299,7 +299,7 @@ void os_watch_deattach(OS_Watch watch, OS_Handle attached) {
   inotify_rm_watch(watch.handle, attached);
 }
 
-StringList os_watch_check(Arena* arena, OS_Watch watch) {
+StringList os_watch_check(Allocator arena, OS_Watch watch) {
   u8* buff = push_buffer(arena, KB(1));
   u64 read_size = os_file_read(watch.handle, KB(1), buff);
   if (read_size == -1) {
@@ -320,7 +320,7 @@ StringList os_watch_check(Arena* arena, OS_Watch watch) {
 
 // Directory iteration
 
-OS_FileIter* os_file_iter_begin(Arena* arena, String path, OS_FileIterFlags flags) {
+OS_FileIter* os_file_iter_begin(Allocator arena, String path, OS_FileIterFlags flags) {
   OS_FileIter* base_iter = push_struct(arena, OS_FileIter);
   base_iter->flags = flags;
   OS_LNX_FileIter* iter = (OS_LNX_FileIter*)base_iter->memory;
@@ -330,8 +330,8 @@ OS_FileIter* os_file_iter_begin(Arena* arena, String path, OS_FileIterFlags flag
   return base_iter;
 }
 
-b32 os_file_iter_next(Arena* arena, OS_FileIter* iter, OS_FileInfo* info_out) {
-  Scratch scratch(&arena);
+b32 os_file_iter_next(Allocator arena, OS_FileIter* iter, OS_FileInfo* info_out) {
+  Scratch scratch(arena);
   b32 good = 0;
   OS_LNX_FileIter* lnx_iter = (OS_LNX_FileIter*)iter->memory;
   while (true) {

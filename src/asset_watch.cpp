@@ -14,7 +14,7 @@ struct DirectoryWatch {
 };
 
 struct AssetWatchState {
-  Arena* arena;
+  Arena arena;
   Array<FileWatch, 128> watches;
   Array<DirectoryWatch, 128> directories;
 };
@@ -22,12 +22,12 @@ struct AssetWatchState {
 global AssetWatchState st;
 
 void asset_watch_init() {
-  st.arena = arena_alloc();
+  st.arena = arena_init();
 }
 
 void asset_watch_add(String watch_name, void (*callback)()) {
   FileProperties props = os_file_path_properties(watch_name);
-  append(st.watches, {
+  st.watches.append({
     .path = watch_name,
     .modified = props.modified,
     .callback = callback,
@@ -38,7 +38,7 @@ void asset_watch_directory_add(String watch_name, void (*reload_callback)(String
   String dir_path = push_strf(st.arena, "%s/%s", asset_base_path(), watch_name);
   OS_Watch watch = os_watch_open(flags);
   os_watch_attach(watch, dir_path);
-  append(st.directories, {
+  st.directories.append({
     .path = dir_path,
     .watch = watch,
     .callback = reload_callback,

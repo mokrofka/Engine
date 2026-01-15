@@ -1,24 +1,21 @@
 #pragma once
 #include "mem.h"
 
-KAPI Temp tctx_get_scratch(Arena** conflics, u64 counts);
+KAPI Temp tctx_get_scratch();
+KAPI Temp tctx_get_scratch(Allocator conflict);
 
 struct Scratch {
   Temp temp;
   
-  INLINE operator Arena*() { return temp.arena; }
+  INLINE operator Allocator() { return {.type = AllocatorType_Arena, .ctx = temp.arena}; }
 
   INLINE Scratch() {
-    temp = tctx_get_scratch(null, 0);
+    temp = tctx_get_scratch();
   }
-  INLINE Scratch(Arena** conflics) {
-    temp = tctx_get_scratch(conflics, 1);
+  INLINE Scratch(Allocator conflict) {
+    temp = tctx_get_scratch(conflict);
   }
   INLINE ~Scratch() { temp.arena->pos = temp.pos; };
 };
 
 KAPI void tctx_init();
-
-// deprecated
-#define GetScratch(conflicts, count) (tctx_get_scratch((conflicts), (count)))
-#define ReleaseScratch(scratch) temp_end(scratch)

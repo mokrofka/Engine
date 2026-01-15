@@ -8234,15 +8234,6 @@ void ImGui::DebugNodeMultiSelectState(ImGuiMultiSelectState* storage)
 // - ImGuiSelectionExternalStorage
 //-------------------------------------------------------------------------
 
-ImGuiSelectionBasicStorage::ImGuiSelectionBasicStorage()
-{
-    Size = 0;
-    PreserveOrder = false;
-    UserData = NULL;
-    AdapterIndexToStorageId = [](ImGuiSelectionBasicStorage*, int idx) { return (ImGuiID)idx; };
-    _SelectionOrder = 1; // Always >0
-}
-
 void ImGuiSelectionBasicStorage::Clear()
 {
     Size = 0;

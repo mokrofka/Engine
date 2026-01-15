@@ -20,17 +20,17 @@ void event_register(u32 code, void* listener, PFN_On_Event on_event) {
       return;
     }
   }
-  append(st.registered[code], {listener, on_event});
+  st.registered[code].append({listener, on_event});
 }
 
 void event_unregister(u32 code, void* listener, PFN_On_Event on_event) {
-  if (len(st.registered[code]) == 0) {
+  if (st.registered[code].count == 0) {
     Assert(!"you're trying to unregister nothing!");
   }
   u32 index = 0;
   for (RegisteredEvent e : st.registered[code]) {
     if (e.listener == listener && e.callback == on_event) {
-      remove(st.registered[code], index);
+      st.registered[code].swap_remove(index);
     }
     ++index;
   }

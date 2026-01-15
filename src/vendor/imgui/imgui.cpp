@@ -38,6 +38,19 @@
 // modifying imgui.h or imgui.cpp. You may include imgui_internal.h to access internal data structures, but it doesn't
 // come with any guarantee of forward compatibility. Discussing your changes on the GitHub Issue Tracker may lead you
 // to a better solution or official support for them.
+#define CONCAT_IMPL(x, y) x##y
+#define CONCAT(x, y) CONCAT_IMPL(x, y)
+
+#define FixGuard(name, T) \
+            struct {  \
+              char buff[sizeof(T)];  \
+            } static CONCAT(_buff, __LINE__); \
+            T& name = *(T*)&CONCAT(_buff, __LINE__); \
+            static int CONCAT(is_init, __LINE__); \
+            if (!CONCAT(is_init, __LINE__)) { \
+              name = {}; \
+              CONCAT(is_init, __LINE__) = true; \
+            }
 
 /*
 
@@ -21423,7 +21436,7 @@ void ImGui::ShowMetricsWindow(bool* p_open)
         BulletText("MouseViewport: 0x%08X (UserHovered 0x%08X, LastHovered 0x%08X)", g.MouseViewport ? g.MouseViewport->ID : 0, g.IO.MouseHoveredViewport, g.MouseLastHoveredViewport ? g.MouseLastHoveredViewport->ID : 0);
         if (TreeNode("Inferred Z order (front-to-back)"))
         {
-            static ImVector<ImGuiViewportP*> viewports;
+          FixGuard(viewports, ImVector<ImGuiViewportP*>);
             viewports.resize(g.Viewports.Size);
             memcpy(viewports.Data, g.Viewports.Data, g.Viewports.size_in_bytes());
             if (viewports.Size > 1)

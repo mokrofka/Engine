@@ -2,8 +2,8 @@
 #include "defines.h"
 #include "str.h"
 
-#define PI             3.14159265358f
-#define Tau            (PI * 2)
+#define PI  3.14159265358f
+#define Tau (PI * 2)
 
 #define EulerNumber  2.71828182846f
 #define GoldBig      1.61803398875f
@@ -15,27 +15,36 @@
 inline f32 degtorad(f32 degrees) { return degrees * PI / 180.0f; }
 inline f32 radtodeg(f32 radians) { return radians * 180.0f / PI; }
 
-struct v2 {
-  f32 x;
-  f32 y;
+union v2 {
+  struct {
+    f32 x;
+    f32 y;
+  };
+  f32 e[2];
 
   v2 () = default;
   INLINE v2 (f32 x_, f32 y_) { x = x_, y = y_; }
   INLINE v2 (f32 scale) { x = scale; y = scale; }
 };
 
-struct v2i {
-  i32 x;
-  i32 y;
+union v2i {
+  struct {
+    i32 x;
+    i32 y;
+  };
+  i32 e[2];
 
   v2i () = default;
   INLINE v2i (i32 x_, i32 y_) { x = x_, y = y_; }
   INLINE v2i (i32 scale) { x = scale; y = scale; }
 };
 
-struct v2u {
-  u32 x;
-  u32 y;
+union v2u {
+  struct {
+    u32 x;
+    u32 y;
+  };
+  u32 e[2];
 
   v2u () = default;
   INLINE v2u (u32 x_, u32 y_) { x = x_, y = y_; }
@@ -68,11 +77,14 @@ union v3u {
   INLINE v3u (u32 scale) { x = scale; y = scale; z = scale; }
 };
 
-struct v4 {
-  f32 x;
-  f32 y;
-  f32 z;
-  f32 w;
+union v4 {
+  struct {
+    f32 x;
+    f32 y;
+    f32 z;
+    f32 w;
+  };
+  f32 e[4];
 
   v4 () = default;
   INLINE v4 (f32 x_, f32 y_, f32 z_, f32 w_) { x = x_, y = y_, z = z_, w = w_; }
@@ -84,12 +96,12 @@ union mat3 {
   INLINE f32& operator[](u32 a) { return e[a]; }
 };
 
-typedef v4 quat;
-
 union mat4 {
   f32 e[16];
   INLINE f32& operator[](u32 a) { return e[a]; }
 };
+
+typedef v4 quat;
 
 union Rect {
   struct {
@@ -115,22 +127,22 @@ struct Transform {
   v3 scale;
 };
 
-INLINE f32 Sin(f32 a)           { return __builtin_sinf(a); }
-INLINE f32 Cos(f32 a)           { return __builtin_cosf(a); }
-INLINE f32 Tan(f32 a)           { return __builtin_tanf(a); }
-INLINE f32 Asin(f32 a)          { return __builtin_asinf(a); }
-INLINE f32 Acos(f32 a)          { return __builtin_acosf(a); }
-INLINE f32 Atan2(f32 y, f32 x)  { return __builtin_atan2f(y,x); }
-INLINE f32 Sqrt(f32 a)          { return __builtin_sqrtf(a); }
-INLINE f32 Pow(f32 a, f32 b)    { return __builtin_powf(a, b); }
-INLINE f32 Floor(f32 a)         { return __builtin_floorf(a); }
-INLINE f32 Ceil(f32 a)          { return __builtin_ceilf(a); }
-INLINE f32 Round(f32 a)         { return __builtin_roundf(a); }
-INLINE f32 Mod(f32 a, f32 b)    { return __builtin_fmodf(a, b); }
-INLINE f32 Exp(f32 a)           { return __builtin_expf(a); }
-INLINE f32 LogE(f32 a)          { return __builtin_logf(a); }
-INLINE f32 Log2(f32 a)          { return __builtin_log2f(a); }
-INLINE f32 Log10(f32 a)         { return __builtin_log10f(a); }
+NO_DEBUG inline f32 Sin(f32 a)           { return __builtin_sinf(a); }
+NO_DEBUG inline f32 Cos(f32 a)           { return __builtin_cosf(a); }
+NO_DEBUG inline f32 Tan(f32 a)           { return __builtin_tanf(a); }
+NO_DEBUG inline f32 Asin(f32 a)          { return __builtin_asinf(a); }
+NO_DEBUG inline f32 Acos(f32 a)          { return __builtin_acosf(a); }
+NO_DEBUG inline f32 Atan2(f32 y, f32 x)  { return __builtin_atan2f(y,x); }
+NO_DEBUG inline f32 Sqrt(f32 a)          { return __builtin_sqrtf(a); }
+NO_DEBUG inline f32 Pow(f32 a, f32 b)    { return __builtin_powf(a, b); }
+NO_DEBUG inline f32 Floor(f32 a)         { return __builtin_floorf(a); }
+NO_DEBUG inline f32 Ceil(f32 a)          { return __builtin_ceilf(a); }
+NO_DEBUG inline f32 Round(f32 a)         { return __builtin_roundf(a); }
+NO_DEBUG inline f32 Mod(f32 a, f32 b)    { return __builtin_fmodf(a, b); }
+NO_DEBUG inline f32 Exp(f32 a)           { return __builtin_expf(a); }
+NO_DEBUG inline f32 LogE(f32 a)          { return __builtin_logf(a); }
+NO_DEBUG inline f32 Log2(f32 a)          { return __builtin_log2f(a); }
+NO_DEBUG inline f32 Log10(f32 a)         { return __builtin_log10f(a); }
 
 NO_DEBUG inline f32 SinD(f32 a)                { return Sin(degtorad(a)); }
 NO_DEBUG inline f32 CosD(f32 a)                { return Cos(degtorad(a)); }
@@ -198,9 +210,7 @@ inline u64 squirrel3(u64 at) {
   at ^= (at >> 8);
   return at;
 }
-inline u64 hash(u64 x) {
-  return squirrel3(x);
-}
+
 inline u64 str_hash_FNV(String str) {
   u32 hash = 0x811c9dc5;
   Loop (i, str.size) {
@@ -208,9 +218,11 @@ inline u64 str_hash_FNV(String str) {
   }
   return hash;
 }
-inline u64 hash(String str) {
-  return str_hash_FNV(str);
-}
+
+inline u64 hash(u64 x) { return squirrel3(x); }
+inline u64 hash(String str) { return str_hash_FNV(str); }
+inline b32 equal(i64 a, i64 b) { return a == b; }
+inline b32 lessthan(i64 a, i64 b) { return a < b; }
 
 ////////////////////////////////////////////////////////////////////////
 // Random
@@ -223,16 +235,16 @@ inline u32 xorshift32(u32* seed) {
   return *seed = x;
 }
 
-KAPI extern u32 _seed;
+thread_local inline u32 _seed = 0x95123512;
 NO_DEBUG inline u32 rand_u32()                        { return xorshift32(&_seed); }
 NO_DEBUG inline u32 rand_range_u32(u32 min, u32 max)  { return (rand_u32() % (max - min + 1)) + min; }
 NO_DEBUG inline i32 rand_i32()                        { return rand_u32(); }
 NO_DEBUG inline i32 rand_range_i32(i32 min, i32 max)  { return (i32)(rand_u32() % (u32)(max - min + 1)) + min; }
 NO_DEBUG inline f32 rand_f32_01()                     { return rand_u32() / (f32)U32_MAX; }
-NO_DEBUG inline f32 rand_f32_11()                     { return rand_f32_01() * 2.f - 1.f; }
-NO_DEBUG inline f32 rand_f32()                        { return rand_f32_01() * 2 * U16_MAX - U16_MAX; }
-NO_DEBUG inline f32 rand_range_f32(f32 min, f32 max)  { return rand_f32_01() * (max - min) + min ; }
-NO_DEBUG inline b32 rand_b32()                        { return rand_u32()%2; }
+NO_DEBUG inline f32 rand_f32_11()                     { return rand_f32_01()*2.0f - 1.0f; }
+NO_DEBUG inline f32 rand_f32()                        { return rand_f32_01()*2*U16_MAX - U16_MAX; }
+NO_DEBUG inline f32 rand_range_f32(f32 min, f32 max)  { return rand_f32_01()*(max - min) + min ; }
+NO_DEBUG inline b32 rand_b32()                        { return rand_u32() % 2; }
 NO_DEBUG inline void rand_seed()                      { _seed = CpuTimerNow(); }
 
 ////////////////////////////////////////////////////////////////////////
@@ -273,7 +285,7 @@ NO_DEBUG inline f32 v2_cross(v2 a, v2 b)       { return a.x*b.y - a.y*b.x; } // 
 NO_DEBUG inline v2  v2_lerp(v2 a, f32 t, v2 b) { return v2(Lerp(a.x, t, b.x), Lerp(a.y, t, b.y));}
 NO_DEBUG inline v2  v2_skew(v2 a)              { return v2(-a.y, a.x); }
 
-NO_DEBUG inline f32 v2_shortest_arc(v2 a, v2 b) {
+inline f32 v2_shortest_arc(v2 a, v2 b) {
 	a = v2_norm(a);
 	b = v2_norm(b);
 	f32 c = v2_dot(a, b);
@@ -294,8 +306,8 @@ NO_DEBUG inline v3 v3_up()                { return v3(0.0f, 1.0f, 0.0f); }
 NO_DEBUG inline v3 v3_down()              { return v3(0.0f, -1.0f, 0.0f); }
 NO_DEBUG inline v3 v3_left()              { return v3(-1.0f, 0.0f, 0.0f); }
 NO_DEBUG inline v3 v3_right()             { return v3(1.0f, 0.0f, 0.0f); }
-NO_DEBUG inline v3 v3_forward()           { return v3(0.0f, 0.0f, -1.0f); }
-NO_DEBUG inline v3 v3_back()              { return v3(0.0f, 0.0f, 1.0f); }
+NO_DEBUG inline v3 v3_forward()           { return v3(0.0f, 0.0f, 1.0f); }
+NO_DEBUG inline v3 v3_back()              { return v3(0.0f, 0.0f, -1.0f); }
 NO_DEBUG inline v3 v3_of_v4(v4 a)         { return v3(a.x, a.y, a.z); }
 NO_DEBUG inline v4 v3_to_v4(v3 a, f32 b)  { return v4(a.x, a.y, a.z, b); }
 
@@ -313,13 +325,13 @@ NO_DEBUG inline b32 operator==(v3u a, v3u b)       { return a.x == b.x && a.y ==
 NO_DEBUG inline b32 operator!=(v3 a, v3 b)         { return !(a == b); }
 NO_DEBUG inline v3  operator-(v3 a)                { return v3(-a.x, -a.y, -a.z); }
 
-NO_DEBUG inline f32 v3_length_squared(v3 a)    { return Sqr(a.x) + Sqr(a.y) + Sqr(a.z); }
-NO_DEBUG inline f32 v3_length(v3 a)            { return Sqrt(v3_length_squared(a)); }
-NO_DEBUG inline v3  v3_norm(v3 a)              { return a * (1.0f/v3_length(a)); }
-NO_DEBUG inline f32 v3_distance(v3 a, v3 b)    { return v3_length(v3(a.x - b.x, a.y - b.y, a.z - b.z)); }
-NO_DEBUG inline f32 v3_dot(v3 a, v3 b)         { return a.x*b.x + a.y*b.y + a.z*b.z; }
-NO_DEBUG inline v3  v3_cross(v3 a, v3 b)       { return v3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x); }
-NO_DEBUG inline v3  v3_lerp(v3 a, f32 t, v3 b) { return v3(Lerp(a.x, t, b.x), Lerp(a.y, t, b.y), Lerp(a.z, t, b.z));}
+NO_DEBUG inline f32 v3_length_squared(v3 a)     { return Sqr(a.x) + Sqr(a.y) + Sqr(a.z); }
+NO_DEBUG inline f32 v3_length(v3 a)             { return Sqrt(v3_length_squared(a)); }
+NO_DEBUG inline v3  v3_norm(v3 a)               { return a * (1.0f/v3_length(a)); }
+NO_DEBUG inline f32 v3_distance(v3 a, v3 b)     { return v3_length(v3(a.x - b.x, a.y - b.y, a.z - b.z)); }
+NO_DEBUG inline f32 v3_dot(v3 a, v3 b)          { return a.x*b.x + a.y*b.y + a.z*b.z; }
+NO_DEBUG inline v3  v3_cross(v3 a, v3 b)        { return v3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x); }
+NO_DEBUG inline v3  v3_lerp(v3 a, f32 t, v3 b)  { return v3(Lerp(a.x, t, b.x), Lerp(a.y, t, b.y), Lerp(a.z, t, b.z));}
 
 NO_DEBUG inline v3 v3_pos_of_mat4(mat4 mat) {
   v3 vec = {

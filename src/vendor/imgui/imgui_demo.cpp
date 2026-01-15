@@ -122,6 +122,30 @@ Index of this file:
 // [SECTION] Example App: Assets Browser / ShowExampleAppAssetsBrowser()
 
 */
+#define CONCAT_IMPL(x, y) x##y
+#define CONCAT(x, y) CONCAT_IMPL(x, y)
+
+#define FixGuard(name, T) \
+            struct {  \
+              char buff[sizeof(T)];  \
+            } static CONCAT(_buff, __LINE__); \
+            T& name = *(T*)&CONCAT(_buff, __LINE__); \
+            static int CONCAT(is_init, __LINE__); \
+            if (!CONCAT(is_init, __LINE__)) { \
+              name = {}; \
+              CONCAT(is_init, __LINE__) = true; \
+            }
+
+#define FixGuardValue(name, T, value) \
+            struct {  \
+              char buff[sizeof(T)];  \
+            } static CONCAT(_buff, __LINE__); \
+            T& name = *(T*)&CONCAT(_buff, __LINE__); \
+            static int CONCAT(is_init, __LINE__); \
+            if (!CONCAT(is_init, __LINE__)) { \
+              name = value; \
+              CONCAT(is_init, __LINE__) = true; \
+            }
 
 #if defined(_MSC_VER) && !defined(_CRT_SECURE_NO_WARNINGS)
 #define _CRT_SECURE_NO_WARNINGS
@@ -336,7 +360,7 @@ struct ImGuiDemoWindowData
     bool DisableSections = false;
     ExampleTreeNode* DemoTree = NULL;
 
-    ~ImGuiDemoWindowData() { if (DemoTree) ExampleTree_DestroyNode(DemoTree); }
+    // ~ImGuiDemoWindowData() { if (DemoTree) ExampleTree_DestroyNode(DemoTree); }
 };
 
 // Demonstrate most Dear ImGui features (this is big function!)
@@ -1379,7 +1403,7 @@ static void DemoWindowWidgetsComboBoxes()
         // See https://github.com/ocornut/imgui/issues/718 for advanced/esoteric alternatives.
         if (ImGui::BeginCombo("combo 2 (w/ filter)", combo_preview_value, flags))
         {
-            static ImGuiTextFilter filter;
+            FixGuard(filter, ImGuiTextFilter);
             if (ImGui::IsWindowAppearing())
             {
                 ImGui::SetKeyboardFocusHere();
@@ -2737,7 +2761,7 @@ static void DemoWindowWidgetsSelectionAndMultiSelect(ImGuiDemoWindowData* demo_d
 
             // Use default selection.Adapter: Pass index to SetNextItemSelectionUserData(), store index in Selection
             const int ITEMS_COUNT = 50;
-            static ImGuiSelectionBasicStorage selection;
+            FixGuard(selection, ImGuiSelectionBasicStorage);
             ImGui::Text("Selection: %d/%d", selection.Size, ITEMS_COUNT);
 
             // The BeginChild() has no purpose for selection logic, other that offering a scrolling region.
@@ -2768,7 +2792,7 @@ static void DemoWindowWidgetsSelectionAndMultiSelect(ImGuiDemoWindowData* demo_d
         if (ImGui::TreeNode("Multi-Select (with clipper)"))
         {
             // Use default selection.Adapter: Pass index to SetNextItemSelectionUserData(), store index in Selection
-            static ImGuiSelectionBasicStorage selection;
+            FixGuard(selection, ImGuiSelectionBasicStorage);
 
             ImGui::Text("Added features:");
             ImGui::BulletText("Using ImGuiListClipper.");
@@ -2817,8 +2841,8 @@ static void DemoWindowWidgetsSelectionAndMultiSelect(ImGuiDemoWindowData* demo_d
             // Storing items data separately from selection data.
             // (you may decide to store selection data inside your item (aka intrusive storage) if you don't need multiple views over same items)
             // Use a custom selection.Adapter: store item identifier in Selection (instead of index)
-            static ImVector<ImGuiID> items;
-            static ExampleSelectionWithDeletion selection;
+            FixGuard(items, ImVector<ImGuiID>);
+            FixGuard(selection, ExampleSelectionWithDeletion );
             selection.UserData = (void*)&items;
             selection.AdapterIndexToStorageId = [](ImGuiSelectionBasicStorage* self, int idx) { ImVector<ImGuiID>* p_items = (ImVector<ImGuiID>*)self->UserData; return (*p_items)[idx]; }; // Index -> ID
 
@@ -2876,7 +2900,7 @@ static void DemoWindowWidgetsSelectionAndMultiSelect(ImGuiDemoWindowData* demo_d
         if (ImGui::TreeNode("Multi-Select (dual list box)"))
         {
             // Init default state
-            static ExampleDualListBox dlb;
+            FixGuard(dlb, ExampleDualListBox);
             if (dlb.Items[0].Size == 0 && dlb.Items[1].Size == 0)
                 for (int item_id = 0; item_id < IM_ARRAYSIZE(ExampleNames); item_id++)
                     dlb.Items[0].push_back((ImGuiID)item_id);
@@ -2891,7 +2915,7 @@ static void DemoWindowWidgetsSelectionAndMultiSelect(ImGuiDemoWindowData* demo_d
         IMGUI_DEMO_MARKER("Widgets/Selection State/Multi-Select (in a table)");
         if (ImGui::TreeNode("Multi-Select (in a table)"))
         {
-            static ImGuiSelectionBasicStorage selection;
+            FixGuard(selection, ImGuiSelectionBasicStorage);
 
             const int ITEMS_COUNT = 10000;
             ImGui::Text("Selection: %d/%d", selection.Size, ITEMS_COUNT);
@@ -2977,7 +3001,18 @@ static void DemoWindowWidgetsSelectionAndMultiSelect(ImGuiDemoWindowData* demo_d
             // Use default select: Pass index to SetNextItemSelectionUserData(), store index in Selection
             const int SCOPES_COUNT = 3;
             const int ITEMS_COUNT = 8; // Per scope
-            static ImGuiSelectionBasicStorage selections_data[SCOPES_COUNT];
+            // static ImGuiSelectionBasicStorage selections_data[SCOPES_COUNT];
+            struct {
+              char buff[sizeof(ImGuiSelectionBasicStorage)*SCOPES_COUNT];
+            } static _buff3005;
+            ImGuiSelectionBasicStorage* selections_data = (ImGuiSelectionBasicStorage*)&_buff3005;
+            static int is_init3005;
+            if (!is_init3005) {
+              for (int i = 0; i < SCOPES_COUNT; ++i) {
+                selections_data[i] = {};
+              }
+              is_init3005 = true;
+            }
 
             // Use ImGuiMultiSelectFlags_ScopeRect to not affect other selections in same window.
             static ImGuiMultiSelectFlags flags = ImGuiMultiSelectFlags_ScopeRect | ImGuiMultiSelectFlags_ClearOnEscape;// | ImGuiMultiSelectFlags_ClearOnClickVoid;
@@ -3158,7 +3193,7 @@ static void DemoWindowWidgetsSelectionAndMultiSelect(ImGuiDemoWindowData* demo_d
 
             }; // ExampleTreeFuncs
 
-            static ImGuiSelectionBasicStorage selection;
+            FixGuard(selection, ImGuiSelectionBasicStorage);
             if (demo_data->DemoTree == NULL)
                 demo_data->DemoTree = ExampleTree_CreateDemoTree(); // Create tree once
             ImGui::Text("Selection size: %d", selection.Size);
@@ -3236,10 +3271,10 @@ static void DemoWindowWidgetsSelectionAndMultiSelect(ImGuiDemoWindowData* demo_d
 
             // Initialize default list with 1000 items.
             // Use default selection.Adapter: Pass index to SetNextItemSelectionUserData(), store index in Selection
-            static ImVector<int> items;
+            FixGuard(items, ImVector<int>);
             static int items_next_id = 0;
             if (items_next_id == 0) { for (int n = 0; n < 1000; n++) { items.push_back(items_next_id++); } }
-            static ExampleSelectionWithDeletion selection;
+            FixGuard(selection, ExampleSelectionWithDeletion);
             static bool request_deletion_from_menu = false; // Queue deletion triggered from context menu
 
             ImGui::Text("Selection size: %d/%d", selection.Size, items.Size);
@@ -3497,7 +3532,7 @@ static void DemoWindowWidgetsTabs()
         IMGUI_DEMO_MARKER("Widgets/Tabs/TabItemButton & Leading-Trailing flags");
         if (ImGui::TreeNode("TabItemButton & Leading/Trailing flags"))
         {
-            static ImVector<int> active_tabs;
+            FixGuard(active_tabs, ImVector<int>);
             static int next_tab_id = 0;
             if (next_tab_id == 0) // Initialize with some default tabs
                 for (int i = 0; i < 3; i++)
@@ -3659,7 +3694,7 @@ static void DemoWindowWidgetsTextFilter()
         // Helper class to easy setup a text filter.
         // You may want to implement a more feature-full filtering scheme in your own application.
         HelpMarker("Not a widget per-se, but ImGuiTextFilter is a helper to perform simple filtering on text strings.");
-        static ImGuiTextFilter filter;
+        FixGuard(filter, ImGuiTextFilter);
         ImGui::Text("Filter usage:\n"
             "  \"\"         display all lines\n"
             "  \"xxx\"      display lines containing \"xxx\"\n"
@@ -3852,7 +3887,7 @@ static void DemoWindowWidgetsTextInput()
             // For this demo we are using ImVector as a string container.
             // Note that because we need to store a terminating zero character, our size/capacity are 1 more
             // than usually reported by a typical string class.
-            static ImVector<char> my_str;
+            FixGuard(my_str, ImVector<char>);
             if (my_str.empty())
                 my_str.push_back(0);
             Funcs::MyInputTextMultiline("##MyStr", &my_str, ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 16));
@@ -7114,7 +7149,7 @@ static void DemoWindowTables()
     if (ImGui::TreeNode("Sorting"))
     {
         // Create item list
-        static ImVector<MyItem> items;
+        FixGuard(items, ImVector<MyItem>);
         if (items.Size == 0)
         {
             items.resize(50, MyItem());
@@ -7212,7 +7247,7 @@ static void DemoWindowTables()
         static int freeze_cols = 1;
         static int freeze_rows = 1;
         static int items_count = IM_ARRAYSIZE(template_items_names) * 2;
-        static ImVec2 outer_size_value = ImVec2(0.0f, TEXT_BASE_HEIGHT * 12);
+        FixGuardValue(outer_size_value, ImVec2, ImVec2(0.0f, TEXT_BASE_HEIGHT * 12))
         static float row_min_height = 0.0f; // Auto
         static float inner_width_with_scroll = 0.0f; // Auto-extend
         static bool outer_size_enabled = true;
@@ -7341,8 +7376,8 @@ static void DemoWindowTables()
         }
 
         // Update item list if we changed the number of items
-        static ImVector<MyItem> items;
-        static ImVector<int> selection;
+        FixGuard(items, ImVector<MyItem>);
+        FixGuard(selection, ImVector<int>);
         static bool items_need_sort = false;
         if (items.Size != items_count)
         {
@@ -8286,7 +8321,7 @@ void ImGui::ShowStyleEditor(ImGuiStyle* ref)
     // You can pass in a reference ImGuiStyle structure to compare to, revert to and save to
     // (without a reference style pointer, we will use one compared locally as a reference)
     ImGuiStyle& style = ImGui::GetStyle();
-    static ImGuiStyle ref_saved_style;
+    FixGuard(ref_saved_style, ImGuiStyle);
 
     // Default to using internal storage as reference
     static bool init = true;
@@ -8447,7 +8482,7 @@ void ImGui::ShowStyleEditor(ImGuiStyle* ref)
             ImGui::SameLine(); ImGui::SetNextItemWidth(120); ImGui::Combo("##output_type", &output_dest, "To Clipboard\0To TTY\0");
             ImGui::SameLine(); ImGui::Checkbox("Only Modified Colors", &output_only_modified);
 
-            static ImGuiTextFilter filter;
+            FixGuard(filter, ImGuiTextFilter);
             filter.Draw("Filter colors", ImGui::GetFontSize() * 16);
 
             static ImGuiColorEditFlags alpha_flags = 0;
@@ -9101,7 +9136,7 @@ struct ExampleAppConsole
 
 static void ShowExampleAppConsole(bool* p_open)
 {
-    static ExampleAppConsole console;
+    FixGuard(console, ExampleAppConsole);
     console.Draw("Example: Console", p_open);
 }
 
@@ -9239,8 +9274,7 @@ struct ExampleAppLog
 // Demonstrate creating a simple log window with basic filtering.
 static void ShowExampleAppLog(bool* p_open)
 {
-    static ExampleAppLog log;
-
+    FixGuard(log, ExampleAppLog);
     // For the demo: add a debug button _BEFORE_ the normal log window contents
     // We take advantage of a rarely used feature: multiple calls to Begin()/End() are appending to the _same_ window.
     // Most of the contents of the window will be added by the log.Draw() call.
@@ -9480,7 +9514,7 @@ static void ShowExampleAppPropertyEditor(bool* p_open, ImGuiDemoWindowData* demo
     }
 
     IMGUI_DEMO_MARKER("Examples/Property Editor");
-    static ExampleAppPropertyEditor property_editor;
+    FixGuard(property_editor, ExampleAppPropertyEditor);
     if (demo_data->DemoTree == NULL)
         demo_data->DemoTree = ExampleTree_CreateDemoTree();
     property_editor.Draw(demo_data->DemoTree);
@@ -9504,7 +9538,7 @@ static void ShowExampleAppLongText(bool* p_open)
     IMGUI_DEMO_MARKER("Examples/Long text display");
 
     static int test_type = 0;
-    static ImGuiTextBuffer log;
+    FixGuard(log, ImGuiTextBuffer);
     static int lines = 0;
     ImGui::Text("Printing unusually long amount of text.");
     ImGui::Combo("Test type", &test_type,
@@ -9964,7 +9998,7 @@ static void ShowExampleAppCustomRendering(bool* p_open)
 
         if (ImGui::BeginTabItem("Canvas"))
         {
-            static ImVector<ImVec2> points;
+            FixGuard(points, ImVector<ImVec2>);
             static ImVec2 scrolling(0.0f, 0.0f);
             static bool opt_enable_grid = true;
             static bool opt_enable_context_menu = true;
@@ -10370,7 +10404,7 @@ struct ExampleAppDocuments
 
 void ShowExampleAppDocuments(bool* p_open)
 {
-    static ExampleAppDocuments app;
+    FixGuard(app, ExampleAppDocuments);
 
     // Options
     enum Target
@@ -10709,9 +10743,9 @@ struct ExampleAssetsBrowser
     int             LayoutLineCount = 0;
 
     // Functions
-    ExampleAssetsBrowser()
+    ExampleAssetsBrowser() 
     {
-        AddItems(10000);
+      AddItems(10000);
     }
     void AddItems(int count)
     {
@@ -10984,7 +11018,7 @@ struct ExampleAssetsBrowser
             ms_io = ImGui::EndMultiSelect();
             Selection.ApplyRequests(ms_io);
             if (want_delete)
-                Selection.ApplyDeletionPostLoop(ms_io, Items, item_curr_idx_to_focus);
+              Selection.ApplyDeletionPostLoop(ms_io, Items, item_curr_idx_to_focus);
 
             // Zooming with CTRL+Wheel
             if (ImGui::IsWindowAppearing())
@@ -11027,7 +11061,7 @@ struct ExampleAssetsBrowser
 void ShowExampleAppAssetsBrowser(bool* p_open)
 {
     IMGUI_DEMO_MARKER("Examples/Assets Browser");
-    static ExampleAssetsBrowser assets_browser;
+    FixGuard(assets_browser, ExampleAssetsBrowser);
     assets_browser.Draw("Example: Assets Browser", p_open);
 }
 

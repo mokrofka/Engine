@@ -92,7 +92,7 @@ KAPI u64            os_file_read(OS_Handle file, u64 size, u8* out_data);
 KAPI u64            os_file_write(OS_Handle file, u64 size, u8* data);
 KAPI u64            os_file_size(OS_Handle file);
 KAPI FileProperties os_file_properties(OS_Handle file);
-KAPI Buffer         os_file_all_read(Arena* arena, String path);
+KAPI Buffer         os_file_all_read(Allocator arena, String path);
 KAPI b32            os_file_path_exists(String path);
 KAPI b32            os_file_path_copy(String dst, String src);
 KAPI void           os_file_path_time_copy(String src, String dst);
@@ -108,12 +108,12 @@ OS_Watch   os_watch_open(OS_WatchFlags flags);
 void       os_watch_close(OS_Watch watch);
 OS_Handle  os_watch_attach(OS_Watch watch, String name);
 void       os_watch_deattach(OS_Watch watch, OS_Handle attached);
-StringList os_watch_check(Arena* arena, OS_Watch watch);
+StringList os_watch_check(Allocator arena, OS_Watch watch);
 
 // Directory iteration
-KAPI OS_FileIter* os_file_iter_begin(Arena *arena, String path, OS_FileIterFlags flags);
-KAPI b32          os_file_iter_next(Arena *arena, OS_FileIter *iter, OS_FileInfo *info_out);
-KAPI void         os_file_iter_end(OS_FileIter *iter);
+KAPI OS_FileIter* os_file_iter_begin(Allocator arena, String path, OS_FileIterFlags flags);
+KAPI b32          os_file_iter_next(Allocator arena, OS_FileIter *iter, OS_FileInfo *info_out);
+KAPI void         os_file_iter_end(OS_FileIter* iter);
 
 ////////////////////////////////////////////////////////////////////////
 // Processes
