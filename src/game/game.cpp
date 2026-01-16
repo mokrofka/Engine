@@ -1,8 +1,6 @@
 #include "lib.h"
 
 #include "common.h"
-#include "event.h"
-#include "profiler.h"
 
 // f32 cube_vertices[] = {
 //   // Pos                 // Normal           // Texcoord
@@ -604,21 +602,10 @@ Vertex triangle_vertices[] = {
 
 struct Entity {
   u32 id;
-  // union {
-  //   Transform trans;
-  //   struct {
-  //     v3 pos;
-  //     v3 rot;
-  //     v3 scale;
-  //   };
-  // };
   Transform& trans() { return entities_transforms[id]; }
   v3& pos() { return entities_transforms[id].pos; }
   v3& rot() { return entities_transforms[id].rot; }
   v3& scale() { return entities_transforms[id].scale; }
-  u32 r_handle;
-  u32 mesh;
-  u32 shader;
 };
 
 struct Camera {
@@ -684,13 +671,11 @@ void* grid_create(Allocator arena, i32 grid_size, f32 grid_step) {
 
 Entity& entity_create(u32 mesh, u32 shader, u32 texture) {
   Entity e = {
-    .id = id_pool_alloc(st->id_pool),
-    // .pos = {},
-    // .scale = v3_one(),
-    .r_handle = vk_make_renderable(e.id, mesh, shader, texture),
+    .id = id_pool_alloc(st->id_pool) + 1,
   };
   e.pos() = v3_zero();
   e.scale() = v3_one();
+  vk_make_renderable(e.id, mesh, shader, texture);
   return st->entities.append(e);
 }
 
@@ -788,27 +773,27 @@ void app_init(u8** state) {
     .fov = 45,
   };
 
+  for (i32 i = 1; i < Shader_COUNT; ++i) {
+    shaders(i) = shader_load(shaders_definition(i).path, shaders_definition(i).type);
+  }
+  for (i32 i = 1; i < Shader_COUNT; ++i) {
+    meshes(i) = mesh_load(meshes_path(i));
+  }
+  for (i32 i = 1; i < Texture_COUNT; ++i) {
+    textures(i) = texture_load(textures_path(i));
+  }
+
   {
     Mesh triangle = {
       .vertices = triangle_vertices,
       .vert_count = ArrayCount(triangle_vertices),
     };
-    vk_mesh_load(triangle);
-    // Entity& e = entity_create(0, u32 shader, u32 texture)
+    u32 mesh = vk_mesh_load(triangle);
+    Entity& e = entity_create(mesh, shaders(Shader_Color), textures(Texture_Container));
+    e.pos().x = 3;
   }
-
-  Loop (i, Shader_COUNT) {
-    shaders[i] = shader_load(shaders_definition[i].path, shaders_definition[i].type);
-  }
-  Loop (i, Mesh_COUNT) {
-    meshes[i] = mesh_load(meshs_path[i]);
-  }
-  Loop (i, Texture_COUNT) {
-    textures[i] = texture_load(textures_path[i]);
-  }
-
-  Entity& cube = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_OrangeLines]);
-  Entity& cube1 = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_Container]);
+  Entity& cube = entity_create(meshes(Mesh_Cube), shaders(Shader_Color), textures(Texture_OrangeLines));
+  Entity& cube1 = entity_create(meshes(Mesh_Cube), shaders(Shader_Color), textures(Texture_Container));
   cube1.pos() = {-3,0,1};
   // Entity& room = entity_create(meshes[Mesh_Room], shaders[Shader_Color], textures[Texture_Room]);
   // room.pos = {0,0,10};

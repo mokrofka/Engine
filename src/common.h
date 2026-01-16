@@ -2,6 +2,7 @@
 #include "lib.h"
 #include "r_types.h"
 #include "vk.h"
+#include "profiler.h"
 
 #define MaxLights KB(1)
 #define MaxEntities KB(4)
@@ -38,35 +39,34 @@ struct ShaderDefinition {
   ShaderType type;
 };
 
-enum {
-  Shader_Color,
+enum Shader_Name {
+  Shader_Color = 1,
   Shader_COUNT,
 };
 
-KAPI extern ShaderDefinition shaders_definition[Shader_COUNT];
-KAPI extern u32 shaders[Shader_COUNT];
+KAPI ShaderDefinition shaders_definition(u32 idx);
+KAPI u32& shaders(u32 idx);
 
 ////////////////////////////////////////////////////////////////////////
 // Meshes
 
 enum {
-  Mesh_Cube,
+  Mesh_Cube = 1,
   Mesh_Room,
   Mesh_COUNT,
 };
 
-KAPI extern String meshs_path[Mesh_COUNT];
-KAPI extern u32 meshes[ArrayCount(meshs_path)];
+KAPI String meshes_path(u32 idx);
+KAPI u32& meshes(u32 idx);
 
 ////////////////////////////////////////////////////////////////////////
 // Textures
 enum {
-  Texture_OrangeLines,
+  Texture_OrangeLines = 1,
   Texture_Container,
   Texture_Room,
   Texture_COUNT,
 };
 
-KAPI extern String textures_path[Texture_COUNT];
-KAPI extern u32 textures[Texture_COUNT];
-
+KAPI String textures_path(u32 idx);
+KAPI u32& textures(u32 idx);

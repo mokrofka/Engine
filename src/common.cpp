@@ -248,20 +248,46 @@ u32 texture_load(String name) {
 ////////////////////////////////////////////////////////////////////////
 // Resources
 
-ShaderDefinition shaders_definition[Shader_COUNT] = {
-  [Shader_Color] = "color_shader", ShaderType_Drawing,
+ShaderDefinition shaders_definition_[Shader_COUNT-1] = {
+  [Shader_Color-1] = "color_shader", ShaderType_Drawing,
 };
-u32 shaders[Shader_COUNT];
+ShaderDefinition shaders_definition(u32 idx) {
+  Assert(IsInsideBounds(1, idx, Shader_COUNT));
+  return shaders_definition_[idx-1];
+}
+u32 shaders_[Shader_COUNT-1];
+u32& shaders(u32 idx) { 
+  Assert(IsInsideBounds(1, idx, Shader_COUNT));
+  return shaders_[idx-1];
+}
 
-String meshs_path[Mesh_COUNT] = {
-  [Mesh_Cube] = "cube.obj",
+String meshes_path_[Mesh_COUNT-1] = {
+  [Mesh_Cube-1] = "cube.obj",
   // [Mesh_Room] = "room.obj",
 };
-u32 meshes[Mesh_COUNT];
+String meshes_path(u32 idx) {
+  Assert(IsInsideBounds(1, idx, Mesh_COUNT));
+  return meshes_path_[idx-1];
+}
+u32 meshes_[Mesh_COUNT-1];
+u32& meshes(u32 idx) {
+  Assert(IsInsideBounds(1, idx, Mesh_COUNT));
+  return meshes_[idx-1];
+}
 
-String textures_path[Texture_COUNT] = {
-  [Texture_OrangeLines] = "orange_lines_512.png",
-  [Texture_Container] = "container.jpg",
-  [Texture_Room] = "image.png",
+String textures_path_[Texture_COUNT-1] = {
+  [Texture_OrangeLines-1] = "orange_lines_512.png",
+  [Texture_Container-1] = "container.jpg",
+  [Texture_Room-1] = "image.png",
 };
-u32 textures[Texture_COUNT];
+String textures_path(u32 idx) { 
+  Assert(IsInsideBounds(1, idx, Texture_COUNT));
+  return textures_path_[idx-1];
+}
+u32 textures_[Texture_COUNT-1];
+u32& textures(u32 idx) {
+  Assert(IsInsideBounds(1, idx, Texture_COUNT));
+  return textures_[idx-1];
+}
+
+

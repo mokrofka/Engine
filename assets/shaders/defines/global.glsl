@@ -15,10 +15,6 @@
 struct Entity {
   mat4 model;
   v3 color;
-  // v3 ambient;
-  // v3 diffuse;
-  // v3 specular;
-  // f32 shininess;
 };
 
 struct PointLight {
@@ -43,6 +39,11 @@ struct SpotLight {
   f32 outer_cutoff; // Cosine of outer cone angle
 };
 
+struct Material {
+  v3 color;
+  u32 tex_id;
+};
+
 // Global state
 layout(std430, set = 0, binding = 0) readonly buffer Buffer {
   mat4 projection_view;
@@ -59,6 +60,8 @@ layout(std430, set = 0, binding = 0) readonly buffer Buffer {
   PointLight point_lights[KB(1)];
   DirLight dir_lights[KB(1)];
   SpotLight spot_lights[KB(1)];
+
+  Material materials[KB(1)];
 } st;
 
 layout(push_constant) uniform PushConstants {
