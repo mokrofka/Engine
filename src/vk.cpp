@@ -147,7 +147,7 @@ struct VK_State {
   VkCommandBuffer* cmds;
   VkCommandBuffer* compute_cmds;
 
-  IdPool entity_handlers;
+  // IdPool entity_handlers;
   ShaderEntity* entities_data;
 
   Array<u32, MaxEntities> entities_to_shader;
@@ -1683,7 +1683,10 @@ void vk_draw() {
       u32 mesh_id = vk.entities_to_mesh[id];
       VK_Mesh mesh = vk.meshes[mesh_id];
       PushConstant* push = &vk.push_constants[id];
-      vk_update_transform(id, entities_transforms[id]);
+      // ShaderEntity* e_data = 
+      // vk_update_transform(id, entities_transforms[id]);
+      ShaderEntity& e = vk_get_entity(id);
+      e.model = mat4_transform(entities_transforms[id]);
 
       vkCmdPushConstants(cmd, shader.pipeline.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstant), push);
       vkCmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, &mesh.vert_offset);
@@ -2561,14 +2564,14 @@ void vk_end_renderpass(u32 renderpass_id) {
 
 void vk_update_transform(u32 entity_id, Transform trans) {
   PushConstant& push = vk_get_push_constant(entity_id);
-  push.model = mat4_transform(trans.pos, trans.rot, trans.scale);
+  // push.model = mat4_transform(trans.pos, trans.rot, trans.scale);
 }
 
 ////////////////////////////////////////////////////////////////////////
 // Entity
 
-u32 vk_make_renderable(u32 mesh_id, u32 shader_id, u32 texture_id) {
-  u32 entity_id = id_pool_alloc(vk.entity_handlers);
+u32 vk_make_renderable(u32 entity_id, u32 mesh_id, u32 shader_id, u32 texture_id) {
+  // u32 entity_id = id_pool_alloc(vk.entity_handlers);
 
   VK_Shader& shader = vk.shaders[shader_id];
   shader.entities.append(entity_id);

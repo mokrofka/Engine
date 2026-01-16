@@ -8,12 +8,13 @@ enum {
 };
 
 struct PushConstant {
-  mat4 model;
+  // mat4 model;
   u32 entity_index;
   u32 texture_id;
 };
 
 struct ShaderEntity {
+  alignas(16) mat4 model;
   alignas(16) v3 color;
   // alignas(16) v3 ambient;
   // alignas(16) v3 diffuse;

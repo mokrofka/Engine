@@ -13,6 +13,7 @@
 #define v4 vec4
 
 struct Entity {
+  mat4 model;
   v3 color;
   // v3 ambient;
   // v3 diffuse;
@@ -61,7 +62,7 @@ layout(std430, set = 0, binding = 0) readonly buffer Buffer {
 } st;
 
 layout(push_constant) uniform PushConstants {
-  mat4 model;
+  // mat4 model;
   u32 id;
   u32 tex_id;
 } push;

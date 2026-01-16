@@ -687,7 +687,7 @@ Entity& entity_create(u32 mesh, u32 shader, u32 texture) {
     .id = id_pool_alloc(st->id_pool),
     // .pos = {},
     // .scale = v3_one(),
-    .r_handle = vk_make_renderable(mesh, shader, texture),
+    .r_handle = vk_make_renderable(e.id, mesh, shader, texture),
   };
   e.pos() = v3_zero();
   e.scale() = v3_one();
