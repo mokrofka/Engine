@@ -624,7 +624,7 @@ struct GameState {
   AllocSegList gpa;
   IdPool id_pool;
   Darray<Entity> entities;
-  Camera camera;
+  Camera cam;
 };
 
 GameState* st;
@@ -634,7 +634,7 @@ GameState* st;
 
 void gpu_data_update() {
   ShaderGlobalState& shader_st = *vk_get_shader_state();
-  Camera& cam = st->camera;
+  Camera& cam = st->cam;
   shader_st.projection_view = cam.projection * cam.view;
   shader_st.projection = cam.projection;
   shader_st.view = cam.view;
@@ -683,7 +683,7 @@ Entity& entity_create(u32 mesh, u32 shader, u32 texture) {
 // Camera
 
 void camera_update() {
-  Camera& cam = st->camera;
+  Camera& cam = st->cam;
   v2 win_size = v2_of_v2i(os_get_window_size());
   cam.projection = mat4_perspective(degtorad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
 
@@ -759,6 +759,42 @@ void camera_update() {
 ////////////////////////////////////////////////////////////////////////
 // Init
 
+void new_init() {
+
+}
+
+void game_init() {
+  Camera& cam = st->cam;
+  cam = {
+    .pos = v3(0,0,-5),
+    .dir = v3(0,0,1),
+    .yaw = 90,
+    .fov = 45,
+  };
+  cam.view = mat4_look_at(cam.pos, cam.dir, v3_up());
+  Entity& cube = entity_create(meshes(Mesh_Cube), shaders(Shader_Color), textures(Texture_OrangeLines));
+  Entity& cube1 = entity_create(meshes(Mesh_Cube), shaders(Shader_Color), textures(Texture_Container));
+  cube1.pos() = {-3,0,1};
+  {
+    Mesh triangle = {
+      .vertices = triangle_vertices,
+      .vert_count = ArrayCount(triangle_vertices),
+    };
+    u32 mesh = vk_mesh_load(triangle);
+    Entity& e = entity_create(mesh, shaders(Shader_Color), textures(Texture_Container));
+    e.pos().x = 3;
+  }
+  // Entity& room = entity_create(meshes[Mesh_Room], shaders[Shader_Color], textures[Texture_Room]);
+  // room.pos = {0,0,10};
+}
+
+void game_deinit() {
+  for (Entity e : st->entities) {
+    vk_remove_renderable(e.id);
+  }
+  st->entities.clear();
+}
+
 void app_init(u8** state) {
   Scratch scratch;
   Assign(*state, global_alloc_struct_zero(GameState));
@@ -767,11 +803,6 @@ void app_init(u8** state) {
   st->arena = arena_init();
   st->gpa.init(st->arena);
   st->id_pool.array.init(st->gpa);
-  st->camera = {
-    .pos = v3(0,0,-5),
-    .yaw = 90,
-    .fov = 45,
-  };
 
   for (i32 i = 1; i < Shader_COUNT; ++i) {
     shaders(i) = shader_load(shaders_definition(i).path, shaders_definition(i).type);
@@ -783,20 +814,7 @@ void app_init(u8** state) {
     textures(i) = texture_load(textures_path(i));
   }
 
-  {
-    Mesh triangle = {
-      .vertices = triangle_vertices,
-      .vert_count = ArrayCount(triangle_vertices),
-    };
-    u32 mesh = vk_mesh_load(triangle);
-    Entity& e = entity_create(mesh, shaders(Shader_Color), textures(Texture_Container));
-    e.pos().x = 3;
-  }
-  Entity& cube = entity_create(meshes(Mesh_Cube), shaders(Shader_Color), textures(Texture_OrangeLines));
-  Entity& cube1 = entity_create(meshes(Mesh_Cube), shaders(Shader_Color), textures(Texture_Container));
-  cube1.pos() = {-3,0,1};
-  // Entity& room = entity_create(meshes[Mesh_Room], shaders[Shader_Color], textures[Texture_Room]);
-  // room.pos = {0,0,10};
+  game_init();
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -809,14 +827,18 @@ shared_function void app_update(u8** state) {
     app_init(state);
   }
   Assign(st, *state);
+  if (os_is_key_down(Key_R)) {
+    game_deinit();
+    game_init();
+  }
   if (os_is_key_down(Key_Escape)) {
     os_close_window();
   }
   if (os_is_key_pressed(Key_1)) {
-    st->camera.fov += 5;
+    st->cam.fov += 5;
   }
   if (os_is_key_pressed(Key_2)) {
-    st->camera.fov -= 5;
+    st->cam.fov -= 5;
   }
 
   // Local(Timer, timer, timer_init(1));
@@ -825,12 +847,16 @@ shared_function void app_update(u8** state) {
   //   Entity& cube1 = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_Container]);
   //   cube1.pos = v3_rand_range(v3(-10), v3(10));
   // }
+
   Local(Timer, timer, timer_init(0.3));
   if (timer_tick(timer, delta_time)) {
-    Info("cam yaw: %f", Mod(st->camera.yaw, 360));
-    Info("block x: %f", st->entities[0].pos().x);
-    v3 pos = st->camera.pos;
+    Info("cam yaw: %f", Mod(st->cam.yaw, 360));
+    // Info("block x: %f", st->entities[0].pos().x);
+    v3 pos = st->cam.pos;
     Info("cam pos: %f %f %f", pos.x,pos.y,pos.z);
+  }
+  for (Entity& e : st->entities) {
+    e.pos().x -= delta_time * 0.5;
   }
 
   camera_update();

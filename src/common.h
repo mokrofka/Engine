@@ -61,6 +61,7 @@ KAPI u32& meshes(u32 idx);
 
 ////////////////////////////////////////////////////////////////////////
 // Textures
+
 enum {
   Texture_OrangeLines = 1,
   Texture_Container,
@@ -70,3 +71,4 @@ enum {
 
 KAPI String textures_path(u32 idx);
 KAPI u32& textures(u32 idx);
+

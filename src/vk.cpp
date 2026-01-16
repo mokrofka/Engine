@@ -147,7 +147,6 @@ struct VK_State {
   VkCommandBuffer* cmds;
   VkCommandBuffer* compute_cmds;
 
-  // IdPool entity_handlers;
   ShaderEntity* entities_data;
 
   Array<u32, MaxEntities> entities_to_shader;
@@ -2571,8 +2570,6 @@ void vk_update_transform(u32 entity_id, Transform trans) {
 // Entity
 
 u32 vk_make_renderable(u32 entity_id, u32 mesh_id, u32 shader_id, u32 texture_id) {
-  // u32 entity_id = id_pool_alloc(vk.entity_handlers);
-
   VK_Shader& shader = vk.shaders[shader_id];
   shader.entities.append(entity_id);
 
@@ -2588,10 +2585,9 @@ u32 vk_make_renderable(u32 entity_id, u32 mesh_id, u32 shader_id, u32 texture_id
 }
 
 void vk_remove_renderable(u32 entity_id) {
-  // u32 shader_id = vk.entities_to_shader[entity_id];
-  // VK_Shader& shader = vk.shaders[shader_id];
-  // remove(shader.entities, entity_id);
-  // vk.push_constants.remove(entity_id);
+  u32 shader_id = vk.entities_to_shader[entity_id];
+  VK_Shader& shader = vk.shaders[shader_id];
+  shader.entities.remove(entity_id);
 }
 
 ShaderEntity& vk_get_entity(u32 entity_id) {
