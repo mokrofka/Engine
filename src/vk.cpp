@@ -113,6 +113,7 @@ struct VK_SyncObj {
 struct VK_State {
   Arena arena;
   
+  OS_Handle lib;
   VkAllocationCallbacks* allocator;
   VkAllocationCallbacks _allocator;
   VkInstance instance;
@@ -169,6 +170,121 @@ struct VK_State {
   // offscreen rendering
   VK_Texture* texture_targets;
   VK_Image offscreen_depth_buffer;
+
+  #define VK_DECL(name) Glue(PFN_, vk##name) name
+
+  #define VK_FUNCTION(name) vk.name = (Glue(PFN_, vk##name))os_lib_get_proc(vk.lib, Stringify(vk##name))
+  #define VK_INSTANCE_FUNCTION(name) vk.name = (Glue(PFN_, vk##name))vk.GetInstanceProcAddr(vk.instance, Stringify(vk##name))
+  #define VK_DEVICE_FUNCTION(name) vk.name = (Glue(PFN_, vk##name))vk.GetDeviceProcAddr(vkdevice, Stringify(vk##name))
+
+  // Core functions
+  VK_DECL(GetInstanceProcAddr);
+
+  // Instance functions
+  VK_DECL(EnumerateInstanceExtensionProperties);
+  VK_DECL(EnumerateInstanceVersion);
+  VK_DECL(EnumerateInstanceLayerProperties);
+  VK_DECL(CreateInstance);
+  VK_DECL(DestroyInstance);
+  VK_DECL(EnumeratePhysicalDevices);
+  VK_DECL(GetDeviceProcAddr);
+  VK_DECL(GetPhysicalDeviceProperties);
+  VK_DECL(GetPhysicalDeviceFeatures);
+  VK_DECL(GetPhysicalDeviceMemoryProperties);
+  VK_DECL(GetPhysicalDeviceQueueFamilyProperties);
+  VK_DECL(GetPhysicalDeviceFormatProperties);
+  VK_DECL(GetPhysicalDeviceSurfaceFormatsKHR);
+  VK_DECL(GetPhysicalDeviceSurfaceCapabilitiesKHR);
+  VK_DECL(GetPhysicalDeviceSurfacePresentModesKHR);
+  VK_DECL(GetPhysicalDeviceSurfaceSupportKHR);
+  VK_DECL(EnumerateDeviceExtensionProperties);
+  VK_DECL(CreateDevice);
+  VK_DECL(DestroySurfaceKHR);
+
+  // Device functions.
+  VK_DECL(GetDeviceQueue);
+  VK_DECL(DeviceWaitIdle);
+  VK_DECL(CreateCommandPool);
+  VK_DECL(DestroyCommandPool);
+  VK_DECL(DestroyDevice);
+  VK_DECL(CreateSwapchainKHR);
+  VK_DECL(DestroySwapchainKHR);
+  VK_DECL(GetSwapchainImagesKHR);
+  VK_DECL(CreateImage);
+  VK_DECL(CreateImageView);
+  VK_DECL(DestroyImage);
+  VK_DECL(DestroyImageView);
+  VK_DECL(GetImageMemoryRequirements);
+  VK_DECL(AllocateMemory);
+  VK_DECL(FreeMemory);
+  VK_DECL(AllocateCommandBuffers);
+  VK_DECL(FreeCommandBuffers);
+  VK_DECL(BeginCommandBuffer);
+  VK_DECL(EndCommandBuffer);
+  VK_DECL(BindImageMemory);
+  VK_DECL(CreateSemaphore);
+  VK_DECL(DestroySemaphore);
+  VK_DECL(CreateFence);
+  VK_DECL(DestroyFence);
+  VK_DECL(WaitForFences);
+  VK_DECL(AcquireNextImageKHR);
+  VK_DECL(ResetFences);
+  VK_DECL(CreateDescriptorSetLayout);
+  VK_DECL(DestroyDescriptorSetLayout);
+  VK_DECL(CreateDescriptorPool);
+  VK_DECL(DestroyDescriptorPool);
+  VK_DECL(CreateShaderModule);
+  VK_DECL(DestroyShaderModule);
+  VK_DECL(CreateSampler);
+  VK_DECL(DestroySampler);
+  VK_DECL(CreateBuffer);
+  VK_DECL(DestroyBuffer);
+  VK_DECL(GetBufferMemoryRequirements);
+  VK_DECL(BindBufferMemory);
+  VK_DECL(MapMemory);
+  VK_DECL(UnmapMemory);
+  VK_DECL(FlushMappedMemoryRanges);
+  VK_DECL(CreatePipelineLayout);
+  VK_DECL(DestroyPipelineLayout);
+  VK_DECL(CreateGraphicsPipelines);
+  VK_DECL(DestroyPipeline);
+  VK_DECL(AllocateDescriptorSets);
+  VK_DECL(FreeDescriptorSets);
+  VK_DECL(UpdateDescriptorSets);
+
+  VK_DECL(CmdBindPipeline);
+  VK_DECL(CmdPipelineBarrier);
+  VK_DECL(CmdBlitImage);
+  VK_DECL(CmdCopyBuffer);
+  VK_DECL(CmdCopyBufferToImage);
+  VK_DECL(CmdCopyImageToBuffer);
+  VK_DECL(CmdExecuteCommands);
+  VK_DECL(CmdSetViewport);
+  VK_DECL(CmdSetScissor);
+  VK_DECL(CmdSetFrontFace);
+  VK_DECL(CmdSetCullMode);
+  VK_DECL(CmdSetStencilTestEnable);
+  VK_DECL(CmdSetDepthTestEnable);
+  VK_DECL(CmdSetDepthWriteEnable);
+  VK_DECL(CmdSetStencilReference);
+  VK_DECL(CmdSetStencilOp);
+  VK_DECL(CmdBeginRendering);
+  VK_DECL(CmdEndRendering);
+  VK_DECL(CmdSetStencilCompareMask);
+  VK_DECL(CmdSetStencilWriteMask);
+  VK_DECL(CmdClearColorImage);
+  VK_DECL(CmdClearDepthStencilImage);
+  VK_DECL(CmdSetPrimitiveTopology);
+  VK_DECL(CmdPushConstants);
+  VK_DECL(CmdBindVertexBuffers);
+  VK_DECL(CmdBindIndexBuffer);
+  VK_DECL(CmdDraw);
+  VK_DECL(CmdDrawIndexed);
+  VK_DECL(CmdBindDescriptorSets);
+
+  VK_DECL(QueueSubmit);
+  VK_DECL(QueueWaitIdle);
+  VK_DECL(QueuePresentKHR);
 };
 
 #define ParticleCount KB(40)
@@ -224,10 +340,11 @@ VK_State vk;
       } vk_surface; 
       os_get_gfx_api_handlers(&vk_surface);
       VkXcbSurfaceCreateInfoKHR surfaceInfo = {
-          .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
-          .connection = vk_surface.connection,
-          .window = vk_surface.window,
+        .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
+        .connection = vk_surface.connection,
+        .window = vk_surface.window,
       };
+      PFN_vkCreateXcbSurfaceKHR vkCreateXcbSurfaceKHR = (PFN_vkCreateXcbSurfaceKHR)vk.GetInstanceProcAddr(vk.instance, "vkCreateXcbSurfaceKHR");
       VK_CHECK(vkCreateXcbSurfaceKHR(vk.instance, &surfaceInfo, vk.allocator, &vk.surface));
       Info("Vulkan XCB surface created");
     }
@@ -371,12 +488,12 @@ intern VkCommandBuffer vk_cmd_alloc(VkCommandPool pool) {
   };
 
   VkCommandBuffer cmd;
-  VK_CHECK(vkAllocateCommandBuffers(vkdevice, &allocate_info, &cmd));
+  VK_CHECK(vk.AllocateCommandBuffers(vkdevice, &allocate_info, &cmd));
   return cmd;
 }
 
 intern void vk_cmd_free(VkCommandPool pool, VkCommandBuffer cmd) {
-  vkFreeCommandBuffers(vkdevice, pool, 1, &cmd);
+  vk.FreeCommandBuffers(vkdevice, pool, 1, &cmd);
 }
 
 intern void vk_cmd_begin(VkCommandBuffer cmd) {
@@ -384,11 +501,11 @@ intern void vk_cmd_begin(VkCommandBuffer cmd) {
     .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
     .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
   };
-  VK_CHECK(vkBeginCommandBuffer(cmd, &begin_info));
+  VK_CHECK(vk.BeginCommandBuffer(cmd, &begin_info));
 }
 
 intern void vk_cmd_end(VkCommandBuffer cmd) {
-  VK_CHECK(vkEndCommandBuffer(cmd));
+  VK_CHECK(vk.EndCommandBuffer(cmd));
 }
 
 intern VkCommandBuffer vk_cmd_alloc_and_begin_single_use() {
@@ -405,8 +522,8 @@ intern void vk_cmd_end_single_use(VkCommandBuffer cmd) {
     .commandBufferCount = 1,
     .pCommandBuffers = &cmd,
   };
-  VK_CHECK(vkQueueSubmit(vk.device.graphics_queue, 1, &submit_info, 0));
-  VK_CHECK(vkQueueWaitIdle(vk.device.graphics_queue));
+  VK_CHECK(vk.QueueSubmit(vk.device.graphics_queue, 1, &submit_info, 0));
+  VK_CHECK(vk.QueueWaitIdle(vk.device.graphics_queue));
   
   vk_cmd_free(vk.device.transient_cmd_pool, cmd);
 }
@@ -429,10 +546,10 @@ intern VK_Buffer vk_buffer_create(u64 size, u32 usage, u32 memory_property_flags
     .memory_property_flags = memory_property_flags,
   };
   
-  VK_CHECK(vkCreateBuffer(vkdevice, &buffer_create_info, vk.allocator, &buffer.handle));
+  VK_CHECK(vk.CreateBuffer(vkdevice, &buffer_create_info, vk.allocator, &buffer.handle));
 
   VkMemoryRequirements requirements;
-  vkGetBufferMemoryRequirements(vkdevice, buffer.handle, &requirements);
+  vk.GetBufferMemoryRequirements(vkdevice, buffer.handle, &requirements);
   buffer.memory_index = vk_find_memory_index(requirements.memoryTypeBits, buffer.memory_property_flags);
   
   VkMemoryAllocateInfo allocate_info = {
@@ -441,24 +558,24 @@ intern VK_Buffer vk_buffer_create(u64 size, u32 usage, u32 memory_property_flags
     .memoryTypeIndex = buffer.memory_index,
   };
   
-  VK_CHECK(vkAllocateMemory(vkdevice, &allocate_info, vk.allocator, &buffer.memory));
-  VK_CHECK(vkBindBufferMemory(vkdevice, buffer.handle, buffer.memory, 0));
+  VK_CHECK(vk.AllocateMemory(vkdevice, &allocate_info, vk.allocator, &buffer.memory));
+  VK_CHECK(vk.BindBufferMemory(vkdevice, buffer.handle, buffer.memory, 0));
   
   return buffer;
 }
 
 intern void vk_buffer_destroy(VK_Buffer buffer) {
   Assert(buffer.memory && buffer.handle);
-  vkFreeMemory(vkdevice, buffer.memory, vk.allocator);
-  vkDestroyBuffer(vkdevice, buffer.handle, vk.allocator);
+  vk.FreeMemory(vkdevice, buffer.memory, vk.allocator);
+  vk.DestroyBuffer(vkdevice, buffer.handle, vk.allocator);
 }
 
 intern void vk_buffer_map_memory(VK_Buffer& buffer, u64 offset, u64 size) {
-  VK_CHECK(vkMapMemory(vkdevice, buffer.memory, offset, size, 0, (void**)&buffer.maped_memory));
+  VK_CHECK(vk.MapMemory(vkdevice, buffer.memory, offset, size, 0, (void**)&buffer.maped_memory));
 }
 
 intern void vk_buffer_unmap_memory(VK_Buffer buffer) {
-  vkUnmapMemory(vkdevice, buffer.memory);
+  vk.UnmapMemory(vkdevice, buffer.memory);
 }
 
 intern void vk_buffer_upload_to_gpu(VK_Buffer buffer, Range range, void* data) {
@@ -472,7 +589,7 @@ intern void vk_buffer_upload_to_gpu(VK_Buffer buffer, Range range, void* data) {
     .size = range.size,
   };
   
-  vkCmdCopyBuffer(temp_cmd, vk.stage_buffer.handle, buffer.handle, 1, &copy_region);
+  vk.CmdCopyBuffer(temp_cmd, vk.stage_buffer.handle, buffer.handle, 1, &copy_region);
   
   vk_cmd_end_single_use(temp_cmd);
 }
@@ -667,7 +784,7 @@ intern VK_Pipeline vk_shader_pipeline_create(ShaderInfo shader_info, Array<VkPip
   };
   
   VK_Pipeline result = {};
-  VK_CHECK(vkCreatePipelineLayout(vkdevice, &pipeline_layout_create_info, vk.allocator, &result.pipeline_layout));
+  VK_CHECK(vk.CreatePipelineLayout(vkdevice, &pipeline_layout_create_info, vk.allocator, &result.pipeline_layout));
 
   // Pipeline create
   VkGraphicsPipelineCreateInfo pipeline_create_info = {
@@ -690,7 +807,7 @@ intern VK_Pipeline vk_shader_pipeline_create(ShaderInfo shader_info, Array<VkPip
     .basePipelineIndex = -1,
   };
 
-  VK_CHECK(vkCreateGraphicsPipelines(vkdevice, VK_NULL_HANDLE, 1, &pipeline_create_info, vk.allocator, &result.handle));
+  VK_CHECK(vk.CreateGraphicsPipelines(vkdevice, VK_NULL_HANDLE, 1, &pipeline_create_info, vk.allocator, &result.handle));
 
   return result;
 }
@@ -712,7 +829,7 @@ intern Array<VkPipelineShaderStageCreateInfo, 2> vk_shader_module_create(String 
       .pCode = (u32*)binary.data,
     };
     VkShaderModule handle;
-    VK_CHECK(vkCreateShaderModule(vkdevice, &module_create_info, vk.allocator, &handle));
+    VK_CHECK(vk.CreateShaderModule(vkdevice, &module_create_info, vk.allocator, &handle));
     stages[i] = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       .stage = stage_types[i],
@@ -761,19 +878,19 @@ u32 vk_shader_load(String name, ShaderType type) {
 void vk_shader_reload(String name, u32 id) {
   if (id >= 100) {
     VK_Shader& shader = vk.screen_shader;
-    vkDeviceWaitIdle(vkdevice);
-    vkDestroyPipeline(vkdevice, shader.pipeline.handle, vk.allocator);
+    vk.DeviceWaitIdle(vkdevice);
+    vk.DestroyPipeline(vkdevice, shader.pipeline.handle, vk.allocator);
     Loop (i, 2) {
-      vkDestroyShaderModule(vkdevice, shader.stages[i].module, vk.allocator);
+      vk.DestroyShaderModule(vkdevice, shader.stages[i].module, vk.allocator);
     }
     shader.stages = vk_shader_module_create(name);
     shader.pipeline = vk_shader_pipeline_create(shader_type[shader.type], shader.stages);
   } else {
     VK_Shader& shader = vk.shaders[id];
-    vkDeviceWaitIdle(vkdevice);
-    vkDestroyPipeline(vkdevice, shader.pipeline.handle, vk.allocator);
+    vk.DeviceWaitIdle(vkdevice);
+    vk.DestroyPipeline(vkdevice, shader.pipeline.handle, vk.allocator);
     Loop (i, 2) {
-      vkDestroyShaderModule(vkdevice, shader.stages[i].module, vk.allocator);
+      vk.DestroyShaderModule(vkdevice, shader.stages[i].module, vk.allocator);
     }
     shader.stages = vk_shader_module_create(name);
     shader.pipeline = vk_shader_pipeline_create(shader_type[shader.type], shader.stages);
@@ -799,7 +916,7 @@ intern void vk_shader_init() {
       .poolSizeCount = ArrayCount(pool_sizes),
       .pPoolSizes = pool_sizes,
     };
-    vkCreateDescriptorPool(vkdevice, &pool_info, vk.allocator, &vk.descriptor_pool);
+    vk.CreateDescriptorPool(vkdevice, &pool_info, vk.allocator, &vk.descriptor_pool);
   }
 
   // Setlayout
@@ -835,7 +952,7 @@ intern void vk_shader_init() {
       .bindingCount = ArrayCount(layout_bindings),
       .pBindings = layout_bindings,
     };
-    VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &layout_info, vk.allocator, &vk.descriptor_set_layout));
+    VK_CHECK(vk.CreateDescriptorSetLayout(vkdevice, &layout_info, vk.allocator, &vk.descriptor_set_layout));
   }
 
   // Descriptor
@@ -846,7 +963,7 @@ intern void vk_shader_init() {
       .descriptorSetCount = 1,
       .pSetLayouts = &vk.descriptor_set_layout,
     };
-    VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, &vk.descriptor_sets));
+    VK_CHECK(vk.AllocateDescriptorSets(vkdevice, &alloc_info, &vk.descriptor_sets));
   }
 
   // Mem for shaders
@@ -875,7 +992,7 @@ intern VkImageView vk_image_view_create(VkFormat format, VkImage image, VkImageA
   };
 
   VkImageView result;
-  VK_CHECK(vkCreateImageView(vkdevice, &view_create_info, vk.allocator, &result));
+  VK_CHECK(vk.CreateImageView(vkdevice, &view_create_info, vk.allocator, &result));
   return result;
 }
 
@@ -905,10 +1022,10 @@ intern VK_Image vk_image_create(
   };
 
   VkImage handle;
-  VK_CHECK(vkCreateImage(vkdevice, &image_create_info, vk.allocator, &handle));
+  VK_CHECK(vk.CreateImage(vkdevice, &image_create_info, vk.allocator, &handle));
 
   VkMemoryRequirements memory_requirements;
-  vkGetImageMemoryRequirements(vkdevice, handle, &memory_requirements);
+  vk.GetImageMemoryRequirements(vkdevice, handle, &memory_requirements);
   u32 memory_type = vk_find_memory_index(memory_requirements.memoryTypeBits, memory_flags);
   VkMemoryAllocateInfo memory_allocate_info = {
     .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
@@ -917,8 +1034,8 @@ intern VK_Image vk_image_create(
   };
 
   VkDeviceMemory memory;
-  VK_CHECK(vkAllocateMemory(vkdevice, &memory_allocate_info, vk.allocator, &memory));
-  VK_CHECK(vkBindImageMemory(vkdevice, handle, memory, 0));
+  VK_CHECK(vk.AllocateMemory(vkdevice, &memory_allocate_info, vk.allocator, &memory));
+  VK_CHECK(vk.BindImageMemory(vkdevice, handle, memory, 0));
 
   VkImageView view = 0;
   if (create_view) {
@@ -938,13 +1055,13 @@ intern VK_Image vk_image_create(
 
 intern void vk_image_destroy(VK_Image image) {
   if (image.view) {
-    vkDestroyImageView(vkdevice, image.view, vk.allocator);
+    vk.DestroyImageView(vkdevice, image.view, vk.allocator);
   }
   if (image.memory) {
-    vkFreeMemory(vkdevice, image.memory, vk.allocator);
+    vk.FreeMemory(vkdevice, image.memory, vk.allocator);
   }
   if (image.handle) {
-    vkDestroyImage(vkdevice, image.handle, vk.allocator);
+    vk.DestroyImage(vkdevice, image.handle, vk.allocator);
   }
 }
 
@@ -985,7 +1102,7 @@ intern void vk_image_transition_layout(VkCommandBuffer cmd, VK_Image image, VkIm
     return;
   }
 
-  vkCmdPipelineBarrier(
+  vk.CmdPipelineBarrier(
     cmd,
     source_stage, dest_stage,
     NoFlags,
@@ -1008,7 +1125,7 @@ intern void vk_image_upload_to_gpu(VkCommandBuffer cmd, VK_Image image) {
     .imageExtent = { image.width, image.height, 1 },
   };
   
-  vkCmdCopyBufferToImage(
+  vk.CmdCopyBufferToImage(
     cmd,
     vk.stage_buffer.handle, 
     image.handle, 
@@ -1065,7 +1182,7 @@ u32 vk_texture_load(Texture t) {
     .unnormalizedCoordinates = VK_FALSE,
   };
   
-  VK_CHECK(vkCreateSampler(vkdevice, &sampler_info, vk.allocator, &texture.sampler));
+  VK_CHECK(vk.CreateSampler(vkdevice, &sampler_info, vk.allocator, &texture.sampler));
 
   VkDescriptorImageInfo image_info = {
     .sampler = texture.sampler,
@@ -1083,14 +1200,14 @@ u32 vk_texture_load(Texture t) {
   };
 
   VkWriteDescriptorSet descriptors[] = {texture_descriptor};
-  vkUpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
+  vk.UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
   u32 id = vk.texture.count;
   vk.texture.append(texture);
   return id;
 }
 
 intern void vk_resize_texture_target() {
-  VK_CHECK(vkDeviceWaitIdle(vkdevice));
+  VK_CHECK(vk.DeviceWaitIdle(vkdevice));
   Debug("texture target resized: x = %u y = %u", vk.width, vk.height);
   Loop (i, vk.images_in_flight) {
     vk_image_destroy(vk.texture_targets[i].image);
@@ -1141,17 +1258,17 @@ intern VK_SwapchainSupportInfo vk_device_query_swapchain_support(VkPhysicalDevic
   VK_SwapchainSupportInfo support_info = {};
 
   // Surface capabilities
-  VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, vk.surface, &support_info.capabilities));
+  VK_CHECK(vk.GetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, vk.surface, &support_info.capabilities));
 
   // Surface formats
-  VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, vk.surface, &support_info.format_count, null));
+  VK_CHECK(vk.GetPhysicalDeviceSurfaceFormatsKHR(physical_device, vk.surface, &support_info.format_count, null));
   support_info.formats = push_array(vk.arena, VkSurfaceFormatKHR, support_info.format_count);
-  VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, vk.surface, &support_info.format_count, support_info.formats));
+  VK_CHECK(vk.GetPhysicalDeviceSurfaceFormatsKHR(physical_device, vk.surface, &support_info.format_count, support_info.formats));
   
   // Present modes
-  VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, vk.surface, &support_info.present_mode_count, null));
+  VK_CHECK(vk.GetPhysicalDeviceSurfacePresentModesKHR(physical_device, vk.surface, &support_info.present_mode_count, null));
   support_info.present_modes = push_array(vk.arena, VkPresentModeKHR, support_info.present_mode_count);
-  VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, vk.surface, &support_info.present_mode_count, support_info.present_modes));
+  VK_CHECK(vk.GetPhysicalDeviceSurfacePresentModesKHR(physical_device, vk.surface, &support_info.present_mode_count, support_info.present_modes));
   return support_info;
 }
 
@@ -1172,9 +1289,9 @@ intern VK_DevicePhysicalQueueFamilyInfo vk_device_physical_meets_requirements(
   };
   
   u32 queue_family_count = 0;
-  vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, null);
+  vk.GetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, null);
   VkQueueFamilyProperties* queue_families = push_array(scratch, VkQueueFamilyProperties, queue_family_count);
-  vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, queue_families);
+  vk.GetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, queue_families);
   
   // Look at each queue and see what queues it supports
   Info("Graphics | Present | Computer | Transfer | Name");
@@ -1197,7 +1314,7 @@ intern VK_DevicePhysicalQueueFamilyInfo vk_device_physical_meets_requirements(
     }
     // Present queue?
     VkBool32 supports_present;
-    VK_CHECK(vkGetPhysicalDeviceSurfaceSupportKHR(device, i, vk.surface, &supports_present));
+    VK_CHECK(vk.GetPhysicalDeviceSurfaceSupportKHR(device, i, vk.surface, &supports_present));
     if (supports_present && queue_info.present_family_index == -1) {
       queue_info.present_family_index = i;
     }
@@ -1244,10 +1361,10 @@ intern VK_DevicePhysicalQueueFamilyInfo vk_device_physical_meets_requirements(
   if (requirements.device_extension_names.count) {
     u32 available_extension_count = 0;
     VkExtensionProperties* available_extensions = 0;
-    VK_CHECK(vkEnumerateDeviceExtensionProperties(device, null, &available_extension_count, null));
+    VK_CHECK(vk.EnumerateDeviceExtensionProperties(device, null, &available_extension_count, null));
     if (available_extension_count != 0) {
       available_extensions = push_array(scratch, VkExtensionProperties, available_extension_count);
-      VK_CHECK(vkEnumerateDeviceExtensionProperties(device, null, &available_extension_count, available_extensions));
+      VK_CHECK(vk.EnumerateDeviceExtensionProperties(device, null, &available_extension_count, available_extensions));
     }
     Loop(i, requirements.device_extension_names.count) {
       b32 found = false;
@@ -1270,24 +1387,24 @@ intern VK_Device vk_device_select_physical() {
   Scratch scratch;
 
   u32 physical_device_count;
-  VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &physical_device_count, null));
+  VK_CHECK(vk.EnumeratePhysicalDevices(vk.instance, &physical_device_count, null));
   VK_Device* devices = push_array(scratch, VK_Device, physical_device_count);
 
   VkPhysicalDevice* physical_devices = push_array(scratch, VkPhysicalDevice, physical_device_count);
-  VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &physical_device_count, physical_devices));
+  VK_CHECK(vk.EnumeratePhysicalDevices(vk.instance, &physical_device_count, physical_devices));
 
   i32 discrete_gpu_index = -1;
   i32 fallback_gpu_index = -1;
 
   Loop (i, physical_device_count) {
     VkPhysicalDeviceProperties properties;
-    vkGetPhysicalDeviceProperties(physical_devices[i], &properties);
+    vk.GetPhysicalDeviceProperties(physical_devices[i], &properties);
     
     VkPhysicalDeviceFeatures features;
-    vkGetPhysicalDeviceFeatures(physical_devices[i], &features);
+    vk.GetPhysicalDeviceFeatures(physical_devices[i], &features);
     
     VkPhysicalDeviceMemoryProperties memory;
-    vkGetPhysicalDeviceMemoryProperties(physical_devices[i], &memory);
+    vk.GetPhysicalDeviceMemoryProperties(physical_devices[i], &memory);
     
     String extentions[] = {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
@@ -1438,7 +1555,7 @@ intern void vk_device_create() {
     .ppEnabledExtensionNames = extension_names,
     .pEnabledFeatures = &device_features,
   };
-  VK_CHECK(vkCreateDevice(vk.device.physical_device, &device_create_info, vk.allocator, &vk.device.logical_device));
+  VK_CHECK(vk.CreateDevice(vk.device.physical_device, &device_create_info, vk.allocator, &vk.device.logical_device));
   Info("Logical device created");
 }
 
@@ -1452,7 +1569,7 @@ intern void vk_device_detect_depth_format(VK_Device* device) {
   u32 flags = VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
   for (VkFormat x : candidates) {
     VkFormatProperties properties;
-    vkGetPhysicalDeviceFormatProperties(device->physical_device, x, &properties);
+    vk.GetPhysicalDeviceFormatProperties(device->physical_device, x, &properties);
     if (FlagHas(properties.optimalTilingFeatures, flags)) {
       device->depth_format = x;
       return;
@@ -1523,10 +1640,10 @@ intern void vk_swapchain_create(b32 reuse) {
     .oldSwapchain = reuse ? vk.old_swapchain.handle : null,
   };
 
-  VK_CHECK(vkCreateSwapchainKHR(vkdevice, &swapchain_create_info, vk.allocator, &vk.swapchain.handle));
+  VK_CHECK(vk.CreateSwapchainKHR(vkdevice, &swapchain_create_info, vk.allocator, &vk.swapchain.handle));
   
   u32 image_count = vk.images_in_flight;
-  VK_CHECK(vkGetSwapchainImagesKHR(vkdevice, vk.swapchain.handle, &image_count, vk.swapchain.images));
+  VK_CHECK(vk.GetSwapchainImagesKHR(vkdevice, vk.swapchain.handle, &image_count, vk.swapchain.images));
 
   Loop (i, image_count) {
     VkImageViewCreateInfo view_create_info = {
@@ -1542,7 +1659,7 @@ intern void vk_swapchain_create(b32 reuse) {
         .layerCount = 1,
       },
     };
-    VK_CHECK(vkCreateImageView(vkdevice, &view_create_info, vk.allocator, &vk.swapchain.views[i]));
+    VK_CHECK(vk.CreateImageView(vkdevice, &view_create_info, vk.allocator, &vk.swapchain.views[i]));
   }
 
   vk_device_detect_depth_format(&vk.device);
@@ -1560,14 +1677,14 @@ intern void vk_swapchain_create(b32 reuse) {
 }
 
 intern void vk_swapchain_destroy(VK_Swapchain swapchain) {
-  VK_CHECK(vkDeviceWaitIdle(vkdevice));
+  VK_CHECK(vk.DeviceWaitIdle(vkdevice));
   vk_image_destroy(swapchain.depth_attachment);
 
   Loop (i, vk.images_in_flight) {
-    vkDestroyImageView(vkdevice, swapchain.views[i], vk.allocator);
+    vk.DestroyImageView(vkdevice, swapchain.views[i], vk.allocator);
   }
 
-  vkDestroySwapchainKHR(vkdevice, swapchain.handle, vk.allocator);
+  vk.DestroySwapchainKHR(vkdevice, swapchain.handle, vk.allocator);
 }
 
 intern void vk_swapchain_recreate() {
@@ -1584,7 +1701,7 @@ intern void vk_swapchain_recreate() {
 
 intern u32 vk_swapchain_acquire_next_image_index(VkSemaphore image_available_semaphore) {
   u32 image_index;
-  VkResult result = vkAcquireNextImageKHR(vkdevice, vk.swapchain.handle, U64_MAX,
+  VkResult result = vk.AcquireNextImageKHR(vkdevice, vk.swapchain.handle, U64_MAX,
                                           image_available_semaphore, null, &image_index);
   if (result == VK_ERROR_OUT_OF_DATE_KHR) {
     AssertMsg(false, "vkAcquireNextImageKHR failed with: %s", vk_result_string(result));
@@ -1603,7 +1720,7 @@ intern void vk_swapchain_present(VkSemaphore render_complete_semaphore, u32 pres
   };
 
   // VK_CHECK(vkQueuePresentKHR(vk.device.graphics_queue, &present_info));
-  VkResult result = vkQueuePresentKHR(vk.device.graphics_queue, &present_info);
+  VkResult result = vk.QueuePresentKHR(vk.device.graphics_queue, &present_info);
   // Info("vkQueuePresentKHR failed with: %s", vk_result_string(result));
   // Assert(result == VK_SUCCESS);
   
@@ -1666,17 +1783,17 @@ void vk_draw_init() {
   };
   
   VkWriteDescriptorSet descriptors[] = {ubo_descriptor};
-  vkUpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
+  vk.UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
 }
 
 void vk_draw() {
   VkCommandBuffer cmd = vk_get_current_cmd();
 
   VK_Shader& shader = vk.shaders[0];
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader.pipeline.pipeline_layout, 0, 1, &vk.descriptor_sets, 0, null);
+  vk.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader.pipeline.pipeline_layout, 0, 1, &vk.descriptor_sets, 0, null);
 
   for (VK_Shader shader : vk.shaders) {
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader.pipeline.handle);
+    vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader.pipeline.handle);
 
     for (u32 id : shader.entities) {
       u32 mesh_id = vk.entities_to_mesh[id];
@@ -1687,14 +1804,14 @@ void vk_draw() {
       ShaderEntity& e = vk_get_entity(id);
       e.model = mat4_transform(entities_transforms[id]);
 
-      vkCmdPushConstants(cmd, shader.pipeline.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstant), push);
-      vkCmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, &mesh.vert_offset);
+      vk.CmdPushConstants(cmd, shader.pipeline.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstant), push);
+      vk.CmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, &mesh.vert_offset);
       
       if (mesh.index_count) {
-        vkCmdBindIndexBuffer(cmd, vk.index_buffer.handle, mesh.index_offset, VK_INDEX_TYPE_UINT32);
-        vkCmdDrawIndexed(cmd, mesh.index_count, 1, 0, 0, 0);
+        vk.CmdBindIndexBuffer(cmd, vk.index_buffer.handle, mesh.index_offset, VK_INDEX_TYPE_UINT32);
+        vk.CmdDrawIndexed(cmd, mesh.index_count, 1, 0, 0, 0);
       } else {
-        vkCmdDraw(cmd, mesh.vert_count, 1, 0, 0);
+        vk.CmdDraw(cmd, mesh.vert_count, 1, 0, 0);
       }
     }
   }
@@ -1708,8 +1825,8 @@ void vk_draw_screen() {
   VkPipeline pipeline = vk.screen_shader.pipeline.handle;
 
   // vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &vk.screen_descriptor_sets[vk.current_frame], 0, null);
-  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-  vkCmdDraw(cmd, 3, 1, 0, 0);
+  vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+  vk.CmdDraw(cmd, 3, 1, 0, 0);
 }
 
 // void vk_draw_compute() {
@@ -1769,9 +1886,118 @@ void vk_draw_screen() {
 //   vkUpdateDescriptorSets(vkdevice, ArrayCount(descriptor_writes), descriptor_writes, 0, null);
 // }
 
-#define FUNCTION(name) vk.name = (PFN_##name)os_lib_get_proc(vk.lib, #name)
-#define INSTANCE_FUNCTION(name) vk.name = (PFN_##name)vk.vkGetInstanceProcAddr(vk.instance, #name)
-#define DEVICE_FUNCTION(name) vk.name = (PFN_##name)vk.vkGetDeviceProcAddr(vkdevice, #name)
+void vk_loader_load_core() {
+  vk.lib = os_lib_open("libvulkan.so");
+  VK_FUNCTION(GetInstanceProcAddr);
+  VK_FUNCTION(EnumerateInstanceVersion);
+  VK_FUNCTION(EnumerateInstanceExtensionProperties);
+  VK_FUNCTION(EnumerateInstanceLayerProperties);
+  VK_FUNCTION(CreateInstance);
+}
+
+void vk_loader_load_instance() {
+  VK_INSTANCE_FUNCTION(GetDeviceProcAddr);
+  VK_INSTANCE_FUNCTION(DestroyInstance);
+  VK_INSTANCE_FUNCTION(EnumeratePhysicalDevices);
+  VK_INSTANCE_FUNCTION(GetPhysicalDeviceProperties);
+  VK_INSTANCE_FUNCTION(GetPhysicalDeviceFeatures);
+  VK_INSTANCE_FUNCTION(GetPhysicalDeviceMemoryProperties);
+  VK_INSTANCE_FUNCTION(GetPhysicalDeviceQueueFamilyProperties);
+  VK_INSTANCE_FUNCTION(GetPhysicalDeviceFormatProperties);
+  VK_INSTANCE_FUNCTION(GetPhysicalDeviceSurfaceCapabilitiesKHR);
+  VK_INSTANCE_FUNCTION(GetPhysicalDeviceSurfaceFormatsKHR);
+  VK_INSTANCE_FUNCTION(GetPhysicalDeviceSurfacePresentModesKHR);
+  VK_INSTANCE_FUNCTION(GetPhysicalDeviceSurfaceSupportKHR);
+  VK_INSTANCE_FUNCTION(EnumerateDeviceExtensionProperties);
+  VK_INSTANCE_FUNCTION(CreateDevice);
+  VK_INSTANCE_FUNCTION(DestroySurfaceKHR);
+}
+
+void vk_loader_load_device() {
+  VK_DEVICE_FUNCTION(GetDeviceQueue);
+  VK_DEVICE_FUNCTION(DeviceWaitIdle);
+  VK_DEVICE_FUNCTION(CreateCommandPool);
+  VK_DEVICE_FUNCTION(DestroyCommandPool);
+  VK_DEVICE_FUNCTION(DestroyDevice);
+  VK_DEVICE_FUNCTION(CreateSwapchainKHR);
+  VK_DEVICE_FUNCTION(DestroySwapchainKHR);
+  VK_DEVICE_FUNCTION(GetSwapchainImagesKHR);
+  VK_DEVICE_FUNCTION(CreateImage);
+  VK_DEVICE_FUNCTION(CreateImageView);
+  VK_DEVICE_FUNCTION(DestroyImage);
+  VK_DEVICE_FUNCTION(DestroyImageView);
+  VK_DEVICE_FUNCTION(GetImageMemoryRequirements);
+  VK_DEVICE_FUNCTION(AllocateMemory);
+  VK_DEVICE_FUNCTION(FreeMemory);
+  VK_DEVICE_FUNCTION(AllocateCommandBuffers);
+  VK_DEVICE_FUNCTION(FreeCommandBuffers);
+  VK_DEVICE_FUNCTION(BeginCommandBuffer);
+  VK_DEVICE_FUNCTION(EndCommandBuffer);
+  VK_DEVICE_FUNCTION(BindImageMemory);
+  VK_DEVICE_FUNCTION(CreateSemaphore);
+  VK_DEVICE_FUNCTION(DestroySemaphore);
+  VK_DEVICE_FUNCTION(CreateFence);
+  VK_DEVICE_FUNCTION(DestroyFence);
+  VK_DEVICE_FUNCTION(WaitForFences);
+  VK_DEVICE_FUNCTION(AcquireNextImageKHR);
+  VK_DEVICE_FUNCTION(ResetFences);
+  VK_DEVICE_FUNCTION(CreateDescriptorSetLayout);
+  VK_DEVICE_FUNCTION(DestroyDescriptorSetLayout);
+  VK_DEVICE_FUNCTION(CreateDescriptorPool);
+  VK_DEVICE_FUNCTION(DestroyDescriptorPool);
+  VK_DEVICE_FUNCTION(CreateShaderModule);
+  VK_DEVICE_FUNCTION(DestroyShaderModule);
+  VK_DEVICE_FUNCTION(CreateSampler);
+  VK_DEVICE_FUNCTION(DestroySampler);
+  VK_DEVICE_FUNCTION(CreateBuffer);
+  VK_DEVICE_FUNCTION(DestroyBuffer);
+  VK_DEVICE_FUNCTION(GetBufferMemoryRequirements);
+  VK_DEVICE_FUNCTION(BindBufferMemory);
+  VK_DEVICE_FUNCTION(MapMemory);
+  VK_DEVICE_FUNCTION(UnmapMemory);
+  VK_DEVICE_FUNCTION(FlushMappedMemoryRanges);
+  VK_DEVICE_FUNCTION(CreatePipelineLayout);
+  VK_DEVICE_FUNCTION(DestroyPipelineLayout);
+  VK_DEVICE_FUNCTION(CreateGraphicsPipelines);
+  VK_DEVICE_FUNCTION(DestroyPipeline);
+  VK_DEVICE_FUNCTION(CmdBindPipeline);
+  VK_DEVICE_FUNCTION(AllocateDescriptorSets);
+  VK_DEVICE_FUNCTION(FreeDescriptorSets);
+  VK_DEVICE_FUNCTION(UpdateDescriptorSets);
+
+  VK_DEVICE_FUNCTION(CmdPipelineBarrier);
+  VK_DEVICE_FUNCTION(CmdBlitImage);
+  VK_DEVICE_FUNCTION(CmdCopyBuffer);
+  VK_DEVICE_FUNCTION(CmdCopyBufferToImage);
+  VK_DEVICE_FUNCTION(CmdCopyImageToBuffer);
+  VK_DEVICE_FUNCTION(CmdExecuteCommands);
+  VK_DEVICE_FUNCTION(CmdSetViewport);
+  VK_DEVICE_FUNCTION(CmdSetScissor);
+  VK_DEVICE_FUNCTION(CmdSetFrontFace);
+  VK_DEVICE_FUNCTION(CmdSetCullMode);
+  VK_DEVICE_FUNCTION(CmdSetStencilTestEnable);
+  VK_DEVICE_FUNCTION(CmdSetDepthTestEnable);
+  VK_DEVICE_FUNCTION(CmdSetDepthWriteEnable);
+  VK_DEVICE_FUNCTION(CmdSetStencilReference);
+  VK_DEVICE_FUNCTION(CmdSetStencilOp);
+  VK_DEVICE_FUNCTION(CmdBeginRendering);
+  VK_DEVICE_FUNCTION(CmdEndRendering);
+  VK_DEVICE_FUNCTION(CmdSetStencilCompareMask);
+  VK_DEVICE_FUNCTION(CmdSetStencilWriteMask);
+  VK_DEVICE_FUNCTION(CmdClearColorImage);
+  VK_DEVICE_FUNCTION(CmdClearDepthStencilImage);
+  VK_DEVICE_FUNCTION(CmdSetPrimitiveTopology);
+  VK_DEVICE_FUNCTION(CmdPushConstants);
+  VK_DEVICE_FUNCTION(CmdBindVertexBuffers);
+  VK_DEVICE_FUNCTION(CmdBindIndexBuffer);
+  VK_DEVICE_FUNCTION(CmdDraw);
+  VK_DEVICE_FUNCTION(CmdDrawIndexed);
+  VK_DEVICE_FUNCTION(CmdBindDescriptorSets);
+
+  VK_DEVICE_FUNCTION(QueueSubmit);
+  VK_DEVICE_FUNCTION(QueueWaitIdle);
+  VK_DEVICE_FUNCTION(QueuePresentKHR);
+}
 
 intern void vk_instance_create() {
   Scratch scratch;
@@ -1781,20 +2007,18 @@ intern void vk_instance_create() {
   };
   
   Array<const char*, 1> required_validation_layer_names = {};
-
-  Array<const char*, 3> required_extensions = {
-    VK_KHR_SURFACE_EXTENSION_NAME, VK_SURFACE_NAME,
-  };
+  Array<const char*, 3> required_extensions = { VK_KHR_SURFACE_EXTENSION_NAME, VK_SURFACE_NAME };
 
 #if BUILD_DEBUG
   required_validation_layer_names.append("VK_LAYER_KHRONOS_validation");
   Debug("%Required layers:");
-  for (const char* x : required_validation_layer_names)
+  for (const char* x : required_validation_layer_names) {
     Debug(x);
+  }
   u32 available_layer_count = 0;
-  VK_CHECK(vkEnumerateInstanceLayerProperties(&available_layer_count, null));
+  VK_CHECK(vk.EnumerateInstanceLayerProperties(&available_layer_count, null));
   VkLayerProperties* available_layers = push_array(scratch, VkLayerProperties, available_layer_count);
-  VK_CHECK(vkEnumerateInstanceLayerProperties(&available_layer_count, available_layers));
+  VK_CHECK(vk.EnumerateInstanceLayerProperties(&available_layer_count, available_layers));
   Loop (i, required_validation_layer_names.count) {
     b32 found = false;
     Loop (j, available_layer_count) {
@@ -1812,9 +2036,9 @@ intern void vk_instance_create() {
   for (const char* x : required_extensions)
     Debug(x);
   uint32_t extension_count = 0;
-  vkEnumerateInstanceExtensionProperties(null, &extension_count, null);
+  vk.EnumerateInstanceExtensionProperties(null, &extension_count, null);
   VkExtensionProperties* props = push_array(scratch, VkExtensionProperties, extension_count);
-  vkEnumerateInstanceExtensionProperties(null, &extension_count, props);
+  vk.EnumerateInstanceExtensionProperties(null, &extension_count, props);
   Loop (i, required_extensions.count) {
     b32 found = false;
     Loop (j, extension_count) {
@@ -1837,7 +2061,7 @@ intern void vk_instance_create() {
     .ppEnabledExtensionNames = required_extensions.data,
   };
   
-  VK_CHECK(vkCreateInstance(&instance_create_info, vk.allocator, &vk.instance));
+  VK_CHECK(vk.CreateInstance(&instance_create_info, vk.allocator, &vk.instance));
   Info("Vulkan insance created");
 
 #if BUILD_DEBUG
@@ -1875,7 +2099,7 @@ intern void vk_instance_create() {
   };
 
   PFN_vkCreateDebugUtilsMessengerEXT func = null;
-  Assign(func, vkGetInstanceProcAddr(vk.instance, "vkCreateDebugUtilsMessengerEXT"));
+  Assign(func, vk.GetInstanceProcAddr(vk.instance, "vkCreateDebugUtilsMessengerEXT"));
   AssertMsg(func, "Failed to create debug messenger");
 
   VK_CHECK(func(vk.instance, &debug_create_info, vk.allocator, &vk.debug_messenger));
@@ -1891,7 +2115,9 @@ void vk_init() {
   vk.allocator = &vk._allocator;
 #endif
 
+  vk_loader_load_core();
   vk_instance_create();
+  vk_loader_load_instance();
   {
     v2i win_size = os_get_window_size();
     vk.width = win_size.x;
@@ -1900,12 +2126,13 @@ void vk_init() {
 
   vk_surface_create();
   vk_device_create();
+  vk_loader_load_device();
 
   {
-    vkGetDeviceQueue(vkdevice, vk.device.graphics_queue_index, 0, &vk.device.graphics_queue);
-    vkGetDeviceQueue(vkdevice, vk.device.present_queue_index, 0, &vk.device.present_queue);
-    vkGetDeviceQueue(vkdevice, vk.device.transfer_queue_index, 0, &vk.device.transfer_queue);
-    vkGetDeviceQueue(vkdevice, vk.device.compute_queue_index, 0, &vk.device.compute_queue);
+    vk.GetDeviceQueue(vkdevice, vk.device.graphics_queue_index, 0, &vk.device.graphics_queue);
+    vk.GetDeviceQueue(vkdevice, vk.device.present_queue_index, 0, &vk.device.present_queue);
+    vk.GetDeviceQueue(vkdevice, vk.device.transfer_queue_index, 0, &vk.device.transfer_queue);
+    vk.GetDeviceQueue(vkdevice, vk.device.compute_queue_index, 0, &vk.device.compute_queue);
     Info("Queues obtained");
 
     VkCommandPoolCreateInfo transfer_pool_create_info = {
@@ -1913,7 +2140,7 @@ void vk_init() {
       .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
       .queueFamilyIndex = vk.device.transfer_queue_index,
     };
-    VK_CHECK(vkCreateCommandPool(vkdevice, &transfer_pool_create_info, vk.allocator, &vk.device.transient_cmd_pool));
+    VK_CHECK(vk.CreateCommandPool(vkdevice, &transfer_pool_create_info, vk.allocator, &vk.device.transient_cmd_pool));
     Info("Transient command pool created");
     
     VkCommandPoolCreateInfo graphics_pool_create_info = {
@@ -1921,7 +2148,7 @@ void vk_init() {
       .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
       .queueFamilyIndex = vk.device.graphics_queue_index,
     };
-    VK_CHECK(vkCreateCommandPool(vkdevice, &graphics_pool_create_info, vk.allocator, &vk.device.cmd_pool));
+    VK_CHECK(vk.CreateCommandPool(vkdevice, &graphics_pool_create_info, vk.allocator, &vk.device.cmd_pool));
     Info("Graphics command pool created");
 
     vk.images_in_flight = vk.device.swapchain_support.capabilities.minImageCount;
@@ -1946,20 +2173,20 @@ void vk_init() {
     vk.sync.compute_complete_semaphores = push_array(vk.arena, VkSemaphore, vk.images_in_flight);
     Loop (i, vk.images_in_flight) {
       VkSemaphoreCreateInfo semaphore_create_info = { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-      vkCreateSemaphore(vkdevice, &semaphore_create_info, vk.allocator, &vk.sync.render_complete_semaphores[i]);
-      vkCreateSemaphore(vkdevice, &semaphore_create_info, vk.allocator, &vk.sync.compute_complete_semaphores[i]);
+      vk.CreateSemaphore(vkdevice, &semaphore_create_info, vk.allocator, &vk.sync.render_complete_semaphores[i]);
+      vk.CreateSemaphore(vkdevice, &semaphore_create_info, vk.allocator, &vk.sync.compute_complete_semaphores[i]);
     }
 
     vk.sync.image_available_semaphores = push_array(vk.arena, VkSemaphore, vk.images_in_flight);
     vk.sync.in_flight_fences = push_array(vk.arena, VkFence, vk.frames_in_flight);
     Loop (i, vk.frames_in_flight) {
       VkSemaphoreCreateInfo semaphore_create_info = { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-      vkCreateSemaphore(vkdevice, &semaphore_create_info, vk.allocator, &vk.sync.image_available_semaphores[i]);
+      vk.CreateSemaphore(vkdevice, &semaphore_create_info, vk.allocator, &vk.sync.image_available_semaphores[i]);
       VkFenceCreateInfo fence_create_info = {
         .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
         .flags = VK_FENCE_CREATE_SIGNALED_BIT,
       };
-      VK_CHECK(vkCreateFence(vkdevice, &fence_create_info, vk.allocator, &vk.sync.in_flight_fences[i]));
+      VK_CHECK(vk.CreateFence(vkdevice, &fence_create_info, vk.allocator, &vk.sync.in_flight_fences[i]));
     }
   }
 
@@ -2063,19 +2290,19 @@ void vk_shutdown() {
   VK_CHECK(vkDeviceWaitIdle(vkdevice));
   
   Loop (i, vk.frames_in_flight) {
-    vkDestroySemaphore(vkdevice, vk.sync.image_available_semaphores[i], vk.allocator);
-    vkDestroySemaphore(vkdevice, vk.sync.render_complete_semaphores[i], vk.allocator);
-    vkDestroySemaphore(vkdevice, vk.sync.compute_complete_semaphores[i], vk.allocator);
-    vkDestroyFence(vkdevice, vk.sync.in_flight_fences[i], vk.allocator);
+    vk.DestroySemaphore(vkdevice, vk.sync.image_available_semaphores[i], vk.allocator);
+    vk.DestroySemaphore(vkdevice, vk.sync.render_complete_semaphores[i], vk.allocator);
+    vk.DestroySemaphore(vkdevice, vk.sync.compute_complete_semaphores[i], vk.allocator);
+    vk.DestroyFence(vkdevice, vk.sync.in_flight_fences[i], vk.allocator);
     vk_cmd_free(vk.device.cmd_pool, vk.cmds[i]);
     vk_cmd_free(vk.device.cmd_pool, vk.compute_cmds[i]);
   }
 
   {
-    vkDestroyBuffer(vkdevice, vk.vert_buffer.handle, vk.allocator);
-    vkDestroyBuffer(vkdevice, vk.index_buffer.handle, vk.allocator);
-    vkDestroyBuffer(vkdevice, vk.stage_buffer.handle, vk.allocator);
-    vkDestroyBuffer(vkdevice, vk.storage_buffer.handle, vk.allocator);
+    vk.DestroyBuffer(vkdevice, vk.vert_buffer.handle, vk.allocator);
+    vk.DestroyBuffer(vkdevice, vk.index_buffer.handle, vk.allocator);
+    vk.DestroyBuffer(vkdevice, vk.stage_buffer.handle, vk.allocator);
+    vk.DestroyBuffer(vkdevice, vk.storage_buffer.handle, vk.allocator);
   }
   
   vk_swapchain_destroy(vk.swapchain);
@@ -2083,15 +2310,15 @@ void vk_shutdown() {
   // Device
   {
     Debug("Destroying Vulkan device...");
-    vkDestroyCommandPool(vkdevice, vk.device.cmd_pool, vk.allocator);
-    vkDestroyCommandPool(vkdevice, vk.device.transient_cmd_pool, vk.allocator);
-    vkDestroyDevice(vkdevice, vk.allocator);
+    vk.DestroyCommandPool(vkdevice, vk.device.cmd_pool, vk.allocator);
+    vk.DestroyCommandPool(vkdevice, vk.device.transient_cmd_pool, vk.allocator);
+    vk.DestroyDevice(vkdevice, vk.allocator);
   }
   
   Info("Releasing physical device resources...");
   
   Debug("Destroying Vulkan surface...");
-  vkDestroySurfaceKHR(vk.instance, vk.surface, vk.allocator);
+  vk.DestroySurfaceKHR(vk.instance, vk.surface, vk.allocator);
   
 #if DUILD_DEBUG
   Debug("Destroying Vulkan debugger...");
@@ -2100,17 +2327,17 @@ void vk_shutdown() {
 #endif
 
   Debug("Destroying Vulkan instance...");
-  vkDestroyInstance(vk.instance, vk.allocator);
+  vk.DestroyInstance(vk.instance, vk.allocator);
 }
 
 void vk_begin_frame() {
-  VK_CHECK(vkWaitForFences(vkdevice, 1, &vk.sync.in_flight_fences[vk.current_frame], true, U64_MAX));
+  VK_CHECK(vk.WaitForFences(vkdevice, 1, &vk.sync.in_flight_fences[vk.current_frame], true, U64_MAX));
 
   v2i win_size = os_get_window_size();
   if (vk.width != win_size.x || vk.height != win_size.y) {
     vk.width = win_size.x;
     vk.height = win_size.y;
-    VK_CHECK(vkDeviceWaitIdle(vkdevice));
+    VK_CHECK(vk.DeviceWaitIdle(vkdevice));
     vk_swapchain_recreate();
     // vk_resize_texture_target();
   }
@@ -2137,7 +2364,7 @@ void vk_begin_frame() {
     .minDepth = 0.0f,
     .maxDepth = 1.0f,
   };
-  vkCmdSetViewport(cmd, 0, 1, &viewport);
+  vk.CmdSetViewport(cmd, 0, 1, &viewport);
 
   VkRect2D scissor = {
     .offset = {.x = 0, .y = 0},
@@ -2146,14 +2373,14 @@ void vk_begin_frame() {
       .height = (u32)vk.height
     },
   };
-  vkCmdSetScissor(cmd, 0, 1, &scissor);
+  vk.CmdSetScissor(cmd, 0, 1, &scissor);
 }
 
 void vk_end_frame() {
   VkCommandBuffer cmd = vk_get_current_cmd();
   vk_cmd_end(cmd);
   
-  VK_CHECK(vkResetFences(vkdevice, 1, &vk.sync.in_flight_fences[vk.current_frame]));
+  VK_CHECK(vk.ResetFences(vkdevice, 1, &vk.sync.in_flight_fences[vk.current_frame]));
   
   // // compute
   // VkSubmitInfo compute_submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
@@ -2186,7 +2413,7 @@ void vk_end_frame() {
     .pSignalSemaphores = &semaphore_render_complete,
   };
 
-  VK_CHECK(vkQueueSubmit(vk.device.graphics_queue, 1, &submit_info, vk.sync.in_flight_fences[vk.current_frame]));
+  VK_CHECK(vk.QueueSubmit(vk.device.graphics_queue, 1, &submit_info, vk.sync.in_flight_fences[vk.current_frame]));
 
   vk_swapchain_present(vk_get_current_render_complete_semaphore(), vk.image_index);
 }
@@ -2280,7 +2507,7 @@ void vk_begin_renderpass(u32 renderpass_id) {
           .layerCount = 1,
         },
       };
-      vkCmdPipelineBarrier(
+      vk.CmdPipelineBarrier(
         cmd,
         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -2304,7 +2531,7 @@ void vk_begin_renderpass(u32 renderpass_id) {
           .layerCount = 1,
         },
       };
-      vkCmdPipelineBarrier(
+      vk.CmdPipelineBarrier(
         cmd,
         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
         VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
@@ -2346,7 +2573,7 @@ void vk_begin_renderpass(u32 renderpass_id) {
         .pColorAttachments = &color_attachment,
         .pDepthAttachment = &depth_attachment
       };
-      vkCmdBeginRendering(cmd, &render_info);
+      vk.CmdBeginRendering(cmd, &render_info);
     } break;
     case Renderpass_UI: {
       // // Color
@@ -2411,7 +2638,7 @@ void vk_begin_renderpass(u32 renderpass_id) {
           .layerCount = 1,
         },
       };
-      vkCmdPipelineBarrier(
+      vk.CmdPipelineBarrier(
         cmd,
         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -2442,7 +2669,7 @@ void vk_begin_renderpass(u32 renderpass_id) {
         .pColorAttachments = &color_attachment,
       };
       // Info("render swapchain, width: %i, height: %i", render_info.renderArea.extent.width, render_info.renderArea.extent.height);
-      vkCmdBeginRendering(cmd, &render_info);
+      vk.CmdBeginRendering(cmd, &render_info);
     } break;
 
     default: {
@@ -2457,7 +2684,7 @@ void vk_end_renderpass(u32 renderpass_id) {
 
   switch (renderpass_id) {
     case Renderpass_World: {
-      vkCmdEndRendering(cmd);
+      vk.CmdEndRendering(cmd);
       // VkImageMemoryBarrier barrier = {
       //   .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
       //   .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
@@ -2494,7 +2721,7 @@ void vk_end_renderpass(u32 renderpass_id) {
           .layerCount = 1,
         },
       };
-      vkCmdPipelineBarrier(
+      vk.CmdPipelineBarrier(
         cmd,
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
@@ -2529,7 +2756,7 @@ void vk_end_renderpass(u32 renderpass_id) {
     } break;
 
     case Renderpass_Screen: {
-      vkCmdEndRendering(cmd);
+      vk.CmdEndRendering(cmd);
       VkImageMemoryBarrier barrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
@@ -2544,7 +2771,7 @@ void vk_end_renderpass(u32 renderpass_id) {
           .layerCount = 1,
         },
       };
-      vkCmdPipelineBarrier(
+      vk.CmdPipelineBarrier(
         cmd,
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
@@ -2652,9 +2879,9 @@ ShaderGlobalState* vk_get_shader_state() {
   return (ShaderGlobalState*)vk.storage_buffer.maped_memory;
 }
 
-f32 ease_in_exp(f32 x) {
-	return x <= 0.0 ? 0.0 : Pow(2, 10.0 * x - 10.0);
-}
+// f32 ease_in_exp(f32 x) {
+// 	return x <= 0.0 ? 0.0 : Pow(2, 10.0 * x - 10.0);
+// }
 
 // void compute_shader() {
 //   Scratch scratch;
@@ -2883,235 +3110,4 @@ f32 ease_in_exp(f32 x) {
 //   MemCopy(&shader->attribute_desriptions, &attribute_desriptions, attribute_count*sizeof(VkVertexInputAttributeDescription));
 //   shader->pipeline = vk_pipeline_create(vert_stride, attribute_count, attribute_desriptions,
 //                                         2, stage_create_infos, shader->topology, false, false);
-// }
-
-
-// NOTE: link vulkan?
-//   #define FN_VULKAN_DECL(name) PFN_##name name
-//   // Core functions
-
-//   FN_VULKAN_DECL(vkGetInstanceProcAddr);
-
-//   // Instance functions
-
-//   FN_VULKAN_DECL(vkEnumerateInstanceExtensionProperties);
-//   FN_VULKAN_DECL(vkEnumerateInstanceVersion);
-//   FN_VULKAN_DECL(vkEnumerateInstanceLayerProperties);
-//   FN_VULKAN_DECL(vkCreateInstance);
-//   FN_VULKAN_DECL(vkDestroyInstance);
-//   FN_VULKAN_DECL(vkEnumeratePhysicalDevices);
-//   FN_VULKAN_DECL(vkGetDeviceProcAddr);
-//   FN_VULKAN_DECL(vkGetPhysicalDeviceProperties);
-//   FN_VULKAN_DECL(vkGetPhysicalDeviceProperties2);
-//   FN_VULKAN_DECL(vkGetPhysicalDeviceFeatures);
-//   FN_VULKAN_DECL(vkGetPhysicalDeviceFeatures2);
-//   FN_VULKAN_DECL(vkGetPhysicalDeviceMemoryProperties);
-//   FN_VULKAN_DECL(vkGetPhysicalDeviceQueueFamilyProperties);
-//   FN_VULKAN_DECL(vkGetPhysicalDeviceFormatProperties);
-//   FN_VULKAN_DECL(vkGetPhysicalDeviceSurfaceFormatsKHR);
-//   FN_VULKAN_DECL(vkGetPhysicalDeviceSurfaceCapabilitiesKHR);
-//   FN_VULKAN_DECL(vkGetPhysicalDeviceSurfacePresentModesKHR);
-//   FN_VULKAN_DECL(vkEnumerateDeviceExtensionProperties);
-//   FN_VULKAN_DECL(vkCreateDevice);
-//   FN_VULKAN_DECL(vkDestroySurfaceKHR);
-
-//   // Device functions.
-//   FN_VULKAN_DECL(vkGetDeviceQueue);
-//   FN_VULKAN_DECL(vkDeviceWaitIdle);
-//   FN_VULKAN_DECL(vkCreateCommandPool);
-//   FN_VULKAN_DECL(vkDestroyCommandPool);
-//   FN_VULKAN_DECL(vkDestroyDevice);
-//   FN_VULKAN_DECL(vkCreateSwapchainKHR);
-//   FN_VULKAN_DECL(vkDestroySwapchainKHR);
-//   FN_VULKAN_DECL(vkGetSwapchainImagesKHR);
-//   FN_VULKAN_DECL(vkCreateImage);
-//   FN_VULKAN_DECL(vkCreateImageView);
-//   FN_VULKAN_DECL(vkDestroyImage);
-//   FN_VULKAN_DECL(vkDestroyImageView);
-//   FN_VULKAN_DECL(vkGetImageMemoryRequirements);
-//   FN_VULKAN_DECL(vkAllocateMemory);
-//   FN_VULKAN_DECL(vkFreeMemory);
-//   FN_VULKAN_DECL(vkAllocateCommandBuffers);
-//   FN_VULKAN_DECL(vkFreeCommandBuffers);
-//   FN_VULKAN_DECL(vkBeginCommandBuffer);
-//   FN_VULKAN_DECL(vkEndCommandBuffer);
-//   FN_VULKAN_DECL(vkBindImageMemory);
-//   FN_VULKAN_DECL(vkCreateSemaphore);
-//   FN_VULKAN_DECL(vkDestroySemaphore);
-//   FN_VULKAN_DECL(vkCreateFence);
-//   FN_VULKAN_DECL(vkDestroyFence);
-//   FN_VULKAN_DECL(vkWaitForFences);
-//   FN_VULKAN_DECL(vkAcquireNextImageKHR);
-//   FN_VULKAN_DECL(vkResetFences);
-//   FN_VULKAN_DECL(vkCreateDescriptorSetLayout);
-//   FN_VULKAN_DECL(vkDestroyDescriptorSetLayout);
-//   FN_VULKAN_DECL(vkCreateDescriptorPool);
-//   FN_VULKAN_DECL(vkDestroyDescriptorPool);
-//   FN_VULKAN_DECL(vkCreateShaderModule);
-//   FN_VULKAN_DECL(vkDestroyShaderModule);
-//   FN_VULKAN_DECL(vkCreateSampler);
-//   FN_VULKAN_DECL(vkDestroySampler);
-//   FN_VULKAN_DECL(vkCreateBuffer);
-//   FN_VULKAN_DECL(vkDestroyBuffer);
-//   FN_VULKAN_DECL(vkGetBufferMemoryRequirements);
-//   FN_VULKAN_DECL(vkBindBufferMemory);
-//   FN_VULKAN_DECL(vkMapMemory);
-//   FN_VULKAN_DECL(vkUnmapMemory);
-//   FN_VULKAN_DECL(vkFlushMappedMemoryRanges);
-//   FN_VULKAN_DECL(vkCreatePipelineLayout);
-//   FN_VULKAN_DECL(vkDestroyPipelineLayout);
-//   FN_VULKAN_DECL(vkCreateGraphicsPipelines);
-//   FN_VULKAN_DECL(vkDestroyPipeline);
-//   FN_VULKAN_DECL(vkAllocateDescriptorSets);
-//   FN_VULKAN_DECL(vkFreeDescriptorSets);
-//   FN_VULKAN_DECL(vkUpdateDescriptorSets);
-
-//   FN_VULKAN_DECL(vkCmdBindPipeline);
-//   FN_VULKAN_DECL(vkCmdPipelineBarrier);
-//   FN_VULKAN_DECL(vkCmdBlitImage);
-//   FN_VULKAN_DECL(vkCmdCopyBuffer);
-//   FN_VULKAN_DECL(vkCmdCopyBufferToImage);
-//   FN_VULKAN_DECL(vkCmdCopyImageToBuffer);
-//   FN_VULKAN_DECL(vkCmdExecuteCommands);
-//   FN_VULKAN_DECL(vkCmdSetViewport);
-//   FN_VULKAN_DECL(vkCmdSetScissor);
-//   FN_VULKAN_DECL(vkCmdSetFrontFace);
-//   FN_VULKAN_DECL(vkCmdSetCullMode);
-//   FN_VULKAN_DECL(vkCmdSetStencilTestEnable);
-//   FN_VULKAN_DECL(vkCmdSetDepthTestEnable);
-//   FN_VULKAN_DECL(vkCmdSetDepthWriteEnable);
-//   FN_VULKAN_DECL(vkCmdSetStencilReference);
-//   FN_VULKAN_DECL(vkCmdSetStencilOp);
-//   FN_VULKAN_DECL(vkCmdBeginRendering);
-//   FN_VULKAN_DECL(vkCmdEndRendering);
-//   FN_VULKAN_DECL(vkCmdSetStencilCompareMask);
-//   FN_VULKAN_DECL(vkCmdSetStencilWriteMask);
-//   FN_VULKAN_DECL(vkCmdClearColorImage);
-//   FN_VULKAN_DECL(vkCmdClearDepthStencilImage);
-//   FN_VULKAN_DECL(vkCmdSetPrimitiveTopology);
-//   FN_VULKAN_DECL(vkCmdPushConstants);
-//   FN_VULKAN_DECL(vkCmdBindVertexBuffers);
-//   FN_VULKAN_DECL(vkCmdBindIndexBuffer);
-//   FN_VULKAN_DECL(vkCmdDraw);
-//   FN_VULKAN_DECL(vkCmdDrawIndexed);
-//   FN_VULKAN_DECL(vkCmdBindDescriptorSets);
-
-//   FN_VULKAN_DECL(vkQueueSubmit);
-//   FN_VULKAN_DECL(vkQueueWaitIdle);
-//   FN_VULKAN_DECL(vkQueuePresentKHR);
-
-// void vk_loader_core() {
-//   // Core
-//   FUNCTION(vkGetInstanceProcAddr);
-//   FUNCTION(vkEnumerateInstanceVersion);
-//   FUNCTION(vkEnumerateInstanceExtensionProperties);
-//   FUNCTION(vkEnumerateInstanceLayerProperties);
-//   FUNCTION(vkCreateInstance);
-// }
-
-// void vk_loader_instance() {
-//   // Instance
-//   vk.vkGetDeviceProcAddr = (PFN_vkGetDeviceProcAddr)vk.vkGetInstanceProcAddr(vk.instance, "vkGetDeviceProcAddr");
-//   INSTANCE_FUNCTION(vkDestroyInstance);
-//   INSTANCE_FUNCTION(vkEnumeratePhysicalDevices);
-//   INSTANCE_FUNCTION(vkGetPhysicalDeviceProperties);
-//   INSTANCE_FUNCTION(vkGetPhysicalDeviceProperties2);
-//   INSTANCE_FUNCTION(vkGetPhysicalDeviceFeatures);
-//   INSTANCE_FUNCTION(vkGetPhysicalDeviceFeatures2);
-//   INSTANCE_FUNCTION(vkGetPhysicalDeviceMemoryProperties);
-//   INSTANCE_FUNCTION(vkGetPhysicalDeviceQueueFamilyProperties);
-//   INSTANCE_FUNCTION(vkGetPhysicalDeviceFormatProperties);
-//   INSTANCE_FUNCTION(vkGetPhysicalDeviceSurfaceCapabilitiesKHR);
-//   INSTANCE_FUNCTION(vkGetPhysicalDeviceSurfaceFormatsKHR);
-//   INSTANCE_FUNCTION(vkGetPhysicalDeviceSurfacePresentModesKHR);
-//   INSTANCE_FUNCTION(vkEnumerateDeviceExtensionProperties);
-//   INSTANCE_FUNCTION(vkCreateDevice);
-//   INSTANCE_FUNCTION(vkDestroySurfaceKHR);
-// }
-
-// void vk_loader_device() {
-//   // Device
-//   vk.vkGetDeviceQueue = (PFN_vkGetDeviceQueue)vk.vkGetDeviceProcAddr(vk.device.logical_device, "vkGetDeviceQueue");
-//   DEVICE_FUNCTION(vkDeviceWaitIdle);
-//   DEVICE_FUNCTION(vkCreateCommandPool);
-//   DEVICE_FUNCTION(vkDestroyCommandPool);
-//   DEVICE_FUNCTION(vkDestroyDevice);
-//   DEVICE_FUNCTION(vkCreateSwapchainKHR);
-//   DEVICE_FUNCTION(vkDestroySwapchainKHR);
-//   DEVICE_FUNCTION(vkGetSwapchainImagesKHR);
-//   DEVICE_FUNCTION(vkCreateImage);
-//   DEVICE_FUNCTION(vkCreateImageView);
-//   DEVICE_FUNCTION(vkDestroyImage);
-//   DEVICE_FUNCTION(vkDestroyImageView);
-//   DEVICE_FUNCTION(vkGetImageMemoryRequirements);
-//   DEVICE_FUNCTION(vkAllocateMemory);
-//   DEVICE_FUNCTION(vkFreeMemory);
-//   DEVICE_FUNCTION(vkAllocateCommandBuffers);
-//   DEVICE_FUNCTION(vkFreeCommandBuffers);
-//   DEVICE_FUNCTION(vkBeginCommandBuffer);
-//   DEVICE_FUNCTION(vkEndCommandBuffer);
-//   DEVICE_FUNCTION(vkBindImageMemory);
-//   DEVICE_FUNCTION(vkCreateSemaphore);
-//   DEVICE_FUNCTION(vkDestroySemaphore);
-//   DEVICE_FUNCTION(vkCreateFence);
-//   DEVICE_FUNCTION(vkDestroyFence);
-//   DEVICE_FUNCTION(vkWaitForFences);
-//   DEVICE_FUNCTION(vkAcquireNextImageKHR);
-//   DEVICE_FUNCTION(vkResetFences);
-//   DEVICE_FUNCTION(vkCreateDescriptorSetLayout);
-//   DEVICE_FUNCTION(vkDestroyDescriptorSetLayout);
-//   DEVICE_FUNCTION(vkCreateDescriptorPool);
-//   DEVICE_FUNCTION(vkDestroyDescriptorPool);
-//   DEVICE_FUNCTION(vkCreateShaderModule);
-//   DEVICE_FUNCTION(vkDestroyShaderModule);
-//   DEVICE_FUNCTION(vkCreateSampler);
-//   DEVICE_FUNCTION(vkDestroySampler);
-//   DEVICE_FUNCTION(vkCreateBuffer);
-//   DEVICE_FUNCTION(vkDestroyBuffer);
-//   DEVICE_FUNCTION(vkGetBufferMemoryRequirements);
-//   DEVICE_FUNCTION(vkBindBufferMemory);
-//   DEVICE_FUNCTION(vkMapMemory);
-//   DEVICE_FUNCTION(vkUnmapMemory);
-//   DEVICE_FUNCTION(vkFlushMappedMemoryRanges);
-//   DEVICE_FUNCTION(vkCreatePipelineLayout);
-//   DEVICE_FUNCTION(vkDestroyPipelineLayout);
-//   DEVICE_FUNCTION(vkCreateGraphicsPipelines);
-//   DEVICE_FUNCTION(vkDestroyPipeline);
-//   DEVICE_FUNCTION(vkCmdBindPipeline);
-//   DEVICE_FUNCTION(vkAllocateDescriptorSets);
-//   DEVICE_FUNCTION(vkFreeDescriptorSets);
-//   DEVICE_FUNCTION(vkUpdateDescriptorSets);
-
-//   DEVICE_FUNCTION(vkCmdPipelineBarrier);
-//   DEVICE_FUNCTION(vkCmdBlitImage);
-//   DEVICE_FUNCTION(vkCmdCopyBuffer);
-//   DEVICE_FUNCTION(vkCmdCopyBufferToImage);
-//   DEVICE_FUNCTION(vkCmdCopyImageToBuffer);
-//   DEVICE_FUNCTION(vkCmdExecuteCommands);
-//   DEVICE_FUNCTION(vkCmdSetViewport);
-//   DEVICE_FUNCTION(vkCmdSetScissor);
-//   DEVICE_FUNCTION(vkCmdSetFrontFace);
-//   DEVICE_FUNCTION(vkCmdSetCullMode);
-//   DEVICE_FUNCTION(vkCmdSetStencilTestEnable);
-//   DEVICE_FUNCTION(vkCmdSetDepthTestEnable);
-//   DEVICE_FUNCTION(vkCmdSetDepthWriteEnable);
-//   DEVICE_FUNCTION(vkCmdSetStencilReference);
-//   DEVICE_FUNCTION(vkCmdSetStencilOp);
-//   DEVICE_FUNCTION(vkCmdBeginRendering);
-//   DEVICE_FUNCTION(vkCmdEndRendering);
-//   DEVICE_FUNCTION(vkCmdSetStencilCompareMask);
-//   DEVICE_FUNCTION(vkCmdSetStencilWriteMask);
-//   DEVICE_FUNCTION(vkCmdClearColorImage);
-//   DEVICE_FUNCTION(vkCmdClearDepthStencilImage);
-//   DEVICE_FUNCTION(vkCmdSetPrimitiveTopology);
-//   DEVICE_FUNCTION(vkCmdPushConstants);
-//   DEVICE_FUNCTION(vkCmdBindVertexBuffers);
-//   DEVICE_FUNCTION(vkCmdBindIndexBuffer);
-//   DEVICE_FUNCTION(vkCmdDraw);
-//   DEVICE_FUNCTION(vkCmdDrawIndexed);
-//   DEVICE_FUNCTION(vkCmdBindDescriptorSets);
-
-//   DEVICE_FUNCTION(vkQueueSubmit);
-//   DEVICE_FUNCTION(vkQueueWaitIdle);
-//   DEVICE_FUNCTION(vkQueuePresentKHR);
 // }

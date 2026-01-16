@@ -760,7 +760,7 @@ void camera_update() {
 // Init
 
 void new_init() {
-
+  Entity& cube = entity_create(meshes(Mesh_Cube), shaders(Shader_Color), textures(Texture_OrangeLines));
 }
 
 void game_init() {
@@ -793,6 +793,7 @@ void game_deinit() {
     vk_remove_renderable(e.id);
   }
   st->entities.clear();
+  arena_clear(&st->arena);
 }
 
 void app_init(u8** state) {
@@ -827,9 +828,12 @@ shared_function void app_update(u8** state) {
     app_init(state);
   }
   Assign(st, *state);
-  if (os_is_key_down(Key_R)) {
+  if (os_is_key_down(Key_T)) {
     game_deinit();
     game_init();
+  }
+  if (os_is_key_down(Key_N)) {
+    new_init();
   }
   if (os_is_key_down(Key_Escape)) {
     os_close_window();
@@ -850,10 +854,10 @@ shared_function void app_update(u8** state) {
 
   Local(Timer, timer, timer_init(0.3));
   if (timer_tick(timer, delta_time)) {
-    Info("cam yaw: %f", Mod(st->cam.yaw, 360));
+    // Info("cam yaw: %f", Mod(st->cam.yaw, 360));
     // Info("block x: %f", st->entities[0].pos().x);
     v3 pos = st->cam.pos;
-    Info("cam pos: %f %f %f", pos.x,pos.y,pos.z);
+    // Info("cam pos: %f %f %f", pos.x,pos.y,pos.z);
   }
   for (Entity& e : st->entities) {
     e.pos().x -= delta_time * 0.5;
