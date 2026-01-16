@@ -3,7 +3,15 @@
 #include "r_types.h"
 #include "vk.h"
 
-KAPI extern f32 delta_time; // I dond't know where it should be
+#define MaxLights KB(1)
+#define MaxEntities KB(4)
+#define MaxMeshes KB(1)
+#define MaxShaders KB(1)
+#define MaxTextures KB(1)
+
+KAPI extern Transform entities_transforms[MaxEntities];
+
+KAPI extern f32 delta_time;
 
 KAPI void common_init();
 KAPI void r_shutdown();

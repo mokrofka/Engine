@@ -1,7 +1,6 @@
 #include "vk.h"
-#include "event.h"
-#include "renderer.h"
-#include <vulkan/vulkan.h>
+#include "common.h"
+#include "vulkan/vulkan_core.h"
 
 #if BUILD_DEBUG
   #define VK_CHECK(expr)          \
@@ -13,8 +12,6 @@
 #endif
 
 #define vkdevice vk.device.logical_device
-// #define FramesInFlight 3
-// #define ImagesInFlight 4
 
 struct VK_Buffer {
   VkBuffer handle;
@@ -133,8 +130,6 @@ struct VK_State {
   u32 current_frame;
   u32 width;
   u32 height;
-  u32 size_generation;
-  u32 size_last_generation;
   
   VK_Buffer vert_buffer;
   VK_Buffer index_buffer;
@@ -216,27 +211,28 @@ VK_State vk;
     VK_CHECK(vkCreateWin32SurfaceKHR(vk.instance, &surface_create_info, vk.allocator, &vk.surface));
     Info("Vulkan win32 surface created");
   }
-  // const char* vk_surface_extension_name() { return VK_KHR_WIN32_SURFACE_EXTENSION_NAME; }
   #define VK_SURFACE_NAME VK_KHR_WIN32_SURFACE_EXTENSION_NAME
   
 #elif OS_LINUX
   #if GFX_X11
-  #include <xcb/xcb.h>
-  #include <vulkan/vulkan_xcb.h>
-  intern void vk_surface_create() {
-    struct VK_Surface {
-      xcb_connection_t* connection;
-      xcb_window_t window;
-    } vk_surface = *(VK_Surface*)os_get_gfx_api_thing(); // Assuming os_get_vk_surface() returns your X11 state
-    VkXcbSurfaceCreateInfoKHR surfaceInfo = {
-        .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
-        .connection = vk_surface.connection,
-        .window = vk_surface.window,
-    };
-    VK_CHECK(vkCreateXcbSurfaceKHR(vk.instance, &surfaceInfo, vk.allocator, &vk.surface));
-    Info("Vulkan XCB surface created");
-  }
-  #define VK_SURFACE_NAME VK_KHR_XCB_SURFACE_EXTENSION_NAME
+    #include <xcb/xcb.h>
+    #include <vulkan/vulkan_xcb.h>
+
+    intern void vk_surface_create() {
+      struct VK_Surface {
+        xcb_connection_t* connection;
+        xcb_window_t window;
+      } vk_surface; 
+      os_get_gfx_api_handlers(&vk_surface);
+      VkXcbSurfaceCreateInfoKHR surfaceInfo = {
+          .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
+          .connection = vk_surface.connection,
+          .window = vk_surface.window,
+      };
+      VK_CHECK(vkCreateXcbSurfaceKHR(vk.instance, &surfaceInfo, vk.allocator, &vk.surface));
+      Info("Vulkan XCB surface created");
+    }
+    #define VK_SURFACE_NAME VK_KHR_XCB_SURFACE_EXTENSION_NAME
 
   #else
     #include <vulkan/vulkan_wayland.h>
@@ -272,7 +268,7 @@ VK_State vk;
         return result;
       },
       .pfnFree = [](void* user_data, void* memory){
-        if (!memory) { // NOTE: It happens
+        if (!memory) { // NOTE: it happens
           return;
         }
         mem_free(memory);
@@ -1584,7 +1580,6 @@ intern void vk_swapchain_recreate() {
   vk_swapchain_create(true);
   vk_swapchain_destroy(vk.old_swapchain);
   
-  vk.size_last_generation = vk.size_generation;
   Info("Swapchain recreated x: %i y: %i", vk.width, vk.height);
 }
 
@@ -1688,11 +1683,17 @@ void vk_draw() {
       u32 mesh_id = vk.entities_to_mesh[id];
       VK_Mesh mesh = vk.meshes[mesh_id];
       PushConstant* push = &vk.push_constants[id];
+      vk_update_transform(id, entities_transforms[id]);
 
       vkCmdPushConstants(cmd, shader.pipeline.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstant), push);
       vkCmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, &mesh.vert_offset);
-      vkCmdBindIndexBuffer(cmd, vk.index_buffer.handle, mesh.index_offset, VK_INDEX_TYPE_UINT32);
-      vkCmdDrawIndexed(cmd, mesh.index_count, 1, 0, 0, 0);
+      
+      if (mesh.index_count) {
+        vkCmdBindIndexBuffer(cmd, vk.index_buffer.handle, mesh.index_offset, VK_INDEX_TYPE_UINT32);
+        vkCmdDrawIndexed(cmd, mesh.index_count, 1, 0, 0, 0);
+      } else {
+        vkCmdDraw(cmd, mesh.vert_count, 1, 0, 0);
+      }
     }
   }
 
@@ -1707,7 +1708,6 @@ void vk_draw_screen() {
   // vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &vk.screen_descriptor_sets[vk.current_frame], 0, null);
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
   vkCmdDraw(cmd, 3, 1, 0, 0);
-  
 }
 
 // void vk_draw_compute() {
@@ -1892,16 +1892,8 @@ void vk_init() {
   vk_instance_create();
   {
     v2i win_size = os_get_window_size();
-    vk.width =  win_size.x;
+    vk.width = win_size.x;
     vk.height = win_size.y;
-    event_register(EventCode_Resized, null, [](u32 code, void* sender, void* listener_inst, EventContext context)->b32 {
-      f32 width = context.i32[0];
-      f32 height = context.i32[1];
-      vk.width = width;
-      vk.height = height;
-      ++vk.size_generation;
-      return false;
-    });
   }
 
   vk_surface_create();
@@ -2004,50 +1996,50 @@ void vk_init() {
 
   // Target texture render
   {
-    vk.texture_targets = push_array(vk.arena, VK_Texture, vk.images_in_flight);
-    Loop (i, vk.images_in_flight) {
-      vk.texture_targets[i].image = vk_image_create(
-        VK_IMAGE_TYPE_2D,
-        vk.width, vk.height,
-        VK_FORMAT_B8G8R8A8_UNORM,
-        // VK_FORMAT_R8G8B8A8_UNORM,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        true,
-        VK_IMAGE_ASPECT_COLOR_BIT);
+    // vk.texture_targets = push_array(vk.arena, VK_Texture, vk.images_in_flight);
+    // Loop (i, vk.images_in_flight) {
+    //   vk.texture_targets[i].image = vk_image_create(
+    //     VK_IMAGE_TYPE_2D,
+    //     vk.width, vk.height,
+    //     VK_FORMAT_B8G8R8A8_UNORM,
+    //     // VK_FORMAT_R8G8B8A8_UNORM,
+    //     VK_IMAGE_TILING_OPTIMAL,
+    //     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+    //     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    //     true,
+    //     VK_IMAGE_ASPECT_COLOR_BIT);
 
-      VkSamplerCreateInfo sampler_info = {
-        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-        .magFilter = VK_FILTER_LINEAR,
-        .minFilter = VK_FILTER_LINEAR,
-        .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
-        .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-        .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-        .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-        .mipLodBias = 0.0f,
-        .anisotropyEnable = VK_FALSE,
-        .maxAnisotropy = 1,
-        .compareEnable = VK_FALSE,
-        .compareOp = VK_COMPARE_OP_ALWAYS,
-        .minLod = 0.0f,
-        .maxLod = 0.0f,
-        .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
-        .unnormalizedCoordinates = VK_FALSE,
-      };
-      VK_CHECK(vkCreateSampler(vkdevice, &sampler_info, vk.allocator, &vk.texture_targets[i].sampler));
-    }
+    //   VkSamplerCreateInfo sampler_info = {
+    //     .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+    //     .magFilter = VK_FILTER_LINEAR,
+    //     .minFilter = VK_FILTER_LINEAR,
+    //     .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+    //     .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+    //     .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+    //     .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+    //     .mipLodBias = 0.0f,
+    //     .anisotropyEnable = VK_FALSE,
+    //     .maxAnisotropy = 1,
+    //     .compareEnable = VK_FALSE,
+    //     .compareOp = VK_COMPARE_OP_ALWAYS,
+    //     .minLod = 0.0f,
+    //     .maxLod = 0.0f,
+    //     .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+    //     .unnormalizedCoordinates = VK_FALSE,
+    //   };
+    //   VK_CHECK(vkCreateSampler(vkdevice, &sampler_info, vk.allocator, &vk.texture_targets[i].sampler));
+    // }
 
-    vk.offscreen_depth_buffer = vk_image_create(
-      VK_IMAGE_TYPE_2D,
-      vk.width,
-      vk.height,
-      vk.device.depth_format,
-      VK_IMAGE_TILING_OPTIMAL,
-      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-      true,
-      VK_IMAGE_ASPECT_DEPTH_BIT);
+    // vk.offscreen_depth_buffer = vk_image_create(
+    //   VK_IMAGE_TYPE_2D,
+    //   vk.width,
+    //   vk.height,
+    //   vk.device.depth_format,
+    //   VK_IMAGE_TILING_OPTIMAL,
+    //   VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+    //   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    //   true,
+    //   VK_IMAGE_ASPECT_DEPTH_BIT);
   }
 
   Info("Vulkan renderer initialized");
@@ -2112,7 +2104,10 @@ void vk_shutdown() {
 void vk_begin_frame() {
   VK_CHECK(vkWaitForFences(vkdevice, 1, &vk.sync.in_flight_fences[vk.current_frame], true, U64_MAX));
 
-  if (vk.size_generation != vk.size_last_generation) {
+  v2i win_size = os_get_window_size();
+  if (vk.width != win_size.x || vk.height != win_size.y) {
+    vk.width = win_size.x;
+    vk.height = win_size.y;
     VK_CHECK(vkDeviceWaitIdle(vkdevice));
     vk_swapchain_recreate();
     // vk_resize_texture_target();

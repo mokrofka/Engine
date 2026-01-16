@@ -1,5 +1,4 @@
 #include "asset_watch.h"
-#include "renderer.h"
 
 struct FileWatch {
   String path;
@@ -35,7 +34,7 @@ void asset_watch_add(String watch_name, void (*callback)()) {
 }
 
 void asset_watch_directory_add(String watch_name, void (*reload_callback)(String name), OS_WatchFlags flags) {
-  String dir_path = push_strf(st.arena, "%s/%s", asset_base_path(), watch_name);
+  String dir_path = push_strf(st.arena, "%s", watch_name);
   OS_Watch watch = os_watch_open(flags);
   os_watch_attach(watch, dir_path);
   st.directories.append({

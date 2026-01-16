@@ -16,6 +16,7 @@ KAPI u32 vk_shader_load(String name, ShaderType type);
 KAPI u32 vk_texture_load(Texture t);
 
 void vk_draw();
+void vk_draw_screen();
 void vk_draw_compute();
 
 KAPI void vk_update_transform(u32 entity_id, Transform trans);
@@ -45,5 +46,4 @@ KAPI PushConstant& vk_get_push_constant(u32 id);
 KAPI ShaderGlobalState* vk_get_shader_state();
 KAPI void vk_shader_reload(String name, u32 id);
 
-void vk_draw_screen();
 

@@ -8,8 +8,6 @@
 
 #include "stdlib.h"
 
-#include "event.h"
-
 struct X11State {
   xcb_connection_t* connection;
   xcb_screen_t* screen;
@@ -37,11 +35,6 @@ struct X11State {
     struct MouseState mouse_current;
     struct MouseState mouse_previous;
   } input;
-
-  struct {
-    xcb_connection_t* connection;
-    xcb_window_t window;
-  } vk_surface;
 };
 
 global X11State st;
@@ -242,22 +235,11 @@ void os_pump_messages() {
       } break;
       case XCB_CONFIGURE_NOTIFY: {
         xcb_configure_notify_event_t* cfg = (xcb_configure_notify_event_t*)event;
-
-        i32 width = cfg->width;
-        i32 height = cfg->height;
-
-        if (!width || !height) {
+        if (!cfg->width || !cfg->height) {
           return;
         }
-        if (st.width != width || st.height != height) {
-          st.width = width;
-          st.height = height;
-          EventContext data = {
-            .i32[0] = width,
-            .i32[1] = height,
-          };
-          event_fire(EventCode_Resized, null, data);
-        }
+        st.width = cfg->width;
+        st.height = cfg->height;
       } break;
       case XCB_CLIENT_MESSAGE: {
         xcb_client_message_event_t* cm = (xcb_client_message_event_t*)event;
@@ -273,9 +255,12 @@ b32 os_window_should_close() { return st.should_close; }
 v2i os_get_window_size() { return v2i(st.width, st.height); }
 v2i os_get_mouse_pos() { return v2i(st.input.mouse_current.x, st.input.mouse_current.y); }
 
-void* os_get_gfx_api_thing() {
-  st.vk_surface = {st.connection, st.window};
-  return &st.vk_surface;
+void os_get_gfx_api_handlers(void* out) {
+  struct Surface {
+    xcb_connection_t* connection;
+    xcb_window_t window;
+  };
+  *(Surface*)out = { st.connection, st.window };
 }
 
 void  os_close_window() { st.should_close = true; }

@@ -24,41 +24,32 @@ struct OS_LNX_FileIter {
 struct OS_State {
   Allocator arena;
 
-  String binary_name;
   String binary_filepath;
   String binary_directory;
+  String binary_name;
 };
 
 global OS_State st;
 
+String os_get_current_filepath()     { return st.binary_filepath; }
 String os_get_current_directory()    { return st.binary_directory; }
 String os_get_current_binary_name()  { return st.binary_name; }
-String os_get_current_filepath()     { return st.binary_filepath; }
+
+void os_init(String name) {
+  st.arena = arena_init();
+  st.binary_filepath = name;
+  st.binary_directory = str_chop_last_slash(name);
+  st.binary_name = str_skip_last_slash(name);
+}
 
 void os_exit(i32 exit_code) { _exit(exit_code); }
 
-void os_init() {
-  Arena arena = arena_init();
-  const u32 max_path_length = 512;
-  u8* buff[max_path_length];
-  u32 size = readlink("/proc/self/exe", (char*)buff, max_path_length);
-  String name = push_str_copy(arena, String((u8*)buff, size));
-  st = {
-    .arena = arena,
-    .binary_name = str_skip_last_slash(name),
-    .binary_filepath = name,
-    .binary_directory = str_chop_last_slash(name),
-  };
-}
-
-u64 os_timer_frequency() {
-  return Million(1);
-}
+u64 os_timer_frequency() { return Million(1); }
 
 u64 os_timer_now() {
   struct timeval time;
   gettimeofday(&time, null);
-  u64 result = os_timer_frequency()*time.tv_sec + time.tv_usec;
+  u64 result = time.tv_usec + os_timer_frequency()*time.tv_sec;
   return result;
 }
 

@@ -1,5 +1,5 @@
 #include "lib.h"
-#include "renderer.h"
+#include "common.h"
 
 #include "asset_watch.h"
 #include "test.h"
@@ -24,13 +24,12 @@ void app_update(u8** state);
 i32 main(i32 count, char* args[]) {
   global_alloc_init();
   tctx_init();
-  test();
-
-  os_init();
+  // test();
+  os_init(args[0]);
   os_gfx_init();
   asset_watch_init();
-  asset_init("../assets");
-  r_init();
+  common_init();
+
   Scratch scratch;
 
 #if HOTRELOAD_BUILD
@@ -90,7 +89,6 @@ i32 main(i32 count, char* args[]) {
   // r_shutdown();
   os_gfx_shutdown();
   os_exit(0);
-  
 }
 
 

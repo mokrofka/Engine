@@ -60,12 +60,12 @@ struct Buffer {
   u64 size;
 };
 
+KAPI String os_get_current_filepath();
 KAPI String os_get_current_directory();
 KAPI String os_get_current_binary_name();
-KAPI String os_get_current_filepath();
 
+KAPI void os_init(String name);
 KAPI void os_exit(i32 exit_code);
-KAPI void os_init();
 
 KAPI u64 os_timer_frequency();
 KAPI u64 os_timer_now();

@@ -1,9 +1,7 @@
 #include "common.h"
 #include "asset_watch.h"
 
-u32 shaders[Shader_COUNT];
-u32 meshes[Mesh_COUNT];
-u32 textures[Texture_COUNT];
+Transform entities_transforms[MaxEntities];
 
 f32 delta_time;
 
@@ -247,17 +245,23 @@ u32 texture_load(String name) {
   return id;
 }
 
+////////////////////////////////////////////////////////////////////////
+// Resources
+
 ShaderDefinition shaders_definition[Shader_COUNT] = {
   [Shader_Color] = "color_shader", ShaderType_Drawing,
 };
+u32 shaders[Shader_COUNT];
 
 String meshs_path[Mesh_COUNT] = {
   [Mesh_Cube] = "cube.obj",
   // [Mesh_Room] = "room.obj",
 };
+u32 meshes[Mesh_COUNT];
 
 String textures_path[Texture_COUNT] = {
   [Texture_OrangeLines] = "orange_lines_512.png",
   [Texture_Container] = "container.jpg",
   [Texture_Room] = "image.png",
 };
+u32 textures[Texture_COUNT];

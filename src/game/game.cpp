@@ -1,8 +1,7 @@
 #include "lib.h"
 
-#include "renderer.h"
+#include "common.h"
 #include "event.h"
-#include "test.h"
 #include "profiler.h"
 
 // f32 cube_vertices[] = {
@@ -597,28 +596,26 @@
 
 // }
 
-Vertex triangle[] = {
+Vertex triangle_vertices[] = {
   {v3( 0.0,   0.5, 0), v3(), v2(0.5, 1)},
   {v3(-0.5,  -0.5, 0), v3(), v2(0.0, 0)},
   {v3( 0.5,  -0.5, 0), v3(), v2(1.0, 0)},
 };
 
-struct EntityDescription {
-  u32 mesh;
-  u32 shader;
-  u32 texture;
-};
-
 struct Entity {
   u32 id;
-  union {
-    Transform trans;
-    struct {
-      v3 pos;
-      v3 rot;
-      v3 scale;
-    };
-  };
+  // union {
+  //   Transform trans;
+  //   struct {
+  //     v3 pos;
+  //     v3 rot;
+  //     v3 scale;
+  //   };
+  // };
+  Transform& trans() { return entities_transforms[id]; }
+  v3& pos() { return entities_transforms[id].pos; }
+  v3& rot() { return entities_transforms[id].rot; }
+  v3& scale() { return entities_transforms[id].scale; }
   u32 r_handle;
   u32 mesh;
   u32 shader;
@@ -635,18 +632,12 @@ struct Camera {
   b8 view_dirty;
 };
 
-struct AssetLoader {
-
-};
-
 struct GameState {
   Arena arena;
-  Map<String, Mesh> meshes;
-  ShaderGlobalState* shader_state;
+  AllocSegList gpa;
+  IdPool id_pool;
   Darray<Entity> entities;
   Camera camera;
-
-  Timer timer_to_create;
 };
 
 GameState* st;
@@ -654,22 +645,12 @@ GameState* st;
 ////////////////////////////////////////////////////////////////////////
 // Utils
 
-b32 perspective_projection_callback(u32 code, void* sender, void* listener_inst, EventContext context) {
-  f32 width = context.i32[0];
-  f32 height = context.i32[1];
-  st->camera.projection = mat4_perspective(degtorad(st->camera.fov), width / height, 0.1f, 1000.0f);
-  return false;
-};
-
 void gpu_data_update() {
-  ShaderGlobalState& shader_st = *st->shader_state;
+  ShaderGlobalState& shader_st = *vk_get_shader_state();
   Camera& cam = st->camera;
   shader_st.projection_view = cam.projection * cam.view;
   shader_st.projection = cam.projection;
   shader_st.view = cam.view;
-  for (Entity x : st->entities) {
-    vk_update_transform(x.r_handle, x.trans);
-  }
 }
 
 void* grid_create(Allocator arena, i32 grid_size, f32 grid_step) {
@@ -703,15 +684,15 @@ void* grid_create(Allocator arena, i32 grid_size, f32 grid_step) {
 
 Entity& entity_create(u32 mesh, u32 shader, u32 texture) {
   Entity e = {
-    .pos = {},
-    .scale = v3_one(),
+    .id = id_pool_alloc(st->id_pool),
+    // .pos = {},
+    // .scale = v3_one(),
     .r_handle = vk_make_renderable(mesh, shader, texture),
   };
+  e.pos() = v3_zero();
+  e.scale() = v3_one();
   return st->entities.append(e);
 }
-// Entity& entity_create() {
-//   return 0;
-// }
 
 ////////////////////////////////////////////////////////////////////////
 // Camera
@@ -724,7 +705,7 @@ void camera_update() {
   // Camera Rotation
   {
     f32 rotation_speed = 180.0f;
-    auto camera_yaw = [&](f32 amount) {
+    var camera_yaw = [&](f32 amount) {
       cam.yaw += amount;
       cam.view_dirty = true;
     };
@@ -734,7 +715,7 @@ void camera_update() {
     if (os_is_key_down(Key_D)) {
       camera_yaw(-rotation_speed * delta_time);
     }
-    auto camera_pitch = [&](f32 amount) {
+    var camera_pitch = [&](f32 amount) {
       cam.pitch += amount;
       cam.view_dirty = true;
     };
@@ -794,27 +775,33 @@ void camera_update() {
 // Init
 
 void app_init(u8** state) {
-  // TLSF_Allocator all = {};
-
-  // u8* buff = tlsf_alloc(all, 13);
-
-  u32 a = 5;
   Scratch scratch;
   Assign(*state, global_alloc_struct_zero(GameState));
+  st = push_struct(scratch, GameState);
   Assign(st, *state);
   st->arena = arena_init();
-  st->shader_state = vk_get_shader_state();
+  st->gpa.init(st->arena);
+  st->id_pool.array.init(st->gpa);
   st->camera = {
     .pos = v3(0,0,-5),
     .yaw = 90,
     .fov = 45,
   };
 
+  {
+    Mesh triangle = {
+      .vertices = triangle_vertices,
+      .vert_count = ArrayCount(triangle_vertices),
+    };
+    vk_mesh_load(triangle);
+    // Entity& e = entity_create(0, u32 shader, u32 texture)
+  }
+
   Loop (i, Shader_COUNT) {
-    shaders[i] = shader_create(shaders_definition[i].path, shaders_definition[i].type);
+    shaders[i] = shader_load(shaders_definition[i].path, shaders_definition[i].type);
   }
   Loop (i, Mesh_COUNT) {
-    meshes[i] = mesh_create(meshs_path[i]);
+    meshes[i] = mesh_load(meshs_path[i]);
   }
   Loop (i, Texture_COUNT) {
     textures[i] = texture_load(textures_path[i]);
@@ -822,13 +809,9 @@ void app_init(u8** state) {
 
   Entity& cube = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_OrangeLines]);
   Entity& cube1 = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_Container]);
-  cube1.pos = {-3,0,1};
+  cube1.pos() = {-3,0,1};
   // Entity& room = entity_create(meshes[Mesh_Room], shaders[Shader_Color], textures[Texture_Room]);
   // room.pos = {0,0,10};
-
-
-  st->timer_to_create = timer_init(0.1);
-
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -851,18 +834,19 @@ shared_function void app_update(u8** state) {
     st->camera.fov -= 5;
   }
 
-  Local(Timer, timer, timer_init(1));
-  if (timer_tick(timer, delta_time)) {
-    Info("entity created %i", st->entities.count);
-    Entity& cube1 = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_Container]);
-    cube1.pos = v3_rand_range(v3(-10), v3(10));
-  }
-
-  // local Timer timer = timer_create(0.3);
+  // Local(Timer, timer, timer_init(1));
   // if (timer_tick(timer, delta_time)) {
-  //   Info("%f", Mod(st->camera.yaw, 360));
+  //   Info("entity created %i", st->entities.count);
+  //   Entity& cube1 = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_Container]);
+  //   cube1.pos = v3_rand_range(v3(-10), v3(10));
   // }
-  // st->entities[2].scale += 0.01;
+  Local(Timer, timer, timer_init(0.3));
+  if (timer_tick(timer, delta_time)) {
+    Info("cam yaw: %f", Mod(st->camera.yaw, 360));
+    Info("block x: %f", st->entities[0].pos().x);
+    v3 pos = st->camera.pos;
+    Info("cam pos: %f %f %f", pos.x,pos.y,pos.z);
+  }
 
   camera_update();
   gpu_data_update();

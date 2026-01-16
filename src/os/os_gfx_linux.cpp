@@ -3,14 +3,12 @@
 #if OS_LINUX && !GFX_X11
 
 #undef global
-#include "vendor/xdg-shell-client-protocol.h"
-#include "vendor/xdg-shell-protocol.h"
+#include "xdg-shell-client-protocol.h"
+#include "xdg-shell-protocol.h"
 #include <wayland-client.h>
 #define global static
 
 #include <linux/input-event-codes.h>
-
-#include "event.h"
 
 struct WaylandState {
   wl_display* wl_display;
@@ -270,11 +268,6 @@ void os_gfx_init() {
         if (st.width != width || st.height != height) {
           st.width = width;
           st.height = height;
-          EventContext data = {
-            .i32[0] = width,
-            .i32[1] = height,
-          };
-          event_fire(EventCode_Resized, null, data);
         }
       },
       .close = [](void* data, xdg_toplevel* top){ st.should_close = true; },
