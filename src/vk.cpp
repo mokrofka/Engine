@@ -78,7 +78,6 @@ struct VK_Device {
   VkQueue compute_queue;
   
   VkCommandPool cmd_pool;
-  VkCommandPool transient_cmd_pool;
   
   VkPhysicalDeviceProperties properties;
   VkPhysicalDeviceFeatures features;
@@ -512,7 +511,7 @@ intern void vk_cmd_end(VkCommandBuffer cmd) {
 }
 
 intern VkCommandBuffer vk_cmd_alloc_and_begin_single_use() {
-  VkCommandBuffer result = vk_cmd_alloc(vk.device.transient_cmd_pool);
+  VkCommandBuffer result = vk_cmd_alloc(vk.device.cmd_pool);
   vk_cmd_begin(result);
   return result;
 }
@@ -528,7 +527,7 @@ intern void vk_cmd_end_single_use(VkCommandBuffer cmd) {
   VK_CHECK(vk.QueueSubmit(vk.device.graphics_queue, 1, &submit_info, 0));
   VK_CHECK(vk.QueueWaitIdle(vk.device.graphics_queue));
   
-  vk_cmd_free(vk.device.transient_cmd_pool, cmd);
+  vk_cmd_free(vk.device.cmd_pool, cmd);
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -2141,14 +2140,6 @@ void vk_init() {
     vk.GetDeviceQueue(vkdevice, vk.device.transfer_queue_index, 0, &vk.device.transfer_queue);
     vk.GetDeviceQueue(vkdevice, vk.device.compute_queue_index, 0, &vk.device.compute_queue);
     Info("Queues obtained");
-
-    VkCommandPoolCreateInfo transfer_pool_create_info = {
-      .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-      .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
-      .queueFamilyIndex = vk.device.transfer_queue_index,
-    };
-    VK_CHECK(vk.CreateCommandPool(vkdevice, &transfer_pool_create_info, vk.allocator, &vk.device.transient_cmd_pool));
-    Info("Transient command pool created");
     
     VkCommandPoolCreateInfo graphics_pool_create_info = {
       .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -2318,7 +2309,7 @@ void vk_shutdown() {
   {
     Debug("Destroying Vulkan device...");
     vk.DestroyCommandPool(vkdevice, vk.device.cmd_pool, vk.allocator);
-    vk.DestroyCommandPool(vkdevice, vk.device.transient_cmd_pool, vk.allocator);
+    vk.DestroyCommandPool(vkdevice, vk.device.cmd_pool, vk.allocator);
     vk.DestroyDevice(vkdevice, vk.allocator);
   }
   
