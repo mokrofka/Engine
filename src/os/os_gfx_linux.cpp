@@ -46,11 +46,6 @@ struct WaylandState {
     MouseState mouse_current;
     MouseState mouse_previous;
   } input;
-
-  struct {
-    struct wl_display* wl_display;
-    struct wl_surface* wl_surface;
-  } vk_surface;
 };
 
 global WaylandState st;
@@ -295,11 +290,14 @@ void os_pump_messages() {
 
 b32 os_window_should_close()       { return st.should_close; }
 
-v2i   os_get_window_size()          { return v2i(st.width, st.height); }
-v2i   os_get_mouse_pos()            { return v2i(st.input.mouse_current.x, st.input.mouse_current.y); }
-void* os_get_gfx_api_thing() {
-  st.vk_surface = {.wl_display = st.wl_display, .wl_surface = st.wl_surface};
-  return &st.vk_surface;
+v2i  os_get_window_size()          { return v2i(st.width, st.height); }
+v2i  os_get_mouse_pos()            { return v2i(st.input.mouse_current.x, st.input.mouse_current.y); }
+void os_get_gfx_api_handlers(void* out) {
+  struct Surface {
+    struct wl_display* wl_display;
+    struct wl_surface* wl_surface;
+  };
+  *(Surface*)out = {.wl_display = st.wl_display, .wl_surface = st.wl_surface};
 }
 void  os_close_window() {
   st.should_close = true; 

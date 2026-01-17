@@ -44,12 +44,14 @@ struct VK_Mesh {
   VkDeviceSize index_offset;
 };
 
-struct VK_Swapchain  {
+struct VK_Swapchain {
   VkSwapchainKHR handle;
   VkSurfaceFormatKHR image_format;  
-  VkImage images[4]; // should be enough
+  VkImage images[4];
   VkImageView views[4];
   
+  VkPresentModeKHR present_mode;
+
   VK_Image depth_attachment;
 };
 
@@ -114,8 +116,9 @@ struct VK_State {
   Arena arena;
   
   OS_Handle lib;
+  AllocSegList alloc;
+  VkAllocationCallbacks allocator_;
   VkAllocationCallbacks* allocator;
-  VkAllocationCallbacks _allocator;
   VkInstance instance;
   VkSurfaceKHR surface;
   VkDebugUtilsMessengerEXT debug_messenger;
@@ -123,12 +126,11 @@ struct VK_State {
   VK_Device device;
   VK_SyncObj sync;
   VK_Swapchain swapchain;
-  VK_Swapchain old_swapchain;
 
   u32 images_in_flight;
   u32 frames_in_flight;
-  u32 image_index;
-  u32 current_frame;
+  u32 current_image_idx;
+  u32 current_frame_idx;
   u32 width;
   u32 height;
   
@@ -356,13 +358,15 @@ VK_State vk;
       struct VK_Surface{
         struct wl_display* wl_display;
         struct wl_surface* wl_surface;
-      } vk_surface = *(VK_Surface*)os_get_gfx_api_thing();
+      } vk_surface;
+      os_get_gfx_api_handlers(&vk_surface);
       VkWaylandSurfaceCreateInfoKHR surfaceInfo = {
         .sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR,
         .display = vk_surface.wl_display,
         .surface = vk_surface.wl_surface,
       };
-      VK_CHECK(vkCreateWaylandSurfaceKHR(vk.instance, &surfaceInfo, vk.allocator, &vk.surface));
+      PFN_vkCreateWaylandSurfaceKHR vkCreateWaylandSurfaceKHR = (PFN_vkCreateWaylandSurfaceKHR)vk.GetInstanceProcAddr(vk.instance, "vkCreateWaylandSurfaceKHR");
+      VK_CHECK(vkCreateWaylandSurfaceKHR (vk.instance, &surfaceInfo, vk.allocator, &vk.surface));
       Info("Vulkan wayland surface created");
     }
     #define VK_SURFACE_NAME VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME
@@ -376,12 +380,11 @@ VK_State vk;
     VkAllocationCallbacks callbacks = {
       .pUserData = null,
       .pfnAllocation = [](void* user_data, size_t size, size_t alignment, VkSystemAllocationScope allocation_scope){
-        void* result = mem_alloc(size);
+        void* result = mem_alloc(vk.alloc, size);
         return result;
       },
       .pfnReallocation = [](void* user_data, void* origin, size_t size, size_t alignment, VkSystemAllocationScope allocation_scope) {
-        void* result = mem_realloc(origin, size);
-        return result;
+        ...
       },
       .pfnFree = [](void* user_data, void* memory){
         if (!memory) { // NOTE: it happens
@@ -399,9 +402,9 @@ VK_State vk;
 ////////////////////////////////////////////////////////////////////////
 // @Utils
 
-intern VkSemaphore vk_get_current_image_available_semaphore() { return vk.sync.image_available_semaphores[vk.current_frame]; }
-intern VkSemaphore vk_get_current_render_complete_semaphore() { return vk.sync.render_complete_semaphores[vk.image_index]; }
-intern VkCommandBuffer& vk_get_current_cmd()                  { return vk.cmds[vk.current_frame]; }
+intern VkSemaphore vk_get_current_image_available_semaphore() { return vk.sync.image_available_semaphores[vk.current_frame_idx]; }
+intern VkSemaphore vk_get_current_render_complete_semaphore() { return vk.sync.render_complete_semaphores[vk.current_image_idx]; }
+intern VkCommandBuffer& vk_get_current_cmd()                  { return vk.cmds[vk.current_frame_idx]; }
 
 intern u32 vk_find_memory_index(u32 type_filter, u32 property_flags) {
   VkPhysicalDeviceMemoryProperties memory_properties = vk.device.memory;
@@ -1243,7 +1246,7 @@ struct VK_DevicePhysicalRequirements {
   b8 present;
   b8 transfer;
   b8 compute;
-  b8 sampler_anisotropy;  
+  b8 depth_attachment;
   StringArray device_extension_names;
 };
 
@@ -1270,6 +1273,26 @@ intern VK_SwapchainSupportInfo vk_device_query_swapchain_support(VkPhysicalDevic
   support_info.present_modes = push_array(vk.arena, VkPresentModeKHR, support_info.present_mode_count);
   VK_CHECK(vk.GetPhysicalDeviceSurfacePresentModesKHR(physical_device, vk.surface, &support_info.present_mode_count, support_info.present_modes));
   return support_info;
+}
+
+intern VkFormat vk_device_detect_depth_format(VkPhysicalDevice physical_device) {
+  VkFormat candidates[] = {
+    VK_FORMAT_D32_SFLOAT,
+    VK_FORMAT_D32_SFLOAT_S8_UINT,
+    VK_FORMAT_D24_UNORM_S8_UINT
+  };
+
+  u32 flags = VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
+  for (VkFormat x : candidates) {
+    VkFormatProperties properties;
+    vk.GetPhysicalDeviceFormatProperties(physical_device, x, &properties);
+    if (FlagHas(properties.optimalTilingFeatures, flags)) {
+      return x;
+    }
+  }
+
+  Assert(!"Failed to find a supported format!");
+  return VK_FORMAT_UNDEFINED;
 }
 
 intern VK_DevicePhysicalQueueFamilyInfo vk_device_physical_meets_requirements(
@@ -1377,8 +1400,6 @@ intern VK_DevicePhysicalQueueFamilyInfo vk_device_physical_meets_requirements(
       Assert(found);
     }
   }
-  
-  Assert(requirements.sampler_anisotropy && features.samplerAnisotropy);
 
   return queue_info;
 }
@@ -1393,8 +1414,8 @@ intern VK_Device vk_device_select_physical() {
   VkPhysicalDevice* physical_devices = push_array(scratch, VkPhysicalDevice, physical_device_count);
   VK_CHECK(vk.EnumeratePhysicalDevices(vk.instance, &physical_device_count, physical_devices));
 
-  i32 discrete_gpu_index = -1;
-  i32 fallback_gpu_index = -1;
+  i32 discrete_gpu_idx = -1;
+  i32 fallback_gpu_idx = -1;
 
   Loop (i, physical_device_count) {
     VkPhysicalDeviceProperties properties;
@@ -1402,7 +1423,8 @@ intern VK_Device vk_device_select_physical() {
     
     VkPhysicalDeviceFeatures features;
     vk.GetPhysicalDeviceFeatures(physical_devices[i], &features);
-    
+    Assert(features.samplerAnisotropy);
+
     VkPhysicalDeviceMemoryProperties memory;
     vk.GetPhysicalDeviceMemoryProperties(physical_devices[i], &memory);
     
@@ -1414,7 +1436,7 @@ intern VK_Device vk_device_select_physical() {
       .present = true,
       .transfer = true,
       .compute = true,
-      .sampler_anisotropy = true,
+      .depth_attachment = true,
       .device_extension_names = {extentions, ArrayCount(extentions)},
     };
 
@@ -1431,23 +1453,23 @@ intern VK_Device vk_device_select_physical() {
     switch (properties.deviceType) {
       case VK_PHYSICAL_DEVICE_TYPE_OTHER: {
         Info("GPU type is Unkown");
-        fallback_gpu_index = i;
+        fallback_gpu_idx = i;
       } break;
       case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: {
         Info("GPU type is Integrated");
-        fallback_gpu_index = i;
+        fallback_gpu_idx = i;
       } break;
       case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU: {
-        discrete_gpu_index = i;
+        discrete_gpu_idx = i;
       } Info("GPU type is Descrete");
         break;
       case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU: {
         Info("GPU type is Virtual");
-        fallback_gpu_index = i;
+        fallback_gpu_idx = i;
       } break;
       case VK_PHYSICAL_DEVICE_TYPE_CPU: {
         Info("GPU type is CPU");
-        fallback_gpu_index = i;
+        fallback_gpu_idx = i;
       } break;
       default:;
     }
@@ -1464,11 +1486,10 @@ intern VK_Device vk_device_select_physical() {
 
     Loop (j, memory.memoryHeapCount) {
       f32 memory_size_gib = (((f32)memory.memoryHeaps[j].size) / GB(1));
-      if (memory.memoryHeaps[j].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) {
+      if (memory.memoryHeaps[j].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
         Info("Local GPU memory: %.2f GiB", memory_size_gib);
-      } else {
+      else
         Info("Shared System memory: %.2f GiB", memory_size_gib);
-      }
     }
 
     devices[i].physical_device = physical_devices[i];
@@ -1480,17 +1501,16 @@ intern VK_Device vk_device_select_physical() {
     devices[i].properties = properties;
     devices[i].features = features;
     devices[i].memory = memory;
+    devices[i].depth_format = vk_device_detect_depth_format(physical_devices[i]);
   }
   i32 selected_index;
-  if (discrete_gpu_index != -1) {
-    selected_index = discrete_gpu_index; 
+  if (discrete_gpu_idx != -1) {
+    selected_index = discrete_gpu_idx; 
     Info("Discrete GPU was choosen");
   } else {
-    selected_index = fallback_gpu_index;
+    selected_index = fallback_gpu_idx;
     Info("Integrated GPU was choosen");
   }
-  
-  Assert(devices[selected_index].physical_device && "No physical devices were found which meet the requirements");
   
   Info("Physical device selected");
   return devices[selected_index];
@@ -1498,12 +1518,13 @@ intern VK_Device vk_device_select_physical() {
 
 intern void vk_device_create() {
   vk.device = vk_device_select_physical();
-  
+
+  // Features
   VkPhysicalDeviceDescriptorIndexingFeatures indexing_features = {
     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES,
     .shaderSampledImageArrayNonUniformIndexing = VK_TRUE,     // allows runtime indexing
     .descriptorBindingSampledImageUpdateAfterBind = VK_TRUE,  // allows update image descriptors
-    .descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE, // allows updaate storage descriptrs TODO: I don't use this
+    // .descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE, // allows updaate storage descriptrs TODO: I don't use this
     .descriptorBindingPartiallyBound = VK_TRUE,               // allows not updated descriptors
     .runtimeDescriptorArray = VK_TRUE,                        // allows not specified size of descriptor array in shader
   };
@@ -1529,14 +1550,15 @@ intern void vk_device_create() {
   Array<VkDeviceQueueCreateInfo, queue_count> queue_create_infos;
   for (u32 i : indices) {
     f32 queue_priority = 1.0f;
-    queue_create_infos.append(VkDeviceQueueCreateInfo{
+    VkDeviceQueueCreateInfo device_queue_create_info = {
       .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
       .pNext = null,
       .flags = 0,
       .queueFamilyIndex = indices[i],
       .queueCount = 1,
       .pQueuePriorities = &queue_priority,
-    });
+    };
+    queue_create_infos.append(device_queue_create_info);
   }
   
   const char* extension_names[] = {
@@ -1559,70 +1581,12 @@ intern void vk_device_create() {
   Info("Logical device created");
 }
 
-intern void vk_device_detect_depth_format(VK_Device* device) {
-  VkFormat candidates[] = {
-    VK_FORMAT_D32_SFLOAT,
-    VK_FORMAT_D32_SFLOAT_S8_UINT,
-    VK_FORMAT_D24_UNORM_S8_UINT
-  };
-
-  u32 flags = VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
-  for (VkFormat x : candidates) {
-    VkFormatProperties properties;
-    vk.GetPhysicalDeviceFormatProperties(device->physical_device, x, &properties);
-    if (FlagHas(properties.optimalTilingFeatures, flags)) {
-      device->depth_format = x;
-      return;
-    }
-  }
-
-  Assert(!"Failed to find a supported format!");
-}
-
 ////////////////////////////////////////////////////////////////////////
 // @Swapchain
 
 intern void vk_swapchain_create(b32 reuse) {
-  vk.device.swapchain_support = vk_device_query_swapchain_support(vk.device.physical_device);
-  vk.current_frame = 0;
-  
-  // Choose a swap surface format
-  b32 found = false;
-  Loop (i, vk.device.swapchain_support.format_count) {
-    VkSurfaceFormatKHR format = vk.device.swapchain_support.formats[i];
-    // Preferred formats
-    if (format.format == VK_FORMAT_B8G8R8A8_UNORM && // darker
-    // if (format.format == VK_FORMAT_B8G8R8A8_SRGB && // brighter
-        format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) 
-    {
-      vk.swapchain.image_format = format;
-      found = true;
-      break;
-    }
-  }
-  if (!found) {
-    vk.swapchain.image_format = vk.device.swapchain_support.formats[0];
-  }
-  
-  // TODO: configurable
-  VkPresentModeKHR present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
-  Loop (i, vk.device.swapchain_support.present_mode_count) {
-    VkPresentModeKHR mode = vk.device.swapchain_support.present_modes[i];
-    if (mode == VK_PRESENT_MODE_FIFO_KHR) {
-      present_mode = mode;
-      break;
-    }
-  }
-  
   VkExtent2D swapchain_extent = {vk.width, vk.height};
-  if (vk.device.swapchain_support.capabilities.currentExtent.width != U32_MAX) {
-    swapchain_extent = vk.device.swapchain_support.capabilities.currentExtent;
-  }
-  VkExtent2D min = vk.device.swapchain_support.capabilities.minImageExtent;
-  VkExtent2D max = vk.device.swapchain_support.capabilities.maxImageExtent;
-  swapchain_extent.width = Clamp(min.width, swapchain_extent.width, max.width);
-  swapchain_extent.height = Clamp(min.height, swapchain_extent.height, max.height);
-  
+
   VkSwapchainCreateInfoKHR swapchain_create_info = {
     .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
     .surface = vk.surface,
@@ -1635,9 +1599,9 @@ intern void vk_swapchain_create(b32 reuse) {
     .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
     .preTransform = vk.device.swapchain_support.capabilities.currentTransform,
     .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-    .presentMode = present_mode,
+    .presentMode = vk.swapchain.present_mode,
     .clipped = VK_TRUE,
-    .oldSwapchain = reuse ? vk.old_swapchain.handle : null,
+    .oldSwapchain = reuse ? vk.swapchain.handle : null,
   };
 
   VK_CHECK(vk.CreateSwapchainKHR(vkdevice, &swapchain_create_info, vk.allocator, &vk.swapchain.handle));
@@ -1662,8 +1626,6 @@ intern void vk_swapchain_create(b32 reuse) {
     VK_CHECK(vk.CreateImageView(vkdevice, &view_create_info, vk.allocator, &vk.swapchain.views[i]));
   }
 
-  vk_device_detect_depth_format(&vk.device);
-
   vk.swapchain.depth_attachment = vk_image_create(
     VK_IMAGE_TYPE_2D,
     swapchain_extent.width,
@@ -1674,6 +1636,51 @@ intern void vk_swapchain_create(b32 reuse) {
     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     true,
     VK_IMAGE_ASPECT_DEPTH_BIT);
+}
+
+intern void vk_swapchain_query() {
+  // vk.device.swapchain_support = vk_device_query_swapchain_support(vk.device.physical_device);
+  // vk.device.depth_format = vk_device_detect_depth_format();
+  
+  vk.current_frame_idx = 0;
+  
+  // Choose a swap surface format
+  b32 found = false;
+  Loop (i, vk.device.swapchain_support.format_count) {
+    VkSurfaceFormatKHR format = vk.device.swapchain_support.formats[i];
+    // Preferred formats
+    if (format.format == VK_FORMAT_B8G8R8A8_UNORM && // darker
+    // if (format.format == VK_FORMAT_B8G8R8A8_SRGB && // brighter TODO: use
+        format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) 
+    {
+      vk.swapchain.image_format = format;
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    vk.swapchain.image_format = vk.device.swapchain_support.formats[0];
+  }
+  
+  // Choose present mode
+  VkPresentModeKHR present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+  Loop (i, vk.device.swapchain_support.present_mode_count) {
+    VkPresentModeKHR mode = vk.device.swapchain_support.present_modes[i];
+    if (mode == VK_PRESENT_MODE_FIFO_KHR) {
+      present_mode = mode;
+      break;
+    }
+  }
+  vk.swapchain.present_mode = present_mode;
+  
+  // VkExtent2D swapchain_extent = {vk.width, vk.height};
+  // if (vk.device.swapchain_support.capabilities.currentExtent.width != U32_MAX) {
+    // swapchain_extent = vk.device.swapchain_support.capabilities.currentExtent;
+  // }
+  // VkExtent2D min = vk.device.swapchain_support.capabilities.minImageExtent;
+  // VkExtent2D max = vk.device.swapchain_support.capabilities.maxImageExtent;
+  // swapchain_extent.width = Clamp(min.width, swapchain_extent.width, max.width);
+  // swapchain_extent.height = Clamp(min.height, swapchain_extent.height, max.height);
 }
 
 intern void vk_swapchain_destroy(VK_Swapchain swapchain) {
@@ -1692,9 +1699,9 @@ intern void vk_swapchain_recreate() {
     Debug("recreate_swapchain called when window is < 1 in a dimension. Booting");
   }
 
-  vk.old_swapchain = vk.swapchain;
+  VK_Swapchain old = vk.swapchain;
   vk_swapchain_create(true);
-  vk_swapchain_destroy(vk.old_swapchain);
+  vk_swapchain_destroy(old);
   
   Info("Swapchain recreated x: %i y: %i", vk.width, vk.height);
 }
@@ -1702,7 +1709,7 @@ intern void vk_swapchain_recreate() {
 intern u32 vk_swapchain_acquire_next_image_index(VkSemaphore image_available_semaphore) {
   u32 image_index;
   VkResult result = vk.AcquireNextImageKHR(vkdevice, vk.swapchain.handle, U64_MAX,
-                                          image_available_semaphore, null, &image_index);
+                                           image_available_semaphore, null, &image_index);
   if (result == VK_ERROR_OUT_OF_DATE_KHR) {
     AssertMsg(false, "vkAcquireNextImageKHR failed with: %s", vk_result_string(result));
   }
@@ -1724,7 +1731,7 @@ intern void vk_swapchain_present(VkSemaphore render_complete_semaphore, u32 pres
   // Info("vkQueuePresentKHR failed with: %s", vk_result_string(result));
   // Assert(result == VK_SUCCESS);
   
-  vk.current_frame = (vk.current_frame + 1) % vk.frames_in_flight;
+  vk.current_frame_idx = (vk.current_frame_idx + 1) % vk.frames_in_flight;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -1799,8 +1806,6 @@ void vk_draw() {
       u32 mesh_id = vk.entities_to_mesh[id];
       VK_Mesh mesh = vk.meshes[mesh_id];
       PushConstant* push = &vk.push_constants[id];
-      // ShaderEntity* e_data = 
-      // vk_update_transform(id, entities_transforms[id]);
       ShaderEntity& e = vk_get_entity(id);
       e.model = mat4_transform(entities_transforms[id]);
 
@@ -2010,6 +2015,8 @@ intern void vk_instance_create() {
   Array<const char*, 3> required_extensions = { VK_KHR_SURFACE_EXTENSION_NAME, VK_SURFACE_NAME };
 
 #if BUILD_DEBUG
+
+  // Validation layer
   required_validation_layer_names.append("VK_LAYER_KHRONOS_validation");
   Debug("%Required layers:");
   for (const char* x : required_validation_layer_names) {
@@ -2031,11 +2038,13 @@ intern void vk_instance_create() {
     AssertMsg(found, "Required validation layer is missing: %s", String(required_validation_layer_names[i]));
   }
 
+  // Extensions
   required_extensions.append(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
   Debug("Required extensions:");
-  for (const char* x : required_extensions)
+  for (const char* x : required_extensions) {
     Debug(x);
-  uint32_t extension_count = 0;
+  }
+  u32 extension_count = 0;
   vk.EnumerateInstanceExtensionProperties(null, &extension_count, null);
   VkExtensionProperties* props = push_array(scratch, VkExtensionProperties, extension_count);
   vk.EnumerateInstanceExtensionProperties(null, &extension_count, props);
@@ -2118,11 +2127,9 @@ void vk_init() {
   vk_loader_load_core();
   vk_instance_create();
   vk_loader_load_instance();
-  {
-    v2i win_size = os_get_window_size();
-    vk.width = win_size.x;
-    vk.height = win_size.y;
-  }
+  v2i win_size = os_get_window_size();
+  vk.width = win_size.x;
+  vk.height = win_size.y;
 
   vk_surface_create();
   vk_device_create();
@@ -2153,7 +2160,7 @@ void vk_init() {
 
     vk.images_in_flight = vk.device.swapchain_support.capabilities.minImageCount;
     vk.frames_in_flight = vk.images_in_flight - 1;
-  
+    vk_swapchain_query();
     vk_swapchain_create(false);
     Info("Swapchain created");
   
@@ -2331,7 +2338,7 @@ void vk_shutdown() {
 }
 
 void vk_begin_frame() {
-  VK_CHECK(vk.WaitForFences(vkdevice, 1, &vk.sync.in_flight_fences[vk.current_frame], true, U64_MAX));
+  VK_CHECK(vk.WaitForFences(vkdevice, 1, &vk.sync.in_flight_fences[vk.current_frame_idx], true, U64_MAX));
 
   v2i win_size = os_get_window_size();
   if (vk.width != win_size.x || vk.height != win_size.y) {
@@ -2342,7 +2349,7 @@ void vk_begin_frame() {
     // vk_resize_texture_target();
   }
 
-  vk.image_index = vk_swapchain_acquire_next_image_index(vk_get_current_image_available_semaphore());
+  vk.current_image_idx = vk_swapchain_acquire_next_image_index(vk_get_current_image_available_semaphore());
 
   VkCommandBuffer cmd = vk_get_current_cmd();
   vk_cmd_begin(cmd);
@@ -2380,7 +2387,7 @@ void vk_end_frame() {
   VkCommandBuffer cmd = vk_get_current_cmd();
   vk_cmd_end(cmd);
   
-  VK_CHECK(vk.ResetFences(vkdevice, 1, &vk.sync.in_flight_fences[vk.current_frame]));
+  VK_CHECK(vk.ResetFences(vkdevice, 1, &vk.sync.in_flight_fences[vk.current_frame_idx]));
   
   // // compute
   // VkSubmitInfo compute_submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
@@ -2413,9 +2420,9 @@ void vk_end_frame() {
     .pSignalSemaphores = &semaphore_render_complete,
   };
 
-  VK_CHECK(vk.QueueSubmit(vk.device.graphics_queue, 1, &submit_info, vk.sync.in_flight_fences[vk.current_frame]));
+  VK_CHECK(vk.QueueSubmit(vk.device.graphics_queue, 1, &submit_info, vk.sync.in_flight_fences[vk.current_frame_idx]));
 
-  vk_swapchain_present(vk_get_current_render_complete_semaphore(), vk.image_index);
+  vk_swapchain_present(vk_get_current_render_complete_semaphore(), vk.current_image_idx);
 }
 
 void vk_begin_renderpass(u32 renderpass_id) {
@@ -2499,7 +2506,7 @@ void vk_begin_renderpass(u32 renderpass_id) {
         .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
         .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .image = vk.swapchain.images[vk.image_index],
+        .image = vk.swapchain.images[vk.current_image_idx],
         .subresourceRange = {
           .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
           .baseMipLevel = 0,
@@ -2543,7 +2550,7 @@ void vk_begin_renderpass(u32 renderpass_id) {
       // Render
       VkRenderingAttachmentInfo color_attachment = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-        .imageView = vk.swapchain.views[vk.image_index],
+        .imageView = vk.swapchain.views[vk.current_image_idx],
         .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -2630,7 +2637,7 @@ void vk_begin_renderpass(u32 renderpass_id) {
         .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
         .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .image = vk.swapchain.images[vk.image_index],
+        .image = vk.swapchain.images[vk.current_image_idx],
         .subresourceRange = {
           .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
           .baseMipLevel = 0,
@@ -2650,7 +2657,7 @@ void vk_begin_renderpass(u32 renderpass_id) {
       // Render
       VkRenderingAttachmentInfo color_attachment = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-        .imageView = vk.swapchain.views[vk.image_index],
+        .imageView = vk.swapchain.views[vk.current_image_idx],
         .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -2713,7 +2720,7 @@ void vk_end_renderpass(u32 renderpass_id) {
         .dstAccessMask = 0,
         .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-        .image = vk.swapchain.images[vk.image_index],
+        .image = vk.swapchain.images[vk.current_image_idx],
         .subresourceRange = {
           .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
           .baseMipLevel = 0,
@@ -2763,7 +2770,7 @@ void vk_end_renderpass(u32 renderpass_id) {
         .dstAccessMask = 0,
         .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-        .image = vk.swapchain.images[vk.image_index],
+        .image = vk.swapchain.images[vk.current_image_idx],
         .subresourceRange = {
           .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
           .baseMipLevel = 0,
