@@ -760,7 +760,7 @@ intern VK_Pipeline vk_shader_pipeline_create(ShaderInfo shader_info, Array<VkPip
     VK_DYNAMIC_STATE_VIEWPORT,
     VK_DYNAMIC_STATE_SCISSOR,
   };
-  VkPipelineDynamicStateCreateInfo dynamic_state_create_info = {
+  VkPipelineDynamicStateCreateInfo dynamic_state_info = {
     .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
     .dynamicStateCount = ArrayCount(dynamic_state),
     .pDynamicStates = dynamic_state,
@@ -777,7 +777,7 @@ intern VK_Pipeline vk_shader_pipeline_create(ShaderInfo shader_info, Array<VkPip
   VkDescriptorSetLayout set_layouts[] = {
     vk.descriptor_set_layout,
   };
-  VkPipelineLayoutCreateInfo pipeline_layout_create_info = {
+  VkPipelineLayoutCreateInfo pipeline_layout_info = {
     .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
     .setLayoutCount = ArrayCount(set_layouts),
     .pSetLayouts = set_layouts,
@@ -786,10 +786,10 @@ intern VK_Pipeline vk_shader_pipeline_create(ShaderInfo shader_info, Array<VkPip
   };
   
   VK_Pipeline result = {};
-  VK_CHECK(vk.CreatePipelineLayout(vkdevice, &pipeline_layout_create_info, vk.allocator, &result.pipeline_layout));
+  VK_CHECK(vk.CreatePipelineLayout(vkdevice, &pipeline_layout_info, vk.allocator, &result.pipeline_layout));
 
   // Pipeline create
-  VkGraphicsPipelineCreateInfo pipeline_create_info = {
+  VkGraphicsPipelineCreateInfo pipeline_info = {
     .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
     .pNext = &renderingCreateInfo,
     .stageCount = shader_info.stage_count,
@@ -802,14 +802,14 @@ intern VK_Pipeline vk_shader_pipeline_create(ShaderInfo shader_info, Array<VkPip
     .pMultisampleState = &multisampling_create_info,
     .pDepthStencilState = &depth_stencil,
     .pColorBlendState = &color_blend_state_create_info,
-    .pDynamicState = &dynamic_state_create_info,
+    .pDynamicState = &dynamic_state_info,
     .layout = result.pipeline_layout,
     .renderPass = null,
     .basePipelineHandle = VK_NULL_HANDLE,
     .basePipelineIndex = -1,
   };
 
-  VK_CHECK(vk.CreateGraphicsPipelines(vkdevice, VK_NULL_HANDLE, 1, &pipeline_create_info, vk.allocator, &result.handle));
+  VK_CHECK(vk.CreateGraphicsPipelines(vkdevice, VK_NULL_HANDLE, 1, &pipeline_info, vk.allocator, &result.handle));
 
   return result;
 }
@@ -899,16 +899,15 @@ void vk_shader_reload(String name, u32 id) {
   }
 }
 
-intern void vk_shader_init() {
+intern void vk_descriptor_init() {
   Scratch scratch;
 
   // Pool
-  #define TextureMax 10     
   #define StorageBufferMax 1
   #define SetsMax 1
   {
     VkDescriptorPoolSize pool_sizes[] = {
-      {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, TextureMax},
+      {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MaxTextures},
       {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, StorageBufferMax},
     };
     VkDescriptorPoolCreateInfo pool_info = {
@@ -923,6 +922,17 @@ intern void vk_shader_init() {
 
   // Setlayout
   {
+    // Bindless extension
+    VkDescriptorBindingFlags flags[] = {
+      0,
+      VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
+    };
+    VkDescriptorSetLayoutBindingFlagsCreateInfo binding_flags = {
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+      .pNext = null,
+      .bindingCount = ArrayCount(flags),
+      .pBindingFlags = flags,
+    };
     VkDescriptorSetLayoutBinding layout_bindings[] = {
       {
         .binding = 0,
@@ -933,19 +943,9 @@ intern void vk_shader_init() {
       {
         .binding = 1,
         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        .descriptorCount = 10,
+        .descriptorCount = MaxTextures,
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
       },
-    };
-    VkDescriptorBindingFlags flags[] = {
-      VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
-      VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
-    };
-    VkDescriptorSetLayoutBindingFlagsCreateInfo binding_flags = {
-      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
-      .pNext = null,
-      .bindingCount = ArrayCount(flags),
-      .pBindingFlags = flags,
     };
     VkDescriptorSetLayoutCreateInfo layout_info = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -972,6 +972,30 @@ intern void vk_shader_init() {
   {
     u64 entities_start = AlignUp(sizeof(ShaderGlobalState), alignof(ShaderEntity));
     Assign(vk.entities_data, Offset(vk.storage_buffer.maped_memory, entities_start));
+  }
+
+  // Shader Data
+  {
+    VkDescriptorSet descriptor_set = vk.descriptor_sets;
+    
+    // Storage
+    VkDescriptorBufferInfo buffer_info = {
+      .buffer = vk.storage_buffer.handle,
+      .offset = 0,
+      .range = VK_WHOLE_SIZE,
+    };
+    VkWriteDescriptorSet ubo_descriptor = {
+      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+      .dstSet = descriptor_set,
+      .dstBinding = 0,
+      .dstArrayElement = 0,
+      .descriptorCount = 1,
+      .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      .pBufferInfo = &buffer_info,
+    };
+    
+    VkWriteDescriptorSet descriptors[] = {ubo_descriptor};
+    vk.UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
   }
 }
 
@@ -1067,50 +1091,54 @@ intern void vk_image_destroy(VK_Image image) {
   }
 }
 
-intern void vk_image_transition_layout(VkCommandBuffer cmd, VK_Image image, VkImageLayout old_layout, VkImageLayout new_layout) {
+intern VkAccessFlags vk_image_layout_to_mem_access_flags(VkImageLayout layout) {
+	switch (layout) {
+		case VK_IMAGE_LAYOUT_UNDEFINED:
+		case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:                              return NoFlags;
+		case VK_IMAGE_LAYOUT_PREINITIALIZED:                               return VK_ACCESS_HOST_WRITE_BIT;
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:                     return VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL:                     return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:                     return VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:                         return VK_ACCESS_TRANSFER_READ_BIT;
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:                         return VK_ACCESS_TRANSFER_WRITE_BIT;
+    default: Assert(false); return 0;
+	}
+}
+
+intern VkPipelineStageFlags vk_image_layout_to_pipeline_stage_flags(VkImageLayout layout) {
+	switch (layout) {
+		case VK_IMAGE_LAYOUT_UNDEFINED:                                    return VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		case VK_IMAGE_LAYOUT_PREINITIALIZED:                               return VK_PIPELINE_STAGE_HOST_BIT;
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:                         return VK_PIPELINE_STAGE_TRANSFER_BIT; 
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:                     return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL:                     return VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:                     return VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:                              return VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    default: Assert(false); return 0;
+	}
+}
+
+intern void vk_image_layout_transition(VkCommandBuffer cmd, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout, VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT) {
   VkImageMemoryBarrier barrier = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+    .srcAccessMask = vk_image_layout_to_mem_access_flags(old_layout),
+    .dstAccessMask = vk_image_layout_to_mem_access_flags(new_layout),
     .oldLayout = old_layout,
     .newLayout = new_layout,
     .srcQueueFamilyIndex = vk.device.graphics_queue_index,
-    .image = image.handle,
+    .image = image,
     .subresourceRange = {
-      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .aspectMask = aspect_mask,
       .baseMipLevel = 0,
       .levelCount = 1,
       .baseArrayLayer = 0,
       .layerCount = 1,
     },
   };
-  
-  VkPipelineStageFlags source_stage;
-  VkPipelineStageFlags dest_stage;
-
-  if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED && new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-    barrier.srcAccessMask = 0;
-    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-    source_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    dest_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-  }
-  else if (old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-    source_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    dest_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-  } else {
-    Assert(false && "unsupported layout transition");
-    return;
-  }
-
-  vk.CmdPipelineBarrier(
-    cmd,
-    source_stage, dest_stage,
-    NoFlags,
-    0, null,
-    0, null,
-    1, &barrier);
+  VkPipelineStageFlags src_stage = vk_image_layout_to_pipeline_stage_flags(old_layout);
+  VkPipelineStageFlags dst_stage = vk_image_layout_to_pipeline_stage_flags(new_layout);
+  vk.CmdPipelineBarrier(cmd, src_stage, dst_stage, NoFlags, 0, null, 0, null, 1, &barrier);
 }
 
 intern void vk_image_upload_to_gpu(VkCommandBuffer cmd, VK_Image image) {
@@ -1126,14 +1154,8 @@ intern void vk_image_upload_to_gpu(VkCommandBuffer cmd, VK_Image image) {
     },
     .imageExtent = { image.width, image.height, 1 },
   };
-  
-  vk.CmdCopyBufferToImage(
-    cmd,
-    vk.stage_buffer.handle, 
-    image.handle, 
-    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
-    1, 
-    &region);
+
+  vk.CmdCopyBufferToImage(cmd, vk.stage_buffer.handle, image.handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 }
 
 u32 vk_texture_load(Texture t) {
@@ -1157,9 +1179,9 @@ u32 vk_texture_load(Texture t) {
   {
     VkCommandBuffer cmd = vk_cmd_alloc_and_begin_single_use();
 
-    vk_image_transition_layout(cmd, texture.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    vk_image_layout_transition(cmd, texture.image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     vk_image_upload_to_gpu(cmd, texture.image);
-    vk_image_transition_layout(cmd, texture.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    vk_image_layout_transition(cmd, texture.image.handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     vk_cmd_end_single_use(cmd);
   }
@@ -1523,7 +1545,6 @@ intern void vk_device_create() {
     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES,
     .shaderSampledImageArrayNonUniformIndexing = VK_TRUE,     // allows runtime indexing
     .descriptorBindingSampledImageUpdateAfterBind = VK_TRUE,  // allows update image descriptors
-    // .descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE, // allows updaate storage descriptrs TODO: I don't use this
     .descriptorBindingPartiallyBound = VK_TRUE,               // allows not updated descriptors
     .runtimeDescriptorArray = VK_TRUE,                        // allows not specified size of descriptor array in shader
   };
@@ -1584,7 +1605,18 @@ intern void vk_device_create() {
 // @Swapchain
 
 intern void vk_swapchain_create(b32 reuse) {
+
+  // vk_device_query_swapchain_support(vk.device.physical_device);
+  // VK_CHECK(vk.GetPhysicalDeviceSurfaceCapabilitiesKHR(vk.device.physical_device, vk.surface, &vk.device.swapchain_support.capabilities));
+
   VkExtent2D swapchain_extent = {vk.width, vk.height};
+  // if (vk.device.swapchain_support.capabilities.currentExtent.width != U32_MAX) {
+  //   swapchain_extent = vk.device.swapchain_support.capabilities.currentExtent;
+  // }
+  // VkExtent2D min = vk.device.swapchain_support.capabilities.minImageExtent;
+  // VkExtent2D max = vk.device.swapchain_support.capabilities.maxImageExtent;
+  // swapchain_extent.width = Clamp(min.width, swapchain_extent.width, max.width);
+  // swapchain_extent.height = Clamp(min.height, swapchain_extent.height, max.height);
 
   VkSwapchainCreateInfoKHR swapchain_create_info = {
     .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
@@ -1694,10 +1726,6 @@ intern void vk_swapchain_destroy(VK_Swapchain swapchain) {
 }
 
 intern void vk_swapchain_recreate() {
-  if (vk.width == 0 || vk.height == 0) {
-    Debug("recreate_swapchain called when window is < 1 in a dimension. Booting");
-  }
-
   VK_Swapchain old = vk.swapchain;
   vk_swapchain_create(true);
   vk_swapchain_destroy(old);
@@ -1770,26 +1798,6 @@ u32 vk_mesh_load(Mesh mesh) {
 // @Drawing
 
 void vk_draw_init() {
-  VkDescriptorSet descriptor_set = vk.descriptor_sets;
-  
-  // Storage
-  VkDescriptorBufferInfo buffer_info = {
-    .buffer = vk.storage_buffer.handle,
-    .offset = 0,
-    .range = VK_WHOLE_SIZE,
-  };
-  VkWriteDescriptorSet ubo_descriptor = {
-    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    .dstSet = descriptor_set,
-    .dstBinding = 0,
-    .dstArrayElement = 0,
-    .descriptorCount = 1,
-    .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-    .pBufferInfo = &buffer_info,
-  };
-  
-  VkWriteDescriptorSet descriptors[] = {ubo_descriptor};
-  vk.UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
 }
 
 void vk_draw() {
@@ -2126,10 +2134,6 @@ void vk_init() {
   vk_loader_load_core();
   vk_instance_create();
   vk_loader_load_instance();
-  v2i win_size = os_get_window_size();
-  vk.width = win_size.x;
-  vk.height = win_size.y;
-
   vk_surface_create();
   vk_device_create();
   vk_loader_load_device();
@@ -2149,6 +2153,10 @@ void vk_init() {
     VK_CHECK(vk.CreateCommandPool(vkdevice, &graphics_pool_create_info, vk.allocator, &vk.device.cmd_pool));
     Info("Graphics command pool created");
 
+    v2i win_size = os_get_window_size();
+    vk.width = win_size.x;
+    vk.height = win_size.y;
+
     vk.images_in_flight = vk.device.swapchain_support.capabilities.minImageCount;
     vk.frames_in_flight = vk.images_in_flight - 1;
     vk_swapchain_query();
@@ -2156,29 +2164,29 @@ void vk_init() {
     Info("Swapchain created");
   
     vk.cmds = push_array(vk.arena, VkCommandBuffer, vk.frames_in_flight);
-    vk.compute_cmds = push_array(vk.arena, VkCommandBuffer, vk.frames_in_flight);
+    // vk.compute_cmds = push_array(vk.arena, VkCommandBuffer, vk.frames_in_flight);
     Loop (i, vk.frames_in_flight) {
       vk.cmds[i] = vk_cmd_alloc(vk.device.cmd_pool);
-      vk.compute_cmds[i] = vk_cmd_alloc(vk.device.cmd_pool);
+      // vk.compute_cmds[i] = vk_cmd_alloc(vk.device.cmd_pool);
     }
     Debug("Command buffers created");
   }
 
   // Sync
   {
-    // NOTE: Vulkan requires image_ready semaphore per frames_in_flight and render_ready per images_in_swapchain
+    // NOTE: for some reasons validation layer complains about render_complete_sempahores when their number is frames_in_flight but doesn't when is images_in_flight
     vk.sync.render_complete_semaphores = push_array(vk.arena, VkSemaphore, vk.images_in_flight);
-    vk.sync.compute_complete_semaphores = push_array(vk.arena, VkSemaphore, vk.images_in_flight);
+    // vk.sync.compute_complete_semaphores = push_array(vk.arena, VkSemaphore, vk.images_in_flight);
     Loop (i, vk.images_in_flight) {
-      VkSemaphoreCreateInfo semaphore_create_info = { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+      VkSemaphoreCreateInfo semaphore_create_info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
       vk.CreateSemaphore(vkdevice, &semaphore_create_info, vk.allocator, &vk.sync.render_complete_semaphores[i]);
-      vk.CreateSemaphore(vkdevice, &semaphore_create_info, vk.allocator, &vk.sync.compute_complete_semaphores[i]);
+      // vk.CreateSemaphore(vkdevice, &semaphore_create_info, vk.allocator, &vk.sync.compute_complete_semaphores[i]);
     }
 
     vk.sync.image_available_semaphores = push_array(vk.arena, VkSemaphore, vk.images_in_flight);
     vk.sync.in_flight_fences = push_array(vk.arena, VkFence, vk.frames_in_flight);
     Loop (i, vk.frames_in_flight) {
-      VkSemaphoreCreateInfo semaphore_create_info = { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+      VkSemaphoreCreateInfo semaphore_create_info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
       vk.CreateSemaphore(vkdevice, &semaphore_create_info, vk.allocator, &vk.sync.image_available_semaphores[i]);
       VkFenceCreateInfo fence_create_info = {
         .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
@@ -2190,36 +2198,27 @@ void vk_init() {
 
   // Buffers
   {
-    // Vert
     vk.vert_buffer = vk_buffer_create(
       MB(1),
       VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    // Index
     vk.index_buffer = vk_buffer_create(
       MB(1),
       VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    // Stage
     vk.stage_buffer = vk_buffer_create(
       MB(10),
       VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     vk_buffer_map_memory(vk.stage_buffer, 0, vk.stage_buffer.cap);
-    // Storage
     vk.storage_buffer = vk_buffer_create(
       MB(1),
       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     vk_buffer_map_memory(vk.storage_buffer, 0, vk.storage_buffer.cap);
-    // Textures
   }
 
-  vk_shader_init();
-  vk_draw_init();
-  // {
-  //   vk.entity_handlers = make_handle_pool();
-  // }
+  vk_descriptor_init();
 
   // Target texture render
   {
@@ -2293,7 +2292,7 @@ void vk_shutdown() {
     vk.DestroySemaphore(vkdevice, vk.sync.compute_complete_semaphores[i], vk.allocator);
     vk.DestroyFence(vkdevice, vk.sync.in_flight_fences[i], vk.allocator);
     vk_cmd_free(vk.device.cmd_pool, vk.cmds[i]);
-    vk_cmd_free(vk.device.cmd_pool, vk.compute_cmds[i]);
+    // vk_cmd_free(vk.device.cmd_pool, vk.compute_cmds[i]);
   }
 
   {
@@ -2353,7 +2352,7 @@ void vk_begin_frame() {
   //   .minDepth = 0.0f,
   //   .maxDepth = 1.0f,
   // };
-  // NOTE: we flip Y coordinate so positive Y is on top of screen
+  // NOTE: we flip Y coordinate so Y:0 is on bottom of screen
   VkViewport viewport = {
     .x = 0.0f,
     .y = (f32)vk.height,
@@ -2363,7 +2362,6 @@ void vk_begin_frame() {
     .maxDepth = 1.0f,
   };
   vk.CmdSetViewport(cmd, 0, 1, &viewport);
-
   VkRect2D scissor = {
     .offset = {.x = 0, .y = 0},
     .extent = {
@@ -2416,374 +2414,84 @@ void vk_end_frame() {
   vk_swapchain_present(vk_get_current_render_complete_semaphore(), vk.current_image_idx);
 }
 
-void vk_begin_renderpass(u32 renderpass_id) {
-  VkCommandBuffer cmd = vk_get_current_cmd();
-
-  switch (renderpass_id) {
-    case Renderpass_World: {
-      // Color
-      // VkImageMemoryBarrier barrier = {
-      //   .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-      //   .srcAccessMask = 0,
-      //   .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-      //   .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-      //   .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      //   .image = vk.texture_targets[vk.image_index].image.handle,
-      //   .subresourceRange = {
-      //     .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-      //     .baseMipLevel = 0,
-      //     .levelCount = 1,
-      //     .layerCount = 1,
-      //   },
-      // };
-      // vkCmdPipelineBarrier(
-      //   cmd,
-      //   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-      //   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-      //   NoFlags,
-      //   0, null,
-      //   0, null,
-      //   1, &barrier);
-
-      // // Depth
-      // VkImageMemoryBarrier depth_barrier = {
-      //   .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-      //   .srcAccessMask = 0,
-      //   .dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-      //   .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-      //   .newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-      //   .image = vk.offscreen_depth_buffer.handle,
-      //   .subresourceRange = {
-      //     .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-      //     .baseMipLevel = 0,
-      //     .levelCount = 1,
-      //     .layerCount = 1,
-      //   },
-      // };
-      // vkCmdPipelineBarrier(
-      //   cmd,
-      //   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-      //   VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-      //   NoFlags,
-      //   0, null,
-      //   0, null,
-      //   1, &depth_barrier);
-
-      // // Render
-      // VkRenderingAttachmentInfo color_attachment = {
-      //   .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-      //   .imageView = vk.texture_targets[vk.image_index].image.view,
-      //   .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      //   .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-      //   .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-      //   .clearValue = {
-      //     .color = {0.1f, 0.1f, 0.1f, 1.0f}
-      //   },
-      // };
-      // VkRenderingAttachmentInfo depth_attachment = {
-      //   .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-      //   .imageView = vk.offscreen_depth_buffer.view,
-      //   .imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-      //   .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-      //   .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-      //   .clearValue = {
-      //     .depthStencil = {1.0f, 0}
-      //   },
-      // };
-
-      VkImageMemoryBarrier barrier = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask = 0,
-        .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .image = vk.swapchain.images[vk.current_image_idx],
-        .subresourceRange = {
-          .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-          .baseMipLevel = 0,
-          .levelCount = 1,
-          .layerCount = 1,
-        },
-      };
-      vk.CmdPipelineBarrier(
-        cmd,
-        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        NoFlags,
-        0, null,
-        0, null,
-        1, &barrier);
-
-      // Depth
-      VkImageMemoryBarrier depth_barrier = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask = 0,
-        .dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-        .image = vk.swapchain.depth_attachment.handle,
-        .subresourceRange = {
-          .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-          .baseMipLevel = 0,
-          .levelCount = 1,
-          .layerCount = 1,
-        },
-      };
-      vk.CmdPipelineBarrier(
-        cmd,
-        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-        VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-        NoFlags,
-        0, null,
-        0, null,
-        1, &depth_barrier);
-
-      // Render
-      VkRenderingAttachmentInfo color_attachment = {
-        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-        .imageView = vk.swapchain.views[vk.current_image_idx],
-        .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-        .clearValue = {
-          .color = {0.1f, 0.1f, 0.1f, 1.0f}
-        },
-      };
-      VkRenderingAttachmentInfo depth_attachment = {
-        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-        .imageView = vk.swapchain.depth_attachment.view,
-        .imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-        .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-        .clearValue = {
-          .depthStencil = {1.0f, 0}
-        },
-      };
-
-      VkRenderingInfo render_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-        .renderArea = {
-          .offset = {.x = 0, .y = 0}, 
-          .extent = {.width = vk.width, .height = vk.height}
-        },
-        .layerCount = 1,
-        .colorAttachmentCount = 1,
-        .pColorAttachments = &color_attachment,
-        .pDepthAttachment = &depth_attachment
-      };
-      vk.CmdBeginRendering(cmd, &render_info);
-    } break;
-    case Renderpass_UI: {
-      // // Color
-      // VkImageMemoryBarrier barrier = {
-      //   .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-      //   .srcAccessMask = 0,
-      //   .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-      //   .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-      //   .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      //   .image = vk.swapchain.images[vk.image_index],
-      //   .subresourceRange = {
-      //     .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-      //     .baseMipLevel = 0,
-      //     .levelCount = 1,
-      //     .layerCount = 1,
-      //   },
-      // };
-      // vkCmdPipelineBarrier(
-      //   cmd,
-      //   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-      //   VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-      //   NoFlags,
-      //   0, null, 0, null,
-      //   1, &barrier);
-      // VkRenderingAttachmentInfo color_attachment = {
-      //   .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-      //   .imageView = vk.swapchain.views[vk.image_index],
-      //   .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      //   .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-      //   .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-      //   .clearValue = { 
-      //     .color = {0.01f, 0.01f, 0.01f, 1.0f},
-      //   },
-      // };
-      // // Start pass
-      // VkRenderingInfo render_info = {
-      //   .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-      //   .renderArea = {
-      //     .offset = {.x = 0, .y = 0}, 
-      //     .extent = { .width = vk.width, .height = vk.height }
-      //   },
-      //   .layerCount = 1,
-      //   .colorAttachmentCount = 1,
-      //   .pColorAttachments = &color_attachment,
-      // };
-      // vkCmdBeginRendering(cmd, &render_info);
-    } break;
-
-    case Renderpass_Screen: {
-      // Color
-      VkImageMemoryBarrier barrier = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask = 0,
-        .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .image = vk.swapchain.images[vk.current_image_idx],
-        .subresourceRange = {
-          .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-          .baseMipLevel = 0,
-          .levelCount = 1,
-          .layerCount = 1,
-        },
-      };
-      vk.CmdPipelineBarrier(
-        cmd,
-        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        NoFlags,
-        0, null,
-        0, null,
-        1, &barrier);
-
-      // Render
-      VkRenderingAttachmentInfo color_attachment = {
-        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-        .imageView = vk.swapchain.views[vk.current_image_idx],
-        .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-        .clearValue = { 
-          .color = {0.01f, 0.01f, 0.01f, 1.0f},
-        },
-      };
-      VkRenderingInfo render_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-        .renderArea = {
-          .offset = {.x = 0, .y = 0}, 
-          .extent = { .width = vk.width, .height = vk.height }
-        },
-        .layerCount = 1,
-        .colorAttachmentCount = 1,
-        .pColorAttachments = &color_attachment,
-      };
-      // Info("render swapchain, width: %i, height: %i", render_info.renderArea.extent.width, render_info.renderArea.extent.height);
-      vk.CmdBeginRendering(cmd, &render_info);
-    } break;
-
-    default: {
-      Assert(!"wrong id");
-      return;
+intern VkRenderingAttachmentInfo vk_default_color_attachment_info(VkImageView view) {
+  VkRenderingAttachmentInfo result = {
+    .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+    .imageView = view,
+    .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+    .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+    .clearValue = {
+      .color = {0.1f, 0.1f, 0.1f, 1.0f},
     }
-  }
+  };
+  return result;
 }
 
-void vk_end_renderpass(u32 renderpass_id) {
-  VkCommandBuffer cmd = vk_get_current_cmd();
-
-  switch (renderpass_id) {
-    case Renderpass_World: {
-      vk.CmdEndRendering(cmd);
-      // VkImageMemoryBarrier barrier = {
-      //   .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-      //   .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-      //   .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-      //   .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      //   .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-      //   .image = vk.texture_targets[vk.image_index].image.handle,
-      //   .subresourceRange = {
-      //     .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-      //     .baseMipLevel = 0,
-      //     .levelCount = 1,
-      //     .layerCount = 1,
-      //   },
-      // };
-      // vkCmdPipelineBarrier(
-      //   cmd,
-      //   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-      //   VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-      //   NoFlags,
-      //   0, null,
-      //   0, null,
-      //   1, &barrier);
-      VkImageMemoryBarrier barrier = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        .dstAccessMask = 0,
-        .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-        .image = vk.swapchain.images[vk.current_image_idx],
-        .subresourceRange = {
-          .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-          .baseMipLevel = 0,
-          .levelCount = 1,
-          .layerCount = 1,
-        },
-      };
-      vk.CmdPipelineBarrier(
-        cmd,
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-        NoFlags,
-        0, null,
-        0, null,
-        1, &barrier);
-    } break;
-
-    case Renderpass_UI: {
-      // VkImageMemoryBarrier barrier = {
-      //   .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-      //   .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-      //   .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT,
-      //   .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      //   .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-      //   .image = vk.swapchain.images[vk.image_index],
-      //   .subresourceRange = {
-      //     .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-      //     .baseMipLevel = 0,
-      //     .levelCount = 1,
-      //     .layerCount = 1,
-      //   },
-      // };
-      // vkCmdPipelineBarrier(
-      //   cmd,
-      //   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-      //   VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-      //   NoFlags,
-      //   0, null, 0, null,
-      //   1, &barrier);
-    } break;
-
-    case Renderpass_Screen: {
-      vk.CmdEndRendering(cmd);
-      VkImageMemoryBarrier barrier = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        .dstAccessMask = 0,
-        .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-        .image = vk.swapchain.images[vk.current_image_idx],
-        .subresourceRange = {
-          .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-          .baseMipLevel = 0,
-          .levelCount = 1,
-          .layerCount = 1,
-        },
-      };
-      vk.CmdPipelineBarrier(
-        cmd,
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-        NoFlags,
-        0, null,
-        0, null,
-        1, &barrier);
-    } break;
-
-    default: {
-      Assert(!"wrong id");
-      return;
+intern VkRenderingAttachmentInfo vk_default_depth_attachment_info(VkImageView view) {
+  VkRenderingAttachmentInfo result = {
+    .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+    .imageView = view,
+    .imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+    .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+    .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+    .clearValue = { 
+      .depthStencil = {1, 0} 
     }
+  };
+  return result;
+}
+
+intern VkRenderingInfo vk_default_rendering_info(VkRenderingAttachmentInfo* color_attachment, VkRenderingAttachmentInfo* depth_attachment = null) {
+  VkRenderingInfo result = {
+    .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+    .renderArea = {
+      .offset = {.x = 0, .y = 0}, 
+      .extent = {.width = vk.width, .height = vk.height}
+    },
+    .layerCount = 1,
+    .colorAttachmentCount = 1,
+    .pColorAttachments = color_attachment,
+    .pDepthAttachment = depth_attachment
+  };
+  return result;
+}
+
+void vk_begin_renderpass(RenderpassType renderpass_id) {
+  VkCommandBuffer cmd = vk_get_current_cmd();
+  switch (renderpass_id) {
+    case RenderpassType_World: {
+      // Color
+      vk_image_layout_transition(cmd, vk.swapchain.images[vk.current_image_idx], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+      // Depth
+      vk_image_layout_transition(cmd, vk.swapchain.depth_attachment.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+      // Render
+      VkRenderingAttachmentInfo color_attachment = vk_default_color_attachment_info(vk.swapchain.views[vk.current_image_idx]);
+      VkRenderingAttachmentInfo depth_attachment = vk_default_depth_attachment_info(vk.swapchain.depth_attachment.view);
+      VkRenderingInfo render_info = vk_default_rendering_info(&color_attachment, &depth_attachment);
+      vk.CmdBeginRendering(cmd, &render_info);
+    } break;
+    case RenderpassType_UI: {
+    } break;
+    case RenderpassType_Screen: {
+    } break;
   }
+  return;
+}
+
+void vk_end_renderpass(RenderpassType renderpass) {
+  VkCommandBuffer cmd = vk_get_current_cmd();
+  switch (renderpass) {
+    case RenderpassType_World: {
+      vk.CmdEndRendering(cmd);
+      vk_image_layout_transition(cmd, vk.swapchain.images[vk.current_image_idx], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    } break;
+    case RenderpassType_UI: {
+    } break;
+    case RenderpassType_Screen: {
+    } break;
+  }
+  return;
 }
 
 void vk_update_transform(u32 entity_id, Transform trans) {

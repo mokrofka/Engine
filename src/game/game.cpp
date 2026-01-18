@@ -1,5 +1,3 @@
-#include "lib.h"
-
 #include "common.h"
 
 // f32 cube_vertices[] = {
@@ -782,7 +780,7 @@ void game_init() {
     };
     u32 mesh = vk_mesh_load(triangle);
     Entity& e = entity_create(mesh, shaders(Shader_Color), textures(Texture_Container));
-    e.pos().x = 3;
+    e.pos().z = 0.8;
   }
   // Entity& room = entity_create(meshes[Mesh_Room], shaders[Shader_Color], textures[Texture_Room]);
   // room.pos = {0,0,10};
@@ -860,7 +858,10 @@ shared_function void app_update(u8** state) {
     // Info("cam pos: %f %f %f", pos.x,pos.y,pos.z);
   }
   for (Entity& e : st->entities) {
-    e.pos().x -= delta_time * 0.5;
+    // e.pos().x += delta_time * 0.01;
+    // e.pos() += v3_cross(v3_up(), v3_forward()) * delta_time * 0.1;
+
+    // e.pos().x += -0.1 * delta_time;
   }
 
   camera_update();

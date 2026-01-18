@@ -1,10 +1,10 @@
 #pragma once
 #include "lib.h"
 
-enum {
-  Renderpass_World,
-  Renderpass_UI,
-  Renderpass_Screen,
+enum RenderpassType{
+  RenderpassType_World,
+  RenderpassType_UI,
+  RenderpassType_Screen,
 };
 
 struct PushConstant {

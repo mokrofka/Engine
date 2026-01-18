@@ -64,6 +64,8 @@ layout(std430, set = 0, binding = 0) readonly buffer Buffer {
   Material materials[KB(1)];
 } st;
 
+layout(set = 0, binding = 1) uniform sampler2D textures[];
+
 layout(push_constant) uniform PushConstants {
   // mat4 model;
   u32 id;

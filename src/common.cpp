@@ -30,7 +30,7 @@ void common_init() {
       String cmd = push_strf(scratch, "glslangValidator -V %s -o %s", shader_filepath, shader_compiled_filepath);
       os_process_launch(cmd);
     }, OS_WatchFlag_Modify);
-    asset_watch_directory_add(push_str_cat(scratch, asset_base_path(), "shaders/compiled"), [](String name) {
+    asset_watch_directory_add(push_str_cat(scratch, asset_base_path(), "/shaders/compiled"), [](String name) {
       Scratch scratch;
       String shader_name_with_format = str_chop_last_dot(name);
       String shader_name = str_chop_last_dot(shader_name_with_format);
@@ -57,9 +57,9 @@ void r_end_draw_frame() {
 
   // World
   {
-    vk_begin_renderpass(Renderpass_World);
+    vk_begin_renderpass(RenderpassType_World);
     vk_draw();
-    vk_end_renderpass(Renderpass_World);
+    vk_end_renderpass(RenderpassType_World);
   }
   
   // {

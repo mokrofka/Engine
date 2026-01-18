@@ -305,6 +305,7 @@ void  os_close_window() {
 
 ////////////////////////////////////////////////////////////////////////
 // keyboard
+
 void os_input_update() {
   MemCopyStruct(&st.input.keyboard_previous, &st.input.keyboard_current);
   MemCopyStruct(&st.input.mouse_previous, &st.input.mouse_current);
@@ -319,6 +320,7 @@ b32 os_is_key_released(Key key)   { return os_is_key_up(key) && os_was_key_down(
 
 ////////////////////////////////////////////////////////////////////////
 // mouse
+
 b32 os_is_button_down(MouseButtons button)          { return st.input.mouse_current.buttons[button] == true; }
 b32 os_is_button_up(MouseButtons button)            { return st.input.mouse_current.buttons[button] == false; }
 b32 os_was_button_down(MouseButtons button)         { return st.input.mouse_previous.buttons[button] == true; }

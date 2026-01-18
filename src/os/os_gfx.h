@@ -1,5 +1,5 @@
 #pragma once
-#include "lib.h"
+#include "os/os_core.h"
 
 KAPI void os_gfx_init();
 KAPI void os_gfx_shutdown();

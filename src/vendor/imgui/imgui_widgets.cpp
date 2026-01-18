@@ -5045,7 +5045,7 @@ bool ImGui::InputTextEx(const char* label, const char* hint, char* buf, int buf_
                 apply_new_text = "";
                 apply_new_text_length = 0;
                 value_changed = true;
-                IMSTB_TEXTEDIT_CHARTYPE empty_string;
+                const IMSTB_TEXTEDIT_CHARTYPE empty_string = 0;
                 stb_textedit_replace(state, state->Stb, &empty_string, 0);
             }
             else if (strcmp(buf, state->TextToRevertTo.Data) != 0)
@@ -10703,3 +10703,4 @@ void ImGui::TabItemLabelAndCloseButton(ImDrawList* draw_list, const ImRect& bb, 
 
 
 #endif // #ifndef IMGUI_DISABLE
+
