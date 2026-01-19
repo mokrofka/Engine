@@ -9,7 +9,7 @@ enum RenderpassType{
 
 struct PushConstant {
   // mat4 model;
-  u32 entity_index;
+  u32 entity_idx;
   u32 texture_id;
 };
 
@@ -104,6 +104,10 @@ struct Mesh {
   u32* indexes;
   u32 vert_count;
   u32 index_count;
+};
+
+struct RenderEntity {
+  u32 shader_handle;
 };
 
 enum ShaderTopology {

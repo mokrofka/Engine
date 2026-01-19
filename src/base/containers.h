@@ -7,6 +7,9 @@
 #define DEFAULT_CAPACITY      8
 #define DEFAULT_RESIZE_FACTOR 2
 
+////////////////////////////////////////////////////////////////////////
+// Generic interface
+
 template <typename T>
 struct InterfaceEqual {
   NO_DEBUG b32 operator()(T a, T b) { return equal(a,b); }
@@ -25,7 +28,63 @@ enum EqualMode {
   EqualMem
 };
 
-// TODO: implement object pool indexes through u32 freelist with handler generation
+////////////////////////////////////////////////////////////////////////
+// Pool
+
+template<typename T>
+struct ObjectPool {
+  u32 head = 0;
+  u32 cap = 0;
+  Allocator alloc = {};
+  T* data = null;
+  void init(Allocator alloc_) {
+    alloc = alloc_;
+  }
+  T& get(u32 idx) {
+    Assert(idx < cap);
+    return data[idx];
+  }
+  u32 append(T a) {
+    if (head >= cap) {
+      grow();
+    }
+    u32 result = head;
+    head = *(u32*)&data[head];
+    data[result] = a;
+    return result;
+  }
+  u32 append() {
+    if (head == U32_MAX) {
+      grow();
+    }
+    u32 result = head;
+    head = *(u32*)&data[head];
+    return result;
+  }
+  void remove(u32 id) {
+    *(u32*)&data[id] = head;
+    head = id;
+  }
+  void grow() {
+    if (data) {
+      u32 cap_old = cap;
+      cap *= DEFAULT_RESIZE_FACTOR;
+      data = mem_realloc_array(alloc, data, cap_old, T, cap);
+      head = cap_old;
+      for (i32 i = cap_old; i < cap-1; ++i) {
+        *(u32*)&data[i] = i+1;
+      }
+      *(u32*)&data[cap-1] = U32_MAX;
+    } else {
+      cap = DEFAULT_CAPACITY;
+      data = mem_alloc_array(alloc, T, cap);
+      Loop (i, cap-1) {
+        *(u32*)&data[i] = i+1;
+      }
+      *(u32*)&data[cap-1] = U32_MAX;
+    }
+  }
+};
 
 ////////////////////////////////////////////////////////////////////////
 // Array
@@ -327,107 +386,167 @@ struct SparseSetIndex {
   }
 };
 
-// template<typename T, i32 N>
-// struct SparseArray {
-//   static constexpr i32 cap = N;
-//   u32 count = 0;
-//   u32 entity_to_index[N] = {};
-//   u32 entities[N] = {};
-//   T data[N] = {};
+template<typename T, i32 N>
+struct SparseArray {
+  static constexpr i32 cap = N;
+  u32 count = 0;
+  u32 entity_to_index[N] = {};
+  u32 entities[N] = {};
+  T data[N] = {};
 
-//   T* begin() { return data; }
-//   T* end()   { return data + count; }
+  T* begin() { return data; }
+  T* end()   { return data + count; }
 
-//   SparseArray() = default;
+  SparseArray() = default;
 
-//   T& operator[](u32 idx) {
-//     Assert(idx < cap);
-//     DebugDo(Assert(entity_to_index[idx] != INVALID_ID));
-//     u32 index = entity_to_index[idx];
-//     return data[index];
-//   }
-//   u32 append(T e) {
-//     u32 id = count++;
-//     entity_to_index[id] = id;
-//     entities[id] = id;
-//     data[id] = e;
-//     return id;
-//   }
-//   void remove(u32 id) {
-//     DebugDo(Assert(entity_to_index[id] != INVALID_ID));
-//     u32 idx_of_removed_entity = entity_to_index[id];
-//     u32 idx_of_last_element = count - 1;
-//     data[idx_of_removed_entity] = data[idx_of_last_element];
+  T& operator[](u32 idx) {
+    Assert(idx < cap);
+    DebugDo(Assert(entity_to_index[idx] != INVALID_ID));
+    u32 index = entity_to_index[idx];
+    return data[index];
+  }
+  u32 append(T e) {
+    u32 id = count++;
+    entity_to_index[id] = id;
+    entities[id] = id;
+    data[id] = e;
+    return id;
+  }
+  void remove(u32 id) {
+    DebugDo(Assert(entity_to_index[id] != INVALID_ID));
+    u32 idx_of_removed_entity = entity_to_index[id];
+    u32 idx_of_last_element = count - 1;
+    data[idx_of_removed_entity] = data[idx_of_last_element];
 
-//     u32 last_entity = entities[idx_of_last_element];
+    u32 last_entity = entities[idx_of_last_element];
 
-//     entity_to_index[last_entity] = idx_of_removed_entity;
-//     entities[idx_of_removed_entity] = last_entity;
+    entity_to_index[last_entity] = idx_of_removed_entity;
+    entities[idx_of_removed_entity] = last_entity;
 
-//     --count;
+    --count;
 
-//     DebugDo(entity_to_index[id] = INVALID_ID);
-//   }
-// };
+    DebugDo(entity_to_index[id] = INVALID_ID);
+  }
+};
 
-// template <typename T>
-// struct SparseDarray {
-//   u32 count = 0;
-//   u32 cap = 0;
-//   u32* entity_to_index = null;
-//   u32* entities = null;
-//   T* data = null;
+template <typename T>
+struct SparseDarray {
+  u32 count = 0;
+  u32 cap = 0;
+  Allocator alloc = {};
+  u32* entity_to_index = null;
+  u32* entities = null;
+  T* data = null;
 
-//   T* begin() { return data; }
-//   T* end()   { return data + count; }
+  T* begin() { return data; }
+  T* end()   { return data + count; }
 
-//   T& operator[](u32 idx) {
-//     Assert(idx < cap);
-//     DebugDo(Assert(entity_to_index[idx] != INVALID_ID));
-//     u32 index = entity_to_index[idx];
-//     return data[index];
-//   }
-//   u32 append(T e) {
-//     if (count >= cap) {
-//       grow();
-//     }
-//     u32 id = count++;
-//     entity_to_index[id] = id;
-//     entities[id] = id;
-//     data[id] = e;
-//     return id;
-//   }
-//   void remove(u32 id) {
-//     DebugDo(Assert(entity_to_index[id] != INVALID_ID));
-//     u32 idx_of_removed_entity = entity_to_index[id];
-//     u32 idx_of_last_element = count - 1;
-//     data[idx_of_removed_entity] = data[idx_of_last_element];
+  T& operator[](u32 idx) {
+    Assert(idx < cap);
+    DebugDo(Assert(entity_to_index[idx] != INVALID_ID));
+    u32 index = entity_to_index[idx];
+    return data[index];
+  }
+  u32 append(T e) {
+    if (count >= cap) {
+      grow();
+    }
+    u32 id = count++;
+    entity_to_index[id] = id;
+    entities[id] = id;
+    data[id] = e;
+    return id;
+  }
+  void remove(u32 id) {
+    DebugDo(Assert(entity_to_index[id] != INVALID_ID));
+    u32 idx_of_removed_entity = entity_to_index[id];
+    u32 idx_of_last_element = count - 1;
+    data[idx_of_removed_entity] = data[idx_of_last_element];
 
-//     u32 last_entity = entities[idx_of_last_element];
+    u32 last_entity = entities[idx_of_last_element];
 
-//     entity_to_index[last_entity] = idx_of_removed_entity;
-//     entities[idx_of_removed_entity] = last_entity;
+    entity_to_index[last_entity] = idx_of_removed_entity;
+    entities[idx_of_removed_entity] = last_entity;
 
-//     --count;
+    --count;
 
-//     DebugDo(entity_to_index[id] = INVALID_ID);
-//   }
-//   void grow() {
-//     if (data) {
-//       cap *= DEFAULT_RESIZE_FACTOR;
-//       // entities = global_realloc_array(entities, u32, cap);
-//       // entity_to_index = global_realloc_array(entity_to_index, u32, cap);
-//       // data = global_realloc_array(entities, T, cap);
-//     }
-//     else {
-//       cap = DEFAULT_CAPACITY;
-//       entities = global_alloc_array(u32, cap);
-//       data = global_alloc_array(T, cap);
-//       entity_to_index = global_alloc_array(u32, cap);
-//     }
-//   }
-// };
+    DebugDo(entity_to_index[id] = INVALID_ID);
+  }
+  void grow() {
+    if (data) {
+      u32 cap_old = cap;
+      cap *= DEFAULT_RESIZE_FACTOR;
+      SoA_Field fields[] = {
+        SoA_push_field(&entity_to_index, u32),
+        SoA_push_field(&entities, u32),
+        SoA_push_field(&data, T),
+      };
+      mem_realloc_soa(alloc, entity_to_index, cap_old, cap, fields, ArrayCount(fields));
+    }
+    else {
+      cap = DEFAULT_CAPACITY;
+      SoA_Field fields[] = {
+        SoA_push_field(&entity_to_index, u32),
+        SoA_push_field(&entities, u32),
+        SoA_push_field(&data, T),
+      };
+      mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
+    }
+  }
+};
 
+struct SparseDarrayIndex {
+  u32 count = 0;
+  u32 cap = 0;
+  Allocator alloc = {};
+  u32* entity_to_index = null;
+  u32* entities = null;
+
+  u32* begin() { return entities; }
+  u32* end()   { return entities + count; }
+
+  void append(u32 e) {
+    if (count >= cap) {
+      grow();
+    }
+    u32 id = count++;
+    entity_to_index[id] = id;
+    entities[id] = id;
+  }
+  void remove(u32 id) {
+    DebugDo(Assert(entity_to_index[id] != INVALID_ID));
+    u32 idx_of_removed_entity = entity_to_index[id];
+    u32 idx_of_last_element = count - 1;
+
+    u32 last_entity = entities[idx_of_last_element];
+
+    entity_to_index[last_entity] = idx_of_removed_entity;
+    entities[idx_of_removed_entity] = last_entity;
+
+    --count;
+
+    DebugDo(entity_to_index[id] = INVALID_ID);
+  }
+  void grow() {
+    if (entity_to_index) {
+      u32 cap_old = cap;
+      cap *= DEFAULT_RESIZE_FACTOR;
+      SoA_Field fields[] = {
+        SoA_push_field(&entity_to_index, u32),
+        SoA_push_field(&entities, u32),
+      };
+      mem_realloc_soa(alloc, entity_to_index, cap_old, cap, fields, ArrayCount(fields));
+    }
+    else {
+      cap = DEFAULT_CAPACITY;
+      SoA_Field fields[] = {
+        SoA_push_field(&entity_to_index, u32),
+        SoA_push_field(&entities, u32),
+      };
+      mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
+    }
+  }
+};
 ////////////////////////////////////////////////////////////////////////
 // IdPool
 

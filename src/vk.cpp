@@ -19,9 +19,6 @@ struct VK_Buffer {
   u8* maped_memory;
   u64 size;
   u64 cap;
-  u64 usage;
-  u32 memory_index;
-  u32 memory_property_flags;
 };
 
 struct VK_Image {
@@ -34,7 +31,7 @@ struct VK_Image {
 
 struct VK_Texture {
   VK_Image image;
-  VkSampler sampler;
+  VkSampler sampler; // TODO:
 };
 
 struct VK_Mesh {
@@ -47,11 +44,9 @@ struct VK_Mesh {
 struct VK_Swapchain {
   VkSwapchainKHR handle;
   VkSurfaceFormatKHR image_format;  
+  VkPresentModeKHR present_mode;
   VkImage images[4];
   VkImageView views[4];
-  
-  VkPresentModeKHR present_mode;
-
   VK_Image depth_attachment;
 };
 
@@ -88,7 +83,7 @@ struct VK_Device {
 
 struct VK_Pipeline {
   VkPipeline handle;
-  VkPipelineLayout pipeline_layout;
+  VkPipelineLayout pipeline_layout; // TODO:
 };
 
 struct VK_Shader {
@@ -96,7 +91,8 @@ struct VK_Shader {
   ShaderType type;
   VK_Pipeline pipeline;
   Array<VkPipelineShaderStageCreateInfo, 2> stages;
-  SparseSetIndex entities;
+  // SparseSetIndex entities;
+  SparseDarrayIndex entities;
 };
 
 struct VK_ShaderCompute {
@@ -151,9 +147,9 @@ struct VK_State {
 
   ShaderEntity* entities_data;
 
+  Array<RenderEntity, MaxEntities> entities;
   Array<u32, MaxEntities> entities_to_shader;
   Array<u32, MaxEntities> entities_to_mesh;
-  Array<u32, MaxEntities> entities_to_texture;
 
   Array<PushConstant, MaxEntities> push_constants;
   Array<VK_Shader, MaxShaders> shaders;
@@ -403,21 +399,19 @@ VK_State vk;
 
 intern VkSemaphore vk_get_current_image_available_semaphore() { return vk.sync.image_available_semaphores[vk.current_frame_idx]; }
 intern VkSemaphore vk_get_current_render_complete_semaphore() { return vk.sync.render_complete_semaphores[vk.current_image_idx]; }
-intern VkCommandBuffer& vk_get_current_cmd()                  { return vk.cmds[vk.current_frame_idx]; }
+intern VkCommandBuffer vk_get_current_cmd()                   { return vk.cmds[vk.current_frame_idx]; }
 
-intern u32 vk_find_memory_index(u32 type_filter, u32 property_flags) {
+intern u32 vk_find_memory_idx(u32 type_filter, u32 property_flags) {
   VkPhysicalDeviceMemoryProperties memory_properties = vk.device.memory;
-  u32 index = INVALID_ID;
-
+  u32 idx = -1;
   Loop (i, memory_properties.memoryTypeCount) {
     if (BitHas(type_filter, i) && FlagHas(memory_properties.memoryTypes[i].propertyFlags, property_flags)) {
-      index = i;
+      idx = i;
       break;
     }
   }
-
-  AssertMsg(index != INVALID_ID, "Unable to find suitable memory type");
-  return index;
+  AssertMsg(idx != -1, "Unable to find suitable memory type");
+  return idx;
 }
 
 intern String vk_result_string(VkResult result) {
@@ -488,7 +482,6 @@ intern VkCommandBuffer vk_cmd_alloc(VkCommandPool pool) {
     .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
     .commandBufferCount = 1,
   };
-
   VkCommandBuffer cmd;
   VK_CHECK(vk.AllocateCommandBuffers(vkdevice, &allocate_info, &cmd));
   return cmd;
@@ -518,7 +511,6 @@ intern VkCommandBuffer vk_cmd_alloc_and_begin_single_use() {
 
 intern void vk_cmd_end_single_use(VkCommandBuffer cmd) {
   vk_cmd_end(cmd);
-  
   VkSubmitInfo submit_info = {
     .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
     .commandBufferCount = 1,
@@ -526,7 +518,6 @@ intern void vk_cmd_end_single_use(VkCommandBuffer cmd) {
   };
   VK_CHECK(vk.QueueSubmit(vk.device.graphics_queue, 1, &submit_info, 0));
   VK_CHECK(vk.QueueWaitIdle(vk.device.graphics_queue));
-  
   vk_cmd_free(vk.device.cmd_pool, cmd);
 }
 
@@ -540,29 +531,20 @@ intern VK_Buffer vk_buffer_create(u64 size, u32 usage, u32 memory_property_flags
     .usage = usage,
     .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
   };
-
   VK_Buffer buffer = {
-    .size = 0,
     .cap = size,
-    .usage = usage,
-    .memory_property_flags = memory_property_flags,
   };
-  
   VK_CHECK(vk.CreateBuffer(vkdevice, &buffer_create_info, vk.allocator, &buffer.handle));
-
   VkMemoryRequirements requirements;
   vk.GetBufferMemoryRequirements(vkdevice, buffer.handle, &requirements);
-  buffer.memory_index = vk_find_memory_index(requirements.memoryTypeBits, buffer.memory_property_flags);
-  
+  u32 memory_index = vk_find_memory_idx(requirements.memoryTypeBits, memory_property_flags);
   VkMemoryAllocateInfo allocate_info = {
     .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
     .allocationSize = requirements.size,
-    .memoryTypeIndex = buffer.memory_index,
+    .memoryTypeIndex = memory_index,
   };
-  
   VK_CHECK(vk.AllocateMemory(vkdevice, &allocate_info, vk.allocator, &buffer.memory));
   VK_CHECK(vk.BindBufferMemory(vkdevice, buffer.handle, buffer.memory, 0));
-  
   return buffer;
 }
 
@@ -582,17 +564,13 @@ intern void vk_buffer_unmap_memory(VK_Buffer buffer) {
 
 intern void vk_buffer_upload_to_gpu(VK_Buffer buffer, Range range, void* data) {
   MemCopy(vk.stage_buffer.maped_memory, data, range.size);
-
   VkCommandBuffer temp_cmd = vk_cmd_alloc_and_begin_single_use();
-  
   VkBufferCopy copy_region = {
     .srcOffset = 0,
     .dstOffset = range.offset,
     .size = range.size,
   };
-  
   vk.CmdCopyBuffer(temp_cmd, vk.stage_buffer.handle, buffer.handle, 1, &copy_region);
-  
   vk_cmd_end_single_use(temp_cmd);
 }
 
@@ -746,7 +724,6 @@ intern VK_Pipeline vk_shader_pipeline_create(ShaderInfo shader_info, Array<VkPip
   }
   color_blend_attachment_state.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                                                 VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-
   VkPipelineColorBlendStateCreateInfo color_blend_state_create_info = {
     .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
     .logicOpEnable = VK_FALSE,
@@ -784,7 +761,6 @@ intern VK_Pipeline vk_shader_pipeline_create(ShaderInfo shader_info, Array<VkPip
     .pushConstantRangeCount = 1,
     .pPushConstantRanges = &push_constant,
   };
-  
   VK_Pipeline result = {};
   VK_CHECK(vk.CreatePipelineLayout(vkdevice, &pipeline_layout_info, vk.allocator, &result.pipeline_layout));
 
@@ -808,9 +784,7 @@ intern VK_Pipeline vk_shader_pipeline_create(ShaderInfo shader_info, Array<VkPip
     .basePipelineHandle = VK_NULL_HANDLE,
     .basePipelineIndex = -1,
   };
-
   VK_CHECK(vk.CreateGraphicsPipelines(vkdevice, VK_NULL_HANDLE, 1, &pipeline_info, vk.allocator, &result.handle));
-
   return result;
 }
 
@@ -845,7 +819,6 @@ intern Array<VkPipelineShaderStageCreateInfo, 2> vk_shader_module_create(String 
 u32 vk_shader_load(String name, ShaderType type) {
   Scratch scratch;
   ShaderInfo shader_info = shader_type[type];
-
   if (IsInsideBounds(ShaderType_Drawing, type, ShaderType_Drawing_COUNT)) {
     VK_Shader shader = {
       .name = name,
@@ -869,10 +842,6 @@ u32 vk_shader_load(String name, ShaderType type) {
     // append(vk.shaders, shader);
     return id;
   }
-  // else if (IsInsideBounds(ShaderType_Compute, type, ShaderType_Compute_COUNT)) {
-
-  // }
-
   Assert(true);
   return 0;
 }
@@ -976,9 +945,6 @@ intern void vk_descriptor_init() {
 
   // Shader Data
   {
-    VkDescriptorSet descriptor_set = vk.descriptor_sets;
-    
-    // Storage
     VkDescriptorBufferInfo buffer_info = {
       .buffer = vk.storage_buffer.handle,
       .offset = 0,
@@ -986,14 +952,13 @@ intern void vk_descriptor_init() {
     };
     VkWriteDescriptorSet ubo_descriptor = {
       .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-      .dstSet = descriptor_set,
+      .dstSet = vk.descriptor_sets,
       .dstBinding = 0,
       .dstArrayElement = 0,
       .descriptorCount = 1,
       .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
       .pBufferInfo = &buffer_info,
     };
-    
     VkWriteDescriptorSet descriptors[] = {ubo_descriptor};
     vk.UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
   }
@@ -1052,7 +1017,7 @@ intern VK_Image vk_image_create(
 
   VkMemoryRequirements memory_requirements;
   vk.GetImageMemoryRequirements(vkdevice, handle, &memory_requirements);
-  u32 memory_type = vk_find_memory_index(memory_requirements.memoryTypeBits, memory_flags);
+  u32 memory_type = vk_find_memory_idx(memory_requirements.memoryTypeBits, memory_flags);
   VkMemoryAllocateInfo memory_allocate_info = {
     .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
     .allocationSize = memory_requirements.size,
@@ -1813,6 +1778,7 @@ void vk_draw() {
       u32 mesh_id = vk.entities_to_mesh[id];
       VK_Mesh mesh = vk.meshes[mesh_id];
       PushConstant* push = &vk.push_constants[id];
+      push->entity_idx = id;
       ShaderEntity& e = vk_get_entity(id);
       e.model = mat4_transform(entities_transforms[id]);
 
@@ -2508,10 +2474,8 @@ u32 vk_make_renderable(u32 entity_id, u32 mesh_id, u32 shader_id, u32 texture_id
 
   vk.entities_to_mesh[entity_id] = mesh_id;
   vk.entities_to_shader[entity_id] = shader_id;
-  vk.entities_to_texture[entity_id] = texture_id;
 
   PushConstant& push = vk.push_constants[entity_id];
-  push.entity_index = entity_id;
   push.texture_id = texture_id;
 
   return entity_id;
