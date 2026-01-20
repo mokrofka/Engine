@@ -41,7 +41,7 @@ void common_init() {
 
   vk_init();
 
-  shader_load("screen_shader", ShaderType_Screen);
+  // shader_load("screen_shader", ShaderType_Screen);
 }
 
 void r_shutdown() {

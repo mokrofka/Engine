@@ -865,17 +865,19 @@ intern void vk_descriptor_init() {
   Scratch scratch;
 
   // Pool
-  #define StorageBufferMax 1
-  #define SetsMax 1
+  #define MaxStorageBuffer 1
+  #define MaxSets 1
+  #define MaxSamplers 1
   {
     VkDescriptorPoolSize pool_sizes[] = {
-      {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MaxTextures},
-      {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, StorageBufferMax},
+      {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, MaxStorageBuffer},
+      {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, MaxTextures},
+      {VK_DESCRIPTOR_TYPE_SAMPLER, MaxSamplers},
     };
     VkDescriptorPoolCreateInfo pool_info = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
       .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT | VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT_EXT,
-      .maxSets = SetsMax,
+      .maxSets = MaxSets,
       .poolSizeCount = ArrayCount(pool_sizes),
       .pPoolSizes = pool_sizes,
     };
@@ -888,6 +890,7 @@ intern void vk_descriptor_init() {
     VkDescriptorBindingFlags flags[] = {
       0,
       VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
+      0,
     };
     VkDescriptorSetLayoutBindingFlagsCreateInfo binding_flags = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
@@ -904,8 +907,14 @@ intern void vk_descriptor_init() {
       },
       {
         .binding = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
         .descriptorCount = MaxTextures,
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+      },
+      {
+        .binding = 2,
+        .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+        .descriptorCount = MaxSamplers,
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
       },
     };
@@ -1144,6 +1153,22 @@ intern void vk_texture_init() {
     .unnormalizedCoordinates = VK_FALSE,
   };
   VK_CHECK(vk.CreateSampler(vkdevice, &sampler_info, vk.allocator, &vk.sampler));
+
+  VkDescriptorImageInfo descriptor_image_info = {
+    .sampler = vk.sampler,
+    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+  };
+  VkWriteDescriptorSet texture_descriptor = {
+    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+    .dstSet = vk.descriptor_sets,
+    .dstBinding = 2,
+    .dstArrayElement = 0,
+    .descriptorCount = 1,
+    .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+    .pImageInfo = &descriptor_image_info,
+  };
+  VkWriteDescriptorSet descriptors[] = {texture_descriptor};
+  vk.UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
 };
 
 u32 vk_texture_load(Texture t) {
@@ -1168,7 +1193,7 @@ u32 vk_texture_load(Texture t) {
     .dstBinding = 1,
     .dstArrayElement = vk.texture.count,
     .descriptorCount = 1,
-    .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+    .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
     .pImageInfo = &descriptor_image_info,
   };
   VkWriteDescriptorSet descriptors[] = {texture_descriptor};
@@ -1719,9 +1744,6 @@ u32 vk_mesh_load(Mesh mesh) {
 ////////////////////////////////////////////////////////////////////////
 // @Drawing
 
-void vk_draw_init() {
-}
-
 void vk_draw() {
   VkCommandBuffer cmd = vk_get_current_cmd();
 
@@ -2145,40 +2167,40 @@ void vk_init() {
   vk_shader_pipeline_init();
 
   // Target texture render
-  {
-    // vk.texture_targets = push_array(vk.arena, VK_Texture, vk.images_in_flight);
-    // Loop (i, vk.images_in_flight) {
-    //   vk.texture_targets[i].image = vk_image_create(
-    //     VK_IMAGE_TYPE_2D,
-    //     vk.width, vk.height,
-    //     VK_FORMAT_B8G8R8A8_UNORM,
-    //     // VK_FORMAT_R8G8B8A8_UNORM,
-    //     VK_IMAGE_TILING_OPTIMAL,
-    //     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-    //     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    //     true,
-    //     VK_IMAGE_ASPECT_COLOR_BIT);
+  // {
+  //   vk.texture_targets = push_array(vk.arena, VK_Texture, vk.images_in_flight);
+  //   Loop (i, vk.images_in_flight) {
+  //     vk.texture_targets[i].image = vk_image_create(
+  //       VK_IMAGE_TYPE_2D,
+  //       vk.width, vk.height,
+  //       VK_FORMAT_B8G8R8A8_UNORM,
+  //       // VK_FORMAT_R8G8B8A8_UNORM,
+  //       VK_IMAGE_TILING_OPTIMAL,
+  //       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+  //       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+  //       true,
+  //       VK_IMAGE_ASPECT_COLOR_BIT);
 
-    //   VkSamplerCreateInfo sampler_info = {
-    //     .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-    //     .magFilter = VK_FILTER_LINEAR,
-    //     .minFilter = VK_FILTER_LINEAR,
-    //     .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
-    //     .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-    //     .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-    //     .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-    //     .mipLodBias = 0.0f,
-    //     .anisotropyEnable = VK_FALSE,
-    //     .maxAnisotropy = 1,
-    //     .compareEnable = VK_FALSE,
-    //     .compareOp = VK_COMPARE_OP_ALWAYS,
-    //     .minLod = 0.0f,
-    //     .maxLod = 0.0f,
-    //     .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
-    //     .unnormalizedCoordinates = VK_FALSE,
-    //   };
-    //   VK_CHECK(vkCreateSampler(vkdevice, &sampler_info, vk.allocator, &vk.texture_targets[i].sampler));
-    // }
+  //     VkSamplerCreateInfo sampler_info = {
+  //       .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+  //       .magFilter = VK_FILTER_LINEAR,
+  //       .minFilter = VK_FILTER_LINEAR,
+  //       .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+  //       .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+  //       .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+  //       .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+  //       .mipLodBias = 0.0f,
+  //       .anisotropyEnable = VK_FALSE,
+  //       .maxAnisotropy = 1,
+  //       .compareEnable = VK_FALSE,
+  //       .compareOp = VK_COMPARE_OP_ALWAYS,
+  //       .minLod = 0.0f,
+  //       .maxLod = 0.0f,
+  //       .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+  //       .unnormalizedCoordinates = VK_FALSE,
+  //     };
+  //     VK_CHECK(vkCreateSampler(vkdevice, &sampler_info, vk.allocator, &vk.texture_targets[i].sampler));
+  //   }
 
     // vk.offscreen_depth_buffer = vk_image_create(
     //   VK_IMAGE_TYPE_2D,
@@ -2190,7 +2212,7 @@ void vk_init() {
     //   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     //   true,
     //   VK_IMAGE_ASPECT_DEPTH_BIT);
-  }
+  // }
 
   Info("Vulkan renderer initialized");
 

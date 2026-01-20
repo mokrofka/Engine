@@ -64,7 +64,8 @@ layout(std430, set = 0, binding = 0) readonly buffer Buffer {
   Material materials[KB(1)];
 } st;
 
-layout(set = 0, binding = 1) uniform sampler2D textures[];
+layout(set = 0, binding = 1) uniform texture2D textures[];
+layout(set = 0, binding = 2) uniform sampler samplers[];
 
 layout(push_constant) uniform PushConstants {
   // mat4 model;
@@ -76,4 +77,5 @@ v3 norm;
 v3 frag_pos;
 v3 view_dir;
 Entity e;
+
 
