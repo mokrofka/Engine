@@ -92,7 +92,7 @@ struct VK_Shader {
   VK_Pipeline pipeline;
   Array<VkPipelineShaderStageCreateInfo, 2> stages;
   // SparseSetIndex entities;
-  SparseDarrayIndex entities;
+  HandlerDarray<u32> entities;
 };
 
 struct VK_ShaderCompute {
@@ -2469,22 +2469,19 @@ void vk_update_transform(u32 entity_id, Transform trans) {
 // Entity
 
 u32 vk_make_renderable(u32 entity_id, u32 mesh_id, u32 shader_id, u32 texture_id) {
-  VK_Shader& shader = vk.shaders[shader_id];
-  shader.entities.append(entity_id);
-
+  vk.entities[entity_id].shader_handle = vk.shaders[shader_id].entities.append(entity_id);
   vk.entities_to_mesh[entity_id] = mesh_id;
   vk.entities_to_shader[entity_id] = shader_id;
-
   PushConstant& push = vk.push_constants[entity_id];
   push.texture_id = texture_id;
-
   return entity_id;
 }
 
 void vk_remove_renderable(u32 entity_id) {
   u32 shader_id = vk.entities_to_shader[entity_id];
+  u32 shader_handler = vk.entities[entity_id].shader_handle;
   VK_Shader& shader = vk.shaders[shader_id];
-  shader.entities.remove(entity_id);
+  shader.entities.remove(shader_handler);
 }
 
 ShaderEntity& vk_get_entity(u32 entity_id) {

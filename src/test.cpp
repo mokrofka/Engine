@@ -204,6 +204,57 @@ void object_pool_test() {
   }
 }
 
+void test_handle_darray() {
+  Scratch scratch;
+  struct A {
+    u32 a;
+    u32 b;
+  };
+  HandlerDarray<A> arr;
+  Array<A, 100> values;
+  Array<u32, 100> handlers;
+  Loop (i, 100) {
+    values[i].a = rand_range_u32(0, 100);
+    values[i].b = rand_range_u32(0, 100);
+  };
+  Loop (i, 100) {
+    handlers[i] = arr.append(values[i]);
+  }
+  Loop (i, 100) {
+    Assert(MemMatchStruct(&values[i], &arr[handlers[i]]));
+  }
+  Array<u32, 100> indices;
+  Loop(i, 100) indices.append(i);
+  for (u32 i = indices.count - 1; i > 0; --i) {
+    u32 j = rand_range_u32(0, i);
+    Swap(indices[i], indices[j]);
+  }
+  Loop (i, 100) {
+    arr.remove(handlers[i]);
+  }
+
+  indices.clear();
+  Loop (i, 100) {
+    values[i].a = rand_range_u32(0, 100);
+    values[i].b = rand_range_u32(0, 100);
+  };
+  Loop (i, 100) {
+    handlers[i] = arr.append(values[i]);
+  }
+  Loop (i, 100) {
+    Assert(MemMatchStruct(&values[i], &arr[handlers[i]]));
+  }
+  Loop(i, 100) indices.append(i);
+  for (u32 i = indices.count - 1; i > 0; --i) {
+    u32 j = rand_range_u32(0, i);
+    Swap(indices[i], indices[j]);
+  }
+  Loop (i, 100) {
+    arr.remove(handlers[i]);
+  }
+
+}
+
 void test() {
   global_alloc_test();
   arena_alloc_test();

@@ -780,7 +780,7 @@ void game_init() {
     };
     u32 mesh = vk_mesh_load(triangle);
     Entity& e = entity_create(mesh, shaders(Shader_Color), textures(Texture_Container));
-    e.pos().z = 0.8;
+    e.pos().x = 3;
   }
   // Entity& room = entity_create(meshes[Mesh_Room], shaders[Shader_Color], textures[Texture_Room]);
   // room.pos = {0,0,10};

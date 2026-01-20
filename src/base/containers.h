@@ -37,9 +37,9 @@ struct ObjectPool {
   u32 cap = 0;
   Allocator alloc = {};
   T* data = null;
-  void init(Allocator alloc_) {
-    alloc = alloc_;
-  }
+  ObjectPool() = default;
+  ObjectPool(Allocator alloc_) { alloc = alloc_; }
+  void init(Allocator alloc_) { alloc = alloc_; }
   T& get(u32 idx) {
     Assert(idx < cap);
     return data[idx];
@@ -94,12 +94,9 @@ struct Array {
   static constexpr i32 cap = N;
   u32 count = 0;
   T data[N] = {};
-
   T* begin() { return data; }
   T* end()   { return data + count; }
-
   Array() = default;
-
   Array(std::initializer_list<T> init) {
     Assert(init.size() <= cap);
     count = init.size();
@@ -154,21 +151,16 @@ struct Darray {
   u32 cap = 0;
   Allocator alloc = {};
   T* data = null;
-
   T* begin() { return data; }
   T* end()   { return data + count; }
-
   Darray() = default;
   Darray(Allocator alloc_) { alloc = alloc_; }
-
   void init(Allocator alloc_) { alloc = alloc_; }
   void deinit() { mem_free(alloc, data); }
-
   INLINE T& operator[](u32 idx) {
     Assert(idx < cap);
     return data[idx];
   }
-
   T& append(T b) { 
     if (count >= cap) {
       if (data) {
@@ -246,19 +238,15 @@ struct SparseSet {
   u32* sparse = null;
   u32* dense = null;
   T* data = null;
-
   T* begin() { return data; }
   T* end()   { return data + count; }
-
   SparseSet() = default;
   SparseSet(Allocator alloc_) { alloc = alloc_; }
-
   void init(Allocator alloc_) { alloc = alloc_; }
   void deinit() { 
     mem_free(alloc, sparse); 
     mem_free(alloc, dense); 
   }
-
   T& operator[](u32 id) {
     Assert(id < cap);
     DebugDo(Assert(sparse[id] != INVALID_ID));
@@ -290,17 +278,13 @@ struct SparseSet {
   }
   void remove(u32 id) {
     DebugDo(Assert(sparse[id] != INVALID_ID));
-    u32 idx_of_removed_entity = sparse[id];
-    u32 idx_of_last_element = count - 1;
-    data[idx_of_removed_entity] = data[idx_of_last_element];
-
-    u32 last_entity = dense[idx_of_last_element];
-
-    sparse[last_entity] = idx_of_removed_entity;
-    dense[idx_of_removed_entity] = last_entity;
-
+    u32 idx_removed = sparse[id];
+    u32 idx_last = count - 1;
+    data[idx_removed] = data[idx_last];
+    u32 last_entity = dense[idx_last];
+    sparse[last_entity] = idx_removed;
+    dense[idx_removed] = last_entity;
     --count;
-
     DebugDo(sparse[id] = INVALID_ID);
   }
   void grow() {
@@ -331,19 +315,19 @@ struct SparseSet {
   }
 };
 
-// Just stores ids
 struct SparseSetIndex {
   u32 count = 0;
   u32 cap = 0;
   u32 sparse_count = 0;
-  Allocator alloc;
+  Allocator alloc = {};
   u32* sparse = null;
   u32* dense = null;
-
   u32* begin() { return dense; }
   u32* end()   { return dense + count; }
-
-  void append(u32 id) {
+  SparseSetIndex() = default;
+  SparseSetIndex(Allocator alloc_) { alloc = alloc_; }
+  void init(Allocator alloc_) { alloc = alloc_; }
+    void append(u32 id) {
     if (count >= cap) {
       grow();
     }
@@ -355,14 +339,11 @@ struct SparseSetIndex {
     ++count;
   }
   void remove(u32 id) {
-    u32 idx_of_removed_entity = sparse[id];
-    u32 idx_of_last_element = count - 1;
-
-    u32 last_entity = dense[idx_of_last_element];
-
-    sparse[last_entity] = idx_of_removed_entity;
-    dense[idx_of_removed_entity] = last_entity;
-
+    u32 idx_removed = sparse[id];
+    u32 idx_last = count - 1;
+    u32 last_entity = dense[idx_last];
+    sparse[last_entity] = idx_removed;
+    dense[idx_removed] = last_entity;
     --count;
   }
   void grow() {
@@ -387,18 +368,14 @@ struct SparseSetIndex {
 };
 
 template<typename T, i32 N>
-struct SparseArray {
+struct HandlerArray {
   static constexpr i32 cap = N;
   u32 count = 0;
   u32 entity_to_index[N] = {};
   u32 entities[N] = {};
   T data[N] = {};
-
   T* begin() { return data; }
   T* end()   { return data + count; }
-
-  SparseArray() = default;
-
   T& operator[](u32 idx) {
     Assert(idx < cap);
     DebugDo(Assert(entity_to_index[idx] != INVALID_ID));
@@ -414,33 +391,30 @@ struct SparseArray {
   }
   void remove(u32 id) {
     DebugDo(Assert(entity_to_index[id] != INVALID_ID));
-    u32 idx_of_removed_entity = entity_to_index[id];
-    u32 idx_of_last_element = count - 1;
-    data[idx_of_removed_entity] = data[idx_of_last_element];
-
-    u32 last_entity = entities[idx_of_last_element];
-
-    entity_to_index[last_entity] = idx_of_removed_entity;
-    entities[idx_of_removed_entity] = last_entity;
-
+    u32 idx_removed = entity_to_index[id];
+    u32 idx_last = count - 1;
+    data[idx_removed] = data[idx_last];
+    u32 last_entity = entities[idx_last];
+    entity_to_index[last_entity] = idx_removed;
+    entities[idx_removed] = last_entity;
     --count;
-
     DebugDo(entity_to_index[id] = INVALID_ID);
   }
 };
 
 template <typename T>
-struct SparseDarray {
+struct HandlerDarray {
   u32 count = 0;
   u32 cap = 0;
   Allocator alloc = {};
   u32* entity_to_index = null;
   u32* entities = null;
   T* data = null;
-
   T* begin() { return data; }
   T* end()   { return data + count; }
-
+  HandlerDarray() = default;
+  HandlerDarray(Allocator alloc_) { alloc = alloc_; }
+  void init(Allocator alloc_) { alloc = alloc_; }
   T& operator[](u32 idx) {
     Assert(idx < cap);
     DebugDo(Assert(entity_to_index[idx] != INVALID_ID));
@@ -459,17 +433,13 @@ struct SparseDarray {
   }
   void remove(u32 id) {
     DebugDo(Assert(entity_to_index[id] != INVALID_ID));
-    u32 idx_of_removed_entity = entity_to_index[id];
-    u32 idx_of_last_element = count - 1;
-    data[idx_of_removed_entity] = data[idx_of_last_element];
-
-    u32 last_entity = entities[idx_of_last_element];
-
-    entity_to_index[last_entity] = idx_of_removed_entity;
-    entities[idx_of_removed_entity] = last_entity;
-
+    u32 idx_removed = entity_to_index[id];
+    u32 idx_last = count - 1;
+    data[idx_removed] = data[idx_last];
+    u32 last_entity = entities[idx_last];
+    entity_to_index[last_entity] = idx_removed;
+    entities[idx_removed] = last_entity;
     --count;
-
     DebugDo(entity_to_index[id] = INVALID_ID);
   }
   void grow() {
@@ -495,36 +465,34 @@ struct SparseDarray {
   }
 };
 
-struct SparseDarrayIndex {
+struct HandlerDarrayIndex {
   u32 count = 0;
   u32 cap = 0;
   Allocator alloc = {};
   u32* entity_to_index = null;
   u32* entities = null;
-
   u32* begin() { return entities; }
   u32* end()   { return entities + count; }
-
-  void append(u32 e) {
+  HandlerDarrayIndex() = default;
+  HandlerDarrayIndex(Allocator alloc_) { alloc = alloc_; }
+  void init(Allocator alloc_) { alloc = alloc_; }
+  u32 append() {
     if (count >= cap) {
       grow();
     }
     u32 id = count++;
     entity_to_index[id] = id;
     entities[id] = id;
+    return id;
   }
   void remove(u32 id) {
     DebugDo(Assert(entity_to_index[id] != INVALID_ID));
-    u32 idx_of_removed_entity = entity_to_index[id];
-    u32 idx_of_last_element = count - 1;
-
-    u32 last_entity = entities[idx_of_last_element];
-
-    entity_to_index[last_entity] = idx_of_removed_entity;
-    entities[idx_of_removed_entity] = last_entity;
-
+    u32 idx_removed = entity_to_index[id];
+    u32 idx_last = count - 1;
+    u32 last_entity = entities[idx_last];
+    entity_to_index[last_entity] = idx_removed;
+    entities[idx_removed] = last_entity;
     --count;
-
     DebugDo(entity_to_index[id] = INVALID_ID);
   }
   void grow() {
@@ -547,6 +515,7 @@ struct SparseDarrayIndex {
     }
   }
 };
+
 ////////////////////////////////////////////////////////////////////////
 // IdPool
 
@@ -582,14 +551,12 @@ enum MapSlot : u8 {
 template<typename Key, typename T>
 struct Map {
   static constexpr f32 LF = 0.7;
-
   u32 count = 0;
   u32 cap = 0;
   Allocator alloc = {};
   T* data = null;
   Key* keys = null;
   MapSlot* is_occupied = null;
-
   void insert(Key key, T val) {
     if (count >= cap*LF) { grow(); }
     u64 hash_idx = hash(key);
@@ -602,7 +569,6 @@ struct Map {
     is_occupied[index] = MapSlot_Occupied;
     ++count;
   }
-
   T& get(Key key) {
     u64 hash_idx = hash(key);
     u64 index = ModPow2(hash_idx, cap);
@@ -613,11 +579,9 @@ struct Map {
       index = ModPow2(index + 1, cap);
     }
     Assert(false);
-
     found:
     return data[index];
   }
-
   void erase(Key key) {
     u64 hash_idx = hash(key);
     u64 index = ModPow2(hash_idx, cap);
@@ -630,7 +594,6 @@ struct Map {
       index = ModPow2(index + 1, cap);
     }
   }
-
   void grow() {
     if (data) {
       T* old_data = data;
@@ -638,20 +601,17 @@ struct Map {
       MapSlot* old_is_occupied = is_occupied;
       u32 old_cap = cap;
       cap *= DEFAULT_RESIZE_FACTOR;
-
       SoA_Field fields[] = {
         SoA_push_field(&data, T),
         SoA_push_field(&keys, Key),
         SoA_push_field(&is_occupied, MapSlot),
       };
       mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
-
       Loop (i, old_cap) {
         if (old_is_occupied[i] == MapSlot_Occupied) {
           insert(old_keys[i], old_data[i]);
         }
       }
-
       mem_free(alloc, old_data);
     }
     else {
@@ -664,6 +624,5 @@ struct Map {
       mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
     }
   }
-
 };
 
