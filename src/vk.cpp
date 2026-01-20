@@ -76,22 +76,16 @@ struct VK_Device {
   VkFormat depth_format;
 };
 
-struct VK_Pipeline {
-  VkPipeline handle;
-  VkPipelineLayout pipeline_layout; // TODO:
-};
-
 struct VK_Shader {
   String name;
   ShaderType type;
-  VK_Pipeline pipeline;
+  VkPipeline pipeline;
   Array<VkPipelineShaderStageCreateInfo, 2> stages;
-  // SparseSetIndex entities;
   HandlerDarray<u32> entities;
 };
 
 struct VK_ShaderCompute {
-  VK_Pipeline pipeline;
+  VkPipeline pipeline;
   VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info;
 };
 
@@ -135,6 +129,7 @@ struct VK_State {
   VkDescriptorSet descriptor_sets;
 
   VkSampler sampler;
+  VkPipelineLayout pipeline_layout;
 
   VkDescriptorSetLayout compute_descriptor_set_layout;
   // VkDescriptorSet compute_descriptor_sets[FramesInFlight];
@@ -572,9 +567,31 @@ intern void vk_buffer_upload_to_gpu(VK_Buffer buffer, Range range, void* data) {
 }
 
 ////////////////////////////////////////////////////////////////////////
-// @Shader
+// @Pipeline
 
-intern VK_Pipeline vk_shader_pipeline_create(ShaderInfo shader_info, Array<VkPipelineShaderStageCreateInfo, 2> stages) {
+intern void vk_shader_pipeline_init() {
+  // Push constants
+  VkPushConstantRange push_constant = {
+    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+    .offset = 0,
+    .size = sizeof(u8)*128,
+  };
+  
+  // Pipeline layout
+  VkDescriptorSetLayout set_layouts[] = {
+    vk.descriptor_set_layout,
+  };
+  VkPipelineLayoutCreateInfo pipeline_layout_info = {
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+    .setLayoutCount = ArrayCount(set_layouts),
+    .pSetLayouts = set_layouts,
+    .pushConstantRangeCount = 1,
+    .pPushConstantRanges = &push_constant,
+  };
+  VK_CHECK(vk.CreatePipelineLayout(vkdevice, &pipeline_layout_info, vk.allocator, &vk.pipeline_layout));
+}
+
+intern VkPipeline vk_shader_pipeline_create(ShaderInfo shader_info, Array<VkPipelineShaderStageCreateInfo, 2> stages) {
   // Dynamic rendering
   // VkFormat color_format = VK_FORMAT_R8G8B8A8_UNORM;
   VkFormat color_format = VK_FORMAT_B8G8R8A8_UNORM;
@@ -739,27 +756,6 @@ intern VK_Pipeline vk_shader_pipeline_create(ShaderInfo shader_info, Array<VkPip
     .pDynamicStates = dynamic_state,
   };
   
-  // Push constants
-  VkPushConstantRange push_constant = {
-    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-    .offset = sizeof(mat4) * 0,
-    .size = sizeof(mat4) * 2,
-  };
-  
-  // Pipeline layout
-  VkDescriptorSetLayout set_layouts[] = {
-    vk.descriptor_set_layout,
-  };
-  VkPipelineLayoutCreateInfo pipeline_layout_info = {
-    .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-    .setLayoutCount = ArrayCount(set_layouts),
-    .pSetLayouts = set_layouts,
-    .pushConstantRangeCount = 1,
-    .pPushConstantRanges = &push_constant,
-  };
-  VK_Pipeline result = {};
-  VK_CHECK(vk.CreatePipelineLayout(vkdevice, &pipeline_layout_info, vk.allocator, &result.pipeline_layout));
-
   // Pipeline
   VkGraphicsPipelineCreateInfo pipeline_info = {
     .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -775,12 +771,13 @@ intern VK_Pipeline vk_shader_pipeline_create(ShaderInfo shader_info, Array<VkPip
     .pDepthStencilState = &depth_stencil,
     .pColorBlendState = &color_blend_state_create_info,
     .pDynamicState = &dynamic_state_info,
-    .layout = result.pipeline_layout,
+    .layout = vk.pipeline_layout,
     .renderPass = null,
     .basePipelineHandle = VK_NULL_HANDLE,
     .basePipelineIndex = -1,
   };
-  VK_CHECK(vk.CreateGraphicsPipelines(vkdevice, VK_NULL_HANDLE, 1, &pipeline_info, vk.allocator, &result.handle));
+  VkPipeline result;
+  VK_CHECK(vk.CreateGraphicsPipelines(vkdevice, VK_NULL_HANDLE, 1, &pipeline_info, vk.allocator, &result));
   return result;
 }
 
@@ -846,7 +843,7 @@ void vk_shader_reload(String name, u32 id) {
   if (id >= 100) {
     VK_Shader& shader = vk.screen_shader;
     vk.DeviceWaitIdle(vkdevice);
-    vk.DestroyPipeline(vkdevice, shader.pipeline.handle, vk.allocator);
+    vk.DestroyPipeline(vkdevice, shader.pipeline, vk.allocator);
     Loop (i, 2) {
       vk.DestroyShaderModule(vkdevice, shader.stages[i].module, vk.allocator);
     }
@@ -855,7 +852,7 @@ void vk_shader_reload(String name, u32 id) {
   } else {
     VK_Shader& shader = vk.shaders[id];
     vk.DeviceWaitIdle(vkdevice);
-    vk.DestroyPipeline(vkdevice, shader.pipeline.handle, vk.allocator);
+    vk.DestroyPipeline(vkdevice, shader.pipeline, vk.allocator);
     Loop (i, 2) {
       vk.DestroyShaderModule(vkdevice, shader.stages[i].module, vk.allocator);
     }
@@ -1729,10 +1726,10 @@ void vk_draw() {
   VkCommandBuffer cmd = vk_get_current_cmd();
 
   VK_Shader& shader = vk.shaders[0];
-  vk.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader.pipeline.pipeline_layout, 0, 1, &vk.descriptor_sets, 0, null);
+  vk.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout, 0, 1, &vk.descriptor_sets, 0, null);
 
   for (VK_Shader shader : vk.shaders) {
-    vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader.pipeline.handle);
+    vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader.pipeline);
 
     for (u32 id : shader.entities) {
       u32 mesh_id = vk.entities_to_mesh[id];
@@ -1742,7 +1739,7 @@ void vk_draw() {
       ShaderEntity& e = vk_get_entity(id);
       e.model = mat4_transform(entities_transforms[id]);
 
-      vk.CmdPushConstants(cmd, shader.pipeline.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstant), push);
+      vk.CmdPushConstants(cmd, vk.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstant), push);
       vk.CmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, &mesh.vert_offset);
       
       if (mesh.index_count) {
@@ -1759,12 +1756,12 @@ void vk_draw() {
 void vk_draw_screen() {
   VkCommandBuffer cmd = vk_get_current_cmd();
 
-  VkPipelineLayout pipeline_layout = vk.screen_shader.pipeline.pipeline_layout;
-  VkPipeline pipeline = vk.screen_shader.pipeline.handle;
+  // VkPipelineLayout pipeline_layout = vk.screen_shader.pipeline.pipeline_layout;
+  // VkPipeline pipeline = vk.screen_shader.pipeline.handle;
 
   // vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &vk.screen_descriptor_sets[vk.current_frame], 0, null);
-  vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-  vk.CmdDraw(cmd, 3, 1, 0, 0);
+  // vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+  // vk.CmdDraw(cmd, 3, 1, 0, 0);
 }
 
 // void vk_draw_compute() {
@@ -2145,6 +2142,7 @@ void vk_init() {
 
   vk_descriptor_init();
   vk_texture_init();
+  vk_shader_pipeline_init();
 
   // Target texture render
   {
