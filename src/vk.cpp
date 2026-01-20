@@ -29,11 +29,6 @@ struct VK_Image {
   u32 height;
 };
 
-struct VK_Texture {
-  VK_Image image;
-  VkSampler sampler; // TODO:
-};
-
 struct VK_Mesh {
   u64 vert_count;
   VkDeviceSize vert_offset;
@@ -139,6 +134,8 @@ struct VK_State {
   VkDescriptorSetLayout descriptor_set_layout;
   VkDescriptorSet descriptor_sets;
 
+  VkSampler sampler;
+
   VkDescriptorSetLayout compute_descriptor_set_layout;
   // VkDescriptorSet compute_descriptor_sets[FramesInFlight];
   
@@ -154,7 +151,7 @@ struct VK_State {
   Array<PushConstant, MaxEntities> push_constants;
   Array<VK_Shader, MaxShaders> shaders;
   Array<VK_Mesh, MaxMeshes> meshes;
-  Array<VK_Texture, MaxTextures> texture;
+  Array<VK_Image, MaxTextures> texture;
 
   SparseSet<PointLight> point_light_data;
   SparseSet<DirLight> dir_light_data;
@@ -165,7 +162,7 @@ struct VK_State {
   VK_Shader screen_shader;
 
   // offscreen rendering
-  VK_Texture* texture_targets;
+  // VK_Texture* texture_targets;
   VK_Image offscreen_depth_buffer;
 
   #define VK_DECL(name) Glue(PFN_, vk##name) name
@@ -577,8 +574,7 @@ intern void vk_buffer_upload_to_gpu(VK_Buffer buffer, Range range, void* data) {
 ////////////////////////////////////////////////////////////////////////
 // @Shader
 
-intern VK_Pipeline vk_shader_pipeline_create(ShaderInfo shader_info, Array<VkPipelineShaderStageCreateInfo, 2> stages)
-{
+intern VK_Pipeline vk_shader_pipeline_create(ShaderInfo shader_info, Array<VkPipelineShaderStageCreateInfo, 2> stages) {
   // Dynamic rendering
   // VkFormat color_format = VK_FORMAT_R8G8B8A8_UNORM;
   VkFormat color_format = VK_FORMAT_B8G8R8A8_UNORM;
@@ -764,7 +760,7 @@ intern VK_Pipeline vk_shader_pipeline_create(ShaderInfo shader_info, Array<VkPip
   VK_Pipeline result = {};
   VK_CHECK(vk.CreatePipelineLayout(vkdevice, &pipeline_layout_info, vk.allocator, &result.pipeline_layout));
 
-  // Pipeline create
+  // Pipeline
   VkGraphicsPipelineCreateInfo pipeline_info = {
     .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
     .pNext = &renderingCreateInfo,
@@ -981,66 +977,75 @@ intern VkImageView vk_image_view_create(VkFormat format, VkImage image, VkImageA
       .layerCount = 1,
     },
   };
-
   VkImageView result;
   VK_CHECK(vk.CreateImageView(vkdevice, &view_create_info, vk.allocator, &result));
   return result;
 }
 
-intern VK_Image vk_image_create(
-  VkImageType image_type,
-  u32 width,
-  u32 height,
-  VkFormat format,
-  VkImageTiling tiling,
-  VkImageUsageFlags usage,
-  VkMemoryPropertyFlags memory_flags,
-  b32 create_view,
-  VkImageAspectFlags view_aspect_flags) 
-{
+struct VK_ImageInfo {
+  VkImageType image_type;
+  u32 width;
+  u32 height;
+  VkFormat format;
+  VkImageTiling tiling;
+  VkImageUsageFlags usage;
+  VkMemoryPropertyFlags memory_flags;
+  b32 create_view;
+  VkImageAspectFlags aspect;
+};
+
+intern VK_ImageInfo vk_image_info_default(u32 width, u32 height) {
+  VK_ImageInfo result = {
+    .image_type = VK_IMAGE_TYPE_2D,
+    .width = width,
+    .height = height,
+    .format = VK_FORMAT_R8G8B8A8_UNORM,
+    .tiling = VK_IMAGE_TILING_OPTIMAL,
+    .memory_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    .create_view = true,
+    .aspect = VK_IMAGE_ASPECT_COLOR_BIT,
+  };
+  return result;
+};
+
+intern VK_Image vk_image_create(VK_ImageInfo info) {
   VkImageCreateInfo image_create_info = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
     .imageType = VK_IMAGE_TYPE_2D,
-    .format = format,
-    .extent = {width, height, 1},
+    .format = info.format,
+    .extent = {info.width, info.height, 1},
     .mipLevels = 1,
     .arrayLayers = 1,
     .samples = VK_SAMPLE_COUNT_1_BIT,
-    .tiling = tiling,
-    .usage = usage,
+    .tiling = info.tiling,
+    .usage = info.usage,
     .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
     .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
   };
-
   VkImage handle;
   VK_CHECK(vk.CreateImage(vkdevice, &image_create_info, vk.allocator, &handle));
-
   VkMemoryRequirements memory_requirements;
   vk.GetImageMemoryRequirements(vkdevice, handle, &memory_requirements);
-  u32 memory_type = vk_find_memory_idx(memory_requirements.memoryTypeBits, memory_flags);
+  u32 memory_type = vk_find_memory_idx(memory_requirements.memoryTypeBits, info.memory_flags);
   VkMemoryAllocateInfo memory_allocate_info = {
     .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
     .allocationSize = memory_requirements.size,
     .memoryTypeIndex = memory_type,
   };
-
   VkDeviceMemory memory;
   VK_CHECK(vk.AllocateMemory(vkdevice, &memory_allocate_info, vk.allocator, &memory));
   VK_CHECK(vk.BindImageMemory(vkdevice, handle, memory, 0));
-
   VkImageView view = 0;
-  if (create_view) {
-    view = vk_image_view_create(format, handle, view_aspect_flags);
+  if (info.create_view) {
+    view = vk_image_view_create(info.format, handle, info.aspect);
   }
-
   VK_Image result = {
     .handle = handle,
     .memory = memory,
     .view = view,
-    .width = width,
-    .height = height,
+    .width = info.width,
+    .height = info.height,
   };
-  
   return result;
 }
 
@@ -1119,39 +1124,10 @@ intern void vk_image_upload_to_gpu(VkCommandBuffer cmd, VK_Image image) {
     },
     .imageExtent = { image.width, image.height, 1 },
   };
-
   vk.CmdCopyBufferToImage(cmd, vk.stage_buffer.handle, image.handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 }
 
-u32 vk_texture_load(Texture t) {
-  VK_Texture texture = {};
-  
-  u64 size = t.width*t.height*t.channel_count;
-  
-  MemCopy(vk.stage_buffer.maped_memory, t.data, size);
-  
-  texture.image = vk_image_create(
-    VK_IMAGE_TYPE_2D, 
-    t.width, 
-    t.height, 
-    VK_FORMAT_R8G8B8A8_UNORM, 
-    VK_IMAGE_TILING_OPTIMAL, 
-    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    true,
-    VK_IMAGE_ASPECT_COLOR_BIT);
-  
-  {
-    VkCommandBuffer cmd = vk_cmd_alloc_and_begin_single_use();
-
-    vk_image_layout_transition(cmd, texture.image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    vk_image_upload_to_gpu(cmd, texture.image);
-    vk_image_layout_transition(cmd, texture.image.handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-    vk_cmd_end_single_use(cmd);
-  }
-  
-  // Create a sampler for the texture TODO: centrelize samplers
+intern void vk_texture_init() {
   VkSamplerCreateInfo sampler_info = {
     .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
     .magFilter = VK_FILTER_LINEAR,
@@ -1161,21 +1137,32 @@ u32 vk_texture_load(Texture t) {
     .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
     .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
     .mipLodBias = 0.0f,
-    .anisotropyEnable = VK_FALSE,
+    .anisotropyEnable = VK_TRUE,
     .maxAnisotropy = 16,
     .compareEnable = VK_FALSE,
     .compareOp = VK_COMPARE_OP_ALWAYS,
     .minLod = 0.0f,
-    .maxLod = 0.0f,
+    .maxLod = VK_LOD_CLAMP_NONE,
     .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
     .unnormalizedCoordinates = VK_FALSE,
   };
-  
-  VK_CHECK(vk.CreateSampler(vkdevice, &sampler_info, vk.allocator, &texture.sampler));
+  VK_CHECK(vk.CreateSampler(vkdevice, &sampler_info, vk.allocator, &vk.sampler));
+};
 
-  VkDescriptorImageInfo image_info = {
-    .sampler = texture.sampler,
-    .imageView = texture.image.view,
+u32 vk_texture_load(Texture t) {
+  u64 size = t.width * t.height * 4;
+  MemCopy(vk.stage_buffer.maped_memory, t.data, size);
+  VK_ImageInfo image_info = vk_image_info_default(t.width, t.height);
+  image_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+  VK_Image image = vk_image_create(image_info);
+  VkCommandBuffer cmd = vk_cmd_alloc_and_begin_single_use();
+  vk_image_layout_transition(cmd, image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  vk_image_upload_to_gpu(cmd, image);
+  vk_image_layout_transition(cmd, image.handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  vk_cmd_end_single_use(cmd);
+  VkDescriptorImageInfo descriptor_image_info = {
+    .sampler = vk.sampler,
+    .imageView = image.view,
     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
   };
   VkWriteDescriptorSet texture_descriptor = {
@@ -1185,13 +1172,12 @@ u32 vk_texture_load(Texture t) {
     .dstArrayElement = vk.texture.count,
     .descriptorCount = 1,
     .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-    .pImageInfo = &image_info,
+    .pImageInfo = &descriptor_image_info,
   };
-
   VkWriteDescriptorSet descriptors[] = {texture_descriptor};
   vk.UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
   u32 id = vk.texture.count;
-  vk.texture.append(texture);
+  vk.texture.append(image);
   return id;
 }
 
@@ -1199,28 +1185,15 @@ intern void vk_resize_texture_target() {
   VK_CHECK(vk.DeviceWaitIdle(vkdevice));
   Debug("texture target resized: x = %u y = %u", vk.width, vk.height);
   Loop (i, vk.images_in_flight) {
-    vk_image_destroy(vk.texture_targets[i].image);
+    // vk_image_destroy(vk.texture_targets[i]);
     vk_image_destroy(vk.offscreen_depth_buffer);
-    vk.texture_targets[i].image = vk_image_create(
-      VK_IMAGE_TYPE_2D,
-      vk.width, vk.height,
-      VK_FORMAT_B8G8R8A8_UNORM,
-      // VK_FORMAT_R8G8B8A8_UNORM,
-      VK_IMAGE_TILING_OPTIMAL,
-      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-      true,
-      VK_IMAGE_ASPECT_COLOR_BIT);
-    vk.offscreen_depth_buffer = vk_image_create(
-      VK_IMAGE_TYPE_2D,
-      vk.width,
-      vk.height,
-      vk.device.depth_format,
-      VK_IMAGE_TILING_OPTIMAL,
-      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-      true,
-      VK_IMAGE_ASPECT_DEPTH_BIT);
+    VK_ImageInfo texture_info = vk_image_info_default(vk.width, vk.height);
+    texture_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    // vk.texture_targets[i].image = vk_image_create(texture_info);
+    VK_ImageInfo depth_info = vk_image_info_default(vk.width, vk.height);
+    depth_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    depth_info.aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+    vk.offscreen_depth_buffer = vk_image_create(depth_info);
   }
 }
 
@@ -1570,19 +1543,15 @@ intern void vk_device_create() {
 // @Swapchain
 
 intern void vk_swapchain_create(b32 reuse) {
-
-  // vk_device_query_swapchain_support(vk.device.physical_device);
-  // VK_CHECK(vk.GetPhysicalDeviceSurfaceCapabilitiesKHR(vk.device.physical_device, vk.surface, &vk.device.swapchain_support.capabilities));
-
+  VK_CHECK(vk.GetPhysicalDeviceSurfaceCapabilitiesKHR(vk.device.physical_device, vk.surface, &vk.device.swapchain_support.capabilities));
   VkExtent2D swapchain_extent = {vk.width, vk.height};
-  // if (vk.device.swapchain_support.capabilities.currentExtent.width != U32_MAX) {
-  //   swapchain_extent = vk.device.swapchain_support.capabilities.currentExtent;
-  // }
-  // VkExtent2D min = vk.device.swapchain_support.capabilities.minImageExtent;
-  // VkExtent2D max = vk.device.swapchain_support.capabilities.maxImageExtent;
-  // swapchain_extent.width = Clamp(min.width, swapchain_extent.width, max.width);
-  // swapchain_extent.height = Clamp(min.height, swapchain_extent.height, max.height);
-
+  if (vk.device.swapchain_support.capabilities.currentExtent.width != U32_MAX) {
+    swapchain_extent = vk.device.swapchain_support.capabilities.currentExtent;
+  }
+  VkExtent2D min = vk.device.swapchain_support.capabilities.minImageExtent;
+  VkExtent2D max = vk.device.swapchain_support.capabilities.maxImageExtent;
+  swapchain_extent.width = Clamp(min.width, swapchain_extent.width, max.width);
+  swapchain_extent.height = Clamp(min.height, swapchain_extent.height, max.height);
   VkSwapchainCreateInfoKHR swapchain_create_info = {
     .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
     .surface = vk.surface,
@@ -1599,12 +1568,9 @@ intern void vk_swapchain_create(b32 reuse) {
     .clipped = VK_TRUE,
     .oldSwapchain = reuse ? vk.swapchain.handle : null,
   };
-
   VK_CHECK(vk.CreateSwapchainKHR(vkdevice, &swapchain_create_info, vk.allocator, &vk.swapchain.handle));
-  
   u32 image_count = vk.images_in_flight;
   VK_CHECK(vk.GetSwapchainImagesKHR(vkdevice, vk.swapchain.handle, &image_count, vk.swapchain.images));
-
   Loop (i, image_count) {
     VkImageViewCreateInfo view_create_info = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -1621,17 +1587,11 @@ intern void vk_swapchain_create(b32 reuse) {
     };
     VK_CHECK(vk.CreateImageView(vkdevice, &view_create_info, vk.allocator, &vk.swapchain.views[i]));
   }
-
-  vk.swapchain.depth_attachment = vk_image_create(
-    VK_IMAGE_TYPE_2D,
-    swapchain_extent.width,
-    swapchain_extent.height,
-    vk.device.depth_format,
-    VK_IMAGE_TILING_OPTIMAL,
-    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    true,
-    VK_IMAGE_ASPECT_DEPTH_BIT);
+  VK_ImageInfo depth_info = vk_image_info_default(swapchain_extent.width, swapchain_extent.height);
+  depth_info.format = vk.device.depth_format;
+  depth_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+  depth_info.aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+  vk.swapchain.depth_attachment = vk_image_create(depth_info);
 }
 
 intern void vk_swapchain_query() {
@@ -2148,7 +2108,6 @@ void vk_init() {
       vk.CreateSemaphore(vkdevice, &semaphore_create_info, vk.allocator, &vk.sync.render_complete_semaphores[i]);
       // vk.CreateSemaphore(vkdevice, &semaphore_create_info, vk.allocator, &vk.sync.compute_complete_semaphores[i]);
     }
-
     vk.sync.image_available_semaphores = push_array(vk.arena, VkSemaphore, vk.images_in_flight);
     vk.sync.in_flight_fences = push_array(vk.arena, VkFence, vk.frames_in_flight);
     Loop (i, vk.frames_in_flight) {
@@ -2185,6 +2144,7 @@ void vk_init() {
   }
 
   vk_descriptor_init();
+  vk_texture_init();
 
   // Target texture render
   {

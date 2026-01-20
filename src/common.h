@@ -19,16 +19,9 @@ KAPI void r_shutdown();
 KAPI void r_begin_draw_frame();
 KAPI void r_end_draw_frame();
 
-// Assets
-String asset_base_path();
-
-// Mesh
+KAPI String asset_base_path();
 KAPI u32 mesh_load(String name);
-
-// Shader
 KAPI u32 shader_load(String shader, ShaderType type);
-
-// Texture
 KAPI u32 texture_load(String name);
 
 ////////////////////////////////////////////////////////////////////////

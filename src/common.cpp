@@ -78,29 +78,23 @@ void r_end_draw_frame() {
   vk_end_frame();
 }
 
-////////////////////////////////////////////////////////////////////////
-// Asset
-
 String asset_base_path() {
   return st.asset_path;
 }
 
-////////////////////////////////////////////////////////////////////////
-// Mesh
-
-intern Mesh load_obj(String name) {
+intern Mesh mesh_load_obj(String name) {
   Scratch scratch;
-
   Darray<v3> positions(scratch);
   Darray<v3> normals(scratch);
   Darray<v2> uvs(scratch);
   Darray<v3u> indexes(scratch);
   Buffer buff = os_file_all_read(scratch, name);
-
   Range range = {(u64)buff.data, buff.size + (u64)buff.data};
   String line;
+
+  // Parsing
   while ((line = str_read_line(&range)).size) {
-    // Vert
+    // vert
     if (line.str[0] == 'v' && char_is_space(line.str[1])) {
       u32 start = 2;
       v3 v = {
@@ -108,11 +102,10 @@ intern Mesh load_obj(String name) {
         f32_from_str(str_next_word(line, start)),
         f32_from_str(str_next_word(line, start)),
       };
-
       // Info("v %f, %f, %f", v.x, v.y, v.z);
       positions.append(v);
     }
-    // Norm
+    // norm
     else if (line.str[0] == 'v' && line.str[1] == 'n') {
       u32 start = 3;
       v3 v = {
@@ -123,7 +116,7 @@ intern Mesh load_obj(String name) {
       // Info("vn %f, %f, %f", v.x, v.y, v.z);
       normals.append(v);
     }
-    // UV
+    // uv
     else if (line.str[0] == 'v' && line.str[1] == 't') {
       u32 start = 3;
       v2 v = {
@@ -133,21 +126,17 @@ intern Mesh load_obj(String name) {
       // Info("vt %f, %f", v.x, v.y);
       uvs.append(v);
     }
-    // Indexes
+    // indexes
     else if (line.str[0] == 'f') {
       u32 start = 2;
       Loop (i, 3) {
         String vert_index = str_next_word(line, start);
-
         u32 fist_slash_index = str_index_of(vert_index, '/');
         String first_num = str_prefix(vert_index, fist_slash_index);
-
         String second_part = str_skip(vert_index, fist_slash_index+1);
         u32 second_slash_index = str_index_of(second_part, '/');
         String second_num = str_prefix(second_part, second_slash_index);
-
         String third_num = str_skip(second_part, second_slash_index+1);
-
         v3u v = {
           u32_from_str(first_num) - 1,
           u32_from_str(third_num) - 1,
@@ -159,9 +148,9 @@ intern Mesh load_obj(String name) {
     }
   }
 
+  // Load to memory in right order
   Darray<Vertex> vertices(st.arena);
   Darray<u32> final_indices(st.arena);
-
   // TODO: use hash
   for (v3u idx : indexes) {
     u32 pos_idx = idx.x;
@@ -172,7 +161,6 @@ intern Mesh load_obj(String name) {
       .norm = normals[norm_idx],
       .uv = uvs[uv_idx],
     };
-
     u32 vertex_index;
     if (!vertices.exists_at(vertex, &vertex_index, EqualMem)) {
       vertex_index = vertices.count;
@@ -192,13 +180,10 @@ intern Mesh load_obj(String name) {
 u32 mesh_load(String name) {
   Scratch scratch;
   String filepath = push_strf(scratch, "%s/%s/%s", asset_base_path(), String("models"), name);
-  Mesh mesh = load_obj(filepath);
+  Mesh mesh = mesh_load_obj(filepath);
   u32 id = vk_mesh_load(mesh);
   return id;
 }
-
-////////////////////////////////////////////////////////////////////////
-// Shader
 
 struct ShaderState {
   Arena arena;
@@ -215,12 +200,15 @@ u32 shader_load(String name, ShaderType type) {
   return id;
 }
 
-////////////////////////////////////////////////////////////////////////
-// Texture
+struct TextureState {
+
+};
+
+global TextureState texture_st;
 
 #include "vendor/stb_image.h"
 
-intern Texture image_load(String name) {
+intern Texture texture_image_load(String name) {
   Scratch scratch;
   Texture texture = {};
   u32 required_channel_count = 4;
@@ -232,7 +220,6 @@ intern Texture image_load(String name) {
     (i32*)&texture.height,
     (i32*)&channel_count,
     required_channel_count);
-
   Assert(data);
   texture.channel_count = required_channel_count;
   texture.data = data;
@@ -240,13 +227,13 @@ intern Texture image_load(String name) {
 }
 
 u32 texture_load(String name) {
-  Texture texture = image_load(name);
+  Texture texture = texture_image_load(name);
   u32 id = vk_texture_load(texture);
   return id;
 }
 
 ////////////////////////////////////////////////////////////////////////
-// Resources
+// Shaders
 
 ShaderDefinition shaders_definition_[Shader_COUNT-1] = {
   [Shader_Color-1] = "color_shader", ShaderType_Drawing,
@@ -261,6 +248,9 @@ u32& shaders(u32 idx) {
   return shaders_[idx-1];
 }
 
+////////////////////////////////////////////////////////////////////////
+// Meshes
+
 String meshes_path_[Mesh_COUNT-1] = {
   [Mesh_Cube-1] = "cube.obj",
   // [Mesh_Room] = "room.obj",
@@ -274,6 +264,9 @@ u32& meshes(u32 idx) {
   Assert(IsInsideBounds(1, idx, Mesh_COUNT));
   return meshes_[idx-1];
 }
+
+////////////////////////////////////////////////////////////////////////
+// Textures
 
 String textures_path_[Texture_COUNT-1] = {
   [Texture_OrangeLines-1] = "orange_lines_512.png",
