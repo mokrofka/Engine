@@ -108,7 +108,6 @@ intern u32 f32_length(f32 value, u32 precision) {
     ++len; // for '.'
     len += precision;
   }
-
   return len;
 }
 
@@ -129,7 +128,6 @@ intern u32 f64_length(f64 value, u32 precision) {
     ++len; // for '.'
     len += precision;
   }
-
   return len;
 }
 
@@ -148,7 +146,6 @@ intern u32 f32_write(u8* dest, f32 value, u32 precision) {
   // Process the fractional part
   if (precision > 0) {
     dest[len++] = '.';
-
     u32 multiplier = 1;
     for (u32 i = 0; i < precision; ++i) multiplier *= 10;
     u32 frac_part = (u32)(value * multiplier + 0.5); // rounding since possible 0.02 * multi = 1.999...
@@ -158,7 +155,6 @@ intern u32 f32_write(u8* dest, f32 value, u32 precision) {
     }
     len += u32_write(dest + len, frac_part);
   }
-
   return len;
 }
 
@@ -177,15 +173,6 @@ intern u32 f64_write(u8* dest, f64 value, u32 precision) {
   // Process the fractional part
   if (precision > 0) {
     dest[len++] = '.';
-
-    // for (u32 i = 0; i < precision; ++i) {
-    //   value *= 10;
-    //   u32 integer = value;
-    //   value -= integer;
-    //   dest[len++] = '0' + integer;
-    // }
-
-    // NOTE: feels more accurate
     u64 multiplier = 1;
     for (u32 i = 0; i < precision; ++i) multiplier *= 10;
     u64 frac_part = (u64)(value * multiplier + 0.5); // rounding since possible 0.02 * multi = 1.999...
@@ -195,7 +182,6 @@ intern u32 f64_write(u8* dest, f64 value, u32 precision) {
     }
     len += u64_write(dest + len, frac_part);
   }
-
   return len;
 }
 
@@ -204,17 +190,16 @@ global u8 HEX[] = "0123456789ABCDEF";
 
 u32 hex_u64_write(u8* dest, u64 value) {
   u32 len = HEX_LENGTH;
-
   for (i32 i = len - 1; i >= 0; --i) {
     dest[i] = HEX[value & 0xF]; // last 4 bits
     value >>= 4;                // shift right 4 bits
   }
-
   return len;
 }
 
 ////////////////////////////////////////////////////////////////////////
 // Great sprintf
+
 u32 my_sprintf(u8* buff, String fmt, va_list argc) {
 
   // Calculate length
@@ -348,6 +333,25 @@ u32 my_sprintf(u8* buff, String fmt, va_list argc) {
     };
   }
   return written;
+}
+
+u64 cstr_length(const void* c) {
+  u8* p = (u8*)c;
+  for (; *p != 0; ++p);
+  return (u64)(p - (u8*)c);
+}
+
+String::String(u8* str_, u64 size_) {
+  str = str_;
+  size = size_; 
+}
+String::String(const char* str_) { 
+  str = (u8*)str_;
+  size = cstr_length(str);
+}
+String::String(u8* str_){
+  str = (u8*)str_;
+  size = cstr_length(str_) ;
 }
 
 ////////////////////////////////////////////////////////////////////////

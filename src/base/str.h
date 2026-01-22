@@ -2,28 +2,13 @@
 #include "defines.h"
 #include "mem.h"
 
-NO_DEBUG inline u64 cstr_length(const void* c) {
-  u8* p = (u8*)c;
-  for (; *p != 0; ++p);
-  return (u64)(p - (u8*)c);
-}
-
 struct String {
   u8* str;
   u64 size;
   String() = default;
-  INLINE String(u8* str_, u64 size_) {
-    str = str_;
-    size = size_; 
-  }
-  INLINE String(const char* str_) { 
-    str = (u8*)str_;
-    size = cstr_length(str);
-  }
-  INLINE String(u8* str_){
-    str = (u8*)str_;
-    size = cstr_length(str_) ;
-  }
+  NO_DEBUG String(u8* str_, u64 size_);
+  NO_DEBUG String(const char* str_);
+  NO_DEBUG String(u8* str_);
 };
 
 struct StringArray {
@@ -45,13 +30,15 @@ struct StringList {
 
 struct String64 {
   u8 str[64];
-  u64 size;
+  u32 size;
 };
 
 INLINE u32 range_size(Range r) {
   u32 c = ((r.size > r.offset) ? (r.size - r.offset) : 0);
   return c;
 }
+
+KAPI u64 cstr_length(const void* c);
 
 ////////////////////////////////////////////////////////////////////////
 // Character Classification & Conversion Functions
@@ -79,8 +66,8 @@ KAPI String str_cstr_capped(const void* String, const void* cap);
 ////////////////////////////////////////////////////////////////////////
 // String Stylization
 
-KAPI String upper_from_str(Allocator*arena, String string);
-KAPI String lower_from_str(Allocator*arena, String string);
+KAPI String upper_from_str(Allocator arena, String string);
+KAPI String lower_from_str(Allocator arena, String string);
 
 ////////////////////////////////////////////////////////////////////////
 // String Matching
@@ -129,11 +116,13 @@ KAPI String push_strf(Allocator arena, String fmt, ...);
 
 ////////////////////////////////////////////////////////////////////////
 // String List Construction Functions
+
 KAPI StringNode* str_list_push_node(StringList* list, StringNode* node);
 KAPI StringNode* str_list_push(Allocator arena, StringList* list, String string);
 
 ////////////////////////////////////////////////////////////////////////
 // String utils
+
 KAPI void str_copy(String64& dest, String str);
 KAPI String str_next_word(String line, u32& start);
 KAPI String str_read_line(Range* range);
@@ -161,7 +150,9 @@ KAPI String str_chop_after_last_slash(String string);
 KAPI String str_chop_last_slash(String string);
 
 // one/two/three -> three
-String str_skip_last_slash(String string);
+KAPI String str_skip_last_slash(String string);
+
+// name.fmt -> fmt
 KAPI String str_chop_last_dot(String string);
 
 ////////////////////////////////////////////////////////////////////////

@@ -130,7 +130,7 @@ intern Mesh mesh_load_obj(String name) {
   Darray<v3> normals(scratch);
   Darray<v2> uvs(scratch);
   Darray<v3u> indexes(scratch);
-  Buffer buff = os_file_all_read(scratch, name);
+  Buffer buff = os_file_read_all(scratch, name);
   Lexer lexer = lexer_init({buff.data, buff.size});
   String word;
   while ((word = lexer_next_token(&lexer)).size) {
@@ -202,10 +202,121 @@ intern Mesh mesh_load_obj(String name) {
   return mesh;
 }
 
+intern Mesh mesh_load_gltf(String name) {
+  Scratch scratch;
+  Buffer buff = os_file_read_all(scratch, name);
+
+  JsonReader r = json_reader_init({buff.data, buff.size});
+  #define JSON_OBJ(r, obj) for (JsonValue key, val; r.iter_obj(obj, &key, &val);)
+  #define JSON_ARR(r, arr, v) for (JsonValue v; r.iter_array(arr, &v);)
+
+  JSON_OBJ(r, r.base_obj) {
+    if (key.match("meshes")) {
+      JSON_ARR(r, val, v) {
+        JSON_OBJ(r, v) {
+          if (key.match("attributes")) {
+            JSON_OBJ(r, val) {
+              if ("POSITION") {
+                Info("pos: %s", val.str);
+              }
+              if ("norm: NORMAL") {
+                Info("%s", val.str);
+              }
+              if ("texcoord: TEXCOORD_0") {
+                Info("%s", val.str);
+              }
+            }
+          }
+          if (key.match("indices")) {
+          
+          }
+          if (key.match("material")) {
+          
+          }
+        }
+      }
+    }
+  }
+
+  // for (JsonValue key, val; r.iter_obj(r.base_obj, &key, &val);) {
+
+  // }
+
+  // while (r.base_obj) {
+  // for (JsonValue val, key, ;;) {
+  //   if (r.) {
+    
+  //   }
+  //   JsonValue meshes = r.next_obj("meshes");
+  // }
+
+  // JsonValue val = r.next_obj(r.base_obj, "meshes");
+  // while (val) {
+  //   JsonValue obj = r.iter_next(val);
+  //   JsonValue name = r.next_obj(obj);
+  //   JsonValue primitives = r.next_obj(obj);
+  //   while (primitives) {
+  //     JsonValue obj = r.iter_next(primitives);
+  //     JsonValue attributes = r.next_obj(obj);
+  //     JsonValue POSITION = r.next_obj(attributes, )
+  //     JsonValue NORMAL = r.next_obj(attributes, )
+  //     JsonValue TEXCOORD_0 = r.next_obj(attributes, )
+  //   }
+  // }
+
+  // iter_array(val) {
+  //   JsonValue obj = iter_next(val);
+  //   JsonValue name = r.iter_obj(obj, "name");
+  //   JsonValue val =  r.iter_obj(obj, "primitives");
+
+
+  // }
+
+  // JsonValue key, val;
+  // while (r.iter_obj(r.base_obj, &key, &val)) {
+  //   if (key.match("meshes")) {
+  //     JsonValue v;
+  //     while (r.iter_array(val, &v)) {
+  //       JsonValue key, val;
+  //       while (r.iter_obj(v, &key, &val)) {
+  //         if (key.match("name")) {
+  //           Info("%s", val.str);
+  //         } else if (key.match("primitives")) {
+  //           JsonValue key, val;
+  //           while (r.iter_obj()) {
+            
+  //           }
+  //         }
+          
+  //       }
+  //     }
+  //   }
+  // }
+
+  // while (json_iter_object(&r, obj, &key, &val)) {
+  //   if (str_match(key.str, "meshes")) {
+  //     JsonValue val;
+  //     while (json_iter_array(&r, val, &val)) {
+
+  //     }
+  //   }
+  // }
+  return {};
+}
+
 u32 mesh_load(String name) {
   Scratch scratch;
   String filepath = push_strf(scratch, "%s/%s/%s", asset_base_path(), String("models"), name);
-  Mesh mesh = mesh_load_obj(filepath);
+  String format = str_skip_last_slash(name);
+  Mesh mesh = {};
+  if (str_match(format, "gltf")) {
+    mesh = mesh_load_obj(filepath);
+  } else if (str_match(format, "obj")) {
+    mesh = mesh_load_gltf(filepath);
+  } else {
+    Assert(true);
+  }
+
   u32 id = vk_mesh_load(mesh);
   return id;
 }
@@ -265,14 +376,6 @@ intern b32 char_is_number_cont(u8 c) {
   return (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '+';
 }
 
-JsonReader json_reader_init(String buffer) {
-  JsonReader reader = {
-    .cur = buffer.str,
-    .end = buffer.str + buffer.size,
-  };
-  return reader;
-}
-
 JsonValue json_read(JsonReader* r) {
   JsonValue res = {};
   top:
@@ -329,6 +432,16 @@ JsonValue json_read(JsonReader* r) {
   return res;
 }
 
+JsonReader json_reader_init(String buffer) {
+  JsonReader r = {
+    .cur = buffer.str,
+    .end = buffer.str + buffer.size,
+  };
+  r.base_obj = r.read();
+  return r;
+}
+
+
 intern void json_discard_until(JsonReader* r, i32 depth) {
   JsonValue val;
   val.type = JsonType_Null;
@@ -354,6 +467,26 @@ b32 json_iter_array(JsonReader* r, JsonValue arr, JsonValue* val) {
   return true;
 }
 
+JsonValue JsonReader::read() {
+  return json_read(this);
+}
+
+b32 JsonReader::iter_obj(JsonValue obj, JsonValue *key, JsonValue *val)   {
+  json_discard_until(this, obj.depth);
+  *key = json_read(this);
+  if (key->type == JsonType_Error || key->type == JsonType_End) { return false; }
+  *val = json_read(this);
+  if (val->type == JsonType_End)   { this->error = "unexpected object end"; return false; }
+  if (val->type == JsonType_Error) { return false; }
+  return true;
+}
+
+b32 JsonReader::iter_array(JsonValue arr, JsonValue* val) {
+  json_discard_until(this, arr.depth);
+  *val = json_read(this);
+  if (val->type == JsonType_Error || val->type == JsonType_End) { return false; }
+  return true;
+}
 
 ////////////////////////////////////////////////////////////////////////
 // Shaders
@@ -376,6 +509,7 @@ u32& shaders(u32 idx) {
 
 String meshes_path_[Mesh_COUNT-1] = {
   [Mesh_Cube-1] = "cube.obj",
+  // [Mesh_GltfCube-1] = "cube.gltf"
   // [Mesh_Room] = "room.obj",
 };
 String meshes_path(u32 idx) {

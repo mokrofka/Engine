@@ -2,10 +2,12 @@ cmake_minimum_required(VERSION 3.10.0)
 set(CMAKE_CXX_STANDARD 20)
 project(Engine)
 
+  # options
   set(hotreload true)
   set(X11_use true)
   set(sanitize_address true)
   set(binary_dir "${CMAKE_SOURCE_DIR}/bin")
+  set(CXX_SCAN_FOR_MODULES true)
 
   message("hotreload: ${hotreload}")
   message("binary path: ${binary_dir}")
@@ -25,10 +27,7 @@ project(Engine)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO "${binary_dir}")
 
 # Compiler
-  if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    add_compile_options(-Wuninitialized -fno-exceptions -fno-rtti -Wno-c99-designator)
-  elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-  endif()
+  add_compile_options(-Wuninitialized -fno-exceptions -fno-rtti -Wno-c99-designator)
   message("Compiler: ${CMAKE_CXX_COMPILER_ID}")
 
 # Sanitizer
@@ -38,7 +37,7 @@ project(Engine)
   endif()
 
 # Linker
-  set(CMAKE_EXE_LINKER_FLAGS "-fuse-ld=lld")
+  # set(CMAKE_EXE_LINKER_FLAGS "-fuse-ld=lld")
   add_link_options(-nostdlib++)
   message("Linker path: ${CMAKE_LINKER}")
 
@@ -78,7 +77,8 @@ project(Engine)
     # lib
     add_library(lib SHARED ${lib_files})
     target_compile_definitions(lib PRIVATE KEXPORT)
-    # target_link_libraries(lib Vulkan::Vulkan)
+    file(GLOB_RECURSE modules src/*.ixx)
+    target_sources(lib PRIVATE FILE_SET CXX_MODULES BASE_DIRS src FILES ${modules})
     if (UNIX)
       if (X11_use)
         # target_link_libraries(lib ${X11_LIBRARIES})
@@ -96,12 +96,15 @@ project(Engine)
     # exe
     add_executable(exe ${exe_file})
     target_link_libraries(exe ${binary_dir}/liblib.so)
+    # set_target_properties(exe PROPERTIES CXX_SCAN_FOR_MODULES ON)
 
   # One Exe
   else()
     file(GLOB_RECURSE binary_files src/*.cpp src/*.c)
     add_executable(exe ${binary_files})
-    # target_link_libraries(exe Vulkan::Vulkan)
+
+    file(GLOB_RECURSE modules src/*.ixx)
+    target_sources(exe PRIVATE FILE_SET CXX_MODULES BASE_DIRS src FILES ${modules})
 
     if (UNIX)
       if (X11_use)

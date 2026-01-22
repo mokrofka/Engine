@@ -38,23 +38,28 @@ enum JsonType {
   JsonType_End,
 };
 
+struct JsonValue {
+  JsonType type;
+  String str;
+  i32 depth;
+  b32 match(String name) { return str_match(str, name); };
+};
+
 struct JsonReader {
   u8* cur;
   u8* end;
   i32 depth;
   String error;
-};
-
-struct JsonValue {
-  JsonType type;
-  String str;
-  i32 depth;
+  JsonValue base_obj;
+  JsonValue read();
+  b32 iter_obj(JsonValue obj, JsonValue *key, JsonValue *val);
+  b32 iter_array(JsonValue arr, JsonValue* val);
 };
 
 JsonReader json_reader_init(String buffer);
-JsonValue json_read(JsonReader* r);
-b32 json_iter_object(JsonReader* r, JsonValue obj, JsonValue *key, JsonValue *val);
-b32 json_iter_array(JsonReader* r, JsonValue arr, JsonValue* val);
+// JsonValue json_read(JsonReader* r);
+// b32 json_iter_object(JsonReader* r, JsonValue obj, JsonValue *key, JsonValue *val);
+// b32 json_iter_array(JsonReader* r, JsonValue arr, JsonValue* val);
 
 ////////////////////////////////////////////////////////////////////////
 // Shaders
@@ -77,7 +82,8 @@ KAPI u32& shaders(u32 idx);
 
 enum {
   Mesh_Cube = 1,
-  Mesh_Room,
+  // Mesh_Room,
+  // Mesh_GltfCube,
   Mesh_COUNT,
 };
 

@@ -3,6 +3,7 @@
 #include "stdarg.h"
 #include <initializer_list>
 
+
 typedef uint8_t  u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
@@ -36,13 +37,13 @@ typedef u64 DenseTime;
 #define global static
 #define local  static
 
-#define U8_MAX  0xFF
-#define U16_MAX 0xFFFF
-#define U32_MAX 0xFFFFFFFF
-#define U64_MAX 0xFFFFFFFFFFFFFFFF
-#define INVALID_ID     U32_MAX
-#define INVALID_ID_U16 U16_MAX
-#define INVALID_ID_U8  U8_MAX
+const u64 U8_MAX  = 0xFF;
+const u64 U16_MAX = 0xFFFF;
+const u64 U32_MAX = 0xFFFFFFFF;
+const u64 U64_MAX = 0xFFFFFFFFFFFFFFFF;
+const u64 INVALID_ID     = U32_MAX;
+const u64 INVALID_ID_U16 = U16_MAX;
+const u64 INVALID_ID_U8  = U8_MAX;
 
 #define KB(n)         ((u64)(n) << 10)
 #define MB(n)         ((u64)(n) << 20)
@@ -68,6 +69,9 @@ typedef u64 DenseTime;
 #define NsToMs(x)   ((f64)(x) / Million (1))
 #define NsToUs(x)   ((f64)(x) / Thousand(1))
 
+////////////////////////////////////////////////////////////////////////
+// Memory
+
 #define OffsetOf(T,m)                (u64)(&((T*)0)->m)
 #define MemberFromOffset(T,ptr,off)  (T)(Offset(ptr, off))
 #define CastFromMember(T,m,ptr)      (T*)(OffsetBack(ptr, OffsetOf(T,m)))
@@ -91,6 +95,9 @@ typedef u64 DenseTime;
 #define OffsetBack(x,a)    ((u8*)(x) - (a))
 #define MemDiff(x,a)       ((u8*)(x) - (u8*)(a))
 #define PtrMatch(a,b)      ((u8*)(a) == (u8*)(b))
+
+////////////////////////////////////////////////////////////////////////
+// Common operations
 
 #define Min(a,b)               (((a) < (b)) ? (a) : (b))
 #define Max(a,b)               (((a) > (b)) ? (a) : (b))
@@ -116,16 +123,21 @@ typedef u64 DenseTime;
 #define RoundDown(x,a)         ((x) / (y) * (a))
 #define Compose64Bit(a,b)      (((u64)(a) << 32) | (u64)(b))
 
+////////////////////////////////////////////////////////////////////////
+// Shenanigans
+
 #define ArrayCount(x)  (sizeof((x)) / sizeof((x)[0]))
 #define ElemSize(x)    (sizeof((x)[0]))
 #define Assign(a,b)    (*((u8**)(&(a))) = (u8*)(b))
 #define As(T)          *(T*)
-#define cast(a)        (a)
 #define Loop(i, c)     for (i32 i = 0; i < c; ++i)
 #define _Stringify(S)  #S
 #define Stringify(S)   _Stringify(S)
 #define _Glue(A,B)     A##B
 #define Glue(A,B)      _Glue(A,B)
+
+////////////////////////////////////////////////////////////////////////
+// Bits
 
 #define Bit(x)               (1 << (x))
 #define BitHas(x, pos)       ((x) & (1 << (pos)))
@@ -136,7 +148,8 @@ typedef u64 DenseTime;
 #define FlagEquals(x, f)     ((x) == (f))
 #define FlagIntersects(x,f)  (((x) & (f)) > 0)
 
-#define quick_sort(ptr, count, element_size, cmp_function) qsort((ptr), (count), (element_size), (int (*)(const void *, const void *))(cmp_function))
+////////////////////////////////////////////////////////////////////////
+// TODO:
 
 #define CheckNil(nil,p) ((p) == 0 || (p) == nil)
 #define SetNil(nil,p) ((p) = nil)
@@ -144,16 +157,10 @@ typedef u64 DenseTime;
 #define SLLQueuePush_NZ(nil,f,l,n,next) (CheckNil(nil,f) ?                                 \
                                         ((f)=(l)=(n), SetNil(nil, (n)->next)) :            \
                                         ((l)->next=(n), (l)=(n), SetNil(nil, (n)->next)))
-
 #define SLLQueuePush(f,l,n) SLLQueuePush_NZ(0,f,l,n,next)
 
-#define Local(T, x, fn) \
-  local T x; \
-  local b32 Glue(is_init, __LINE__); \
-  if (!Glue(is_init, __LINE__)) { \
-    x = fn; \
-    Glue(is_init, __LINE__) = true; \
-  }
+////////////////////////////////////////////////////////////////////////
+// Defer
 
 template<typename F>
 struct _Defer {
@@ -163,6 +170,9 @@ struct _Defer {
 #define defer(code) auto Glue(_defer_, __LINE__) = _Defer([&](){ code; })
 #define DeferLoop(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
 #define IfDeferLoop(begin, end) for (b32 _once = (begin); _once; _once = false, (end))
+
+////////////////////////////////////////////////////////////////////////
+// Error handling
 
 template <typename T>
 struct Ret {
@@ -227,8 +237,8 @@ inline void _result_return(Ret<void> res) {
 ////////////////////////////////////////////////////////////////////////
 // Compiler
 
-#define Likely(expr)           Expect(expr,1)
-#define Unlikely(expr)         Expect(expr,0)
+#define Likely(expr)   Expect(expr,1)
+#define Unlikely(expr) Expect(expr,0)
 
 #if COMPILER_CLANG
   #define NO_DEBUG           __attribute__((nodebug))
@@ -295,9 +305,15 @@ inline u32 most_significant_bit(u64 size) {
   return 63 - clz(size);
 }
 
+struct Buffer {
+  u8* data;
+  u64 size;
+};
+
 struct Range {
   u64 offset; 
   u64 size; 
 };
+
 
 

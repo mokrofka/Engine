@@ -623,6 +623,9 @@ struct GameState {
   IdPool id_pool;
   Darray<Entity> entities;
   Camera cam;
+
+
+  Timer timer;
 };
 
 GameState* st;
@@ -807,7 +810,7 @@ void app_init(u8** state) {
   for (i32 i = 1; i < Shader_COUNT; ++i) {
     shaders(i) = shader_load(shaders_definition(i).path, shaders_definition(i).type);
   }
-  for (i32 i = 1; i < Shader_COUNT; ++i) {
+  for (i32 i = 1; i < Mesh_COUNT; ++i) {
     meshes(i) = mesh_load(meshes_path(i));
   }
   for (i32 i = 1; i < Texture_COUNT; ++i) {
@@ -815,6 +818,8 @@ void app_init(u8** state) {
   }
 
   game_init();
+
+  st->timer = timer_init(1);
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -845,19 +850,19 @@ shared_function void app_update(u8** state) {
   }
 
   // Local(Timer, timer, timer_init(1));
-  // if (timer_tick(timer, delta_time)) {
+  // if (timer_tick(st->timer, delta_time)) {
   //   Info("entity created %i", st->entities.count);
   //   Entity& cube1 = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_Container]);
   //   cube1.pos = v3_rand_range(v3(-10), v3(10));
   // }
 
-  Local(Timer, timer, timer_init(0.3));
-  if (timer_tick(timer, delta_time)) {
+  // Local(Timer, timer, timer_init(0.3));
+  // if (timer_tick(timer, delta_time)) {
     // Info("cam yaw: %f", Mod(st->cam.yaw, 360));
     // Info("block x: %f", st->entities[0].pos().x);
-    v3 pos = st->cam.pos;
+    // v3 pos = st->cam.pos;
     // Info("cam pos: %f %f %f", pos.x,pos.y,pos.z);
-  }
+  // }
   for (Entity& e : st->entities) {
     // e.pos().x += delta_time * 0.01;
     // e.pos() += v3_cross(v3_up(), v3_forward()) * delta_time * 0.1;

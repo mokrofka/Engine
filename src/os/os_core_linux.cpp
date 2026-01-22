@@ -199,7 +199,7 @@ FileProperties os_file_path_properties(String path) {
   return props;
 }
 
-Buffer os_file_all_read(Allocator arena, String path) {
+Buffer os_file_read_all(Allocator arena, String path) {
   Scratch scratch(arena);
   OS_Handle f = os_file_open(path, OS_AccessFlag_Read);
   Assert(f);

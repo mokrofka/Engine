@@ -55,11 +55,6 @@ struct OS_Watch{
   OS_WatchFlags flags;
 };
 
-struct Buffer {
-  u8* data;
-  u64 size;
-};
-
 KAPI String os_get_current_filepath();
 KAPI String os_get_current_directory();
 KAPI String os_get_current_binary_name();
@@ -92,7 +87,7 @@ KAPI u64            os_file_read(OS_Handle file, u64 size, u8* out_data);
 KAPI u64            os_file_write(OS_Handle file, u64 size, u8* data);
 KAPI u64            os_file_size(OS_Handle file);
 KAPI FileProperties os_file_properties(OS_Handle file);
-KAPI Buffer         os_file_all_read(Allocator arena, String path);
+KAPI Buffer         os_file_read_all(Allocator arena, String path);
 KAPI b32            os_file_path_exists(String path);
 KAPI b32            os_file_path_copy(String dst, String src);
 KAPI void           os_file_path_time_copy(String src, String dst);
