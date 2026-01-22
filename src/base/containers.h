@@ -105,7 +105,7 @@ struct Array {
       data[i++] = x;
     }
   }
-  INLINE T& operator[](u32 idx) {
+  NO_DEBUG T& operator[](u32 idx) {
     Assert(idx < cap);
     return data[idx];
   }
@@ -157,7 +157,7 @@ struct Darray {
   Darray(Allocator alloc_) { alloc = alloc_; }
   void init(Allocator alloc_) { alloc = alloc_; }
   void deinit() { mem_free(alloc, data); }
-  INLINE T& operator[](u32 idx) {
+  NO_DEBUG T& operator[](u32 idx) {
     Assert(idx < cap);
     return data[idx];
   }
@@ -550,7 +550,7 @@ enum MapSlot : u8 {
 
 template<typename Key, typename T>
 struct Map {
-  static constexpr f32 LF = 0.7;
+  static constexpr f32 LF = 0.8;
   u32 count = 0;
   u32 cap = 0;
   Allocator alloc = {};
@@ -625,4 +625,83 @@ struct Map {
     }
   }
 };
+
+template<typename Key, typename T>
+struct MapAuto {
+  static constexpr f32 LF = 0.8;
+  u32 count = 0;
+  u32 cap = 0;
+  Allocator alloc = {};
+  T* data = null;
+  Key* keys = null;
+  MapSlot* is_occupied = null;
+  void insert(Key key, T val) {
+    if (count >= cap*LF) { grow(); }
+    u64 hash_idx = hash_memory(&key, sizeof(Key));
+    u64 index = ModPow2(hash_idx, cap);
+    while (is_occupied[index] == MapSlot_Occupied) {
+      index = ModPow2(index + 1, cap);
+    }
+    keys[index] = key;
+    data[index] = val;
+    is_occupied[index] = MapSlot_Occupied;
+    ++count;
+  }
+  T& get(Key key) {
+    u64 hash_idx = hash_memory(&key, sizeof(Key));
+    u64 index = ModPow2(hash_idx, cap);
+    while (is_occupied[index] != MapSlot_Empty) {
+      if ((is_occupied[index] == MapSlot_Occupied) && (MemMatchStruct(&keys[index], &key))) {
+        goto found;
+      }
+      index = ModPow2(index + 1, cap);
+    }
+    Assert(false);
+    found:
+    return data[index];
+  }
+  void erase(Key key) {
+    u64 hash_idx = hash_memory(&key, sizeof(Key));
+    u64 index = ModPow2(hash_idx, cap);
+    while (is_occupied[index] != MapSlot_Empty) {
+      if ((is_occupied[index] == MapSlot_Occupied) && (keys[index] == key)) {
+        is_occupied[index] = MapSlot_Deleted;
+        --count;
+        return;
+      }
+      index = ModPow2(index + 1, cap);
+    }
+  }
+  void grow() {
+    if (data) {
+      T* old_data = data;
+      Key* old_keys = keys;
+      MapSlot* old_is_occupied = is_occupied;
+      u32 old_cap = cap;
+      cap *= DEFAULT_RESIZE_FACTOR;
+      SoA_Field fields[] = {
+        SoA_push_field(&data, T),
+        SoA_push_field(&keys, Key),
+        SoA_push_field(&is_occupied, MapSlot),
+      };
+      mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
+      Loop (i, old_cap) {
+        if (old_is_occupied[i] == MapSlot_Occupied) {
+          insert(old_keys[i], old_data[i]);
+        }
+      }
+      mem_free(alloc, old_data);
+    }
+    else {
+      cap = DEFAULT_CAPACITY;
+      SoA_Field fields[] = {
+        SoA_push_field(&data, T),
+        SoA_push_field(&keys, Key),
+        SoA_push_field(&is_occupied, MapSlot),
+      };
+      mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
+    }
+  }
+};
+
 

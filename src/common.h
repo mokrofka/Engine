@@ -25,6 +25,38 @@ KAPI u32 shader_load(String shader, ShaderType type);
 KAPI u32 texture_load(String name);
 
 ////////////////////////////////////////////////////////////////////////
+// Json
+
+enum JsonType {
+  JsonType_Error,
+  JsonType_Bool,
+  JsonType_Number,
+  JsonType_String,
+  JsonType_Array,
+  JsonType_Object,
+  JsonType_Null,
+  JsonType_End,
+};
+
+struct JsonReader {
+  u8* cur;
+  u8* end;
+  i32 depth;
+  String error;
+};
+
+struct JsonValue {
+  JsonType type;
+  String str;
+  i32 depth;
+};
+
+JsonReader json_reader_init(String buffer);
+JsonValue json_read(JsonReader* r);
+b32 json_iter_object(JsonReader* r, JsonValue obj, JsonValue *key, JsonValue *val);
+b32 json_iter_array(JsonReader* r, JsonValue arr, JsonValue* val);
+
+////////////////////////////////////////////////////////////////////////
 // Shaders
 
 struct ShaderDefinition {

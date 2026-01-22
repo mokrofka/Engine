@@ -82,6 +82,48 @@ String asset_base_path() {
   return st.asset_path;
 }
 
+struct Lexer {
+  u8* cur;
+  u8* end;
+};
+
+Lexer lexer_init(String buffer) {
+  Lexer lexer = {
+    .cur = buffer.str,
+    .end = buffer.str + buffer.size,
+  };
+  return lexer;
+}
+
+String lexer_next_token(Lexer* l) {
+  while (l->cur < l->end && char_is_space(*l->cur)) {
+    l->cur++;
+  }
+  if (l->cur == l->end) return {};
+  u8* current = l->cur;
+  while (l->cur < l->end && !char_is_space(*l->cur)) {
+    l->cur++;
+  }
+  String result = {current, (u64)l->cur - (u64)current};
+  return result;
+}
+
+String lexer_next_integer(Lexer* l) {
+  while (l->cur < l->end && char_is_space(*l->cur)) {
+    l->cur++;
+  }
+  if (l->cur == l->end) return {};
+  while (!char_is_digit(*l->cur)) {
+    ++l->cur;
+  }
+  u8* current = l->cur;
+  while (char_is_digit(*l->cur)) {
+    ++l->cur;
+  }
+  String result = {current, (u64)l->cur - (u64)current};
+  return result;
+}
+
 intern Mesh mesh_load_obj(String name) {
   Scratch scratch;
   Darray<v3> positions(scratch);
@@ -89,69 +131,52 @@ intern Mesh mesh_load_obj(String name) {
   Darray<v2> uvs(scratch);
   Darray<v3u> indexes(scratch);
   Buffer buff = os_file_all_read(scratch, name);
-  Range range = {(u64)buff.data, buff.size + (u64)buff.data};
-  String line;
-
-  // Parsing
-  while ((line = str_read_line(&range)).size) {
+  Lexer lexer = lexer_init({buff.data, buff.size});
+  String word;
+  while ((word = lexer_next_token(&lexer)).size) {
     // vert
-    if (line.str[0] == 'v' && char_is_space(line.str[1])) {
-      u32 start = 2;
-      v3 v = {
-        f32_from_str(str_next_word(line, start)),
-        f32_from_str(str_next_word(line, start)),
-        f32_from_str(str_next_word(line, start)),
-      };
+    if (str_match(word, "v")) {
+      v3 v = {};
+      for (f32& e : v.e) {
+        e = f32_from_str(lexer_next_token(&lexer));
+      }
       // Info("v %f, %f, %f", v.x, v.y, v.z);
       positions.append(v);
     }
     // norm
-    else if (line.str[0] == 'v' && line.str[1] == 'n') {
-      u32 start = 3;
-      v3 v = {
-        f32_from_str(str_next_word(line, start)),
-        f32_from_str(str_next_word(line, start)),
-        f32_from_str(str_next_word(line, start)),
-      };
+    else if (str_match(word, "vn")) {
+      v3 v = {};
+      for (f32& e : v.e) {
+        e = f32_from_str(lexer_next_token(&lexer));
+      }
       // Info("vn %f, %f, %f", v.x, v.y, v.z);
       normals.append(v);
     }
     // uv
-    else if (line.str[0] == 'v' && line.str[1] == 't') {
-      u32 start = 3;
-      v2 v = {
-        f32_from_str(str_next_word(line, start)),
-        f32_from_str(str_next_word(line, start)),
-      };
+    else if (str_match(word, "vt")) {
+      v2 v = {};
+      for (f32& e : v.e) {
+        e = f32_from_str(lexer_next_token(&lexer));
+      }
       // Info("vt %f, %f", v.x, v.y);
       uvs.append(v);
     }
     // indexes
-    else if (line.str[0] == 'f') {
-      u32 start = 2;
+    else if (str_match(word, "f")) {
       Loop (i, 3) {
-        String vert_index = str_next_word(line, start);
-        u32 fist_slash_index = str_index_of(vert_index, '/');
-        String first_num = str_prefix(vert_index, fist_slash_index);
-        String second_part = str_skip(vert_index, fist_slash_index+1);
-        u32 second_slash_index = str_index_of(second_part, '/');
-        String second_num = str_prefix(second_part, second_slash_index);
-        String third_num = str_skip(second_part, second_slash_index+1);
-        v3u v = {
-          u32_from_str(first_num) - 1,
-          u32_from_str(third_num) - 1,
-          u32_from_str(second_num) - 1,
-        };
+        v3u raw = {};
+        for (u32& e : raw.e) {
+          e = u32_from_str(lexer_next_integer(&lexer)) - 1;
+        }
+        v3u v = {raw.x, raw.z, raw.y};
         // Info("%i, %i, %i", v.x, v.y, v.z);
         indexes.append(v);
       }
     }
   }
 
-  // Load to memory in right order
   Darray<Vertex> vertices(st.arena);
   Darray<u32> final_indices(st.arena);
-  // TODO: use hash
   for (v3u idx : indexes) {
     u32 pos_idx = idx.x;
     u32 norm_idx = idx.y;
@@ -231,6 +256,104 @@ u32 texture_load(String name) {
   u32 id = vk_texture_load(texture);
   return id;
 }
+
+// https://github.com/rxi/sj.h.git
+////////////////////////////////////////////////////////////////////////
+// Json reader
+
+intern b32 char_is_number_cont(u8 c) {
+  return (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '+';
+}
+
+JsonReader json_reader_init(String buffer) {
+  JsonReader reader = {
+    .cur = buffer.str,
+    .end = buffer.str + buffer.size,
+  };
+  return reader;
+}
+
+JsonValue json_read(JsonReader* r) {
+  JsonValue res = {};
+  top:
+  if (r->error.str) { return { .type = JsonType_Error, .str = str_range(r->cur, r->end)}; }
+  u8* start = r->cur;
+  switch (*r->cur) {
+    case ' ': case '\n': case '\r': case '\t':
+    case ':': case ',': {
+      ++r->cur;
+      goto top;
+    }
+    case '-': case '0': case '1': case '2': case '3': case '4':
+    case '5': case '6': case '7': case '8': case '9': {
+      res.type = JsonType_Number;
+      while (r->cur != r->end && char_is_number_cont(*r->cur)) { ++r->cur; }
+    } break;
+    case '"': {
+      res.type = JsonType_String;
+      start = ++r->cur;
+      while (true) {
+        if (r->cur == r->end) { r->error = "unclosed string"; goto top; }
+        if (*r->cur == '"')   { break; }
+        if (*r->cur == '\\')  { r->cur++; }
+        if (r->cur != r->end) { r->cur++; }
+      }
+      res.str = str_range(start, r->cur++);
+      return res;
+    }
+    case '{': case '[': {
+      res.type = (*r->cur == '{') ? JsonType_Object : JsonType_Array;
+      res.depth = ++r->depth;
+      r->cur++;
+    } break;
+    case '}': case ']': {
+      res.type = JsonType_End;
+      if (--r->depth < 0) {
+        r->error = (*r->cur == '}') ? "stray '}'" : "stray ']'";
+        goto top;
+      }
+      r->cur++;
+    } break;
+    case 'n': case 't': case 'f': {
+      res.type = (*r->cur == 'n') ? JsonType_Null : JsonType_Bool;
+      if (str_match(String(r->cur, 4),  "null")) { r->cur += 4; break; }
+      if (str_match(String(r->cur, 4),  "true")) { r->cur += 4; break; }
+      if (str_match(String(r->cur, 5), "false")) { r->cur += 5; break; }
+    } // fallthrough
+    default: {
+      r->error = "unknown token";
+      goto top;
+    }
+  }
+  res.str = str_range(start, r->cur);
+  return res;
+}
+
+intern void json_discard_until(JsonReader* r, i32 depth) {
+  JsonValue val;
+  val.type = JsonType_Null;
+  while (r->depth != depth && val.type != JsonType_Error) {
+    val = json_read(r);
+  }
+}
+
+b32 json_iter_object(JsonReader* r, JsonValue obj, JsonValue *key, JsonValue *val) {
+  json_discard_until(r, obj.depth);
+  *key = json_read(r);
+  if (key->type == JsonType_Error || key->type == JsonType_End) { return false; }
+  *val = json_read(r);
+  if (val->type == JsonType_End)   { r->error = "unexpected object end"; return false; }
+  if (val->type == JsonType_Error) { return false; }
+  return true;
+}
+
+b32 json_iter_array(JsonReader* r, JsonValue arr, JsonValue* val) {
+  json_discard_until(r, arr.depth);
+  *val = json_read(r);
+  if (val->type == JsonType_Error || val->type == JsonType_End) { return false; }
+  return true;
+}
+
 
 ////////////////////////////////////////////////////////////////////////
 // Shaders

@@ -56,7 +56,7 @@ INLINE u32 range_size(Range r) {
 ////////////////////////////////////////////////////////////////////////
 // Character Classification & Conversion Functions
 
-INLINE b32 char_is_space(u8 c) { return c == ' '; }
+INLINE b32 char_is_space(u8 c) { return c == ' ' || c == '\n' || c == '\t'; }
 INLINE b32 char_is_upper(u8 c) { return 'A' <= c && c <= 'Z'; }
 INLINE b32 char_is_lower(u8 c) { return 'a' <= c && c <= 'z'; }
 INLINE b32 char_is_alpha(u8 c) { return char_is_upper(c) || char_is_lower(c); }

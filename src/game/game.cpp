@@ -794,6 +794,7 @@ void game_deinit() {
   arena_clear(&st->arena);
 }
 
+
 void app_init(u8** state) {
   Scratch scratch;
   Assign(*state, global_alloc_struct_zero(GameState));

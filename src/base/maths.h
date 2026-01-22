@@ -219,6 +219,16 @@ inline u64 str_hash_FNV(String str) {
   return hash;
 }
 
+inline u64 hash_memory(void* data, u64 size) {
+  u8*p = (u8*)data;
+  uint64_t h = 1469598103934665603ull;
+  Loop (i, size) {
+    h ^= p[i];
+    h *= 1099511628211ull;
+  }
+  return h;
+}
+
 inline u64 hash(u64 x) { return squirrel3(x); }
 inline u64 hash(String str) { return str_hash_FNV(str); }
 inline b32 equal(i64 a, i64 b) { return a == b; }

@@ -541,7 +541,6 @@ String str_next_word(String line, u32& start) {
   return {line.str + token_start, start - token_start};
 }
 
-// the end of line win: \r\n, linux: \n
 String str_read_line(Range* range) {
   while (range->offset < range->size) {
     u8* line_start = (u8*)range->offset;
