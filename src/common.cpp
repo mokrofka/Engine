@@ -775,14 +775,11 @@ intern Mesh mesh_load_gltf(String name) {
   Scratch scratch;
   Buffer buff = os_file_read_all(scratch, name);
   JsonReader r = json_reader_init({buff.data, buff.size});
-  #define JSON_OBJ(r, o) for (JsonValue k, v; json_iter_object(&r, o, &k, &v);)
-  #define JSON_OBJ_(r, o) for (JsonValue key, val; json_iter_object(&r, o, &key, &val);)
-  #define JSON_ARR(r, val) for (JsonValue obj; json_iter_array(&r, val, &obj);)
   struct MeshInfo {
-    u32 pos_idx;
-    u32 norm_idx;
-    u32 uv_idx;
-    u32 indices_idx;
+    // u32 pos_idx;
+    // u32 norm_idx;
+    // u32 uv_idx;
+    // u32 indices_idx;
     // b32 arr[10];
     // u32 vert_count[10];
     u32 vert_count;
@@ -792,38 +789,38 @@ intern Mesh mesh_load_gltf(String name) {
     u32 file_size;
   } info = {};
 
-  // parsing json
+  // Parsing json
   JSON_OBJ(r, r.base_obj) {
-    if (k.match("meshes")) {
-      JSON_ARR(r, v) JSON_OBJ(r, obj) {
-        if (k.match("primitives")) {
-          u32 i = 0;
-          JSON_ARR(r, v) JSON_OBJ(r, obj) {
-            if (k.match("attributes")) {
-              JSON_OBJ_(r, v) {
-                if (key.match("POSITION")) {
-                  info.pos_idx = i;
-                  // info.arr[i] = true;
-                }
-                else if (key.match("NORMAL")) {
-                  info.norm_idx = i;
-                  // info.arr[i] = true;
-                }
-                else if (key.match("TEXCOORD_0")) {
-                  info.uv_idx = i;
-                  // info.arr[i] = true;
-                }
-                ++i;
-              }
-            }
-            else if (k.match("indices")) {
-              info.indices_idx = i;
-              // info.arr[i] = true;
-            }
-          }
-        }
-      }
-    }
+  //   if (k.match("meshes")) {
+  //     JSON_ARR(r, v) JSON_OBJ(r, obj) {
+  //       if (k.match("primitives")) {
+  //         u32 i = 0;
+  //         JSON_ARR(r, v) JSON_OBJ(r, obj) {
+  //           if (k.match("attributes")) {
+  //             JSON_OBJ_(r, v) {
+  //               if (key.match("POSITION")) {
+  //                 info.pos_idx = i;
+  //                 // info.arr[i] = true;
+  //               }
+  //               else if (key.match("NORMAL")) {
+  //                 info.norm_idx = i;
+  //                 // info.arr[i] = true;
+  //               }
+  //               else if (key.match("TEXCOORD_0")) {
+  //                 info.uv_idx = i;
+  //                 // info.arr[i] = true;
+  //               }
+  //               ++i;
+  //             }
+  //           }
+  //           else if (k.match("indices")) {
+  //             info.indices_idx = i;
+  //             // info.arr[i] = true;
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
     if (k.match("accessors")) {
       u32 i = 0;
       JSON_ARR(r, v) {
@@ -895,15 +892,157 @@ intern Mesh mesh_load_gltf(String name) {
   return mesh;
 }
 
+Mesh mesh_load_glb(String name) {
+  Scratch scratch;
+  Buffer buff = os_file_read_all(scratch, name);
+
+  struct FileHeader {
+    u32 magic;
+    u32 version;
+    u32 length;
+  };
+  struct Chunk {
+    u32 chunk_length;
+    u32 chunk_type;
+    u32 chunk_data;
+  };
+  FileHeader* header = (FileHeader*)buff.data;
+  Assert(str_match(String((u8*)&header->magic, 4), "glTF"));
+
+  Chunk* json_chunk = (Chunk*)Offset(header, sizeof(FileHeader));
+  Assert(str_match(String((u8*)&json_chunk->chunk_type, 4), "JSON"));
+
+  Chunk* bin_chunk = (Chunk*)Offset(json_chunk, sizeof(Chunk)-4 + json_chunk->chunk_length);
+  Assert(str_match(String((u8*)&bin_chunk->chunk_type, 3), "BIN"));
+
+  // String model_dir = str_chop_last_slash(name);
+  // String new_file_path = push_strf(scratch, "%s/%s", model_dir, String("test glb json"));
+  // OS_Handle file = os_file_open(new_file_path, OS_AccessFlag_Write);
+  // os_file_write(file, json_chunk_size, buff.data+20);
+  // os_file_close(file);
+
+  JsonReader r = json_reader_init({(u8*)&json_chunk->chunk_data, buff.size});
+  struct Accessor{
+    u32 count;
+  };
+  struct Primitives {
+    u32 pos;
+    u32 norm;
+    u32 uv;
+    u32 index;
+  };
+  struct MeshInfo {
+    Accessor accessors[10];
+    Range buffer_views[10];
+    Primitives primitives;
+
+    String file_name;
+    u32 file_size;
+  } info = {};
+
+  // Parsing json
+  JSON_OBJ(r, r.base_obj) {
+    if (k.match("meshes")) {
+      JSON_ARR(r, v) JSON_OBJ(r, obj) {
+        if (k.match("primitives")) {
+          JSON_ARR(r, v) JSON_OBJ(r, obj) {
+            if (k.match("attributes")) {
+              JSON_OBJ_(r, v) {
+                if (key.match("POSITION")) {
+                  info.primitives.pos = u32_from_str(val.str);
+                }
+                else if (key.match("NORMAL")) {
+                  info.primitives.norm = u32_from_str(val.str);
+                }
+                else if (key.match("TEXCOORD_0")) {
+                  info.primitives.uv = u32_from_str(val.str);
+                }
+              }
+            }
+            else if (k.match("indices")) {
+              info.primitives.index = u32_from_str(v.str);
+            }
+          }
+        }
+      }
+    }
+    if (k.match("accessors")) {
+      u32 i = 0;
+      JSON_ARR(r, v) {
+        JSON_OBJ(r, obj) {
+          if (k.match("count")) {
+            info.accessors[i].count = u32_from_str(v.str);
+            info.accessors[i].count = u32_from_str(v.str);
+          }
+        }
+        ++i;
+      }
+    }
+    else if (k.match("bufferViews")) {
+      u32 i = 0;
+      JSON_ARR(r, v) {
+        JSON_OBJ(r, obj) {
+          if (k.match("byteLength")) {
+            info.buffer_views[i].size = u32_from_str(v.str);
+          }
+          else if (k.match("byteOffset")) {
+            info.buffer_views[i].offset = u32_from_str(v.str);
+          }
+        }
+        ++i;
+      }
+    }
+    else if (k.match("buffers")) {
+      JSON_ARR(r, v) {
+        JSON_OBJ(r, obj) {
+          if (k.match("byteLength")) {
+            info.file_size = u32_from_str(v.str);
+          }
+          else if (k.match("uri")) {
+            info.file_name = v.str;
+          }
+        }
+      }
+    }
+  }
+
+  u8* data = (u8*)&bin_chunk->chunk_data;
+  v3* vertices_pos = (v3*)Offset(data, info.buffer_views[info.primitives.pos].offset);
+  v3* vertices_norm = (v3*)Offset(data, info.buffer_views[info.primitives.norm].offset);
+  v2* vertices_uv = (v2*)Offset(data, info.buffer_views[info.primitives.uv].offset);
+  u16* vertices_indices = (u16*)Offset(data, info.buffer_views[info.primitives.index].offset);
+  u32 vertex_count = info.accessors[info.primitives.pos].count;
+  u32 index_count = info.accessors[info.primitives.index].count;
+  Vertex* vertices = push_array(common_st.arena, Vertex, vertex_count);
+  u32* indices = push_array(common_st.arena, u32, index_count);
+  Loop (i, index_count) {
+    indices[i] = vertices_indices[i];
+  }
+  Loop (i, vertex_count) {
+    vertices[i] = {
+      .pos = vertices_pos[i],
+      .norm = vertices_norm[i],
+      .uv = vertices_uv[i],
+    };
+  }
+  Mesh mesh = {
+    .vertices = vertices,
+    .indexes = (u32*)indices,
+    .vert_count = vertex_count,
+    .index_count = index_count,
+  };
+
+  return mesh;
+}
+
 u32 mesh_load(String name) {
   Scratch scratch;
   String filepath = push_strf(scratch, "%s/%s/%s", asset_base_path(), String("models"), name);
   String format = str_skip_last_dot(name);
   Mesh mesh = {};
   if (str_match(format, "glb")) {
-  
-  }
-  else if (str_match(format, "gltf")) {
+    mesh = mesh_load_glb(filepath);
+  } else if (str_match(format, "gltf")) {
     mesh = mesh_load_gltf(filepath);
   } else if (str_match(format, "obj")) {
     mesh = mesh_load_obj(filepath);
@@ -990,7 +1129,8 @@ u32& shaders(u32 idx) {
 Extern String meshes_path_[Mesh_COUNT-1] = {
   [Mesh_Cube-1] = "cube.obj",
   [Mesh_GltfCube-1] = "cube.gltf",
-  [Mesh_Helmet-1] = "helmet.gltf",
+  [Mesh_GltfHelmet-1] = "helmet.gltf",
+  [Mesh_GlbHelmet-1] = "helmet.glb",
   // [Mesh_Room] = "room.obj",
 };
 String meshes_path(u32 idx) {

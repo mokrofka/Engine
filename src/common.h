@@ -72,12 +72,13 @@ struct JsonReader {
   i32 depth;
   String error;
   JsonValue base_obj;
-  JsonValue read();
-  b32 iter_obj(JsonValue obj, JsonValue *key, JsonValue *val);
-  b32 iter_array(JsonValue arr, JsonValue* val);
 };
 
 JsonReader json_reader_init(String buffer);
+
+#define JSON_OBJ(r, o) for (JsonValue k, v; json_iter_object(&r, o, &k, &v);)
+#define JSON_OBJ_(r, o) for (JsonValue key, val; json_iter_object(&r, o, &key, &val);)
+#define JSON_ARR(r, val) for (JsonValue obj; json_iter_array(&r, val, &obj);)
 
 ////////////////////////////////////////////////////////////////////////
 // Asset watcher
@@ -186,7 +187,8 @@ KAPI u32& shaders(u32 idx);
 enum {
   Mesh_Cube = 1,
   Mesh_GltfCube,
-  Mesh_Helmet,
+  Mesh_GltfHelmet,
+  Mesh_GlbHelmet,
   // Mesh_Room,
   Mesh_COUNT,
 };

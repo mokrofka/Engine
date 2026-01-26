@@ -773,8 +773,8 @@ void game_init() {
   };
   cam.view = mat4_look_at(cam.pos, cam.dir, v3_up());
   Entity& cube = entity_create(meshes(Mesh_Cube), shaders(Shader_Color), textures(Texture_OrangeLines));
-  Entity& cube1 = entity_create(meshes(Mesh_Helmet), shaders(Shader_Color), textures(Texture_Container));
-  cube1.pos() = {-3,0,1};
+  Entity& cube1 = entity_create(meshes(Mesh_GlbHelmet), shaders(Shader_Color), textures(Texture_Container));
+  cube1.pos() = {-4,0,1};
   {
     Mesh triangle = {
       .vertices = triangle_vertices,
@@ -864,11 +864,13 @@ shared_function void app_update(u8** state) {
     // Info("cam pos: %f %f %f", pos.x,pos.y,pos.z);
   // }
   // for (Entity& e : st->entities) {
-    // e.pos().x += delta_time * 0.01;
-    // e.pos() += v3_cross(v3_up(), v3_forward()) * delta_time * 0.1;
+  //   e.pos().x += delta_time * 0.01;
+  //   e.pos() += v3_cross(v3_up(), v3_forward()) * delta_time * 0.1;
 
-    // e.pos().x += -0.1 * delta_time;
+  //   e.pos().x += -0.1 * delta_time;
   // }
+  Entity& e = st->entities[1];
+  e.pos().x -= 0.01;
 
   camera_update();
   gpu_data_update();
