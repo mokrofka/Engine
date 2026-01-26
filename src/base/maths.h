@@ -1,5 +1,5 @@
 #pragma once
-#include "defines.h"
+#include "base.h"
 #include "str.h"
 
 #define PI  3.14159265358f
@@ -255,7 +255,7 @@ NO_DEBUG inline f32 rand_f32_11()                     { return rand_f32_01()*2.0
 NO_DEBUG inline f32 rand_f32()                        { return rand_f32_01()*2*U16_MAX - U16_MAX; }
 NO_DEBUG inline f32 rand_range_f32(f32 min, f32 max)  { return rand_f32_01()*(max - min) + min ; }
 NO_DEBUG inline b32 rand_b32()                        { return rand_u32() % 2; }
-NO_DEBUG inline void rand_seed()                      { _seed = CpuTimerNow(); }
+NO_DEBUG inline void rand_seed()                      { _seed = cpu_timer_now(); }
 
 ////////////////////////////////////////////////////////////////////////
 // Vector2
@@ -286,7 +286,7 @@ NO_DEBUG inline b32 operator==(v2 a, v2 b)         { return (Abs(a.x - b.x) <= F
 NO_DEBUG inline b32 operator!=(v2 a, v2 b)         { return !(a == b); }
 NO_DEBUG inline v2  operator-(v2 a)                { return v2(-a.x, -a.y); }
 
-NO_DEBUG inline f32 v2_length_squared(v2 a)    { return Sqr(a.x) + Sqr(a.y); }
+NO_DEBUG inline f32 v2_length_squared(v2 a)    { return Square(a.x) + Square(a.y); }
 NO_DEBUG inline f32 v2_length(v2 a)            { return Sqrt(v2_length_squared(a)); }
 NO_DEBUG inline v2  v2_norm(v2 a)              { return a * (1.0f/v2_length(a)); }
 NO_DEBUG inline f32 v2_distance(v2 a, v2 b)    { return v2_length(v2(a.x - b.x, a.y - b.y)); }
@@ -335,7 +335,7 @@ NO_DEBUG inline b32 operator==(v3u a, v3u b)       { return a.x == b.x && a.y ==
 NO_DEBUG inline b32 operator!=(v3 a, v3 b)         { return !(a == b); }
 NO_DEBUG inline v3  operator-(v3 a)                { return v3(-a.x, -a.y, -a.z); }
 
-NO_DEBUG inline f32 v3_length_squared(v3 a)     { return Sqr(a.x) + Sqr(a.y) + Sqr(a.z); }
+NO_DEBUG inline f32 v3_length_squared(v3 a)     { return Square(a.x) + Square(a.y) + Square(a.z); }
 NO_DEBUG inline f32 v3_length(v3 a)             { return Sqrt(v3_length_squared(a)); }
 NO_DEBUG inline v3  v3_norm(v3 a)               { return a * (1.0f/v3_length(a)); }
 NO_DEBUG inline f32 v3_distance(v3 a, v3 b)     { return v3_length(v3(a.x - b.x, a.y - b.y, a.z - b.z)); }
@@ -391,7 +391,7 @@ NO_DEBUG inline v4  operator*=(v4& a, f32 scalar)  { return a = a * scalar; }
 NO_DEBUG inline v4  operator/=(v4& a, f32 scalar)  { return a = a / scalar; }
 NO_DEBUG inline v4  operator-(v4 a)                { return v4(-a.x, -a.y, -a.z, -a.w); }
 
-NO_DEBUG inline f32 v4_length_squared(v4 a)  { return Sqr(a.x) + Sqr(a.y) + Sqr(a.z) + Sqr(a.w); }
+NO_DEBUG inline f32 v4_length_squared(v4 a)  { return Square(a.x) + Square(a.y) + Square(a.z) + Square(a.w); }
 NO_DEBUG inline f32 v4_length(v4 a)          { return Sqrt(v4_length_squared(a)); }
 NO_DEBUG inline v4  v4_normalize(v4 a)       { return a * (1.0f / v4_length(a)); }
 

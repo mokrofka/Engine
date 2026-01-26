@@ -848,6 +848,7 @@ shared_function void app_update(u8** state) {
   if (os_is_key_pressed(Key_2)) {
     st->cam.fov -= 5;
   }
+  // Info("yea");
 
   // Local(Timer, timer, timer_init(1));
   // if (timer_tick(st->timer, delta_time)) {

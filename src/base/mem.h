@@ -1,5 +1,5 @@
 #pragma once
-#include "defines.h"
+#include "base.h"
 
 #define MEM_ALLOC_HEADER_GUARD   0xA110C8
 #define MEM_DEALLOC_HEADER_GUARD 0xDE1E7E

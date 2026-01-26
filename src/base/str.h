@@ -1,5 +1,5 @@
 #pragma once
-#include "defines.h"
+#include "base.h"
 #include "mem.h"
 
 struct String {
@@ -76,7 +76,7 @@ KAPI b32 str_match(String str0, String str1);
 KAPI b32 str_matchi(String str0, String str1);
 KAPI b32 str_ends_with(String string, String end);
 
-inline b32 equal(String a, String b) { return str_match(a, b); }
+KAPI b32 equal(String a, String b);
 
 ////////////////////////////////////////////////////////////////////////
 // String Slicing

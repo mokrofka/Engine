@@ -29,17 +29,17 @@ struct OS_State {
   String binary_name;
 };
 
-global OS_State st;
+global OS_State os_st;
 
-String os_get_current_filepath()     { return st.binary_filepath; }
-String os_get_current_directory()    { return st.binary_directory; }
-String os_get_current_binary_name()  { return st.binary_name; }
+String os_get_current_filepath()     { return os_st.binary_filepath; }
+String os_get_current_directory()    { return os_st.binary_directory; }
+String os_get_current_binary_name()  { return os_st.binary_name; }
 
 void os_init(String name) {
-  st.arena = arena_init();
-  st.binary_filepath = name;
-  st.binary_directory = str_chop_last_slash(name);
-  st.binary_name = str_skip_last_slash(name);
+  os_st.arena = arena_init();
+  os_st.binary_filepath = name;
+  os_st.binary_directory = str_chop_last_slash(name);
+  os_st.binary_name = str_skip_last_slash(name);
 }
 
 void os_exit(i32 exit_code) { _exit(exit_code); }
@@ -53,17 +53,16 @@ u64 os_timer_now() {
   return result;
 }
 
-f64 os_now_seconds() {
+u64 os_now_ns() {
   timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);
-  return (f64)ts.tv_sec + NsToSec((f64)ts.tv_nsec);
+  return ts.tv_sec*Billion(1) + ts.tv_nsec;
 }
 
-void os_sleep(u64 ms) { 
-  timespec ts = {
-    .tv_sec = (i32)ms / Thousand(1),
-    .tv_nsec = ((i32)ms % Thousand(1)) * Million(1),
-  };
+void os_sleep_ms(u64 ms) { 
+  timespec ts;
+  ts.tv_sec = ms / Thousand(1);
+  ts.tv_nsec = (ms % Thousand(1)) * Million(1);
   nanosleep(&ts, null);
 }
 

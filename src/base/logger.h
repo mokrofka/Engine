@@ -1,5 +1,5 @@
 #pragma once
-#include "defines.h"
+#include "base.h"
 #include "str.h"
 
 #define LOG_TRACE_ENABLED 1

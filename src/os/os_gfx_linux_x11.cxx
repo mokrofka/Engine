@@ -37,7 +37,7 @@ struct X11State {
   } input;
 };
 
-global X11State st;
+global X11State gfx_st;
 
 intern u32 lnx_mouse_button_translate(u32 button) {
   switch (button) {
@@ -147,21 +147,21 @@ Key lnx_keycode_translate(u32 keysym) {
 
 void os_gfx_init() {
   int screen_number;
-  st.connection = xcb_connect(null, &screen_number);
-  if (xcb_connection_has_error(st.connection)) {
+  gfx_st.connection = xcb_connect(null, &screen_number);
+  if (xcb_connection_has_error(gfx_st.connection)) {
     AssertMsg(false, "Failed to connect to X server");
   }
 
-  const xcb_setup_t* setup = xcb_get_setup(st.connection);
+  const xcb_setup_t* setup = xcb_get_setup(gfx_st.connection);
   xcb_screen_iterator_t iter = xcb_setup_roots_iterator(setup);
   for (int i = 0; i < screen_number; ++i)
     xcb_screen_next(&iter);
-  st.screen = iter.data;
+  gfx_st.screen = iter.data;
 
-  st.window = xcb_generate_id(st.connection);
+  gfx_st.window = xcb_generate_id(gfx_st.connection);
   u32 mask = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK;
   u32 values[] = {
-    st.screen->black_pixel,
+    gfx_st.screen->black_pixel,
     XCB_EVENT_MASK_EXPOSURE |
     XCB_EVENT_MASK_KEY_PRESS |
     XCB_EVENT_MASK_KEY_RELEASE |
@@ -169,22 +169,22 @@ void os_gfx_init() {
   };
 
   xcb_create_window(
-    st.connection,
+    gfx_st.connection,
     XCB_COPY_FROM_PARENT,         // depth
-    st.window,                    // window ID
-    st.screen->root,              // parent
+    gfx_st.window,                    // window ID
+    gfx_st.screen->root,              // parent
     100, 100, 800, 600,           // x, y, width, height
     1,                            // border width
     XCB_WINDOW_CLASS_INPUT_OUTPUT,// class
-    st.screen->root_visual,       // visual
+    gfx_st.screen->root_visual,       // visual
     mask, values                  // masks
   );
 
   const char* title = "XCB Window Example";
   xcb_change_property(
-    st.connection,
+    gfx_st.connection,
     XCB_PROP_MODE_REPLACE,
-    st.window,
+    gfx_st.window,
     XCB_ATOM_WM_NAME,
     XCB_ATOM_STRING,
     8,
@@ -192,15 +192,15 @@ void os_gfx_init() {
     title
   );
 
-  xcb_intern_atom_cookie_t protocols_cookie = xcb_intern_atom(st.connection, 1, 12, "WM_PROTOCOLS");
-  xcb_intern_atom_reply_t* protocols_reply = xcb_intern_atom_reply(st.connection, protocols_cookie, null);
-  xcb_intern_atom_cookie_t delete_cookie = xcb_intern_atom(st.connection, 0, 16, "WM_DELETE_WINDOW");
-  xcb_intern_atom_reply_t* delete_reply = xcb_intern_atom_reply(st.connection, delete_cookie, null);
-  st.wm_delete_window = delete_reply->atom;
+  xcb_intern_atom_cookie_t protocols_cookie = xcb_intern_atom(gfx_st.connection, 1, 12, "WM_PROTOCOLS");
+  xcb_intern_atom_reply_t* protocols_reply = xcb_intern_atom_reply(gfx_st.connection, protocols_cookie, null);
+  xcb_intern_atom_cookie_t delete_cookie = xcb_intern_atom(gfx_st.connection, 0, 16, "WM_DELETE_WINDOW");
+  xcb_intern_atom_reply_t* delete_reply = xcb_intern_atom_reply(gfx_st.connection, delete_cookie, null);
+  gfx_st.wm_delete_window = delete_reply->atom;
   xcb_change_property(
-    st.connection,
+    gfx_st.connection,
     XCB_PROP_MODE_REPLACE,
-    st.window,
+    gfx_st.window,
     protocols_reply->atom,
     4,
     32,
@@ -208,83 +208,83 @@ void os_gfx_init() {
     &delete_reply->atom
   );
 
-  xcb_map_window(st.connection, st.window);
-  xcb_flush(st.connection);
-  st.key_symbols = xcb_key_symbols_alloc(st.connection);
+  xcb_map_window(gfx_st.connection, gfx_st.window);
+  xcb_flush(gfx_st.connection);
+  gfx_st.key_symbols = xcb_key_symbols_alloc(gfx_st.connection);
 }
 
 void os_gfx_shutdown() {
-  xcb_disconnect(st.connection);
+  xcb_disconnect(gfx_st.connection);
 }
 
 void os_pump_messages() {
   xcb_generic_event_t* event;
-  while ((event = xcb_poll_for_event(st.connection))) {
+  while ((event = xcb_poll_for_event(gfx_st.connection))) {
     switch (event->response_type & ~0x80) {
       case XCB_KEY_PRESS: {
         xcb_key_press_event_t* kp = (xcb_key_press_event_t*)event;
-        xcb_keysym_t sym = xcb_key_symbols_get_keysym(st.key_symbols, kp->detail, 0);
+        xcb_keysym_t sym = xcb_key_symbols_get_keysym(gfx_st.key_symbols, kp->detail, 0);
         Key key = lnx_keycode_translate(sym);
-        st.input.keyboard_current.keys[key] = true;
+        gfx_st.input.keyboard_current.keys[key] = true;
       } break;
       case XCB_KEY_RELEASE: {
         xcb_key_press_event_t* kp = (xcb_key_press_event_t*)event;
-        xcb_keysym_t sym = xcb_key_symbols_get_keysym(st.key_symbols, kp->detail, 0);
+        xcb_keysym_t sym = xcb_key_symbols_get_keysym(gfx_st.key_symbols, kp->detail, 0);
         Key key = lnx_keycode_translate(sym);
-        st.input.keyboard_current.keys[key] = false;
+        gfx_st.input.keyboard_current.keys[key] = false;
       } break;
       case XCB_CONFIGURE_NOTIFY: {
         xcb_configure_notify_event_t* cfg = (xcb_configure_notify_event_t*)event;
         if (!cfg->width || !cfg->height) {
           return;
         }
-        st.width = cfg->width;
-        st.height = cfg->height;
+        gfx_st.width = cfg->width;
+        gfx_st.height = cfg->height;
       } break;
       case XCB_CLIENT_MESSAGE: {
         xcb_client_message_event_t* cm = (xcb_client_message_event_t*)event;
-        if (cm->data.data32[0] == st.wm_delete_window) {
-          st.should_close = true; // mark window for closing
+        if (cm->data.data32[0] == gfx_st.wm_delete_window) {
+          gfx_st.should_close = true; // mark window for closing
         }
       } break;
     }
   }
 }
 
-b32 os_window_should_close() { return st.should_close; }
-v2i os_get_window_size() { return v2i(st.width, st.height); }
-v2i os_get_mouse_pos() { return v2i(st.input.mouse_current.x, st.input.mouse_current.y); }
+b32 os_window_should_close() { return gfx_st.should_close; }
+v2i os_get_window_size() { return v2i(gfx_st.width, gfx_st.height); }
+v2i os_get_mouse_pos() { return v2i(gfx_st.input.mouse_current.x, gfx_st.input.mouse_current.y); }
 
 void os_get_gfx_api_handlers(void* out) {
   struct Surface {
     xcb_connection_t* connection;
     xcb_window_t window;
   };
-  *(Surface*)out = { st.connection, st.window };
+  *(Surface*)out = { gfx_st.connection, gfx_st.window };
 }
 
-void  os_close_window() { st.should_close = true; }
+void  os_close_window() { gfx_st.should_close = true; }
 
 ////////////////////////////////////////////////////////////////////////
 // keyboard
 void os_input_update() {
-  MemCopyStruct(&st.input.keyboard_previous, &st.input.keyboard_current);
-  MemCopyStruct(&st.input.mouse_previous, &st.input.mouse_current);
+  MemCopyStruct(&gfx_st.input.keyboard_previous, &gfx_st.input.keyboard_current);
+  MemCopyStruct(&gfx_st.input.mouse_previous, &gfx_st.input.mouse_current);
 }
 
-b32 os_is_key_down(Key key)       { return st.input.keyboard_current.keys[key] == true; }
-b32 os_is_key_up(Key key)         { return st.input.keyboard_current.keys[key] == false; }
-b32 os_was_key_down(Key key)      { return st.input.keyboard_previous.keys[key] == true; }
-b32 os_was_key_up(Key key)        { return st.input.keyboard_previous.keys[key] == false; }
+b32 os_is_key_down(Key key)       { return gfx_st.input.keyboard_current.keys[key] == true; }
+b32 os_is_key_up(Key key)         { return gfx_st.input.keyboard_current.keys[key] == false; }
+b32 os_was_key_down(Key key)      { return gfx_st.input.keyboard_previous.keys[key] == true; }
+b32 os_was_key_up(Key key)        { return gfx_st.input.keyboard_previous.keys[key] == false; }
 b32 os_is_key_pressed(Key key)    { return os_is_key_down(key) && os_was_key_up(key); }
 b32 os_is_key_released(Key key)   { return os_is_key_up(key) && os_was_key_down(key); }
 
 ////////////////////////////////////////////////////////////////////////
 // mouse
-b32 os_is_button_down(MouseButtons button)          { return st.input.mouse_current.buttons[button] == true; }
-b32 os_is_button_up(MouseButtons button)            { return st.input.mouse_current.buttons[button] == false; }
-b32 os_was_button_down(MouseButtons button)         { return st.input.mouse_previous.buttons[button] == true; }
-b32 os_was_button_up(MouseButtons button)           { return st.input.mouse_previous.buttons[button] == false; }
+b32 os_is_button_down(MouseButtons button)          { return gfx_st.input.mouse_current.buttons[button] == true; }
+b32 os_is_button_up(MouseButtons button)            { return gfx_st.input.mouse_current.buttons[button] == false; }
+b32 os_was_button_down(MouseButtons button)         { return gfx_st.input.mouse_previous.buttons[button] == true; }
+b32 os_was_button_up(MouseButtons button)           { return gfx_st.input.mouse_previous.buttons[button] == false; }
 b32 os_is_button_pressed(MouseButtons button)       { return os_is_button_down(button) && os_was_button_up(button); }
 b32 os_is_button_released(MouseButtons button)      { return os_is_button_up(button) && os_was_button_down(button); }
 

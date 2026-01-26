@@ -1,5 +1,5 @@
 #pragma once
-#include "base/defines.h"
+#include "base/base.h"
 #include "base/str.h"
 #include "base/mem.h"
 #include "base/maths.h"
@@ -64,9 +64,9 @@ KAPI void os_exit(i32 exit_code);
 
 KAPI u64 os_timer_frequency();
 KAPI u64 os_timer_now();
-KAPI f64  os_now_seconds();
+KAPI u64 os_now_ns();
 KAPI void os_console_write(String message, u32 color);
-KAPI void os_sleep(u64 ms);
+KAPI void os_sleep_ms(u64 ms);
 
 //////////////////////////////////////////////////////////////////////////
 // Memory

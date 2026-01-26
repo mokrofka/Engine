@@ -812,7 +812,7 @@ intern Array<VkPipelineShaderStageCreateInfo, 2> vk_shader_module_create(String 
 u32 vk_shader_load(String name, ShaderType type) {
   Scratch scratch;
   ShaderInfo shader_info = shader_type[type];
-  if (IsInsideBounds(ShaderType_Drawing, type, ShaderType_Drawing_COUNT)) {
+  if (IsInRange(ShaderType_Drawing, type, ShaderType_Drawing_COUNT)) {
     VK_Shader shader = {
       .name = name,
       .type = type,
@@ -823,7 +823,7 @@ u32 vk_shader_load(String name, ShaderType type) {
     vk.shaders.append(shader);
     return id;
   }
-  else if (IsInsideBounds(ShaderType_Screen, type, ShaderType_Screen_COUNT)) {
+  else if (IsInRange(ShaderType_Screen, type, ShaderType_Screen_COUNT)) {
     VK_Shader &shader = vk.screen_shader;
     shader = {
       .name = name,
@@ -2754,7 +2754,7 @@ ShaderGlobalState* vk_get_shader_state() {
 //   Loop (i, ShaderStageCount) {
 //     stage_create_infos[i] = shader->stages[i].shader_state_create_info;
 //   }
-//   MemCopy(&shader->attribute_desriptions, &attribute_desriptions, attribute_count*sizeof(VkVertexInputAttributeDescription));
+//   mem_copy(&shader->attribute_desriptions, &attribute_desriptions, attribute_count*sizeof(VkVertexInputAttributeDescription));
 //   shader->pipeline = vk_pipeline_create(vert_stride, attribute_count, attribute_desriptions,
 //                                         2, stage_create_infos, shader->topology, false, false);
 // }

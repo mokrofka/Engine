@@ -432,15 +432,15 @@ void mem_free(AllocGpu& allocator, AllocGpuHandle handle) {
 // }
 
 u8* mem_alloc_soa(Allocator alloc, u32 count, SoA_Field* fields, u32 fields_count) {
-  u64 offset = 0;
+  u64 mem_offset = 0;
   u64 offsets[10] = {};
   Loop (i, fields_count) {
-    offset = AlignUp(offset, fields[i].align);
-    offsets[i] = offset;
-    offset += fields[i].elem_size * count;
+    mem_offset = AlignUp(mem_offset, fields[i].align);
+    offsets[i] = mem_offset;
+    mem_offset += fields[i].elem_size * count;
   }
 
-  u64 alloc_size = offset;
+  u64 alloc_size = mem_offset;
   u8* buff = mem_alloc(alloc, alloc_size, fields[0].align);
 
   Loop (i, fields_count) {
@@ -452,14 +452,14 @@ u8* mem_alloc_soa(Allocator alloc, u32 count, SoA_Field* fields, u32 fields_coun
 }
 
 u8* mem_realloc_soa(Allocator alloc, void* ptr, u32 old_count, u32 new_count, SoA_Field* fields, u32 fields_count) {
-  u64 offset = 0;
+  u64 mem_offset = 0;
   u64 offsets[10] = {};
   Loop (i, fields_count) {
-    offset = AlignUp(offset, fields[i].align);
-    offsets[i] = offset;
-    offset += fields[i].elem_size * new_count;
+    mem_offset = AlignUp(mem_offset, fields[i].align);
+    offsets[i] = mem_offset;
+    mem_offset += fields[i].elem_size * new_count;
   }
-  u64 new_size = offset;
+  u64 new_size = mem_offset;
 
   u8* buff = mem_alloc(alloc, new_size, fields[0].align);
 

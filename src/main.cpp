@@ -1,9 +1,6 @@
 #include "lib.h"
 #include "common.h"
 
-#include "asset_watch.h"
-#include "test.h"
-
 struct App {
   void (*update)(u8** state);
 
@@ -24,6 +21,7 @@ void app_update(u8** state);
 i32 main(i32 count, char* args[]) {
   global_alloc_init();
   tctx_init();
+  Info("%i", ModPow2(-31, -4));
   // test();
   os_init(args[0]);
   os_gfx_init();
@@ -45,7 +43,7 @@ i32 main(i32 count, char* args[]) {
   asset_watch_add(st.lib_filepath, []() {
     os_lib_close(st.lib);
     os_file_path_copy(st.lib_temp_filepath, st.lib_filepath);
-    os_sleep(10);
+    os_sleep_ms(10);
     st.lib = os_lib_open(st.lib_temp_filepath);
     Assign(st.update, os_lib_get_proc(st.lib, "app_update"));
   });
@@ -53,14 +51,14 @@ i32 main(i32 count, char* args[]) {
   st.update = app_update;
 #endif
 
-  f64 target_fps = 1.0f / 60.0f;
-  f64 last_time = os_now_seconds();
-  f64 timer = 0;
+  u64 target_fps = Billion(1) / 60;
+  u64 last_time = os_now_ns();
+  f32 timer = 0;
 
   while (!os_window_should_close()) {
     os_pump_messages();
-    f64 start_time = os_now_seconds();
-    delta_time = start_time - last_time;
+    u64 start_time = os_now_ns();
+    delta_time = f32(start_time - last_time) / Billion(1);
     last_time = start_time;
     
     if (!st.is_suspended) {
@@ -73,16 +71,16 @@ i32 main(i32 count, char* args[]) {
       asset_watch_update();
     }
 
-    f64 frame_duration = os_now_seconds() - start_time;
-    f64 sleep_time = target_fps - frame_duration;
-    if (sleep_time > 0.0f) {
-      os_sleep(SecToMs(sleep_time));
+    u64 frame_duration = os_now_ns() - start_time;
+    if (frame_duration < target_fps) {
+      u64 sleep_time = target_fps - frame_duration;
+      os_sleep_ms(sleep_time / Million(1));
     }
 
     timer += delta_time;
     if (timer >= 1.0) {
       timer = 0;
-      // Info("Frame rate: %f ms, %f fps", delta_time, 1/delta_time);
+      Info("Frame rate: %f, %f fps", delta_time, 1/delta_time);
     }
   }
 

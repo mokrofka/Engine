@@ -1,5 +1,5 @@
 #pragma once
-#include "defines.h"
+#include "base.h"
 #include "logger.h"
 #include "mem.h"
 #include "maths.h"
@@ -54,7 +54,7 @@ struct ObjectPool {
     return result;
   }
   u32 append() {
-    if (head == U32_MAX) {
+    if (head >= cap) {
       grow();
     }
     u32 result = head;
@@ -534,7 +534,7 @@ inline u32 id_pool_alloc(IdPool& p) {
 
 inline void id_pool_free(IdPool& p, u32 id) {
   Assert(p.next_idx > 0);
-  Assert(IsInsideBound(id, p.next_idx));
+  Assert(id < p.next_idx);
   Assert(!p.array.exists(id));
   p.array.append(id);
 }

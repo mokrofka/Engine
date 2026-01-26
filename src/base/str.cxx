@@ -419,6 +419,8 @@ b32 str_ends_with(String string, String end) {
   return is_match;
 }
 
+b32 equal(String a, String b) { return str_match(a, b); }
+
 ////////////////////////////////////////////////////////////////////////
 // String Slicing
 
