@@ -2,6 +2,9 @@
 #include "base.h"
 #include "mem.h"
 
+////////////////////////////////////////////////////////////////////////
+// Base
+
 struct String {
   u8* str;
   u64 size;
@@ -33,25 +36,21 @@ struct String64 {
   u32 size;
 };
 
-INLINE u32 range_size(Range r) {
-  u32 c = ((r.size > r.offset) ? (r.size - r.offset) : 0);
-  return c;
-}
-
 KAPI u64 cstr_length(const void* c);
 
 ////////////////////////////////////////////////////////////////////////
 // Character Classification & Conversion Functions
 
-INLINE b32 char_is_space(u8 c) { return c == ' ' || c == '\n' || c == '\t'; }
-INLINE b32 char_is_upper(u8 c) { return 'A' <= c && c <= 'Z'; }
-INLINE b32 char_is_lower(u8 c) { return 'a' <= c && c <= 'z'; }
-INLINE b32 char_is_alpha(u8 c) { return char_is_upper(c) || char_is_lower(c); }
-INLINE b32 char_is_slash(u8 c) { return c == '/' || c == '\\'; }
-INLINE b32 char_is_digit(u8 c) { return (c >= '0' && c <= '9'); }
-INLINE u8 char_to_lower(u8 c) { if (char_is_upper(c)) { c += ('a' - 'A'); } return c; }
-INLINE u8 char_to_upper(u8 c) { if (char_is_lower(c)) { c += ('A' - 'a'); } return c; }
-INLINE u8 char_to_correct_slash(u8 c) { if (char_is_slash(c)) { c = '/'; } return c; }
+KAPI b32 char_is_space(u8 c);
+KAPI b32 char_is_upper(u8 c);
+KAPI b32 char_is_lower(u8 c);
+KAPI b32 char_is_alpha(u8 c);
+KAPI b32 char_is_slash(u8 c);
+KAPI b32 char_is_digit(u8 c);
+KAPI u8 char_to_lower(u8 c);
+KAPI u8 char_to_upper(u8 c);
+KAPI u8 char_to_correct_slash(u8 c);
+KAPI b32 char_is_number_cont(u8 c);
 
 ////////////////////////////////////////////////////////////////////////
 // String Constructors
@@ -75,7 +74,6 @@ KAPI String lower_from_str(Allocator arena, String string);
 KAPI b32 str_match(String str0, String str1);
 KAPI b32 str_matchi(String str0, String str1);
 KAPI b32 str_ends_with(String string, String end);
-
 KAPI b32 equal(String a, String b);
 
 ////////////////////////////////////////////////////////////////////////
@@ -152,8 +150,11 @@ KAPI String str_chop_last_slash(String string);
 // one/two/three -> three
 KAPI String str_skip_last_slash(String string);
 
-// name.fmt -> fmt
+// name.fmt -> name
 KAPI String str_chop_last_dot(String string);
+
+// name.fmt -> fmt
+KAPI String str_skip_last_dot(String string);
 
 ////////////////////////////////////////////////////////////////////////
 // Wchar stuff

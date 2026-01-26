@@ -270,6 +270,9 @@ inline void _result_return(Ret<void> res) {
 }
 #define Try(expr) ({ auto r = expr; if (r.err) return {.err = r.err}; _result_return(r); })
 
+////////////////////////////////////////////////////////////////////////
+// Types
+
 struct Buffer {
   u8* data;
   u64 size;
@@ -280,4 +283,5 @@ struct Range {
   u64 size;
 };
 
+KAPI u64 range_size(Range r);
 

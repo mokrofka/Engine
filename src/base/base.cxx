@@ -55,6 +55,10 @@ KAPI u64 RoundUp(u64 x, u64 a)      { return CeilIntDiv(x, a) * a; }
 KAPI u64 RoundDown(u64 x, u64 a)    { return x / a * a; }
 KAPI u64 Compose64Bit(u64 a, u64 b) { return (a << 32) | b; }
 
+////////////////////////////////////////////////////////////////////////
+// Types
 
-
+u64 range_size(Range r) {
+  return  r.size - r.offset;
+}
 

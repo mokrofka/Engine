@@ -188,7 +188,7 @@ intern u32 f64_write(u8* dest, f64 value, u32 precision) {
 #define HEX_LENGTH 16
 global u8 HEX[] = "0123456789ABCDEF";
 
-u32 hex_u64_write(u8* dest, u64 value) {
+intern u32 hex_u64_write(u8* dest, u64 value) {
   u32 len = HEX_LENGTH;
   for (i32 i = len - 1; i >= 0; --i) {
     dest[i] = HEX[value & 0xF]; // last 4 bits
@@ -200,7 +200,7 @@ u32 hex_u64_write(u8* dest, u64 value) {
 ////////////////////////////////////////////////////////////////////////
 // Great sprintf
 
-u32 my_sprintf(u8* buff, String fmt, va_list argc) {
+intern u32 my_sprintf(u8* buff, String fmt, va_list argc) {
 
   // Calculate length
   if (buff == null) {
@@ -335,6 +335,9 @@ u32 my_sprintf(u8* buff, String fmt, va_list argc) {
   return written;
 }
 
+////////////////////////////////////////////////////////////////////////
+// Base
+
 u64 cstr_length(const void* c) {
   u8* p = (u8*)c;
   for (; *p != 0; ++p);
@@ -353,6 +356,20 @@ String::String(u8* str_){
   str = (u8*)str_;
   size = cstr_length(str_) ;
 }
+
+////////////////////////////////////////////////////////////////////////
+// Character Classification & Conversion Functions
+
+b32 char_is_space(u8 c) { return c == ' ' || c == '\n' || c == '\t'; }
+b32 char_is_upper(u8 c) { return 'A' <= c && c <= 'Z'; }
+b32 char_is_lower(u8 c) { return 'a' <= c && c <= 'z'; }
+b32 char_is_alpha(u8 c) { return char_is_upper(c) || char_is_lower(c); }
+b32 char_is_slash(u8 c) { return c == '/' || c == '\\'; }
+b32 char_is_digit(u8 c) { return (c >= '0' && c <= '9'); }
+u8 char_to_lower(u8 c) { if (char_is_upper(c)) { c += ('a' - 'A'); } return c; }
+u8 char_to_upper(u8 c) { if (char_is_lower(c)) { c += ('A' - 'a'); } return c; }
+u8 char_to_correct_slash(u8 c) { if (char_is_slash(c)) { c = '/'; } return c; }
+b32 char_is_number_cont(u8 c) { return (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '+'; }
 
 ////////////////////////////////////////////////////////////////////////
 // String Constructors
@@ -484,13 +501,10 @@ String push_strfv(Allocator arena, String fmt, va_list argc) {
   va_copy(va_list_argc, argc); 
   u32 need_bytes = my_sprintf(null, fmt, va_list_argc);
   va_end(va_list_argc);
-
   u8* buff = push_buffer(arena, need_bytes + 1); // for C-str
-
   va_copy(va_list_argc, argc); 
   u32 final_size = my_sprintf(buff, fmt, va_list_argc);
   va_end(va_list_argc);
-  
   String result = {buff, final_size};
   result.str[result.size] = 0;
   return result;
@@ -506,6 +520,7 @@ String push_strf(Allocator arena, String fmt, ...) {
 
 ////////////////////////////////////////////////////////////////////////
 // String List Construction Functions
+
 StringNode* str_list_push_node(StringList* list, StringNode* node) {
   SLLQueuePush(list->first, list->last, node);
   list->node_count += 1;
@@ -539,11 +554,9 @@ String str_next_word(String line, u32& start) {
   // skip spaces
   while (start < line.size && char_is_space(line.str[start]))
     start++;
-
   u32 token_start = start;
   while (start < line.size && !char_is_space(line.str[start]))
     start++;
-
   return {line.str + token_start, start - token_start};
 }
 
@@ -552,7 +565,6 @@ String str_read_line(Range* range) {
     u8* line_start = (u8*)range->offset;
     u8* start = (u8*)range->offset;
     u8* end = (u8*)range->size;
-
 #if OS_WINDOWS
     while (start < end && *start != '\r') {
       ++start;
@@ -567,18 +579,14 @@ String str_read_line(Range* range) {
     u32 len = start - line_start;
     // move to next line and handle \n
     range->offset += len + 1;
-
 #endif
-
     // If line is not empty, return it
     if (len > 0) {
       String result = {line_start, len};
       return result;
     }
-
     // If line was empty, loop to read the next one
   }
-
   // If nothing left
   String result = {0, 0};
   return result;
@@ -598,7 +606,6 @@ String str_trim(String string) {
     }
     result.size = e - result.str;
   }
-  
   return result;
 }
 
@@ -608,7 +615,6 @@ i32 str_index_of(String string, u8 c) {
       return i;
     }
   }
-  
   return -1;
 }
 
@@ -628,17 +634,14 @@ i64 i64_from_str(String str) {
   i64 x = 0;
   u32 i = 0;
   b32 negative = false;
-
   if (str.str[i] == '-') {
     negative = true;
     i++;
   }
-
   Loop(j, str.size - i) {
     x *= 10;
     x += str.str[i + j] - '0';
   }
-
   if (negative)
     x = -x;
   return x;
@@ -651,7 +654,6 @@ f64 f64_from_str(String str) {
   b32 is_fraction = false;
   b32 negative = false;
   i32 j = 0;
-
   // handle optional sign
   if (str.size > 0) {
     if (str.str[j] == '-') {
@@ -659,7 +661,6 @@ f64 f64_from_str(String str) {
       j++;
     }
   }
-
   for (; j < str.size; ++j) {
     u8 ch = str.str[j];
     if (ch == '.') {
@@ -667,7 +668,6 @@ f64 f64_from_str(String str) {
       ++j;
       break;
     }
-
     x = x * 10 + (ch - '0'); // integer part
   }
   for (; j < str.size; ++j) {
@@ -675,7 +675,6 @@ f64 f64_from_str(String str) {
     frac += (ch - '0') * factor; // fractional part
     factor *= 0.1;
   }
-
   x += frac;
   if (negative)
     x = -x;
@@ -685,7 +684,6 @@ f64 f64_from_str(String str) {
 ////////////////////////////////////////////////////////////////////////
 // String Path Helpers
 
-// one/two/three -> one/two/
 String str_chop_after_last_slash(String string){
   if (string.size > 0) {
     u8* ptr = string.str + string.size - 1;
@@ -703,7 +701,6 @@ String str_chop_after_last_slash(String string){
   return string;
 }
 
-// one/two/three -> two/three
 String str_skip_slash(String string) {
   u8* ptr = string.str + string.size - 1;
   for (; ptr >= string.str; --ptr) {
@@ -719,7 +716,6 @@ String str_skip_slash(String string) {
   return string;
 }
 
-// one/two/three -> one/two
 String str_chop_last_slash(String string) {
   u8* ptr = string.str + string.size - 1;
   for (; ptr >= string.str; --ptr) {
@@ -735,7 +731,6 @@ String str_chop_last_slash(String string) {
   return string;
 }
 
-// one/two/three -> three
 String str_skip_last_slash(String string) {
   u8* ptr = string.str + string.size - 1;
   for (; ptr >= string.str; --ptr) {
@@ -762,6 +757,21 @@ String str_chop_last_dot(String string) {
     }
   }
   return result;
+}
+
+String str_skip_last_dot(String string) {
+  u8* ptr = string.str + string.size - 1;
+  for (; ptr >= string.str; --ptr) {
+    if (*ptr == '.') {
+      break;
+    }
+  }
+  if (ptr >= string.str) {
+    ptr += 1;
+    string.size = (u32)(string.str + string.size - ptr);
+    string.str = ptr;
+  }
+  return string;
 }
 
 ////////////////////////////////////////////////////////////////////////

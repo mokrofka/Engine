@@ -185,8 +185,9 @@ KAPI u32& shaders(u32 idx);
 
 enum {
   Mesh_Cube = 1,
+  Mesh_GltfCube,
+  Mesh_Helmet,
   // Mesh_Room,
-  // Mesh_GltfCube,
   Mesh_COUNT,
 };
 

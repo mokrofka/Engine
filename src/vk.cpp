@@ -789,9 +789,6 @@ intern Array<VkPipelineShaderStageCreateInfo, 2> vk_shader_module_create(String 
     VkShaderStageFlagBits stage_types[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
     String filepath = push_strf(scratch, "%s/shaders/compiled/%s.%s.spv", asset_base_path(), name, stage_type_strs[i]);
     Buffer binary = os_file_read_all(scratch, filepath);
-    if (!binary.data) {
-      AssertMsg(false, "Unable to read shader module: %s", filepath);
-    }
     VkShaderModuleCreateInfo module_create_info = {
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
       .codeSize = binary.size,
@@ -1721,7 +1718,7 @@ u32 vk_mesh_load(Mesh mesh) {
   VK_Buffer& index_buff = vk.index_buffer;
   u64 index_size = mesh.index_count*sizeof(u32);
   u64 index_offset = index_buff.size;
-  index_offset += index_size;
+  index_buff.size += index_size;
   Range index_range = { .offset = index_offset, .size = index_size };
 
   VK_Mesh vk_mesh = {

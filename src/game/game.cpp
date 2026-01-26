@@ -624,7 +624,6 @@ struct GameState {
   Darray<Entity> entities;
   Camera cam;
 
-
   Timer timer;
 };
 
@@ -774,7 +773,7 @@ void game_init() {
   };
   cam.view = mat4_look_at(cam.pos, cam.dir, v3_up());
   Entity& cube = entity_create(meshes(Mesh_Cube), shaders(Shader_Color), textures(Texture_OrangeLines));
-  Entity& cube1 = entity_create(meshes(Mesh_Cube), shaders(Shader_Color), textures(Texture_Container));
+  Entity& cube1 = entity_create(meshes(Mesh_Helmet), shaders(Shader_Color), textures(Texture_Container));
   cube1.pos() = {-3,0,1};
   {
     Mesh triangle = {
@@ -796,7 +795,6 @@ void game_deinit() {
   st->entities.clear();
   arena_clear(&st->arena);
 }
-
 
 void app_init(u8** state) {
   Scratch scratch;
@@ -820,6 +818,7 @@ void app_init(u8** state) {
   game_init();
 
   st->timer = timer_init(1);
+  Info("%app initialied");
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -864,12 +863,12 @@ shared_function void app_update(u8** state) {
     // v3 pos = st->cam.pos;
     // Info("cam pos: %f %f %f", pos.x,pos.y,pos.z);
   // }
-  for (Entity& e : st->entities) {
+  // for (Entity& e : st->entities) {
     // e.pos().x += delta_time * 0.01;
     // e.pos() += v3_cross(v3_up(), v3_forward()) * delta_time * 0.1;
 
     // e.pos().x += -0.1 * delta_time;
-  }
+  // }
 
   camera_update();
   gpu_data_update();
