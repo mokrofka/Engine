@@ -7,10 +7,12 @@ enum RenderpassType{
   RenderpassType_Screen,
 };
 
-struct PushConstant {
-  // mat4 model;
-  u32 entity_idx;
-  u32 texture_id;
+union PushConstant {
+  struct {
+    u32 entity_idx;
+    u32 texture_id;
+  };
+  u8 data[128];
 };
 
 struct ShaderEntity {
@@ -88,15 +90,14 @@ struct Vertex2D {
 struct Texture {
   u32 width;
   u32 height;
-  u8 channel_count;
   u8* data;
 };
 
-#define VertexAttributeCount 3
 struct Vertex {
   v3 pos;
   v3 norm;
   v2 uv;
+  v3 color;
 };
 
 struct Mesh {
@@ -104,10 +105,6 @@ struct Mesh {
   u32* indexes;
   u32 vert_count;
   u32 index_count;
-};
-
-struct RenderEntity {
-  u32 shader_handle;
 };
 
 enum ShaderTopology {
@@ -133,6 +130,10 @@ enum ShaderType {
   ShaderType_Screen,
   ShaderType_Screen_COUNT,
 
+  // Cubemap
+  ShaderType_Cubemap,
+  ShaderType_Cubemap_COUNT,
+
   // Compute
   ShaderType_Compute,
   ShaderType_Compute_COUNT,
@@ -155,6 +156,9 @@ inline ShaderInfo shader_type[] = {
   [ShaderType_Screen] = {
     .use_depth = false,
   },
+
+  // Cubemap
+  [ShaderType_Cubemap] = {},
 
   // Compute
   [ShaderType_Compute] = {},

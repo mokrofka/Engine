@@ -593,10 +593,16 @@
 // }
 
 Vertex triangle_vertices[] = {
-  {v3( 0.0,   0.5, 0), v3(), v2(0.5, 1)},
-  {v3(-0.5,  -0.5, 0), v3(), v2(0.0, 0)},
-  {v3( 0.5,  -0.5, 0), v3(), v2(1.0, 0)},
+  {v3( 0.0,   0.5, 0), v3(), v2(0.5, 1), v3(1, 0.0, 0)},
+  {v3(-0.5,  -0.5, 0), v3(), v2(0.0, 0), v3(0.0, 1, 0)},
+  {v3( 0.5,  -0.5, 0), v3(), v2(1.0, 0), v3(0.0, 0.0, 1)},
 };
+
+// Vertex triangle_vertices[] = {
+//   {v3( 0.0,   0.5, 0), v3(), v2(0.5, 1)},
+//   {v3(-0.5,  -0.5, 0), v3(), v2(0.0, 0)},
+//   {v3( 0.5,  -0.5, 0), v3(), v2(1.0, 0)},
+// };
 
 struct Entity {
   u32 id;
@@ -638,6 +644,7 @@ void gpu_data_update() {
   shader_st.projection_view = cam.projection * cam.view;
   shader_st.projection = cam.projection;
   shader_st.view = cam.view;
+  shader_st.time = os_timer_now();
 }
 
 void* grid_create(Allocator arena, i32 grid_size, f32 grid_step) {
@@ -760,7 +767,7 @@ void camera_update() {
 // Init
 
 void new_init() {
-  Entity& cube = entity_create(meshes(Mesh_Cube), shaders(Shader_Color), textures(Texture_OrangeLines));
+  Entity& cube = entity_create(meshes(Mesh_GltfCube), shaders(Shader_Color), textures(Texture_OrangeLines));
 }
 
 void game_init() {
@@ -772,8 +779,8 @@ void game_init() {
     .fov = 45,
   };
   cam.view = mat4_look_at(cam.pos, cam.dir, v3_up());
-  Entity& cube = entity_create(meshes(Mesh_Cube), shaders(Shader_Color), textures(Texture_OrangeLines));
-  Entity& cube1 = entity_create(meshes(Mesh_GlbHelmet), shaders(Shader_Color), textures(Texture_Container));
+  // Entity& cube = entity_create(meshes(Mesh_GltfCube), shaders(Shader_Color), textures(Texture_OrangeLines));
+  Entity& cube1 = entity_create(meshes(Mesh_GltfCube), shaders(Shader_Color), textures(Texture_Container));
   cube1.pos() = {-4,0,1};
   {
     Mesh triangle = {
@@ -781,11 +788,26 @@ void game_init() {
       .vert_count = ArrayCount(triangle_vertices),
     };
     u32 mesh = vk_mesh_load(triangle);
-    Entity& e = entity_create(mesh, shaders(Shader_Color), textures(Texture_Container));
-    e.pos().x = 3;
+    Entity& e = entity_create(mesh, shaders(Shader_Color), textures(Texture_OrangeLines));
+    e.pos() = 3;
   }
-  // Entity& room = entity_create(meshes[Mesh_Room], shaders[Shader_Color], textures[Texture_Room]);
-  // room.pos = {0,0,10};
+}
+
+void foo() {
+
+  struct Material {
+    u32 shader;
+    f32 albedo;
+    f32 matallic;
+    f32 roughness;
+  };
+
+  struct E_Description {
+    
+  };
+
+  // Entity& e = entity_create(mesh, shaders(Shader_Color));
+  
 }
 
 void game_deinit() {
@@ -814,11 +836,13 @@ void app_init(u8** state) {
   for (i32 i = 1; i < Texture_COUNT; ++i) {
     textures(i) = texture_load(textures_path(i));
   }
+  shader_load("cubemap_shader", ShaderType_Cubemap);
+  cubemap_load("cubemap");
 
   game_init();
 
   st->timer = timer_init(1);
-  Info("%app initialied");
+  Info("app initialied");
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -869,8 +893,8 @@ shared_function void app_update(u8** state) {
 
   //   e.pos().x += -0.1 * delta_time;
   // }
-  Entity& e = st->entities[1];
-  e.pos().x -= 0.01;
+  // Entity& e = st->entities[1];
+  // e.pos().x -= 0.01;
 
   camera_update();
   gpu_data_update();

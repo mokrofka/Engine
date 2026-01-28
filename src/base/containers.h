@@ -569,18 +569,19 @@ struct Map {
     is_occupied[index] = MapSlot_Occupied;
     ++count;
   }
-  T& get(Key key) {
+  T* get(Key key) {
     u64 hash_idx = hash(key);
     u64 index = ModPow2(hash_idx, cap);
-    while (is_occupied[index] != MapSlot_Empty) {
+    u64 start_idx = index;
+    do {
       if ((is_occupied[index] == MapSlot_Occupied) && (equal(keys[index], key))) {
-        goto found;
+        return &data[index];
+      } 
+      else if (is_occupied[index] == MapSlot_Empty) {
+        return null;
       }
-      index = ModPow2(index + 1, cap);
-    }
-    Assert(false);
-    found:
-    return data[index];
+    } while (index != start_idx);
+    return null;
   }
   void erase(Key key) {
     u64 hash_idx = hash(key);

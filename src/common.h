@@ -153,6 +153,7 @@ KAPI String asset_base_path();
 KAPI u32 mesh_load(String name);
 KAPI u32 shader_load(String shader, ShaderType type);
 KAPI u32 texture_load(String name);
+KAPI u32 cubemap_load(String name);
 
 struct Timer {
   f32 passed;
@@ -185,10 +186,11 @@ KAPI u32& shaders(u32 idx);
 // Meshes
 
 enum {
-  Mesh_Cube = 1,
-  Mesh_GltfCube,
-  Mesh_GltfHelmet,
-  Mesh_GlbHelmet,
+  // Mesh_Cube = 1,
+  Mesh_GltfCube = 1,
+  // Mesh_GltfHelmet,
+  // Mesh_GlbHelmet,
+  // Mesh_GlbMonkey,
   // Mesh_Room,
   Mesh_COUNT,
 };
@@ -202,7 +204,7 @@ KAPI u32& meshes(u32 idx);
 enum {
   Texture_OrangeLines = 1,
   Texture_Container,
-  Texture_Room,
+  // Texture_Room,
   Texture_COUNT,
 };
 

@@ -66,6 +66,7 @@ layout(std430, set = 0, binding = 0) readonly buffer Buffer {
 
 layout(set = 0, binding = 1) uniform texture2D textures[];
 layout(set = 0, binding = 2) uniform sampler samplers[];
+layout(set = 0, binding = 3) uniform textureCube cube_texture;
 
 layout(push_constant) uniform PushConstants {
   // mat4 model;

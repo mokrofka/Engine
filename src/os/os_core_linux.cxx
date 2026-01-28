@@ -8,6 +8,7 @@
 #include <time.h>
 #include <dlfcn.h>
 #include <dirent.h>
+#include "spawn.h"
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/sendfile.h>
@@ -363,25 +364,39 @@ void os_file_iter_end(OS_FileIter *iter) {
 ////////////////////////////////////////////////////////////////////////
 // Processes
 
-OS_Handle os_process_launch(String cmd) {
-  pid_t pid = fork();
-  if (pid == 0) {
-    Scratch scratch;
-    char** argv = push_array(scratch, char*, 10 + 2);
-    u32 args_count = 0;
-    u32 start = 0;
-    String next_word;
-    while ((next_word = str_next_word(cmd, start)).size) {
-      String arg_c = push_str_copy(scratch, next_word);
-      argv[args_count] = (char*)arg_c.str;
-      ++args_count;
-    }
-    argv[args_count] = null;
-    execvp(argv[0], argv);
-    os_exit(0);
+OS_Handle os_process_launch(StringList list) {
+  Scratch scratch;
+  OS_Handle handle = {};
+  char** argv = push_array(scratch, char*, list.node_count + 1);
+  argv[list.node_count] = null;
+  u32 i = 0;
+  for (StringNode* n = list.first; n != null; n = n->next) {
+    argv[i++] = (char*)n->string.str;
   }
-  return pid;
+  pid_t pid = 0;
+  handle = posix_spawnp(&pid, argv[0], null, null, argv, null);
+  return handle;
 }
+
+// OS_Handle os_process_launch(StringList list) {
+//   pid_t pid = fork();
+//   // if (pid == 0) {
+//     Scratch scratch;
+//     char** argv = push_array(scratch, char*, 10 + 2);
+//     u32 args_count = 0;
+//     u32 start = 0;
+//     String next_word;
+//     while ((next_word = str_next_word(cmd, start)).size) {
+//       String arg_c = push_str_copy(scratch, next_word);
+//       argv[args_count] = (char*)arg_c.str;
+//       ++args_count;
+//     }
+//     argv[args_count] = null;
+//     execvp(argv[0], argv);
+//     os_exit(0);
+//   // }
+//   return pid;
+// }
 
 void os_process_join(OS_Handle handle) {
   int pid = handle;

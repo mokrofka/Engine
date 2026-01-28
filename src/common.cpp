@@ -596,15 +596,21 @@ void common_init() {
       Scratch scratch;
       String shader_filepath = push_strf(scratch, "%s/%s", common_st.shader_dir, name);
       String shader_compiled_filepath = push_strf(scratch, "%s/%s%s", common_st.shader_compiled_dir, name, String(".spv"));
-      String cmd = push_strf(scratch, "glslangValidator -V %s -o %s", shader_filepath, shader_compiled_filepath);
-      os_process_launch(cmd);
+      StringList list = {};
+      str_list_pushf(scratch, &list, "glslangValidator");
+      str_list_pushf(scratch, &list, "-V");
+      str_list_pushf(scratch, &list, "%s", shader_filepath);
+      str_list_pushf(scratch, &list, "-o");
+      str_list_pushf(scratch, &list, "%s", shader_compiled_filepath);
+      // String cmd = push_strf(scratch, "glslangValidator -V %s -o %s", shader_filepath, shader_compiled_filepath);
+      os_process_launch(list);
     }, OS_WatchFlag_Modify);
     asset_watch_directory_add(push_str_cat(scratch, asset_base_path(), "/shaders/compiled"), [](String name) {
       Scratch scratch;
       String shader_name_with_format = str_chop_last_dot(name);
       String shader_name = str_chop_last_dot(shader_name_with_format);
-      u32 id = common_st.shader_map.get(shader_name);
-      vk_shader_reload(shader_name, id);
+      u32* id = common_st.shader_map.get(shader_name);
+      vk_shader_reload(shader_name, *id);
     }, OS_WatchFlag_Modify);
   }
 
@@ -895,7 +901,6 @@ intern Mesh mesh_load_gltf(String name) {
 Mesh mesh_load_glb(String name) {
   Scratch scratch;
   Buffer buff = os_file_read_all(scratch, name);
-
   struct FileHeader {
     u32 magic;
     u32 version;
@@ -908,20 +913,10 @@ Mesh mesh_load_glb(String name) {
   };
   FileHeader* header = (FileHeader*)buff.data;
   Assert(str_match(String((u8*)&header->magic, 4), "glTF"));
-
   Chunk* json_chunk = (Chunk*)Offset(header, sizeof(FileHeader));
   Assert(str_match(String((u8*)&json_chunk->chunk_type, 4), "JSON"));
-
   Chunk* bin_chunk = (Chunk*)Offset(json_chunk, sizeof(Chunk)-4 + json_chunk->chunk_length);
   Assert(str_match(String((u8*)&bin_chunk->chunk_type, 3), "BIN"));
-
-  // String model_dir = str_chop_last_slash(name);
-  // String new_file_path = push_strf(scratch, "%s/%s", model_dir, String("test glb json"));
-  // OS_Handle file = os_file_open(new_file_path, OS_AccessFlag_Write);
-  // os_file_write(file, json_chunk_size, buff.data+20);
-  // os_file_close(file);
-
-  JsonReader r = json_reader_init({(u8*)&json_chunk->chunk_data, buff.size});
   struct Accessor{
     u32 count;
   };
@@ -935,12 +930,10 @@ Mesh mesh_load_glb(String name) {
     Accessor accessors[10];
     Range buffer_views[10];
     Primitives primitives;
-
     String file_name;
     u32 file_size;
   } info = {};
-
-  // Parsing json
+  JsonReader r = json_reader_init({(u8*)&json_chunk->chunk_data, buff.size});
   JSON_OBJ(r, r.base_obj) {
     if (k.match("meshes")) {
       JSON_ARR(r, v) JSON_OBJ(r, obj) {
@@ -971,7 +964,6 @@ Mesh mesh_load_glb(String name) {
       JSON_ARR(r, v) {
         JSON_OBJ(r, obj) {
           if (k.match("count")) {
-            info.accessors[i].count = u32_from_str(v.str);
             info.accessors[i].count = u32_from_str(v.str);
           }
         }
@@ -1005,7 +997,6 @@ Mesh mesh_load_glb(String name) {
       }
     }
   }
-
   u8* data = (u8*)&bin_chunk->chunk_data;
   v3* vertices_pos = (v3*)Offset(data, info.buffer_views[info.primitives.pos].offset);
   v3* vertices_norm = (v3*)Offset(data, info.buffer_views[info.primitives.norm].offset);
@@ -1027,11 +1018,10 @@ Mesh mesh_load_glb(String name) {
   }
   Mesh mesh = {
     .vertices = vertices,
-    .indexes = (u32*)indices,
+    .indexes = indices,
     .vert_count = vertex_count,
     .index_count = index_count,
   };
-
   return mesh;
 }
 
@@ -1075,7 +1065,6 @@ intern Texture texture_image_load(String name) {
     (i32*)&channel_count,
     required_channel_count);
   Assert(data);
-  texture.channel_count = required_channel_count;
   texture.data = data;
   return texture;
 }
@@ -1084,6 +1073,24 @@ u32 texture_load(String name) {
   Texture texture = texture_image_load(name);
   u32 id = vk_texture_load(texture);
   return id;
+}
+
+u32 cubemap_load(String name) {
+  Scratch scratch;
+  Texture textures[6];
+  String sides[] = {
+    "right", "left",
+    "top", "bottom",
+    "front", "back",
+  };
+  Loop (i, ArrayCount(textures)) {
+    String texture_name = push_strf(scratch, "%s/%s%s", name, sides[i], String(".jpg"));
+    textures[i] = texture_image_load(texture_name);
+  }
+
+  vk_cubemap_load(textures);
+
+  return 0;
 }
 
 Timer timer_init(f32 interval) {
@@ -1109,7 +1116,7 @@ b32 timer_tick(Timer& t, f32 dt) {
 ///////////////////////////////////
 // Shaders
 
-Extern ShaderDefinition shaders_definition_[Shader_COUNT-1] = {
+global ShaderDefinition shaders_definition_[Shader_COUNT-1] = {
   [Shader_Color-1] = "color_shader", ShaderType_Drawing,
 };
 ShaderDefinition shaders_definition(u32 idx) {
@@ -1117,7 +1124,7 @@ ShaderDefinition shaders_definition(u32 idx) {
   Assert(IsInRange<u32>(1, idx, Shader_COUNT));
   return shaders_definition_[idx-1];
 }
-Extern u32 shaders_[Shader_COUNT-1];
+global u32 shaders_[Shader_COUNT-1];
 u32& shaders(u32 idx) { 
   Assert(IsInRange((u32)1, idx, (u32)Shader_COUNT));
   return shaders_[idx-1];
@@ -1126,18 +1133,19 @@ u32& shaders(u32 idx) {
 ///////////////////////////////////
 // Meshes
 
-Extern String meshes_path_[Mesh_COUNT-1] = {
-  [Mesh_Cube-1] = "cube.obj",
+global String meshes_path_[Mesh_COUNT-1] = {
+  // [Mesh_Cube-1] = "cube.obj",
   [Mesh_GltfCube-1] = "cube.gltf",
-  [Mesh_GltfHelmet-1] = "helmet.gltf",
-  [Mesh_GlbHelmet-1] = "helmet.glb",
+  // [Mesh_GltfHelmet-1] = "helmet.gltf",
+  // [Mesh_GlbHelmet-1] = "helmet.glb",
+  // [Mesh_GlbMonkey-1] = "monkey.glb",
   // [Mesh_Room] = "room.obj",
 };
 String meshes_path(u32 idx) {
   Assert(IsInRange<u32>(1, idx, Mesh_COUNT));
   return meshes_path_[idx-1];
 }
-Extern u32 meshes_[Mesh_COUNT-1];
+global u32 meshes_[Mesh_COUNT-1];
 u32& meshes(u32 idx) {
   Assert(IsInRange<u32>(1, idx, Mesh_COUNT));
   return meshes_[idx-1];
@@ -1146,16 +1154,16 @@ u32& meshes(u32 idx) {
 ///////////////////////////////////
 // Textures
 
-Extern String textures_path_[Texture_COUNT-1] = {
+global String textures_path_[Texture_COUNT-1] = {
   [Texture_OrangeLines-1] = "orange_lines_512.png",
   [Texture_Container-1] = "container.jpg",
-  [Texture_Room-1] = "image.png",
+  // [Texture_Room-1] = "image.png",
 };
 String textures_path(u32 idx) { 
   Assert(IsInRange<u32>(1, idx, Texture_COUNT));
   return textures_path_[idx-1];
 }
-Extern u32 textures_[Texture_COUNT-1];
+global u32 textures_[Texture_COUNT-1];
 u32& textures(u32 idx) {
   Assert(IsInRange<u32>(1, idx, Texture_COUNT));
   return textures_[idx-1];

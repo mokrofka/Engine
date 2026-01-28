@@ -14,6 +14,7 @@ void vk_end_renderpass(RenderpassType renderpass);
 
 KAPI u32 vk_shader_load(String name, ShaderType type);
 KAPI u32 vk_texture_load(Texture t);
+KAPI u32 vk_cubemap_load(Texture* textures);
 
 void vk_draw();
 void vk_draw_screen();

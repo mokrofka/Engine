@@ -27,6 +27,7 @@ struct VK_Image {
   VkImageView view;
   u32 width;
   u32 height;
+  u32 array_layers;
 };
 
 struct VK_Mesh {
@@ -40,7 +41,7 @@ struct VK_Swapchain {
   VkSwapchainKHR handle;
   VkSurfaceFormatKHR image_format;  
   VkPresentModeKHR present_mode;
-  VkImage images[4];
+  VK_Image images[4];
   VkImageView views[4];
   VK_Image depth_attachment;
 };
@@ -94,6 +95,10 @@ struct VK_SyncObj {
   VkSemaphore* render_complete_semaphores;
   VkSemaphore* compute_complete_semaphores;
   VkFence* in_flight_fences;
+};
+
+struct RenderEntity {
+  u32 shader_handle;
 };
 
 struct VK_State {
@@ -152,9 +157,10 @@ struct VK_State {
   SparseSet<DirLight> dir_light_data;
   SparseSet<SpotLight> spot_light_data;
 
-  VK_ShaderCompute compute_shader;
-  ShaderGlobalState* global_shader_state;
+  // VK_ShaderCompute compute_shader;
+  // ShaderGlobalState* global_shader_state;
   VK_Shader screen_shader;
+  VK_Shader cubemap_shader;
 
   // offscreen rendering
   // VK_Texture* texture_targets;
@@ -591,7 +597,9 @@ intern void vk_shader_pipeline_init() {
   VK_CHECK(vk.CreatePipelineLayout(vkdevice, &pipeline_layout_info, vk.allocator, &vk.pipeline_layout));
 }
 
-intern VkPipeline vk_shader_pipeline_create(ShaderInfo shader_info, Array<VkPipelineShaderStageCreateInfo, 2> stages) {
+intern VkPipeline vk_shader_pipeline_create(ShaderType type, Array<VkPipelineShaderStageCreateInfo, 2> stages) {
+  ShaderInfo shader_info = shader_type[type];
+
   // Dynamic rendering
   // VkFormat color_format = VK_FORMAT_R8G8B8A8_UNORM;
   VkFormat color_format = VK_FORMAT_B8G8R8A8_UNORM;
@@ -630,12 +638,18 @@ intern VkPipeline vk_shader_pipeline_create(ShaderInfo shader_info, Array<VkPipe
       .format = VK_FORMAT_R32G32_SFLOAT,
       .offset = (u32)OffsetOf(Vertex, uv),
     },
+    [3] = {
+      .location = 3,
+      .binding = 0,
+      .format = VK_FORMAT_R32G32B32_SFLOAT,
+      .offset = (u32)OffsetOf(Vertex, color),
+    },
   };
   VkPipelineVertexInputStateCreateInfo vertex_input_info = {
     .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
     .vertexBindingDescriptionCount = 1,
     .pVertexBindingDescriptions = &binding_description,
-    .vertexAttributeDescriptionCount = VertexAttributeCount,
+    .vertexAttributeDescriptionCount = ArrayCount(attribute_desriptions),
     .pVertexAttributeDescriptions = attribute_desriptions,
   };
 
@@ -708,8 +722,13 @@ intern VkPipeline vk_shader_pipeline_create(ShaderInfo shader_info, Array<VkPipe
   VkPipelineDepthStencilStateCreateInfo depth_stencil = {VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
   if (shader_info.use_depth) {
     depth_stencil.depthTestEnable = VK_TRUE;
-    depth_stencil.depthWriteEnable = VK_TRUE;
-    depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    if (IsInRange(ShaderType_Cubemap, type, ShaderType_Cubemap_COUNT)) {
+      depth_stencil.depthWriteEnable = VK_FALSE;
+      depth_stencil.depthCompareOp   = VK_COMPARE_OP_LESS_OR_EQUAL;
+    } else {
+      depth_stencil.depthWriteEnable = VK_TRUE;
+      depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    }
     depth_stencil.depthBoundsTestEnable = VK_FALSE;
     depth_stencil.stencilTestEnable = VK_FALSE;
   }
@@ -776,6 +795,7 @@ intern VkPipeline vk_shader_pipeline_create(ShaderInfo shader_info, Array<VkPipe
     .basePipelineHandle = VK_NULL_HANDLE,
     .basePipelineIndex = -1,
   };
+  VkPipelineCacheCreateInfo info;
   VkPipeline result;
   VK_CHECK(vk.CreateGraphicsPipelines(vkdevice, VK_NULL_HANDLE, 1, &pipeline_info, vk.allocator, &result));
   return result;
@@ -815,7 +835,7 @@ u32 vk_shader_load(String name, ShaderType type) {
       .type = type,
       .stages = vk_shader_module_create(name),
     };
-    shader.pipeline = vk_shader_pipeline_create(shader_info, shader.stages);
+    shader.pipeline = vk_shader_pipeline_create(type, shader.stages);
     u32 id = vk.shaders.count;
     vk.shaders.append(shader);
     return id;
@@ -827,17 +847,36 @@ u32 vk_shader_load(String name, ShaderType type) {
       .type = type,
       .stages = vk_shader_module_create(name),
     };
-    shader.pipeline = vk_shader_pipeline_create(shader_info, shader.stages);
+    shader.pipeline = vk_shader_pipeline_create(type, shader.stages);
     u32 id = vk.shaders.count + 100;
     // append(vk.shaders, shader);
     return id;
+  }
+  else if (IsInRange(ShaderType_Cubemap, type, ShaderType_Cubemap_COUNT)) {
+    VK_Shader &shader = vk.cubemap_shader;
+    shader = {
+      .name = name,
+      .type = type,
+      .stages = vk_shader_module_create(name),
+    };
+    shader.pipeline = vk_shader_pipeline_create(type, shader.stages);
+    return 200;
   }
   Assert(true);
   return 0;
 }
 
 void vk_shader_reload(String name, u32 id) {
-  if (id >= 100) {
+  if (id >= 200) {
+    VK_Shader& shader = vk.cubemap_shader;
+    vk.DeviceWaitIdle(vkdevice);
+    vk.DestroyPipeline(vkdevice, shader.pipeline, vk.allocator);
+    Loop (i, 2) {
+      vk.DestroyShaderModule(vkdevice, shader.stages[i].module, vk.allocator);
+    }
+    shader.stages = vk_shader_module_create(name);
+    shader.pipeline = vk_shader_pipeline_create(shader.type, shader.stages);
+  } else if (id >= 100) {
     VK_Shader& shader = vk.screen_shader;
     vk.DeviceWaitIdle(vkdevice);
     vk.DestroyPipeline(vkdevice, shader.pipeline, vk.allocator);
@@ -845,7 +884,7 @@ void vk_shader_reload(String name, u32 id) {
       vk.DestroyShaderModule(vkdevice, shader.stages[i].module, vk.allocator);
     }
     shader.stages = vk_shader_module_create(name);
-    shader.pipeline = vk_shader_pipeline_create(shader_type[shader.type], shader.stages);
+    shader.pipeline = vk_shader_pipeline_create(shader.type, shader.stages);
   } else {
     VK_Shader& shader = vk.shaders[id];
     vk.DeviceWaitIdle(vkdevice);
@@ -854,7 +893,7 @@ void vk_shader_reload(String name, u32 id) {
       vk.DestroyShaderModule(vkdevice, shader.stages[i].module, vk.allocator);
     }
     shader.stages = vk_shader_module_create(name);
-    shader.pipeline = vk_shader_pipeline_create(shader_type[shader.type], shader.stages);
+    shader.pipeline = vk_shader_pipeline_create(shader.type, shader.stages);
   }
 }
 
@@ -865,6 +904,7 @@ intern void vk_descriptor_init() {
   #define MaxStorageBuffer 1
   #define MaxSets 1
   #define MaxSamplers 1
+  #define MaxCubeTextures 1
   {
     VkDescriptorPoolSize pool_sizes[] = {
       {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, MaxStorageBuffer},
@@ -888,6 +928,7 @@ intern void vk_descriptor_init() {
       0,
       VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
       0,
+      0,
     };
     VkDescriptorSetLayoutBindingFlagsCreateInfo binding_flags = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
@@ -905,13 +946,19 @@ intern void vk_descriptor_init() {
       {
         .binding = 1,
         .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-        .descriptorCount = MaxTextures,
+        .descriptorCount = MaxTextures - MaxCubeTextures,
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
       },
       {
         .binding = 2,
         .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
         .descriptorCount = MaxSamplers,
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+      },
+      {
+        .binding = 3,
+        .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+        .descriptorCount = MaxCubeTextures,
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
       },
     };
@@ -966,18 +1013,33 @@ intern void vk_descriptor_init() {
 ////////////////////////////////////////////////////////////////////////
 // @Image
 
-intern VkImageView vk_image_view_create(VkFormat format, VkImage image, VkImageAspectFlags aspect_flags) {
+struct VK_ImageInfo {
+  VkImageType image_type;
+  u32 width;
+  u32 height;
+  VkImageCreateFlags flags;
+  VkFormat format;
+  u32 arrayLayers;
+  VkImageTiling tiling;
+  VkImageUsageFlags usage;
+  VkMemoryPropertyFlags memory_flags;
+  b32 create_view;
+  VkImageAspectFlags aspect;
+  VkImageViewType view_type;
+};
+
+intern VkImageView vk_image_view_create(VkImage image, VK_ImageInfo info) {
   VkImageViewCreateInfo view_create_info = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
     .image = image,
-    .viewType = VK_IMAGE_VIEW_TYPE_2D,
-    .format = format,
+    .viewType = info.view_type,
+    .format = info.format,
     .subresourceRange = {
-      .aspectMask = aspect_flags,
+      .aspectMask = info.aspect,
       .baseMipLevel = 0,
       .levelCount = 1,
       .baseArrayLayer = 0,
-      .layerCount = 1,
+      .layerCount = info.arrayLayers,
     },
   };
   VkImageView result;
@@ -985,28 +1047,19 @@ intern VkImageView vk_image_view_create(VkFormat format, VkImage image, VkImageA
   return result;
 }
 
-struct VK_ImageInfo {
-  VkImageType image_type;
-  u32 width;
-  u32 height;
-  VkFormat format;
-  VkImageTiling tiling;
-  VkImageUsageFlags usage;
-  VkMemoryPropertyFlags memory_flags;
-  b32 create_view;
-  VkImageAspectFlags aspect;
-};
-
 intern VK_ImageInfo vk_image_info_default(u32 width, u32 height) {
   VK_ImageInfo result = {
     .image_type = VK_IMAGE_TYPE_2D,
     .width = width,
     .height = height,
+    .flags = 0,
     .format = VK_FORMAT_R8G8B8A8_UNORM,
+    .arrayLayers = 1,
     .tiling = VK_IMAGE_TILING_OPTIMAL,
     .memory_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     .create_view = true,
     .aspect = VK_IMAGE_ASPECT_COLOR_BIT,
+    .view_type = VK_IMAGE_VIEW_TYPE_2D,
   };
   return result;
 };
@@ -1014,11 +1067,12 @@ intern VK_ImageInfo vk_image_info_default(u32 width, u32 height) {
 intern VK_Image vk_image_create(VK_ImageInfo info) {
   VkImageCreateInfo image_create_info = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+    .flags = info.flags,
     .imageType = VK_IMAGE_TYPE_2D,
     .format = info.format,
     .extent = {info.width, info.height, 1},
     .mipLevels = 1,
-    .arrayLayers = 1,
+    .arrayLayers = info.arrayLayers,
     .samples = VK_SAMPLE_COUNT_1_BIT,
     .tiling = info.tiling,
     .usage = info.usage,
@@ -1040,7 +1094,7 @@ intern VK_Image vk_image_create(VK_ImageInfo info) {
   VK_CHECK(vk.BindImageMemory(vkdevice, handle, memory, 0));
   VkImageView view = 0;
   if (info.create_view) {
-    view = vk_image_view_create(info.format, handle, info.aspect);
+    view = vk_image_view_create(handle, info);
   }
   VK_Image result = {
     .handle = handle,
@@ -1048,6 +1102,7 @@ intern VK_Image vk_image_create(VK_ImageInfo info) {
     .view = view,
     .width = info.width,
     .height = info.height,
+    .array_layers = info.arrayLayers
   };
   return result;
 }
@@ -1092,7 +1147,7 @@ intern VkPipelineStageFlags vk_image_layout_to_pipeline_stage_flags(VkImageLayou
 	}
 }
 
-intern void vk_image_layout_transition(VkCommandBuffer cmd, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout, VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT) {
+intern void vk_image_layout_transition(VkCommandBuffer cmd, VK_Image image, VkImageLayout old_layout, VkImageLayout new_layout, VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT) {
   VkImageMemoryBarrier barrier = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
     .srcAccessMask = vk_image_layout_to_mem_access_flags(old_layout),
@@ -1100,13 +1155,13 @@ intern void vk_image_layout_transition(VkCommandBuffer cmd, VkImage image, VkIma
     .oldLayout = old_layout,
     .newLayout = new_layout,
     .srcQueueFamilyIndex = vk.device.graphics_queue_index,
-    .image = image,
+    .image = image.handle,
     .subresourceRange = {
       .aspectMask = aspect_mask,
       .baseMipLevel = 0,
       .levelCount = 1,
       .baseArrayLayer = 0,
-      .layerCount = 1,
+      .layerCount = image.array_layers,
     },
   };
   VkPipelineStageFlags src_stage = vk_image_layout_to_pipeline_stage_flags(old_layout);
@@ -1123,7 +1178,7 @@ intern void vk_image_upload_to_gpu(VkCommandBuffer cmd, VK_Image image) {
       .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
       .mipLevel = 0,
       .baseArrayLayer = 0,
-      .layerCount = 1,
+      .layerCount = image.array_layers,
     },
     .imageExtent = { image.width, image.height, 1 },
   };
@@ -1151,6 +1206,7 @@ intern void vk_texture_init() {
   };
   VK_CHECK(vk.CreateSampler(vkdevice, &sampler_info, vk.allocator, &vk.sampler));
 
+  // common texture sampler
   VkDescriptorImageInfo descriptor_image_info = {
     .sampler = vk.sampler,
     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -1166,6 +1222,25 @@ intern void vk_texture_init() {
   };
   VkWriteDescriptorSet descriptors[] = {texture_descriptor};
   vk.UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
+
+  // cubemap sampler
+  // {
+  //   VkDescriptorImageInfo descriptor_image_info = {
+  //     .sampler = vk.sampler,
+  //     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+  //   };
+  //   VkWriteDescriptorSet texture_descriptor = {
+  //     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+  //     .dstSet = vk.descriptor_sets,
+  //     .dstBinding = 3,
+  //     .dstArrayElement = 0,
+  //     .descriptorCount = 1,
+  //     .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+  //     .pImageInfo = &descriptor_image_info,
+  //   };
+  //   VkWriteDescriptorSet descriptors[] = {texture_descriptor};
+  //   vk.UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
+  // }
 };
 
 u32 vk_texture_load(Texture t) {
@@ -1175,9 +1250,9 @@ u32 vk_texture_load(Texture t) {
   image_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
   VK_Image image = vk_image_create(image_info);
   VkCommandBuffer cmd = vk_cmd_alloc_and_begin_single_use();
-  vk_image_layout_transition(cmd, image.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  vk_image_layout_transition(cmd, image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
   vk_image_upload_to_gpu(cmd, image);
-  vk_image_layout_transition(cmd, image.handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  vk_image_layout_transition(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   vk_cmd_end_single_use(cmd);
   VkDescriptorImageInfo descriptor_image_info = {
     .sampler = vk.sampler,
@@ -1198,6 +1273,47 @@ u32 vk_texture_load(Texture t) {
   u32 id = vk.texture.count;
   vk.texture.append(image);
   return id;
+}
+
+u32 vk_cubemap_load(Texture* textures) {
+
+  u32 width = textures->width;
+  u32 height = textures->height;
+  u64 size = width * height * 4;
+
+  Loop (i, 6) {
+    MemCopy(Offset(vk.stage_buffer.maped_memory, size * i), textures[i].data, size);
+  }
+
+  VK_ImageInfo image_info = vk_image_info_default(width, height);
+  image_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+  image_info.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+  image_info.arrayLayers = 6;
+  image_info.view_type = VK_IMAGE_VIEW_TYPE_CUBE;
+  VK_Image image = vk_image_create(image_info);
+  VkCommandBuffer cmd = vk_cmd_alloc_and_begin_single_use();
+  vk_image_layout_transition(cmd, image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  vk_image_upload_to_gpu(cmd, image);
+  vk_image_layout_transition(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  vk_cmd_end_single_use(cmd);
+
+  VkDescriptorImageInfo descriptor_image_info = {
+    .sampler = vk.sampler,
+    .imageView = image.view,
+    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+  };
+  VkWriteDescriptorSet texture_descriptor = {
+    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+    .dstSet = vk.descriptor_sets,
+    .dstBinding = 3,
+    .dstArrayElement = 0,
+    .descriptorCount = 1,
+    .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+    .pImageInfo = &descriptor_image_info,
+  };
+  VkWriteDescriptorSet descriptors[] = {texture_descriptor};
+  vk.UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
+  return 0;
 }
 
 intern void vk_resize_texture_target() {
@@ -1589,11 +1705,17 @@ intern void vk_swapchain_create(b32 reuse) {
   };
   VK_CHECK(vk.CreateSwapchainKHR(vkdevice, &swapchain_create_info, vk.allocator, &vk.swapchain.handle));
   u32 image_count = vk.images_in_flight;
-  VK_CHECK(vk.GetSwapchainImagesKHR(vkdevice, vk.swapchain.handle, &image_count, vk.swapchain.images));
+
+  VkImage images[4];
+  VK_CHECK(vk.GetSwapchainImagesKHR(vkdevice, vk.swapchain.handle, &image_count, images));
   Loop (i, image_count) {
+    vk.swapchain.images[i] = {
+      .handle = images[i],
+      .array_layers = 1,
+    };
     VkImageViewCreateInfo view_create_info = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-      .image = vk.swapchain.images[i],
+      .image = vk.swapchain.images[i].handle,
       .viewType = VK_IMAGE_VIEW_TYPE_2D,
       .format = vk.swapchain.image_format.format,
       .subresourceRange = {
@@ -1770,6 +1892,11 @@ void vk_draw() {
     }
   }
 
+  vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.cubemap_shader.pipeline);
+  VK_Mesh mesh = vk.meshes[0];
+  vk.CmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, &mesh.vert_offset);
+  vk.CmdBindIndexBuffer(cmd, vk.index_buffer.handle, mesh.index_offset, VK_INDEX_TYPE_UINT32);
+  vk.CmdDrawIndexed(cmd, mesh.index_count, 1, 0, 0, 0);
 }
 
 void vk_draw_screen() {
@@ -2066,6 +2193,7 @@ intern void vk_instance_create() {
 }
 
 void vk_init() {
+  Scratch scratch;
   vk.arena = arena_init();
   
 #if VulkanUseAllocator
@@ -2148,7 +2276,7 @@ void vk_init() {
       VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     vk.stage_buffer = vk_buffer_create(
-      MB(10),
+      MB(110),
       VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     vk_buffer_map_memory(vk.stage_buffer, 0, vk.stage_buffer.cap);
@@ -2407,7 +2535,7 @@ void vk_begin_renderpass(RenderpassType renderpass_id) {
       // Color
       vk_image_layout_transition(cmd, vk.swapchain.images[vk.current_image_idx], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
       // Depth
-      vk_image_layout_transition(cmd, vk.swapchain.depth_attachment.handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+      vk_image_layout_transition(cmd, vk.swapchain.depth_attachment, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
       // Render
       VkRenderingAttachmentInfo color_attachment = vk_default_color_attachment_info(vk.swapchain.views[vk.current_image_idx]);
       VkRenderingAttachmentInfo depth_attachment = vk_default_depth_attachment_info(vk.swapchain.depth_attachment.view);

@@ -117,6 +117,7 @@ KAPI String push_strf(Allocator arena, String fmt, ...);
 
 KAPI StringNode* str_list_push_node(StringList* list, StringNode* node);
 KAPI StringNode* str_list_push(Allocator arena, StringList* list, String string);
+KAPI StringNode* str_list_pushf(Allocator arena, StringList* list, String fmt, ...);
 
 ////////////////////////////////////////////////////////////////////////
 // String utils

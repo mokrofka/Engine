@@ -542,6 +542,15 @@ StringNode* str_list_push(Allocator arena, StringList* list, String string) {
   return node;
 }
 
+StringNode* str_list_pushf(Allocator arena, StringList* list, String fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  String string = push_strfv(arena, fmt, args);
+  StringNode* result = str_list_push(arena, list, string);
+  va_end(args);
+  return result;
+}
+
 ////////////////////////////////////////////////////////////////////////
 // String utils
 

@@ -113,7 +113,7 @@ KAPI void         os_file_iter_end(OS_FileIter* iter);
 ////////////////////////////////////////////////////////////////////////
 // Processes
 
-KAPI OS_Handle os_process_launch(String cmd);
+KAPI OS_Handle os_process_launch(StringList list);
 KAPI void      os_process_join(OS_Handle handle);
 
 ////////////////////////////////////////////////////////////////////////
