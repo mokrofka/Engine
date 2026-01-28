@@ -1,6 +1,6 @@
 #version 450 core
 #extension GL_GOOGLE_include_directive : enable
-#include "defines/global.vert.glsl"
+#include "defines/global.glsl"
 
 layout(location = 0) in vec3 in_pos;
 layout(location = 1) in vec3 in_normal;

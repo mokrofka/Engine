@@ -3,11 +3,9 @@
   "tasks": [
     {
       "label": "Run My Batch File",
-      // "type": "shell",
       "type": "process",
-      // "command": "${workspaceFolder}\\post-build.bat",
-      "command": "${workspaceFolder}\\shader_compiler.exe",
-      "problemMatcher": [],
+      "command": "${workspaceFolder}/bin/shader_compiler",
+      "args": ["../assets/shaders", "../assets/shaders/compiled"],
       "group": {
         "kind": "build",
         "isDefault": true
