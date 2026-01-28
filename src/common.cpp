@@ -1084,7 +1084,8 @@ u32 cubemap_load(String name) {
     "front", "back",
   };
   Loop (i, ArrayCount(textures)) {
-    String texture_name = push_strf(scratch, "%s/%s%s", name, sides[i], String(".jpg"));
+    // str_skip_last_dot();
+    String texture_name = push_strf(scratch, "%s/%s%s", name, sides[i], String(".png"));
     textures[i] = texture_image_load(texture_name);
   }
 

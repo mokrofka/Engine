@@ -837,7 +837,8 @@ void app_init(u8** state) {
     textures(i) = texture_load(textures_path(i));
   }
   shader_load("cubemap_shader", ShaderType_Cubemap);
-  cubemap_load("cubemap");
+  // cubemap_load("cubemap");
+  cubemap_load("night_cubemap");
 
   game_init();
 
