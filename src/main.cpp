@@ -2,17 +2,19 @@
 #include "common.h"
 
 struct App {
-  void (*update)(u8** state);
   u8* state;
+  void (*update)(u8** state);
   OS_Handle lib;
   String lib_filepath;
   String lib_temp_filepath;
 };
 
+global App st;
+
 void app_update(u8** state);
 
 i32 main(i32 count, char* args[]) {
-  App st = {};
+  u64 start = os_now_ns();
   global_alloc_init();
   tctx_init();
   // test();
@@ -42,6 +44,9 @@ i32 main(i32 count, char* args[]) {
   u64 target_fps = Billion(1) / 60;
   u64 last_time = os_now_ns();
   f32 timer = 0;
+
+  u64 end = os_now_ns();
+  Info("main init took: %f64 sec", f64(end - start) / Billion(1));
 
   // Main loop
   while (!os_window_should_close()) {

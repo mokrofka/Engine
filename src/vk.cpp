@@ -803,7 +803,7 @@ intern VkPipeline vk_shader_pipeline_create(ShaderType type, Array<VkPipelineSha
 
 intern Array<VkPipelineShaderStageCreateInfo, 2> vk_shader_module_create(String name) {
   Scratch scratch;
-  Array<VkPipelineShaderStageCreateInfo, 2> stages;
+  Array<VkPipelineShaderStageCreateInfo, 2> stages = {};
   Loop (i, 2) {
     String stage_type_strs[] = {"vert", "frag"};
     VkShaderStageFlagBits stage_types[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
@@ -837,7 +837,7 @@ u32 vk_shader_load(String name, ShaderType type) {
     };
     shader.pipeline = vk_shader_pipeline_create(type, shader.stages);
     u32 id = vk.shaders.count;
-    vk.shaders.append(shader);
+    vk.shaders.add(shader);
     return id;
   }
   else if (IsInRange(ShaderType_Screen, type, ShaderType_Screen_COUNT)) {
@@ -1271,7 +1271,7 @@ u32 vk_texture_load(Texture t) {
   VkWriteDescriptorSet descriptors[] = {texture_descriptor};
   vk.UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
   u32 id = vk.texture.count;
-  vk.texture.append(image);
+  vk.texture.add(image);
   return id;
 }
 
@@ -1628,19 +1628,19 @@ intern void vk_device_create() {
   };
   
   const u32 queue_count = 4;
-  Array<u32, queue_count> indices;
-  indices.append(vk.device.graphics_queue_index);
+  Array<u32, queue_count> indices = {};
+  indices.add(vk.device.graphics_queue_index);
   if (!indices.exists(vk.device.present_queue_index)) {
-    indices.append(vk.device.present_queue_index);
+    indices.add(vk.device.present_queue_index);
   }
   if (!indices.exists(vk.device.transfer_queue_index)) {
-    indices.append(vk.device.transfer_queue_index);
+    indices.add(vk.device.transfer_queue_index);
   }
   if (!indices.exists(vk.device.compute_queue_index)) {
-    indices.append(vk.device.compute_queue_index);
+    indices.add(vk.device.compute_queue_index);
   }
 
-  Array<VkDeviceQueueCreateInfo, queue_count> queue_create_infos;
+  Array<VkDeviceQueueCreateInfo, queue_count> queue_create_infos = {};
   for (u32 i : indices) {
     f32 queue_priority = 1.0f;
     VkDeviceQueueCreateInfo device_queue_create_info = {
@@ -1651,7 +1651,7 @@ intern void vk_device_create() {
       .queueCount = 1,
       .pQueuePriorities = &queue_priority,
     };
-    queue_create_infos.append(device_queue_create_info);
+    queue_create_infos.add(device_queue_create_info);
   }
   
   const char* extension_names[] = {
@@ -1856,7 +1856,7 @@ u32 vk_mesh_load(Mesh mesh) {
   }
 
   u32 id = vk.meshes.count;
-  vk.meshes.append(vk_mesh);
+  vk.meshes.add(vk_mesh);
   return id;
 }
 
@@ -2093,7 +2093,7 @@ intern void vk_instance_create() {
 #if BUILD_DEBUG
 
   // Validation layer
-  required_validation_layer_names.append("VK_LAYER_KHRONOS_validation");
+  required_validation_layer_names.add("VK_LAYER_KHRONOS_validation");
   Debug("%Required layers:");
   for (const char* x : required_validation_layer_names) {
     Debug(x);
@@ -2115,7 +2115,7 @@ intern void vk_instance_create() {
   }
 
   // Extensions
-  required_extensions.append(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+  required_extensions.add(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
   Debug("Required extensions:");
   for (const char* x : required_extensions) {
     Debug(x);
@@ -2574,7 +2574,7 @@ void vk_update_transform(u32 entity_id, Transform trans) {
 // Entity
 
 u32 vk_make_renderable(u32 entity_id, u32 mesh_id, u32 shader_id, u32 texture_id) {
-  vk.entities[entity_id].shader_handle = vk.shaders[shader_id].entities.append(entity_id);
+  vk.entities[entity_id].shader_handle = vk.shaders[shader_id].entities.add(entity_id);
   vk.entities_to_mesh[entity_id] = mesh_id;
   vk.entities_to_shader[entity_id] = shader_id;
   PushConstant& push = vk.push_constants[entity_id];

@@ -1,5 +1,4 @@
 #include "thread_ctx.h"
-#include "mem.h"
 
 struct TCTX {
   Arena arenas[2];
@@ -12,11 +11,11 @@ void tctx_init() {
   tctx.arenas[1] = arena_init();
 }
 
-Temp tctx_get_scratch() {
+intern Temp tctx_get_scratch() {
   return temp_begin(&tctx.arenas[0]);
 }
 
-Temp tctx_get_scratch(Allocator conflict) {
+intern Temp tctx_get_scratch(Allocator conflict) {
   Arena* arena_conflict = (Arena*)conflict.ctx;
   Arena* arena_result = {};
   for (Arena& arena : tctx.arenas) {
@@ -32,8 +31,8 @@ Temp tctx_get_scratch(Allocator conflict) {
   return temp_begin(arena_result);
 }
 
-// Scratch::operator Allocator() { return {.type = AllocatorType_Arena, .ctx = temp.arena}; }
-// Scratch::Scratch()                   { temp = tctx_get_scratch(); }
-// Scratch::Scratch(Allocator conflict) { temp = tctx_get_scratch(conflict); }
-// Scratch:: ~Scratch()                  { temp.arena->pos = temp.pos; };
+Scratch::operator Allocator()        { return {.type = AllocatorType_Arena, .ctx = temp.arena}; }
+Scratch::Scratch()                   { temp = tctx_get_scratch(); }
+Scratch::Scratch(Allocator conflict) { temp = tctx_get_scratch(conflict); }
+Scratch::~Scratch()                  { temp.arena->pos = temp.pos; };
 

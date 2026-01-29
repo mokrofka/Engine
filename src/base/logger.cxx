@@ -2,16 +2,6 @@
 #include "thread_ctx.h"
 #include "os/os_core.h"
 
-struct LoggerSystemState {
-  OS_Handle log_file_handle;
-};
-
-global LoggerSystemState st;
-
-intern void append_to_log_file(String message) {
-  os_file_write(st.log_file_handle, message.size, message.str);
-}
-
 void _log_output(LogLevel level, String fmt, ...) {
   Scratch scratch;
   String level_strings[] = {"[TRACE]: ", "[DEBUG]: ", "[INFO]:  ", "[WARN]:  ", "[ERROR]: ",};

@@ -29,47 +29,48 @@
 i32 alignments[] = { 8, 16, 32, 64 };
 
 void test_global_alloc() {
-  Array<u8*, 100> arr;
+  Array<u8*, 100> arr = {};
+  Allocator alloc = mem_get_global_allocator();
 
   Loop (i, 100) {
     u64 size = rand_range_u32(8, KB(1));
     u64 align = alignments[rand_range_u32(0, 3)];
-    arr.append(global_alloc(size, align));
+    arr.add(mem_alloc(alloc, size, align));
     MemZero(arr[i], size);
   }
-  Array<u32, 100> indices;
-  Loop(i, 100) indices.append(i);
+  Array<u32, 100> indices = {};
+  Loop(i, 100) indices.add(i);
   for (u32 i = indices.count - 1; i > 0; --i) {
     u32 j = rand_range_u32(0, i);
     Swap(indices[i], indices[j]);
   }
   Loop (i, 100) {
-    global_free(arr[indices[i]]);
+    mem_free(alloc, arr[indices[i]]);
   }
 
   arr.clear();
   Loop (i, 100) {
     u64 size = rand_range_u32(8, KB(1));
     u64 align = alignments[rand_range_u32(0, 3)];
-    arr.append(global_alloc(size, align));
+    arr.add(mem_alloc(alloc, size, align));
     MemZero(arr[i], size);
   }
   indices.clear();
-  Loop(i, 100) indices.append(i);
+  Loop(i, 100) indices.add(i);
   for (u32 i = indices.count - 1; i > 0; --i) {
     u32 j = rand_range_u32(0, i);
     Swap(indices[i], indices[j]);
   }
   Loop (i, 100) {
-    global_free(arr[indices[i]]);
+    mem_free(alloc, arr[indices[i]]);
   }
 }
 
 void test_arena_alloc() {
   Arena arena = arena_init();
-  Array<u8*, 100> arr;
-  Array<u32, 100> sizes;
-  Array<u32, 100> values;
+  Array<u8*, 100> arr = {};
+  Array<u32, 100> sizes = {};
+  Array<u32, 100> values = {};
   Loop (i, 100) {
     u32 size = rand_range_u32(8, KB(1));
     u64 align = alignments[rand_range_u32(0, 3)];
@@ -93,9 +94,9 @@ void test_arena_list_alloc() {
   Scratch scratch;
   ArenaList arena(scratch);
 
-  Array<u8*, 100> arr;
-  Array<u32, 100> sizes;
-  Array<u32, 100> values;
+  Array<u8*, 100> arr = {};
+  Array<u32, 100> sizes = {};
+  Array<u32, 100> values = {};
   Loop (i, 100) {
     u32 size = rand_range_u32(8, KB(1));
     u64 align = alignments[rand_range_u32(0, 3)];
@@ -138,16 +139,16 @@ void test_arena_list_alloc() {
 void test_seglist_alloc() {
   Scratch scratch;
   AllocSegList alloc(scratch);
-  Array<u8*, 100> arr;
+  Array<u8*, 100> arr = {};
 
   Loop (i, 100) {
     u64 size = rand_range_u32(8, KB(1));
     u64 align = alignments[rand_range_u32(0, 3)];
-    arr.append(mem_alloc(alloc, size, align));
+    arr.add(mem_alloc(alloc, size, align));
     MemZero(arr[i], size);
   }
-  Array<u32, 100> indices;
-  Loop(i, 100) indices.append(i);
+  Array<u32, 100> indices = {};
+  Loop(i, 100) indices.add(i);
   for (u32 i = indices.count - 1; i > 0; --i) {
     u32 j = rand_range_u32(0, i);
     Swap(indices[i], indices[j]);
@@ -160,11 +161,11 @@ void test_seglist_alloc() {
   Loop (i, 100) {
     u64 size = rand_range_u32(8, KB(1));
     u64 align = alignments[rand_range_u32(0, 3)];
-    arr.append(mem_alloc(alloc, size, align));
+    arr.add(mem_alloc(alloc, size, align));
     MemZero(arr[i], size);
   }
   indices.clear();
-  Loop(i, 100) indices.append(i);
+  Loop(i, 100) indices.add(i);
   for (u32 i = indices.count - 1; i > 0; --i) {
     u32 j = rand_range_u32(0, i);
     Swap(indices[i], indices[j]);
@@ -183,21 +184,21 @@ void test_object_pool() {
     u32 a;
     u32 b;
   };
-  ObjectPool<A> pool;
-  Array<A, 100> values;
-  Array<u32, 100> handlers;
+  ObjectPool<A> pool(scratch);
+  Array<A, 100> values = {};
+  Array<u32, 100> handlers = {};
   Loop (i, 100) {
     values[i].a = rand_range_u32(0, 100);
     values[i].b = rand_range_u32(0, 100);
   };
   Loop (i, 100) {
-    handlers[i] = pool.append(values[i]);
+    handlers[i] = pool.add(values[i]);
   }
   Loop (i, 100) {
     Assert(MemMatchStruct(&values[i], &pool.get(handlers[i])));
   }
-  Array<u32, 100> indices;
-  Loop(i, 100) indices.append(i);
+  Array<u32, 100> indices = {};
+  Loop(i, 100) indices.add(i);
   for (u32 i = indices.count - 1; i > 0; --i) {
     u32 j = rand_range_u32(0, i);
     Swap(indices[i], indices[j]);
@@ -212,12 +213,12 @@ void test_object_pool() {
     values[i].b = rand_range_u32(0, 100);
   };
   Loop (i, 100) {
-    handlers[i] = pool.append(values[i]);
+    handlers[i] = pool.add(values[i]);
   }
   Loop (i, 100) {
     Assert(MemMatchStruct(&values[i], &pool.get(handlers[i])));
   }
-  Loop(i, 100) indices.append(i);
+  Loop(i, 100) indices.add(i);
   for (u32 i = indices.count - 1; i > 0; --i) {
     u32 j = rand_range_u32(0, i);
     Swap(indices[i], indices[j]);
@@ -233,21 +234,21 @@ void test_handle_darray() {
     u32 a;
     u32 b;
   };
-  HandlerDarray<A> arr;
-  Array<A, 100> values;
-  Array<u32, 100> handlers;
+  HandlerDarray<A> arr = {};
+  Array<A, 100> values = {};
+  Array<u32, 100> handlers = {};
   Loop (i, 100) {
     values[i].a = rand_range_u32(0, 100);
     values[i].b = rand_range_u32(0, 100);
   };
   Loop (i, 100) {
-    handlers[i] = arr.append(values[i]);
+    handlers[i] = arr.add(values[i]);
   }
   Loop (i, 100) {
-    Assert(MemMatchStruct(&values[i], &arr[handlers[i]]));
+    Assert(MemMatchStruct(&values[i], &arr.get(handlers[i])));
   }
-  Array<u32, 100> indices;
-  Loop(i, 100) indices.append(i);
+  Array<u32, 100> indices = {};
+  Loop(i, 100) indices.add(i);
   for (u32 i = indices.count - 1; i > 0; --i) {
     u32 j = rand_range_u32(0, i);
     Swap(indices[i], indices[j]);
@@ -262,12 +263,12 @@ void test_handle_darray() {
     values[i].b = rand_range_u32(0, 100);
   };
   Loop (i, 100) {
-    handlers[i] = arr.append(values[i]);
+    handlers[i] = arr.add(values[i]);
   }
   Loop (i, 100) {
-    Assert(MemMatchStruct(&values[i], &arr[handlers[i]]));
+    Assert(MemMatchStruct(&values[i], &arr.get(handlers[i])));
   }
-  Loop(i, 100) indices.append(i);
+  Loop(i, 100) indices.add(i);
   for (u32 i = indices.count - 1; i > 0; --i) {
     u32 j = rand_range_u32(0, i);
     Swap(indices[i], indices[j]);
@@ -284,7 +285,6 @@ void test() {
   test_arena_list_alloc();
   test_seglist_alloc();
   test_object_pool();
-  i32 a = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -315,7 +315,7 @@ u64 cpu_frequency() {
 
 ProfileBlock::ProfileBlock(String label_, ProfileAnchor& anchor_) {
   if (!anchor_.label.size) {
-    profiler_st.anchors.append(&anchor_);
+    profiler_st.anchors.add(&anchor_);
   }
   parent = profiler_st.profiler_parent;
   anchor = &anchor_;
@@ -486,7 +486,7 @@ void asset_watch_init() {
 
 void asset_watch_add(String watch_name, void (*callback)()) {
   FileProperties props = os_file_path_properties(watch_name);
-  file_watch_st.watches.append({
+  file_watch_st.watches.add({
     .path = watch_name,
     .modified = props.modified,
     .callback = callback,
@@ -497,7 +497,7 @@ void asset_watch_directory_add(String watch_name, void (*reload_callback)(String
   String dir_path = push_strf(file_watch_st.arena, "%s", watch_name);
   OS_Watch watch = os_watch_open(flags);
   os_watch_attach(watch, dir_path);
-  file_watch_st.directories.append({
+  file_watch_st.directories.add({
     .path = dir_path,
     .watch = watch,
     .callback = reload_callback,
@@ -543,7 +543,7 @@ void event_register(u32 code, void* listener, PFN_On_Event on_event) {
       return;
     }
   }
-  event_st.registered[code].append({listener, on_event});
+  event_st.registered[code].add({listener, on_event});
 }
 
 void event_unregister(u32 code, void* listener, PFN_On_Event on_event) {
@@ -716,7 +716,7 @@ intern Mesh mesh_load_obj(String name) {
         e = f32_from_str(lexer_next_token(&lexer));
       }
       // Info("v %f, %f, %f", v.x, v.y, v.z);
-      positions.append(v);
+      positions.add(v);
     }
     // norm
     else if (str_match(word, "vn")) {
@@ -725,7 +725,7 @@ intern Mesh mesh_load_obj(String name) {
         e = f32_from_str(lexer_next_token(&lexer));
       }
       // Info("vn %f, %f, %f", v.x, v.y, v.z);
-      normals.append(v);
+      normals.add(v);
     }
     // uv
     else if (str_match(word, "vt")) {
@@ -734,7 +734,7 @@ intern Mesh mesh_load_obj(String name) {
         e = f32_from_str(lexer_next_token(&lexer));
       }
       // Info("vt %f, %f", v.x, v.y);
-      uvs.append(v);
+      uvs.add(v);
     }
     // indexes
     else if (str_match(word, "f")) {
@@ -745,7 +745,7 @@ intern Mesh mesh_load_obj(String name) {
         }
         v3u v = {raw.x, raw.z, raw.y};
         // Info("%i, %i, %i", v.x, v.y, v.z);
-        indexes.append(v);
+        indexes.add(v);
       }
     }
   }
@@ -764,9 +764,9 @@ intern Mesh mesh_load_obj(String name) {
     u32 vertex_index;
     if (!vertices.exists_at(vertex, &vertex_index, EqualMem)) {
       vertex_index = vertices.count;
-      vertices.append(vertex);
+      vertices.add(vertex);
     }
-    final_indices.append(vertex_index);
+    final_indices.add(vertex_index);
   }
   Mesh mesh = {
     .vertices = vertices.data,
@@ -1169,5 +1169,3 @@ u32& textures(u32 idx) {
   Assert(IsInRange<u32>(1, idx, Texture_COUNT));
   return textures_[idx-1];
 }
-
-

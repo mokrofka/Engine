@@ -21,6 +21,8 @@ typedef i32 b32;
 
 typedef u64 DenseTime;
 
+template<typename T> using InitializerList = std::initializer_list<T>;
+
 #if _WIN64
   #define OS_WINDOWS 1
 #elif __linux__
@@ -58,12 +60,9 @@ typedef u64 DenseTime;
   #endif
 #elif OS_LINUX
   #if HOTRELOAD_BUILD
-    #define shared_function C_LINKAGE __attribute__((visibility("default")))
-    #ifdef KEXPORT
-      #define KAPI __attribute__((visibility("default")))
-    #else
-      #define KAPI
-    #endif
+    // #define shared_function C_LINKAGE __attribute__((visibility("default")))
+    #define shared_function C_LINKAGE 
+    #define KAPI
   #else
     #define KAPI
     #define shared_function

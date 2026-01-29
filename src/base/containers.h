@@ -4,8 +4,8 @@
 #include "mem.h"
 #include "maths.h"
 
-#define DEFAULT_CAPACITY      8
-#define DEFAULT_RESIZE_FACTOR 2
+const u32 DEFAULT_CAPACITY = 8;
+const u32 DEFAULT_RESIZE_FACTOR = 2;
 
 ////////////////////////////////////////////////////////////////////////
 // Generic interface
@@ -18,10 +18,6 @@ template <typename T>
 struct InterfaceMemEqual {
   NO_DEBUG b32 operator()(T a, T b) { return MemMatchStruct(&a, &b); }
 };
-template <typename T>
-struct InterfaceLessthan {
-  NO_DEBUG b32 operator()(T a, T b) { return lessthan(a,b); }
-};
 
 enum EqualMode {
   EqualDefault,
@@ -33,18 +29,19 @@ enum EqualMode {
 
 template<typename T>
 struct ObjectPool {
-  u32 head = 0;
-  u32 cap = 0;
-  Allocator alloc = {};
-  T* data = null;
+  u32 head;
+  u32 cap;
+  Allocator alloc;
+  T* data;
   ObjectPool() = default;
-  ObjectPool(Allocator alloc_) { alloc = alloc_; }
-  void init(Allocator alloc_) { alloc = alloc_; }
+  ObjectPool(Allocator alloc_) { *this = {}; alloc = alloc_; }
+  void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
+  void deinit() { Assert(data); mem_free(alloc, data); }
   T& get(u32 idx) {
     Assert(idx < cap);
     return data[idx];
   }
-  u32 append(T a) {
+  u32 add(T a) {
     if (head >= cap) {
       grow();
     }
@@ -53,7 +50,7 @@ struct ObjectPool {
     data[result] = a;
     return result;
   }
-  u32 append() {
+  u32 add() {
     if (head >= cap) {
       grow();
     }
@@ -69,7 +66,7 @@ struct ObjectPool {
     if (data) {
       u32 cap_old = cap;
       cap *= DEFAULT_RESIZE_FACTOR;
-      data = mem_realloc_array(alloc, data, cap_old, T, cap);
+      data = mem_realloc_array(alloc, data, cap_old, cap);
       head = cap_old;
       for (i32 i = cap_old; i < cap-1; ++i) {
         *(u32*)&data[i] = i+1;
@@ -77,7 +74,7 @@ struct ObjectPool {
       *(u32*)&data[cap-1] = U32_MAX;
     } else {
       cap = DEFAULT_CAPACITY;
-      data = mem_alloc_array(alloc, T, cap);
+      data = mem_alloc_array<T>(alloc, cap);
       Loop (i, cap-1) {
         *(u32*)&data[i] = i+1;
       }
@@ -92,32 +89,33 @@ struct ObjectPool {
 template<typename T, i32 N>
 struct Array {
   static constexpr i32 cap = N;
-  u32 count = 0;
-  T data[N] = {};
-  T* begin() { return data; }
-  T* end()   { return data + count; }
+  u32 count;
+  T data[N];
   Array() = default;
-  Array(std::initializer_list<T> init) {
+  Array(InitializerList<T> init) {
     Assert(init.size() <= cap);
+    *this = {};
     count = init.size();
     u32 i = 0;
     for (T x : init) {
       data[i++] = x;
     }
   }
+  T* begin() { return data; }
+  T* end()   { return data + count; }
   NO_DEBUG T& operator[](u32 idx) {
     Assert(idx < cap);
     return data[idx];
   }
-  T& append(T a) { 
+  T& add(T a) { 
     Assert(count < cap);
     T& e = data[count];
     data[count++] = a;
     return e;
   }
-  void append(std::initializer_list<T> slice) {
+  void add(InitializerList<T> slice) {
     for (T x : slice) {
-      append(x);
+      add(x);
     }
   }
   void swap_remove(u32 idx) {
@@ -147,38 +145,38 @@ struct Array {
 
 template <typename T>
 struct Darray {
-  u32 count = 0;
-  u32 cap = 0;
-  Allocator alloc = {};
-  T* data = null;
+  u32 count;
+  u32 cap;
+  Allocator alloc;
+  T* data;
+  Darray() = default;
+  Darray(Allocator alloc_) { *this = {}; alloc = alloc_; }
   T* begin() { return data; }
   T* end()   { return data + count; }
-  Darray() = default;
-  Darray(Allocator alloc_) { alloc = alloc_; }
-  void init(Allocator alloc_) { alloc = alloc_; }
-  void deinit() { mem_free(alloc, data); }
+  void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
+  void deinit() { Assert(data); mem_free(alloc, data); }
   NO_DEBUG T& operator[](u32 idx) {
     Assert(idx < cap);
     return data[idx];
   }
-  T& append(T b) { 
+  T& add(T b) { 
     if (count >= cap) {
       if (data) {
         u32 odl_cap = cap;
         cap *= DEFAULT_RESIZE_FACTOR;
-        data = mem_realloc_array(alloc, data, odl_cap, T, cap);
+        data = mem_realloc_array(alloc, data, odl_cap, cap);
       } else {
         cap = DEFAULT_CAPACITY;
-        data = mem_alloc_array(alloc, T, cap);
+        data = mem_alloc_array<T>(alloc, cap);
       }
     }
     T& e = data[count];
     data[count++] = b;
     return e;
   }
-  void append(std::initializer_list<T> slice) {
+  void add(std::initializer_list<T> slice) {
     for (T x : slice) {
-      append(x);
+      add(x);
     }
   }
   void reserve(u32 min_cap) { 
@@ -186,9 +184,9 @@ struct Darray {
     u32 old_cap = cap;
     u32 new_cap = Max(cap*DEFAULT_RESIZE_FACTOR, min_cap);
     if (data) {
-      data = mem_realloc_array(alloc, data, old_cap, T, new_cap);
+      data = mem_realloc_array(alloc, data, old_cap, new_cap);
     } else {
-      data = mem_alloc_array(alloc, T, new_cap);
+      data = mem_alloc_array<T>(alloc, new_cap);
     }
   }
   void swap_remove(u32 idx) {
@@ -208,9 +206,9 @@ struct Darray {
     }
     return false;
   }
-  INLINE b32 exists(T a, bool(*fn)(T a, T b)) { return exists_impl(a, fn); }
-  INLINE b32 exists(T a)                      { return exists_impl(a, InterfaceEqual<T>{}); }
-  INLINE b32 exists(T a, EqualMode mode)      { return exists_impl(a, InterfaceMemEqual<T>{}); }
+  b32 exists(T a, bool(*fn)(T a, T b)) { return exists_impl(a, fn); }
+  b32 exists(T a)                      { return exists_impl(a, InterfaceEqual<T>{}); }
+  b32 exists(T a, EqualMode mode)      { return exists_impl(a, InterfaceMemEqual<T>{}); }
   template<typename Equal>
   b32 exists_at_impl(T e, u32* index, Equal eq) { 
     Loop (i, count) {
@@ -221,9 +219,9 @@ struct Darray {
     }
     return false;
   }
-  INLINE b32 exists_at(T a, u32* idx, bool(*fn)(T a, T b)) { return exists_at_impl(a, idx, fn); }
-  INLINE b32 exists_at(T a, u32* idx)                      { return exists_at_impl(a, idx, InterfaceEqual<T>{}); }
-  INLINE b32 exists_at(T a, u32* idx, EqualMode mode)      { return exists_at_impl(a, idx, InterfaceMemEqual<T>{}); }
+  b32 exists_at(T a, u32* idx, bool(*fn)(T a, T b)) { return exists_at_impl(a, idx, fn); }
+  b32 exists_at(T a, u32* idx)                      { return exists_at_impl(a, idx, InterfaceEqual<T>{}); }
+  b32 exists_at(T a, u32* idx, EqualMode mode)      { return exists_at_impl(a, idx, InterfaceMemEqual<T>{}); }
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -231,29 +229,26 @@ struct Darray {
 
 template <typename T>
 struct SparseSet {
-  u32 count = 0;
-  u32 cap = 0;
-  u32 sparse_count = 0;
-  Allocator alloc = {};
-  u32* sparse = null;
-  u32* dense = null;
-  T* data = null;
+  u32 count;
+  u32 cap;
+  u32 sparse_count;
+  Allocator alloc;
+  u32* sparse;
+  u32* dense;
+  T* data;
   T* begin() { return data; }
   T* end()   { return data + count; }
   SparseSet() = default;
-  SparseSet(Allocator alloc_) { alloc = alloc_; }
-  void init(Allocator alloc_) { alloc = alloc_; }
-  void deinit() { 
-    mem_free(alloc, sparse); 
-    mem_free(alloc, dense); 
-  }
-  T& operator[](u32 id) {
+  SparseSet(Allocator alloc_) { *this = {}; alloc = alloc_; }
+  void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
+  void deinit() { Assert(sparse && dense); mem_free(alloc, sparse); mem_free(alloc, dense); }
+  T& get(u32 id) {
     Assert(id < cap);
     DebugDo(Assert(sparse[id] != INVALID_ID));
     u32 idx = sparse[id];
     return data[idx];
   }
-  void append(u32 id) {
+  void add(u32 id) {
     if (count >= cap) {
       grow();
     }
@@ -264,7 +259,7 @@ struct SparseSet {
     dense[count] = id;
     ++count;
   }
-  void append(u32 id, T element) {
+  void add(u32 id, T element) {
     if (count >= cap) {
       grow();
     }
@@ -304,85 +299,54 @@ struct SparseSet {
         SoA_push_field(&data, T),
       };
       mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
-      sparse = mem_alloc_array(alloc, u32, cap);
+      sparse = mem_alloc_array<u32>(alloc, cap);
     }
   }
   void grow_max_index(u32 id) {
     u32 modifier = CeilIntDiv(id+1, sparse_count);
     u32 old_count = sparse_count;
     sparse_count *= modifier;
-    sparse = mem_realloc_array(alloc, sparse, old_count, u32, sparse_count);
+    sparse = mem_realloc_array(alloc, sparse, old_count, sparse_count);
   }
 };
 
 struct SparseSetIndex {
-  u32 count = 0;
-  u32 cap = 0;
-  u32 sparse_count = 0;
-  Allocator alloc = {};
-  u32* sparse = null;
-  u32* dense = null;
-  u32* begin() { return dense; }
-  u32* end()   { return dense + count; }
+  u32 count;
+  u32 cap;
+  u32 sparse_count;
+  Allocator alloc;
+  u32* sparse;
+  u32* dense;
+  u32* begin();
+  u32* end();
   SparseSetIndex() = default;
-  SparseSetIndex(Allocator alloc_) { alloc = alloc_; }
-  void init(Allocator alloc_) { alloc = alloc_; }
-    void append(u32 id) {
-    if (count >= cap) {
-      grow();
-    }
-    if (id >= sparse_count) {
-      grow_max_index(id);
-    }
-    sparse[id] = count;
-    dense[count] = id;
-    ++count;
-  }
-  void remove(u32 id) {
-    u32 idx_removed = sparse[id];
-    u32 idx_last = count - 1;
-    u32 last_entity = dense[idx_last];
-    sparse[last_entity] = idx_removed;
-    dense[idx_removed] = last_entity;
-    --count;
-  }
-  void grow() {
-    if (dense) {
-      u32 old_cap = cap;
-      cap *= DEFAULT_RESIZE_FACTOR;
-      dense = mem_realloc_array(alloc, dense, old_cap, u32, cap);
-    }
-    else {
-      cap = DEFAULT_CAPACITY;
-      dense = mem_alloc_array(alloc, u32, cap);
-      sparse_count = cap;
-      sparse = mem_alloc_array(alloc, u32, sparse_count);
-    }
-  }
-  void grow_max_index(u32 id) {
-    u32 modifier = CeilIntDiv(id+1, sparse_count);
-    u32 old_sparse_count = sparse_count;
-    sparse_count *= modifier;
-    sparse = mem_realloc_array(alloc, sparse, old_sparse_count, u32, sparse_count);
-  }
+  SparseSetIndex(Allocator alloc_);
+  void init(Allocator alloc_);
+  void add(u32 id);
+  void remove(u32 id);
+  void grow();
+  void grow_max_index(u32 id);
 };
+
+////////////////////////////////////////////////////////////////////////
+// HandlerArray
 
 template<typename T, i32 N>
 struct HandlerArray {
   static constexpr i32 cap = N;
-  u32 count = 0;
-  u32 entity_to_index[N] = {};
-  u32 entities[N] = {};
-  T data[N] = {};
+  u32 count;
+  u32 entity_to_index[N];
+  u32 entities[N];
+  T data[N];
   T* begin() { return data; }
   T* end()   { return data + count; }
-  T& operator[](u32 idx) {
+  T& get(u32 idx) {
     Assert(idx < cap);
     DebugDo(Assert(entity_to_index[idx] != INVALID_ID));
     u32 index = entity_to_index[idx];
     return data[index];
   }
-  u32 append(T e) {
+  u32 add(T e) {
     u32 id = count++;
     entity_to_index[id] = id;
     entities[id] = id;
@@ -404,24 +368,24 @@ struct HandlerArray {
 
 template <typename T>
 struct HandlerDarray {
-  u32 count = 0;
-  u32 cap = 0;
-  Allocator alloc = {};
-  u32* entity_to_index = null;
-  u32* entities = null;
-  T* data = null;
+  u32 count;
+  u32 cap;
+  Allocator alloc;
+  u32* entity_to_index;
+  u32* entities;
+  T* data;
   T* begin() { return data; }
   T* end()   { return data + count; }
   HandlerDarray() = default;
-  HandlerDarray(Allocator alloc_) { alloc = alloc_; }
-  void init(Allocator alloc_) { alloc = alloc_; }
-  T& operator[](u32 idx) {
+  HandlerDarray(Allocator alloc_) { *this = {}; alloc = alloc_; }
+  void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
+  T& get(u32 idx) {
     Assert(idx < cap);
     DebugDo(Assert(entity_to_index[idx] != INVALID_ID));
     u32 index = entity_to_index[idx];
     return data[index];
   }
-  u32 append(T e) {
+  u32 add(T e) {
     if (count >= cap) {
       grow();
     }
@@ -466,54 +430,19 @@ struct HandlerDarray {
 };
 
 struct HandlerDarrayIndex {
-  u32 count = 0;
-  u32 cap = 0;
-  Allocator alloc = {};
-  u32* entity_to_index = null;
-  u32* entities = null;
-  u32* begin() { return entities; }
-  u32* end()   { return entities + count; }
+  u32 count;
+  u32 cap;
+  Allocator alloc;
+  u32* entity_to_index;
+  u32* entities;
+  u32* begin();
+  u32* end();
   HandlerDarrayIndex() = default;
-  HandlerDarrayIndex(Allocator alloc_) { alloc = alloc_; }
-  void init(Allocator alloc_) { alloc = alloc_; }
-  u32 append() {
-    if (count >= cap) {
-      grow();
-    }
-    u32 id = count++;
-    entity_to_index[id] = id;
-    entities[id] = id;
-    return id;
-  }
-  void remove(u32 id) {
-    DebugDo(Assert(entity_to_index[id] != INVALID_ID));
-    u32 idx_removed = entity_to_index[id];
-    u32 idx_last = count - 1;
-    u32 last_entity = entities[idx_last];
-    entity_to_index[last_entity] = idx_removed;
-    entities[idx_removed] = last_entity;
-    --count;
-    DebugDo(entity_to_index[id] = INVALID_ID);
-  }
-  void grow() {
-    if (entity_to_index) {
-      u32 cap_old = cap;
-      cap *= DEFAULT_RESIZE_FACTOR;
-      SoA_Field fields[] = {
-        SoA_push_field(&entity_to_index, u32),
-        SoA_push_field(&entities, u32),
-      };
-      mem_realloc_soa(alloc, entity_to_index, cap_old, cap, fields, ArrayCount(fields));
-    }
-    else {
-      cap = DEFAULT_CAPACITY;
-      SoA_Field fields[] = {
-        SoA_push_field(&entity_to_index, u32),
-        SoA_push_field(&entities, u32),
-      };
-      mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
-    }
-  }
+  HandlerDarrayIndex(Allocator alloc_);
+  void init(Allocator alloc_);
+  u32 add();
+  void remove(u32 id);
+  void grow();
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -524,20 +453,8 @@ struct IdPool {
   Darray<u32> array;
 };
 
-inline u32 id_pool_alloc(IdPool& p) {
-  if (p.array.count > 0) {
-    return p.array.pop();
-  }
-  u32 id = p.next_idx++;
-  return id;
-}
-
-inline void id_pool_free(IdPool& p, u32 id) {
-  Assert(p.next_idx > 0);
-  Assert(id < p.next_idx);
-  Assert(!p.array.exists(id));
-  p.array.append(id);
-}
+KAPI u32 id_pool_alloc(IdPool& p);
+KAPI void id_pool_free(IdPool& p, u32 id);
 
 ////////////////////////////////////////////////////////////////////////
 // Hashmap
@@ -551,12 +468,15 @@ enum MapSlot : u8 {
 template<typename Key, typename T>
 struct Map {
   static constexpr f32 LF = 0.8;
-  u32 count = 0;
-  u32 cap = 0;
-  Allocator alloc = {};
-  T* data = null;
-  Key* keys = null;
-  MapSlot* is_occupied = null;
+  u32 count;
+  u32 cap;
+  Allocator alloc;
+  T* data;
+  Key* keys;
+  MapSlot* is_occupied;
+  Map() = default;
+  Map(Allocator alloc_) { *this = {}; alloc = alloc_; }
+  void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
   void insert(Key key, T val) {
     if (count >= cap*LF) { grow(); }
     u64 hash_idx = hash(key);

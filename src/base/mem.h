@@ -1,26 +1,7 @@
 #pragma once
 #include "base.h"
 
-#define MEM_ALLOC_HEADER_GUARD   0xA110C8
-#define MEM_DEALLOC_HEADER_GUARD 0xDE1E7E
-#define MEM_ALLOC_GUARD          0xA1
-#define MEM_DEALLOC_GUARD        0xDE
-#define MEM_ALLOC_TAIL_GUARD     0xdeedbeef
-
-#define MEM_GUARD 1
-
-#if MEM_GUARD
-  #define MemGuardAlloc(d, z)   MemSet(d, MEM_ALLOC_GUARD, z)
-  #define MemGuardDealloc(d, z) MemSet(d, MEM_DEALLOC_GUARD, z)
-#else
-  #define MemGuardAlloc(d, c)
-  #define MemGuardDealloc(d, c)
-#endif
-
-#define MEM_DEFAULT_ALIGNMENT sizeof(void*)
-
-#define ARENA_DEFAULT_RESERVE_SIZE MB(64)
-#define ARENA_DEFAULT_COMMIT_SIZE  KB(4)
+const u32 MEM_DEFAULT_ALIGNMENT = sizeof(void*);
 
 enum AllocatorType {
   AllocatorType_Global,
@@ -35,19 +16,10 @@ struct Allocator {
 };
 
 ////////////////////////////////////////////////////////////////////////
-// Global allocator (just seglist)
+// Global allocator
 
 KAPI void global_alloc_init();
-KAPI u8*  global_alloc(u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
-KAPI u8*  global_alloc_zero(u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
-#define   global_alloc_struct(T)        (T*)global_alloc(     sizeof(T),     alignof(T))
-#define   global_alloc_struct_zero(T)   (T*)global_alloc_zero(sizeof(T),     alignof(T))
-#define   global_alloc_array(T,c)       (T*)global_alloc(     sizeof(T)*(c), alignof(T))
-#define   global_alloc_array_zero(T,c)  (T*)global_alloc_zero(sizeof(T)*(c), alignof(T))
-KAPI u8*  global_realloc(void* ptr, u64 old_size, u64 new_size, u64 align = MEM_DEFAULT_ALIGNMENT);
-KAPI u8*  global_realloc_zero(void* ptr, u64 old_size, u64 new_size, u64 align = MEM_DEFAULT_ALIGNMENT);
-#define   global_realloc_array(ptr,old_c,T,c) (T*)global_realloc(ptr, sizeof(T)*(old_c), sizeof(T)*(c), alignof(T))
-KAPI void global_free(void* ptr);
+KAPI Allocator mem_get_global_allocator();
 
 ////////////////////////////////////////////////////////////////////////
 // Arena (page allocator)
@@ -57,24 +29,20 @@ struct Arena {
   u64 pos;
   u64 cmt;
   u64 cap;
-  operator Allocator() { return {.type = AllocatorType_Arena, .ctx = this}; }
+  operator Allocator();
 };
 
 KAPI Arena arena_init();
 KAPI void  arena_deinit(Arena* arena);
 KAPI void  arena_clear(Arena* arena);
-KAPI u8*   arena_alloc(Arena* arena, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
-KAPI u8*   arena_alloc_zero(Arena* arena, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
-KAPI u8*   arena_realloc(Arena* arena, void* ptr, u64 old_size, u64 new_size, u64 align = MEM_DEFAULT_ALIGNMENT);
-KAPI u8*   arena_realloc_zero(Arena* arena, void* ptr, u64 old_size, u64 new_size, u64 align = MEM_DEFAULT_ALIGNMENT);
 
 struct Temp {
   Arena* arena;
   u64 pos;
 };
 
-INLINE Temp temp_begin(Arena* arena) { return Temp{arena, arena->pos}; };
-INLINE void temp_end(Temp temp)      { temp.arena->pos = temp.pos; }
+KAPI Temp temp_begin(Arena* arena);
+KAPI void temp_end(Temp temp);
 
 ////////////////////////////////////////////////////////////////////////
 // ArenaList
@@ -86,61 +54,40 @@ struct ArenaBlock {
 };
 
 struct ArenaList {
-  Allocator alloc = {};
-  ArenaBlock* current = null;
-  ArenaBlock* first = null;
+  Allocator alloc;
+  ArenaBlock* current;
+  ArenaBlock* first;
   ArenaList() = default;
-  ArenaList(Allocator alloc_) { alloc = alloc_; }
-  void init(Allocator alloc_) { alloc = alloc_; }
+  ArenaList(Allocator alloc_);
+  void init(Allocator alloc_);
   void clear();
-  operator Allocator() { return {.type = AllocatorType_ArenaList, .ctx = this}; }
+  operator Allocator();
 };
-
-KAPI u8* arena_list_alloc(ArenaList* arena, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
-KAPI u8* arena_list_alloc_zero(ArenaList* arena, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
-KAPI u8* arena_list_realloc(ArenaList* arena, void* ptr, u64 old_size, u64 new_size, u64 align = MEM_DEFAULT_ALIGNMENT);
-KAPI u8* arena_list_realloc_zero(ArenaList* arena, void* ptr, u64 old_size, u64 new_size, u64 align = MEM_DEFAULT_ALIGNMENT);
 
 ////////////////////////////////////////////////////////////////////////
 // General allocator (segregated pow2 list)
 
-struct PoolFreeNode {
-  PoolFreeNode* next;
-};
-
-struct MemPoolPow2 {
-  PoolFreeNode* head;
-};
-
 struct AllocSegList {
-  Allocator alloc = {};
-  MemPoolPow2 pools[32] = {};
+  Allocator alloc;
+  u8* pools[32];
   AllocSegList() = default;
-  AllocSegList(Allocator alloc_) { alloc = alloc_; }
-  void init(Allocator alloc_) { alloc = alloc_; }
-  operator Allocator() { return {.type = AllocatorType_SegList, .ctx = this}; }
+  AllocSegList(Allocator alloc_);
+  void init(Allocator alloc_);
+  operator Allocator();
 };
-
-KAPI u8*  seglist_alloc(AllocSegList* alloc, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
-KAPI u8*  seglist_alloc_zero(AllocSegList* alloc, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
-KAPI u8*  seglist_realloc(AllocSegList* alloc, void* ptr, u64 old_size, u64 new_size, u64 align = MEM_DEFAULT_ALIGNMENT);
-KAPI u8*  seglist_realloc_zero(AllocSegList* alloc, void* ptr, u64 old_size, u64 new_size, u64 align = MEM_DEFAULT_ALIGNMENT);
-KAPI void seglist_free(AllocSegList* alloc, void* ptr);
 
 ////////////////////////////////////////////////////////////////////////
 // tlsf TODO: implement
 
-#define BinCount      32
-#define SubbinCount   32
-#define MinAllocation 128
-
-struct TLSF_Allocator {
-  u32 bin_bitmap;
-  u32 sub_bin_bitmaps[BinCount];
-};
-
-TLSF_Allocator tlsf_init();
-KAPI u8* tlsf_alloc(TLSF_Allocator& allocator, u64 size, u64 alignment = MEM_DEFAULT_ALIGNMENT);
+// #define BinCount      32
+// #define SubbinCount   32
+// #define MinAllocation 128
+// struct TLSF_Allocator {
+//   u32 bin_bitmap;
+//   u32 sub_bin_bitmaps[BinCount];
+// };
+// TLSF_Allocator tlsf_init();
+// KAPI u8* tlsf_alloc(TLSF_Allocator& allocator, u64 size, u64 alignment = MEM_DEFAULT_ALIGNMENT);
 
 ////////////////////////////////////////////////////////////////////////
 // atlas TODO: implement
@@ -150,21 +97,24 @@ KAPI u8* tlsf_alloc(TLSF_Allocator& allocator, u64 size, u64 alignment = MEM_DEF
 
 KAPI u8*  mem_alloc(Allocator alloc, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
 KAPI u8*  mem_alloc_zero(Allocator alloc, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
-#define   mem_alloc_struct(a,T)        (T*)mem_alloc(a,      sizeof(T),     alignof(T))
-#define   mem_alloc_struct_zero(a,T)   (T*)mem_alloc_zero(a, sizeof(T),     alignof(T))
-#define   mem_alloc_array(a,T,c)       (T*)mem_alloc(a,      sizeof(T)*(c), alignof(T))
-#define   mem_alloc_array_zero(a,T,c)  (T*)mem_alloc_zero(a, sizeof(T)*(c), alignof(T))
-#define   push_buffer(a, z, ...)           mem_alloc(a,      z, ##__VA_ARGS__)
-#define   push_buffer_zero(a, z, ...)      mem_alloc_zero(a, z, ##__VA_ARGS__)
-#define   push_struct(a, T)            (T*)mem_alloc(a,      sizeof(T),     alignof(T))
-#define   push_struct_zero(a, T)       (T*)mem_alloc_zero(a, sizeof(T),     alignof(T))
-#define   push_array(a, T, c)          (T*)mem_alloc(a,      sizeof(T)*(c), alignof(T))
-#define   push_array_zero(a, T, c)     (T*)mem_alloc_zero(a, sizeof(T)*(c), alignof(T))
 KAPI u8*  mem_realloc(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 align = MEM_DEFAULT_ALIGNMENT);
 KAPI u8*  mem_realloc_zero(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 align = MEM_DEFAULT_ALIGNMENT);
-#define   mem_realloc_array(a,ptr,old_c,T,c)      (T*)mem_realloc(a, ptr, sizeof(T)*(old_c), sizeof(T)*(c))
-#define   mem_realloc_array_zero(a,ptr,old_c,T,c) (T*)mem_realloc_zero(a, ptr, sizeof(T)*(old_c), sizeof(T)*(c))
 KAPI void mem_free(Allocator alloc, void* ptr);
+
+template<typename T> T* mem_alloc_struct(Allocator a)                                 { return (T*)mem_alloc(a,             sizeof(T),                    alignof(T)); }
+template<typename T> T* mem_alloc_struct_zero(Allocator a)                            { return (T*)mem_alloc_zero(a,        sizeof(T),                    alignof(T)); }
+template<typename T> T* mem_alloc_array(Allocator a, u32 c)                           { return (T*)mem_alloc(a,             sizeof(T)*c,                  alignof(T)); }
+template<typename T> T* mem_alloc_array_zero(Allocator a, u32 c)                      { return (T*)mem_alloc_zero(a,        sizeof(T)*c,                  alignof(T)); }
+template<typename T> T* mem_realloc_array(Allocator a, T* ptr, u32 old_c, u32 c)      { return (T*)mem_realloc(a, ptr,      sizeof(T)*old_c, sizeof(T)*c, alignof(T)); }
+template<typename T> T* mem_realloc_array_zero(Allocator a, T* ptr, u32 old_c, u32 c) { return (T*)mem_realloc_zero(a, ptr, sizeof(T)*old_c, sizeof(T)*c, alignof(T)); }
+
+// I like push name)
+#define push_buffer(a, z, ...)           mem_alloc(a,      z, ##__VA_ARGS__)
+#define push_buffer_zero(a, z, ...)      mem_alloc_zero(a, z, ##__VA_ARGS__)
+#define push_struct(a, T)            (T*)mem_alloc(a,      sizeof(T),     alignof(T))
+#define push_struct_zero(a, T)       (T*)mem_alloc_zero(a, sizeof(T),     alignof(T))
+#define push_array(a, T, c)          (T*)mem_alloc(a,      sizeof(T)*(c), alignof(T))
+#define push_array_zero(a, T, c)     (T*)mem_alloc_zero(a, sizeof(T)*(c), alignof(T))
 
 ////////////////////////////////////////////////////////////////////////
 // General GPU allocator (segregated pow2)
@@ -175,7 +125,7 @@ struct AllocGpuHandle {
 };
 
 struct AllocGpu {
-  AllocGpuHandle* pools[32] = {};
+  AllocGpuHandle* pools[32];
   AllocGpuHandle* handlers;
 };
 
