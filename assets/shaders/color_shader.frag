@@ -4,7 +4,12 @@
 #include "defines/fragdef.glsl"
 
 void main() {
-  v4 texture_color = texture(sampler2D(textures[push.tex_id], samplers[0]), in_uv);
-  // v4 texture_color = v4(in_color, 1);
+  Material material = st.materials[push.material];
+
+  v4 texture_color = texture(sampler2D(textures[material.texture], samplers[0]), in_uv);
   out_color = texture_color;
+  // out_color = v4(material.ambient, 1);
 } 
+
+
+

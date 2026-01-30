@@ -142,7 +142,9 @@ struct VK_State {
   VkCommandBuffer* cmds;
   VkCommandBuffer* compute_cmds;
 
-  ShaderEntity* entities_data;
+  ShaderEntity* shader_entities;
+  ShaderMaterial* shader_materials;
+  u32 shader_materials_count;
 
   Array<RenderEntity, MaxEntities> entities;
   Array<u32, MaxEntities> entities_to_shader;
@@ -983,13 +985,7 @@ intern void vk_descriptor_init() {
     VK_CHECK(vk.AllocateDescriptorSets(vkdevice, &alloc_info, &vk.descriptor_sets));
   }
 
-  // Mem for shaders
-  {
-    u64 entities_start = AlignUp(sizeof(ShaderGlobalState), alignof(ShaderEntity));
-    Assign(vk.entities_data, Offset(vk.storage_buffer.maped_memory, entities_start));
-  }
-
-  // Shader Data
+  // Shader data
   {
     VkDescriptorBufferInfo buffer_info = {
       .buffer = vk.storage_buffer.handle,
@@ -1007,6 +1003,15 @@ intern void vk_descriptor_init() {
     };
     VkWriteDescriptorSet descriptors[] = {ubo_descriptor};
     vk.UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
+  }
+
+  // Set pointers to shader data
+  {
+    u64 entities_start = AlignUp(sizeof(ShaderGlobalState), alignof(ShaderEntity));
+    Assign(vk.shader_entities, Offset(vk.storage_buffer.maped_memory, entities_start));
+    u64 entities_end = (u64)Offset((u64*)entities_start, sizeof(ShaderEntity) * MaxShaderEntity);
+    u64 material_start = AlignUp(entities_end, alignof(ShaderMaterial));
+    Assign(vk.shader_materials, Offset(vk.storage_buffer.maped_memory, material_start));
   }
 }
 
@@ -1272,6 +1277,18 @@ u32 vk_texture_load(Texture t) {
   vk.UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
   u32 id = vk.texture.count;
   vk.texture.add(image);
+  return id;
+}
+
+u32 vk_material_load(Material material) {
+  vk.shader_materials[vk.shader_materials_count] = {
+    .ambient = material.ambient,
+    .diffuse = material.diffuse,
+    .specular = material.specular,
+    .shininess = material.shininess, 
+    .texture = material.texture, 
+  };
+  u32 id = vk.shader_materials_count++;
   return id;
 }
 
@@ -2573,12 +2590,12 @@ void vk_update_transform(u32 entity_id, Transform trans) {
 ////////////////////////////////////////////////////////////////////////
 // Entity
 
-u32 vk_make_renderable(u32 entity_id, u32 mesh_id, u32 shader_id, u32 texture_id) {
+u32 vk_make_renderable(u32 entity_id, u32 mesh_id, u32 shader_id, u32 material_id) {
   vk.entities[entity_id].shader_handle = vk.shaders[shader_id].entities.add(entity_id);
   vk.entities_to_mesh[entity_id] = mesh_id;
   vk.entities_to_shader[entity_id] = shader_id;
   PushConstant& push = vk.push_constants[entity_id];
-  push.texture_id = texture_id;
+  push.texture_id = material_id;
   return entity_id;
 }
 
@@ -2590,7 +2607,7 @@ void vk_remove_renderable(u32 entity_id) {
 }
 
 ShaderEntity& vk_get_entity(u32 entity_id) {
-  return vk.entities_data[entity_id];
+  return vk.shader_entities[entity_id];
 }
 
 ////////////////////////////////////////////////////////////////////////

@@ -1084,7 +1084,6 @@ u32 cubemap_load(String name) {
     "front", "back",
   };
   Loop (i, ArrayCount(textures)) {
-    // str_skip_last_dot();
     String texture_name = push_strf(scratch, "%s/%s%s", name, sides[i], String(".png"));
     textures[i] = texture_image_load(texture_name);
   }
@@ -1108,64 +1107,4 @@ b32 timer_tick(Timer& t, f32 dt) {
     return true;
   }
   return false;
-}
-
-
-////////////////////////////////////////////////////////////////////////
-// Assets
-
-///////////////////////////////////
-// Shaders
-
-global ShaderDefinition shaders_definition_[Shader_COUNT-1] = {
-  [Shader_Color-1] = "color_shader", ShaderType_Drawing,
-};
-ShaderDefinition shaders_definition(u32 idx) {
-  IsInRange<u32>(1, idx, Shader_COUNT);
-  Assert(IsInRange<u32>(1, idx, Shader_COUNT));
-  return shaders_definition_[idx-1];
-}
-global u32 shaders_[Shader_COUNT-1];
-u32& shaders(u32 idx) { 
-  Assert(IsInRange((u32)1, idx, (u32)Shader_COUNT));
-  return shaders_[idx-1];
-}
-
-///////////////////////////////////
-// Meshes
-
-global String meshes_path_[Mesh_COUNT-1] = {
-  // [Mesh_Cube-1] = "cube.obj",
-  [Mesh_GltfCube-1] = "cube.gltf",
-  // [Mesh_GltfHelmet-1] = "helmet.gltf",
-  // [Mesh_GlbHelmet-1] = "helmet.glb",
-  // [Mesh_GlbMonkey-1] = "monkey.glb",
-  // [Mesh_Room] = "room.obj",
-};
-String meshes_path(u32 idx) {
-  Assert(IsInRange<u32>(1, idx, Mesh_COUNT));
-  return meshes_path_[idx-1];
-}
-global u32 meshes_[Mesh_COUNT-1];
-u32& meshes(u32 idx) {
-  Assert(IsInRange<u32>(1, idx, Mesh_COUNT));
-  return meshes_[idx-1];
-}
-
-///////////////////////////////////
-// Textures
-
-global String textures_path_[Texture_COUNT-1] = {
-  [Texture_OrangeLines-1] = "orange_lines_512.png",
-  [Texture_Container-1] = "container.jpg",
-  // [Texture_Room-1] = "image.png",
-};
-String textures_path(u32 idx) { 
-  Assert(IsInRange<u32>(1, idx, Texture_COUNT));
-  return textures_path_[idx-1];
-}
-global u32 textures_[Texture_COUNT-1];
-u32& textures(u32 idx) {
-  Assert(IsInRange<u32>(1, idx, Texture_COUNT));
-  return textures_[idx-1];
 }

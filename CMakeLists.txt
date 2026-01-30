@@ -3,7 +3,7 @@ set(CMAKE_CXX_STANDARD 23)
 project(Engine)
 
 # options
-  set(hotreload true)
+  set(hotreload false)
   set(X11_use true)
   set(sanitize_address true)
   set(binary_dir "${CMAKE_SOURCE_DIR}/bin")

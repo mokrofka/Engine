@@ -17,6 +17,14 @@ struct Entity {
   v3 color;
 };
 
+struct Material {
+  v3 ambient;
+  v3 diffuse;
+  v3 specular;
+  f32 shininess;
+  u32 texture;
+};
+
 struct PointLight {
   v3 color;
   v3 pos;
@@ -39,11 +47,6 @@ struct SpotLight {
   f32 outer_cutoff; // Cosine of outer cone angle
 };
 
-struct Material {
-  v3 color;
-  u32 tex_id;
-};
-
 // Global state
 layout(std430, set = 0, binding = 0) readonly buffer Buffer {
   mat4 projection_view;
@@ -56,12 +59,12 @@ layout(std430, set = 0, binding = 0) readonly buffer Buffer {
   u32 spot_light_count;
 
   Entity entities[KB(1)];
+  Material materials[KB(1)];
 
   PointLight point_lights[KB(1)];
   DirLight dir_lights[KB(1)];
   SpotLight spot_lights[KB(1)];
 
-  Material materials[KB(1)];
 } st;
 
 layout(set = 0, binding = 1) uniform texture2D textures[];
@@ -71,7 +74,7 @@ layout(set = 0, binding = 3) uniform textureCube cube_texture;
 layout(push_constant) uniform PushConstants {
   // mat4 model;
   u32 id;
-  u32 tex_id;
+  u32 material;
 } push;
 
 v3 norm;

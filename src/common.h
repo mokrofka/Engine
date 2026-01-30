@@ -175,39 +175,78 @@ struct ShaderDefinition {
 };
 
 enum ShaderThing {
-  Shader_Color = 1,
+  Shader_Color,
   Shader_COUNT,
 };
-
-KAPI ShaderDefinition shaders_definition(u32 idx);
-KAPI u32& shaders(u32 idx);
+global ShaderDefinition shaders_info[Shader_COUNT] = {
+  [Shader_Color] = "color_shader", ShaderType_Drawing,
+};
+global u32 shaders[Shader_COUNT];
 
 ///////////////////////////////////
 // Meshes
 
 enum {
   // Mesh_Cube = 1,
-  Mesh_GltfCube = 1,
+  Mesh_GltfCube,
   // Mesh_GltfHelmet,
   // Mesh_GlbHelmet,
   // Mesh_GlbMonkey,
   // Mesh_Room,
   Mesh_COUNT,
 };
-
-KAPI String meshes_path(u32 idx);
-KAPI u32& meshes(u32 idx);
+global String meshes_path[Mesh_COUNT] = {
+  // [Mesh_Cube-1] = "cube.obj",
+  [Mesh_GltfCube] = "cube.gltf",
+  // [Mesh_GltfHelmet-1] = "helmet.gltf",
+  // [Mesh_GlbHelmet-1] = "helmet.glb",
+  // [Mesh_GlbMonkey-1] = "monkey.glb",
+  // [Mesh_Room] = "room.obj",
+};
+global u32 meshes[Mesh_COUNT];
 
 ///////////////////////////////////
 // Textures
 
 enum {
-  Texture_OrangeLines = 1,
+  Texture_OrangeLines,
   Texture_Container,
   // Texture_Room,
   Texture_COUNT,
 };
+global String textures_path[Texture_COUNT] = {
+  [Texture_OrangeLines] = "orange_lines_512.png",
+  [Texture_Container] = "container.jpg",
+  // [Texture_Room-1] = "image.png",
+};
+global u32 textures[Texture_COUNT];
 
-KAPI String textures_path(u32 idx);
-KAPI u32& textures(u32 idx);
+///////////////////////////////////
+// Materials
+
+enum {
+  Material_RedOrange,
+  Material_GreenContainer,
+  Material_COUNT,
+};
+
+global Material materials_info[Material_COUNT] = {
+  [Material_RedOrange] = {
+    .ambient = v3(1,0,0),
+    .diffuse = v3(1),
+    .specular = v3(1),
+    .shininess = 1,
+    .texture = Texture_OrangeLines,
+  },
+  [Material_GreenContainer] = {
+    .ambient = v3(0,1,0),
+    .diffuse = v3(1),
+    .specular = v3(1),
+    .shininess = 1,
+    .texture = Texture_Container,
+  },
+};
+global u32 materials[Material_COUNT];
+
+
 

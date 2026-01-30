@@ -15,13 +15,11 @@ union PushConstant {
   u8 data[128];
 };
 
+#define MaxShaderEntity KB(1)
+
 struct ShaderEntity {
   alignas(16) mat4 model;
-  alignas(16) v3 color;
-  // alignas(16) v3 ambient;
-  // alignas(16) v3 diffuse;
-  // alignas(16) v3 specular;
-  // alignas(4) f32 shininess;
+  alignas(16) v4 color;
 };
 
 struct PointLight {
@@ -30,7 +28,7 @@ struct PointLight {
   f32 intensity;
   f32 rad;
 };
-struct ShaderPointLight {
+struct alignas(16) ShaderPointLight {
   alignas(16) v3 color;
   alignas(16) v3 pos;
   alignas(4) f32 intensity;
@@ -76,15 +74,19 @@ struct ShaderGlobalState {
   alignas(4) u32 spot_light_count;
 };
 
-struct Vertex3D {
-  v3 pos;
-  v3 normal;
-  v2 texcoord;
+struct Material {
+  v3 ambient;
+  v3 diffuse;
+  v3 specular;
+  f32 shininess;
+  u32 texture;
 };
-
-struct Vertex2D {
-  v2 position;
-  v2 texcoord;
+struct ShaderMaterial {
+  alignas(16) v3 ambient;
+  alignas(16) v3 diffuse;
+  alignas(16) v3 specular;
+  alignas(4) f32 shininess;
+  alignas(4) u32 texture;
 };
 
 struct Texture {
