@@ -20,7 +20,6 @@ i32 main(i32 count, char* args[]) {
   // test();
   os_init(args[0]);
   os_gfx_init();
-  asset_watch_init();
   common_init();
   Scratch scratch;
 #if HOTRELOAD_BUILD
@@ -52,7 +51,8 @@ i32 main(i32 count, char* args[]) {
   while (!os_window_should_close()) {
     os_pump_messages();
     u64 start_time = os_now_ns();
-    delta_time = f32(start_time - last_time) / Billion(1);
+    g_dt = f32(start_time - last_time) / Billion(1);
+    g_time += g_dt;
     last_time = start_time;
 
     // Main logic
@@ -67,10 +67,10 @@ i32 main(i32 count, char* args[]) {
       u64 sleep_time = target_fps - frame_duration;
       os_sleep_ms(sleep_time / Million(1));
     }
-    timer += delta_time;
+    timer += g_dt;
     if (timer >= 1.0) {
       timer = 0;
-      Info("Frame rate: %f, %f fps", delta_time, 1/delta_time);
+      Info("Frame rate: %f, %f fps", g_dt, 1/g_dt);
     }
   }
   // r_shutdown();

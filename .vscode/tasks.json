@@ -2,7 +2,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Run My Batch File",
+      "label": "Compile shaders",
       "type": "process",
       "command": "${workspaceFolder}/bin/shader_compiler",
       "args": ["../assets/shaders", "../assets/shaders/compiled"],

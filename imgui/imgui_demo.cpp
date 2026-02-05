@@ -127,7 +127,7 @@ Index of this file:
 
 #define FixGuard(name, T) \
             struct {  \
-              char buff[sizeof(T)];  \
+              char buf[sizeof(T)];  \
             } static CONCAT(_buff, __LINE__); \
             T& name = *(T*)&CONCAT(_buff, __LINE__); \
             static int CONCAT(is_init, __LINE__); \
@@ -138,7 +138,7 @@ Index of this file:
 
 #define FixGuardValue(name, T, value) \
             struct {  \
-              char buff[sizeof(T)];  \
+              char buf[sizeof(T)];  \
             } static CONCAT(_buff, __LINE__); \
             T& name = *(T*)&CONCAT(_buff, __LINE__); \
             static int CONCAT(is_init, __LINE__); \
@@ -3003,7 +3003,7 @@ static void DemoWindowWidgetsSelectionAndMultiSelect(ImGuiDemoWindowData* demo_d
             const int ITEMS_COUNT = 8; // Per scope
             // static ImGuiSelectionBasicStorage selections_data[SCOPES_COUNT];
             struct {
-              char buff[sizeof(ImGuiSelectionBasicStorage)*SCOPES_COUNT];
+              char buf[sizeof(ImGuiSelectionBasicStorage)*SCOPES_COUNT];
             } static _buff3005;
             ImGuiSelectionBasicStorage* selections_data = (ImGuiSelectionBasicStorage*)&_buff3005;
             static int is_init3005;

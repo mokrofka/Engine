@@ -43,7 +43,7 @@
 
 #define FixGuard(name, T) \
             struct {  \
-              char buff[sizeof(T)];  \
+              char buf[sizeof(T)];  \
             } static CONCAT(_buff, __LINE__); \
             T& name = *(T*)&CONCAT(_buff, __LINE__); \
             static int CONCAT(is_init, __LINE__); \

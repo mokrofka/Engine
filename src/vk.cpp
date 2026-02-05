@@ -810,7 +810,7 @@ intern Array<VkPipelineShaderStageCreateInfo, 2> vk_shader_module_create(String 
     String stage_type_strs[] = {"vert", "frag"};
     VkShaderStageFlagBits stage_types[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
     String filepath = push_strf(scratch, "%s/shaders/compiled/%s.%s.spv", asset_base_path(), name, stage_type_strs[i]);
-    Buffer binary = os_file_read_all(scratch, filepath);
+    Buffer binary = os_file_path_read_all(scratch, filepath);
     VkShaderModuleCreateInfo module_create_info = {
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
       .codeSize = binary.size,

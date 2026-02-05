@@ -15,7 +15,7 @@ intern Temp tctx_get_scratch() {
   return temp_begin(&tctx.arenas[0]);
 }
 
-intern Temp tctx_get_scratch(Allocator conflict) {
+intern Temp tctx_get_scratch_conflict(Allocator conflict) {
   Arena* arena_conflict = (Arena*)conflict.ctx;
   Arena* arena_result = {};
   for (Arena& arena : tctx.arenas) {
@@ -33,6 +33,6 @@ intern Temp tctx_get_scratch(Allocator conflict) {
 
 Scratch::operator Allocator()        { return {.type = AllocatorType_Arena, .ctx = temp.arena}; }
 Scratch::Scratch()                   { temp = tctx_get_scratch(); }
-Scratch::Scratch(Allocator conflict) { temp = tctx_get_scratch(conflict); }
+Scratch::Scratch(Allocator conflict) { temp = tctx_get_scratch_conflict(conflict); }
 Scratch::~Scratch()                  { temp.arena->pos = temp.pos; };
 

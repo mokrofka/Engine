@@ -54,9 +54,9 @@ KAPI void os_init() {
   RegisterClassA(&wc);
 
   Arena* arena = mem_arena_alloc(KB(1));
-  u8* buff = push_buffer(scratch, 512);
-  u32 size = GetModuleFileNameA(0, (char*)buff, 512);
-  String name = push_str_copy(arena, String(buff, size));
+  u8* buf = push_buffer(scratch, 512);
+  u32 size = GetModuleFileNameA(0, (char*)buf, 512);
+  String name = push_str_copy(arena, String(buf, size));
 
   st = {
     .arena = arena,
@@ -372,9 +372,9 @@ b32 os_file_path_exists(String path) {
 }
 
 String os_exe_filename(Arena* arena) {
-  u8* buff = push_buffer(arena, 512);
-  DWORD size = GetModuleFileNameA(0, (char*)buff, 512);
-  return String(buff, size);
+  u8* buf = push_buffer(arena, 512);
+  DWORD size = GetModuleFileNameA(0, (char*)buf, 512);
+  return String(buf, size);
 }
 
 b32 os_file_compare_time(u64 new_write_time, u64 last_write_time) {

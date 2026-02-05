@@ -3,6 +3,16 @@
 #include "r_types.h"
 #include "vk.h"
 
+#define MaxLights KB(1)
+#define MaxEntities KB(4)
+#define MaxMeshes KB(1)
+#define MaxShaders KB(1)
+#define MaxTextures KB(1)
+
+KAPI extern f32 g_dt;
+KAPI extern f32 g_time;
+KAPI extern Transform entities_transforms[MaxEntities];
+
 ////////////////////////////////////////////////////////////////////////
 // Test
 
@@ -11,7 +21,7 @@ KAPI void test();
 ////////////////////////////////////////////////////////////////////////
 // Profiler
 
-KAPI u64 cpu_frequency();
+KAPI u64 profiler_cpu_frequency();
 
 struct ProfileAnchor {
   u64 TSC_elapsed;
@@ -19,13 +29,6 @@ struct ProfileAnchor {
   u64 TSC_elapsed_at_root;
   u64 hit_count;
   String label;
-};
-
-struct Profiler {
-  Array<ProfileAnchor*, 4096> anchors;
-  u64 start_TSC;
-  u64 end_TSC;
-  ProfileAnchor* profiler_parent;
 };
 
 struct ProfileBlock {
@@ -83,9 +86,8 @@ JsonReader json_reader_init(String buffer);
 ////////////////////////////////////////////////////////////////////////
 // Asset watcher
 
-KAPI void asset_watch_init();
 KAPI void asset_watch_add(String watch_name, void (*callback)());
-KAPI void asset_watch_directory_add(String watch_name, void (*reload_callback)(String filename), OS_WatchFlags flags);
+KAPI void asset_watch_directory_add(String watch_name, OS_WatchFlags flags, void (*reload_callback)(String filename));
 KAPI void asset_watch_update();
 
 ////////////////////////////////////////////////////////////////////////
@@ -110,14 +112,7 @@ union EventContext {
   char c[16];
 };
 
-// Should return false if you want other listeners to listen
-using PFN_On_Event = b32 (*)(u32 code, void* sender, void* listener_inst, EventContext data);
-
-KAPI void event_register(u32 code, void* listener, PFN_On_Event on_event);
-KAPI void event_unregister(u32 code, void* listener, PFN_On_Event on_event);
-KAPI void event_fire(u32 code, void* sender, EventContext on_event);
-
-enum SystemEventCode {
+enum EventCode {
   EventCode_ApplicationQuit,
   EventCode_KeyPressed,
   EventCode_KeyReleased,
@@ -127,22 +122,18 @@ enum SystemEventCode {
   EventCode_MouseWheel,
   EventCode_Resized,
   EventCode_ViewportResized,
-
   EventCode_COUNT
 };
 
+// Should return false if you want other listeners to listen
+using PFN_On_Event = b32 (*)(u32 code, void* sender, void* listener_inst, EventContext data);
+
+KAPI void event_register(u32 code, void* listener, PFN_On_Event on_event);
+KAPI void event_unregister(u32 code, void* listener, PFN_On_Event on_event);
+KAPI void event_fire(u32 code, void* sender, EventContext on_event);
+
 ////////////////////////////////////////////////////////////////////////
 // Common
-
-#define MaxLights KB(1)
-#define MaxEntities KB(4)
-#define MaxMeshes KB(1)
-#define MaxShaders KB(1)
-#define MaxTextures KB(1)
-
-KAPI extern Transform entities_transforms[MaxEntities];
-
-KAPI extern f32 delta_time;
 
 KAPI void common_init();
 KAPI void r_shutdown();
@@ -161,7 +152,7 @@ struct Timer {
 };
 
 KAPI Timer timer_init(f32 interval);
-KAPI b32 timer_tick(Timer& t, f32 dt);
+KAPI b32 timer_tick(Timer& t);
 
 ////////////////////////////////////////////////////////////////////////
 // Assets
@@ -187,19 +178,16 @@ global u32 shaders[Shader_COUNT];
 // Meshes
 
 enum {
-  // Mesh_Cube = 1,
   Mesh_GltfCube,
-  // Mesh_GltfHelmet,
-  // Mesh_GlbHelmet,
-  // Mesh_GlbMonkey,
-  // Mesh_Room,
+  Mesh_GlbCube,
   Mesh_COUNT,
 };
 global String meshes_path[Mesh_COUNT] = {
   // [Mesh_Cube-1] = "cube.obj",
   [Mesh_GltfCube] = "cube.gltf",
+  [Mesh_GlbCube] = "cube.glb",
   // [Mesh_GltfHelmet-1] = "helmet.gltf",
-  // [Mesh_GlbHelmet-1] = "helmet.glb",
+  // [Mesh_GlbHelmet] = "helmet.glb",
   // [Mesh_GlbMonkey-1] = "monkey.glb",
   // [Mesh_Room] = "room.obj",
 };

@@ -3,27 +3,34 @@
 #if OS_LINUX && !GFX_X11
 
 #undef global
-#include "xdg-shell-client-protocol.h"
-#include "xdg-shell-protocol.h"
+#include "wayland_extensions/xdg-shell-client-protocol.h"
+#include "wayland_extensions/xdg-shell-protocol.c"
 #include <wayland-client.h>
 #define global static
 
 #include <linux/input-event-codes.h>
 
 struct WaylandState {
-  wl_display* wl_display;
-  wl_registry* wl_registry;
-  wl_surface* wl_surface;
-  xdg_surface* xdg_surface;
-  xdg_toplevel* xdg_toplevel;
+  wl_display* display;
+  wl_registry* registry;
+  wl_registry_listener  registry_list;
+  wl_compositor* compositor;
+  wl_surface* surface;
+  wl_seat* seat;
+  wl_seat_listener seat_listener;
 
-  wl_compositor* wl_compositor;
-  wl_seat* wl_seat;
   xdg_wm_base* xdg_wm_base;
+  xdg_wm_base_listener xdg_wm_base_listener;
+  xdg_surface* xdg_surface;
+  xdg_surface_listener xdg_surface_listener;
+  xdg_toplevel* xdg_toplevel;
+  xdg_toplevel_listener xdg_toplevel_listener;
 
   // Input
-  wl_pointer* wl_pointer;
-  wl_keyboard* wl_keyboard;
+  wl_pointer* pointer;
+  wl_pointer_listener pointer_listener;
+  wl_keyboard* keyboard;
+  wl_keyboard_listener keyboard_listener;
   
   i32 width = 1;
   i32 height = 1;
@@ -48,7 +55,7 @@ struct WaylandState {
   } input;
 };
 
-global WaylandState st;
+global WaylandState wl_st;
 #undef global // because of: wl_registry_listener.global;
 
 intern u32 lnx_keycode_translate(u32 code) {
@@ -169,162 +176,154 @@ intern u32 lnx_mouse_buttoncode_translate(u32 code) {
 }
 
 intern void wl_seat_capabilities(void* data, wl_seat* seat, u32 capabilities) {
-  if (capabilities & WL_SEAT_CAPABILITY_KEYBOARD && !st.wl_keyboard) {
-    st.wl_keyboard = wl_seat_get_keyboard(seat);
-    local wl_keyboard_listener wl_keyboard_listener = {
+  if (capabilities & WL_SEAT_CAPABILITY_KEYBOARD && !wl_st.keyboard) {
+    wl_st.keyboard = wl_seat_get_keyboard(seat);
+    wl_st.keyboard_listener = {
       .keymap = [](void* data, wl_keyboard* keyboard, u32 format, i32 fd, u32 size){},
       .enter = [](void* data, wl_keyboard* keyboard, u32 serial, wl_surface* surface, wl_array* keys){},
       .leave = [](void* data, wl_keyboard* keyboard, u32 serial, wl_surface* surface){},
       .key = [](void* data, wl_keyboard* keyboard, u32 serial, u32 time, u32 key, u32 state) {
         u32 my_key = lnx_keycode_translate(key);
-        st.input.keyboard_current.keys[my_key] = state;
+        wl_st.input.keyboard_current.keys[my_key] = state;
       },
       .modifiers = [](void* data, wl_keyboard* keyboard, u32 serial, u32 mods_depressed, u32 mods_latched, u32 mods_locked, u32 group){},
     };
-    wl_keyboard_add_listener(st.wl_keyboard, &wl_keyboard_listener, data);
+    wl_keyboard_add_listener(wl_st.keyboard, &wl_st.keyboard_listener, data);
   }
 
-  if (capabilities & WL_SEAT_CAPABILITY_POINTER && !st.wl_pointer) {
-    st.wl_pointer = wl_seat_get_pointer(seat);
-    local wl_pointer_listener pointer_listener = {
-      .enter = [](void* data, struct wl_pointer* wl_pointer, uint32_t serial, struct wl_surface* surface, wl_fixed_t surface_x, wl_fixed_t surface_y){},
-      .leave = [](void* data, struct wl_pointer* wl_pointer, uint32_t serial, struct wl_surface* surface){},
+  if (capabilities & WL_SEAT_CAPABILITY_POINTER && !wl_st.pointer) {
+    wl_st.pointer = wl_seat_get_pointer(seat);
+    wl_st.pointer_listener = {
+      .enter = [](void* data, struct wl_pointer* wl_pointer, u32 serial, struct wl_surface* surface, wl_fixed_t surface_x, wl_fixed_t surface_y){},
+      .leave = [](void* data, struct wl_pointer* wl_pointer, u32 serial, struct wl_surface* surface){},
       .motion = [](void* data, wl_pointer* pointer, u32 time, wl_fixed_t sx, wl_fixed_t sy) {
         f32 x = wl_fixed_to_double(sx);
         f32 y = wl_fixed_to_double(sy);
-        st.input.mouse_current.x = x;
-        st.input.mouse_current.y = y;
+        wl_st.input.mouse_current.x = x;
+        wl_st.input.mouse_current.y = y;
       },
-      .button = [](void* data, struct wl_pointer* wl_pointer, uint32_t serial, uint32_t time, uint32_t button, uint32_t state) {
+      .button = [](void* data, struct wl_pointer* wl_pointer, u32 serial, u32 time, u32 button, u32 state) {
         #define WL_LBUTTON 272
         #define WL_RBUTTON 273
         u32 my_button = lnx_mouse_buttoncode_translate(button);
-        st.input.mouse_current.buttons[my_button] = state;
+        wl_st.input.mouse_current.buttons[my_button] = state;
       },
     };
-    wl_pointer_add_listener(st.wl_pointer, &pointer_listener, data);
+    wl_pointer_add_listener(wl_st.pointer, &wl_st.pointer_listener, data);
   }
 }
 
 intern void wl_registry_global_handler(void* data, wl_registry* registry, u32 name, const char* interface, u32 version) {
   if (str_match(interface, wl_compositor_interface.name)) {
-    Assign(st.wl_compositor, wl_registry_bind(registry, name, &wl_compositor_interface, version));
+    wl_st.compositor = (wl_compositor*)wl_registry_bind(registry, name, &wl_compositor_interface, version);
   }
   else if (str_match(interface, wl_seat_interface.name)) {
-    Assign(st.wl_seat, wl_registry_bind(registry, name, &wl_seat_interface, 1));
-    local wl_seat_listener wl_seat_listener = {
+    wl_st.seat = (wl_seat*)wl_registry_bind(registry, name, &wl_seat_interface, 1);
+    wl_st.seat_listener = {
       .capabilities = wl_seat_capabilities,
       .name = [](void* data, wl_seat* seat, const char* name) {},
     };
-    wl_seat_add_listener(st.wl_seat, &wl_seat_listener, null);
+    wl_seat_add_listener(wl_st.seat, &wl_st.seat_listener, null);
   }
   else if (str_match(interface, xdg_wm_base_interface.name)) {
-    Assign(st.xdg_wm_base, wl_registry_bind(registry, name, &xdg_wm_base_interface, 1));
-    local xdg_wm_base_listener xdg_wm_base_listener = {
+    wl_st.xdg_wm_base = (xdg_wm_base*)wl_registry_bind(registry, name, &xdg_wm_base_interface, 1);
+    wl_st.xdg_wm_base_listener = {
       .ping = [](void* data, xdg_wm_base* shell, u32 serial){ xdg_wm_base_pong(shell, serial); },
     };
-    xdg_wm_base_add_listener(st.xdg_wm_base, &xdg_wm_base_listener, null);
+    xdg_wm_base_add_listener(wl_st.xdg_wm_base, &wl_st.xdg_wm_base_listener, null);
   }
 }
 
 void os_gfx_init() {
   {
-    st.wl_display = wl_display_connect(null);
-    st.wl_registry = wl_display_get_registry(st.wl_display);
-    local wl_registry_listener wl_registry_listener = {
-      .global = wl_registry_global_handler,
-    };
-    wl_registry_add_listener(st.wl_registry, &wl_registry_listener, null);
-    wl_display_roundtrip(st.wl_display);
-    st.wl_surface = wl_compositor_create_surface(st.wl_compositor);
+    wl_st.display = wl_display_connect(null);
+    wl_st.registry = wl_display_get_registry(wl_st.display);
+    wl_registry_listener wl_registry_listener = {.global = wl_registry_global_handler};
+    wl_registry_add_listener(wl_st.registry, &wl_registry_listener, null);
+    wl_display_roundtrip(wl_st.display);
+    wl_st.surface = wl_compositor_create_surface(wl_st.compositor);
   }
 
   {
-    st.xdg_surface = xdg_wm_base_get_xdg_surface(st.xdg_wm_base, st.wl_surface);
-    local xdg_surface_listener xdg_surface_listener = {
+    wl_st.xdg_surface = xdg_wm_base_get_xdg_surface(wl_st.xdg_wm_base, wl_st.surface);
+    wl_st.xdg_surface_listener = {
       .configure = [](void* data, xdg_surface* xdg_surface, u32 serial) {
         xdg_surface_ack_configure(xdg_surface, serial);
-        // if (!st.is_showned) {
-        //   st.is_showned = true;
-        // }
-        // wl_surface_commit(st.wl_surface);
       }
     };
-    xdg_surface_add_listener(st.xdg_surface, &xdg_surface_listener, null);
+    xdg_surface_add_listener(wl_st.xdg_surface, &wl_st.xdg_surface_listener, null);
   }
 
   {
-    st.xdg_toplevel = xdg_surface_get_toplevel(st.xdg_surface);
-    local xdg_toplevel_listener xdg_toplevel_listener = {
+    wl_st.xdg_toplevel = xdg_surface_get_toplevel(wl_st.xdg_surface);
+    wl_st.xdg_toplevel_listener = {
       .configure = [](void* data, xdg_toplevel* top, i32 width, i32 height, wl_array* stat) {
         if (!width || !height) {
           return;
         }
-        if (st.width != width || st.height != height) {
-          st.width = width;
-          st.height = height;
-        }
+        wl_st.width = width;
+        wl_st.height = height;
       },
-      .close = [](void* data, xdg_toplevel* top){ st.should_close = true; },
+      .close = [](void* data, xdg_toplevel* top){ wl_st.should_close = true; },
     };
-    xdg_toplevel_add_listener(st.xdg_toplevel, &xdg_toplevel_listener, null);
+    xdg_toplevel_add_listener(wl_st.xdg_toplevel, &wl_st.xdg_toplevel_listener, null);
   }
 
-  xdg_toplevel_set_title(st.xdg_toplevel, "wayland client");
-  wl_surface_commit(st.wl_surface);
+  xdg_toplevel_set_title(wl_st.xdg_toplevel, "wayland client");
+  wl_surface_commit(wl_st.surface);
 }
 
 void os_gfx_shutdown() {
-  wl_keyboard_destroy(st.wl_keyboard);
-  wl_pointer_destroy(st.wl_pointer);
-  wl_seat_release(st.wl_seat);
-  xdg_toplevel_destroy(st.xdg_toplevel);
-  xdg_surface_destroy(st.xdg_surface);
-  wl_surface_destroy(st.wl_surface);
-  wl_display_disconnect(st.wl_display);
+  wl_keyboard_destroy(wl_st.keyboard);
+  wl_pointer_destroy(wl_st.pointer);
+  wl_seat_release(wl_st.seat);
+  xdg_toplevel_destroy(wl_st.xdg_toplevel);
+  xdg_surface_destroy(wl_st.xdg_surface);
+  wl_surface_destroy(wl_st.surface);
+  wl_display_disconnect(wl_st.display);
 }
 
 void os_pump_messages() { 
-  wl_display_dispatch_pending(st.wl_display); 
+  wl_display_dispatch_pending(wl_st.display); 
 }
 
-b32 os_window_should_close()       { return st.should_close; }
+b32 os_window_should_close()       { return wl_st.should_close; }
 
-v2i  os_get_window_size()          { return v2i(st.width, st.height); }
-v2i  os_get_mouse_pos()            { return v2i(st.input.mouse_current.x, st.input.mouse_current.y); }
+v2i  os_get_window_size()          { return v2i(wl_st.width, wl_st.height); }
+v2i  os_get_mouse_pos()            { return v2i(wl_st.input.mouse_current.x, wl_st.input.mouse_current.y); }
 void os_get_gfx_api_handlers(void* out) {
   struct Surface {
     struct wl_display* wl_display;
     struct wl_surface* wl_surface;
   };
-  *(Surface*)out = {.wl_display = st.wl_display, .wl_surface = st.wl_surface};
+  *(Surface*)out = {.wl_display = wl_st.display, .wl_surface = wl_st.surface};
 }
 void  os_close_window() {
-  st.should_close = true; 
+  wl_st.should_close = true; 
 }
 
 ////////////////////////////////////////////////////////////////////////
 // keyboard
 
 void os_input_update() {
-  MemCopyStruct(&st.input.keyboard_previous, &st.input.keyboard_current);
-  MemCopyStruct(&st.input.mouse_previous, &st.input.mouse_current);
+  MemCopyStruct(&wl_st.input.keyboard_previous, &wl_st.input.keyboard_current);
+  MemCopyStruct(&wl_st.input.mouse_previous, &wl_st.input.mouse_current);
 }
 
-b32 os_is_key_down(Key key)       { return st.input.keyboard_current.keys[key] == true; }
-b32 os_is_key_up(Key key)         { return st.input.keyboard_current.keys[key] == false; }
-b32 os_was_key_down(Key key)      { return st.input.keyboard_previous.keys[key] == true; }
-b32 os_was_key_up(Key key)        { return st.input.keyboard_previous.keys[key] == false; }
+b32 os_is_key_down(Key key)       { return wl_st.input.keyboard_current.keys[key] == true; }
+b32 os_is_key_up(Key key)         { return wl_st.input.keyboard_current.keys[key] == false; }
+b32 os_was_key_down(Key key)      { return wl_st.input.keyboard_previous.keys[key] == true; }
+b32 os_was_key_up(Key key)        { return wl_st.input.keyboard_previous.keys[key] == false; }
 b32 os_is_key_pressed(Key key)    { return os_is_key_down(key) && os_was_key_up(key); }
 b32 os_is_key_released(Key key)   { return os_is_key_up(key) && os_was_key_down(key); }
 
 ////////////////////////////////////////////////////////////////////////
 // mouse
 
-b32 os_is_button_down(MouseButtons button)          { return st.input.mouse_current.buttons[button] == true; }
-b32 os_is_button_up(MouseButtons button)            { return st.input.mouse_current.buttons[button] == false; }
-b32 os_was_button_down(MouseButtons button)         { return st.input.mouse_previous.buttons[button] == true; }
-b32 os_was_button_up(MouseButtons button)           { return st.input.mouse_previous.buttons[button] == false; }
+b32 os_is_button_down(MouseButtons button)          { return wl_st.input.mouse_current.buttons[button] == true; }
+b32 os_is_button_up(MouseButtons button)            { return wl_st.input.mouse_current.buttons[button] == false; }
+b32 os_was_button_down(MouseButtons button)         { return wl_st.input.mouse_previous.buttons[button] == true; }
+b32 os_was_button_up(MouseButtons button)           { return wl_st.input.mouse_previous.buttons[button] == false; }
 b32 os_is_button_pressed(MouseButtons button)       { return os_is_button_down(button) && os_was_button_up(button); }
 b32 os_is_button_released(MouseButtons button)      { return os_is_button_up(button) && os_was_button_down(button); }
 

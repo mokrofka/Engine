@@ -162,3 +162,13 @@ KAPI String str_skip_last_dot(String string);
 
 KAPI u64 wchar_to_char(char* out, const wchar_t* in, u64 out_size);
 KAPI String push_str_wchar(Allocator arena, const wchar_t* in, u32 wchar_length);
+
+struct Lexer {
+  u8* cur;
+  u8* end;
+};
+
+KAPI Lexer lexer_init(String buffer);
+KAPI String lexer_next_token(Lexer* l);
+KAPI String lexer_next_integer(Lexer* l);
+

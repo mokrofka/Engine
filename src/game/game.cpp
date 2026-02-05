@@ -180,20 +180,20 @@ void camera_update() {
       cam.view_dirty = true;
     };
     if (os_is_key_down(Key_A)) {
-      camera_yaw(rotation_speed * delta_time);
+      camera_yaw(rotation_speed * g_dt);
     }
     if (os_is_key_down(Key_D)) {
-      camera_yaw(-rotation_speed * delta_time);
+      camera_yaw(-rotation_speed * g_dt);
     }
     var camera_pitch = [&](f32 amount) {
       cam.pitch += amount;
       cam.view_dirty = true;
     };
     if (os_is_key_down(Key_R)) {
-      camera_pitch(rotation_speed * delta_time);
+      camera_pitch(rotation_speed * g_dt);
     }
     if (os_is_key_down(Key_F)) {
-      camera_pitch(-rotation_speed * delta_time);
+      camera_pitch(-rotation_speed * g_dt);
     }
   }
 
@@ -225,7 +225,7 @@ void camera_update() {
     }
     if (velocity != v3_zero()) {
       velocity = v3_norm(velocity);
-      cam.pos += velocity * speed * delta_time;
+      cam.pos += velocity * speed * g_dt;
       cam.view_dirty = true;
     }
   }
@@ -245,7 +245,7 @@ void camera_update() {
 // Init
 
 void new_init() {
-  Entity& cube = entity_create(meshes[Mesh_GltfCube], shaders[Shader_Color], textures[Texture_OrangeLines]);
+  Info("new init");
 }
 
 void game_init() {
@@ -257,7 +257,7 @@ void game_init() {
     .fov = 45,
   };
   cam.view = mat4_look_at(cam.pos, cam.dir, v3_up());
-  Entity& cube = entity_create(meshes[Mesh_GltfCube], shaders[Shader_Color], textures[Texture_OrangeLines]);
+  Entity& cube = entity_create(meshes[Mesh_GlbCube], shaders[Shader_Color], textures[Texture_OrangeLines]);
   Entity& cube1 = entity_create(meshes[Mesh_GltfCube], shaders[Shader_Color], textures[Texture_Container]);
   cube1.pos() = {-4,0,1};
   {
@@ -269,16 +269,6 @@ void game_init() {
     Entity& e = entity_create(mesh, shaders[Shader_Color], textures[Texture_OrangeLines]);
     e.pos() = 3;
   }
-}
-
-void foo() {
-
-  struct E_Description {
-    
-  };
-
-  // Entity& e = entity_create(mesh, shaders(Shader_Color), materials[Material_GreenColor]);
-  
 }
 
 void game_deinit() {
@@ -314,17 +304,22 @@ void app_init(u8** state) {
   shader_load("cubemap_shader", ShaderType_Cubemap);
   cubemap_load("night_cubemap");
   game_init();
-  st->timer = timer_init(1);
+  st->timer = timer_init(3);
   u64 end = os_now_ns();
-  Info("app init took: %f64 sec", f64(end - start) / Billion(1));
+  // Info("app init took: %f64 sec", f64(end - start) / Billion(1));
 }
 
 ////////////////////////////////////////////////////////////////////////
 // Update
 
+b32 foo(u32 code, void* sender, void* listener_inst, EventContext data) {
+  Entity& e = entity_create(0, 0, 0);
+  e.pos() = v3_rand_range(-10, 10);
+  return false;
+}
+
 shared_function void app_update(u8** state) {
   Scratch scratch;
-
   if (*state == null) {
     app_init(state);
   }
@@ -333,41 +328,20 @@ shared_function void app_update(u8** state) {
     game_deinit();
     game_init();
   }
-  if (os_is_key_down(Key_N)) {
+  if (os_is_key_pressed(Key_N)) {
     new_init();
+    event_register(EventCode_ApplicationQuit, (void*)0, foo);
+    // event_register(EventCode_ApplicationQuit, (void*)0, foo1);
   }
   if (os_is_key_down(Key_Escape)) {
     os_close_window();
   }
-  if (os_is_key_pressed(Key_1)) {
-    st->cam.fov += 5;
-  }
-  if (os_is_key_pressed(Key_2)) {
-    st->cam.fov -= 5;
+  if (timer_tick(st->timer)) {
+    event_fire(EventCode_ApplicationQuit, (void*)0, {});
   }
 
-  // Local(Timer, timer, timer_init(1));
-  // if (timer_tick(st->timer, delta_time)) {
-  //   Info("entity created %i", st->entities.count);
-  //   Entity& cube1 = entity_create(meshes[Mesh_Cube], shaders[Shader_Color], textures[Texture_Container]);
-  //   cube1.pos = v3_rand_range(v3(-10), v3(10));
-  // }
-
-  // Local(Timer, timer, timer_init(0.3));
-  // if (timer_tick(timer, delta_time)) {
-    // Info("cam yaw: %f", Mod(st->cam.yaw, 360));
-    // Info("block x: %f", st->entities[0].pos().x);
-    // v3 pos = st->cam.pos;
-    // Info("cam pos: %f %f %f", pos.x,pos.y,pos.z);
-  // }
-  // for (Entity& e : st->entities) {
-  //   e.pos().x += delta_time * 0.01;
-  //   e.pos() += v3_cross(v3_up(), v3_forward()) * delta_time * 0.1;
-
-  //   e.pos().x += -0.1 * delta_time;
-  // }
-  // Entity& e = st->entities[1];
-  // e.pos().x -= 0.01;
+  Entity& e = st->entities[0];
+  e.pos().x = Sin(g_time);
 
   camera_update();
   gpu_data_update();

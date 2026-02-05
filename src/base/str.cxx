@@ -200,10 +200,10 @@ intern u32 hex_u64_write(u8* dest, u64 value) {
 ////////////////////////////////////////////////////////////////////////
 // Great sprintf
 
-intern u32 my_sprintf(u8* buff, String fmt, va_list argc) {
+intern u32 my_sprintf(u8* buf, String fmt, va_list argc) {
 
   // Calculate length
-  if (buff == null) {
+  if (buf == null) {
     u32 length = 0;
     for (u8* p = fmt.str; p < fmt.str+fmt.size; ++p) {
       if (*p == '%') {
@@ -275,39 +275,39 @@ intern u32 my_sprintf(u8* buff, String fmt, va_list argc) {
           if (str_match(String(p+1, 2), "64")) {
             p += 2; // skip "64"
             i64 val = va_arg(argc, i64);
-            u32 len = i64_write(buff + written, val);
+            u32 len = i64_write(buf + written, val);
             written += len;
             break;
           }
           i32 val = va_arg(argc, i32);
-          u32 len = i32_write(buff + written, val);
+          u32 len = i32_write(buf + written, val);
           written += len;
         } break;
         case 'u': {
           if (str_match(String(p+1, 2), "64")) {
             p += 2; // skip "64"
             i64 val = va_arg(argc, i64);
-            u32 len = i64_write(buff + written, val);
+            u32 len = i64_write(buf + written, val);
             written += len;
             break;
           }
           u32 val = va_arg(argc, u32);
-          u32 len = u32_write(buff + written, val);
+          u32 len = u32_write(buf + written, val);
           written += len;
         } break;
         case 'f': {
           f64 val = va_arg(argc, f64); // f64 - because of compiler
-          u32 len = f64_write(buff + written, val, DefaultFloatPrecision);
+          u32 len = f64_write(buf + written, val, DefaultFloatPrecision);
           written += len;
         } break;
         case 's': {
           String val = va_arg(argc, String);
-          MemCopy(buff+written, val.str, val.size);
+          MemCopy(buf+written, val.str, val.size);
           written += val.size;
         } break;
         case 'c': {
           char val = va_arg(argc, i32); // i32 - because of compiler
-          buff[written] = val;
+          buf[written] = val;
           written += 1;
         } break;
         case '.': {
@@ -315,21 +315,21 @@ intern u32 my_sprintf(u8* buff, String fmt, va_list argc) {
           u32 precision = *p - '0'; // 'num' - '0'
           ++p;                      // skip number
           f64 val = va_arg(argc, f64);
-          u32 len = f64_write(buff + written, val, precision);
+          u32 len = f64_write(buf + written, val, precision);
           written += len;
         } break;
         case 'p': {
           u64 val = va_arg(argc, u64);
-          u32 len = hex_u64_write(buff + written, val);
+          u32 len = hex_u64_write(buf + written, val);
           written += len;
         }; break;
         case '%': {
-          buff[written] = '%';
+          buf[written] = '%';
           written += 1;
         }; break;
       }
     } else {
-      buff[written++] = *p;
+      buf[written++] = *p;
     };
   }
   return written;
@@ -501,11 +501,11 @@ String push_strfv(Allocator arena, String fmt, va_list argc) {
   va_copy(va_list_argc, argc); 
   u32 need_bytes = my_sprintf(null, fmt, va_list_argc);
   va_end(va_list_argc);
-  u8* buff = push_buffer(arena, need_bytes + 1); // for C-str
+  u8* buf = push_buffer(arena, need_bytes + 1); // for C-str
   va_copy(va_list_argc, argc); 
-  u32 final_size = my_sprintf(buff, fmt, va_list_argc);
+  u32 final_size = my_sprintf(buf, fmt, va_list_argc);
   va_end(va_list_argc);
-  String result = {buff, final_size};
+  String result = {buf, final_size};
   result.str[result.size] = 0;
   return result;
 }
@@ -801,11 +801,48 @@ u64 wchar_to_char(char* out, const wchar_t* in, u64 out_size) {
 }
 
 String push_str_wchar(Allocator arena, const wchar_t* in, u32 wchar_length) {
-  u8* buff = push_buffer(arena, wchar_length + 1);
+  u8* buf = push_buffer(arena, wchar_length + 1);
   Loop (i , wchar_length) {
-    buff[i] = in[i];
+    buf[i] = in[i];
   }
-  buff[wchar_length] = 0;
-  return {buff, wchar_length};
+  buf[wchar_length] = 0;
+  return {buf, wchar_length};
+}
+
+Lexer lexer_init(String buffer) {
+  Lexer lexer = {
+    .cur = buffer.str,
+    .end = buffer.str + buffer.size,
+  };
+  return lexer;
+}
+
+String lexer_next_token(Lexer* l) {
+  while (l->cur < l->end && char_is_space(*l->cur)) {
+    l->cur++;
+  }
+  if (l->cur == l->end) return {};
+  u8* current = l->cur;
+  while (l->cur < l->end && !char_is_space(*l->cur)) {
+    l->cur++;
+  }
+  String result = {current, (u64)l->cur - (u64)current};
+  return result;
+}
+
+String lexer_next_integer(Lexer* l) {
+  while (l->cur < l->end && char_is_space(*l->cur)) {
+    l->cur++;
+  }
+  if (l->cur == l->end) return {};
+  while (!char_is_digit(*l->cur)) {
+    ++l->cur;
+  }
+  u8* current = l->cur;
+  while (char_is_digit(*l->cur)) {
+    ++l->cur;
+  }
+  String result = {current, (u64)l->cur - (u64)current};
+  return result;
 }
 

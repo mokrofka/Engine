@@ -46,8 +46,6 @@ enum {
   OS_WatchFlag_Create     = Bit(0),
   OS_WatchFlag_Delete     = Bit(1),
   OS_WatchFlag_Modify     = Bit(2),
-  OS_WatchFlag_CloseWrite = Bit(3),
-  OS_WatchFlag_MovedTo    = Bit(4),
 };
 
 struct OS_Watch{
@@ -65,8 +63,9 @@ KAPI void os_exit(i32 exit_code);
 KAPI u64 os_timer_frequency();
 KAPI u64 os_timer_now();
 KAPI u64 os_now_ns();
-KAPI void os_console_write(String message, u32 color);
 KAPI void os_sleep_ms(u64 ms);
+KAPI void os_console_write(String message, u32 color);
+KAPI String os_get_environment(String name);
 
 //////////////////////////////////////////////////////////////////////////
 // Memory
@@ -87,7 +86,7 @@ KAPI u64            os_file_read(OS_Handle file, u64 size, u8* out_data);
 KAPI u64            os_file_write(OS_Handle file, u64 size, u8* data);
 KAPI u64            os_file_size(OS_Handle file);
 KAPI FileProperties os_file_properties(OS_Handle file);
-KAPI Buffer         os_file_read_all(Allocator arena, String path);
+KAPI Buffer         os_file_path_read_all(Allocator arena, String path);
 KAPI b32            os_file_path_exists(String path);
 KAPI b32            os_file_path_copy(String dst, String src);
 KAPI void           os_file_path_time_copy(String src, String dst);

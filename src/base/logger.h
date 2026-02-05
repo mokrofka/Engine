@@ -11,7 +11,7 @@
 #define ASSERTIONS_ENABLED 1
 
 enum LogLevel {
-  LogLevel_Trace,
+  LogLevel_Trace = 1,
   LogLevel_Debug,
   LogLevel_Info,
   LogLevel_Warn,

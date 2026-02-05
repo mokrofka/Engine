@@ -213,15 +213,15 @@ intern u8* seglist_alloc(AllocSegList* alloc, u64 size, u64 align) {
   u64 pool_idx = ctz(pow2_size) - ctz(8);
   MemPoolPow2& p = *(MemPoolPow2*)&alloc->pools[pool_idx];
   if (p.head == null) {
-    u8* buff = mem_alloc(alloc->alloc, sizeof(u32) + pow2_size);
-    *(u32*)buff = pool_idx;
-    u8* result_no_aligned = Offset(buff+sizeof(u32)+sizeof(void*), sizeof(SegListHeader));
+    u8* buf = mem_alloc(alloc->alloc, sizeof(u32) + pow2_size);
+    *(u32*)buf = pool_idx;
+    u8* result_no_aligned = Offset(buf+sizeof(u32)+sizeof(void*), sizeof(SegListHeader));
     u8* result = (u8*)AlignUp(((u64)result_no_aligned), align);
     SegListHeader* header = (SegListHeader*)OffsetBack(result, sizeof(SegListHeader));
     *header = {
       .size = size,
       .guard = MEM_ALLOC_HEADER_GUARD,
-      .pad = (u32)MemDiff(result, buff),
+      .pad = (u32)MemDiff(result, buf),
     };
     u32* tail = (u32*)Offset(result, size);
     *tail = MEM_ALLOC_TAIL_GUARD;
@@ -440,12 +440,12 @@ u8* mem_alloc_soa(Allocator alloc, u32 count, SoA_Field* fields, u32 fields_coun
     mem_offset += fields[i].elem_size * count;
   }
   u64 alloc_size = mem_offset;
-  u8* buff = mem_alloc(alloc, alloc_size, fields[0].align);
+  u8* buf = mem_alloc(alloc, alloc_size, fields[0].align);
   Loop (i, fields_count) {
-    void* new_ptr = Offset(buff, offsets[i]);
+    void* new_ptr = Offset(buf, offsets[i]);
     *(fields[i].dst_ptr) = new_ptr;
   }
-  return buff;
+  return buf;
 }
 
 u8* mem_realloc_soa(Allocator alloc, void* ptr, u32 old_count, u32 new_count, SoA_Field* fields, u32 fields_count) {
@@ -457,15 +457,15 @@ u8* mem_realloc_soa(Allocator alloc, void* ptr, u32 old_count, u32 new_count, So
     mem_offset += fields[i].elem_size * new_count;
   }
   u64 new_size = mem_offset;
-  u8* buff = mem_alloc(alloc, new_size, fields[0].align);
+  u8* buf = mem_alloc(alloc, new_size, fields[0].align);
   Loop (i, fields_count) {
     void* old_ptr = *(fields[i].dst_ptr);
-    void* new_ptr = Offset(buff, offsets[i]);
+    void* new_ptr = Offset(buf, offsets[i]);
     u64 old_ptr_size = fields[i].elem_size * old_count;
     MemCopy(new_ptr, old_ptr, old_ptr_size);
     *(fields[i].dst_ptr) = new_ptr;
   }
   mem_free(alloc, ptr);
-  return buff;
+  return buf;
 }
 

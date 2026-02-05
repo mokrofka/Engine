@@ -3,9 +3,9 @@ set(CMAKE_CXX_STANDARD 23)
 project(Engine)
 
 # options
-  set(hotreload false)
-  set(X11_use true)
-  set(sanitize_address true)
+  set(hotreload true)
+  set(X11_use false)
+  set(sanitize_address false)
   set(binary_dir "${CMAKE_SOURCE_DIR}/bin")
 
   message("hotreload: ${hotreload}")
@@ -47,12 +47,12 @@ project(Engine)
   endif()
   message("Build: ${CMAKE_BUILD_TYPE}")
 
-# Binaries
   if (X11_use)
     find_package(X11 REQUIRED)
     add_compile_definitions(GFX_X11=1)
   endif()
   include_directories(src)
+  include_directories(vendor)
   
 # Hotreload
   if (hotreload)

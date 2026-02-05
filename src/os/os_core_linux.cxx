@@ -1,20 +1,21 @@
 #include "lib.h"
-#include <cstdio>
 
 #if OS_LINUX
 
-#include <fcntl.h>
-#include <unistd.h>
-#include <time.h>
-#include <dlfcn.h>
 #include <dirent.h>
-#include "spawn.h"
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/sendfile.h>
-#include <sys/wait.h>
+#include <dlfcn.h>
+#include <fcntl.h>
+#include <spawn.h>
+#include <stdlib.h>
 #include <sys/inotify.h>
+#include <sys/mman.h>
+#include <sys/sendfile.h>
+#include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/uio.h>
+#include <sys/wait.h>
+#include <time.h>
+#include <unistd.h>
 
 struct OS_LNX_FileIter {
   DIR* dir;
@@ -70,24 +71,25 @@ void os_sleep_ms(u64 ms) {
 void os_console_write(String message, u32 color) {
   String color_str;
   switch (color) {
-    case 0: color_str = "\x1b[90m"; break; // Gray
-    case 1: color_str = "\x1b[36m"; break; // Cyan
-    case 2: color_str = "\x1b[32m"; break; // Green
-    case 3: color_str = "\x1b[33m"; break; // Yellow
-    case 4: color_str = "\x1b[31m"; break; // Red
-    default: color_str = "\x1b[0m"; break; // Reset
+    case 0: color_str = "\x1b[0m";  break; // Reset
+    case 1: color_str = "\x1b[90m"; break; // Gray
+    case 2: color_str = "\x1b[36m"; break; // Cyan
+    case 3: color_str = "\x1b[32m"; break; // Green
+    case 4: color_str = "\x1b[33m"; break; // Yellow
+    case 5: color_str = "\x1b[31m"; break; // Red
   }
-  write(STDOUT_FILENO, color_str.str, color_str.size);
-  write(STDOUT_FILENO, message.str, message.size);
+  iovec iov[] = {
+    {.iov_base = color_str.str, .iov_len = color_str.size},
+    {.iov_base = message.str, .iov_len = message.size}
+  };
+  writev(STDOUT_FILENO, iov, ArrayCount(iov));
 }
 
-FileProperties os_lnx_file_properties_from_stat(struct stat s) {
-  FileProperties props = {
-    .size = (u64)s.st_size,
-    .modified = s.st_mtim.tv_sec*Billion(1) + s.st_mtim.tv_nsec,
-    .created = s.st_ctim.tv_sec*Billion(1) + s.st_ctim.tv_nsec,
-  };
-  return props;
+String os_get_environment(String name) {
+  Scratch scratch;
+  String name_c = push_str_copy(scratch, name);
+  String result = getenv((char*)name_c.str);
+  return result;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -102,6 +104,15 @@ b32  os_commit_large(void* ptr, u64 size)  { return 1; }
 
 //////////////////////////////////////////////////////////////////////////
 // Files
+
+FileProperties os_lnx_file_properties_from_stat(struct stat s) {
+  FileProperties props = {
+    .size = (u64)s.st_size,
+    .modified = s.st_mtim.tv_sec*Billion(1) + s.st_mtim.tv_nsec,
+    .created = s.st_ctim.tv_sec*Billion(1) + s.st_ctim.tv_nsec,
+  };
+  return props;
+}
 
 OS_Handle os_file_open(String path, OS_AccessFlags flags) {
   Scratch scratch;
@@ -158,11 +169,10 @@ b32 os_file_path_exists(String path) {
   Scratch scratch;
   String path_c = push_str_copy(scratch, path);
   int access_result = access((char*)path_c.str, F_OK);
-  b32 result = 0;
   if (access_result == 0) {
-    result = true;
+    return true;
   }
-  return result;
+  return false;
 }
 
 b32 os_file_path_copy(String dst, String src) {
@@ -199,7 +209,7 @@ FileProperties os_file_path_properties(String path) {
   return props;
 }
 
-Buffer os_file_read_all(Allocator arena, String path) {
+Buffer os_file_path_read_all(Allocator arena, String path) {
   Scratch scratch(arena);
   OS_Handle f = os_file_open(path, OS_AccessFlag_Read);
   Assert(f);
@@ -265,7 +275,6 @@ void os_watch_close(OS_Watch watch) {
 OS_Handle os_watch_attach(OS_Watch watch, String name) {
   Scratch scratch;
   String name_c = push_str_copy(scratch, name);
-
   int lnx_flags = 0;
   if (watch.flags & OS_WatchFlag_Create) {
     lnx_flags |= IN_CREATE;
@@ -276,12 +285,6 @@ OS_Handle os_watch_attach(OS_Watch watch, String name) {
   if (watch.flags & OS_WatchFlag_Modify) {
     lnx_flags |= IN_MODIFY;
   }
-  if (watch.flags & OS_WatchFlag_CloseWrite) {
-    lnx_flags |= IN_CLOSE_WRITE;
-  }
-  if (watch.flags & OS_WatchFlag_MovedTo) {
-    lnx_flags |= IN_MOVED_TO;
-  }
   OS_Handle wd = inotify_add_watch(watch.handle, (char*)name_c.str, lnx_flags);
   return wd;
 }
@@ -291,15 +294,15 @@ void os_watch_deattach(OS_Watch watch, OS_Handle attached) {
 }
 
 StringList os_watch_check(Allocator arena, OS_Watch watch) {
-  u8* buff = push_buffer(arena, KB(1));
-  u64 read_size = os_file_read(watch.handle, KB(1), buff);
+  u8* buf = push_buffer(arena, KB(1));
+  u64 read_size = os_file_read(watch.handle, KB(1), buf);
   if (read_size == -1) {
     return {};
   }
   StringList result = {};
   int offset = 0;
   while (offset < read_size) {
-    struct inotify_event* event = (struct inotify_event*)&buff[offset];
+    struct inotify_event* event = (struct inotify_event*)&buf[offset];
     if (event->len) {
       int lnx_flags = 0;
       str_list_push(arena, &result, event->name);
