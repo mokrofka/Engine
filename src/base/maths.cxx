@@ -42,6 +42,8 @@ f32 LogE(f32 a)          { return __builtin_logf(a); }
 f32 Log2(f32 a)          { return __builtin_log2f(a); }
 f32 Log10(f32 a)         { return __builtin_log10f(a); }
 
+void SinCos(f32 angle, f32* a, f32* b) { __builtin_sincosf(angle, a, b); }
+
 f32 SinD(f32 a)                { return Sin(degtorad(a)); }
 f32 CosD(f32 a)                { return Cos(degtorad(a)); }
 f32 Lerp(f32 a, f32 t, f32 b)  { return (1 - t)*a + t*b; }
@@ -241,12 +243,8 @@ v3  v3_cross(v3 a, v3 b)        { return v3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z
 v3  v3_lerp(v3 a, f32 t, v3 b)  { return v3(Lerp(a.x, t, b.x), Lerp(a.y, t, b.y), Lerp(a.z, t, b.z));}
 
 v3 v3_pos_of_mat4(mat4 mat) {
-  v3 vec = {
-    mat[9],
-    mat[10],
-    mat[11],
-  };
-  return vec;
+  v3 pos = v3_of_v4(mat.w);
+  return pos;
 };
 v3 v3_rot_of_mat4(mat4 mat) {
   v3 vec = {
@@ -377,8 +375,8 @@ mat4 mat4_scale(v3 scale) {
 }
 
 mat4 mat4_rotate_x(f32 angle_radians) {
-  f32 cos = Cos(angle_radians);
-  f32 sin = Sin(angle_radians);
+  f32 sin, cos;
+  SinCos(angle_radians, &sin, &cos);
   mat4 mat = {
     1,   0,    0,   0,
     0, cos,  sin,   0,
@@ -389,8 +387,8 @@ mat4 mat4_rotate_x(f32 angle_radians) {
 }
 
 mat4 mat4_rotate_y(f32 angle_radians) {
-  f32 cos = Cos(angle_radians);
-  f32 sin = Sin(angle_radians);
+  f32 sin, cos;
+  SinCos(angle_radians, &sin, &cos);
   mat4 mat = {
     cos, 0,  -sin, 0,
     0,   1,   0,   0,
@@ -401,8 +399,8 @@ mat4 mat4_rotate_y(f32 angle_radians) {
 }
 
 mat4 mat4_rotate_z(f32 angle_radians) {
-  f32 cos = Cos(angle_radians);
-  f32 sin = Sin(angle_radians);
+  f32 sin, cos;
+  SinCos(angle_radians, &sin, &cos);
   mat4 mat = {
     cos, sin, 0,   0,
    -sin, cos, 0,   0,
@@ -413,7 +411,7 @@ mat4 mat4_rotate_z(f32 angle_radians) {
 }
 
 mat4 operator*(mat4 a, mat4 b) {
-  mat4 c = {};
+  mat4 c;
   Loop (row, 4) {
     Loop (col, 4) {
       c[row*4 + col] = b[row*4 + 0] * a[0*4 + col] +
@@ -449,7 +447,7 @@ mat4 mat4_transform(v3 pos, v3 rot, v3 scale) {
   return result;
 }
 mat4 mat4_transform(Transform trans) {
-  mat4 result = mat4_translate(trans.pos) * mat4_rotate_xyz(trans.rot) * mat4_scale(trans.scale);
+  mat4 result = mat4_transform(trans.pos, trans.rot, trans.scale);
   return result;
 }
 
@@ -466,12 +464,11 @@ mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 f
 mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 Near, f32 Far) {
   f32 fov = Tan(fov_radians/2.0f);
   mat4 result = {
-    1/(fov*aspect_ratio),                   0,                       0,                    0,
-    0,                                      1/fov,                   0,                    0,
-    0,                                      0,                       Far/(Far-Near),       1,
-    0,                                      0,                       -Far*Near/(Far-Near), 0
+    1/(fov*aspect_ratio), 0,                       0,                    0,
+    0,                    1/fov,                   0,                    0,
+    0,                    0,                       Far/(Far-Near),       1,
+    0,                    0,                       -Far*Near/(Far-Near), 0
   };
-
   // NOTE: This flips z value
   // mat4 result = {
   //   1/(fov*aspect_ratio), 0,                0,                             0,
@@ -479,7 +476,6 @@ mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 Near, f32 Far) {
   //   0,                    0,                -(Far + Near)/(Far - Near),   -1,
   //   0,                    0,                (-2.0f*Far*Near)/(Far - Near), 0
   // };
-
   return result;
 }
 
@@ -514,66 +510,73 @@ mat4 mat4_transpose(mat4 matrix) {
   out_matrix.e[13] = matrix.e[7];
   out_matrix.e[14] = matrix.e[11];
   out_matrix.e[15] = matrix.e[15];
+  mat4 result = {
+    matrix[0],
+  };
   return out_matrix;
 }
 
 mat4 mat4_inverse(mat4 matrix) {
-  const f32* m = matrix.e;
-
-  f32 t0 = m[10] * m[15];
-  f32 t1 = m[14] * m[11];
-  f32 t2 = m[6] * m[15];
-  f32 t3 = m[14] * m[7];
-  f32 t4 = m[6] * m[11];
-  f32 t5 = m[10] * m[7];
-  f32 t6 = m[2] * m[15];
-  f32 t7 = m[14] * m[3];
-  f32 t8 = m[2] * m[11];
-  f32 t9 = m[10] * m[3];
-  f32 t10 = m[2] * m[7];
-  f32 t11 = m[6] * m[3];
-  f32 t12 = m[8] * m[13];
-  f32 t13 = m[12] * m[9];
-  f32 t14 = m[4] * m[13];
-  f32 t15 = m[12] * m[5];
-  f32 t16 = m[4] * m[9];
-  f32 t17 = m[8] * m[5];
-  f32 t18 = m[0] * m[13];
-  f32 t19 = m[12] * m[1];
-  f32 t20 = m[0] * m[9];
-  f32 t21 = m[8] * m[1];
-  f32 t22 = m[0] * m[5];
-  f32 t23 = m[4] * m[1];
-
-  mat4 out_matrix;
-  f32* o = out_matrix.e;
-
-  o[0] = (t0 * m[5] + t3 * m[9] + t4 * m[13]) - (t1 * m[5] + t2 * m[9] + t5 * m[13]);
-  o[1] = (t1 * m[1] + t6 * m[9] + t9 * m[13]) - (t0 * m[1] + t7 * m[9] + t8 * m[13]);
-  o[2] = (t2 * m[1] + t7 * m[5] + t10 * m[13]) - (t3 * m[1] + t6 * m[5] + t11 * m[13]);
-  o[3] = (t5 * m[1] + t8 * m[5] + t11 * m[9]) - (t4 * m[1] + t9 * m[5] + t10 * m[9]);
-
-  f32 d = 1.0f / (m[0] * o[0] + m[4] * o[1] + m[8] * o[2] + m[12] * o[3]);
-
-  o[0] = d * o[0];
-  o[1] = d * o[1];
-  o[2] = d * o[2];
-  o[3] = d * o[3];
-  o[4] = d * ((t1 * m[4] + t2 * m[8] + t5 * m[12]) - (t0 * m[4] + t3 * m[8] + t4 * m[12]));
-  o[5] = d * ((t0 * m[0] + t7 * m[8] + t8 * m[12]) - (t1 * m[0] + t6 * m[8] + t9 * m[12]));
-  o[6] = d * ((t3 * m[0] + t6 * m[4] + t11 * m[12]) - (t2 * m[0] + t7 * m[4] + t10 * m[12]));
-  o[7] = d * ((t4 * m[0] + t9 * m[4] + t10 * m[8]) - (t5 * m[0] + t8 * m[4] + t11 * m[8]));
-  o[8] = d * ((t12 * m[7] + t15 * m[11] + t16 * m[15]) - (t13 * m[7] + t14 * m[11] + t17 * m[15]));
-  o[9] = d * ((t13 * m[3] + t18 * m[11] + t21 * m[15]) - (t12 * m[3] + t19 * m[11] + t20 * m[15]));
-  o[10] = d * ((t14 * m[3] + t19 * m[7] + t22 * m[15]) - (t15 * m[3] + t18 * m[7] + t23 * m[15]));
-  o[11] = d * ((t17 * m[3] + t20 * m[7] + t23 * m[11]) - (t16 * m[3] + t21 * m[7] + t22 * m[11]));
-  o[12] = d * ((t14 * m[10] + t17 * m[14] + t13 * m[6]) - (t16 * m[14] + t12 * m[6] + t15 * m[10]));
-  o[13] = d * ((t20 * m[14] + t12 * m[2] + t19 * m[10]) - (t18 * m[10] + t21 * m[14] + t13 * m[2]));
-  o[14] = d * ((t18 * m[6] + t23 * m[14] + t15 * m[2]) - (t22 * m[14] + t14 * m[2] + t19 * m[6]));
-  o[15] = d * ((t22 * m[10] + t16 * m[2] + t21 * m[6]) - (t20 * m[6] + t23 * m[10] + t17 * m[2]));
-
-  return out_matrix;
+  
+  return {};
 }
+// mat4 mat4_inverse(mat4 matrix) {
+//   const f32* m = matrix.e;
+
+//   f32 t0 = m[10] * m[15];
+//   f32 t1 = m[14] * m[11];
+//   f32 t2 = m[6] * m[15];
+//   f32 t3 = m[14] * m[7];
+//   f32 t4 = m[6] * m[11];
+//   f32 t5 = m[10] * m[7];
+//   f32 t6 = m[2] * m[15];
+//   f32 t7 = m[14] * m[3];
+//   f32 t8 = m[2] * m[11];
+//   f32 t9 = m[10] * m[3];
+//   f32 t10 = m[2] * m[7];
+//   f32 t11 = m[6] * m[3];
+//   f32 t12 = m[8] * m[13];
+//   f32 t13 = m[12] * m[9];
+//   f32 t14 = m[4] * m[13];
+//   f32 t15 = m[12] * m[5];
+//   f32 t16 = m[4] * m[9];
+//   f32 t17 = m[8] * m[5];
+//   f32 t18 = m[0] * m[13];
+//   f32 t19 = m[12] * m[1];
+//   f32 t20 = m[0] * m[9];
+//   f32 t21 = m[8] * m[1];
+//   f32 t22 = m[0] * m[5];
+//   f32 t23 = m[4] * m[1];
+
+//   mat4 out_matrix;
+//   f32* o = out_matrix.e;
+
+//   o[0] = (t0 * m[5] + t3 * m[9] + t4 * m[13]) - (t1 * m[5] + t2 * m[9] + t5 * m[13]);
+//   o[1] = (t1 * m[1] + t6 * m[9] + t9 * m[13]) - (t0 * m[1] + t7 * m[9] + t8 * m[13]);
+//   o[2] = (t2 * m[1] + t7 * m[5] + t10 * m[13]) - (t3 * m[1] + t6 * m[5] + t11 * m[13]);
+//   o[3] = (t5 * m[1] + t8 * m[5] + t11 * m[9]) - (t4 * m[1] + t9 * m[5] + t10 * m[9]);
+
+//   f32 d = 1.0f / (m[0] * o[0] + m[4] * o[1] + m[8] * o[2] + m[12] * o[3]);
+
+//   o[0] = d * o[0];
+//   o[1] = d * o[1];
+//   o[2] = d * o[2];
+//   o[3] = d * o[3];
+//   o[4] = d * ((t1 * m[4] + t2 * m[8] + t5 * m[12]) - (t0 * m[4] + t3 * m[8] + t4 * m[12]));
+//   o[5] = d * ((t0 * m[0] + t7 * m[8] + t8 * m[12]) - (t1 * m[0] + t6 * m[8] + t9 * m[12]));
+//   o[6] = d * ((t3 * m[0] + t6 * m[4] + t11 * m[12]) - (t2 * m[0] + t7 * m[4] + t10 * m[12]));
+//   o[7] = d * ((t4 * m[0] + t9 * m[4] + t10 * m[8]) - (t5 * m[0] + t8 * m[4] + t11 * m[8]));
+//   o[8] = d * ((t12 * m[7] + t15 * m[11] + t16 * m[15]) - (t13 * m[7] + t14 * m[11] + t17 * m[15]));
+//   o[9] = d * ((t13 * m[3] + t18 * m[11] + t21 * m[15]) - (t12 * m[3] + t19 * m[11] + t20 * m[15]));
+//   o[10] = d * ((t14 * m[3] + t19 * m[7] + t22 * m[15]) - (t15 * m[3] + t18 * m[7] + t23 * m[15]));
+//   o[11] = d * ((t17 * m[3] + t20 * m[7] + t23 * m[11]) - (t16 * m[3] + t21 * m[7] + t22 * m[11]));
+//   o[12] = d * ((t14 * m[10] + t17 * m[14] + t13 * m[6]) - (t16 * m[14] + t12 * m[6] + t15 * m[10]));
+//   o[13] = d * ((t20 * m[14] + t12 * m[2] + t19 * m[10]) - (t18 * m[10] + t21 * m[14] + t13 * m[2]));
+//   o[14] = d * ((t18 * m[6] + t23 * m[14] + t15 * m[2]) - (t22 * m[14] + t14 * m[2] + t19 * m[6]));
+//   o[15] = d * ((t22 * m[10] + t16 * m[2] + t21 * m[6]) - (t20 * m[6] + t23 * m[10] + t17 * m[2]));
+
+//   return out_matrix;
+// }
 
 v3 mat4_forward(mat4 matrix) {
   v3 forward = {
@@ -755,8 +758,8 @@ mat4 quat_to_rotation_matrix(quat q, v3 center) {
 
 quat quat_from_axis_angle(v3 axis, f32 angle, b32 normalize) {
   const f32 half_angle = 0.5f * angle;
-  f32 s = Sin(half_angle);
-  f32 c = Cos(half_angle);
+  f32 s, c;
+  SinCos(half_angle, &s, &c);
 
   quat q = quat{s * axis.x, s * axis.y, s * axis.z, c};
   if (normalize) {

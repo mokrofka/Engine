@@ -18,33 +18,26 @@ struct WaylandState {
   wl_surface* surface;
   wl_seat* seat;
   wl_seat_listener seat_listener;
-
+  wl_pointer* pointer;
+  wl_pointer_listener pointer_listener;
+  wl_keyboard* keyboard;
+  wl_keyboard_listener keyboard_listener;
   xdg_wm_base* xdg_wm_base;
   xdg_wm_base_listener xdg_wm_base_listener;
   xdg_surface* xdg_surface;
   xdg_surface_listener xdg_surface_listener;
   xdg_toplevel* xdg_toplevel;
   xdg_toplevel_listener xdg_toplevel_listener;
-
-  // Input
-  wl_pointer* pointer;
-  wl_pointer_listener pointer_listener;
-  wl_keyboard* keyboard;
-  wl_keyboard_listener keyboard_listener;
   
   i32 width = 1;
   i32 height = 1;
   b8 should_close = false;
-  b8 is_showned = false;
-  
-  ////////////////////////////////////////////////////////////////////////
-  // Input
   struct KeyboardState {
     b8 keys[256];
   };
   struct MouseState {
-    u16 x;
-    u16 y;
+    f32 x;
+    f32 y;
     b8 buttons[MouseButton_COUNT];
   };
   struct {
@@ -284,13 +277,17 @@ void os_gfx_shutdown() {
 }
 
 void os_pump_messages() { 
-  wl_display_dispatch_pending(wl_st.display); 
+  wl_display_dispatch_pending(wl_st.display);
 }
 
-b32 os_window_should_close()       { return wl_st.should_close; }
+b32 os_window_should_close() {
+  return wl_st.should_close;
+}
 
-v2i  os_get_window_size()          { return v2i(wl_st.width, wl_st.height); }
-v2i  os_get_mouse_pos()            { return v2i(wl_st.input.mouse_current.x, wl_st.input.mouse_current.y); }
+v2i os_get_window_size() {
+  return v2i(wl_st.width, wl_st.height);
+}
+
 void os_get_gfx_api_handlers(void* out) {
   struct Surface {
     struct wl_display* wl_display;
@@ -327,5 +324,8 @@ b32 os_was_button_up(MouseButtons button)           { return wl_st.input.mouse_p
 b32 os_is_button_pressed(MouseButtons button)       { return os_is_button_down(button) && os_was_button_up(button); }
 b32 os_is_button_released(MouseButtons button)      { return os_is_button_up(button) && os_was_button_down(button); }
 
+v2 os_get_mouse_pos() {
+  return v2(wl_st.input.mouse_current.x, wl_st.input.mouse_current.y);
+}
 
 #endif

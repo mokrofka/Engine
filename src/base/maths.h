@@ -92,6 +92,12 @@ union mat3 {
 
 union mat4 {
   f32 e[16];
+  struct {
+    v4 x;
+    v4 y;
+    v4 z;
+    v4 w;
+  };
   f32& operator[](u32 a);
 };
 
@@ -137,6 +143,8 @@ KAPI NO_DEBUG f32 Exp(f32 a);
 KAPI NO_DEBUG f32 LogE(f32 a);
 KAPI NO_DEBUG f32 Log2(f32 a);
 KAPI NO_DEBUG f32 Log10(f32 a);
+
+KAPI NO_DEBUG void SinCos(f32 angle, f32* a, f32* b);
 
 KAPI NO_DEBUG f32 SinD(f32 a);
 KAPI NO_DEBUG f32 CosD(f32 a);

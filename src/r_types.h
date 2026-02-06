@@ -28,11 +28,11 @@ struct PointLight {
   f32 intensity;
   f32 rad;
 };
-struct alignas(16) ShaderPointLight {
+struct ShaderPointLight {
   alignas(16) v3 color;
   alignas(16) v3 pos;
-  alignas(4) f32 intensity;
-  alignas(4) f32 rad;
+  f32 intensity;
+  f32 rad;
 };
 
 struct DirLight {
@@ -43,7 +43,7 @@ struct DirLight {
 struct ShaderDirLight {
   alignas(16) v3 color;
   alignas(16) v3 direction;
-  alignas(4) f32 intensity;
+  f32 intensity;
 };
 
 struct SpotLight {
@@ -58,9 +58,9 @@ struct ShaderSpotLight {
   alignas(16) v3 color;
   alignas(16) v3 pos;
   alignas(16) v3 dir;
-  alignas(4) f32 intensity;
-  alignas(4) f32 inner_cutoff;
-  alignas(4) f32 outer_cutoff;
+  f32 intensity;
+  f32 inner_cutoff;
+  f32 outer_cutoff;
 };
 
 struct ShaderGlobalState {
@@ -68,10 +68,10 @@ struct ShaderGlobalState {
   alignas(16) mat4 projection;
   alignas(16) mat4 view;
   alignas(16) v4 ambient_color;
-  alignas(4) f32 time;
-  alignas(4) u32 point_light_count;
-  alignas(4) u32 dir_light_count;
-  alignas(4) u32 spot_light_count;
+  f32 time;
+  u32 point_light_count;
+  u32 dir_light_count;
+  u32 spot_light_count;
 };
 
 struct Material {
@@ -85,8 +85,8 @@ struct ShaderMaterial {
   alignas(16) v3 ambient;
   alignas(16) v3 diffuse;
   alignas(16) v3 specular;
-  alignas(4) f32 shininess;
-  alignas(4) u32 texture;
+  f32 shininess;
+  u32 texture;
 };
 
 struct Texture {
@@ -165,3 +165,4 @@ inline ShaderInfo shader_type[] = {
   // Compute
   [ShaderType_Compute] = {},
 };
+

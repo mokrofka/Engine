@@ -2256,7 +2256,7 @@ void vk_init() {
       vk.cmds[i] = vk_cmd_alloc(vk.device.cmd_pool);
       // vk.compute_cmds[i] = vk_cmd_alloc(vk.device.cmd_pool);
     }
-    Debug("Command buffers created");
+    Info("Command buffers created");
   }
 
   // Sync

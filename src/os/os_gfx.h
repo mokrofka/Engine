@@ -148,4 +148,4 @@ KAPI b32 os_was_button_up(MouseButtons button);
 KAPI b32 os_is_button_pressed(MouseButtons button);
 KAPI b32 os_is_button_released(MouseButtons button);
 
-KAPI v2i  os_get_mouse_pos();
+KAPI v2  os_get_mouse_pos();

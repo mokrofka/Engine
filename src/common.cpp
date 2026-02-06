@@ -1,5 +1,4 @@
 #include "common.h"
-
 #include "stb_image.h"
 
 Extern f32 g_dt;
@@ -1025,3 +1024,62 @@ b32 timer_tick(Timer& t) {
   }
   return false;
 }
+
+////////////////////////////////////////////////////////////////////////
+// Assets
+
+///////////////////////////////////
+// Shaders
+
+Extern ShaderDefinition shaders_info[Shader_COUNT] = {
+  [Shader_Color] = "color_shader", ShaderType_Drawing,
+};
+Extern u32 shaders[Shader_COUNT];
+
+
+///////////////////////////////////
+// Meshes
+
+String meshes_path[Mesh_COUNT] = {
+  // [Mesh_Cube-1] = "cube.obj",
+  [Mesh_GltfCube] = "cube.gltf",
+  [Mesh_GlbCube] = "cube.glb",
+  // [Mesh_GltfHelmet-1] = "helmet.gltf",
+  // [Mesh_GlbHelmet] = "helmet.glb",
+  // [Mesh_GlbMonkey-1] = "monkey.glb",
+  // [Mesh_Room] = "room.obj",
+};
+u32 meshes[Mesh_COUNT];
+
+///////////////////////////////////
+// Textures
+
+Extern String textures_path[Texture_COUNT] = {
+  [Texture_OrangeLines] = "orange_lines_512.png",
+  [Texture_Container] = "container.jpg",
+  // [Texture_Room-1] = "image.png",
+};
+Extern u32 textures[Texture_COUNT];
+
+///////////////////////////////////
+// Materials
+
+Extern Material materials_info[Material_COUNT] = {
+  [Material_RedOrange] = {
+    .ambient = v3(1,0,0),
+    .diffuse = v3(1),
+    .specular = v3(1),
+    .shininess = 1,
+    .texture = Texture_OrangeLines,
+  },
+  [Material_GreenContainer] = {
+    .ambient = v3(0,1,0),
+    .diffuse = v3(1),
+    .specular = v3(1),
+    .shininess = 1,
+    .texture = Texture_Container,
+  },
+};
+Extern MaterialId materials[Material_COUNT];
+
+

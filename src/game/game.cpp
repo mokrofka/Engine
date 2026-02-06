@@ -245,7 +245,6 @@ void camera_update() {
 // Init
 
 void new_init() {
-  Info("new init");
 }
 
 void game_init() {
@@ -257,8 +256,8 @@ void game_init() {
     .fov = 45,
   };
   cam.view = mat4_look_at(cam.pos, cam.dir, v3_up());
-  Entity& cube = entity_create(meshes[Mesh_GlbCube], shaders[Shader_Color], textures[Texture_OrangeLines]);
-  Entity& cube1 = entity_create(meshes[Mesh_GltfCube], shaders[Shader_Color], textures[Texture_Container]);
+  Entity& cube = entity_create(meshes[Mesh_GlbCube], shaders[Shader_Color], materials[Material_RedOrange]);
+  Entity& cube1 = entity_create(meshes[Mesh_GltfCube], shaders[Shader_Color], materials[Material_GreenContainer]);
   cube1.pos() = {-4,0,1};
   {
     Mesh triangle = {
@@ -266,7 +265,7 @@ void game_init() {
       .vert_count = ArrayCount(triangle_vertices),
     };
     u32 mesh = vk_mesh_load(triangle);
-    Entity& e = entity_create(mesh, shaders[Shader_Color], textures[Texture_OrangeLines]);
+    Entity& e = entity_create(mesh, shaders[Shader_Color], materials[Material_RedOrange]);
     e.pos() = 3;
   }
 }
@@ -299,23 +298,37 @@ void app_init(u8** state) {
   }
   Loop (i, Material_COUNT) {
     materials_info[i].texture = textures[materials_info[i].texture];
-    materials[i] = vk_material_load(materials_info[i]);
+    materials[i] = (MaterialId)vk_material_load(materials_info[i]);
   }
   shader_load("cubemap_shader", ShaderType_Cubemap);
   cubemap_load("night_cubemap");
   game_init();
-  st->timer = timer_init(3);
+  st->timer = timer_init(1);
   u64 end = os_now_ns();
-  // Info("app init took: %f64 sec", f64(end - start) / Billion(1));
+  Info("app init took: %f64 sec", f64(end - start) / Billion(1));
+}
+
+void select_obj() {
+  v2 mouse_pos = os_get_mouse_pos();
+  v2i win_size = os_get_window_size();
+  v2 normalized_coords =  v2(2*mouse_pos.x / win_size.x - 1, -2*mouse_pos.y / win_size.y - 1);
+  v4 clip_coords = v4(normalized_coords.x, normalized_coords.y, -1, 1);
+  
+  if (timer_tick(st->timer)) {
+    // Info("%f, %f", x, y);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////
 // Update
 
-b32 foo(u32 code, void* sender, void* listener_inst, EventContext data) {
-  Entity& e = entity_create(0, 0, 0);
-  e.pos() = v3_rand_range(-10, 10);
-  return false;
+f32 fast_sin(f32 x) {
+  x = Mod(x, Tau);
+  if (x < 0) {
+    x = -x;
+  }
+  float x2 = x * x;
+  return x * (1.0f - x2 * (1.0f / 6.0f - x2 / 120.0f));
 }
 
 shared_function void app_update(u8** state) {
@@ -330,19 +343,30 @@ shared_function void app_update(u8** state) {
   }
   if (os_is_key_pressed(Key_N)) {
     new_init();
-    event_register(EventCode_ApplicationQuit, (void*)0, foo);
-    // event_register(EventCode_ApplicationQuit, (void*)0, foo1);
   }
   if (os_is_key_down(Key_Escape)) {
     os_close_window();
   }
+  st->timer.interval = 0.1;
   if (timer_tick(st->timer)) {
-    event_fire(EventCode_ApplicationQuit, (void*)0, {});
+    f32 sin = Sin(g_time);
+    f32 f_sin = fast_sin(g_time);
+    // f32 basic_sin = sin_basic_approximation(g_time);
+    // Info("sin = %f", sin);
+    // Info("fast sin: %f, relative error: %f", f_sin, (sin - f_sin)/sin);
+    // Info("basic approx sin: %f, relative error: %f", basic_sin, (sin - basic_sin)/sin);
+    // v2 mouse_pos = os_get_mouse_pos();
+    // Info("%f %f", mouse_pos.x, mouse_pos.y);
+    // v2i win_size = os_get_window_size();
+    // Info("%i %i", win_size.x, win_size.y);
   }
 
   Entity& e = st->entities[0];
   e.pos().x = Sin(g_time);
-
+  // e.scale() = Sin(g_time);
+  e.rot() = Sin(g_time);
+  select_obj();
   camera_update();
   gpu_data_update();
+
 }
