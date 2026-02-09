@@ -25,8 +25,8 @@ struct X11State {
     b8 keys[256];
   };
   struct MouseState {
-    u16 x;
-    u16 y;
+    f32 x;
+    f32 y;
     b8 buttons[MouseButton_COUNT];
   };
   struct {
@@ -253,7 +253,7 @@ void os_pump_messages() {
 
 b32 os_window_should_close() { return gfx_st.should_close; }
 v2i os_get_window_size() { return v2i(gfx_st.width, gfx_st.height); }
-v2i os_get_mouse_pos() { return v2i(gfx_st.input.mouse_current.x, gfx_st.input.mouse_current.y); }
+v2 os_get_mouse_pos() { return v2(gfx_st.input.mouse_current.x, gfx_st.input.mouse_current.y); }
 
 void os_get_gfx_api_handlers(void* out) {
   struct Surface {

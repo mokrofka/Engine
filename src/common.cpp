@@ -1033,6 +1033,8 @@ b32 timer_tick(Timer& t) {
 
 Extern ShaderDefinition shaders_info[Shader_COUNT] = {
   [Shader_Color] = "color_shader", ShaderType_Drawing,
+  [Shader_Grid] = "grid_shader", ShaderType_DrawingTransparentLine,
+  [Shader_Axis] = "axis_shader", ShaderType_DrawingTransparentLine,
 };
 Extern u32 shaders[Shader_COUNT];
 
@@ -1067,15 +1069,15 @@ Extern u32 textures[Texture_COUNT];
 Extern Material materials_info[Material_COUNT] = {
   [Material_RedOrange] = {
     .ambient = v3(1,0,0),
-    .diffuse = v3(1),
-    .specular = v3(1),
+    .diffuse = v3_scale(1),
+    .specular = v3_scale(1),
     .shininess = 1,
     .texture = Texture_OrangeLines,
   },
   [Material_GreenContainer] = {
     .ambient = v3(0,1,0),
-    .diffuse = v3(1),
-    .specular = v3(1),
+    .diffuse = v3_scale(1),
+    .specular = v3_scale(1),
     .shininess = 1,
     .texture = Texture_Container,
   },

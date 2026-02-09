@@ -165,8 +165,10 @@ struct ShaderDefinition {
   ShaderType type;
 };
 
-enum ShaderThing {
+enum ShaderId {
   Shader_Color,
+  Shader_Grid,
+  Shader_Axis,
   Shader_COUNT,
 };
 extern ShaderDefinition shaders_info[Shader_COUNT];
@@ -175,7 +177,7 @@ extern u32 shaders[Shader_COUNT];
 ///////////////////////////////////
 // Meshes
 
-enum {
+enum MeshId{
   Mesh_GltfCube,
   Mesh_GlbCube,
   Mesh_COUNT,

@@ -6,8 +6,15 @@
 void main() {
   Material material = st.materials[push.material];
 
-  v4 texture_color = texture(sampler2D(textures[material.texture], samplers[0]), in_uv);
-  out_color = texture_color;
+  // if (material.texture == 0) {
+  //   v4 texture_color = v4(material.ambient, 1);
+  //   out_color = texture_color;
+  // }
+  // else {
+    v4 texture_color = texture(sampler2D(textures[material.texture], samplers[0]), in_uv);
+    out_color = texture_color;
+  // }
+  
   // out_color = v4(material.ambient, 1);
 } 
 

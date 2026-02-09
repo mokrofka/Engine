@@ -82,8 +82,20 @@ Vertex triangle_vertices[] = {
 //   {v3( 0.5,  -0.5, 0), v3(), v2(1.0, 0)},
 // };
 
+struct AABB {
+  v3 min;
+  v3 max;
+};
+
+struct Ray {
+  v3 origin;
+  v3 dir;
+};
+
 struct Entity {
   u32 id;
+  v3 dir;
+  AABB aabb;
   Transform& trans() { return entities_transforms[id]; }
   v3& pos() { return entities_transforms[id].pos; }
   v3& rot() { return entities_transforms[id].rot; }
@@ -108,6 +120,8 @@ struct GameState {
   Darray<Entity> entities;
   Camera cam;
   Timer timer;
+  Entity* cube_attached_to_cam;
+  Entity* axis_attached_to_cam;
 };
 
 global GameState* st;
@@ -125,40 +139,30 @@ void gpu_data_update() {
   shader_st.ambient_color = v4(1,2,3,4);
 }
 
-void* grid_create(Allocator arena, i32 grid_size, f32 grid_step) {
-  v3* grid = push_array(arena, v3, grid_size*4);
-
-  i32 i = 0;
-  f32 half = (grid_size / 2.0f) * grid_step;
-  // horizontal from left to right
-  {
-    f32 z = 0;
-    f32 x = grid_size * grid_step;
-    Loop (j, grid_size) {
-      grid[i++] = v3(0 - half, 0, z + half);
-      grid[i++] = v3(x - half, 0, z + half);
-      z -= grid_step;
-    }
+Vertex* grid_create(Allocator arena, u32 size, f32 step) {
+  Vertex* vertices = push_array(arena, Vertex, size*4);
+  v3 pos_offset = v3(-(i32)size/2, 0, -(i32)size/2);
+  for (i32 i = 0; i < size; ++i) {
+    vertices[i*2].pos = pos_offset + v3(0, 0, i*step);
+    vertices[i*2+1].pos = pos_offset + v3(size*step, 0, i*step);
   }
-
-  // vertical from top to down
-  {
-    f32 z = -grid_size * grid_step;
-    f32 x = 0;
-    Loop (j, grid_size) {
-      grid[i++] = v3(x - half, 0, 0 + half);
-      grid[i++] = v3(x - half, 0, z + half);
-      x += grid_step;
-    }
+  Vertex* vertical_vertices = vertices + size*2;
+  for (i32 i = 0; i < size; ++i) {
+    vertical_vertices[i*2].pos = pos_offset + v3(i*step, 0, 0);
+    vertical_vertices[i*2+1].pos = pos_offset + v3(i*step, 0, size*step);
   }
-  return grid;
+  return vertices;
 }
 
 Entity& entity_create(u32 mesh, u32 shader, u32 material) {
   Entity e = {
     .id = id_pool_alloc(st->id_pool) + 1,
+    .aabb = {
+      v3_scale(-1),
+      v3_scale(1),
+    }
   };
-  e.pos() = v3_zero();
+  e.trans() = {};
   e.scale() = v3_one();
   vk_make_renderable(e.id, mesh, shader, material);
   return st->entities.add(e);
@@ -172,7 +176,7 @@ void camera_update() {
   v2 win_size = v2_of_v2i(os_get_window_size());
   cam.projection = mat4_perspective(degtorad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
 
-  // Camera Rotation
+  // Camera rotation
   {
     f32 rotation_speed = 180.0f;
     var camera_yaw = [&](f32 amount) {
@@ -230,7 +234,7 @@ void camera_update() {
     }
   }
   
-  // Camera Update
+  // Camera update
   cam.pitch = Clamp(-89.0f, cam.pitch, 89.0f);
   cam.dir = {
     CosD(cam.yaw) * CosD(cam.pitch),
@@ -248,6 +252,7 @@ void new_init() {
 }
 
 void game_init() {
+  Scratch scratch;
   Camera& cam = st->cam;
   cam = {
     .pos = v3(0,0,-5),
@@ -257,8 +262,12 @@ void game_init() {
   };
   cam.view = mat4_look_at(cam.pos, cam.dir, v3_up());
   Entity& cube = entity_create(meshes[Mesh_GlbCube], shaders[Shader_Color], materials[Material_RedOrange]);
+  cube.pos().x = 0;
   Entity& cube1 = entity_create(meshes[Mesh_GltfCube], shaders[Shader_Color], materials[Material_GreenContainer]);
-  cube1.pos() = {-4,0,1};
+  cube1.pos() = {-0,0,0};
+  Entity& cube_attached_to_cam = entity_create(meshes[Mesh_GltfCube], shaders[Shader_Color], materials[Material_GreenContainer]);
+  cube1.pos() = {-0,0,0};
+  st->cube_attached_to_cam = &cube_attached_to_cam;
   {
     Mesh triangle = {
       .vertices = triangle_vertices,
@@ -266,7 +275,35 @@ void game_init() {
     };
     u32 mesh = vk_mesh_load(triangle);
     Entity& e = entity_create(mesh, shaders[Shader_Color], materials[Material_RedOrange]);
-    e.pos() = 3;
+    e.pos() = v3_scale(3);
+  }
+  {
+    u32 grid_size = 100;
+    u32 vert_count = grid_size*2 * 2;
+    Mesh grid_mesh = {
+      .vertices = grid_create(scratch, grid_size, 1),
+      .vert_count = vert_count,
+    };
+    u32 mesh = vk_mesh_load(grid_mesh);
+    Entity& grid = entity_create(mesh, Shader_Grid, 0);
+    grid.pos() = v3(0,0,-5);
+  }
+  {
+    Vertex vertices[6] = {
+      {.pos = v3_zero(), .color = v3(1,0,0)},
+      {.pos = v3(1,0,0), .color = v3(1,0,0)},
+      {.pos = v3_zero(), .color = v3(0,1,0)},
+      {.pos = v3(0,1,0), .color = v3(0,1,0)},
+      {.pos = v3_zero(), .color = v3(0,0,1)},
+      {.pos = v3(0,0,1), .color = v3(0,0,1)},
+    };
+    Mesh axis_mesh = {
+      .vertices = vertices,
+      .vert_count = ArrayCount(vertices),
+    };
+    u32 mesh = vk_mesh_load(axis_mesh);
+    Entity& axis_aattached_to_cam = entity_create(mesh, shaders[Shader_Axis], 0);
+    st->axis_attached_to_cam = &axis_aattached_to_cam;
   }
 }
 
@@ -308,28 +345,47 @@ void app_init(u8** state) {
   Info("app init took: %f64 sec", f64(end - start) / Billion(1));
 }
 
+// b32 ray_intersect_AABB(Ray ray, AABB aabb) {
+//   v3 tMin = v3_hadamard_div(aabb.min - ray.origin, ray.dir);
+//   v3 tMax = v3_hadamard_div(aabb.max - ray.origin, ray.dir);
+//   v3 t1 = v3_less(tMin, tMax);
+//   v3 t2 = v3_greater(tMin, tMax);
+//   f32 tNear = Max3(t1.x, t1.y, t1.z);
+//   f32 tFar = Min3(t2.x, t2.y, t2.z);
+//   if (tNear > tFar) {
+//     return false;
+//   }
+//   return true;
+// };
+
 void select_obj() {
   v2 mouse_pos = os_get_mouse_pos();
   v2i win_size = os_get_window_size();
-  v2 normalized_coords =  v2(2*mouse_pos.x / win_size.x - 1, -2*mouse_pos.y / win_size.y - 1);
-  v4 clip_coords = v4(normalized_coords.x, normalized_coords.y, -1, 1);
-  
-  if (timer_tick(st->timer)) {
-    // Info("%f, %f", x, y);
+  v2 norm_coords = v2(2 * (mouse_pos.x/win_size.x) - 1, 2 * -(mouse_pos.y/win_size.y) + 1);
+  v4 clip_coords = v4(norm_coords.x, norm_coords.y, 1, 1);
+  v4 eye_coord = mat4_inverse(st->cam.projection) * clip_coords;
+  v3 world_coord = v3_of_v4(mat4_inverse(st->cam.view) * eye_coord);
+  world_coord = v3_norm(world_coord);
+  world_coord.z = -world_coord.z;
+  Ray ray = {
+    .origin = st->cam.pos,
+    .dir = world_coord,
+  };
+
+  for (Entity& e : st->entities) {
+    // AABB aabb = e.aabb.max + e.pos();
+    // if (ray_intersect_AABB(ray, aabb)) {
+    //   Info("yes");
+    // }
   }
+  
+  // Entity& e = entity_create(meshes[Mesh_GlbCube], shaders[Shader_Color], materials[Material_RedOrange]);
+  // e.pos() = st->cam.pos;
+  // e.dir = world_coord;
 }
 
 ////////////////////////////////////////////////////////////////////////
 // Update
-
-f32 fast_sin(f32 x) {
-  x = Mod(x, Tau);
-  if (x < 0) {
-    x = -x;
-  }
-  float x2 = x * x;
-  return x * (1.0f - x2 * (1.0f / 6.0f - x2 / 120.0f));
-}
 
 shared_function void app_update(u8** state) {
   Scratch scratch;
@@ -337,6 +393,7 @@ shared_function void app_update(u8** state) {
     app_init(state);
   }
   Assign(st, *state);
+  camera_update();
   if (os_is_key_down(Key_T)) {
     game_deinit();
     game_init();
@@ -349,24 +406,37 @@ shared_function void app_update(u8** state) {
   }
   st->timer.interval = 0.1;
   if (timer_tick(st->timer)) {
-    f32 sin = Sin(g_time);
-    f32 f_sin = fast_sin(g_time);
-    // f32 basic_sin = sin_basic_approximation(g_time);
-    // Info("sin = %f", sin);
-    // Info("fast sin: %f, relative error: %f", f_sin, (sin - f_sin)/sin);
-    // Info("basic approx sin: %f, relative error: %f", basic_sin, (sin - basic_sin)/sin);
-    // v2 mouse_pos = os_get_mouse_pos();
-    // Info("%f %f", mouse_pos.x, mouse_pos.y);
-    // v2i win_size = os_get_window_size();
-    // Info("%i %i", win_size.x, win_size.y);
+  }
+  mat4 trans = mat4_translate(v3_scale(1));
+  Entity& e   = st->entities[0];
+  Entity& e1 = st->entities[1];
+
+  e.pos().x = e1.pos().x + Sin(g_time) * 4;
+  e.pos().z = e1.pos().z + Cos(g_time) * 4;
+  e.pos().y = e1.pos().z + Cos(g_time) * 4;
+
+  if (os_is_button_down(MouseButton_Left)) {
+    select_obj();
+  }
+  for (Entity& e : st->entities) {
+    e.pos() += e.dir * g_dt;
   }
 
-  Entity& e = st->entities[0];
-  e.pos().x = Sin(g_time);
-  // e.scale() = Sin(g_time);
-  e.rot() = Sin(g_time);
-  select_obj();
-  camera_update();
-  gpu_data_update();
+  {
+    v3 forward = mat4_forward(st->cam.view);
+    v3 right   = mat4_right(st->cam.view);
+    v3 up      = mat4_up(st->cam.view);
+    v2i win_size = os_get_window_size();
+    f32 dist = 1.0f;
+    f32 xoff = 0.3f;
+    f32 yoff = 0.3f;
+    Entity& axis = *st->axis_attached_to_cam;;
+    axis.pos() = st->cam.pos
+        + forward * dist
+        + right   * xoff
+        + up      * yoff;
+    axis.scale() = v3_scale(0.1);
+  }
 
+  gpu_data_update();
 }

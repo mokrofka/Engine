@@ -3,9 +3,9 @@ set(CMAKE_CXX_STANDARD 23)
 project(Engine)
 
 # options
-  set(hotreload false)
-  set(X11_use false)
-  set(sanitize_address false)
+  set(hotreload true)
+  set(X11_use true)
+  set(sanitize_address true)
   set(binary_dir "${CMAKE_SOURCE_DIR}/bin")
 
   message("hotreload: ${hotreload}")

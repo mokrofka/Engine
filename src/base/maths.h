@@ -23,7 +23,6 @@ union v2 {
   f32 e[2];
   v2() = default;
   v2(f32 x_, f32 y_);
-  v2(f32 scale);
 };
 
 union v2i {
@@ -34,7 +33,6 @@ union v2i {
   i32 e[2];
   v2i() = default;
   v2i(i32 x_, i32 y_);
-  v2i(i32 scale);
 };
 
 union v2u {
@@ -45,7 +43,6 @@ union v2u {
   u32 e[2];
   v2u() = default;
   v2u(u32 x_, u32 y_);
-  v2u(u32 scale);
 };
 
 union v3 {
@@ -57,7 +54,6 @@ union v3 {
   f32 e[3];
   v3() = default;
   v3(f32 x_, f32 y_, f32 z_);
-  v3(f32 scale);
 };
 
 union v3u {
@@ -69,7 +65,6 @@ union v3u {
   u32 e[3];
   v3u() = default;
   v3u(u32 x_, u32 y_, u32 z_);
-  v3u(u32 scale);
 };
 
 union v4 {
@@ -82,7 +77,6 @@ union v4 {
   f32 e[4];
   v4() = default;
   v4(f32 x_, f32 y_, f32 z_, f32 w_);
-  v4(f32 scale);
 };
 
 union mat3 {
@@ -91,14 +85,14 @@ union mat3 {
 };
 
 union mat4 {
-  f32 e[16];
+  // f32 e[16];
+  f32 e[4][4];
   struct {
     v4 x;
     v4 y;
     v4 z;
     v4 w;
   };
-  f32& operator[](u32 a);
 };
 
 typedef v4 quat;
@@ -192,6 +186,7 @@ KAPI NO_DEBUG void rand_seed();
 
 KAPI NO_DEBUG v2 v2_zero();
 KAPI NO_DEBUG v2 v2_one();
+KAPI NO_DEBUG v2 v2_scale(f32 a);
 KAPI NO_DEBUG v2 v2_up();
 KAPI NO_DEBUG v2 v2_down();
 KAPI NO_DEBUG v2 v2_left();
@@ -229,6 +224,7 @@ KAPI f32 v2_shortest_arc(v2 a, v2 b);
 
 KAPI NO_DEBUG v3 v3_zero();
 KAPI NO_DEBUG v3 v3_one();
+KAPI NO_DEBUG v3 v3_scale(f32 a);
 KAPI NO_DEBUG v3 v3_up();
 KAPI NO_DEBUG v3 v3_down();
 KAPI NO_DEBUG v3 v3_left();
@@ -257,14 +253,19 @@ KAPI NO_DEBUG f32 v3_distance(v3 a, v3 b);
 KAPI NO_DEBUG f32 v3_dot(v3 a, v3 b);
 KAPI NO_DEBUG v3  v3_cross(v3 a, v3 b);
 KAPI NO_DEBUG v3  v3_lerp(v3 a, f32 t, v3 b);
+KAPI NO_DEBUG v3  v3_hadamard_div(v3 a, v3 b);
+KAPI NO_DEBUG v3  v3_greater(v3 a, v3 b);
+KAPI NO_DEBUG v3  v3_less(v3 a, v3 b);
 KAPI NO_DEBUG v3 v3_pos_of_mat4(mat4 mat);
-KAPI NO_DEBUG v3 v3_rot_of_mat4(mat4 mat);
-KAPI NO_DEBUG v3 v3_scale_of_mat4(mat4 mat);
+// KAPI NO_DEBUG v3 v3_rot_of_mat4(mat4 mat);
+// KAPI NO_DEBUG v3 v3_scale_of_mat4(mat4 mat);
 KAPI NO_DEBUG v3 v3_rand_range(v3 a, v3 b);
 
 ////////////////////////////////////////////////////////////////////////
 // Vector4
 
+KAPI NO_DEBUG v4  v4_zero();
+KAPI NO_DEBUG v4  v4_one();
 KAPI NO_DEBUG v4  operator+(v4 a, v4 b);
 KAPI NO_DEBUG v4  operator-(v4 a, v4 b);
 KAPI NO_DEBUG v4  operator*(v4 a, f32 scalar);
@@ -278,6 +279,7 @@ KAPI NO_DEBUG v4  operator-(v4 a);
 KAPI NO_DEBUG f32 v4_length_squared(v4 a);
 KAPI NO_DEBUG f32 v4_length(v4 a);
 KAPI NO_DEBUG v4  v4_normalize(v4 a);
+KAPI NO_DEBUG v4  v4_hadamard(v4 a, v4 b);
 
 ////////////////////////////////////////////////////////////////////////
 // Matrix3
@@ -292,42 +294,42 @@ KAPI NO_DEBUG v3 operator*(mat3 mat, v3 vec);
 ////////////////////////////////////////////////////////////////////////
 // Matrix4
 
-KAPI NO_DEBUG mat4 mat4_identity();
-KAPI NO_DEBUG mat4 mat4_translate(v3 pos);
-KAPI NO_DEBUG mat4 mat4_scale(v3 scale);
-KAPI NO_DEBUG mat4 mat4_rotate_x(f32 angle_radians);
-KAPI NO_DEBUG mat4 mat4_rotate_y(f32 angle_radians);
-KAPI NO_DEBUG mat4 mat4_rotate_z(f32 angle_radians);
-KAPI NO_DEBUG mat4 operator*(mat4 a, mat4 b);
-KAPI NO_DEBUG mat4& operator*=(mat4& a, mat4 b);
-KAPI NO_DEBUG v4 operator*(mat4 mat, v4 vec);
-KAPI NO_DEBUG mat4 mat4_rotate_xyz(v3 rot);
-KAPI NO_DEBUG mat4 mat4_transform(v3 pos, v3 rot, v3 scale);
-KAPI NO_DEBUG mat4 mat4_transform(Transform trans);
-KAPI NO_DEBUG mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far);
-KAPI NO_DEBUG mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 Near, f32 Far);
-KAPI NO_DEBUG mat4 mat4_look_at(v3 pos, v3 dir, v3 up);
-KAPI NO_DEBUG mat4 mat4_transpose(mat4 matrix);
-KAPI NO_DEBUG mat4 mat4_inverse(mat4 matrix);
-KAPI NO_DEBUG v3 mat4_forward(mat4 matrix);
-KAPI NO_DEBUG v3 mat4_backward(mat4 matrix);
-KAPI NO_DEBUG v3 mat4_up(mat4 matrix);
-KAPI NO_DEBUG v3 mat4_down(mat4 matrix);
-KAPI NO_DEBUG v3 mat4_left(mat4 matrix);
-KAPI NO_DEBUG v3 mat4_right(mat4 matrix);
+KAPI mat4 mat4_identity();
+KAPI mat4 mat4_translate(v3 pos);
+KAPI mat4 mat4_scale(v3 scale);
+KAPI mat4 mat4_rotate_x(f32 angle_radians);
+KAPI mat4 mat4_rotate_y(f32 angle_radians);
+KAPI mat4 mat4_rotate_z(f32 angle_radians);
+KAPI mat4 operator*(mat4 a, mat4 b);
+KAPI mat4& operator*=(mat4& a, mat4 b);
+KAPI v4 operator*(mat4 mat, v4 vec);
+KAPI mat4 mat4_rotate_xyz(v3 rot);
+KAPI mat4 mat4_transform(v3 pos, v3 rot, v3 scale);
+KAPI mat4 mat4_transform(Transform trans);
+KAPI mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far);
+KAPI mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 Near, f32 Far);
+KAPI mat4 mat4_look_at(v3 pos, v3 dir, v3 up);
+KAPI mat4 mat4_transpose(mat4 matrix);
+KAPI mat4 mat4_inverse(mat4 matrix);
+KAPI v3 mat4_forward(mat4 matrix);
+KAPI v3 mat4_backward(mat4 matrix);
+KAPI v3 mat4_up(mat4 matrix);
+KAPI v3 mat4_down(mat4 matrix);
+KAPI v3 mat4_right(mat4 matrix);
+KAPI v3 mat4_left(mat4 matrix);
 
 ////////////////////////////////////////////////////////////////////////
 // Quaternions
 
-KAPI NO_DEBUG quat quat_identity();
-KAPI NO_DEBUG f32 quat_normal(quat q);
-KAPI NO_DEBUG quat quat_normalize(quat q);
-KAPI NO_DEBUG quat quat_conjugate(quat q);
-KAPI NO_DEBUG quat quat_inverse(quat q);
-KAPI NO_DEBUG quat quat_mul(quat q_0, quat q_1);
-KAPI NO_DEBUG f32 quat_dot(quat q_0, quat q_1);
-KAPI NO_DEBUG mat4 quat_to_mat4(quat q);
-KAPI NO_DEBUG mat4 quat_to_rotation_matrix(quat q, v3 center);
-KAPI NO_DEBUG quat quat_from_axis_angle(v3 axis, f32 angle, b32 normalize);
-KAPI NO_DEBUG quat quat_slerp(quat q_0, quat q_1, f32 percentage);
+KAPI quat quat_identity();
+KAPI f32 quat_normal(quat q);
+KAPI quat quat_normalize(quat q);
+KAPI quat quat_conjugate(quat q);
+KAPI quat quat_inverse(quat q);
+KAPI quat quat_mul(quat q_0, quat q_1);
+KAPI f32 quat_dot(quat q_0, quat q_1);
+KAPI mat4 quat_to_mat4(quat q);
+KAPI mat4 quat_to_rotation_matrix(quat q, v3 center);
+KAPI quat quat_from_axis_angle(v3 axis, f32 angle, b32 normalize);
+KAPI quat quat_slerp(quat q_0, quat q_1, f32 percentage);
 

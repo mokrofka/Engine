@@ -126,6 +126,7 @@ enum ShaderType {
   // Drawing
   ShaderType_Drawing,
   ShaderType_DrawingTransparent,
+  ShaderType_DrawingTransparentLine,
   ShaderType_Drawing_COUNT,
 
   // Screen
@@ -151,6 +152,10 @@ inline ShaderInfo shader_type[] = {
   // Drawing
   [ShaderType_Drawing] = {},
   [ShaderType_DrawingTransparent] = {
+    .is_transparent = true,
+  },
+  [ShaderType_DrawingTransparentLine] = {
+    .primitive = ShaderTopology_Line,
     .is_transparent = true,
   },
 

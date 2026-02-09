@@ -196,8 +196,8 @@ KAPI b32 FlagIntersects(u64 x, u64 f);
 
 template <typename T> T Max(T a, T b)                { return a > b ? a : b; }
 template <typename T> T Min(T a, T b)                { return a < b ? a : b; }
-template <typename T> T Max(T a, T b, T c)           { return Max(Max(a,b), c); }
-template <typename T> T Min(T a, T b, T c)           { return Min(Min(a,b), c); }
+template <typename T> T Max3(T a, T b, T c)          { return Max(Max(a,b), c); }
+template <typename T> T Min3(T a, T b, T c)          { return Min(Min(a,b), c); }
 template <typename T> T ClampTop(T x, T a)           { return Min(x, a); };
 template <typename T> T ClampBot(T x, T a)           { return Max(x, a); };
 template <typename T> T Clamp(T a, T x, T b)         { return (x < a) ? a : (x > b) ? b : x; };

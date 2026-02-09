@@ -4,26 +4,18 @@ f32 degtorad(f32 degrees) { return degrees * PI / 180.0f; }
 f32 radtodeg(f32 radians) { return radians * 180.0f / PI; }
 
 v2::v2(f32 x_, f32 y_) { x = x_, y = y_; }
-v2::v2(f32 scale) { x = scale; y = scale; }
 
 v2i::v2i(i32 x_, i32 y_) { x = x_, y = y_; }
-v2i::v2i(i32 scale) { x = scale; y = scale; }
 
 v2u::v2u(u32 x_, u32 y_) { x = x_, y = y_; }
-v2u::v2u(u32 scale) { x = scale; y = scale; }
 
 v3::v3(f32 x_, f32 y_, f32 z_) { x = x_, y = y_, z = z_; }
-v3::v3(f32 scale) { x = scale; y = scale; z = scale; }
 
 v3u::v3u(u32 x_, u32 y_, u32 z_) { x = x_, y = y_, z = z_; }
-v3u::v3u(u32 scale) { x = scale; y = scale; z = scale; }
 
 v4::v4(f32 x_, f32 y_, f32 z_, f32 w_) { x = x_, y = y_, z = z_, w = w_; }
-v4::v4(f32 scale) { x = scale; y = scale; z = scale; w = scale; }
 
 f32& mat3::operator[](u32 a) { return e[a]; }
-
-f32& mat4::operator[](u32 a) { return e[a]; }
 
 f32 Sin(f32 a)           { return __builtin_sinf(a); }
 f32 Cos(f32 a)           { return __builtin_cosf(a); }
@@ -161,6 +153,7 @@ void rand_seed()                      { _seed = cpu_timer_now(); }
 
 v2 v2_zero()                     { return v2{}; }
 v2 v2_one()                      { return v2(1.0f, 1.0f); }
+v2 v2_scale(f32 a)               { return v2(a, a); }
 v2 v2_up()                       { return v2(0.0f, 1.0f); }
 v2 v2_down()                     { return v2(0.0f, -1.0f); }
 v2 v2_left()                     { return v2(-1.0f, 0.0f); }
@@ -211,6 +204,7 @@ f32 v2_shortest_arc(v2 a, v2 b) {
 
 v3 v3_zero()              { return v3{}; }
 v3 v3_one()               { return v3(1, 1, 1); }
+v3 v3_scale(f32 a)        { return v3(a, a, a);}
 v3 v3_up()                { return v3(0.0f, 1.0f, 0.0f); }
 v3 v3_down()              { return v3(0.0f, -1.0f, 0.0f); }
 v3 v3_left()              { return v3(-1.0f, 0.0f, 0.0f); }
@@ -240,28 +234,32 @@ v3  v3_norm(v3 a)               { return a * (1.0f/v3_length(a)); }
 f32 v3_distance(v3 a, v3 b)     { return v3_length(v3(a.x - b.x, a.y - b.y, a.z - b.z)); }
 f32 v3_dot(v3 a, v3 b)          { return a.x*b.x + a.y*b.y + a.z*b.z; }
 v3  v3_cross(v3 a, v3 b)        { return v3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x); }
-v3  v3_lerp(v3 a, f32 t, v3 b)  { return v3(Lerp(a.x, t, b.x), Lerp(a.y, t, b.y), Lerp(a.z, t, b.z));}
+v3  v3_lerp(v3 a, f32 t, v3 b)  { return v3(Lerp(a.x, t, b.x), Lerp(a.y, t, b.y), Lerp(a.z, t, b.z)); }
+v3  v3_hadamard(v3 a, v3 b)     { return v3(a.x*b.x, a.y*b.y, a.z*b.z); }
+v3  v3_hadamard_div(v3 a, v3 b) { return v3(a.x/b.x, a.y/b.y, a.z/b.z); }
+v3  v3_greater(v3 a, v3 b)      { return v3(a.x>b.x, a.y>b.y, a.z>b.z); }
+v3  v3_less(v3 a, v3 b)         { return v3(a.x<b.x, a.y<b.y, a.z<b.z); }
 
 v3 v3_pos_of_mat4(mat4 mat) {
   v3 pos = v3_of_v4(mat.w);
   return pos;
 };
-v3 v3_rot_of_mat4(mat4 mat) {
-  v3 vec = {
-    mat[9],
-    mat[10],
-    mat[11],
-  };
-  return vec;
-};
-v3 v3_scale_of_mat4(mat4 mat) {
-  v3 vec = {
-    mat[9],
-    mat[10],
-    mat[11],
-  };
-  return vec;
-};
+// v3 v3_rot_of_mat4(mat4 mat) {
+//   v3 vec = {
+//     mat[9],
+//     mat[10],
+//     mat[11],
+//   };
+//   return vec;
+// };
+// v3 v3_scale_of_mat4(mat4 mat) {
+//   v3 vec = {
+//     mat[9],
+//     mat[10],
+//     mat[11],
+//   };
+//   return vec;
+// };
 
 v3 v3_rand_range(v3 a, v3 b) {
   v3 vec = {
@@ -275,6 +273,9 @@ v3 v3_rand_range(v3 a, v3 b) {
 ////////////////////////////////////////////////////////////////////////
 // Vector4
 
+v4 v4_zero()       { return v4{}; }
+v4 v4_one()        { return v4(1, 1, 1, 1); }
+
 v4  operator+(v4 a, v4 b)          { return v4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w); }
 v4  operator-(v4 a, v4 b)          { return v4(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w); }
 v4  operator*(v4 a, f32 scalar)    { return v4(a.x*scalar, a.y*scalar, a.z*scalar, a.w*scalar); }
@@ -286,9 +287,10 @@ v4  operator*=(v4& a, f32 scalar)  { return a = a * scalar; }
 v4  operator/=(v4& a, f32 scalar)  { return a = a / scalar; }
 v4  operator-(v4 a)                { return v4(-a.x, -a.y, -a.z, -a.w); }
 
-f32 v4_length_squared(v4 a)  { return Square(a.x) + Square(a.y) + Square(a.z) + Square(a.w); }
-f32 v4_length(v4 a)          { return Sqrt(v4_length_squared(a)); }
-v4  v4_normalize(v4 a)       { return a * (1.0f / v4_length(a)); }
+f32 v4_length_squared(v4 a)          { return Square(a.x) + Square(a.y) + Square(a.z) + Square(a.w); }
+f32 v4_length(v4 a)                  { return Sqrt(v4_length_squared(a)); }
+v4  v4_normalize(v4 a)               { return a * (1.0f / v4_length(a)); }
+v4  v4_hadamard(v4 a, v4 b)  { return v4(a.x*b.x, a.y*b.y, a.z*b.z, a.w*b.w); }
 
 ////////////////////////////////////////////////////////////////////////
 // Matrix3
@@ -374,6 +376,15 @@ mat4 mat4_scale(v3 scale) {
   return mat;
 }
 
+mat4 mat4_scale(mat4 m, f32 scale) {
+  Loop (row, 4) {
+    Loop (col, 4) {
+      m.e[row][col] *= scale;
+    }
+  }
+  return m;
+}
+
 mat4 mat4_rotate_x(f32 angle_radians) {
   f32 sin, cos;
   SinCos(angle_radians, &sin, &cos);
@@ -414,10 +425,10 @@ mat4 operator*(mat4 a, mat4 b) {
   mat4 c;
   Loop (row, 4) {
     Loop (col, 4) {
-      c[row*4 + col] = b[row*4 + 0] * a[0*4 + col] +
-                       b[row*4 + 1] * a[1*4 + col] +
-                       b[row*4 + 2] * a[2*4 + col] +
-                       b[row*4 + 3] * a[3*4 + col];
+      c.e[row][col] = b.e[row][0] * a.e[0][col] +
+                      b.e[row][1] * a.e[1][col] +
+                      b.e[row][2] * a.e[2][col] +
+                      b.e[row][3] * a.e[3][col];
     }
   }
   return c;
@@ -426,10 +437,10 @@ mat4& operator*=(mat4& a, mat4 b) { return a = b * a; }
 
 v4 operator*(mat4 mat, v4 vec) {
   v4 result = {
-    mat.e[0 ]*vec.x + mat.e[1 ]*vec.y + mat.e[2 ]*vec.z + mat.e[3 ]*vec.w,
-    mat.e[4 ]*vec.x + mat.e[5 ]*vec.y + mat.e[6 ]*vec.z + mat.e[7 ]*vec.w,
-    mat.e[8 ]*vec.x + mat.e[9 ]*vec.y + mat.e[10]*vec.z + mat.e[11]*vec.w,
-    mat.e[12]*vec.x + mat.e[13]*vec.y + mat.e[14]*vec.z + mat.e[15]*vec.w,
+    mat.e[0][0]*vec.x + mat.e[0][1]*vec.y + mat.e[0][2]*vec.z + mat.e[0][3]*vec.w,
+    mat.e[1][0]*vec.x + mat.e[1][1]*vec.y + mat.e[1][2]*vec.z + mat.e[1][3]*vec.w,
+    mat.e[2][0]*vec.x + mat.e[2][1]*vec.y + mat.e[2][2]*vec.z + mat.e[2][3]*vec.w,
+    mat.e[3][0]*vec.x + mat.e[3][1]*vec.y + mat.e[3][2]*vec.z + mat.e[3][3]*vec.w,
   };
   return result;
 }
@@ -494,95 +505,91 @@ mat4 mat4_look_at(v3 pos, v3 dir, v3 up) {
 
 mat4 mat4_transpose(mat4 matrix) {
   mat4 out_matrix = mat4_identity();
-  out_matrix.e[0] = matrix.e[0];
-  out_matrix.e[1] = matrix.e[4];
-  out_matrix.e[2] = matrix.e[8];
-  out_matrix.e[3] = matrix.e[12];
-  out_matrix.e[4] = matrix.e[1];
-  out_matrix.e[5] = matrix.e[5];
-  out_matrix.e[6] = matrix.e[9];
-  out_matrix.e[7] = matrix.e[13];
-  out_matrix.e[8] = matrix.e[2];
-  out_matrix.e[9] = matrix.e[6];
-  out_matrix.e[10] = matrix.e[10];
-  out_matrix.e[11] = matrix.e[14];
-  out_matrix.e[12] = matrix.e[3];
-  out_matrix.e[13] = matrix.e[7];
-  out_matrix.e[14] = matrix.e[11];
-  out_matrix.e[15] = matrix.e[15];
-  mat4 result = {
-    matrix[0],
-  };
+  // out_matrix.e[0] = matrix.e[0];
+  // out_matrix.e[1] = matrix.e[4];
+  // out_matrix.e[2] = matrix.e[8];
+  // out_matrix.e[3] = matrix.e[12];
+  // out_matrix.e[4] = matrix.e[1];
+  // out_matrix.e[5] = matrix.e[5];
+  // out_matrix.e[6] = matrix.e[9];
+  // out_matrix.e[7] = matrix.e[13];
+  // out_matrix.e[8] = matrix.e[2];
+  // out_matrix.e[9] = matrix.e[6];
+  // out_matrix.e[10] = matrix.e[10];
+  // out_matrix.e[11] = matrix.e[14];
+  // out_matrix.e[12] = matrix.e[3];
+  // out_matrix.e[13] = matrix.e[7];
+  // out_matrix.e[14] = matrix.e[11];
+  // out_matrix.e[15] = matrix.e[15];
+  // mat4 result = {
+  //   matrix[0],
+  // };
   return out_matrix;
 }
 
-mat4 mat4_inverse(mat4 matrix) {
+mat4 mat4_inverse(mat4 m) {
+  f32 coef00 = m.e[2][2] * m.e[3][3] - m.e[3][2] * m.e[2][3];
+  f32 coef02 = m.e[1][2] * m.e[3][3] - m.e[3][2] * m.e[1][3];
+  f32 coef03 = m.e[1][2] * m.e[2][3] - m.e[2][2] * m.e[1][3];
+  f32 coef04 = m.e[2][1] * m.e[3][3] - m.e[3][1] * m.e[2][3];
+  f32 coef06 = m.e[1][1] * m.e[3][3] - m.e[3][1] * m.e[1][3];
+  f32 coef07 = m.e[1][1] * m.e[2][3] - m.e[2][1] * m.e[1][3];
+  f32 coef08 = m.e[2][1] * m.e[3][2] - m.e[3][1] * m.e[2][2];
+  f32 coef10 = m.e[1][1] * m.e[3][2] - m.e[3][1] * m.e[1][2];
+  f32 coef11 = m.e[1][1] * m.e[2][2] - m.e[2][1] * m.e[1][2];
+  f32 coef12 = m.e[2][0] * m.e[3][3] - m.e[3][0] * m.e[2][3];
+  f32 coef14 = m.e[1][0] * m.e[3][3] - m.e[3][0] * m.e[1][3];
+  f32 coef15 = m.e[1][0] * m.e[2][3] - m.e[2][0] * m.e[1][3];
+  f32 coef16 = m.e[2][0] * m.e[3][2] - m.e[3][0] * m.e[2][2];
+  f32 coef18 = m.e[1][0] * m.e[3][2] - m.e[3][0] * m.e[1][2];
+  f32 coef19 = m.e[1][0] * m.e[2][2] - m.e[2][0] * m.e[1][2];
+  f32 coef20 = m.e[2][0] * m.e[3][1] - m.e[3][0] * m.e[2][1];
+  f32 coef22 = m.e[1][0] * m.e[3][1] - m.e[3][0] * m.e[1][1];
+  f32 coef23 = m.e[1][0] * m.e[2][1] - m.e[2][0] * m.e[1][1];
   
-  return {};
+  v4 fac0 = { coef00, coef00, coef02, coef03 };
+  v4 fac1 = { coef04, coef04, coef06, coef07 };
+  v4 fac2 = { coef08, coef08, coef10, coef11 };
+  v4 fac3 = { coef12, coef12, coef14, coef15 };
+  v4 fac4 = { coef16, coef16, coef18, coef19 };
+  v4 fac5 = { coef20, coef20, coef22, coef23 };
+  
+  v4 vec0 = { m.e[1][0], m.e[0][0], m.e[0][0], m.e[0][0] };
+  v4 vec1 = { m.e[1][1], m.e[0][1], m.e[0][1], m.e[0][1] };
+  v4 vec2 = { m.e[1][2], m.e[0][2], m.e[0][2], m.e[0][2] };
+  v4 vec3 = { m.e[1][3], m.e[0][3], m.e[0][3], m.e[0][3] };
+  
+  v4 inv0 = (v4_hadamard(vec1, fac0) - v4_hadamard(vec2, fac1)) + v4_hadamard(vec3, fac2);
+  v4 inv1 = (v4_hadamard(vec0, fac0) - v4_hadamard(vec2, fac3)) + v4_hadamard(vec3, fac4);
+  v4 inv2 = (v4_hadamard(vec0, fac1) - v4_hadamard(vec1, fac3)) + v4_hadamard(vec3, fac5);
+  v4 inv3 = (v4_hadamard(vec0, fac2) - v4_hadamard(vec1, fac4)) + v4_hadamard(vec2, fac5);
+  
+  v4 sign_a = { +1, -1, +1, -1 };
+  v4 sign_b = { -1, +1, -1, +1 };
+  
+  mat4 inverse;
+  Loop (i, 4) {
+    inverse.e[0][i] = inv0.e[i] * sign_a.e[i];
+    inverse.e[1][i] = inv1.e[i] * sign_b.e[i];
+    inverse.e[2][i] = inv2.e[i] * sign_a.e[i];
+    inverse.e[3][i] = inv3.e[i] * sign_b.e[i];
+  }
+  
+  v4 row0 = { inverse.e[0][0], inverse.e[1][0], inverse.e[2][0], inverse.e[3][0] };
+  v4 m0 = { m.e[0][0], m.e[0][1], m.e[0][2], m.e[0][3] };
+  v4 dot0 = v4_hadamard(m0, row0);
+  f32 dot1 = (dot0.x + dot0.y) + (dot0.z + dot0.w);
+  
+  f32 one_over_det = 1 / dot1;
+  
+  return mat4_scale(inverse, one_over_det);
 }
-// mat4 mat4_inverse(mat4 matrix) {
-//   const f32* m = matrix.e;
-
-//   f32 t0 = m[10] * m[15];
-//   f32 t1 = m[14] * m[11];
-//   f32 t2 = m[6] * m[15];
-//   f32 t3 = m[14] * m[7];
-//   f32 t4 = m[6] * m[11];
-//   f32 t5 = m[10] * m[7];
-//   f32 t6 = m[2] * m[15];
-//   f32 t7 = m[14] * m[3];
-//   f32 t8 = m[2] * m[11];
-//   f32 t9 = m[10] * m[3];
-//   f32 t10 = m[2] * m[7];
-//   f32 t11 = m[6] * m[3];
-//   f32 t12 = m[8] * m[13];
-//   f32 t13 = m[12] * m[9];
-//   f32 t14 = m[4] * m[13];
-//   f32 t15 = m[12] * m[5];
-//   f32 t16 = m[4] * m[9];
-//   f32 t17 = m[8] * m[5];
-//   f32 t18 = m[0] * m[13];
-//   f32 t19 = m[12] * m[1];
-//   f32 t20 = m[0] * m[9];
-//   f32 t21 = m[8] * m[1];
-//   f32 t22 = m[0] * m[5];
-//   f32 t23 = m[4] * m[1];
-
-//   mat4 out_matrix;
-//   f32* o = out_matrix.e;
-
-//   o[0] = (t0 * m[5] + t3 * m[9] + t4 * m[13]) - (t1 * m[5] + t2 * m[9] + t5 * m[13]);
-//   o[1] = (t1 * m[1] + t6 * m[9] + t9 * m[13]) - (t0 * m[1] + t7 * m[9] + t8 * m[13]);
-//   o[2] = (t2 * m[1] + t7 * m[5] + t10 * m[13]) - (t3 * m[1] + t6 * m[5] + t11 * m[13]);
-//   o[3] = (t5 * m[1] + t8 * m[5] + t11 * m[9]) - (t4 * m[1] + t9 * m[5] + t10 * m[9]);
-
-//   f32 d = 1.0f / (m[0] * o[0] + m[4] * o[1] + m[8] * o[2] + m[12] * o[3]);
-
-//   o[0] = d * o[0];
-//   o[1] = d * o[1];
-//   o[2] = d * o[2];
-//   o[3] = d * o[3];
-//   o[4] = d * ((t1 * m[4] + t2 * m[8] + t5 * m[12]) - (t0 * m[4] + t3 * m[8] + t4 * m[12]));
-//   o[5] = d * ((t0 * m[0] + t7 * m[8] + t8 * m[12]) - (t1 * m[0] + t6 * m[8] + t9 * m[12]));
-//   o[6] = d * ((t3 * m[0] + t6 * m[4] + t11 * m[12]) - (t2 * m[0] + t7 * m[4] + t10 * m[12]));
-//   o[7] = d * ((t4 * m[0] + t9 * m[4] + t10 * m[8]) - (t5 * m[0] + t8 * m[4] + t11 * m[8]));
-//   o[8] = d * ((t12 * m[7] + t15 * m[11] + t16 * m[15]) - (t13 * m[7] + t14 * m[11] + t17 * m[15]));
-//   o[9] = d * ((t13 * m[3] + t18 * m[11] + t21 * m[15]) - (t12 * m[3] + t19 * m[11] + t20 * m[15]));
-//   o[10] = d * ((t14 * m[3] + t19 * m[7] + t22 * m[15]) - (t15 * m[3] + t18 * m[7] + t23 * m[15]));
-//   o[11] = d * ((t17 * m[3] + t20 * m[7] + t23 * m[11]) - (t16 * m[3] + t21 * m[7] + t22 * m[11]));
-//   o[12] = d * ((t14 * m[10] + t17 * m[14] + t13 * m[6]) - (t16 * m[14] + t12 * m[6] + t15 * m[10]));
-//   o[13] = d * ((t20 * m[14] + t12 * m[2] + t19 * m[10]) - (t18 * m[10] + t21 * m[14] + t13 * m[2]));
-//   o[14] = d * ((t18 * m[6] + t23 * m[14] + t15 * m[2]) - (t22 * m[14] + t14 * m[2] + t19 * m[6]));
-//   o[15] = d * ((t22 * m[10] + t16 * m[2] + t21 * m[6]) - (t20 * m[6] + t23 * m[10] + t17 * m[2]));
-
-//   return out_matrix;
-// }
 
 v3 mat4_forward(mat4 matrix) {
   v3 forward = {
-    matrix.e[2],
-    matrix.e[6],
-    matrix.e[10],
+    matrix.e[0][2],
+    matrix.e[1][2],
+    matrix.e[2][2],
   };
   forward = v3_norm(forward);
   return forward;
@@ -590,9 +597,9 @@ v3 mat4_forward(mat4 matrix) {
 
 v3 mat4_backward(mat4 matrix) {
   v3 forward = {
-    -matrix.e[2],
-    -matrix.e[6],
-    -matrix.e[10],
+    -matrix.e[0][2],
+    -matrix.e[1][2],
+    -matrix.e[2][2],
   };
   forward = v3_norm(forward);
   return forward;
@@ -600,9 +607,9 @@ v3 mat4_backward(mat4 matrix) {
 
 v3 mat4_up(mat4 matrix) {
   v3 up = {
-    matrix.e[1],
-    matrix.e[5],
-    matrix.e[9],
+    matrix.e[0][1],
+    matrix.e[1][1],
+    matrix.e[2][1],
   };
   up = v3_norm(up);
   return up;
@@ -610,32 +617,32 @@ v3 mat4_up(mat4 matrix) {
 
 v3 mat4_down(mat4 matrix) {
   v3 down = {
-    -matrix.e[1],
-    -matrix.e[5],
-    -matrix.e[9],
+    -matrix.e[0][1],
+    -matrix.e[1][1],
+    -matrix.e[2][1],
   };
   down = v3_norm(down);
   return down;
 }
 
-v3 mat4_left(mat4 matrix) {
-  v3 right = {
-    -matrix.e[0],
-    -matrix.e[4],
-    -matrix.e[8],
-  };
-  right = v3_norm(right);
-  return right;
-}
-
 v3 mat4_right(mat4 matrix) {
   v3 left = {
-    matrix.e[0],
-    matrix.e[4],
-    matrix.e[8],
+    matrix.e[0][0],
+    matrix.e[1][0],
+    matrix.e[2][0],
   };
   left = v3_norm(left);
   return left;
+}
+
+v3 mat4_left(mat4 matrix) {
+  v3 right = {
+    -matrix.e[0][0],
+    -matrix.e[1][0],
+    -matrix.e[2][0],
+  };
+  right = v3_norm(right);
+  return right;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -714,17 +721,17 @@ mat4 quat_to_mat4(quat q) {
 
   quat n = quat_normalize(q);
 
-  out_matrix.e[0] = 1.0f - 2.0f * n.y * n.y - 2.0f * n.z * n.z;
-  out_matrix.e[1] = 2.0f * n.x * n.y - 2.0f * n.z * n.w;
-  out_matrix.e[2] = 2.0f * n.x * n.z + 2.0f * n.y * n.w;
+  // out_matrix.e[0] = 1.0f - 2.0f * n.y * n.y - 2.0f * n.z * n.z;
+  // out_matrix.e[1] = 2.0f * n.x * n.y - 2.0f * n.z * n.w;
+  // out_matrix.e[2] = 2.0f * n.x * n.z + 2.0f * n.y * n.w;
 
-  out_matrix.e[4] = 2.0f * n.x * n.y + 2.0f * n.z * n.w;
-  out_matrix.e[5] = 1.0f - 2.0f * n.x * n.x - 2.0f * n.z * n.z;
-  out_matrix.e[6] = 2.0f * n.y * n.z - 2.0f * n.x * n.w;
+  // out_matrix.e[4] = 2.0f * n.x * n.y + 2.0f * n.z * n.w;
+  // out_matrix.e[5] = 1.0f - 2.0f * n.x * n.x - 2.0f * n.z * n.z;
+  // out_matrix.e[6] = 2.0f * n.y * n.z - 2.0f * n.x * n.w;
 
-  out_matrix.e[8] = 2.0f * n.x * n.z - 2.0f * n.y * n.w;
-  out_matrix.e[9] = 2.0f * n.y * n.z + 2.0f * n.x * n.w;
-  out_matrix.e[10] = 1.0f - 2.0f * n.x * n.x - 2.0f * n.y * n.y;
+  // out_matrix.e[8] = 2.0f * n.x * n.z - 2.0f * n.y * n.w;
+  // out_matrix.e[9] = 2.0f * n.y * n.z + 2.0f * n.x * n.w;
+  // out_matrix.e[10] = 1.0f - 2.0f * n.x * n.x - 2.0f * n.y * n.y;
 
   return out_matrix;
 }
@@ -733,26 +740,26 @@ mat4 quat_to_mat4(quat q) {
 mat4 quat_to_rotation_matrix(quat q, v3 center) {
   mat4 out_matrix;
 
-  f32* o = out_matrix.e;
-  o[0] = (q.x * q.x) - (q.y * q.y) - (q.z * q.z) + (q.w * q.w);
-  o[1] = 2.0f * ((q.x * q.y) + (q.z * q.w));
-  o[2] = 2.0f * ((q.x * q.z) - (q.y * q.w));
-  o[3] = center.x - center.x * o[0] - center.y * o[1] - center.z * o[2];
+  // f32* o = out_matrix.e;
+  // o[0] = (q.x * q.x) - (q.y * q.y) - (q.z * q.z) + (q.w * q.w);
+  // o[1] = 2.0f * ((q.x * q.y) + (q.z * q.w));
+  // o[2] = 2.0f * ((q.x * q.z) - (q.y * q.w));
+  // o[3] = center.x - center.x * o[0] - center.y * o[1] - center.z * o[2];
 
-  o[4] = 2.0f * ((q.x * q.y) - (q.z * q.w));
-  o[5] = -(q.x * q.x) + (q.y * q.y) - (q.z * q.z) + (q.w * q.w);
-  o[6] = 2.0f * ((q.y * q.z) + (q.x * q.w));
-  o[7] = center.y - center.x * o[4] - center.y * o[5] - center.z * o[6];
+  // o[4] = 2.0f * ((q.x * q.y) - (q.z * q.w));
+  // o[5] = -(q.x * q.x) + (q.y * q.y) - (q.z * q.z) + (q.w * q.w);
+  // o[6] = 2.0f * ((q.y * q.z) + (q.x * q.w));
+  // o[7] = center.y - center.x * o[4] - center.y * o[5] - center.z * o[6];
 
-  o[8] = 2.0f * ((q.x * q.z) + (q.y * q.w));
-  o[9] = 2.0f * ((q.y * q.z) - (q.x * q.w));
-  o[10] = -(q.x * q.x) - (q.y * q.y) + (q.z * q.z) + (q.w * q.w);
-  o[11] = center.z - center.x * o[8] - center.y * o[9] - center.z * o[10];
+  // o[8] = 2.0f * ((q.x * q.z) + (q.y * q.w));
+  // o[9] = 2.0f * ((q.y * q.z) - (q.x * q.w));
+  // o[10] = -(q.x * q.x) - (q.y * q.y) + (q.z * q.z) + (q.w * q.w);
+  // o[11] = center.z - center.x * o[8] - center.y * o[9] - center.z * o[10];
 
-  o[12] = 0.0f;
-  o[13] = 0.0f;
-  o[14] = 0.0f;
-  o[15] = 1.0f;
+  // o[12] = 0.0f;
+  // o[13] = 0.0f;
+  // o[14] = 0.0f;
+  // o[15] = 1.0f;
   return out_matrix;
 }
 
