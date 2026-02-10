@@ -1,10 +1,9 @@
 #pragma once
 #include "lib.h"
-#include "r_types.h"
 #include "vk.h"
 
 #define MaxLights KB(1)
-#define MaxEntities KB(4)
+#define MaxEntities KB(1)
 #define MaxMeshes KB(1)
 #define MaxShaders KB(1)
 #define MaxTextures KB(1)
@@ -12,6 +11,59 @@
 KAPI extern f32 g_dt;
 KAPI extern f32 g_time;
 KAPI extern Transform entities_transforms[MaxEntities];
+
+////////////////////////////////////////////////////////////////////////
+// Assets
+
+///////////////////////////////////
+// Shaders
+
+extern ShaderInfo shader_type[];
+struct ShaderDefinition {
+  String path;
+  ShaderType type;
+};
+enum ShaderId {
+  Shader_Color,
+  Shader_Grid,
+  Shader_Axis,
+  Shader_COUNT,
+};
+extern ShaderDefinition shaders_info[Shader_COUNT];
+extern u32 shaders[Shader_COUNT];
+
+///////////////////////////////////
+// Meshes
+
+enum MeshId {
+  Mesh_GltfCube,
+  Mesh_GlbCube,
+  Mesh_COUNT,
+};
+extern String meshes_path[Mesh_COUNT];
+extern u32 meshes[Mesh_COUNT];
+
+///////////////////////////////////
+// Textures
+
+enum TextureId {
+  Texture_OrangeLines,
+  Texture_Container,
+  Texture_COUNT,
+};
+extern String textures_path[Texture_COUNT];
+extern u32 textures[Texture_COUNT];
+
+///////////////////////////////////
+// Materials
+
+enum MaterialId {
+  Material_RedOrange,
+  Material_GreenContainer,
+  Material_COUNT,
+};
+extern Material materials_info[Material_COUNT];
+extern u32 materials[Material_COUNT];
 
 ////////////////////////////////////////////////////////////////////////
 // Test
@@ -153,60 +205,4 @@ struct Timer {
 
 KAPI Timer timer_init(f32 interval);
 KAPI b32 timer_tick(Timer& t);
-
-////////////////////////////////////////////////////////////////////////
-// Assets
-
-///////////////////////////////////
-// Shaders
-
-struct ShaderDefinition {
-  String path;
-  ShaderType type;
-};
-
-enum ShaderId {
-  Shader_Color,
-  Shader_Grid,
-  Shader_Axis,
-  Shader_COUNT,
-};
-extern ShaderDefinition shaders_info[Shader_COUNT];
-extern u32 shaders[Shader_COUNT];
-
-///////////////////////////////////
-// Meshes
-
-enum MeshId{
-  Mesh_GltfCube,
-  Mesh_GlbCube,
-  Mesh_COUNT,
-};
-extern String meshes_path[Mesh_COUNT];
-extern u32 meshes[Mesh_COUNT];
-
-///////////////////////////////////
-// Textures
-
-enum TextureId {
-  Texture_OrangeLines,
-  Texture_Container,
-  // Texture_Room,
-  Texture_COUNT,
-};
-extern String textures_path[Texture_COUNT];
-extern u32 textures[Texture_COUNT];
-
-///////////////////////////////////
-// Materials
-
-enum MaterialId {
-  Material_RedOrange,
-  Material_GreenContainer,
-  Material_COUNT,
-};
-
-extern Material materials_info[Material_COUNT];
-extern MaterialId materials[Material_COUNT];
-
 

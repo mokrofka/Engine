@@ -252,6 +252,7 @@ struct _Defer {
 ////////////////////////////////////////////////////////////////////////
 // Error handling
 
+// union result with err_info + b32 err? 
 template <typename T>
 struct Ret {
   T v;

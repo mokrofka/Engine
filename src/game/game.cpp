@@ -335,7 +335,7 @@ void app_init(u8** state) {
   }
   Loop (i, Material_COUNT) {
     materials_info[i].texture = textures[materials_info[i].texture];
-    materials[i] = (MaterialId)vk_material_load(materials_info[i]);
+    materials[i] = vk_material_load(materials_info[i]);
   }
   shader_load("cubemap_shader", ShaderType_Cubemap);
   cubemap_load("night_cubemap");
@@ -407,8 +407,7 @@ shared_function void app_update(u8** state) {
   st->timer.interval = 0.1;
   if (timer_tick(st->timer)) {
   }
-  mat4 trans = mat4_translate(v3_scale(1));
-  Entity& e   = st->entities[0];
+  Entity& e = st->entities[0];
   Entity& e1 = st->entities[1];
 
   e.pos().x = e1.pos().x + Sin(g_time) * 4;
@@ -431,10 +430,7 @@ shared_function void app_update(u8** state) {
     f32 xoff = 0.3f;
     f32 yoff = 0.3f;
     Entity& axis = *st->axis_attached_to_cam;;
-    axis.pos() = st->cam.pos
-        + forward * dist
-        + right   * xoff
-        + up      * yoff;
+    axis.pos() = st->cam.pos + forward*dist + right*xoff + up*yoff;
     axis.scale() = v3_scale(0.1);
   }
 

@@ -6,6 +6,80 @@ Extern f32 g_time;
 Extern Transform entities_transforms[MaxEntities];
 
 ////////////////////////////////////////////////////////////////////////
+// Assets
+
+///////////////////////////////////
+// Shaders
+
+Extern ShaderInfo shader_type[] = {
+  // Drawing
+  [ShaderType_Drawing] = {},
+  [ShaderType_DrawingTransparent] = {
+    .is_transparent = true,
+  },
+  [ShaderType_DrawingTransparentLine] = {
+    .primitive = ShaderTopology_Line,
+    .is_transparent = true,
+  },
+
+  // Screen
+  [ShaderType_Screen] = {
+    .use_depth = false,
+  },
+
+  // Cubemap
+  [ShaderType_Cubemap] = {},
+
+  // Compute
+  [ShaderType_Compute] = {},
+};
+Extern ShaderDefinition shaders_info[Shader_COUNT] = {
+  [Shader_Color] = "color_shader", ShaderType_Drawing,
+  [Shader_Grid] = "grid_shader", ShaderType_DrawingTransparentLine,
+  [Shader_Axis] = "axis_shader", ShaderType_DrawingTransparentLine,
+};
+Extern u32 shaders[Shader_COUNT];
+
+///////////////////////////////////
+// Meshes
+
+String meshes_path[Mesh_COUNT] = {
+  [Mesh_GltfCube] = "cube.gltf",
+  [Mesh_GlbCube] = "cube.glb",
+};
+u32 meshes[Mesh_COUNT];
+
+///////////////////////////////////
+// Textures
+
+Extern String textures_path[Texture_COUNT] = {
+  [Texture_OrangeLines] = "orange_lines_512.png",
+  [Texture_Container] = "container.jpg",
+};
+Extern u32 textures[Texture_COUNT];
+
+///////////////////////////////////
+// Materials
+
+Extern Material materials_info[Material_COUNT] = {
+  [Material_RedOrange] = {
+    .ambient = v3(1,0,0),
+    .diffuse = v3_scale(1),
+    .specular = v3_scale(1),
+    .shininess = 1,
+    .texture = Texture_OrangeLines,
+  },
+  [Material_GreenContainer] = {
+    .ambient = v3(0,1,0),
+    .diffuse = v3_scale(1),
+    .specular = v3_scale(1),
+    .shininess = 1,
+    .texture = Texture_Container,
+  },
+};
+Extern u32 materials[Material_COUNT];
+
+////////////////////////////////////////////////////////////////////////
 // Test
 
 ///////////////////////////////////
@@ -983,7 +1057,7 @@ u32 mesh_load(String name) {
 u32 shader_load(String name, ShaderType type) {
   Scratch scratch;
   u32 id = vk_shader_load(name, type);
-  common_st.shader_map.insert(name, id);
+  common_st.shader_map.add(name, id);
   return id;
 }
 
@@ -1024,64 +1098,3 @@ b32 timer_tick(Timer& t) {
   }
   return false;
 }
-
-////////////////////////////////////////////////////////////////////////
-// Assets
-
-///////////////////////////////////
-// Shaders
-
-Extern ShaderDefinition shaders_info[Shader_COUNT] = {
-  [Shader_Color] = "color_shader", ShaderType_Drawing,
-  [Shader_Grid] = "grid_shader", ShaderType_DrawingTransparentLine,
-  [Shader_Axis] = "axis_shader", ShaderType_DrawingTransparentLine,
-};
-Extern u32 shaders[Shader_COUNT];
-
-
-///////////////////////////////////
-// Meshes
-
-String meshes_path[Mesh_COUNT] = {
-  // [Mesh_Cube-1] = "cube.obj",
-  [Mesh_GltfCube] = "cube.gltf",
-  [Mesh_GlbCube] = "cube.glb",
-  // [Mesh_GltfHelmet-1] = "helmet.gltf",
-  // [Mesh_GlbHelmet] = "helmet.glb",
-  // [Mesh_GlbMonkey-1] = "monkey.glb",
-  // [Mesh_Room] = "room.obj",
-};
-u32 meshes[Mesh_COUNT];
-
-///////////////////////////////////
-// Textures
-
-Extern String textures_path[Texture_COUNT] = {
-  [Texture_OrangeLines] = "orange_lines_512.png",
-  [Texture_Container] = "container.jpg",
-  // [Texture_Room-1] = "image.png",
-};
-Extern u32 textures[Texture_COUNT];
-
-///////////////////////////////////
-// Materials
-
-Extern Material materials_info[Material_COUNT] = {
-  [Material_RedOrange] = {
-    .ambient = v3(1,0,0),
-    .diffuse = v3_scale(1),
-    .specular = v3_scale(1),
-    .shininess = 1,
-    .texture = Texture_OrangeLines,
-  },
-  [Material_GreenContainer] = {
-    .ambient = v3(0,1,0),
-    .diffuse = v3_scale(1),
-    .specular = v3_scale(1),
-    .shininess = 1,
-    .texture = Texture_Container,
-  },
-};
-Extern MaterialId materials[Material_COUNT];
-
-

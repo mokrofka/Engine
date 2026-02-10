@@ -477,7 +477,7 @@ struct Map {
   Map() = default;
   Map(Allocator alloc_) { *this = {}; alloc = alloc_; }
   void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
-  void insert(Key key, T val) {
+  void add(Key key, T val) {
     if (count >= cap*LF) { grow(); }
     u64 hash_idx = hash(key);
     u64 index = ModPow2(hash_idx, cap);
@@ -503,7 +503,7 @@ struct Map {
     } while (index != start_idx);
     return null;
   }
-  void erase(Key key) {
+  void remove(Key key) {
     u64 hash_idx = hash(key);
     u64 index = ModPow2(hash_idx, cap);
     while (is_occupied[index] != MapSlot_Empty) {
@@ -530,7 +530,7 @@ struct Map {
       mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
       Loop (i, old_cap) {
         if (old_is_occupied[i] == MapSlot_Occupied) {
-          insert(old_keys[i], old_data[i]);
+          add(old_keys[i], old_data[i]);
         }
       }
       mem_free(alloc, old_data);
