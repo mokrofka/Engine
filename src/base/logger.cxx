@@ -5,7 +5,7 @@
 void _log_output(LogLevel level, String fmt, ...) {
   Scratch scratch;
   String level_strings[] = {"[TRACE]: ", "[DEBUG]: ", "[INFO]:  ", "[WARN]:  ", "[ERROR]: ",};
-  va_list argc;
+  VaList argc;
   va_start(argc, fmt);
   String formatted = push_strfv(scratch, fmt, argc);
   va_end(argc);
@@ -15,7 +15,7 @@ void _log_output(LogLevel level, String fmt, ...) {
 
 void print(String fmt, ...) {
   Scratch scratch;
-  va_list argc;
+  VaList argc;
   va_start(argc, fmt);
   String formatted = push_strfv(scratch, fmt, argc);
   va_end(argc);
@@ -25,7 +25,7 @@ void print(String fmt, ...) {
 
 void println(String fmt, ...) {
   Scratch scratch;
-  va_list argc;
+  VaList argc;
   va_start(argc, fmt);
   String formatted = push_strfv(scratch, fmt, argc);
   va_end(argc);

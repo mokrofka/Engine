@@ -25,7 +25,6 @@ struct OS_LNX_FileIter {
 
 struct OS_State {
   Allocator arena;
-
   String binary_filepath;
   String binary_directory;
   String binary_name;
@@ -95,22 +94,25 @@ String os_get_environment(String name) {
 //////////////////////////////////////////////////////////////////////////
 // Memory
 
-u8*  os_reserve(u64 size)                  { return (u8*)mmap(null, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0); }
+u8*  os_reserve(u64 size)                  { return (u8*)mmap(null, size, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0); }
 b32  os_commit(void* ptr, u64 size)        { return mprotect(ptr, size, PROT_READ | PROT_WRITE); }
 void os_decommit(void* ptr, u64 size)      { }
 void os_release(void* ptr, u64 size)       { munmap(ptr, size);}
 u8*  os_reserve_large(u64 size)            { return 0; }
-b32  os_commit_large(void* ptr, u64 size)  { return 1; }
+b32  os_commit_large(void* ptr, u64 size)  { return 0; }
 
 //////////////////////////////////////////////////////////////////////////
 // Files
 
-FileProperties os_lnx_file_properties_from_stat(struct stat s) {
+FileProperties os_lnx_file_properties_from_stat(struct stat fd_stat) {
   FileProperties props = {
-    .size = (u64)s.st_size,
-    .modified = s.st_mtim.tv_sec*Billion(1) + s.st_mtim.tv_nsec,
-    .created = s.st_ctim.tv_sec*Billion(1) + s.st_ctim.tv_nsec,
+    .size = (u64)fd_stat.st_size,
+    .modified = fd_stat.st_mtim.tv_sec*Billion(1) + fd_stat.st_mtim.tv_nsec,
+    .created = fd_stat.st_ctim.tv_sec*Billion(1) + fd_stat.st_ctim.tv_nsec,
   };
+  if(fd_stat.st_mode & S_IFDIR) {
+    props.flags |= FilePropertyFlag_IsFolder;
+  }
   return props;
 }
 
@@ -134,21 +136,30 @@ OS_Handle os_file_open(String path, OS_AccessFlags flags) {
     lnx_flags |= O_CREAT;
   }
   int fd = open((char*)path_c.str, lnx_flags, 0755);
-  OS_Handle handle = fd;
+  OS_Handle handle = {};
+  if (fd != -1) {
+    handle.v = fd;
+  }
   return handle;
 }
 
 void os_file_close(OS_Handle file) {
-  close(file); 
+  if (file.v == 0) { return; }
+  int fd = file.v;
+  close(fd); 
 }
 
-u64 os_file_read(OS_Handle file, u64 size, u8* out_data) {
-  u64 size_read = read(file, out_data, size);
-  return size_read;
+u64 os_file_read(OS_Handle file, u64 size, void* out_data) {
+  if (file.v == 0) { return 0; }
+  int fd = file.v;
+  u64 read_result = pread(fd, out_data, size, 0);
+  return read_result;
 }
 
-u64 os_file_write(OS_Handle file, u64 size, u8* data) {
-  u64 size_written = write(file, data, size);
+u64 os_file_write(OS_Handle file, u64 size, void* data) {
+  if (file.v == 0) { return 0; }
+  int fd = file.v;
+  u64 size_written = pwrite(fd, data, size, 0);
   return size_written;
 }
 
@@ -158,73 +169,87 @@ u64 os_file_size(OS_Handle file) {
 }
 
 FileProperties os_file_properties(OS_Handle file) {
+  if (file.v == 0) { return {}; }
   Scratch scratch;
-  struct stat st;
-  fstat(file, &st);
-  FileProperties props = os_lnx_file_properties_from_stat(st);
+  struct stat fd_stat = {};
+  int fd = file.v;
+  int fstat_result = fstat(fd, &fd_stat);
+  FileProperties props = {};
+  if (fstat_result != -1) {
+    props = os_lnx_file_properties_from_stat(fd_stat);
+  }
   return props;
 }
 
 b32 os_file_path_exists(String path) {
   Scratch scratch;
   String path_c = push_str_copy(scratch, path);
-  int access_result = access((char*)path_c.str, F_OK);
-  if (access_result == 0) {
+  struct stat fd_stat = {};
+  int stat_result = stat((char*)path_c.str, &fd_stat);
+  if (stat_result != -1) {
     return true;
   }
   return false;
 }
 
 b32 os_file_path_copy(String dst, String src) {
+  b32 result = 0;
   OS_Handle src_h = os_file_open(src, OS_AccessFlag_Read);
   OS_Handle dst_h = os_file_open(dst, OS_AccessFlag_Write);
-  FileProperties props = os_file_properties(src_h);
-  int src_fd = src_h;
-  int dst_fd = dst_h;
-  sendfile(dst_fd, src_fd, null, props.size);
-  props = os_file_properties(src_h);
+  if (src_h.v != 0 && dst_h.v != 0) {
+    FileProperties props = os_file_properties(src_h);
+    int src_fd = src_h.v;
+    int dst_fd = dst_h.v;
+    sendfile(dst_fd, src_fd, null, props.size);
+    result = true;
+  }
   os_file_close(src_h);
   os_file_close(dst_h);
-  return true;
+  return result;
 }
 
-void os_file_path_time_copy(String src, String dst) {
+void os_file_path_copy_mtime(String src, String dst) {
   Scratch scratch;
   String src_c = push_str_copy(scratch, src);
   String dst_c = push_str_copy(scratch, dst);
-  struct stat st;
-  stat((char*)src_c.str, &st);
+  struct stat fd_stat;
+  stat((char*)src_c.str, &fd_stat);
   struct timespec times[2];
-  times[0] = st.st_atim; // preserve access time
-  times[1] = st.st_mtim; // copy modification time
+  times[0] = fd_stat.st_atim;
+  times[1] = fd_stat.st_mtim;
   utimensat(AT_FDCWD, (char*)dst_c.str, times, 0);
 }
 
 FileProperties os_file_path_properties(String path) {
   Scratch scratch;
   String path_c = push_str_copy(scratch, path);
-  struct stat st;
-  stat((char*)path_c.str, &st);
-  FileProperties props = os_lnx_file_properties_from_stat(st);
+  struct stat fd_stat = {};
+  stat((char*)path_c.str, &fd_stat);
+  FileProperties props = os_lnx_file_properties_from_stat(fd_stat);
   return props;
 }
 
 Buffer os_file_path_read_all(Allocator arena, String path) {
   Scratch scratch(arena);
   OS_Handle f = os_file_open(path, OS_AccessFlag_Read);
-  Assert(f);
-
   u64 file_size = os_file_size(f);
   u8* buffer = push_buffer(arena, file_size);
   u64 read_size = os_file_read(f, file_size, buffer);
-  Assert(read_size);
   os_file_close(f);
-
   Buffer result = {
     .data = buffer,
     .size = file_size,
   };
   return result;
+}
+
+b32 os_file_path_equal_mtime(String a, String b) {
+  FileProperties props_a = os_file_path_properties(a);
+  FileProperties props_b = os_file_path_properties(b);
+  if (props_a.modified == props_b.modified) {
+    return true;
+  }
+  return false;
 }
 
 // Directory
@@ -233,43 +258,64 @@ OS_Handle os_directory_open(String path) {
   Scratch scratch;
   String path_c = push_str_copy(scratch, path);
   DIR* dir = opendir((char*)path_c.str);
-  OS_Handle result = (OS_Handle)dir;
+  OS_Handle result = {};
+  if (dir != null) {
+    result.v = (u64)dir;
+  }
   return result;
 }
 
-void os_directory_create(String path) {
+OS_Handle os_directory_create(String path) {
   Scratch scratch;
   String path_c = push_str_copy(scratch, path);
-  mkdir((char*)path_c.str, S_IRWXU);
+  int fd = mkdir((char*)path_c.str, S_IRWXU);
+  OS_Handle result = {};
+  if (fd != -1) {
+    result.v = fd;
+  }
+  return result;
 }
 
-void os_directory_create_recursively(String path) {
+OS_Handle os_directory_create_p(String path) {
   Scratch scratch;
-  OS_Handle result;
   Loop (i, path.size) {
-    u8 ch = path.str[i];
-    if (char_is_slash(ch)) {
-      String path_c = push_str_copy(scratch, str_prefix(path, i));
-      result = mkdir((char*)path_c.str, S_IRWXU);
+    if (char_is_slash(path.str[i])) {
+      String parent_dir = push_str_copy(scratch, str_prefix(path, i));
+      if (!os_directory_path_exist(parent_dir)) {
+        os_directory_create(parent_dir);
+      }
     }
   }
+  OS_Handle result = os_directory_create(path);
+  return result;
+}
+
+b32 os_directory_path_exist(String path) {
+  Scratch scratch;
   String path_c = push_str_copy(scratch, path);
-  result = mkdir((char*)path_c.str, S_IRWXU);
+  os_file_path_properties(path);
+  struct stat st;
+  b32 success = stat((char*)path_c.str, &st);
+  if (success == 0 && S_ISDIR(st.st_mode)) {
+    return true;
+  }
+  return false;
 }
 
 // Watch
 
 OS_Watch os_watch_open(OS_WatchFlags flags) {
-  OS_Handle fd = inotify_init1(IN_NONBLOCK);
+  int fd = inotify_init1(IN_NONBLOCK);
   OS_Watch result = {
-    .handle = fd,
+    .handle = {(u64)fd},
     .flags = flags,
   };
   return result;
 }
 
 void os_watch_close(OS_Watch watch) {
-  close(watch.handle);
+  int fd = watch.handle.v;
+  close(fd);
 }
 
 OS_Handle os_watch_attach(OS_Watch watch, String name) {
@@ -285,12 +331,19 @@ OS_Handle os_watch_attach(OS_Watch watch, String name) {
   if (watch.flags & OS_WatchFlag_Modify) {
     lnx_flags |= IN_MODIFY;
   }
-  OS_Handle wd = inotify_add_watch(watch.handle, (char*)name_c.str, lnx_flags);
-  return wd;
+  int watch_fd = watch.handle.v;
+  int fd = inotify_add_watch(watch_fd, (char*)name_c.str, lnx_flags);
+  OS_Handle result = {};
+  if (fd != -1) {
+    result.v = fd;
+  }
+  return result;
 }
 
 void os_watch_deattach(OS_Watch watch, OS_Handle attached) {
-  inotify_rm_watch(watch.handle, attached);
+  int watch_fd = watch.handle.v;
+  int fd = attached.v;
+  inotify_rm_watch(watch_fd, fd);
 }
 
 StringList os_watch_check(Allocator arena, OS_Watch watch) {
@@ -338,13 +391,12 @@ b32 os_file_iter_next(Allocator arena, OS_FileIter* iter, OS_FileInfo* info_out)
 
     // filter
     b32 filtered = 0;
-    struct stat st;
+    struct stat fd_stat;
     if (good) {
       String full_path = push_strf(scratch, "%s/%s", lnx_iter->path, String(lnx_iter->dp->d_name));
-      stat((char*)full_path.str, &st);
-
-      filtered = ((st.st_mode == S_IFDIR && iter->flags & OS_FileIterFlag_SkipFolders) ||
-                  (st.st_mode == S_IFREG && iter->flags & OS_FileIterFlag_SkipFiles) ||
+      stat((char*)full_path.str, &fd_stat);
+      filtered = ((S_ISDIR(fd_stat.st_mode) && iter->flags & OS_FileIterFlag_SkipFolders) ||
+                  (S_ISREG(fd_stat.st_mode) && iter->flags & OS_FileIterFlag_SkipFiles) ||
                   (lnx_iter->dp->d_name[0] == '.' && lnx_iter->dp->d_name[1] == 0) ||
                   (lnx_iter->dp->d_name[0] == '.' && lnx_iter->dp->d_name[1] == '.' && lnx_iter->dp->d_name[2] == 0));
     }
@@ -352,7 +404,7 @@ b32 os_file_iter_next(Allocator arena, OS_FileIter* iter, OS_FileInfo* info_out)
     // write output
     if (good && !filtered) {
       info_out->name = push_str_copy(arena, String(lnx_iter->dp->d_name));
-      info_out->props = os_lnx_file_properties_from_stat(st);
+      info_out->props = os_lnx_file_properties_from_stat(fd_stat);
       break;
     }
   }
@@ -377,7 +429,10 @@ OS_Handle os_process_launch(StringList list) {
     argv[i++] = (char*)n->string.str;
   }
   pid_t pid = 0;
-  handle = posix_spawnp(&pid, argv[0], null, null, argv, null);
+  int spawn_code = posix_spawnp(&pid, argv[0], null, null, argv, null);
+  if (spawn_code == 0) {
+    handle.v = spawn_code;
+  }
   return handle;
 }
 
@@ -401,10 +456,11 @@ OS_Handle os_process_launch(StringList list) {
 //   return pid;
 // }
 
-void os_process_join(OS_Handle handle) {
-  int pid = handle;
+i32 os_process_join(OS_Handle handle) {
+  int pid = handle.v;
   int status;
   waitpid(pid, &status, 0);
+  return status;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -413,20 +469,24 @@ void os_process_join(OS_Handle handle) {
 OS_Handle os_lib_open(String path) { 
   Scratch scratch;
   String path_c = push_str_copy(scratch, path);
-  OS_Handle result = (OS_Handle)dlopen((char*)path_c.str, RTLD_NOW); 
-  AssertMsg(result, "dlopen failed: %s", String(dlerror()));
+  void* so = dlopen((char*)path_c.str, RTLD_NOW); 
+  OS_Handle result = {(u64)so};
+  AssertMsg(result.v, "dlopen failed: %s", String(dlerror()));
   return result;
 }
 
-void os_lib_close(OS_Handle lib) { dlclose((void*)lib); }
+void os_lib_close(OS_Handle lib) {
+  void* so = (void*)lib.v;
+  dlclose(so);
+}
 
 void* os_lib_get_proc(OS_Handle lib, String name) {
   Scratch scratch;
   String name_c = push_str_copy(scratch, name);
-  void* result = dlsym((void*)lib, (char*)name_c.str);
+  void* so = (void*)lib.v;
+  void* result = dlsym(so, (char*)name_c.str);
   AssertMsg(result, "dlsym failed: %s", String(dlerror()));
   return result;
 }
-
 
 #endif

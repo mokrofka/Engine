@@ -1,7 +1,7 @@
-
 #extension GL_EXT_nonuniform_qualifier : enable
 
 #define KB(n) ((n) << 10)
+#define MaxEntities KB(10)
 
 #define i32 int
 #define u32 uint
@@ -58,21 +58,19 @@ layout(std430, set = 0, binding = 0) readonly buffer Buffer {
   u32 dir_light_count;
   u32 spot_light_count;
 
-  Entity entities[KB(1)];
-  Material materials[KB(1)];
+  Entity entities[MaxEntities];
+  Material materials[MaxEntities];
 
-  PointLight point_lights[KB(1)];
-  DirLight dir_lights[KB(1)];
-  SpotLight spot_lights[KB(1)];
-
+  PointLight point_lights[MaxEntities];
+  DirLight dir_lights[MaxEntities];
+  SpotLight spot_lights[MaxEntities];
 } st;
 
-layout(set = 0, binding = 1) uniform texture2D textures[];
+layout(set = 0, binding = 1) uniform texture2D textures[10];
 layout(set = 0, binding = 2) uniform sampler samplers[];
 layout(set = 0, binding = 3) uniform textureCube cube_texture;
 
 layout(push_constant) uniform PushConstants {
-  // mat4 model;
   u32 id;
   u32 material;
 } push;
@@ -82,4 +80,12 @@ v3 frag_pos;
 v3 view_dir;
 Entity e;
 
+
+
+// import {
+//   float cos(float x);
+//   vec2 cos(vec2 x);
+//   vec3 cos(vec3 x);
+//   vec4 cos(vec4 x);
+// }
 

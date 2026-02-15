@@ -2,11 +2,12 @@
 #include "lib.h"
 #include "vk.h"
 
-#define MaxLights KB(1)
-#define MaxEntities KB(1)
-#define MaxMeshes KB(1)
-#define MaxShaders KB(1)
-#define MaxTextures KB(1)
+#define MaxNumber KB(10)
+#define MaxLights MaxNumber
+#define MaxEntities MaxNumber
+#define MaxMeshes MaxNumber
+#define MaxShaders MaxNumber
+#define MaxTextures MaxNumber
 
 KAPI extern f32 g_dt;
 KAPI extern f32 g_time;
@@ -38,9 +39,14 @@ extern u32 shaders[Shader_COUNT];
 enum MeshId {
   Mesh_GltfCube,
   Mesh_GlbCube,
+  Mesh_Load_COUNT,
+
+  Mesh_Triangle,
+  Mesh_Grid,
+  Mesh_Axis,
   Mesh_COUNT,
 };
-extern String meshes_path[Mesh_COUNT];
+extern String meshes_path[Mesh_Load_COUNT];
 extern u32 meshes[Mesh_COUNT];
 
 ///////////////////////////////////
@@ -194,6 +200,7 @@ KAPI void r_end_draw_frame();
 
 KAPI String asset_base_path();
 KAPI u32 mesh_load(String name);
+// KAPI u32 mesh_load_(String name);
 KAPI u32 shader_load(String shader, ShaderType type);
 KAPI u32 texture_load(String name);
 KAPI u32 cubemap_load(String name);

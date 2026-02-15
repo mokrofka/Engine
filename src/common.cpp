@@ -43,11 +43,11 @@ Extern u32 shaders[Shader_COUNT];
 ///////////////////////////////////
 // Meshes
 
-String meshes_path[Mesh_COUNT] = {
+String meshes_path[Mesh_Load_COUNT] = {
   [Mesh_GltfCube] = "cube.gltf",
   [Mesh_GlbCube] = "cube.glb",
 };
-u32 meshes[Mesh_COUNT];
+Extern u32 meshes[Mesh_COUNT];
 
 ///////////////////////////////////
 // Textures
@@ -284,7 +284,7 @@ intern void test_handle_darray() {
     u32 a;
     u32 b;
   };
-  HandlerDarray<A> arr = {};
+  DarrayHandler<A> arr = {};
   Array<A, 100> values = {};
   Array<u32, 100> handlers = {};
   Loop (i, 100) {

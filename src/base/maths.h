@@ -85,7 +85,6 @@ union mat3 {
 };
 
 union mat4 {
-  // f32 e[16];
   f32 e[4][4];
   struct {
     v4 x;
@@ -332,4 +331,6 @@ KAPI mat4 quat_to_mat4(quat q);
 KAPI mat4 quat_to_rotation_matrix(quat q, v3 center);
 KAPI quat quat_from_axis_angle(v3 axis, f32 angle, b32 normalize);
 KAPI quat quat_slerp(quat q_0, quat q_1, f32 percentage);
+
+KAPI f32 map_range_f32(f32 v, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
 

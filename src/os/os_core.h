@@ -4,8 +4,14 @@
 #include "base/mem.h"
 #include "base/maths.h"
 
-typedef u64 OS_Handle;
+struct OS_Handle {
+  u64 v;
+};
+
 typedef u32 FilePropertyFlags;
+enum {
+  FilePropertyFlag_IsFolder = Bit(0),
+};
 
 struct FileProperties {
   u64 size;
@@ -32,7 +38,8 @@ struct OS_FileInfo {
   FileProperties props;
 };
 
-enum OS_AccessFlags {
+typedef u32 OS_AccessFlags;
+enum {
   OS_AccessFlag_Read       = Bit(0),
   OS_AccessFlag_Write      = Bit(1),
   OS_AccessFlag_Execute    = Bit(2),
@@ -82,20 +89,22 @@ KAPI b32  os_commit_large(void* ptr, u64 size);
 
 KAPI OS_Handle      os_file_open(String path, OS_AccessFlags flags);
 KAPI void           os_file_close(OS_Handle file);
-KAPI u64            os_file_read(OS_Handle file, u64 size, u8* out_data);
-KAPI u64            os_file_write(OS_Handle file, u64 size, u8* data);
+KAPI u64            os_file_read(OS_Handle file, u64 size, void* out_data);
+KAPI u64            os_file_write(OS_Handle file, u64 size, void* data);
 KAPI u64            os_file_size(OS_Handle file);
 KAPI FileProperties os_file_properties(OS_Handle file);
 KAPI Buffer         os_file_path_read_all(Allocator arena, String path);
 KAPI b32            os_file_path_exists(String path);
 KAPI b32            os_file_path_copy(String dst, String src);
-KAPI void           os_file_path_time_copy(String src, String dst);
+KAPI void           os_file_path_copy_mtime(String src, String dst);
 KAPI FileProperties os_file_path_properties(String path);
+KAPI b32            os_file_path_equal_mtime(String a, String b);
 
 // Directory
 KAPI OS_Handle os_directory_open(String path);
-KAPI void      os_directory_create(String path);
-KAPI void      os_directory_create_recursively(String path);
+KAPI OS_Handle os_directory_create(String path);
+KAPI OS_Handle os_directory_create_p(String path);
+KAPI b32       os_directory_path_exist(String path);
 
 // Watch
 OS_Watch   os_watch_open(OS_WatchFlags flags);
@@ -113,7 +122,7 @@ KAPI void         os_file_iter_end(OS_FileIter* iter);
 // Processes
 
 KAPI OS_Handle os_process_launch(StringList list);
-KAPI void      os_process_join(OS_Handle handle);
+KAPI i32       os_process_join(OS_Handle handle);
 
 ////////////////////////////////////////////////////////////////////////
 // Lib

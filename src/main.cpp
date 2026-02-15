@@ -6,7 +6,6 @@ struct App {
   void (*update)(u8** state);
   OS_Handle lib;
   String lib_filepath;
-  String lib_temp_filepath;
 };
 
 global App st;
@@ -25,16 +24,12 @@ i32 main(i32 count, char* args[]) {
 #if HOTRELOAD_BUILD
   String current_dir = os_get_current_directory();
   st.lib_filepath = push_str_cat(scratch, current_dir, "/libgame.so");
-  st.lib_temp_filepath = push_str_cat(scratch, current_dir, "/libgame_temp.so");
-  os_file_path_copy(st.lib_temp_filepath, st.lib_filepath);
-  st.lib = os_lib_open(st.lib_temp_filepath);
+  st.lib = os_lib_open(st.lib_filepath);
   Assign(st.update, os_lib_get_proc(st.lib, "app_update"));
-  Assert(st.lib && st.update);
   asset_watch_add(st.lib_filepath, []() {
     os_lib_close(st.lib);
-    os_file_path_copy(st.lib_temp_filepath, st.lib_filepath);
     os_sleep_ms(10);
-    st.lib = os_lib_open(st.lib_temp_filepath);
+    st.lib = os_lib_open(st.lib_filepath);
     Assign(st.update, os_lib_get_proc(st.lib, "app_update"));
   });
 #else
@@ -77,5 +72,4 @@ i32 main(i32 count, char* args[]) {
   os_gfx_shutdown();
   os_exit(0);
 }
-
 

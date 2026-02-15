@@ -15,8 +15,6 @@ union PushConstant {
   u8 data[128];
 };
 
-#define MaxShaderEntity KB(1)
-
 struct ShaderEntity {
   alignas(16) mat4 model;
   alignas(16) v4 color;
@@ -87,6 +85,16 @@ struct ShaderMaterial {
   alignas(16) v3 specular;
   f32 shininess;
   u32 texture;
+};
+
+struct DrawLine {
+  v3 a;
+  v3 b;
+  v3 color;
+};
+struct ShaderDrawLine {
+  alignas(16) mat4 model;
+  alignas(16) v3 color;
 };
 
 struct Texture {
@@ -187,4 +195,8 @@ KAPI PushConstant& vk_get_push_constant(u32 id);
 KAPI ShaderGlobalState* vk_get_shader_state();
 KAPI void vk_shader_reload(String name, u32 id);
 
+////////////////////////////////////////////////////////////////////////
+// Debug drawing
+
+KAPI void debug_draw_line(v3 a, v3 b, v3 color);
 

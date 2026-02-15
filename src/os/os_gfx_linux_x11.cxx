@@ -165,6 +165,9 @@ void os_gfx_init() {
     XCB_EVENT_MASK_EXPOSURE |
     XCB_EVENT_MASK_KEY_PRESS |
     XCB_EVENT_MASK_KEY_RELEASE |
+    XCB_EVENT_MASK_BUTTON_PRESS |
+    XCB_EVENT_MASK_BUTTON_RELEASE |
+    XCB_EVENT_MASK_POINTER_MOTION |
     XCB_EVENT_MASK_STRUCTURE_NOTIFY
   };
 
@@ -246,6 +249,29 @@ void os_pump_messages() {
         if (cm->data.data32[0] == gfx_st.wm_delete_window) {
           gfx_st.should_close = true; // mark window for closing
         }
+      } break;
+      case XCB_BUTTON_PRESS: {
+        xcb_button_press_event_t* bp = (xcb_button_press_event_t*)event;
+        // gfx_st.input.mouse_x = bp->event_x;
+        // gfx_st.input.mouse_y = bp->event_y;
+        switch (bp->detail) {
+          case 1: gfx_st.input.mouse_current.buttons[MouseButton_Left] = true; break;
+          case 2: gfx_st.input.mouse_current.buttons[MouseButton_Middle] = true; break;
+          case 3: gfx_st.input.mouse_current.buttons[MouseButton_Right] = true; break;
+        }
+      } break;
+      case XCB_BUTTON_RELEASE: {
+        xcb_button_press_event_t* bp = (xcb_button_press_event_t*)event;
+        switch (bp->detail) {
+          case 1: gfx_st.input.mouse_current.buttons[MouseButton_Left] = false; break;
+          case 2: gfx_st.input.mouse_current.buttons[MouseButton_Middle] = false; break;
+          case 3: gfx_st.input.mouse_current.buttons[MouseButton_Right] = false; break;
+        }
+      } break;
+      case XCB_MOTION_NOTIFY: {
+        xcb_motion_notify_event_t* motion = (xcb_motion_notify_event_t*)event;
+        gfx_st.input.mouse_current.x = motion->event_x;
+        gfx_st.input.mouse_current.y = motion->event_y;
       } break;
     }
   }

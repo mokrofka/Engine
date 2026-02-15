@@ -22,6 +22,7 @@ typedef i32 b32;
 typedef u64 DenseTime;
 
 template<typename T> using InitializerList = std::initializer_list<T>;
+typedef va_list VaList;
 
 #if _WIN64
   #define OS_WINDOWS 1

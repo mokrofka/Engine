@@ -6,6 +6,8 @@
       "type": "lldb-dap",
       "request": "launch",
       "program": "${workspaceFolder}/bin/exe",
+      // "program": "${workspaceFolder}/bin/compiling_shaders",
+      "args": ["../assets/shaders", "../assets/shaders/compiled"],
       "cwd": "${workspaceFolder}",
       "console": "internalConsole",
       "initCommands": [ "settings set target.x86-disassembly-flavor intel" ]

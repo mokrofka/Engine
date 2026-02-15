@@ -57,14 +57,15 @@ project(Engine)
 # Hotreload
   if (hotreload)
     add_compile_definitions(HOTRELOAD_BUILD=1)
-    file(GLOB_RECURSE all_files  src/*.cpp src/*.c)
-    file(GLOB_RECURSE game_files src/game/*.cpp)
-    set(exe_file src/main.cpp)
-    set(lib_files ${all_files})
-    list(REMOVE_ITEM lib_files ${game_files} ${exe_file})
 
     # Lib
-    add_library(lib SHARED ${lib_files})
+    add_library(lib SHARED 
+      src/base/base_impl.cpp
+      src/os/os_impl.cpp
+      src/vk.cpp
+      src/stb_impl.c
+      src/common.cpp
+    )
     target_compile_definitions(lib PRIVATE KEXPORT)
     if (UNIX)
       if (X11_use)
@@ -74,19 +75,18 @@ project(Engine)
     endif()
 
     # Game
-    add_library(game SHARED ${game_files})
+    add_library(game SHARED src/game/game.cpp)
     target_include_directories(game PRIVATE src/game)
     target_link_libraries(game ${binary_dir}/liblib.so)
 
     # Exe
-    add_executable(exe ${exe_file})
+    add_executable(exe src/main.cpp)
     target_link_libraries(exe ${binary_dir}/liblib.so)
 
 # One Exe
   else()
     file(GLOB_RECURSE binary_files src/*.cpp src/*.c)
     add_executable(exe ${binary_files})
-
     if (UNIX)
       if (X11_use)
         target_link_libraries(exe ${X11_LIBRARIES} libxcb-keysyms.so -lxcb)
@@ -97,3 +97,10 @@ project(Engine)
       set_target_properties(exe PROPERTIES WIN32_EXECUTABLE true)
     endif()
   endif()
+
+# add_executable(compiling_shaders 
+#   src/base/base_impl.cpp
+#   src/os/os_core_linux.cxx
+#   src/compiling_shaders.cpp
+# )
+

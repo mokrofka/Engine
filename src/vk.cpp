@@ -82,7 +82,7 @@ struct VK_Shader {
   ShaderType type;
   VkPipeline pipeline;
   Array<VkPipelineShaderStageCreateInfo, 2> stages;
-  HandlerDarray<u32> entities;
+  DarrayHandler<u32> entities;
 };
 
 struct VK_ShaderCompute {
@@ -137,7 +137,6 @@ struct VK_State {
   VkPipelineLayout pipeline_layout;
 
   VkDescriptorSetLayout compute_descriptor_set_layout;
-  // VkDescriptorSet compute_descriptor_sets[FramesInFlight];
   
   VkCommandBuffer* cmds;
   VkCommandBuffer* compute_cmds;
@@ -145,6 +144,7 @@ struct VK_State {
   ShaderEntity* shader_entities;
   ShaderMaterial* shader_materials;
   u32 shader_materials_count;
+  ShaderDrawLine shade;
 
   Array<RenderEntity, MaxEntities> entities;
   Array<u32, MaxEntities> entities_to_shader;
@@ -155,18 +155,19 @@ struct VK_State {
   Array<VK_Mesh, MaxMeshes> meshes;
   Array<VK_Image, MaxTextures> texture;
 
-  SparseSet<PointLight> point_light_data;
-  SparseSet<DirLight> dir_light_data;
-  SparseSet<SpotLight> spot_light_data;
+  // SparseSet<PointLight> point_light_data;
+  // SparseSet<DirLight> dir_light_data;
+  // SparseSet<SpotLight> spot_light_data;
 
-  // VK_ShaderCompute compute_shader;
-  // ShaderGlobalState* global_shader_state;
   VK_Shader screen_shader;
   VK_Shader cubemap_shader;
+  VK_Shader draw_line_shader;
 
   // offscreen rendering
   // VK_Texture* texture_targets;
   VK_Image offscreen_depth_buffer;
+
+  Array<DrawLine, MaxEntities> draw_lines;
 
   #define VK_DECL(name) Glue(PFN_, vk##name) name
 
@@ -1009,7 +1010,7 @@ intern void vk_descriptor_init() {
   {
     u64 entities_start = AlignUp(sizeof(ShaderGlobalState), alignof(ShaderEntity));
     Assign(vk.shader_entities, Offset(vk.storage_buffer.maped_memory, entities_start));
-    u64 entities_end = (u64)Offset((u64*)entities_start, sizeof(ShaderEntity) * MaxShaderEntity);
+    u64 entities_end = (u64)Offset((u64*)entities_start, sizeof(ShaderEntity) * MaxEntities);
     u64 material_start = AlignUp(entities_end, alignof(ShaderMaterial));
     Assign(vk.shader_materials, Offset(vk.storage_buffer.maped_memory, material_start));
   }
@@ -1888,7 +1889,6 @@ void vk_draw() {
 
   for (VK_Shader shader : vk.shaders) {
     vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, shader.pipeline);
-
     for (u32 id : shader.entities) {
       u32 mesh_id = vk.entities_to_mesh[id];
       VK_Mesh mesh = vk.meshes[mesh_id];
@@ -1896,10 +1896,8 @@ void vk_draw() {
       push->entity_idx = id;
       ShaderEntity& e = vk_get_entity(id);
       e.model = mat4_transform(entities_transforms[id]);
-
       vk.CmdPushConstants(cmd, vk.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstant), push);
       vk.CmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, &mesh.vert_offset);
-      
       if (mesh.index_count) {
         vk.CmdBindIndexBuffer(cmd, vk.index_buffer.handle, mesh.index_offset, VK_INDEX_TYPE_UINT32);
         vk.CmdDrawIndexed(cmd, mesh.index_count, 1, 0, 0, 0);
@@ -1909,6 +1907,16 @@ void vk_draw() {
     }
   }
 
+  // Immediate mode drawing
+  {
+    // Lines
+    // vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.draw_line_shader.pipeline);
+    // for (DrawLine x : vk.draw_lines) {
+    // }
+    // vk.draw_lines.clear();
+  }
+
+  // Cube map
   vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.cubemap_shader.pipeline);
   VK_Mesh mesh = vk.meshes[0];
   vk.CmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, &mesh.vert_offset);
@@ -2293,7 +2301,7 @@ void vk_init() {
       VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     vk.stage_buffer = vk_buffer_create(
-      MB(110),
+      MB(10),
       VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     vk_buffer_map_memory(vk.stage_buffer, 0, vk.stage_buffer.cap);
@@ -2668,235 +2676,8 @@ ShaderGlobalState* vk_get_shader_state() {
   return (ShaderGlobalState*)vk.storage_buffer.maped_memory;
 }
 
-// f32 ease_in_exp(f32 x) {
-// 	return x <= 0.0 ? 0.0 : Pow(2, 10.0 * x - 10.0);
-// }
+void debug_draw_line(v3 a, v3 b, v3 color) {
+  DrawLine line = {a,b,color};
+  vk.draw_lines.add(line);
+}
 
-// void compute_shader() {
-//   Scratch scratch;
-//   VK_ShaderCompute* shader = &vk.compute_shader;
-//   // shader->stage.pipeline_shader_stage_create_info = vk_shader_module_create("compute", "comp", VK_SHADER_STAGE_COMPUTE_BIT);
-//   // shader->pipeline_shader_stage_create_info = vk_shader_module_create("compute", "comp", VK_SHADER_STAGE_COMPUTE_BIT);
-  
-//   Particle* particles = push_array(scratch, Particle, ParticleCount);
-  
-//   // v2i frame = os_get_window_size();
-//   f32 min = 0, max = 1;
-  
-//   Loop (i, ParticleCount) {
-//     f32 r = 0.25f * rand_range_f32(min, max);
-//     f32 theta = rand_range_f32(min, max) * Tau;          // angle around Y axis
-//     f32 phi = Acos(2.0f * rand_range_f32(min, max) - 1.0f); // angle from Z axis (0..pi)
-
-//     f32 x = r * Sin(phi) * Cos(theta);
-//     f32 y = r * Sin(phi) * Sin(theta);
-//     f32 z = r * Cos(phi);
-
-//     particles[i].pos = v3(x, y, z);
-//     particles[i].velocity = v3_norm(v3(x, y, z)) * 0.25f;
-//     particles[i].color = v4(rand_range_f32(min, max), rand_range_f32(min, max), rand_range_f32(min, max), 1.0f);
-//   }
-  
-//   u32 num_elipses = 14;
-//   f32 tilt_step = radtodeg(0.1);
-//   f32 radius_step = 1.1;
-//   // Loop (i, num_elipses) {
-//   //   f32 angle_offset = i * tilt_step;
-//   //   f32 a = (i + 1) * radius_step / 5; // semi-major axis
-//   //   // f32 b = a * 0.9f * i;              // semi-minor axis (flattening)
-//   //   f32 b = a * 0.91f;              // semi-minor axis (flattening)
-
-//   //   u32 stars_per_ellipse = ParticleCount / num_elipses;
-//   //   Loop (j, stars_per_ellipse) {
-//   //     f32 t = 2 * PI * j / stars_per_ellipse;
-//   //     f32 rand = rand_range_f32(0,0.2);
-//   //     f32 x = a * Cos(t) + rand;
-//   //     f32 y = b * Sin(t) + rand;
-
-//   //     // Apply rotation
-//   //     f32 xr = Cos(angle_offset) * x - Sin(angle_offset) * y;
-//   //     f32 yr = Sin(angle_offset) * x + Cos(angle_offset) * y;
-
-//   //     particles[i*stars_per_ellipse + j].position = {xr,yr, 1};
-//   //   }
-//   // }
-
-//   // Loop(i, num_elipses) {
-//   //   f32 angle_offset = i * tilt_step;
-//   //   f32 a = (i + 1) * radius_step / 5.0f; // semi-major axis
-//   //   f32 b = a * 0.91f;                    // semi-minor axis
-
-//   //   u32 stars_per_ellipse = ParticleCount / num_elipses;
-
-//   //   Loop(j, stars_per_ellipse) {
-//   //     f32 t = 2.0f * PI * j / stars_per_ellipse;
-
-//   //     // Base ellipse position
-//   //     f32 x = a * Cos(t);
-//   //     f32 y = b * Sin(t);
-
-//   //     // Add random jitter (scatter)
-//   //     f32 rand_angle = rand_range_f32(-0.1f, 0.1f);  // scatter angle
-//   //     f32 rand_radius = rand_range_f32(-0.1f, 0.2f); // scatter radius
-
-//   //     x += rand_radius * Cos(t + rand_angle);
-//   //     y += rand_radius * Sin(t + rand_angle);
-
-//   //     // Rotate ellipse
-//   //     f32 xr = Cos(angle_offset) * x - Sin(angle_offset) * y;
-//   //     f32 yr = Sin(angle_offset) * x + Cos(angle_offset) * y;
-//   //     f32 z = rand_range_f32(-0.1, 0.1);
-
-//   //     particles[i * stars_per_ellipse + j].pos = {xr, yr, z};
-
-//   //     f32 dist = v3_length(particles[i].pos);
-
-//   //     f32 max_dist = 2;
-//   //     f32 brightness = Clamp(0.0f, 1.0f - dist / max_dist, 1.0);
-
-//   //     v4 baseColor = v4(0.5f, 0.5f, 0.5f, 1.0f);
-      
-//   //     particles[i*stars_per_ellipse + j].color = v4(baseColor.r * brightness, baseColor.g * brightness, baseColor.b * brightness, baseColor.a);
-      
-//   //     particles[i*stars_per_ellipse + j].pos = {xr,yr, 1};
-//   //   }
-//   // }
-
-//   Range range = {0, ParticleCount * sizeof(Particle)};
-//   vk_buffer_upload_to_gpu(vk.compute_storage_buffers[0], range, particles);
-//   vk_buffer_upload_to_gpu(vk.compute_storage_buffers[1], range, particles);
-  
-//   VkDescriptorSetLayoutBinding layout_bindings[3] = {};
-//   layout_bindings[0].binding = 0;
-//   layout_bindings[0].descriptorCount = 1;
-//   layout_bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-//   layout_bindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-  
-//   layout_bindings[1].binding = 1;
-//   layout_bindings[1].descriptorCount = 1;
-//   layout_bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-//   layout_bindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-  
-//   layout_bindings[2].binding = 2;
-//   layout_bindings[2].descriptorCount = 1;
-//   layout_bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-//   layout_bindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-  
-//   VkDescriptorSetLayoutCreateInfo layout_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-//   layout_info.bindingCount = ArrayCount(layout_bindings);
-//   layout_info.pBindings = layout_bindings;
-//   VK_CHECK(vkCreateDescriptorSetLayout(vkdevice, &layout_info, vk.allocator, &vk.compute_descriptor_set_layout));
-  
-//   VkDescriptorSetLayout layouts[] = {
-//     vk.compute_descriptor_set_layout, 
-//     vk.compute_descriptor_set_layout, 
-//   };
-//   VkDescriptorSetAllocateInfo alloc_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-//   alloc_info.descriptorPool = vk.descriptor_pool;
-//   alloc_info.descriptorSetCount = ArrayCount(layouts);
-//   alloc_info.pSetLayouts = layouts;
-//   VK_CHECK(vkAllocateDescriptorSets(vkdevice, &alloc_info, vk.compute_descriptor_sets));
-
-//   Loop (i, FramesInFlight) {
-//     VkWriteDescriptorSet descriptor_writes[3];
-    
-//     VkDescriptorBufferInfo uniform_buffer_info = {};
-//     // uniform_buffer_info.buffer = vk.compute_uniform_buffer.handle;
-//     uniform_buffer_info.offset = 0;
-//     uniform_buffer_info.range = sizeof(UniformBufferObject);
-    
-//     descriptor_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-//     descriptor_writes[0].dstSet = vk.compute_descriptor_sets[i];
-//     descriptor_writes[0].dstBinding = 0;
-//     descriptor_writes[0].dstArrayElement = 0;
-//     descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-//     descriptor_writes[0].descriptorCount = 1;
-//     descriptor_writes[0].pBufferInfo = &uniform_buffer_info;
-
-//     VkDescriptorBufferInfo storage_buffer_info_last_frame{};
-//     storage_buffer_info_last_frame.buffer = vk.compute_storage_buffers[(i + 1) % FramesInFlight].handle;
-//     storage_buffer_info_last_frame.offset = 0;
-//     storage_buffer_info_last_frame.range = sizeof(Particle) * ParticleCount;
-
-//     descriptor_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-//     descriptor_writes[1].dstSet = vk.compute_descriptor_sets[i];
-//     descriptor_writes[1].dstBinding = 1;
-//     descriptor_writes[1].dstArrayElement = 0;
-//     descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-//     descriptor_writes[1].descriptorCount = 1;
-//     descriptor_writes[1].pBufferInfo = &storage_buffer_info_last_frame;
-
-//     VkDescriptorBufferInfo storage_buffer_info_current_frame{};
-//     storage_buffer_info_current_frame.buffer = vk.compute_storage_buffers[i].handle;
-//     storage_buffer_info_current_frame.offset = 0;
-//     storage_buffer_info_current_frame.range = sizeof(Particle) * ParticleCount;
-
-//     descriptor_writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-//     descriptor_writes[2].dstSet = vk.compute_descriptor_sets[i];
-//     descriptor_writes[2].dstBinding = 2;
-//     descriptor_writes[2].dstArrayElement = 0;
-//     descriptor_writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-//     descriptor_writes[2].descriptorCount = 1;
-//     descriptor_writes[2].pBufferInfo = &storage_buffer_info_current_frame;
-
-//     vkUpdateDescriptorSets(vkdevice, 3, descriptor_writes, 0, null);
-//   }
-
-//   VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-//   pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-//   pipelineLayoutInfo.setLayoutCount = 1;
-//   pipelineLayoutInfo.pSetLayouts = &vk.compute_descriptor_set_layout;
-//   VK_CHECK(vkCreatePipelineLayout(vkdevice, &pipelineLayoutInfo, vk.allocator, &vk.compute_shader.pipeline.pipeline_layout));
-
-//   VkComputePipelineCreateInfo pipeline_info{};
-//   pipeline_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-//   pipeline_info.layout = vk.compute_shader.pipeline.pipeline_layout;
-//   pipeline_info.stage = vk.compute_shader.pipeline_shader_stage_create_info;
-//   VK_CHECK(vkCreateComputePipelines(vkdevice, VK_NULL_HANDLE, 1, &pipeline_info, vk.allocator, &vk.compute_shader.pipeline.handle));
-  
-
-// }
-
-// void foo() {
-//   Shader s = {
-//     .has_position = true,
-//     .has_color = true
-//   };
-//   vk_Shader* shader = &vk.graphics_shader_compute;
-//   String stage_type_strs[] = { "vert", "frag"};
-//   #define ShaderStageCount 2
-//   VkShaderStageFlagBits stage_types[ShaderStageCount] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
-//   Loop (i, 2) {
-//     shader->stages[i] = vk_shader_module_create("compute", stage_type_strs[i], stage_types[i]);
-//   }
-  
-//   #define AttributeCount 10
-//   u32 stages_count = 0;
-//   u32 vert_stride = 0;
-//   u32 attribute_count = 0;
-//   u32 offset = 0;
-//   VkVertexInputAttributeDescription attribute_desriptions[AttributeCount];
-//   if (s.has_position) {
-//     attribute_desriptions[attribute_count].binding = 0;
-//     attribute_desriptions[attribute_count].location = attribute_count;
-//     attribute_desriptions[attribute_count].format = VK_FORMAT_R32G32B32_SFLOAT;
-//     attribute_desriptions[attribute_count].offset = OffsetOf(Particle, pos);
-//     ++attribute_count;
-//   }
-//   if (s.has_color) {
-//     attribute_desriptions[attribute_count].binding = 0;
-//     attribute_desriptions[attribute_count].location = attribute_count;
-//     attribute_desriptions[attribute_count].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-//     attribute_desriptions[attribute_count].offset = OffsetOf(Particle, color);
-//     ++attribute_count;
-//   }
-//   vert_stride = sizeof(Particle);
-  
-//   VkPipelineShaderStageCreateInfo stage_create_infos[ShaderStageCount] = {};
-//   Loop (i, ShaderStageCount) {
-//     stage_create_infos[i] = shader->stages[i].shader_state_create_info;
-//   }
-//   mem_copy(&shader->attribute_desriptions, &attribute_desriptions, attribute_count*sizeof(VkVertexInputAttributeDescription));
-//   shader->pipeline = vk_pipeline_create(vert_stride, attribute_count, attribute_desriptions,
-//                                         2, stage_create_infos, shader->topology, false, false);
-// }

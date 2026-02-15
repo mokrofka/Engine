@@ -472,26 +472,28 @@ mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 f
   return result;
 }
 
+// NOTE: I use camera looking at -Z direction since I found it's more intuitive
 mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 Near, f32 Far) {
   f32 fov = Tan(fov_radians/2.0f);
-  mat4 result = {
-    1/(fov*aspect_ratio), 0,                       0,                    0,
-    0,                    1/fov,                   0,                    0,
-    0,                    0,                       Far/(Far-Near),       1,
-    0,                    0,                       -Far*Near/(Far-Near), 0
-  };
-  // NOTE: This flips z value
   // mat4 result = {
-  //   1/(fov*aspect_ratio), 0,                0,                             0,
-  //   0,                    1/(fov),          0,                             0,
-  //   0,                    0,                -(Far + Near)/(Far - Near),   -1,
-  //   0,                    0,                (-2.0f*Far*Near)/(Far - Near), 0
+  //   1/(fov*aspect_ratio), 0,                       0,                    0,
+  //   0,                    1/fov,                   0,                    0,
+  //   0,                    0,                       Far/(Far-Near),       1,
+  //   0,                    0,                       -Far*Near/(Far-Near), 0
   // };
+  // NOTE: This flips Z value so camera is looking at -Z direction
+  mat4 result = {
+    1/(fov*aspect_ratio), 0,                0,                             0,
+    0,                    1/(fov),          0,                             0,
+    0,                    0,                -(Far + Near)/(Far - Near),   -1,
+    0,                    0,                (-2.0f*Far*Near)/(Far - Near), 0
+  };
   return result;
 }
 
+// NOTE: we negate Z direction since camera is looking at -Z direction
 mat4 mat4_look_at(v3 pos, v3 dir, v3 up) {
-  v3 z = v3_norm(dir);
+  v3 z = -v3_norm(dir);
   v3 x = v3_norm(v3_cross(up, z));
   v3 y = v3_cross(z, x);
   mat4 camera_view = {
@@ -586,23 +588,23 @@ mat4 mat4_inverse(mat4 m) {
 }
 
 v3 mat4_forward(mat4 matrix) {
-  v3 forward = {
-    matrix.e[0][2],
-    matrix.e[1][2],
-    matrix.e[2][2],
-  };
-  forward = v3_norm(forward);
-  return forward;
-}
-
-v3 mat4_backward(mat4 matrix) {
-  v3 forward = {
+  v3 res = {
     -matrix.e[0][2],
     -matrix.e[1][2],
     -matrix.e[2][2],
   };
-  forward = v3_norm(forward);
-  return forward;
+  res = v3_norm(res);
+  return res;
+}
+
+v3 mat4_backward(mat4 matrix) {
+  v3 res = {
+    matrix.e[0][2],
+    matrix.e[1][2],
+    matrix.e[2][2],
+  };
+  res = v3_norm(res);
+  return res;
 }
 
 v3 mat4_up(mat4 matrix) {
@@ -825,5 +827,9 @@ quat quat_slerp(quat q_0, quat q_1, f32 percentage) {
       (v0.y * s0) + (v1.y * s1),
       (v0.z * s0) + (v1.z * s1),
       (v0.w * s0) + (v1.w * s1)};
+}
+
+f32 map_range_f32(f32 v, f32 old_min, f32 old_max, f32 new_min, f32 new_max) {
+  return new_min + (((v - old_min) * (new_max - new_min)) / (old_max - old_min));
 }
 

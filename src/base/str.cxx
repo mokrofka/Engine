@@ -200,7 +200,7 @@ intern u32 hex_u64_write(u8* dest, u64 value) {
 ////////////////////////////////////////////////////////////////////////
 // Great sprintf
 
-intern u32 my_sprintf(u8* buf, String fmt, va_list argc) {
+intern u32 my_sprintf(u8* buf, String fmt, VaList argc) {
 
   // Calculate length
   if (buf == null) {
@@ -279,7 +279,7 @@ intern u32 my_sprintf(u8* buf, String fmt, va_list argc) {
             written += len;
             break;
           }
-          i32 val = va_arg(argc, i32);
+          i32 val = va_arg(argc, i64);
           u32 len = i32_write(buf + written, val);
           written += len;
         } break;
@@ -496,8 +496,8 @@ String push_str_copy(Allocator arena, String s) {
   return str;
 }
 
-String push_strfv(Allocator arena, String fmt, va_list argc) {
-  va_list va_list_argc;
+String push_strfv(Allocator arena, String fmt, VaList argc) {
+  VaList va_list_argc;
   va_copy(va_list_argc, argc); 
   u32 need_bytes = my_sprintf(null, fmt, va_list_argc);
   va_end(va_list_argc);
@@ -511,7 +511,7 @@ String push_strfv(Allocator arena, String fmt, va_list argc) {
 }
 
 String push_strf(Allocator arena, String fmt, ...) {
-  va_list argc;
+  VaList argc;
   va_start(argc, fmt);
   String result = push_strfv(arena, fmt, argc);
   va_end(argc);
@@ -543,7 +543,7 @@ StringNode* str_list_push(Allocator arena, StringList* list, String string) {
 }
 
 StringNode* str_list_pushf(Allocator arena, StringList* list, String fmt, ...) {
-  va_list args;
+  VaList args;
   va_start(args, fmt);
   String string = push_strfv(arena, fmt, args);
   StringNode* result = str_list_push(arena, list, string);

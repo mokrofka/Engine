@@ -53,12 +53,12 @@ void SparseSetIndex::grow_max_index(u32 id) {
 ////////////////////////////////////////////////////////////////////////
 // HandlerArray
 
-u32* HandlerDarrayIndex::begin() { return entities; }
-u32* HandlerDarrayIndex::end()   { return entities + count; }
-HandlerDarrayIndex::HandlerDarrayIndex(Allocator alloc_) { *this = {}; alloc = alloc_; }
-void HandlerDarrayIndex::init(Allocator alloc_) { *this = {}; alloc = alloc_; }
+u32* DarrayIndexHandler::begin() { return entities; }
+u32* DarrayIndexHandler::end()   { return entities + count; }
+DarrayIndexHandler::DarrayIndexHandler(Allocator alloc_) { *this = {}; alloc = alloc_; }
+void DarrayIndexHandler::init(Allocator alloc_) { *this = {}; alloc = alloc_; }
 
-u32 HandlerDarrayIndex::add() {
+u32 DarrayIndexHandler::add() {
   if (count >= cap) {
     grow();
   }
@@ -68,7 +68,7 @@ u32 HandlerDarrayIndex::add() {
   return id;
 }
 
-void HandlerDarrayIndex::remove(u32 id) {
+void DarrayIndexHandler::remove(u32 id) {
   DebugDo(Assert(entity_to_index[id] != INVALID_ID));
   u32 idx_removed = entity_to_index[id];
   u32 idx_last = count - 1;
@@ -79,7 +79,7 @@ void HandlerDarrayIndex::remove(u32 id) {
   DebugDo(entity_to_index[id] = INVALID_ID);
 }
 
-void HandlerDarrayIndex::grow() {
+void DarrayIndexHandler::grow() {
   if (entity_to_index) {
     u32 cap_old = cap;
     cap *= DEFAULT_RESIZE_FACTOR;

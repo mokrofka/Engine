@@ -109,7 +109,7 @@ KAPI String str_chop(String str, u64 amt);
 
 KAPI String push_str_cat(Allocator arena, String s1, String s2);
 KAPI String push_str_copy(Allocator arena, String s);
-KAPI String push_strfv(Allocator arena, String fmt, va_list argc);
+KAPI String push_strfv(Allocator arena, String fmt, VaList argc);
 KAPI String push_strf(Allocator arena, String fmt, ...);
 
 ////////////////////////////////////////////////////////////////////////

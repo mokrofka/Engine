@@ -14,8 +14,8 @@ void main() {
     v4 texture_color = texture(sampler2D(textures[material.texture], samplers[0]), in_uv);
     out_color = texture_color;
   // }
-  
   // out_color = v4(material.ambient, 1);
+
 } 
 
 

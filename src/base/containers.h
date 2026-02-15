@@ -367,7 +367,7 @@ struct HandlerArray {
 };
 
 template <typename T>
-struct HandlerDarray {
+struct DarrayHandler {
   u32 count;
   u32 cap;
   Allocator alloc;
@@ -376,8 +376,8 @@ struct HandlerDarray {
   T* data;
   T* begin() { return data; }
   T* end()   { return data + count; }
-  HandlerDarray() = default;
-  HandlerDarray(Allocator alloc_) { *this = {}; alloc = alloc_; }
+  DarrayHandler() = default;
+  DarrayHandler(Allocator alloc_) { *this = {}; alloc = alloc_; }
   void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
   T& get(u32 idx) {
     Assert(idx < cap);
@@ -427,9 +427,12 @@ struct HandlerDarray {
       mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
     }
   }
+  void clear() {
+    count = 0;
+  }
 };
 
-struct HandlerDarrayIndex {
+struct DarrayIndexHandler {
   u32 count;
   u32 cap;
   Allocator alloc;
@@ -437,8 +440,8 @@ struct HandlerDarrayIndex {
   u32* entities;
   u32* begin();
   u32* end();
-  HandlerDarrayIndex() = default;
-  HandlerDarrayIndex(Allocator alloc_);
+  DarrayIndexHandler() = default;
+  DarrayIndexHandler(Allocator alloc_);
   void init(Allocator alloc_);
   u32 add();
   void remove(u32 id);

@@ -4,7 +4,7 @@
     {
       "label": "Compile shaders",
       "type": "process",
-      "command": "${workspaceFolder}/bin/shader_compiler",
+      "command": "${workspaceFolder}/bin/compiling_shaders",
       "args": ["../assets/shaders", "../assets/shaders/compiled"],
       "group": {
         "kind": "build",

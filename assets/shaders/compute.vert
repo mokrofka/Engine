@@ -28,3 +28,5 @@ void main() {
   gl_Position = ubo.projection_view * push_ubo.model * vec4(in_position, 1.0);
   fragColor = in_color.xyz;
 }
+
+
