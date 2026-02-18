@@ -408,4 +408,8 @@ shared_function void app_update(u8** state) {
   gpu_data_update();
 }
 
+void bar() {
+  // a.init
 
+  // Info("%i", arr[0]);
+}

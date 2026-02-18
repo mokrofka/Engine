@@ -56,7 +56,6 @@ i32 main(i32 args_count, char* args[]) {
       String shader_full_path = push_strf(scratch, "%s/%s", shader_dir, info.name);
       String compiled_shader_full_path = push_strf(scratch, "%s/%s.spv", compiled_shader_dir, info.name);
       if (!os_file_path_equal_mtime(shader_full_path, compiled_shader_full_path) || is_change) {
-        // Info("it's compiling");
         StringList list = {};
         str_list_pushf(scratch, &list, "glslangValidator");
         str_list_pushf(scratch, &list, "-V");

@@ -115,5 +115,3 @@ void id_pool_free(IdPool& p, u32 id) {
   Assert(!p.array.exists(id));
   p.array.add(id);
 }
-
-

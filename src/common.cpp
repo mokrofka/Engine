@@ -226,6 +226,42 @@ intern void test_seglist_alloc() {
   }
 }
 
+intern void test_gpu_seglist_alloc() {
+  Scratch scratch;
+  GpuAllocSegList alloc = {.cap = MB(1)};
+  alloc.init(scratch);
+  Array<GpuMemHandler, 100> arr = {};
+  Loop (i, 100) {
+    u64 size = rand_range_u32(8, KB(1));
+    u64 align = test_alignments[rand_range_u32(0, 3)];
+    arr.add(alloc.alloc(size, align));
+  }
+  Array<u32, 100> indices = {};
+  Loop(i, 100) indices.add(i);
+  for (u32 i = indices.count - 1; i > 0; --i) {
+    u32 j = rand_range_u32(0, i);
+    Swap(indices[i], indices[j]);
+  }
+  Loop (i, 100) {
+    alloc.free(arr[indices[i]]);
+  }
+  arr.clear();
+  Loop (i, 100) {
+    u64 size = rand_range_u32(8, KB(1));
+    u64 align = test_alignments[rand_range_u32(0, 3)];
+    arr.add(alloc.alloc(size, align));
+  }
+  indices.clear();
+  Loop(i, 100) indices.add(i);
+  for (u32 i = indices.count - 1; i > 0; --i) {
+    u32 j = rand_range_u32(0, i);
+    Swap(indices[i], indices[j]);
+  }
+  Loop (i, 100) {
+    alloc.free(arr[indices[i]]);
+  }
+}
+
 ///////////////////////////////////
 // Containters
 
@@ -332,6 +368,7 @@ void test() {
   test_arena_alloc();
   test_arena_list_alloc();
   test_seglist_alloc();
+  test_gpu_seglist_alloc();
   test_object_pool();
 }
 

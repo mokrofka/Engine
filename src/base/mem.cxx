@@ -245,19 +245,19 @@ intern u8* seglist_alloc(AllocSegList* alloc, u64 size, u64 align) {
   MemGuardAlloc(result, size);
   return result;
 #else
-  size = size + alignment;
-  u64 pow2_size = next_pow2(size);
-  u64 pool_index = ctz64(pow2_size) - ctz64(8);
-  MemPoolPow2& p = allocator.pools[pool_index];
-  if (p.head == null) {
-    u8* result = push_buffer(allocator.arena, pow2_size, alignment);
-    *(u32*)result = pool_index;
-    u32* index = (u32*)OffsetBack(result, sizeof(u32));
-    *index = pool_index;
-    return result;
-  }
-  PoolFreeNode* result = p.head;
-  p.head = p.head->next;
+  // size = size + alignment;
+  // u64 pow2_size = next_pow2(size);
+  // u64 pool_index = ctz64(pow2_size) - ctz64(8);
+  // MemPoolPow2& p = allocator.pools[pool_index];
+  // if (p.head == null) {
+  //   u8* result = push_buffer(allocator.arena, pow2_size, alignment);
+  //   *(u32*)result = pool_index;
+  //   u32* index = (u32*)OffsetBack(result, sizeof(u32));
+  //   *index = pool_index;
+  //   return result;
+  // }
+  // PoolFreeNode* result = p.head;
+  // p.head = p.head->next;
 #endif
 };
 
@@ -413,23 +413,49 @@ void mem_free(Allocator alloc, void* ptr) {
 }
 
 ////////////////////////////////////////////////////////////////////////
-// General allocator (segregated pow2 list but for gpu)
+// General GPU allocator (segregated pow2)
 
-AllocGpuHandle* gpu_seglist_alloc(AllocGpu& allocator, u64 size, u64 alignment) {
-  return {};
+void GpuAllocSegList::init(Allocator alloc_) {
+  allocator = alloc_;
+  range_cap = 8;
+  data = mem_alloc_array<RangeList>(allocator, range_cap);
 }
 
-void mem_free(AllocGpu& allocator, AllocGpuHandle handle) {
+GpuMemHandler GpuAllocSegList::alloc(u64 size, u64 align) {
+  Assert(size > 0);
+  u64 alloc_size = align + size;
+  u64 pow2_size = next_pow2(alloc_size);
+  u64 pool_idx = ctz(pow2_size) - ctz(8);
+  u32& p = heads[pool_idx];
+  if (p == 0) {
+    u64 cur_pos = AlignUp(pos, align);
+    pos = cur_pos + size;
+    RangeList range = {0, true, cur_pos, alloc_size};
+    u32 result = range_count;
+    if (range_count >= range_cap) {
+      range_cap *= 2;
+      mem_realloc_array<RangeList>(allocator, data, range_count, range_cap) ;
+    }
+    data[range_count++] = range;
+    return result;
+  }
+  u32 result = p;
+  p = data[p].next;
+  return result;
+}
+
+void GpuAllocSegList::free(u32 idx) {
+  RangeList& range = data[idx];
+  AssertMsg(range.is_allocated == true, "not allocated chunk");
+  u64 pow2_size = next_pow2(range.range.size);
+  u64 pool_idx = ctz(pow2_size) - ctz(8);
+  u32& p = heads[pool_idx];
+  range.next = p;
+  p = idx;
 }
 
 ////////////////////////////////////////////////////////////////////////
 // Utils
-
-// u64 _push_offset(u64* cur_pos, u64 size, u64 align) {
-//   u64 offset = AlignUp(*cur_pos, align);      // aligned start for this array
-//   *cur_pos = offset + size;                   // advance current position
-//   return offset;
-// }
 
 u8* mem_alloc_soa(Allocator alloc, u32 count, SoA_Field* fields, u32 fields_count) {
   u64 mem_offset = 0;

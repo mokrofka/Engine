@@ -108,7 +108,7 @@ template<typename T> T* mem_alloc_array_zero(Allocator a, u32 c)                
 template<typename T> T* mem_realloc_array(Allocator a, T* ptr, u32 old_c, u32 c)      { return (T*)mem_realloc(a, ptr,      sizeof(T)*old_c, sizeof(T)*c, alignof(T)); }
 template<typename T> T* mem_realloc_array_zero(Allocator a, T* ptr, u32 old_c, u32 c) { return (T*)mem_realloc_zero(a, ptr, sizeof(T)*old_c, sizeof(T)*c, alignof(T)); }
 
-// I like push name)
+// I like push name
 #define push_buffer(a, z, ...)           mem_alloc(a,      z, ##__VA_ARGS__)
 #define push_buffer_zero(a, z, ...)      mem_alloc_zero(a, z, ##__VA_ARGS__)
 #define push_struct(a, T)            (T*)mem_alloc(a,      sizeof(T),     alignof(T))
@@ -119,24 +119,28 @@ template<typename T> T* mem_realloc_array_zero(Allocator a, T* ptr, u32 old_c, u
 ////////////////////////////////////////////////////////////////////////
 // General GPU allocator (segregated pow2)
 
-struct AllocGpuHandle {
-  u64 offset;
-  u64 size;
-};
+typedef u32 GpuMemHandler;
 
-struct AllocGpu {
-  AllocGpuHandle* pools[32];
-  AllocGpuHandle* handlers;
+struct GpuAllocSegList {
+  u64 pos;
+  u64 cap;
+  Allocator allocator;
+  struct RangeList {
+    u32 next;
+    b32 is_allocated;
+    Range range;
+  };
+  RangeList* data;
+  u32 range_count;
+  u32 range_cap;
+  u32 heads[32];
+  void init(Allocator alloc_);
+  GpuMemHandler alloc(u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
+  void free(u32 idx);
 };
-
-AllocGpuHandle* gpu_seglist_alloc(AllocGpu& allocator, u64 size, u64 alignment = MEM_DEFAULT_ALIGNMENT);
-void gpu_seglist_free(AllocGpu& allocator, AllocGpuHandle* handle);
 
 ////////////////////////////////////////////////////////////////////////
 // Utils
-
-// u64 _push_offset(u64* cur_pos, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
-// #define push_offset(cur_pos, T, c) _push_offset(cur_pos, sizeof(T)*(c), alignof(T))
 
 struct SoA_Field {
   void** dst_ptr;

@@ -627,5 +627,3 @@ struct MapAuto {
     }
   }
 };
-
-

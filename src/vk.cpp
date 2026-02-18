@@ -33,8 +33,10 @@ struct VK_Image {
 struct VK_Mesh {
   u64 vert_count;
   VkDeviceSize vert_offset;
+  GpuMemHandler vert_memory;
   u64 index_count;
   VkDeviceSize index_offset;
+  GpuMemHandler index_memory;
 };
 
 struct VK_Swapchain {
