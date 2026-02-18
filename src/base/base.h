@@ -133,16 +133,16 @@ template<typename T> void Swap(T& a, T& b) {
   b = temp;
 }
 
-constexpr u64 KB(u64 x) { return x << 10; }
-constexpr u64 MB(u64 x) { return x << 20; }
-constexpr u64 GB(u64 x) { return x << 30; }
-constexpr u64 TB(u64 x) { return x << 40; }
-constexpr u64 Thousand(u64 x) { return x * 1000; }
-constexpr u64 Million(u64 x)  { return x * 1000000; }
-constexpr u64 Billion(u64 x)  { return x * 1000000000; }
-KAPI f32 BytesToKB(u64 x);
-KAPI f32 BytesToMB(u64 x);
-KAPI f32 BytesToGB(u64 x);
+NO_DEBUG constexpr u64 KB(u64 x) { return x << 10; }
+NO_DEBUG constexpr u64 MB(u64 x) { return x << 20; }
+NO_DEBUG constexpr u64 GB(u64 x) { return x << 30; }
+NO_DEBUG constexpr u64 TB(u64 x) { return x << 40; }
+NO_DEBUG constexpr u64 Thousand(u64 x) { return x * 1000; }
+NO_DEBUG constexpr u64 Million(u64 x)  { return x * 1000000; }
+NO_DEBUG constexpr u64 Billion(u64 x)  { return x * 1000000000; }
+NO_DEBUG KAPI f32 BytesToKB(u64 x);
+NO_DEBUG KAPI f32 BytesToMB(u64 x);
+NO_DEBUG KAPI f32 BytesToGB(u64 x);
 
 KAPI u64 cpu_timer_now();
 KAPI void DebugBreak();

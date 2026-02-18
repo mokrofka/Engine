@@ -235,6 +235,7 @@ intern void test_gpu_seglist_alloc() {
     u64 size = rand_range_u32(8, KB(1));
     u64 align = test_alignments[rand_range_u32(0, 3)];
     arr.add(alloc.alloc(size, align));
+    GpuAllocSegList::RangeList range = alloc.data[arr[i]];
   }
   Array<u32, 100> indices = {};
   Loop(i, 100) indices.add(i);

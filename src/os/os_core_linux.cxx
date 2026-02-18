@@ -152,14 +152,14 @@ void os_file_close(OS_Handle file) {
 u64 os_file_read(OS_Handle file, u64 size, void* out_data) {
   if (file.v == 0) { return 0; }
   int fd = file.v;
-  u64 read_result = pread(fd, out_data, size, 0);
+  u64 read_result = read(fd, out_data, size);
   return read_result;
 }
 
 u64 os_file_write(OS_Handle file, u64 size, void* data) {
   if (file.v == 0) { return 0; }
   int fd = file.v;
-  u64 size_written = pwrite(fd, data, size, 0);
+  u64 size_written = write(fd, data, size);
   return size_written;
 }
 

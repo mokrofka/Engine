@@ -429,7 +429,7 @@ GpuMemHandler GpuAllocSegList::alloc(u64 size, u64 align) {
   u32& p = heads[pool_idx];
   if (p == 0) {
     u64 cur_pos = AlignUp(pos, align);
-    pos = cur_pos + size;
+    pos = cur_pos + pow2_size;
     RangeList range = {0, true, cur_pos, alloc_size};
     u32 result = range_count;
     if (range_count >= range_cap) {
@@ -452,6 +452,10 @@ void GpuAllocSegList::free(u32 idx) {
   u32& p = heads[pool_idx];
   range.next = p;
   p = idx;
+}
+
+u64 GpuAllocSegList::get(u32 idx) {
+  return data[idx].range.offset;
 }
 
 ////////////////////////////////////////////////////////////////////////

@@ -66,7 +66,7 @@ layout(std430, set = 0, binding = 0) readonly buffer Buffer {
   SpotLight spot_lights[MaxEntities];
 } st;
 
-layout(set = 0, binding = 1) uniform texture2D textures[10];
+layout(set = 0, binding = 1) uniform texture2D textures[];
 layout(set = 0, binding = 2) uniform sampler samplers[];
 layout(set = 0, binding = 3) uniform textureCube cube_texture;
 
@@ -79,13 +79,3 @@ v3 norm;
 v3 frag_pos;
 v3 view_dir;
 Entity e;
-
-
-
-// import {
-//   float cos(float x);
-//   vec2 cos(vec2 x);
-//   vec3 cos(vec3 x);
-//   vec4 cos(vec4 x);
-// }
-

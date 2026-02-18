@@ -137,6 +137,7 @@ struct GpuAllocSegList {
   void init(Allocator alloc_);
   GpuMemHandler alloc(u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
   void free(u32 idx);
+  u64 get(u32 idx);
 };
 
 ////////////////////////////////////////////////////////////////////////

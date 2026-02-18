@@ -13,6 +13,11 @@
 
 #define vkdevice vk.device.logical_device
 
+// struct VK_SubBuffer {
+//   GpuMemHandler mem;
+//   Range range;
+// };
+
 struct VK_Buffer {
   VkBuffer handle;
   VkDeviceMemory memory;
@@ -105,9 +110,8 @@ struct RenderEntity {
 
 struct VK_State {
   Arena arena;
+  AllocSegList gpa;
   
-  OS_Handle lib;
-  AllocSegList alloc;
   VkAllocationCallbacks allocator_;
   VkAllocationCallbacks* allocator;
   VkInstance instance;
@@ -128,8 +132,10 @@ struct VK_State {
   VK_Buffer vert_buffer;
   VK_Buffer index_buffer;
   VK_Buffer stage_buffer;
+
   VK_Buffer storage_buffer;
-  VK_Buffer compute_storage_buffers[2];
+  // VK_SubBuffer buffers[10];
+  GpuAllocSegList gpu_alloc;
   
   VkDescriptorPool descriptor_pool;
   VkDescriptorSetLayout descriptor_set_layout;
@@ -137,11 +143,8 @@ struct VK_State {
 
   VkSampler sampler;
   VkPipelineLayout pipeline_layout;
-
-  VkDescriptorSetLayout compute_descriptor_set_layout;
   
   VkCommandBuffer* cmds;
-  VkCommandBuffer* compute_cmds;
 
   ShaderEntity* shader_entities;
   ShaderMaterial* shader_materials;
@@ -166,7 +169,6 @@ struct VK_State {
   VK_Shader draw_line_shader;
 
   // offscreen rendering
-  // VK_Texture* texture_targets;
   VK_Image offscreen_depth_buffer;
 
   Array<DrawLine, MaxEntities> draw_lines;
@@ -176,6 +178,8 @@ struct VK_State {
   #define VK_FUNCTION(name) vk.name = (Glue(PFN_, vk##name))os_lib_get_proc(vk.lib, Stringify(vk##name))
   #define VK_INSTANCE_FUNCTION(name) vk.name = (Glue(PFN_, vk##name))vk.GetInstanceProcAddr(vk.instance, Stringify(vk##name))
   #define VK_DEVICE_FUNCTION(name) vk.name = (Glue(PFN_, vk##name))vk.GetDeviceProcAddr(vkdevice, Stringify(vk##name))
+
+  OS_Handle lib;
 
   // Core functions
   VK_DECL(GetInstanceProcAddr);
@@ -577,6 +581,32 @@ intern void vk_buffer_upload_to_gpu(VK_Buffer buffer, Range range, void* data) {
   vk_cmd_end_single_use(temp_cmd);
 }
 
+// intern void vk_buffer_descriptor_update(VK_SubBuffer buf, u32 binding) {
+//   Range range = buf.range;
+//   VkDescriptorBufferInfo buffer_info = {
+//     .buffer = vk.storage_buffer.handle,
+//     .offset = range.offset,
+//     .range = range.size,
+//   };
+//   VkWriteDescriptorSet ubo_descriptor = {
+//     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+//     .dstSet = vk.descriptor_sets,
+//     .dstBinding = binding,
+//     .dstArrayElement = 0,
+//     .descriptorCount = 1,
+//     .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+//     .pBufferInfo = &buffer_info,
+//   };
+//   VkWriteDescriptorSet descriptors[] = {ubo_descriptor};
+//   vk.UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
+// }
+
+// intern void vk_buffer_alloc(VK_SubBuffer* buf, u32 binding, u64 size, u64 align) {
+//   GpuMemHandler handler = vk.gpu_alloc.alloc(size, align);
+//   buf->mem = handler;
+//   buf->range = {vk.gpu_alloc.get(handler), size};
+// }
+
 ////////////////////////////////////////////////////////////////////////
 // @Pipeline
 
@@ -914,6 +944,7 @@ intern void vk_descriptor_init() {
     VkDescriptorPoolSize pool_sizes[] = {
       {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, MaxStorageBuffer},
       {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, MaxTextures},
+      {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, MaxCubeTextures},
       {VK_DESCRIPTOR_TYPE_SAMPLER, MaxSamplers},
     };
     VkDescriptorPoolCreateInfo pool_info = {
@@ -951,7 +982,7 @@ intern void vk_descriptor_init() {
       {
         .binding = 1,
         .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-        .descriptorCount = MaxTextures - MaxCubeTextures,
+        .descriptorCount = MaxTextures,
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
       },
       {
@@ -966,6 +997,18 @@ intern void vk_descriptor_init() {
         .descriptorCount = MaxCubeTextures,
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
       },
+      // {
+      //   .binding = 4,
+      //   .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      //   .descriptorCount = 1,
+      //   .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+      // },
+      // {
+      //   .binding = 5,
+      //   .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      //   .descriptorCount = 1,
+      //   .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+      // },
     };
     VkDescriptorSetLayoutCreateInfo layout_info = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -1011,11 +1054,15 @@ intern void vk_descriptor_init() {
   // Set pointers to shader data
   {
     u64 entities_start = AlignUp(sizeof(ShaderGlobalState), alignof(ShaderEntity));
-    Assign(vk.shader_entities, Offset(vk.storage_buffer.maped_memory, entities_start));
+    vk.shader_entities = (ShaderEntity*)Offset(vk.storage_buffer.maped_memory, entities_start);
     u64 entities_end = (u64)Offset((u64*)entities_start, sizeof(ShaderEntity) * MaxEntities);
     u64 material_start = AlignUp(entities_end, alignof(ShaderMaterial));
-    Assign(vk.shader_materials, Offset(vk.storage_buffer.maped_memory, material_start));
+    vk.shader_materials = (ShaderMaterial*)Offset(vk.storage_buffer.maped_memory, material_start);
+
+    // vk.shader_entities = (ShaderEntity*)Offset(vk.storage_buffer.maped_memory, vk.buffers[1].range.offset);
+    // vk.shader_materials = (ShaderMaterial*)Offset(vk.storage_buffer.maped_memory, vk.buffers[2].range.offset);
   }
+  
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -2294,27 +2341,23 @@ void vk_init() {
 
   // Buffers
   {
-    vk.vert_buffer = vk_buffer_create(
-      MB(1),
-      VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    vk.index_buffer = vk_buffer_create(
-      MB(1),
-      VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    vk.stage_buffer = vk_buffer_create(
-      MB(10),
-      VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    vk.vert_buffer = vk_buffer_create(MB(1), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    vk.index_buffer = vk_buffer_create(MB(1), VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    vk.stage_buffer = vk_buffer_create(MB(10), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     vk_buffer_map_memory(vk.stage_buffer, 0, vk.stage_buffer.cap);
-    vk.storage_buffer = vk_buffer_create(
-      MB(1),
-      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    vk.storage_buffer = vk_buffer_create(MB(1), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     vk_buffer_map_memory(vk.storage_buffer, 0, vk.storage_buffer.cap);
+    vk.gpu_alloc.init(vk.gpa);
+    // vk_buffer_alloc(&vk.buffers[0], 0, sizeof(ShaderGlobalState), 8);
+    // vk_buffer_alloc(&vk.buffers[1], 4, KB(1), 64);
+    // vk_buffer_alloc(&vk.buffers[2], 5, KB(1), 64);
   }
 
   vk_descriptor_init();
+  // vk_buffer_descriptor_update(vk.buffers[0], 0);
+  // vk_buffer_descriptor_update(vk.buffers[1], 4);
+  // vk_buffer_descriptor_update(vk.buffers[2], 5);
+
   vk_texture_init();
   vk_shader_pipeline_init();
 
@@ -2602,8 +2645,8 @@ void vk_update_transform(u32 entity_id, Transform trans) {
 
 u32 vk_make_renderable(u32 entity_id, u32 mesh_id, u32 shader_id, u32 material_id) {
   vk.entities[entity_id].shader_handle = vk.shaders[shader_id].entities.add(entity_id);
-  vk.entities_to_mesh[entity_id] = mesh_id;
   vk.entities_to_shader[entity_id] = shader_id;
+  vk.entities_to_mesh[entity_id] = mesh_id;
   PushConstant& push = vk.push_constants[entity_id];
   push.texture_id = material_id;
   return entity_id;
