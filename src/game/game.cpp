@@ -77,18 +77,16 @@ struct Ray {
 };
 
 struct Entity {
-  u32 id;
+  Handle<Entity> id;
   v3 dir;
   AABB aabb;
-  Transform& trans() { return entities_transforms[id]; }
-  v3& pos() { return entities_transforms[id].pos; }
-  v3& rot() { return entities_transforms[id].rot; }
-  v3& scale() { return entities_transforms[id].scale; }
+  Transform& trans() { return entities_transforms[id.handle]; }
+  v3& pos() { return entities_transforms[id.handle].pos; }
+  v3& rot() { return entities_transforms[id.handle].rot; }
+  v3& scale() { return entities_transforms[id.handle].scale; }
 };
 
 struct Camera {
-  mat4 view;
-  mat4 projection;
   v3 pos;
   v3 dir;
   f32 yaw;
@@ -103,7 +101,7 @@ struct GameState {
   DarrayHandler<Entity> entities;
   Camera cam;
   Timer timer;
-  u32 axis_attached_to_cam;
+  Handle<Entity> axis_attached_to_cam;
 };
 
 global GameState* st;
@@ -111,17 +109,7 @@ global GameState* st;
 ////////////////////////////////////////////////////////////////////////
 // Utils
 
-void gpu_data_update() {
-  ShaderGlobalState& shader_st = *vk_get_shader_state();
-  Camera& cam = st->cam;
-  shader_st.projection_view = cam.projection * cam.view;
-  shader_st.projection = cam.projection;
-  shader_st.view = cam.view;
-  shader_st.time = os_timer_now();
-  shader_st.ambient_color = v4(1,2,3,4);
-}
-
-Mesh grid_create(Allocator arena, u32 size, f32 step) {
+MeshDesc grid_create(Allocator arena, u32 size, f32 step) {
   Vertex* vertices = push_array(arena, Vertex, size*4);
   v3 pos_offset = v3(-(i32)size/2, 0, -(i32)size/2);
   for (i32 i = 0; i < size; ++i) {
@@ -133,16 +121,16 @@ Mesh grid_create(Allocator arena, u32 size, f32 step) {
     vertical_vertices[i*2].pos = pos_offset + v3(i*step, 0, 0);
     vertical_vertices[i*2+1].pos = pos_offset + v3(i*step, 0, size*step);
   }
-  Mesh mesh = {
+  MeshDesc mesh = {
     .vertices = vertices,
     .vert_count = size*4,
   };
   return mesh;
 }
 
-u32 entity_create(u32 mesh, u32 shader, u32 material) {
+Handle<Entity> entity_create(MeshId mesh_id, ShaderId shader_id, MaterialId material_id) {
   Entity e = {
-    .id = id_pool_alloc(st->id_pool) + 1,
+    .id = st->id_pool.alloc() + 1,
     .aabb = {
       v3_scale(-1),
       v3_scale(1),
@@ -150,15 +138,17 @@ u32 entity_create(u32 mesh, u32 shader, u32 material) {
   };
   e.trans() = {};
   e.scale() = v3_one();
-  vk_make_renderable(e.id, mesh, shader, material);
-  u32 id = st->entities.add(e);
-  return id;
+  vk_make_renderable(e.id, meshes[mesh_id], shaders[shader_id], materials[material_id]);
+  Handle<Entity> handle = st->entities.add(e);
+  return handle;
 }
 
 void camera_update() {
   Camera& cam = st->cam;
   v2 win_size = v2_of_v2i(os_get_window_size());
-  cam.projection = mat4_perspective(degtorad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
+  mat4& projection = vk_get_projection();
+  mat4& view = vk_get_view();
+  projection = mat4_perspective(degtorad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
 
   // Camera rotation
   {
@@ -182,19 +172,19 @@ void camera_update() {
     f32 speed = 10.0f;
     v3 velocity = {};
     if (os_is_key_down(Key_W)) {
-      v3 forward = mat4_forward(cam.view);
+      v3 forward = mat4_forward(view);
       velocity += forward;
     }
     if (os_is_key_down(Key_S)) {
-      v3 backward = mat4_backward(cam.view);
+      v3 backward = mat4_backward(view);
       velocity += backward;
     }
     if (os_is_key_down(Key_Q)) {
-      v3 left = mat4_left(cam.view);
+      v3 left = mat4_left(view);
       velocity += left;
     }
     if (os_is_key_down(Key_E)) {
-      v3 right = mat4_right(cam.view);
+      v3 right = mat4_right(view);
       velocity += right;
     }
     if (os_is_key_down(Key_Space)) {
@@ -216,7 +206,7 @@ void camera_update() {
     SinD(cam.pitch),
     SinD(cam.yaw) * CosD(cam.pitch)
   };
-  cam.view = mat4_look_at(cam.pos, cam.dir, v3_up());
+  view = mat4_look_at(cam.pos, cam.dir, v3_up());
 }
 
 v3 ray_from_camera() {
@@ -224,9 +214,9 @@ v3 ray_from_camera() {
   v2i win_size = os_get_window_size();
   v2 norm_coords = v2(2 * (mouse_pos.x/win_size.x) - 1, 2 * -(mouse_pos.y/win_size.y) + 1);
   v4 clip_coords = v4(norm_coords.x, norm_coords.y, -1, 1);
-  v4 eye_coord = mat4_inverse(st->cam.projection) * clip_coords;
+  v4 eye_coord = mat4_inverse(vk_get_projection()) * clip_coords;
   eye_coord = v4(eye_coord.x, eye_coord.y, -1, 0);
-  v3 world_coord = v3_of_v4(st->cam.view * eye_coord);
+  v3 world_coord = v3_of_v4(vk_get_view() * eye_coord);
   world_coord = v3_norm(world_coord);
   return world_coord;
 }
@@ -237,14 +227,12 @@ void foo() {
 
 void select_obj() {
   v3 dir = ray_from_camera();
-
-  u32 e_id = entity_create(meshes[Mesh_GlbCube], shaders[Shader_Color], materials[Material_RedOrange]);
-  Entity& e = st->entities.get(e_id);
+  Handle<Entity> e_handle = entity_create(Mesh_GlbCube, Shader_Color, Material_RedOrange);
+  Entity& e = st->entities.get(e_handle);
   // e.pos() = st->cam.pos + v3_norm(mat4_forward(st->cam.view));
   e.pos() = st->cam.pos;
   e.scale() = v3_scale(0.3);
   e.dir = dir * 4;
-
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -266,26 +254,36 @@ void scene_init() {
     SinD(cam.pitch),
     SinD(cam.yaw) * CosD(cam.pitch)
   };
-  cam.view = mat4_look_at(cam.pos, cam.dir, v3_up());
-  u32 cube_id = entity_create(meshes[Mesh_GlbCube], shaders[Shader_Color], materials[Material_RedOrange]);
-  Entity& cube = st->entities.get(cube_id);
+  vk_get_view() = mat4_look_at(cam.pos, cam.dir, v3_up());
+  Handle<Entity> cube_handle = entity_create(Mesh_GlbCube, Shader_Color, Material_RedOrange);
+  Entity& cube = st->entities.get(cube_handle);
   cube.pos().x = 0;
-  u32 cube1_id = entity_create(meshes[Mesh_GltfCube], shaders[Shader_Color], materials[Material_GreenContainer]);
-  Entity& cube1 = st->entities.get(cube1_id);
+  Handle<Entity> cube1_handle = entity_create(Mesh_GltfCube, Shader_Color, Material_GreenContainer);
+  Entity& cube1 = st->entities.get(cube1_handle);
   cube1.pos() = {0,0,0};
   {
-    u32 triangle_id = entity_create(meshes[Mesh_Triangle], shaders[Shader_Color], materials[Material_RedOrange]);
-    Entity& e = st->entities.get(triangle_id);
+    Handle<Entity> triangle_handle = entity_create(Mesh_Triangle, Shader_Color, Material_RedOrange);
+    Entity& e = st->entities.get(triangle_handle);
     e.pos() = v3_scale(3);
   }
   {
-    u32 grid_id = entity_create(meshes[Mesh_Grid], Shader_Grid, 0);
-    Entity& grid = st->entities.get(grid_id);
+    Handle<Entity> grid_handle = entity_create(Mesh_Grid, Shader_Grid, MaterialId(0));
+    Entity& grid = st->entities.get(grid_handle);
     grid.pos() = v3(0,0,-5);
   }
   {
-    st->axis_attached_to_cam = entity_create(meshes[Mesh_Axis], shaders[Shader_Axis], 0);
+    st->axis_attached_to_cam = entity_create(Mesh_Axis, Shader_Axis, MaterialId(0));
   }
+  // {
+  //   u64 start = os_now_ns();
+  //   Loop (i, MaxEntities-KB(1)) {
+  //     u32 cube_id = entity_create(meshes[Mesh_GlbCube], shaders[Shader_Color], materials[Material_RedOrange]);
+  //     Entity& cube = st->entities.get(cube_id);
+  //     cube.pos() = v3_rand_range(-v3_scale(KB(1)), v3_scale(KB(1)));
+  //   }
+  //   u64 end = os_now_ns();
+  //   Info("%f64 s", f64(end - start)/Billion(1));
+  // }
 }
 
 void scene_deinit() {
@@ -297,45 +295,43 @@ void scene_deinit() {
 }
 
 void app_init(u8** state) {
-  u64 start = os_now_ns();
   Scratch scratch;
   Allocator global_alloc = mem_get_global_allocator();
   Assign(*state, push_struct_zero(global_alloc, GameState));
   Assign(st, *state);
-  st->arena = arena_init();
-  st->gpa.init(st->arena);
-  st->id_pool.array.init(st->gpa);
+  *st = {
+    .arena = arena_init(),
+    .gpa{st->arena},
+    .id_pool{st->gpa},
+    .timer = timer_init(1),
+  };
   for (i32 i = 0; i < Shader_COUNT; ++i) {
-    shaders[i] = shader_load(shaders_info[i].path, shaders_info[i].type);
+    shaders[i] = shader_load(shaders_info[i].path, shaders_info[i].state);
   }
   for (i32 i = 0; i < Mesh_Load_COUNT; ++i) {
     meshes[i] = mesh_load(meshes_path[i]);
   }
-  Mesh triangle_mesh =  {
-    .vertices = triangle_vertices,
-    .vert_count = ArrayCount(triangle_vertices),
-  };
-  meshes[Mesh_Triangle] = vk_mesh_load(triangle_mesh);
-  Mesh grid_mesh =  grid_create(scratch, 100, 1);
-  meshes[Mesh_Grid] = vk_mesh_load(grid_mesh);
-  Mesh axis_mesh = {
-    .vertices = axis_vertices,
-    .vert_count = ArrayCount(axis_vertices),
-  };
-  meshes[Mesh_Axis] = vk_mesh_load(axis_mesh);
   for (i32 i = 0; i < Texture_COUNT; ++i) {
     textures[i] = texture_load(textures_path[i]);
   }
   Loop (i, Material_COUNT) {
-    materials_info[i].texture = textures[materials_info[i].texture];
+    materials_info[i].texture = textures[materials_info[i].texture.handle];
     materials[i] = vk_material_load(materials_info[i]);
   }
-  shader_load("cubemap_shader", ShaderType_Cubemap);
+  MeshDesc triangle_mesh =  {
+    .vertices = triangle_vertices,
+    .vert_count = ArrayCount(triangle_vertices),
+  };
+  meshes[Mesh_Triangle] = vk_mesh_load(triangle_mesh);
+  MeshDesc grid_mesh = grid_create(scratch, 100, 1);
+  meshes[Mesh_Grid] = vk_mesh_load(grid_mesh);
+  MeshDesc axis_mesh = {
+    .vertices = axis_vertices,
+    .vert_count = ArrayCount(axis_vertices),
+  };
+  meshes[Mesh_Axis] = vk_mesh_load(axis_mesh);
   cubemap_load("night_cubemap");
   scene_init();
-  st->timer = timer_init(1);
-  u64 end = os_now_ns();
-  Info("app init took: %f64 sec", f64(end - start) / Billion(1));
 }
 
 // b32 ray_intersect_AABB(Ray ray, AABB aabb) {
@@ -359,9 +355,8 @@ void scene_update() {
   if (timer_tick(st->timer)) {
   }
   {
-    Entity& e = st->entities.get(0);
-    Entity& e1 = st->entities.get(1);
-    // e1.pos().z += 0.1 * g_dt;
+    Entity& e = st->entities.get({0});
+    Entity& e1 = st->entities.get({1});
     e1.pos().x += 0.1 * g_dt;
     e.pos().x = e1.pos().x + Sin(g_time) * 4;
     e.pos().z = e1.pos().z + Cos(g_time) * 4;
@@ -374,9 +369,10 @@ void scene_update() {
     e.pos() += e.dir * g_dt;
   }
   {
-    v3 forward = mat4_forward(st->cam.view);
-    v3 right   = mat4_right(st->cam.view);
-    v3 up      = mat4_up(st->cam.view);
+    mat4& view = vk_get_view();
+    v3 forward = mat4_forward(view);
+    v3 right   = mat4_right(view);
+    v3 up      = mat4_up(view);
     v2i win_size = os_get_window_size();
     f32 dist = 1.0f;
     f32 xoff = 0.3f;
@@ -405,10 +401,10 @@ shared_function void app_update(u8** state) {
     os_close_window();
   }
   scene_update();
-  gpu_data_update();
 }
 
 void bar() {
+
   // a.init
 
   // Info("%i", arr[0]);

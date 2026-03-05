@@ -3,10 +3,11 @@
 ////////////////////////////////////////////////////////////////////////
 // SparseSet
 
-u32* SparseSetIndex::begin() { return dense; }
-u32* SparseSetIndex::end()   { return dense + count; }
 SparseSetIndex::SparseSetIndex(Allocator alloc_) { *this = {}; alloc = alloc_; }
 void SparseSetIndex::init(Allocator alloc_) { *this = {}; alloc = alloc_; }
+void SparseSetIndex::deinit() { if (sparse) { mem_free(alloc, sparse); mem_free(alloc, dense); } }
+u32* SparseSetIndex::begin() { return dense; }
+u32* SparseSetIndex::end()   { return dense + count; }
 
 void SparseSetIndex::add(u32 id) {
   if (count >= cap) {
@@ -53,10 +54,11 @@ void SparseSetIndex::grow_max_index(u32 id) {
 ////////////////////////////////////////////////////////////////////////
 // HandlerArray
 
-u32* DarrayIndexHandler::begin() { return entities; }
-u32* DarrayIndexHandler::end()   { return entities + count; }
 DarrayIndexHandler::DarrayIndexHandler(Allocator alloc_) { *this = {}; alloc = alloc_; }
 void DarrayIndexHandler::init(Allocator alloc_) { *this = {}; alloc = alloc_; }
+void DarrayIndexHandler::deinit() { if (entity_to_index) mem_free(alloc, entity_to_index); }
+u32* DarrayIndexHandler::begin() { return entities; }
+u32* DarrayIndexHandler::end()   { return entities + count; }
 
 u32 DarrayIndexHandler::add() {
   if (count >= cap) {
@@ -102,16 +104,20 @@ void DarrayIndexHandler::grow() {
 ////////////////////////////////////////////////////////////////////////
 // IdPool
 
-u32 id_pool_alloc(IdPool& p) {
-  if (p.array.count > 0) {
-    return p.array.pop();
+IdPool::IdPool(Allocator alloc) { *this = {}; array.init(alloc); }
+void IdPool::init(Allocator alloc) { *this = {}; array.init(alloc); }
+
+u32 IdPool::alloc() {
+  if (array.count > 0) {
+    return array.pop();
   }
-  u32 id = p.next_idx++;
+  u32 id = next_idx++;
   return id;
 }
 
-void id_pool_free(IdPool& p, u32 id) {
-  Assert(id < p.next_idx);
-  Assert(!p.array.exists(id));
-  p.array.add(id);
+// TODO: use old implementation
+void IdPool::free(u32 id) {
+  Assert(id < next_idx);
+  Assert(!array.exists(id));
+  array.add(id);
 }

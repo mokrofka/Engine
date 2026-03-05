@@ -1,13 +1,156 @@
 #pragma once
 #include "lib.h"
-#include "vk.h"
 
-#define MaxNumber KB(10)
-#define MaxLights MaxNumber
-#define MaxEntities MaxNumber
-#define MaxMeshes MaxNumber
-#define MaxShaders MaxNumber
-#define MaxTextures MaxNumber
+const u32 MaxEntities  = KB(1);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// vk.cpp
+
+struct GpuTexture;
+struct GpuMesh;
+struct GpuShader;
+struct GpuMaterial;
+struct GpuCubemap;
+struct Entity;
+
+enum RenderpassType {
+  RenderpassType_World,
+  RenderpassType_UI,
+  RenderpassType_Screen,
+};
+
+struct PushConstant {
+  u32 entity_idx;
+  u32 texture_id;
+};
+
+struct PointLight {
+  v3 color;
+  v3 pos;
+  f32 intensity;
+  f32 rad;
+};
+
+struct DirLight {
+  v3 color;
+  v3 dir;
+  f32 intensity;
+};
+
+struct SpotLight {
+  v3 color;
+  v3 pos;
+  v3 dir;
+  f32 intensity;
+  f32 inner_cutoff;
+  f32 outer_cutoff;
+};
+
+struct MaterialDesc {
+  v3 ambient;
+  v3 diffuse;
+  v3 specular;
+  f32 shininess;
+  Handle<GpuTexture> texture;
+};
+
+struct DrawLine {
+  v3 a;
+  v3 b;
+  v3 color;
+};
+
+struct TextureDesc {
+  u32 width;
+  u32 height;
+  u8* data;
+};
+
+struct Vertex {
+  v3 pos;
+  v3 norm;
+  v2 uv;
+  v3 color;
+};
+
+struct MeshDesc {
+  Vertex* vertices;
+  u32* indexes;
+  u32 vert_count;
+  u32 index_count;
+};
+
+enum ShaderTopology {
+  ShaderTopology_Triangle,
+  ShaderTopology_Line,
+  ShaderTopology_Point,
+};
+
+enum ShaderType {
+  ShaderType_Drawing,
+  ShaderType_Screen,
+  ShaderType_Cube,
+  ShaderType_Compute,
+};
+
+struct ShaderDesc {
+  ShaderType type;
+  ShaderTopology primitive;
+  b8 is_transparent;
+  b8 use_depth;
+};
+
+Handle<GpuMesh> vk_mesh_load(MeshDesc mesh_desc);
+
+void vk_init();
+void vk_shutdown();
+
+void vk_begin_frame();
+void vk_end_frame();
+void vk_begin_renderpass(RenderpassType renderpass);
+void vk_end_renderpass(RenderpassType renderpass);
+
+KAPI Handle<GpuShader> vk_shader_load(String name, ShaderDesc info);
+KAPI Handle<GpuTexture> vk_texture_load(TextureDesc texture_info);
+KAPI Handle<GpuMaterial> vk_material_load(MaterialDesc material);
+KAPI Handle<GpuCubemap> vk_cubemap_load(TextureDesc* textures);
+
+void vk_draw();
+void vk_draw_screen();
+void vk_draw_compute();
+
+// Entity
+KAPI void vk_make_renderable(Handle<Entity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuShader> shader_handle, Handle<GpuMaterial> material_handle);
+KAPI void vk_remove_renderable(Handle<Entity> entity_handle);
+
+// // Point light
+// KAPI void vk_point_light_create(u32 entity_id);
+// KAPI void vk_point_light_remoove(u32 entity_id);
+// KAPI PointLight& vk_get_point_light_shader(u32 entity_id);
+
+// // Directional light
+// KAPI void vk_dir_light_make(u32 entity_id);
+// KAPI void vk_dir_light_remove(u32 entity_id);
+// KAPI DirLight& vk_dir_light_get(u32 entity_id);
+
+// // Spot light
+// KAPI void vk_spot_light_create(u32 entity_id);
+// KAPI void vk_spot_light_destroy(u32 entity_id);
+// KAPI SpotLight& vk_spot_light_get(u32 entity_id);
+
+// Util
+
+mat4& vk_get_view();
+mat4& vk_get_projection();
+KAPI void vk_shader_reload(String name, Handle<GpuShader> shader_handle, ShaderDesc info);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// common.cpp
+
+////////////////////////////////////////////////////////////////////////
+// Debug drawing
+
+KAPI void debug_draw_line(v3 a, v3 b, v3 color);
 
 KAPI extern f32 g_dt;
 KAPI extern f32 g_time;
@@ -19,19 +162,19 @@ KAPI extern Transform entities_transforms[MaxEntities];
 ///////////////////////////////////
 // Shaders
 
-extern ShaderInfo shader_type[];
 struct ShaderDefinition {
   String path;
-  ShaderType type;
+  ShaderDesc state;
 };
 enum ShaderId {
   Shader_Color,
   Shader_Grid,
   Shader_Axis,
+  Shader_Cubemap,
   Shader_COUNT,
 };
 extern ShaderDefinition shaders_info[Shader_COUNT];
-extern u32 shaders[Shader_COUNT];
+extern Handle<GpuShader> shaders[Shader_COUNT];
 
 ///////////////////////////////////
 // Meshes
@@ -47,7 +190,7 @@ enum MeshId {
   Mesh_COUNT,
 };
 extern String meshes_path[Mesh_Load_COUNT];
-extern u32 meshes[Mesh_COUNT];
+extern Handle<GpuMesh> meshes[Mesh_COUNT];
 
 ///////////////////////////////////
 // Textures
@@ -58,7 +201,7 @@ enum TextureId {
   Texture_COUNT,
 };
 extern String textures_path[Texture_COUNT];
-extern u32 textures[Texture_COUNT];
+extern Handle<GpuTexture> textures[Texture_COUNT];
 
 ///////////////////////////////////
 // Materials
@@ -68,8 +211,8 @@ enum MaterialId {
   Material_GreenContainer,
   Material_COUNT,
 };
-extern Material materials_info[Material_COUNT];
-extern u32 materials[Material_COUNT];
+extern MaterialDesc materials_info[Material_COUNT];
+extern Handle<GpuMaterial> materials[Material_COUNT];
 
 ////////////////////////////////////////////////////////////////////////
 // Test
@@ -199,11 +342,10 @@ KAPI void r_begin_draw_frame();
 KAPI void r_end_draw_frame();
 
 KAPI String asset_base_path();
-KAPI u32 mesh_load(String name);
-// KAPI u32 mesh_load_(String name);
-KAPI u32 shader_load(String shader, ShaderType type);
-KAPI u32 texture_load(String name);
-KAPI u32 cubemap_load(String name);
+KAPI Handle<GpuMesh> mesh_load(String name);
+KAPI Handle<GpuShader> shader_load(String name, ShaderDesc info);
+KAPI Handle<GpuTexture> texture_load(String name);
+KAPI Handle<GpuCubemap> cubemap_load(String name);
 
 struct Timer {
   f32 passed;

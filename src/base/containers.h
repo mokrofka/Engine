@@ -7,6 +7,11 @@
 const u32 DEFAULT_CAPACITY = 8;
 const u32 DEFAULT_RESIZE_FACTOR = 2;
 
+template<typename T>
+struct Handle {
+  u32 handle;
+};
+
 ////////////////////////////////////////////////////////////////////////
 // Generic interface
 
@@ -36,31 +41,33 @@ struct ObjectPool {
   ObjectPool() = default;
   ObjectPool(Allocator alloc_) { *this = {}; alloc = alloc_; }
   void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
-  void deinit() { Assert(data); mem_free(alloc, data); }
-  T& get(u32 idx) {
-    Assert(idx < cap);
-    return data[idx];
+  void deinit() { if (data) mem_free(alloc, data); }
+  T& get(Handle<T> handle) {
+    Assert(handle.handle < cap);
+    return data[handle.handle];
   }
-  u32 add(T a) {
+  Handle<T> add(T a) {
     if (head >= cap) {
       grow();
     }
     u32 result = head;
     head = *(u32*)&data[head];
     data[result] = a;
-    return result;
+    Handle<T> handle = {result};
+    return handle;
   }
-  u32 add() {
+  Handle<T> add() {
     if (head >= cap) {
       grow();
     }
     u32 result = head;
     head = *(u32*)&data[head];
-    return result;
+    Handle<T> handle = {result};
+    return handle;
   }
-  void remove(u32 id) {
-    *(u32*)&data[id] = head;
-    head = id;
+  void remove(Handle<T> handle) {
+    *(u32*)&data[handle.handle] = head;
+    head = handle.handle;
   }
   void grow() {
     if (data) {
@@ -107,11 +114,10 @@ struct Array {
     Assert(idx < cap);
     return data[idx];
   }
-  T& add(T a) { 
+  void add(T a) { 
     Assert(count < cap);
     T& e = data[count];
     data[count++] = a;
-    return e;
   }
   void add(InitializerList<T> slice) {
     for (T x : slice) {
@@ -151,15 +157,15 @@ struct Darray {
   T* data;
   Darray() = default;
   Darray(Allocator alloc_) { *this = {}; alloc = alloc_; }
+  void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
+  void deinit() { if (data) mem_free(alloc, data); }
   T* begin() { return data; }
   T* end()   { return data + count; }
-  void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
-  void deinit() { Assert(data); mem_free(alloc, data); }
-  NO_DEBUG T& operator[](u32 idx) {
+  T& operator[](u32 idx) {
     Assert(idx < cap);
     return data[idx];
   }
-  T& add(T b) { 
+  void add(T b) { 
     if (count >= cap) {
       if (data) {
         u32 odl_cap = cap;
@@ -172,9 +178,8 @@ struct Darray {
     }
     T& e = data[count];
     data[count++] = b;
-    return e;
   }
-  void add(std::initializer_list<T> slice) {
+  void add(InitializerList<T> slice) {
     for (T x : slice) {
       add(x);
     }
@@ -182,12 +187,13 @@ struct Darray {
   void reserve(u32 min_cap) { 
     if (cap >= min_cap) return;
     u32 old_cap = cap;
-    u32 new_cap = Max(cap*DEFAULT_RESIZE_FACTOR, min_cap);
+    u32 new_cap = Max(old_cap*DEFAULT_RESIZE_FACTOR, min_cap);
     if (data) {
       data = mem_realloc_array(alloc, data, old_cap, new_cap);
     } else {
       data = mem_alloc_array<T>(alloc, new_cap);
     }
+    cap = new_cap;
   }
   void swap_remove(u32 idx) {
     Assert(idx < count);
@@ -236,51 +242,51 @@ struct SparseSet {
   u32* sparse;
   u32* dense;
   T* data;
-  T* begin() { return data; }
-  T* end()   { return data + count; }
   SparseSet() = default;
   SparseSet(Allocator alloc_) { *this = {}; alloc = alloc_; }
   void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
-  void deinit() { Assert(sparse && dense); mem_free(alloc, sparse); mem_free(alloc, dense); }
-  T& get(u32 id) {
-    Assert(id < cap);
-    DebugDo(Assert(sparse[id] != INVALID_ID));
-    u32 idx = sparse[id];
+  void deinit() { if (data) { mem_free(alloc, sparse); mem_free(alloc, dense); }; }
+  T* begin() { return data; }
+  T* end()   { return data + count; }
+  T& get(u32 handle) {
+    Assert(handle < cap);
+    DebugDo(Assert(sparse[handle] != INVALID_ID));
+    u32 idx = sparse[handle];
     return data[idx];
   }
-  void add(u32 id) {
+  void add(u32 handle) {
     if (count >= cap) {
       grow();
     }
-    if (id >= sparse_count) {
-      grow_max_index(id);
+    if (handle >= sparse_count) {
+      grow_max_index(handle);
     }
-    sparse[id] = count;
-    dense[count] = id;
+    sparse[handle] = count;
+    dense[count] = handle;
     ++count;
   }
-  void add(u32 id, T element) {
+  void add(u32 handle, T element) {
     if (count >= cap) {
       grow();
     }
-    if (id >= sparse_count) {
-      grow_max_index(id);
+    if (handle >= sparse_count) {
+      grow_max_index(handle);
     }
-    sparse[id] = count;
-    dense[count] = id;
+    sparse[handle] = count;
+    dense[count] = handle;
     data[count] = element;
     ++count;
   }
-  void remove(u32 id) {
-    DebugDo(Assert(sparse[id] != INVALID_ID));
-    u32 idx_removed = sparse[id];
+  void remove(u32 handle) {
+    DebugDo(Assert(sparse[handle] != INVALID_ID));
+    u32 idx_removed = sparse[handle];
     u32 idx_last = count - 1;
     data[idx_removed] = data[idx_last];
     u32 last_entity = dense[idx_last];
     sparse[last_entity] = idx_removed;
     dense[idx_removed] = last_entity;
     --count;
-    DebugDo(sparse[id] = INVALID_ID);
+    DebugDo(sparse[handle] = INVALID_ID);
   }
   void grow() {
     if (data) {
@@ -302,8 +308,8 @@ struct SparseSet {
       sparse = mem_alloc_array<u32>(alloc, cap);
     }
   }
-  void grow_max_index(u32 id) {
-    u32 modifier = CeilIntDiv(id+1, sparse_count);
+  void grow_max_index(u32 handle) {
+    u32 modifier = CeilIntDiv(handle+1, sparse_count);
     u32 old_count = sparse_count;
     sparse_count *= modifier;
     sparse = mem_realloc_array(alloc, sparse, old_count, sparse_count);
@@ -317,11 +323,12 @@ struct SparseSetIndex {
   Allocator alloc;
   u32* sparse;
   u32* dense;
-  u32* begin();
-  u32* end();
   SparseSetIndex() = default;
   SparseSetIndex(Allocator alloc_);
   void init(Allocator alloc_);
+  void deinit();
+  u32* begin();
+  u32* end();
   void add(u32 id);
   void remove(u32 id);
   void grow();
@@ -340,29 +347,29 @@ struct HandlerArray {
   T data[N];
   T* begin() { return data; }
   T* end()   { return data + count; }
-  T& get(u32 idx) {
-    Assert(idx < cap);
-    DebugDo(Assert(entity_to_index[idx] != INVALID_ID));
-    u32 index = entity_to_index[idx];
+  T& get(Handle<T> handle) {
+    Assert(handle < cap);
+    DebugDo(Assert(entity_to_index[handle] != INVALID_ID));
+    u32 index = entity_to_index[handle];
     return data[index];
   }
-  u32 add(T e) {
+  Handle<T> add(T e) {
     u32 id = count++;
     entity_to_index[id] = id;
     entities[id] = id;
     data[id] = e;
     return id;
   }
-  void remove(u32 id) {
-    DebugDo(Assert(entity_to_index[id] != INVALID_ID));
-    u32 idx_removed = entity_to_index[id];
+  void remove(Handle<T> handle) {
+    DebugDo(Assert(entity_to_index[handle] != INVALID_ID));
+    u32 idx_removed = entity_to_index[handle];
     u32 idx_last = count - 1;
     data[idx_removed] = data[idx_last];
     u32 last_entity = entities[idx_last];
     entity_to_index[last_entity] = idx_removed;
     entities[idx_removed] = last_entity;
     --count;
-    DebugDo(entity_to_index[id] = INVALID_ID);
+    DebugDo(entity_to_index[handle] = INVALID_ID);
   }
 };
 
@@ -374,18 +381,19 @@ struct DarrayHandler {
   u32* entity_to_index;
   u32* entities;
   T* data;
-  T* begin() { return data; }
-  T* end()   { return data + count; }
   DarrayHandler() = default;
   DarrayHandler(Allocator alloc_) { *this = {}; alloc = alloc_; }
   void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
-  T& get(u32 idx) {
-    Assert(idx < cap);
-    DebugDo(Assert(entity_to_index[idx] != INVALID_ID));
-    u32 index = entity_to_index[idx];
+  void deinit() { if (entity_to_index) mem_free(alloc, entity_to_index); }
+  T* begin() { return data; }
+  T* end()   { return data + count; }
+  T& get(Handle<T> handle) {
+    Assert(handle.handle < cap);
+    DebugDo(Assert(entity_to_index[handle.handle] != INVALID_ID));
+    u32 index = entity_to_index[handle.handle];
     return data[index];
   }
-  u32 add(T e) {
+  Handle<T> add(T e) {
     if (count >= cap) {
       grow();
     }
@@ -393,18 +401,19 @@ struct DarrayHandler {
     entity_to_index[id] = id;
     entities[id] = id;
     data[id] = e;
-    return id;
+    Handle<T> handle = {id};
+    return handle;
   }
-  void remove(u32 id) {
-    DebugDo(Assert(entity_to_index[id] != INVALID_ID));
-    u32 idx_removed = entity_to_index[id];
+  void remove(Handle<T> handle) {
+    DebugDo(Assert(entity_to_index[handle.handle] != INVALID_ID));
+    u32 idx_removed = entity_to_index[handle.handle];
     u32 idx_last = count - 1;
     data[idx_removed] = data[idx_last];
     u32 last_entity = entities[idx_last];
     entity_to_index[last_entity] = idx_removed;
     entities[idx_removed] = last_entity;
     --count;
-    DebugDo(entity_to_index[id] = INVALID_ID);
+    DebugDo(entity_to_index[handle.handle] = INVALID_ID);
   }
   void grow() {
     if (data) {
@@ -443,6 +452,7 @@ struct DarrayIndexHandler {
   DarrayIndexHandler() = default;
   DarrayIndexHandler(Allocator alloc_);
   void init(Allocator alloc_);
+  void deinit();
   u32 add();
   void remove(u32 id);
   void grow();
@@ -454,10 +464,13 @@ struct DarrayIndexHandler {
 struct IdPool {
   u32 next_idx;
   Darray<u32> array;
+  IdPool() = default;
+  IdPool(Allocator alloc);
+  void init(Allocator alloc);
+  u32 alloc();
+  void free(u32 id);
 };
 
-KAPI u32 id_pool_alloc(IdPool& p);
-KAPI void id_pool_free(IdPool& p, u32 id);
 
 ////////////////////////////////////////////////////////////////////////
 // Hashmap

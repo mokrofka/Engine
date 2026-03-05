@@ -2,15 +2,13 @@
 #include "base.h"
 #include "str.h"
 
-#define PI  3.14159265358f
-#define Tau (PI * 2)
-
-#define EulerNumber  2.71828182846f
-#define GoldBig      1.61803398875f
-#define GoldSmall    0.61803398875f
-
-#define FloatEpsilon   1e-5f
-#define MachineEpsilon 1.1920929e-7f
+const f32 PI             = 3.14159265358f;
+const f32 Tau            = (PI * 2);
+const f32 EulerNumber    = 2.71828182846f;
+const f32 GoldBig        = 1.61803398875f;
+const f32 GoldSmall      = 0.61803398875f;
+const f32 FloatEpsilon   = 1e-5f;
+const f32 MachineEpsilon = 1.1920929e-7f;
 
 KAPI f32 degtorad(f32 degrees);
 KAPI f32 radtodeg(f32 radians);

@@ -11,34 +11,45 @@ Extern Transform entities_transforms[MaxEntities];
 ///////////////////////////////////
 // Shaders
 
-Extern ShaderInfo shader_type[] = {
-  // Drawing
-  [ShaderType_Drawing] = {},
-  [ShaderType_DrawingTransparent] = {
-    .is_transparent = true,
-  },
-  [ShaderType_DrawingTransparentLine] = {
-    .primitive = ShaderTopology_Line,
-    .is_transparent = true,
-  },
-
-  // Screen
-  [ShaderType_Screen] = {
-    .use_depth = false,
-  },
-
-  // Cubemap
-  [ShaderType_Cubemap] = {},
-
-  // Compute
-  [ShaderType_Compute] = {},
-};
 Extern ShaderDefinition shaders_info[Shader_COUNT] = {
-  [Shader_Color] = "color_shader", ShaderType_Drawing,
-  [Shader_Grid] = "grid_shader", ShaderType_DrawingTransparentLine,
-  [Shader_Axis] = "axis_shader", ShaderType_DrawingTransparentLine,
+  [Shader_Color] = {
+    .path = "color",
+    .state = {
+      .type = ShaderType_Drawing,
+      .primitive = ShaderTopology_Triangle,
+      .is_transparent = false,
+      .use_depth = true,
+    },
+  },
+  [Shader_Grid] = {
+    .path = "grid",
+    .state = {
+      .type = ShaderType_Drawing,
+      .primitive = ShaderTopology_Line,
+      .is_transparent = true,
+      .use_depth = true,
+    },
+  },
+  [Shader_Axis] = {
+    .path = "axis",
+    .state = {
+      .type = ShaderType_Drawing,
+      .primitive = ShaderTopology_Line,
+      .is_transparent = true,
+      .use_depth = true,
+    },
+  },
+  [Shader_Cubemap] = {
+    .path = "cubemap",
+    .state = {
+      .type = ShaderType_Cube,
+      .primitive = ShaderTopology_Triangle,
+      .is_transparent = false,
+      .use_depth = true,
+    },
+  },
 };
-Extern u32 shaders[Shader_COUNT];
+Extern Handle<GpuShader> shaders[Shader_COUNT];
 
 ///////////////////////////////////
 // Meshes
@@ -47,7 +58,7 @@ String meshes_path[Mesh_Load_COUNT] = {
   [Mesh_GltfCube] = "cube.gltf",
   [Mesh_GlbCube] = "cube.glb",
 };
-Extern u32 meshes[Mesh_COUNT];
+Extern Handle<GpuMesh> meshes[Mesh_COUNT];
 
 ///////////////////////////////////
 // Textures
@@ -56,12 +67,12 @@ Extern String textures_path[Texture_COUNT] = {
   [Texture_OrangeLines] = "orange_lines_512.png",
   [Texture_Container] = "container.jpg",
 };
-Extern u32 textures[Texture_COUNT];
+Extern Handle<GpuTexture> textures[Texture_COUNT];
 
 ///////////////////////////////////
 // Materials
 
-Extern Material materials_info[Material_COUNT] = {
+Extern MaterialDesc materials_info[Material_COUNT] = {
   [Material_RedOrange] = {
     .ambient = v3(1,0,0),
     .diffuse = v3_scale(1),
@@ -77,7 +88,7 @@ Extern Material materials_info[Material_COUNT] = {
     .texture = Texture_Container,
   },
 };
-Extern u32 materials[Material_COUNT];
+Extern Handle<GpuMaterial> materials[Material_COUNT];
 
 ////////////////////////////////////////////////////////////////////////
 // Test
@@ -274,7 +285,7 @@ intern void test_object_pool() {
   };
   ObjectPool<A> pool(scratch);
   Array<A, 100> values = {};
-  Array<u32, 100> handlers = {};
+  Array<Handle<A>, 100> handlers = {};
   Loop (i, 100) {
     values[i].a = rand_range_u32(0, 100);
     values[i].b = rand_range_u32(0, 100);
@@ -323,7 +334,7 @@ intern void test_handle_darray() {
   };
   DarrayHandler<A> arr = {};
   Array<A, 100> values = {};
-  Array<u32, 100> handlers = {};
+  Array<Handle<A>, 100> handlers = {};
   Loop (i, 100) {
     values[i].a = rand_range_u32(0, 100);
     values[i].b = rand_range_u32(0, 100);
@@ -664,7 +675,7 @@ void event_fire(u32 code, void* sender, EventContext context) {
 ////////////////////////////////////////////////////////////////////////
 // Loaders
 
-intern Mesh mesh_load_obj(Allocator arena, String name) {
+intern MeshDesc mesh_load_obj(Allocator arena, String name) {
   Scratch scratch(arena);
   Darray<v3> positions(scratch);
   Darray<v3> normals(scratch);
@@ -732,7 +743,7 @@ intern Mesh mesh_load_obj(Allocator arena, String name) {
     }
     final_indices.add(vertex_index);
   }
-  Mesh mesh = {
+  MeshDesc mesh = {
     .vertices = vertices.data,
     .indexes = (u32*)final_indices.data,
     .vert_count = vertices.count,
@@ -741,7 +752,7 @@ intern Mesh mesh_load_obj(Allocator arena, String name) {
   return mesh;
 }
 
-intern Mesh mesh_load_gltf(Allocator arena, String name) {
+intern MeshDesc mesh_load_gltf(Allocator arena, String name) {
   Scratch scratch(arena);
   Buffer buf = os_file_path_read_all(scratch, name);
   JsonReader r = json_reader_init({buf.data, buf.size});
@@ -851,7 +862,7 @@ intern Mesh mesh_load_gltf(Allocator arena, String name) {
       .uv = vertices_uv[i],
     };
   }
-  Mesh mesh = {
+  MeshDesc mesh = {
     .vertices = vertices,
     .indexes = (u32*)indices,
     .vert_count = info.vert_count,
@@ -860,7 +871,7 @@ intern Mesh mesh_load_gltf(Allocator arena, String name) {
   return mesh;
 }
 
-intern Mesh mesh_load_glb(Allocator arena, String name) {
+intern MeshDesc mesh_load_glb(Allocator arena, String name) {
   Scratch scratch(arena);
   Buffer buf = os_file_path_read_all(scratch, name);
   struct FileHeader {
@@ -978,7 +989,7 @@ intern Mesh mesh_load_glb(Allocator arena, String name) {
       .uv = vertices_uv[i],
     };
   }
-  Mesh mesh = {
+  MeshDesc mesh = {
     .vertices = vertices,
     .indexes = indices,
     .vert_count = vertex_count,
@@ -987,9 +998,9 @@ intern Mesh mesh_load_glb(Allocator arena, String name) {
   return mesh;
 }
 
-intern Texture texture_image_load(String name) {
+intern TextureDesc texture_image_load(String name) {
   Scratch scratch;
-  Texture texture = {};
+  TextureDesc texture = {};
   u32 required_channel_count = 4;
   u32 channel_count;
   String filepath = push_strf(scratch, "%s/%s/%s", asset_base_path(), String("textures"), name);
@@ -1003,12 +1014,16 @@ intern Texture texture_image_load(String name) {
 ////////////////////////////////////////////////////////////////////////
 // Common
 
+struct ShaderReloadInfo {
+  ShaderDesc info;
+  Handle<GpuShader> shader_handle;
+};
 struct CommonState {
   Arena arena;
   String asset_path;
   String shader_dir;
   String shader_compiled_dir;
-  Map<String, u32> shader_map;
+  Map<String, ShaderReloadInfo> shader_map;
 };
 
 global CommonState common_st;
@@ -1035,8 +1050,8 @@ void common_init() {
     Scratch scratch;
     String shader_name_with_format = str_chop_last_dot(name);
     String shader_name = str_chop_last_dot(shader_name_with_format);
-    u32* id = common_st.shader_map.get(shader_name);
-    vk_shader_reload(shader_name, *id);
+    ShaderReloadInfo* info = common_st.shader_map.get(shader_name);
+    vk_shader_reload(shader_name, info->shader_handle, info->info);
   });
   vk_init();
 }
@@ -1074,11 +1089,11 @@ String asset_base_path() {
   return common_st.asset_path;
 }
 
-u32 mesh_load(String name) {
+Handle<GpuMesh> mesh_load(String name) {
   Scratch scratch;
   String filepath = push_strf(scratch, "%s/%s/%s", asset_base_path(), String("models"), name);
   String format = str_skip_last_dot(name);
-  Mesh mesh = {};
+  MeshDesc mesh = {};
   if (str_match(format, "glb")) {
     mesh = mesh_load_glb(scratch, filepath);
   } else if (str_match(format, "gltf")) {
@@ -1086,28 +1101,28 @@ u32 mesh_load(String name) {
   } else if (str_match(format, "obj")) {
     mesh = mesh_load_obj(scratch, filepath);
   } else {
-    Assert(true);
+    Assert(false);
   }
-  u32 id = vk_mesh_load(mesh);
-  return id;
+  Handle<GpuMesh> handle = vk_mesh_load(mesh);
+  return handle;
 }
 
-u32 shader_load(String name, ShaderType type) {
+Handle<GpuShader> shader_load(String name, ShaderDesc info) {
+  Handle<GpuShader> handle = vk_shader_load(name, info);
+  ShaderReloadInfo reload_info = {info, handle};
+  common_st.shader_map.add(name, reload_info);
+  return handle;
+}
+
+Handle<GpuTexture> texture_load(String name) {
+  TextureDesc texture = texture_image_load(name);
+  Handle<GpuTexture> handle = vk_texture_load(texture);
+  return handle;
+}
+
+Handle<GpuCubemap> cubemap_load(String name) {
   Scratch scratch;
-  u32 id = vk_shader_load(name, type);
-  common_st.shader_map.add(name, id);
-  return id;
-}
-
-u32 texture_load(String name) {
-  Texture texture = texture_image_load(name);
-  u32 id = vk_texture_load(texture);
-  return id;
-}
-
-u32 cubemap_load(String name) {
-  Scratch scratch;
-  Texture textures[6];
+  TextureDesc textures[6];
   String sides[] = {
     "right", "left",
     "top", "bottom",
@@ -1118,7 +1133,7 @@ u32 cubemap_load(String name) {
     textures[i] = texture_image_load(texture_name);
   }
   vk_cubemap_load(textures);
-  return 0;
+  return {};
 }
 
 Timer timer_init(f32 interval) {

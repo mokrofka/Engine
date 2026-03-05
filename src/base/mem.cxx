@@ -18,7 +18,7 @@ const u32 MEM_ALLOC_TAIL_GUARD     = 0xdeedbeef;
   #define MemGuardDealloc(d, c)
 #endif
 
-const u32 ARENA_DEFAULT_RESERVE_SIZE = MB(64);
+const u32 ARENA_DEFAULT_RESERVE_SIZE = MB(164);
 const u32 ARENA_DEFAULT_COMMIT_SIZE  = KB(4);
 const u32 ARENA_LIST_BLOCK_SIZE      = KB(64);
 
