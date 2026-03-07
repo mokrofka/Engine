@@ -11,10 +11,10 @@ Extern Transform entities_transforms[MaxEntities];
 ///////////////////////////////////
 // Shaders
 
-Extern ShaderDefinition shaders_info[Shader_COUNT] = {
+global Shader shaders_desc[Shader_COUNT] = {
   [Shader_Color] = {
     .path = "color",
-    .state = {
+    .desc = {
       .type = ShaderType_Drawing,
       .primitive = ShaderTopology_Triangle,
       .is_transparent = false,
@@ -23,7 +23,7 @@ Extern ShaderDefinition shaders_info[Shader_COUNT] = {
   },
   [Shader_Grid] = {
     .path = "grid",
-    .state = {
+    .desc = {
       .type = ShaderType_Drawing,
       .primitive = ShaderTopology_Line,
       .is_transparent = true,
@@ -32,7 +32,7 @@ Extern ShaderDefinition shaders_info[Shader_COUNT] = {
   },
   [Shader_Axis] = {
     .path = "axis",
-    .state = {
+    .desc = {
       .type = ShaderType_Drawing,
       .primitive = ShaderTopology_Line,
       .is_transparent = true,
@@ -41,7 +41,7 @@ Extern ShaderDefinition shaders_info[Shader_COUNT] = {
   },
   [Shader_Cubemap] = {
     .path = "cubemap",
-    .state = {
+    .desc = {
       .type = ShaderType_Cube,
       .primitive = ShaderTopology_Triangle,
       .is_transparent = false,
@@ -49,30 +49,37 @@ Extern ShaderDefinition shaders_info[Shader_COUNT] = {
     },
   },
 };
-Extern Handle<GpuShader> shaders[Shader_COUNT];
+global Handle<GpuShader> shaders_handle[Shader_COUNT];
+Handle<GpuShader> shader_get(ShaderId id) { return shaders_handle[id]; }
+void shader_set(ShaderId id, Handle<GpuShader> shader_handle) { shaders_handle[id] = shader_handle; }
 
 ///////////////////////////////////
 // Meshes
 
-String meshes_path[Mesh_Load_COUNT] = {
-  [Mesh_GltfCube] = "cube.gltf",
-  [Mesh_GlbCube] = "cube.glb",
+global String meshes_path[Mesh_Load_COUNT] = {
+  // [Mesh_GltfCube] = "cube.gltf",
+  [Mesh_CubeGlb] = "cube.glb",
+  [Mesh_MonkeyGlb] = "monkey.glb"
 };
-Extern Handle<GpuMesh> meshes[Mesh_COUNT];
+global Handle<GpuMesh> meshes_handle[Mesh_COUNT];
+Handle<GpuMesh> mesh_get(MeshId id) { return meshes_handle[id]; }
+void mesh_set(MeshId id, Handle<GpuMesh> mesh_handle) { meshes_handle[id] = mesh_handle; }
 
 ///////////////////////////////////
 // Textures
 
-Extern String textures_path[Texture_COUNT] = {
+global String textures_path[Texture_COUNT] = {
   [Texture_OrangeLines] = "orange_lines_512.png",
   [Texture_Container] = "container.jpg",
 };
-Extern Handle<GpuTexture> textures[Texture_COUNT];
+global Handle<GpuTexture> textures_handle[Texture_COUNT];
+Handle<GpuTexture> texture_get(TextureId id) { return textures_handle[id]; };
+void texture_set(TextureId id, Handle<GpuTexture> texture_handle) { textures_handle[id] = texture_handle; }
 
 ///////////////////////////////////
 // Materials
 
-Extern MaterialDesc materials_info[Material_COUNT] = {
+global Material materials_info[Material_COUNT] = {
   [Material_RedOrange] = {
     .ambient = v3(1,0,0),
     .diffuse = v3_scale(1),
@@ -88,7 +95,24 @@ Extern MaterialDesc materials_info[Material_COUNT] = {
     .texture = Texture_Container,
   },
 };
-Extern Handle<GpuMaterial> materials[Material_COUNT];
+global Handle<GpuMaterial> materials_handle[Material_COUNT];
+Handle<GpuMaterial> material_get(MaterialId id) { return materials_handle[id]; }
+
+void asset_load() {
+  Loop (i, Shader_COUNT) {
+    shaders_handle[i] = shader_load(shaders_desc[i].path, shaders_desc[i].desc);
+  }
+  Loop (i, Mesh_Load_COUNT) {
+    meshes_handle[i] = mesh_load(meshes_path[i]);
+  }
+  Loop (i, Texture_COUNT) {
+    textures_handle[i] = texture_load(textures_path[i]);
+  }
+  Loop (i, Material_COUNT) {
+    materials_info[i].texture = textures_handle[materials_info[i].texture.handle];
+    materials_handle[i] = vk_material_load(materials_info[i]);
+  }
+}
 
 ////////////////////////////////////////////////////////////////////////
 // Test
@@ -675,7 +699,7 @@ void event_fire(u32 code, void* sender, EventContext context) {
 ////////////////////////////////////////////////////////////////////////
 // Loaders
 
-intern MeshDesc mesh_load_obj(Allocator arena, String name) {
+intern Mesh mesh_load_obj(Allocator arena, String name) {
   Scratch scratch(arena);
   Darray<v3> positions(scratch);
   Darray<v3> normals(scratch);
@@ -743,7 +767,7 @@ intern MeshDesc mesh_load_obj(Allocator arena, String name) {
     }
     final_indices.add(vertex_index);
   }
-  MeshDesc mesh = {
+  Mesh mesh = {
     .vertices = vertices.data,
     .indexes = (u32*)final_indices.data,
     .vert_count = vertices.count,
@@ -752,7 +776,7 @@ intern MeshDesc mesh_load_obj(Allocator arena, String name) {
   return mesh;
 }
 
-intern MeshDesc mesh_load_gltf(Allocator arena, String name) {
+intern Mesh mesh_load_gltf(Allocator arena, String name) {
   Scratch scratch(arena);
   Buffer buf = os_file_path_read_all(scratch, name);
   JsonReader r = json_reader_init({buf.data, buf.size});
@@ -862,7 +886,7 @@ intern MeshDesc mesh_load_gltf(Allocator arena, String name) {
       .uv = vertices_uv[i],
     };
   }
-  MeshDesc mesh = {
+  Mesh mesh = {
     .vertices = vertices,
     .indexes = (u32*)indices,
     .vert_count = info.vert_count,
@@ -871,7 +895,7 @@ intern MeshDesc mesh_load_gltf(Allocator arena, String name) {
   return mesh;
 }
 
-intern MeshDesc mesh_load_glb(Allocator arena, String name) {
+intern Mesh mesh_load_glb(Allocator arena, String name) {
   Scratch scratch(arena);
   Buffer buf = os_file_path_read_all(scratch, name);
   struct FileHeader {
@@ -989,7 +1013,7 @@ intern MeshDesc mesh_load_glb(Allocator arena, String name) {
       .uv = vertices_uv[i],
     };
   }
-  MeshDesc mesh = {
+  Mesh mesh = {
     .vertices = vertices,
     .indexes = indices,
     .vert_count = vertex_count,
@@ -998,9 +1022,9 @@ intern MeshDesc mesh_load_glb(Allocator arena, String name) {
   return mesh;
 }
 
-intern TextureDesc texture_image_load(String name) {
+intern Texture texture_image_load(String name) {
   Scratch scratch;
-  TextureDesc texture = {};
+  Texture texture = {};
   u32 required_channel_count = 4;
   u32 channel_count;
   String filepath = push_strf(scratch, "%s/%s/%s", asset_base_path(), String("textures"), name);
@@ -1093,7 +1117,7 @@ Handle<GpuMesh> mesh_load(String name) {
   Scratch scratch;
   String filepath = push_strf(scratch, "%s/%s/%s", asset_base_path(), String("models"), name);
   String format = str_skip_last_dot(name);
-  MeshDesc mesh = {};
+  Mesh mesh = {};
   if (str_match(format, "glb")) {
     mesh = mesh_load_glb(scratch, filepath);
   } else if (str_match(format, "gltf")) {
@@ -1115,14 +1139,14 @@ Handle<GpuShader> shader_load(String name, ShaderDesc info) {
 }
 
 Handle<GpuTexture> texture_load(String name) {
-  TextureDesc texture = texture_image_load(name);
+  Texture texture = texture_image_load(name);
   Handle<GpuTexture> handle = vk_texture_load(texture);
   return handle;
 }
 
 Handle<GpuCubemap> cubemap_load(String name) {
   Scratch scratch;
-  TextureDesc textures[6];
+  Texture textures[6];
   String sides[] = {
     "right", "left",
     "top", "bottom",

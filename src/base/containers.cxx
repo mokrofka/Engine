@@ -106,6 +106,7 @@ void DarrayIndexHandler::grow() {
 
 IdPool::IdPool(Allocator alloc) { *this = {}; array.init(alloc); }
 void IdPool::init(Allocator alloc) { *this = {}; array.init(alloc); }
+void IdPool::clear() { next_idx = 0; array.clear(); }
 
 u32 IdPool::alloc() {
   if (array.count > 0) {

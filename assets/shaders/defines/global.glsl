@@ -2,7 +2,7 @@
 #extension GL_ARB_shader_draw_parameters : enable
 
 #define KB(n) ((n) << 10)
-#define MaxEntities KB(1)
+#define MaxEntities KB(100)
 #define MaxMaterials KB(1)
 #define MaxLights KB(1)
 
@@ -52,10 +52,7 @@ struct SpotLight {
 };
 
 struct DrawCallInfo {
-  u32 vertexCount;
-  u32 instanceCount;
-  u32 firstVertex;
-  u32 firstInstance;
+  u32 pad[5];
   u32 entity_id;
 };
 
@@ -82,10 +79,10 @@ layout(set = 0, binding = 2) uniform sampler samplers[];
 layout(set = 0, binding = 3) uniform textureCube cube_texture;
 layout(set = 0, binding = 4) readonly buffer DrawInfoBuffer { DrawCallInfo drawinfo[]; };
 
-layout(push_constant) uniform PushConstants {
-  u32 id;
-  u32 material;
-} push;
+// layout(push_constant) uniform PushConstants {
+//   u32 id;
+//   // u32 material;
+// } push;
 
 v3 norm;
 v3 frag_pos;

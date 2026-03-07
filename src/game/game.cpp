@@ -1,55 +1,54 @@
 #include "common.h"
 
-// f32 cube_vertices[] = {
-//   // Pos                 // Normal           // Texcoord
-//   // Front face (0, 0, 1)
-//   -0.5f, -0.5f,  0.5f,   0.0f, 0.0f, 1.0f,   0.0f, 0.0f,
-//    0.5f, -0.5f,  0.5f,   0.0f, 0.0f, 1.0f,   1.0f, 0.0f,
-//    0.5f,  0.5f,  0.5f,   0.0f, 0.0f, 1.0f,   1.0f, 1.0f,
-//    0.5f,  0.5f,  0.5f,   0.0f, 0.0f, 1.0f,   1.0f, 1.0f,
-//   -0.5f,  0.5f,  0.5f,   0.0f, 0.0f, 1.0f,   0.0f, 1.0f,
-//   -0.5f, -0.5f,  0.5f,   0.0f, 0.0f, 1.0f,   0.0f, 0.0f,
+Vertex cube_vertices[] = {
+  // Front face (0, 0, 1)
+  {.pos = v3(-0.5f, -0.5f,  0.5f), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0.0f, 0.0f)},
+  {.pos = v3( 0.5f, -0.5f,  0.5f), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1.0f, 0.0f)},
+  {.pos = v3( 0.5f,  0.5f,  0.5f), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3( 0.5f,  0.5f,  0.5f), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3(-0.5f,  0.5f,  0.5f), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0.0f, 1.0f)},
+  {.pos = v3(-0.5f, -0.5f,  0.5f), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0.0f, 0.0f)},
 
-//   // Back face (0, 0, -1)
-//    0.5f, -0.5f, -0.5f,   0.0f, 0.0f, -1.0f,   0.0f, 0.0f,
-//   -0.5f, -0.5f, -0.5f,   0.0f, 0.0f, -1.0f,   1.0f, 0.0f,
-//   -0.5f,  0.5f, -0.5f,   0.0f, 0.0f, -1.0f,   1.0f, 1.0f,
-//   -0.5f,  0.5f, -0.5f,   0.0f, 0.0f, -1.0f,   1.0f, 1.0f,
-//    0.5f,  0.5f, -0.5f,   0.0f, 0.0f, -1.0f,   0.0f, 1.0f,
-//    0.5f, -0.5f, -0.5f,   0.0f, 0.0f, -1.0f,   0.0f, 0.0f,
+  // Back face (0, 0, -1)
+  {.pos = v3( 0.5f, -0.5f, -0.5f), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0.0f, 0.0f)},
+  {.pos = v3(-0.5f, -0.5f, -0.5f), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1.0f, 0.0f)},
+  {.pos = v3(-0.5f,  0.5f, -0.5f), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3(-0.5f,  0.5f, -0.5f), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3( 0.5f,  0.5f, -0.5f), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0.0f, 1.0f)},
+  {.pos = v3( 0.5f, -0.5f, -0.5f), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0.0f, 0.0f)},
 
-//   // Left face (-1, 0, 0)
-//   -0.5f, -0.5f, -0.5f,  -1.0f, 0.0f, 0.0f,   0.0f, 0.0f,
-//   -0.5f, -0.5f,  0.5f,  -1.0f, 0.0f, 0.0f,   1.0f, 0.0f,
-//   -0.5f,  0.5f,  0.5f,  -1.0f, 0.0f, 0.0f,   1.0f, 1.0f,
-//   -0.5f,  0.5f,  0.5f,  -1.0f, 0.0f, 0.0f,   1.0f, 1.0f,
-//   -0.5f,  0.5f, -0.5f,  -1.0f, 0.0f, 0.0f,   0.0f, 1.0f,
-//   -0.5f, -0.5f, -0.5f,  -1.0f, 0.0f, 0.0f,   0.0f, 0.0f,
+  // Left face (-1, 0, 0)
+  {.pos = v3(-0.5f, -0.5f, -0.5f),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+  {.pos = v3(-0.5f, -0.5f,  0.5f),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
+  {.pos = v3(-0.5f,  0.5f,  0.5f),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3(-0.5f,  0.5f,  0.5f),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3(-0.5f,  0.5f, -0.5f),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
+  {.pos = v3(-0.5f, -0.5f, -0.5f),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
 
-//   // Right face (1, 0, 0)
-//    0.5f, -0.5f,  0.5f,   1.0f, 0.0f, 0.0f,   0.0f, 0.0f,
-//    0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 0.0f,   1.0f, 0.0f,
-//    0.5f,  0.5f, -0.5f,   1.0f, 0.0f, 0.0f,   1.0f, 1.0f,
-//    0.5f,  0.5f, -0.5f,   1.0f, 0.0f, 0.0f,   1.0f, 1.0f,
-//    0.5f,  0.5f,  0.5f,   1.0f, 0.0f, 0.0f,   0.0f, 1.0f,
-//    0.5f, -0.5f,  0.5f,   1.0f, 0.0f, 0.0f,   0.0f, 0.0f,
+  // Right face (1, 0, 0)
+  {.pos = v3(0.5f, -0.5f,  0.5f),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+  {.pos = v3(0.5f, -0.5f, -0.5f),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
+  {.pos = v3(0.5f,  0.5f, -0.5f),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3(0.5f,  0.5f, -0.5f),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3(0.5f,  0.5f,  0.5f),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
+  {.pos = v3(0.5f, -0.5f,  0.5f),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
 
-//   // Bottom face (0, -1, 0)
-//   -0.5f, -0.5f, -0.5f,   0.0f, -1.0f, 0.0f,   0.0f, 1.0f,
-//    0.5f, -0.5f, -0.5f,   0.0f, -1.0f, 0.0f,   1.0f, 1.0f,
-//    0.5f, -0.5f,  0.5f,   0.0f, -1.0f, 0.0f,   1.0f, 0.0f,
-//    0.5f, -0.5f,  0.5f,   0.0f, -1.0f, 0.0f,   1.0f, 0.0f,
-//   -0.5f, -0.5f,  0.5f,   0.0f, -1.0f, 0.0f,   0.0f, 0.0f,
-//   -0.5f, -0.5f, -0.5f,   0.0f, -1.0f, 0.0f,   0.0f, 1.0f,
+  // Bottom face (0, -1, 0)
+  {.pos = v3(-0.5f, -0.5f, -0.5f),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
+  {.pos = v3( 0.5f, -0.5f, -0.5f),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3( 0.5f, -0.5f,  0.5f),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
+  {.pos = v3( 0.5f, -0.5f,  0.5f),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
+  {.pos = v3(-0.5f, -0.5f,  0.5f),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+  {.pos = v3(-0.5f, -0.5f, -0.5f),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
 
-//   // Top face (0, 1, 0)
-//   -0.5f,  0.5f,  0.5f,   0.0f, 1.0f, 0.0f,   0.0f, 0.0f,
-//    0.5f,  0.5f,  0.5f,   0.0f, 1.0f, 0.0f,   1.0f, 0.0f,
-//    0.5f,  0.5f, -0.5f,   0.0f, 1.0f, 0.0f,   1.0f, 1.0f,
-//    0.5f,  0.5f, -0.5f,   0.0f, 1.0f, 0.0f,   1.0f, 1.0f,
-//   -0.5f,  0.5f, -0.5f,   0.0f, 1.0f, 0.0f,   0.0f, 1.0f,
-//   -0.5f,  0.5f,  0.5f,   0.0f, 1.0f, 0.0f,   0.0f, 0.0f,
-// };
+  // Top face (0, 1, 0)
+  {.pos = v3(-0.5f,  0.5f,  0.5f), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+  {.pos = v3( 0.5f,  0.5f,  0.5f), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
+  {.pos = v3( 0.5f,  0.5f, -0.5f), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3( 0.5f,  0.5f, -0.5f), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3(-0.5f,  0.5f, -0.5f), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
+  {.pos = v3(-0.5f,  0.5f,  0.5f), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+};
 
 Vertex triangle_vertices[] = {
   {.pos = v3( 0.0,   0.5, 0), .uv = v2(0.5, 1), .color = v3(1,0,0)},
@@ -109,7 +108,7 @@ global GameState* st;
 ////////////////////////////////////////////////////////////////////////
 // Utils
 
-MeshDesc grid_create(Allocator arena, u32 size, f32 step) {
+Mesh grid_create(Allocator arena, u32 size, f32 step) {
   Vertex* vertices = push_array(arena, Vertex, size*4);
   v3 pos_offset = v3(-(i32)size/2, 0, -(i32)size/2);
   for (i32 i = 0; i < size; ++i) {
@@ -121,7 +120,7 @@ MeshDesc grid_create(Allocator arena, u32 size, f32 step) {
     vertical_vertices[i*2].pos = pos_offset + v3(i*step, 0, 0);
     vertical_vertices[i*2+1].pos = pos_offset + v3(i*step, 0, size*step);
   }
-  MeshDesc mesh = {
+  Mesh mesh = {
     .vertices = vertices,
     .vert_count = size*4,
   };
@@ -130,7 +129,7 @@ MeshDesc grid_create(Allocator arena, u32 size, f32 step) {
 
 Handle<Entity> entity_create(MeshId mesh_id, ShaderId shader_id, MaterialId material_id) {
   Entity e = {
-    .id = st->id_pool.alloc() + 1,
+    .id = st->id_pool.alloc(),
     .aabb = {
       v3_scale(-1),
       v3_scale(1),
@@ -138,7 +137,7 @@ Handle<Entity> entity_create(MeshId mesh_id, ShaderId shader_id, MaterialId mate
   };
   e.trans() = {};
   e.scale() = v3_one();
-  vk_make_renderable(e.id, meshes[mesh_id], shaders[shader_id], materials[material_id]);
+  vk_make_renderable(e.id, mesh_get(mesh_id), shader_get(shader_id), material_get(material_id));
   Handle<Entity> handle = st->entities.add(e);
   return handle;
 }
@@ -193,6 +192,9 @@ void camera_update() {
     if (os_is_key_down(Key_X)) {
       velocity.y -= 1.0f;
     }
+    if (os_is_key_down(Key_LShift)) {
+      speed *= 100;
+    }
     if (velocity != v3_zero()) {
       velocity = v3_norm(velocity);
       cam.pos += velocity * speed * g_dt;
@@ -227,7 +229,7 @@ void foo() {
 
 void select_obj() {
   v3 dir = ray_from_camera();
-  Handle<Entity> e_handle = entity_create(Mesh_GlbCube, Shader_Color, Material_RedOrange);
+  Handle<Entity> e_handle = entity_create(Mesh_CubeGlb, Shader_Color, Material_RedOrange);
   Entity& e = st->entities.get(e_handle);
   // e.pos() = st->cam.pos + v3_norm(mat4_forward(st->cam.view));
   e.pos() = st->cam.pos;
@@ -255,10 +257,10 @@ void scene_init() {
     SinD(cam.yaw) * CosD(cam.pitch)
   };
   vk_get_view() = mat4_look_at(cam.pos, cam.dir, v3_up());
-  Handle<Entity> cube_handle = entity_create(Mesh_GlbCube, Shader_Color, Material_RedOrange);
+  Handle<Entity> cube_handle = entity_create(Mesh_CubeGlb, Shader_Color, Material_RedOrange);
   Entity& cube = st->entities.get(cube_handle);
   cube.pos().x = 0;
-  Handle<Entity> cube1_handle = entity_create(Mesh_GltfCube, Shader_Color, Material_GreenContainer);
+  Handle<Entity> cube1_handle = entity_create(Mesh_MonkeyGlb, Shader_Color, Material_GreenContainer);
   Entity& cube1 = st->entities.get(cube1_handle);
   cube1.pos() = {0,0,0};
   {
@@ -274,16 +276,17 @@ void scene_init() {
   {
     st->axis_attached_to_cam = entity_create(Mesh_Axis, Shader_Axis, MaterialId(0));
   }
-  // {
-  //   u64 start = os_now_ns();
-  //   Loop (i, MaxEntities-KB(1)) {
-  //     u32 cube_id = entity_create(meshes[Mesh_GlbCube], shaders[Shader_Color], materials[Material_RedOrange]);
-  //     Entity& cube = st->entities.get(cube_id);
-  //     cube.pos() = v3_rand_range(-v3_scale(KB(1)), v3_scale(KB(1)));
-  //   }
-  //   u64 end = os_now_ns();
-  //   Info("%f64 s", f64(end - start)/Billion(1));
-  // }
+  {
+    u64 start = os_now_ns();
+    // Loop (i, MaxEntities-100) {
+    //   Handle<Entity> cube_handle = entity_create(Mesh_CubeGlb, Shader_Color, Material_RedOrange);
+    //   Entity& cube = st->entities.get(cube_handle);
+    //   u32 range = 100;
+    //   cube.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+    // }
+    u64 end = os_now_ns();
+    Info("%f64 s", f64(end - start)/Billion(1));
+  }
 }
 
 void scene_deinit() {
@@ -291,46 +294,35 @@ void scene_deinit() {
     vk_remove_renderable(e.id);
   }
   st->entities.clear();
+  st->id_pool.clear();
   arena_clear(&st->arena);
 }
 
 void app_init(u8** state) {
   Scratch scratch;
   Allocator global_alloc = mem_get_global_allocator();
-  Assign(*state, push_struct_zero(global_alloc, GameState));
-  Assign(st, *state);
+  GameState* game_st = push_struct_zero(global_alloc, GameState);
+  *state = (u8*)game_st;
+  st = game_st;
   *st = {
     .arena = arena_init(),
     .gpa{st->arena},
     .id_pool{st->gpa},
     .timer = timer_init(1),
   };
-  for (i32 i = 0; i < Shader_COUNT; ++i) {
-    shaders[i] = shader_load(shaders_info[i].path, shaders_info[i].state);
-  }
-  for (i32 i = 0; i < Mesh_Load_COUNT; ++i) {
-    meshes[i] = mesh_load(meshes_path[i]);
-  }
-  for (i32 i = 0; i < Texture_COUNT; ++i) {
-    textures[i] = texture_load(textures_path[i]);
-  }
-  Loop (i, Material_COUNT) {
-    materials_info[i].texture = textures[materials_info[i].texture.handle];
-    materials[i] = vk_material_load(materials_info[i]);
-  }
-  MeshDesc triangle_mesh =  {
+  Mesh triangle_mesh =  {
     .vertices = triangle_vertices,
     .vert_count = ArrayCount(triangle_vertices),
   };
-  meshes[Mesh_Triangle] = vk_mesh_load(triangle_mesh);
-  MeshDesc grid_mesh = grid_create(scratch, 100, 1);
-  meshes[Mesh_Grid] = vk_mesh_load(grid_mesh);
-  MeshDesc axis_mesh = {
-    .vertices = axis_vertices,
-    .vert_count = ArrayCount(axis_vertices),
-  };
-  meshes[Mesh_Axis] = vk_mesh_load(axis_mesh);
+  Mesh cube_mesh = {.vertices = cube_vertices, .vert_count = ArrayCount(cube_vertices)};
+  mesh_set(Mesh_CubeGlb, vk_mesh_load(cube_mesh));
+  mesh_set(Mesh_Triangle, vk_mesh_load(triangle_mesh));
+  Mesh grid_mesh = grid_create(scratch, 100, 1);
+  mesh_set(Mesh_Grid, vk_mesh_load(grid_mesh));
+  Mesh axis_mesh = {.vertices = axis_vertices, .vert_count = ArrayCount(axis_vertices)};
+  mesh_set(Mesh_Axis, vk_mesh_load(axis_mesh));
   cubemap_load("night_cubemap");
+  asset_load();
   scene_init();
 }
 
@@ -379,7 +371,9 @@ void scene_update() {
     f32 yoff = 0.3f;
     Entity& axis = st->entities.get(st->axis_attached_to_cam);
     axis.pos() = st->cam.pos + forward*dist + right*xoff + up*yoff;
+    // axis.pos() = v3_zero();
     axis.scale() = v3_scale(0.1);
+    // axis.scale() = v3_scale(10);
   }
 }
 

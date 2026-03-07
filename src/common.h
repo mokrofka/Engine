@@ -1,7 +1,7 @@
 #pragma once
 #include "lib.h"
 
-const u32 MaxEntities  = KB(1);
+const u32 MaxEntities = KB(100);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // vk.cpp
@@ -12,6 +12,7 @@ struct GpuShader;
 struct GpuMaterial;
 struct GpuCubemap;
 struct Entity;
+struct GpuInstance;
 
 enum RenderpassType {
   RenderpassType_World,
@@ -19,10 +20,9 @@ enum RenderpassType {
   RenderpassType_Screen,
 };
 
-struct PushConstant {
-  u32 entity_idx;
-  u32 texture_id;
-};
+// struct PushConstant {
+//   u32 entity_idx;
+// };
 
 struct PointLight {
   v3 color;
@@ -46,7 +46,7 @@ struct SpotLight {
   f32 outer_cutoff;
 };
 
-struct MaterialDesc {
+struct Material {
   v3 ambient;
   v3 diffuse;
   v3 specular;
@@ -60,7 +60,7 @@ struct DrawLine {
   v3 color;
 };
 
-struct TextureDesc {
+struct Texture {
   u32 width;
   u32 height;
   u8* data;
@@ -73,7 +73,7 @@ struct Vertex {
   v3 color;
 };
 
-struct MeshDesc {
+struct Mesh {
   Vertex* vertices;
   u32* indexes;
   u32 vert_count;
@@ -100,7 +100,12 @@ struct ShaderDesc {
   b8 use_depth;
 };
 
-Handle<GpuMesh> vk_mesh_load(MeshDesc mesh_desc);
+struct Shader {
+  String path;
+  ShaderDesc desc;
+};
+
+Handle<GpuMesh> vk_mesh_load(Mesh mesh);
 
 void vk_init();
 void vk_shutdown();
@@ -111,9 +116,9 @@ void vk_begin_renderpass(RenderpassType renderpass);
 void vk_end_renderpass(RenderpassType renderpass);
 
 KAPI Handle<GpuShader> vk_shader_load(String name, ShaderDesc info);
-KAPI Handle<GpuTexture> vk_texture_load(TextureDesc texture_info);
-KAPI Handle<GpuMaterial> vk_material_load(MaterialDesc material);
-KAPI Handle<GpuCubemap> vk_cubemap_load(TextureDesc* textures);
+KAPI Handle<GpuTexture> vk_texture_load(Texture texture_info);
+KAPI Handle<GpuMaterial> vk_material_load(Material material);
+KAPI Handle<GpuCubemap> vk_cubemap_load(Texture* textures);
 
 void vk_draw();
 void vk_draw_screen();
@@ -121,6 +126,8 @@ void vk_draw_compute();
 
 // Entity
 KAPI void vk_make_renderable(Handle<Entity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuShader> shader_handle, Handle<GpuMaterial> material_handle);
+KAPI Handle<GpuInstance> vk_make_instance(Handle<GpuMesh> mesh_handle, Handle<GpuShader> shader_handle);
+KAPI void vk_push_entity_to_instance(Handle<GpuInstance> instance_handle, Handle<Entity> entity_handle, Handle<GpuMaterial> material_handle);
 KAPI void vk_remove_renderable(Handle<Entity> entity_handle);
 
 // // Point light
@@ -162,10 +169,6 @@ KAPI extern Transform entities_transforms[MaxEntities];
 ///////////////////////////////////
 // Shaders
 
-struct ShaderDefinition {
-  String path;
-  ShaderDesc state;
-};
 enum ShaderId {
   Shader_Color,
   Shader_Grid,
@@ -173,15 +176,15 @@ enum ShaderId {
   Shader_Cubemap,
   Shader_COUNT,
 };
-extern ShaderDefinition shaders_info[Shader_COUNT];
-extern Handle<GpuShader> shaders[Shader_COUNT];
+Handle<GpuShader> shader_get(ShaderId id);
+void shader_set(ShaderId id, Handle<GpuShader> shader_handle);
 
 ///////////////////////////////////
 // Meshes
 
 enum MeshId {
-  Mesh_GltfCube,
-  Mesh_GlbCube,
+  Mesh_MonkeyGlb,
+  Mesh_CubeGlb,
   Mesh_Load_COUNT,
 
   Mesh_Triangle,
@@ -189,8 +192,8 @@ enum MeshId {
   Mesh_Axis,
   Mesh_COUNT,
 };
-extern String meshes_path[Mesh_Load_COUNT];
-extern Handle<GpuMesh> meshes[Mesh_COUNT];
+Handle<GpuMesh> mesh_get(MeshId id);
+void mesh_set(MeshId id, Handle<GpuMesh> mesh_handle);
 
 ///////////////////////////////////
 // Textures
@@ -200,8 +203,8 @@ enum TextureId {
   Texture_Container,
   Texture_COUNT,
 };
-extern String textures_path[Texture_COUNT];
-extern Handle<GpuTexture> textures[Texture_COUNT];
+Handle<GpuTexture> texture_get(TextureId id);
+void texture_set(TextureId id, Handle<GpuTexture> texture_handle);
 
 ///////////////////////////////////
 // Materials
@@ -211,8 +214,9 @@ enum MaterialId {
   Material_GreenContainer,
   Material_COUNT,
 };
-extern MaterialDesc materials_info[Material_COUNT];
-extern Handle<GpuMaterial> materials[Material_COUNT];
+Handle<GpuMaterial> material_get(MaterialId id);
+
+void asset_load();
 
 ////////////////////////////////////////////////////////////////////////
 // Test

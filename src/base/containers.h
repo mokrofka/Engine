@@ -467,6 +467,7 @@ struct IdPool {
   IdPool() = default;
   IdPool(Allocator alloc);
   void init(Allocator alloc);
+  void clear();
   u32 alloc();
   void free(u32 id);
 };
