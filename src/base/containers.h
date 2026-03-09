@@ -168,9 +168,9 @@ struct Darray {
   void add(T b) { 
     if (count >= cap) {
       if (data) {
-        u32 odl_cap = cap;
+        u32 old_cap = cap;
         cap *= DEFAULT_RESIZE_FACTOR;
-        data = mem_realloc_array(alloc, data, odl_cap, cap);
+        data = mem_realloc_array(alloc, data, old_cap, cap);
       } else {
         cap = DEFAULT_CAPACITY;
         data = mem_alloc_array<T>(alloc, cap);

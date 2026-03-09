@@ -1,9 +1,11 @@
 #include "common.h"
 #include "stb_image.h"
+#include "lib.h"
 
 Extern f32 g_dt;
 Extern f32 g_time;
-Extern Transform entities_transforms[MaxEntities];
+Extern Transform* entities_transforms;
+Extern Transform* static_entities_transforms;
 
 ////////////////////////////////////////////////////////////////////////
 // Assets
@@ -408,8 +410,8 @@ void test() {
   test_object_pool();
 }
 
-////////////////////////////////////////////////////////////////////////
-// Profiler
+// ////////////////////////////////////////////////////////////////////////
+// // Profiler
 
 struct Profiler {
   Array<ProfileAnchor*, 4096> anchors;
@@ -1053,30 +1055,36 @@ struct CommonState {
 global CommonState common_st;
 
 void common_init() {
-  Scratch scratch;
-  common_st.arena = arena_init();
-  common_st.asset_path = push_strf(common_st.arena, "%s/%s", os_get_current_directory(), String("../assets"));
-  common_st.shader_dir = push_str_cat(common_st.arena, asset_base_path(), "/shaders");
-  common_st.shader_compiled_dir = push_str_cat(common_st.arena, common_st.shader_dir, "/compiled");
-  asset_watch_directory_add(common_st.shader_dir, OS_WatchFlag_Modify, [](String name) {
+  {
     Scratch scratch;
-    String shader_filepath = push_strf(scratch, "%s/%s", common_st.shader_dir, name);
-    String shader_compiled_filepath = push_strf(scratch, "%s/%s%s", common_st.shader_compiled_dir, name, String(".spv"));
-    StringList list = {};
-    str_list_pushf(scratch, &list, "glslangValidator");
-    str_list_pushf(scratch, &list, "-V");
-    str_list_pushf(scratch, &list, "%s", shader_filepath);
-    str_list_pushf(scratch, &list, "-o");
-    str_list_pushf(scratch, &list, "%s", shader_compiled_filepath);
-    os_process_launch(list);
-  });
-  asset_watch_directory_add(common_st.shader_compiled_dir, OS_WatchFlag_Modify, [](String name) {
-    Scratch scratch;
-    String shader_name_with_format = str_chop_last_dot(name);
-    String shader_name = str_chop_last_dot(shader_name_with_format);
-    ShaderReloadInfo* info = common_st.shader_map.get(shader_name);
-    vk_shader_reload(shader_name, info->shader_handle, info->info);
-  });
+    common_st.arena = arena_init();
+    common_st.asset_path = push_strf(common_st.arena, "%s/%s", os_get_current_directory(), String("../assets"));
+    common_st.shader_dir = push_str_cat(common_st.arena, asset_base_path(), "/shaders");
+    common_st.shader_compiled_dir = push_str_cat(common_st.arena, common_st.shader_dir, "/compiled");
+  }
+  {
+    asset_watch_directory_add(common_st.shader_dir, OS_WatchFlag_Modify, [](String name) {
+      Scratch scratch;
+      String shader_filepath = push_strf(scratch, "%s/%s", common_st.shader_dir, name);
+      String shader_compiled_filepath = push_strf(scratch, "%s/%s%s", common_st.shader_compiled_dir, name, String(".spv"));
+      StringList list = {};
+      str_list_pushf(scratch, &list, "glslangValidator");
+      str_list_pushf(scratch, &list, "-V");
+      str_list_pushf(scratch, &list, "%s", shader_filepath);
+      str_list_pushf(scratch, &list, "-o");
+      str_list_pushf(scratch, &list, "%s", shader_compiled_filepath);
+      os_process_launch(list);
+    });
+    asset_watch_directory_add(common_st.shader_compiled_dir, OS_WatchFlag_Modify, [](String name) {
+      Scratch scratch;
+      String shader_name_with_format = str_chop_last_dot(name);
+      String shader_name = str_chop_last_dot(shader_name_with_format);
+      ShaderReloadInfo* info = common_st.shader_map.get(shader_name);
+      vk_shader_reload(shader_name, info->shader_handle, info->info);
+    });
+  }
+  entities_transforms = push_array(common_st.arena, Transform, MaxEntities);
+  static_entities_transforms = push_array(common_st.arena, Transform, MaxStaticEntities);
   vk_init();
 }
 

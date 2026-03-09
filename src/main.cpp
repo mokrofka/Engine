@@ -65,7 +65,7 @@ i32 main(i32 count, char* args[]) {
     timer += g_dt;
     if (timer >= 1.0) {
       timer = 0;
-      // Info("Frame rate: %f, %f fps", g_dt, 1/g_dt);
+      Info("Frame rate: %f, %f fps", g_dt, 1/g_dt);
     }
   }
   // r_shutdown();

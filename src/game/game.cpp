@@ -85,6 +85,14 @@ struct Entity {
   v3& scale() { return entities_transforms[id.handle].scale; }
 };
 
+struct StaticEntity {
+  Handle<StaticEntity> id;
+  Transform& trans() { return static_entities_transforms[id.handle]; }
+  v3& pos() { return static_entities_transforms[id.handle].pos; }
+  v3& rot() { return static_entities_transforms[id.handle].rot; }
+  v3& scale() { return static_entities_transforms[id.handle].scale; }
+};
+
 struct Camera {
   v3 pos;
   v3 dir;
@@ -96,8 +104,10 @@ struct Camera {
 struct GameState {
   Arena arena;
   AllocSegList gpa;
-  IdPool id_pool;
+  IdPool entity_id_pool;
+  IdPool static_entity_id_pool;
   DarrayHandler<Entity> entities;
+  DarrayHandler<StaticEntity> static_entities;
   Camera cam;
   Timer timer;
   Handle<Entity> axis_attached_to_cam;
@@ -129,7 +139,7 @@ Mesh grid_create(Allocator arena, u32 size, f32 step) {
 
 Handle<Entity> entity_create(MeshId mesh_id, ShaderId shader_id, MaterialId material_id) {
   Entity e = {
-    .id = st->id_pool.alloc(),
+    .id = st->entity_id_pool.alloc(),
     .aabb = {
       v3_scale(-1),
       v3_scale(1),
@@ -139,6 +149,17 @@ Handle<Entity> entity_create(MeshId mesh_id, ShaderId shader_id, MaterialId mate
   e.scale() = v3_one();
   vk_make_renderable(e.id, mesh_get(mesh_id), shader_get(shader_id), material_get(material_id));
   Handle<Entity> handle = st->entities.add(e);
+  return handle;
+}
+
+Handle<StaticEntity> entity_static_create(MeshId mesh_id, ShaderId shader_id, MaterialId material_id) {
+  StaticEntity e = {
+    .id = st->static_entity_id_pool.alloc(),
+  };
+  e.trans() = {};
+  e.scale() = v3_one();
+  vk_make_renderable_static(e.id, mesh_get(mesh_id), shader_get(shader_id), material_get(material_id));
+  Handle<StaticEntity> handle = st->static_entities.add(e);
   return handle;
 }
 
@@ -192,8 +213,8 @@ void camera_update() {
     if (os_is_key_down(Key_X)) {
       velocity.y -= 1.0f;
     }
-    if (os_is_key_down(Key_LShift)) {
-      speed *= 100;
+    if (os_is_key_down(Key_Shift)) {
+      speed *= 20;
     }
     if (velocity != v3_zero()) {
       velocity = v3_norm(velocity);
@@ -221,10 +242,6 @@ v3 ray_from_camera() {
   v3 world_coord = v3_of_v4(vk_get_view() * eye_coord);
   world_coord = v3_norm(world_coord);
   return world_coord;
-}
-
-void foo() {
-  debug_draw_line(v3_zero(), v3_one(), v3_one());
 }
 
 void select_obj() {
@@ -287,6 +304,39 @@ void scene_init() {
     u64 end = os_now_ns();
     Info("%f64 s", f64(end - start)/Billion(1));
   }
+
+  // {
+  //   Handle<Entity> cube_handle = entity_create(Mesh_CubeGlb, Shader_Color, Material_RedOrange);
+  //   Entity& cube = st->entities.get(cube_handle);
+  //   u32 range = 1;
+  //   cube.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+  // }
+  // {
+  //   Handle<Entity> cube_handle = entity_create(Mesh_CubeGlb, Shader_Color, Material_RedOrange);
+  //   Entity& cube = st->entities.get(cube_handle);
+  //   u32 range = 1;
+  //   cube.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+  // }
+
+  {
+    Handle<StaticEntity> cube_handle = entity_static_create(Mesh_CubeGlb, Shader_Color, Material_RedOrange);
+    StaticEntity& cube = st->static_entities.get(cube_handle);
+    u32 range = 2;
+    cube.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+  }
+  {
+    Handle<StaticEntity> cube_handle = entity_static_create(Mesh_CubeGlb, Shader_Color, Material_RedOrange);
+    StaticEntity& cube = st->static_entities.get(cube_handle);
+    u32 range = 2;
+    cube.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+  }
+
+  Loop (i, MB(1)-KB(300)) {
+    Handle<StaticEntity> cube_handle = entity_static_create(Mesh_CubeGlb, Shader_Color, Material_RedOrange);
+    StaticEntity& cube = st->static_entities.get(cube_handle);
+    u32 range = KB(1);
+    cube.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+  }
 }
 
 void scene_deinit() {
@@ -294,7 +344,7 @@ void scene_deinit() {
     vk_remove_renderable(e.id);
   }
   st->entities.clear();
-  st->id_pool.clear();
+  st->entity_id_pool.clear();
   arena_clear(&st->arena);
 }
 
@@ -307,7 +357,7 @@ void app_init(u8** state) {
   *st = {
     .arena = arena_init(),
     .gpa{st->arena},
-    .id_pool{st->gpa},
+    .entity_id_pool{st->gpa},
     .timer = timer_init(1),
   };
   Mesh triangle_mesh =  {
@@ -354,8 +404,12 @@ void scene_update() {
     e.pos().z = e1.pos().z + Cos(g_time) * 4;
     e.pos().y = e1.pos().z + Cos(g_time) * 4;
   }
-  if (os_is_button_pressed(MouseButton_Left)) {
-    select_obj();
+  if (os_is_button_down(MouseButton_Left)) {
+    // select_obj();
+    v3 dir = ray_from_camera();
+    // debug_draw_line(st->cam.pos, dir, ColorWhite);
+    // debug_draw_line(v3_zero(), st->cam.pos + dir, ColorWhite);
+    debug_draw_line_time(st->cam.pos, st->cam.pos + dir*10, ColorWhite, 1000);
   }
   for (Entity& e : st->entities) {
     e.pos() += e.dir * g_dt;
@@ -371,10 +425,14 @@ void scene_update() {
     f32 yoff = 0.3f;
     Entity& axis = st->entities.get(st->axis_attached_to_cam);
     axis.pos() = st->cam.pos + forward*dist + right*xoff + up*yoff;
-    // axis.pos() = v3_zero();
     axis.scale() = v3_scale(0.1);
-    // axis.scale() = v3_scale(10);
   }
+  // Loop (i, 100) {
+  //   Handle<StaticEntity> cube_handle = entity_static_create(Mesh_CubeGlb, Shader_Color, Material_RedOrange);
+  //   StaticEntity& cube = st->static_entities.get(cube_handle);
+  //   u32 range = 100;
+  //   cube.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+  // }
 }
 
 shared_function void app_update(u8** state) {
@@ -395,6 +453,7 @@ shared_function void app_update(u8** state) {
     os_close_window();
   }
   scene_update();
+
 }
 
 void bar() {
@@ -403,3 +462,4 @@ void bar() {
 
   // Info("%i", arr[0]);
 }
+

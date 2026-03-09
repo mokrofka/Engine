@@ -2,7 +2,9 @@
 #extension GL_ARB_shader_draw_parameters : enable
 
 #define KB(n) ((n) << 10)
+#define MB(n) ((n) << 20)
 #define MaxEntities KB(100)
+#define MaxStaticEntities MB(1)
 #define MaxMaterials KB(1)
 #define MaxLights KB(1)
 
@@ -67,7 +69,7 @@ layout(std430, set = 0, binding = 0) readonly buffer Buffer {
   u32 dir_light_count;
   u32 spot_light_count;
 
-  Entity entities[MaxEntities];
+  Entity entities[MaxEntities+MaxStaticEntities];
   Material materials[MaxMaterials];
   PointLight point_lights[MaxLights];
   DirLight dir_lights[MaxLights];

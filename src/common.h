@@ -1,18 +1,28 @@
 #pragma once
 #include "lib.h"
 
+const v3 ColorRed   = v3(1,0,0);
+const v3 ColorGreen = v3(0,1,0);
+const v3 ColorBlue  = v3(0,0,1);
+const v3 ColorWhite = v3(1,1,1);
+const v3 ColorBlack = v3(0,0,0);
+const v3 ColorGrey  = v3(0.8,0.8,0.8);
+
 const u32 MaxEntities = KB(100);
+const u32 MaxStaticEntities = MB(1);
+const u32 MaxDebugLines = KB(1);
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// vk.cpp
-
+struct Entity;
+struct StaticEntity;
 struct GpuTexture;
 struct GpuMesh;
 struct GpuShader;
 struct GpuMaterial;
 struct GpuCubemap;
-struct Entity;
 struct GpuInstance;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// vk.cpp
 
 enum RenderpassType {
   RenderpassType_World,
@@ -52,12 +62,6 @@ struct Material {
   v3 specular;
   f32 shininess;
   Handle<GpuTexture> texture;
-};
-
-struct DrawLine {
-  v3 a;
-  v3 b;
-  v3 color;
 };
 
 struct Texture {
@@ -126,9 +130,11 @@ void vk_draw_compute();
 
 // Entity
 KAPI void vk_make_renderable(Handle<Entity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuShader> shader_handle, Handle<GpuMaterial> material_handle);
-KAPI Handle<GpuInstance> vk_make_instance(Handle<GpuMesh> mesh_handle, Handle<GpuShader> shader_handle);
-KAPI void vk_push_entity_to_instance(Handle<GpuInstance> instance_handle, Handle<Entity> entity_handle, Handle<GpuMaterial> material_handle);
+KAPI void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuShader> shader_handle, Handle<GpuMaterial> material_handle);
 KAPI void vk_remove_renderable(Handle<Entity> entity_handle);
+// KAPI Handle<GpuInstance> vk_make_instance(Handle<GpuMesh> mesh_handle, Handle<GpuShader> shader_handle);
+// KAPI void vk_push_entity_to_instance(Handle<GpuInstance> instance_handle, Handle<Entity> entity_handle, Handle<GpuMaterial> material_handle);
+
 
 // // Point light
 // KAPI void vk_point_light_create(u32 entity_id);
@@ -158,10 +164,12 @@ KAPI void vk_shader_reload(String name, Handle<GpuShader> shader_handle, ShaderD
 // Debug drawing
 
 KAPI void debug_draw_line(v3 a, v3 b, v3 color);
+void debug_draw_line_time(v3 a, v3 b, v3 color, f32 time);
 
 KAPI extern f32 g_dt;
 KAPI extern f32 g_time;
-KAPI extern Transform entities_transforms[MaxEntities];
+KAPI extern Transform* entities_transforms;
+KAPI extern Transform* static_entities_transforms;
 
 ////////////////////////////////////////////////////////////////////////
 // Assets

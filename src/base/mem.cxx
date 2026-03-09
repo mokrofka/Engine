@@ -37,12 +37,12 @@ void global_alloc_init() {
   global_allocator.seglist.init(global_allocator.arena);
 }
 
-Allocator mem_get_global_allocator()                                      { return global_allocator.seglist; }
-u8* global_alloc(u64 size, u64 align)                                     { return mem_alloc(global_allocator.seglist, size, align); }
-u8* global_alloc_zero(u64 size, u64 align)                                { return mem_alloc_zero(global_allocator.seglist, size, align); }
-u8* global_realloc(void* ptr, u64 old_size, u64 new_size, u64 align)      { return mem_realloc(global_allocator.seglist, ptr, old_size, new_size, align); }
-u8* global_realloc_zero(void* ptr, u64 old_size, u64 new_size, u64 align) { return mem_realloc_zero(global_allocator.seglist, ptr, old_size, new_size, align); }
-void global_free(void* ptr)                                               { mem_free(global_allocator.seglist, ptr); }
+Allocator mem_get_global_allocator()                                             { return global_allocator.seglist; }
+intern u8* global_alloc(u64 size, u64 align)                                     { return mem_alloc(global_allocator.seglist, size, align); }
+intern u8* global_alloc_zero(u64 size, u64 align)                                { return mem_alloc_zero(global_allocator.seglist, size, align); }
+intern u8* global_realloc(void* ptr, u64 old_size, u64 new_size, u64 align)      { return mem_realloc(global_allocator.seglist, ptr, old_size, new_size, align); }
+intern u8* global_realloc_zero(void* ptr, u64 old_size, u64 new_size, u64 align) { return mem_realloc_zero(global_allocator.seglist, ptr, old_size, new_size, align); }
+intern void global_free(void* ptr)                                               { mem_free(global_allocator.seglist, ptr); }
 
 ////////////////////////////////////////////////////////////////////////
 // Arena
