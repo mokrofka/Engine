@@ -3,7 +3,7 @@ set(CMAKE_CXX_STANDARD 23)
 project(Engine)
 
 # options
-  set(hotreload true)
+  set(hotreload false)
   set(X11_use true)
   set(sanitize_address true)
   set(binary_dir "${CMAKE_SOURCE_DIR}/bin")
@@ -85,8 +85,15 @@ project(Engine)
 
 # One Exe
   else()
-    file(GLOB_RECURSE binary_files src/*.cpp src/*.c)
-    add_executable(exe ${binary_files})
+    add_executable(exe
+      src/base/base_impl.cpp
+      src/os/os_impl.cpp
+      src/vk.cpp
+      src/stb_impl.c
+      src/common.cpp
+      src/game/game.cpp
+      src/main.cpp
+    )
     if (UNIX)
       if (X11_use)
         target_link_libraries(exe ${X11_LIBRARIES} libxcb-keysyms.so -lxcb)

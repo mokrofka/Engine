@@ -294,15 +294,6 @@ void scene_init() {
     st->axis_attached_to_cam = entity_create(Mesh_Axis, Shader_Axis, MaterialId(0));
   }
   {
-    u64 start = os_now_ns();
-    // Loop (i, MaxEntities-100) {
-    //   Handle<Entity> cube_handle = entity_create(Mesh_CubeGlb, Shader_Color, Material_RedOrange);
-    //   Entity& cube = st->entities.get(cube_handle);
-    //   u32 range = 100;
-    //   cube.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
-    // }
-    u64 end = os_now_ns();
-    Info("%f64 s", f64(end - start)/Billion(1));
   }
 
   // {
@@ -318,25 +309,28 @@ void scene_init() {
   //   cube.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
   // }
 
-  {
-    Handle<StaticEntity> cube_handle = entity_static_create(Mesh_CubeGlb, Shader_Color, Material_RedOrange);
-    StaticEntity& cube = st->static_entities.get(cube_handle);
-    u32 range = 2;
-    cube.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
-  }
-  {
-    Handle<StaticEntity> cube_handle = entity_static_create(Mesh_CubeGlb, Shader_Color, Material_RedOrange);
-    StaticEntity& cube = st->static_entities.get(cube_handle);
-    u32 range = 2;
-    cube.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
-  }
+  // {
+  //   Handle<StaticEntity> cube_handle = entity_static_create(Mesh_CubeGlb, Shader_Color, Material_RedOrange);
+  //   StaticEntity& cube = st->static_entities.get(cube_handle);
+  //   u32 range = 2;
+  //   cube.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+  // }
+  // {
+  //   Handle<StaticEntity> cube_handle = entity_static_create(Mesh_CubeGlb, Shader_Color, Material_RedOrange);
+  //   StaticEntity& cube = st->static_entities.get(cube_handle);
+  //   u32 range = 2;
+  //   cube.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+  // }
 
-  Loop (i, MB(1)-KB(300)) {
-    Handle<StaticEntity> cube_handle = entity_static_create(Mesh_CubeGlb, Shader_Color, Material_RedOrange);
-    StaticEntity& cube = st->static_entities.get(cube_handle);
-    u32 range = KB(1);
-    cube.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
-  }
+    // u64 start = os_now_ns();
+  // Loop (i, MB(1)-KB(1)) {
+  //   Handle<StaticEntity> cube_handle = entity_static_create(Mesh_CubeGlb, Shader_Color, Material_RedOrange);
+  //   StaticEntity& cube = st->static_entities.get(cube_handle);
+  //   u32 range = KB(1);
+  //   cube.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+  // }
+    // u64 end = os_now_ns();
+    // Info("%f64 s", f64(end - start)/Billion(1));
 }
 
 void scene_deinit() {
@@ -462,4 +456,6 @@ void bar() {
 
   // Info("%i", arr[0]);
 }
+
+
 

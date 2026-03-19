@@ -339,7 +339,7 @@ struct SparseSetIndex {
 // HandlerArray
 
 template<typename T, i32 N>
-struct HandlerArray {
+struct ArrayHandler {
   static constexpr i32 cap = N;
   u32 count;
   u32 entity_to_index[N];
@@ -461,6 +461,8 @@ struct DarrayIndexHandler {
 ////////////////////////////////////////////////////////////////////////
 // IdPool
 
+// TODO: make array that allocates as idpool
+
 struct IdPool {
   u32 next_idx;
   Darray<u32> array;
@@ -471,7 +473,6 @@ struct IdPool {
   u32 alloc();
   void free(u32 id);
 };
-
 
 ////////////////////////////////////////////////////////////////////////
 // Hashmap
@@ -507,6 +508,7 @@ struct Map {
     ++count;
   }
   T* get(Key key) {
+    if (!data) return null;
     u64 hash_idx = hash(key);
     u64 index = ModPow2(hash_idx, cap);
     u64 start_idx = index;

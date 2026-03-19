@@ -74,6 +74,8 @@ layout(std430, set = 0, binding = 0) readonly buffer Buffer {
   PointLight point_lights[MaxLights];
   DirLight dir_lights[MaxLights];
   SpotLight spot_lights[MaxLights];
+  // DrawCallInfo drawinfo[MaxEntities+MaxStaticEntities];
+  // DrawCallInfo drawinfo[KB(1)];
 } st;
 
 layout(set = 0, binding = 1) uniform texture2D textures[];

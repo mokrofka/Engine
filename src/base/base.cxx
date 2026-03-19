@@ -48,12 +48,12 @@ b32 FlagIntersects(u64 x, u64 f) { return (x & f) > 0; }
 ////////////////////////////////////////////////////////////////////////
 // Common operations
 
-KAPI u64 ModPow2(u64 x, u64 b)      { return x & (b - 1); }
-KAPI u64 DivPow2(u64 x, u64 b)      { return x >> ctz(b); }
-KAPI u64 CeilIntDiv(u64 x, u64 b)   { return (x + b - 1) / b; }
-KAPI u64 RoundUp(u64 x, u64 a)      { return CeilIntDiv(x, a) * a; }
-KAPI u64 RoundDown(u64 x, u64 a)    { return x / a * a; }
-KAPI u64 Compose64Bit(u64 a, u64 b) { return (a << 32) | b; }
+u64 ModPow2(u64 x, u64 b)      { return x & (b - 1); }
+u64 DivPow2(u64 x, u64 b)      { return x >> ctz(b); }
+u64 CeilIntDiv(u64 x, u64 b)   { return (x + b - 1) / b; }
+u64 RoundUp(u64 x, u64 a)      { return CeilIntDiv(x, a) * a; }
+u64 RoundDown(u64 x, u64 a)    { return x / a * a; }
+u64 Compose64Bit(u64 a, u64 b) { return (a << 32) | b; }
 
 ////////////////////////////////////////////////////////////////////////
 // Types
