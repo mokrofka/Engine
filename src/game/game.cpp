@@ -260,7 +260,7 @@ void select_obj() {
 void new_init() {
 }
 
-void scene_init() {
+void game_init() {
   Scratch scratch;
   Camera& cam = st->cam;
   cam = {
@@ -333,7 +333,7 @@ void scene_init() {
     // Info("%f64 s", f64(end - start)/Billion(1));
 }
 
-void scene_deinit() {
+void game_deinit() {
   for (Entity e : st->entities) {
     vk_remove_renderable(e.id);
   }
@@ -342,7 +342,7 @@ void scene_deinit() {
   arena_clear(&st->arena);
 }
 
-void app_init(u8** state) {
+void main_init(u8** state) {
   Scratch scratch;
   Allocator global_alloc = mem_get_global_allocator();
   GameState* game_st = push_struct_zero(global_alloc, GameState);
@@ -367,7 +367,7 @@ void app_init(u8** state) {
   mesh_set(Mesh_Axis, vk_mesh_load(axis_mesh));
   cubemap_load("night_cubemap");
   asset_load();
-  scene_init();
+  game_init();
 }
 
 // b32 ray_intersect_AABB(Ray ray, AABB aabb) {
@@ -386,7 +386,7 @@ void app_init(u8** state) {
 ////////////////////////////////////////////////////////////////////////
 // Update
 
-void scene_update() {
+void game_update() {
   st->timer.interval = 0.1;
   if (timer_tick(st->timer)) {
   }
@@ -398,12 +398,10 @@ void scene_update() {
     e.pos().z = e1.pos().z + Cos(g_time) * 4;
     e.pos().y = e1.pos().z + Cos(g_time) * 4;
   }
-  if (os_is_button_down(MouseButton_Left)) {
+  if (os_is_button_pressed(MouseButton_Left)) {
     // select_obj();
     v3 dir = ray_from_camera();
-    // debug_draw_line(st->cam.pos, dir, ColorWhite);
-    // debug_draw_line(v3_zero(), st->cam.pos + dir, ColorWhite);
-    debug_draw_line_time(st->cam.pos, st->cam.pos + dir*10, ColorWhite, 1000);
+    debug_draw_line_time(st->cam.pos - v3(0,0.1,0), st->cam.pos + dir*100, ColorWhite, 1000);
   }
   for (Entity& e : st->entities) {
     e.pos() += e.dir * g_dt;
@@ -429,16 +427,16 @@ void scene_update() {
   // }
 }
 
-shared_function void app_update(u8** state) {
+shared_function void main_update(u8** state) {
   Scratch scratch;
   if (*state == null) {
-    app_init(state);
+    main_init(state);
   }
   Assign(st, *state);
   camera_update();
   if (os_is_key_down(Key_T)) {
-    scene_deinit();
-    scene_init();
+    game_deinit();
+    game_init();
   }
   if (os_is_key_pressed(Key_N)) {
     new_init();
@@ -446,15 +444,8 @@ shared_function void app_update(u8** state) {
   if (os_is_key_down(Key_Escape)) {
     os_close_window();
   }
-  scene_update();
+  game_update();
 
-}
-
-void bar() {
-
-  // a.init
-
-  // Info("%i", arr[0]);
 }
 
 

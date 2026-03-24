@@ -10,7 +10,7 @@ struct App {
 
 global App st;
 
-void app_update(u8** state);
+void main_update(u8** state);
 
 i32 main(i32 count, char* args[]) {
   u64 start = os_now_ns();
@@ -25,15 +25,15 @@ i32 main(i32 count, char* args[]) {
   String current_dir = os_get_current_directory();
   st.lib_filepath = push_str_cat(scratch, current_dir, "/libgame.so");
   st.lib = os_lib_open(st.lib_filepath);
-  Assign(st.update, os_lib_get_proc(st.lib, "app_update"));
+  Assign(st.update, os_lib_get_proc(st.lib, "main_update"));
   asset_watch_add(st.lib_filepath, []() {
     os_lib_close(st.lib);
     os_sleep_ms(10);
     st.lib = os_lib_open(st.lib_filepath);
-    Assign(st.update, os_lib_get_proc(st.lib, "app_update"));
+    Assign(st.update, os_lib_get_proc(st.lib, "main_update"));
   });
 #else
-  st.update = app_update;
+  st.update = main_update;
 #endif
   u64 target_fps = Billion(1) / 60;
   u64 last_time = os_now_ns();

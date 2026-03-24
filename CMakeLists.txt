@@ -3,7 +3,7 @@ set(CMAKE_CXX_STANDARD 23)
 project(Engine)
 
 # options
-  set(hotreload false)
+  set(hotreload true)
   set(X11_use true)
   set(sanitize_address true)
   set(binary_dir "${CMAKE_SOURCE_DIR}/bin")
@@ -105,10 +105,10 @@ project(Engine)
     endif()
   endif()
 
-add_executable(compiling_shaders 
-  src/base/base_impl.cpp
-  src/os/os_impl.cpp
-  src/compiling_shaders.cpp
-)
-target_link_libraries(compiling_shaders ${X11_LIBRARIES} libxcb-keysyms.so -lxcb)
+# add_executable(compiling_shaders 
+#   src/base/base_impl.cpp
+#   src/os/os_impl.cpp
+#   src/compiling_shaders.cpp
+# )
+# target_link_libraries(compiling_shaders ${X11_LIBRARIES} libxcb-keysyms.so -lxcb)
 
