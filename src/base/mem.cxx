@@ -499,3 +499,14 @@ u8* mem_realloc_soa(Allocator alloc, void* ptr, u32 old_count, u32 new_count, So
   return buf;
 }
 
+void* OffsetMemPusher::push(u64 size, u64 align) {
+  void* result = (void*)AlignUp((u64)offset, align);
+  offset = Offset(result, size);
+  return result;
+}
+
+u64 OffsetPusher::push(u64 size, u64 align) {
+  u64 result = AlignUp(offset, align);
+  offset = result + size;
+  return result;
+}

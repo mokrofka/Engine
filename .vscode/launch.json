@@ -10,7 +10,6 @@
       "args": ["../assets/shaders", "../assets/shaders/compiled"],
       "cwd": "${workspaceFolder}",
       "console": "internalConsole",
-      "initCommands": [ "settings set target.x86-disassembly-flavor intel" ]
     }
   ]
 }

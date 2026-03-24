@@ -105,9 +105,10 @@ project(Engine)
     endif()
   endif()
 
-# add_executable(compiling_shaders 
-#   src/base/base_impl.cpp
-#   src/os/os_core_linux.cxx
-#   src/compiling_shaders.cpp
-# )
+add_executable(compiling_shaders 
+  src/base/base_impl.cpp
+  src/os/os_impl.cpp
+  src/compiling_shaders.cpp
+)
+target_link_libraries(compiling_shaders ${X11_LIBRARIES} libxcb-keysyms.so -lxcb)
 

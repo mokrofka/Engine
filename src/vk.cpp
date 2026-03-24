@@ -8,6 +8,23 @@ const u32 MaxMeshes    = KB(1);
 const u32 MaxShaders   = KB(1);
 const u32 MaxTextures  = KB(1);
 
+///////////////////////////////////
+// Gpu memory layout
+
+struct GpuEntity {
+  alignas(16) mat4 model;
+  alignas(16) v4 color;
+  Handle<GpuMaterial> material;
+};
+
+struct GpuMaterial {
+  alignas(16) v3 ambient;
+  alignas(16) v3 diffuse;
+  alignas(16) v3 specular;
+  f32 shininess;
+  Handle<GpuTexture> texture;
+};
+
 struct GpuPointLight {
   alignas(16) v3 color;
   alignas(16) v3 pos;
@@ -30,20 +47,6 @@ struct GpuSpotLight {
   f32 outer_cutoff;
 };
 
-struct GpuMaterial {
-  alignas(16) v3 ambient;
-  alignas(16) v3 diffuse;
-  alignas(16) v3 specular;
-  f32 shininess;
-  Handle<GpuTexture> texture;
-};
-
-struct GpuEntity {
-  alignas(16) mat4 model;
-  alignas(16) v4 color;
-  Handle<GpuMaterial> material;
-};
-
 struct GpuGlobalState {
   alignas(16) mat4 projection_view;
   alignas(16) mat4 projection;
@@ -53,14 +56,35 @@ struct GpuGlobalState {
   u32 point_light_count;
   u32 dir_light_count;
   u32 spot_light_count;
-  GpuEntity entities[MaxEntities+MaxStaticEntities];
-  // GpuEntity entities[MaxEntities];
-  GpuMaterial materials[MaxMaterials];
-  GpuPointLight point_lights[MaxLights];
-  GpuDirLight dir_lights[MaxLights];
-  GpuSpotLight spot_lights[MaxLights];
+  // GpuEntity entities[MaxEntities+MaxStaticEntities];
+  // GpuMaterial materials[MaxMaterials];
+  // GpuPointLight point_lights[MaxLights];
+  // GpuDirLight dir_lights[MaxLights];
+  // GpuSpotLight spot_lights[MaxLights];
   // u32 drawinfo[MaxEntities+MaxStaticEntities];
 };
+
+///////////////////////////////////
+// Generic stuff
+
+struct MeshBatch {
+  Handle<GpuMesh> mesh_handle;
+  Darray<Handle<Entity>> entities;
+};
+
+struct ShaderBatch {
+  Handle<GpuShader> shader;
+  Darray<MeshBatch> mesh_batches;
+  Map<u32, u32> mesh_to_batch;
+};
+
+struct RenderEntity {
+  Handle<Handle<Entity>> shader_handle;
+  Handle<Handle<Entity>> entity_idx;
+};
+
+///////////////////////////////////
+// Vulkan
 
 #if BUILD_DEBUG
   #define VK_CHECK(expr)          \
@@ -124,34 +148,19 @@ struct VK_Device {
   u32 present_queue_index;
   u32 transfer_queue_index;
   u32 compute_queue_index;
-  
   VkQueue graphics_queue;
   VkQueue present_queue;
   VkQueue transfer_queue;
   VkQueue compute_queue;
-  
   VkCommandPool cmd_pool;
-  
   VkPhysicalDeviceProperties properties;
   VkPhysicalDeviceFeatures features;
   VkPhysicalDeviceMemoryProperties memory;
-  
   VkFormat depth_format;
 };
 
 struct VK_ShaderStages {
   VkPipelineShaderStageCreateInfo stages[2];
-};
-
-struct MeshBatch {
-  Handle<GpuMesh> mesh_handle;
-  Darray<Handle<Entity>> entities;
-};
-
-struct ShaderBatch {
-  Handle<GpuShader> shader;
-  Darray<MeshBatch> mesh_batches;
-  Map<u32, u32> mesh_to_batch;
 };
 
 struct VK_Shader {
@@ -167,6 +176,21 @@ struct VK_Shader {
   ShaderBatch batch_indexed;
 
   VkShaderModule module[2];
+};
+
+struct VK_SyncObj {
+  VkSemaphore* image_available_semaphores;
+  VkSemaphore* render_complete_semaphores;
+  VkSemaphore* compute_complete_semaphores;
+  VkFence* in_flight_fences;
+};
+
+struct VK_DrawCallInfo {
+  union {
+    VkDrawIndirectCommand draw_command;
+    VkDrawIndexedIndirectCommand index_draw_command;
+  };
+  u32 entity_id;
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -258,27 +282,8 @@ struct VK_Shader {
 
 ////////////////////////////////////////////////////////////////////////
 
-struct VK_ShaderCompute {
-  VkPipeline pipeline;
-  VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info;
-};
-
-struct VK_SyncObj {
-  VkSemaphore* image_available_semaphores;
-  VkSemaphore* render_complete_semaphores;
-  VkSemaphore* compute_complete_semaphores;
-  VkFence* in_flight_fences;
-};
-
-struct RenderEntity {
-  Handle<Handle<Entity>> shader_handle;
-  Handle<Handle<Entity>> entity_idx;
-};
-
-// TODO: bookmarks that preview line of code and you could jump inside a file
 struct VK_State {
   Arena arena;
-  AllocSegList gpa;
   
   VkAllocationCallbacks allocator_;
   VkAllocationCallbacks* allocator;
@@ -301,24 +306,22 @@ struct VK_State {
   VK_Buffer index_buffer;
   VK_Buffer stage_buffer;
   VK_Buffer indirect_draw_buffer;
-
   VK_Buffer storage_buffer;
-  GpuAllocSegList gpu_alloc;
   
   VkDescriptorPool descriptor_pool;
   VkDescriptorSetLayout descriptor_set_layout;
   VkDescriptorSet descriptor_sets;
 
+  VkCommandBuffer* cmds;
   VkSampler sampler;
   VkPipelineLayout pipeline_layout;
-  
-  VkCommandBuffer* cmds;
 
   GpuGlobalState* gpu_global_shader_st;
   GpuEntity* gpu_entities;
   GpuMaterial* gpu_materials;
+  VK_DrawCallInfo* draw_call_infos;
+
   u32 gpu_materials_count;
-  u32* gpu_drawinfo;
 
   Array<RenderEntity, MaxEntities+MaxStaticEntities> entities;
   Array<Handle<GpuShader>, MaxEntities+MaxStaticEntities> entities_to_shader;
@@ -866,7 +869,6 @@ intern VkPipeline vk_shader_pipeline_create(ShaderDesc info, VK_ShaderStages sta
     case ShaderTopology_Triangle: topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST; break;
     case ShaderTopology_Line:     topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST; break;
     case ShaderTopology_Point:    topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST; break;
-    break;
   }
   VkPipelineInputAssemblyStateCreateInfo input_assembly = {
     .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
@@ -1112,10 +1114,8 @@ void vk_shader_reload(String name, Handle<GpuShader> shader_handle, ShaderDesc s
 }
 
 intern void vk_descriptor_init() {
-  Scratch scratch;
-
   // Pool
-  #define MaxStorageBuffer 2
+  #define MaxStorageBuffer 7
   #define MaxSets 1
   #define MaxSamplers 1
   #define MaxCubeTextures 1
@@ -1145,6 +1145,11 @@ intern void vk_descriptor_init() {
       0,
       0,
       0,
+      0,
+      0,
+      0,
+      0,
+      0,
     };
     VkDescriptorSetLayoutBindingFlagsCreateInfo binding_flags = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
@@ -1153,42 +1158,76 @@ intern void vk_descriptor_init() {
       .pBindingFlags = flags,
     };
     VkDescriptorSetLayoutBinding layout_bindings[] = {
+      // Global state
       {
         .binding = 0,
         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         .descriptorCount = 1,
         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
       },
+      // Textures
       {
         .binding = 1,
         .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
         .descriptorCount = MaxTextures,
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
       },
+      // Samplers
       {
         .binding = 2,
         .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
         .descriptorCount = MaxSamplers,
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
       },
+      // Cube textures
       {
         .binding = 3,
         .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
         .descriptorCount = MaxCubeTextures,
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
       },
+      // DrawCall info
       {
         .binding = 4,
         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         .descriptorCount = 1,
         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
       },
-      // {
-      //   .binding = 5,
-      //   .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-      //   .descriptorCount = 1,
-      //   .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-      // },
+      // Entities
+      {
+        .binding = 5,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        .descriptorCount = 1,
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+      },
+      // Materials
+      {
+        .binding = 6,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        .descriptorCount = 1,
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+      },
+      // Point lights
+      {
+        .binding = 7,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        .descriptorCount = 1,
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+      },
+      // Dir lights
+      {
+        .binding = 8,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        .descriptorCount = 1,
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+      },
+      // Spot lights
+      {
+        .binding = 9,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        .descriptorCount = 1,
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+      },
     };
     VkDescriptorSetLayoutCreateInfo layout_info = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -1200,7 +1239,7 @@ intern void vk_descriptor_init() {
     VK_CHECK(vk.CreateDescriptorSetLayout(vkdevice, &layout_info, vk.allocator, &vk.descriptor_set_layout));
   }
 
-  // Descriptor
+  // Descriptor set
   {
     VkDescriptorSetAllocateInfo alloc_info = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
@@ -1211,22 +1250,90 @@ intern void vk_descriptor_init() {
     VK_CHECK(vk.AllocateDescriptorSets(vkdevice, &alloc_info, &vk.descriptor_sets));
   }
 
-  // Shader data
+  // Descriptor
+  // {
+  //   VkDescriptorBufferInfo buffer_info = {
+  //     .buffer = vk.storage_buffer.handle,
+  //     .offset = 0,
+  //     .range = VK_WHOLE_SIZE,
+  //   };
+  //   VkWriteDescriptorSet ubo_descriptor = {
+  //     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+  //     .dstSet = vk.descriptor_sets,
+  //     .dstBinding = 0,
+  //     .dstArrayElement = 0,
+  //     .descriptorCount = 1,
+  //     .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+  //     .pBufferInfo = &buffer_info,
+  //   };
+  //   VkDescriptorBufferInfo indirect_draw_buffer_info = {
+  //     .buffer = vk.indirect_draw_buffer.handle,
+  //     .offset = 0,
+  //     .range = VK_WHOLE_SIZE,
+  //   };
+  //   VkWriteDescriptorSet indirect_draw_write_descriptor = {
+  //     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+  //     .dstSet = vk.descriptor_sets,
+  //     .dstBinding = 4,
+  //     .dstArrayElement = 0,
+  //     .descriptorCount = 1,
+  //     .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+  //     .pBufferInfo = &indirect_draw_buffer_info,
+  //   };
+  //   VkWriteDescriptorSet descriptors[] = {ubo_descriptor, indirect_draw_write_descriptor};
+  //   vk.UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
+  // }
   {
-    VkDescriptorBufferInfo buffer_info = {
+    OffsetPusher pusher = {};
+    offset_push_struct(pusher, GpuGlobalState);
+    u64 entities_offset = (u64)offset_push_array(pusher, GpuEntity, MaxEntities+MaxStaticEntities);
+    u64 materials_offset = (u64)offset_push_array(pusher, GpuMaterial, MaxMaterials);
+    // Global
+    VkDescriptorBufferInfo global_state_buffer_info = {
       .buffer = vk.storage_buffer.handle,
       .offset = 0,
-      .range = VK_WHOLE_SIZE,
+      .range = sizeof(GpuGlobalState),
     };
-    VkWriteDescriptorSet ubo_descriptor = {
+    VkWriteDescriptorSet global_state_descriptor_write = {
       .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
       .dstSet = vk.descriptor_sets,
       .dstBinding = 0,
       .dstArrayElement = 0,
       .descriptorCount = 1,
       .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-      .pBufferInfo = &buffer_info,
+      .pBufferInfo = &global_state_buffer_info,
     };
+    // Entity
+    VkDescriptorBufferInfo entity_buffer_info = {
+      .buffer = vk.storage_buffer.handle,
+      .offset = entities_offset,
+      .range = sizeof(GpuEntity) * (MaxEntities + MaxStaticEntities),
+    };
+    VkWriteDescriptorSet entity_descriptor_write = {
+      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+      .dstSet = vk.descriptor_sets,
+      .dstBinding = 5,
+      .dstArrayElement = 0,
+      .descriptorCount = 1,
+      .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      .pBufferInfo = &entity_buffer_info,
+    };
+    // Material
+    VkDescriptorBufferInfo material_buffer_info = {
+      .buffer = vk.storage_buffer.handle,
+      .offset = materials_offset,
+      .range = sizeof(GpuMaterial) * MaxMaterials,
+    };
+    VkWriteDescriptorSet material_descriptor_write = {
+      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+      .dstSet = vk.descriptor_sets,
+      .dstBinding = 6,
+      .dstArrayElement = 0,
+      .descriptorCount = 1,
+      .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      .pBufferInfo = &material_buffer_info,
+    };
+    // Indirect draw
     VkDescriptorBufferInfo indirect_draw_buffer_info = {
       .buffer = vk.indirect_draw_buffer.handle,
       .offset = 0,
@@ -1241,26 +1348,18 @@ intern void vk_descriptor_init() {
       .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
       .pBufferInfo = &indirect_draw_buffer_info,
     };
-    VkWriteDescriptorSet descriptors[] = {ubo_descriptor, indirect_draw_write_descriptor};
+    VkWriteDescriptorSet descriptors[] = {global_state_descriptor_write, indirect_draw_write_descriptor, entity_descriptor_write, material_descriptor_write};
     vk.UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
   }
 
   // Set pointers to shader data
   {
-    // u64 entities_start = AlignUp(sizeof(ShaderGlobalState), alignof(ShaderEntity));
-    // vk.shader_entities = (ShaderEntity*)Offset(vk.storage_buffer.maped_memory, entities_start);
-    // u64 entities_end = (u64)Offset((u64*)entities_start, sizeof(ShaderEntity) * MaxEntities);
-    // u64 material_start = AlignUp(entities_end, alignof(ShaderMaterial));
-    // vk.shader_materials = (ShaderMaterial*)Offset(vk.storage_buffer.maped_memory, material_start);
+    OffsetMemPusher pusher = {.offset = vk.storage_buffer.mapped_memory};
+    vk.gpu_global_shader_st = offset_push_struct(pusher, GpuGlobalState);
+    vk.gpu_entities = offset_push_array(pusher, GpuEntity, MaxEntities+MaxStaticEntities);
+    vk.gpu_materials = offset_push_array(pusher, GpuMaterial, MaxMaterials);
 
-    // vk.shader_entities = (ShaderEntity*)Offset(vk.storage_buffer.maped_memory, vk.buffers[1].range.offset);
-    // vk.shader_materials = (ShaderMaterial*)Offset(vk.storage_buffer.maped_memory, vk.buffers[2].range.offset);
-
-    GpuGlobalState* state = (GpuGlobalState*)vk.storage_buffer.mapped_memory;
-    vk.gpu_entities = state->entities;
-    vk.gpu_materials = state->materials;
-    // vk.gpu_drawinfo = state->drawinfo;
-    vk.gpu_global_shader_st = state;
+    vk.draw_call_infos = (VK_DrawCallInfo*)vk.indirect_draw_buffer.mapped_memory;
   }
   
 }
@@ -2140,14 +2239,6 @@ Handle<GpuMesh> vk_mesh_load(Mesh mesh) {
 ////////////////////////////////////////////////////////////////////////
 // @Drawing
 
-struct DrawCallInfo {
-  union {
-    VkDrawIndirectCommand draw_command;
-    VkDrawIndexedIndirectCommand index_draw_command;
-  };
-  u32 entity_id;
-};
-
 void vk_draw() {
   GpuGlobalState& shader_st = *vk.gpu_global_shader_st;
   shader_st.projection_view = vk.projection * vk.view;
@@ -2160,7 +2251,7 @@ void vk_draw() {
   VkDeviceSize size = 0;
   vk.CmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, &size);
   vk.CmdBindIndexBuffer(cmd, vk.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
-  DrawCallInfo* drawinfo = (DrawCallInfo*)vk.indirect_draw_buffer.mapped_memory;
+  VK_DrawCallInfo* drawinfo = (VK_DrawCallInfo*)vk.indirect_draw_buffer.mapped_memory;
   u32 draw_call_count = 0;
   u32 draw_call_offset = 0;
   u32 entities_draw_count = 0;
@@ -2177,7 +2268,7 @@ void vk_draw() {
       u32 mesh_idx = vk.entities_to_mesh[entity_idx].handle;
       VK_Mesh mesh = vk.meshes[mesh_idx];
       vk.gpu_entities[entity_idx].model = mat4_transform(entities_transforms[entity_idx]);
-      DrawCallInfo info = {
+      VK_DrawCallInfo info = {
         .index_draw_command = {
           .indexCount = (u32)mesh.index_count,
           .instanceCount = 1,
@@ -2191,7 +2282,7 @@ void vk_draw() {
       ++per_shader_draw_count_indexes;
     }
     if (per_shader_draw_count_indexes > 0) {
-      vk.CmdDrawIndexedIndirect(cmd, vk.indirect_draw_buffer.handle, draw_call_offset, per_shader_draw_count_indexes, sizeof(DrawCallInfo));
+      vk.CmdDrawIndexedIndirect(cmd, vk.indirect_draw_buffer.handle, draw_call_offset, per_shader_draw_count_indexes, sizeof(VK_DrawCallInfo));
     }
 
     // Entities per shader
@@ -2200,7 +2291,7 @@ void vk_draw() {
       u32 mesh_idx = vk.entities_to_mesh[entity_idx].handle;
       VK_Mesh mesh = vk.meshes[mesh_idx];
       vk.gpu_entities[entity_idx].model = mat4_transform(entities_transforms[entity_idx]);
-      DrawCallInfo info = {
+      VK_DrawCallInfo info = {
         .draw_command = {
           .vertexCount = (u32)mesh.vert_count,
           .instanceCount = 1,
@@ -2213,9 +2304,9 @@ void vk_draw() {
       ++per_shader_draw_count;
     }
     if (per_shader_draw_count > 0) {
-      vk.CmdDrawIndirect(cmd, vk.indirect_draw_buffer.handle, draw_call_offset + sizeof(DrawCallInfo)*per_shader_draw_count_indexes, per_shader_draw_count, sizeof(DrawCallInfo));
+      vk.CmdDrawIndirect(cmd, vk.indirect_draw_buffer.handle, draw_call_offset + sizeof(VK_DrawCallInfo)*per_shader_draw_count_indexes, per_shader_draw_count, sizeof(VK_DrawCallInfo));
     }
-    draw_call_offset = draw_call_count * sizeof(DrawCallInfo);
+    draw_call_offset = draw_call_count * sizeof(VK_DrawCallInfo);
 
     ///////////////////////////////////
     // Rebuilding static buffer
@@ -2230,7 +2321,7 @@ void vk_draw() {
         u32 mesh_idx = vk.entities_to_mesh[MaxEntities+entity_idx].handle;
         VK_Mesh mesh = vk.meshes[mesh_idx];
         vk.gpu_entities[MaxEntities+entity_idx].model = mat4_transform(static_entities_transforms[entity_idx]);
-        DrawCallInfo info = {
+        VK_DrawCallInfo info = {
           .index_draw_command = {
             .indexCount = (u32)mesh.index_count,
             .instanceCount = 1,
@@ -2250,7 +2341,7 @@ void vk_draw() {
         u32 mesh_idx = vk.entities_to_mesh[MaxEntities+entity_idx].handle;
         VK_Mesh mesh = vk.meshes[mesh_idx];
         vk.gpu_entities[MaxEntities+entity_idx].model = mat4_transform(static_entities_transforms[entity_idx]);
-        DrawCallInfo info = {
+        VK_DrawCallInfo info = {
           .draw_command = {
             .vertexCount = (u32)mesh.vert_count,
             .instanceCount = 1,
@@ -2262,13 +2353,13 @@ void vk_draw() {
         drawinfo[MaxEntities + static_indexed_draw_call_count + static_draw_call_count++] = info;
       }
     }
-    u32 static_draw_indexed_offset = MaxEntities*sizeof(DrawCallInfo);
-    u32 static_draw_offset = MaxEntities*sizeof(DrawCallInfo) + shader.static_entities_indexed.count*sizeof(DrawCallInfo);
+    u32 static_draw_indexed_offset = MaxEntities*sizeof(VK_DrawCallInfo);
+    u32 static_draw_offset = MaxEntities*sizeof(VK_DrawCallInfo) + shader.static_entities_indexed.count*sizeof(VK_DrawCallInfo);
     if (shader.static_entities_indexed.count) {
-      vk.CmdDrawIndexedIndirect(cmd, vk.indirect_draw_buffer.handle, static_draw_indexed_offset, shader.static_entities_indexed.count, sizeof(DrawCallInfo));
+      vk.CmdDrawIndexedIndirect(cmd, vk.indirect_draw_buffer.handle, static_draw_indexed_offset, shader.static_entities_indexed.count, sizeof(VK_DrawCallInfo));
     }
     if (shader.static_entities.count) {
-      vk.CmdDrawIndirect(cmd, vk.indirect_draw_buffer.handle, static_draw_offset, shader.static_entities.count, sizeof(DrawCallInfo));
+      vk.CmdDrawIndirect(cmd, vk.indirect_draw_buffer.handle, static_draw_offset, shader.static_entities.count, sizeof(VK_DrawCallInfo));
     }
   }
 
@@ -2774,7 +2865,7 @@ void vk_init() {
       VK_CHECK(vk.CreateFence(vkdevice, &fence_create_info, vk.allocator, &vk.sync.in_flight_fences[i]));
     }
   }
-
+  
   // Buffers
   {
     vk.vert_buffer = vk_buffer_create(MB(1), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -2783,7 +2874,6 @@ void vk_init() {
     vk_buffer_map_memory(vk.stage_buffer, 0, vk.stage_buffer.cap);
     vk.storage_buffer = vk_buffer_create(MB(200), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     vk_buffer_map_memory(vk.storage_buffer, 0, vk.storage_buffer.cap);
-    vk.gpu_alloc.init(vk.gpa);
     vk.indirect_draw_buffer = vk_buffer_create(MB(100), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     vk_buffer_map_memory(vk.indirect_draw_buffer, 0, vk.indirect_draw_buffer.cap);
   }

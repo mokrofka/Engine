@@ -148,9 +148,7 @@ Key lnx_keycode_translate(u32 keysym) {
 void os_gfx_init() {
   int screen_number;
   gfx_st.connection = xcb_connect(null, &screen_number);
-  if (xcb_connection_has_error(gfx_st.connection)) {
-    AssertMsg(false, "Failed to connect to X server");
-  }
+  xcb_connection_has_error(gfx_st.connection);
 
   const xcb_setup_t* setup = xcb_get_setup(gfx_st.connection);
   xcb_screen_iterator_t iter = xcb_setup_roots_iterator(setup);
@@ -252,8 +250,6 @@ void os_pump_messages() {
       } break;
       case XCB_BUTTON_PRESS: {
         xcb_button_press_event_t* bp = (xcb_button_press_event_t*)event;
-        // gfx_st.input.mouse_x = bp->event_x;
-        // gfx_st.input.mouse_y = bp->event_y;
         switch (bp->detail) {
           case 1: gfx_st.input.mouse_current.buttons[MouseButton_Left] = true; break;
           case 2: gfx_st.input.mouse_current.buttons[MouseButton_Middle] = true; break;
