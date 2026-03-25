@@ -1,5 +1,6 @@
 #include "common.h"
 #include "vulkan/vulkan_core.h"
+#include "stdio.h"
 
 const u32 MaxMaterials = KB(1);
 const u32 MaxLights    = KB(1);
@@ -403,6 +404,7 @@ struct VK_State {
 
   // offscreen rendering
   VK_Image offscreen_depth_buffer;
+  VK_Image texture_target;
 
   mat4 view;
   mat4 projection;
@@ -979,7 +981,8 @@ intern VkPipeline vk_shader_pipeline_create(ShaderDesc info, VK_ShaderStages sta
   // Multisampling
   VkPipelineMultisampleStateCreateInfo multisampling_state_info = {
     .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-    .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+    // .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+    .rasterizationSamples = VK_SAMPLE_COUNT_4_BIT,
     .sampleShadingEnable = VK_FALSE,
     .minSampleShading = 1.0f,
     .pSampleMask = 0,
@@ -1684,17 +1687,23 @@ Handle<GpuTexture> vk_texture_load(Texture texture_info) {
 intern void vk_texture_resize_target() {
   VK_CHECK(vk.DeviceWaitIdle(vkdevice));
   Debug("texture target resized: x = %u y = %u", vk.width, vk.height);
-  Loop (i, vk.images_in_flight) {
-    // vk_image_destroy(vk.texture_targets[i]);
-    vk_image_destroy(vk.offscreen_depth_buffer);
-    VK_ImageInfo texture_info = vk_image_info_default(vk.width, vk.height);
-    texture_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-    // vk.texture_targets[i].image = vk_image_create(texture_info);
-    VK_ImageInfo depth_info = vk_image_info_default(vk.width, vk.height);
-    depth_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    depth_info.aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
-    vk.offscreen_depth_buffer = vk_image_create(depth_info);
-  }
+  vk_image_destroy(vk.texture_target);
+  VK_ImageInfo image_info = vk_image_info_default(vk.width, vk.height);
+  image_info.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+  image_info.format = VK_FORMAT_B8G8R8A8_UNORM;
+  image_info.samples = VK_SAMPLE_COUNT_4_BIT;
+  vk.texture_target = vk_image_create(image_info);
+  // Loop (i, vk.images_in_flight) {
+  //   // vk_image_destroy(vk.texture_targets[i]);
+  //   vk_image_destroy(vk.offscreen_depth_buffer);
+  //   VK_ImageInfo texture_info = vk_image_info_default(vk.width, vk.height);
+  //   texture_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+  //   // vk.texture_targets[i].image = vk_image_create(texture_info);
+  //   VK_ImageInfo depth_info = vk_image_info_default(vk.width, vk.height);
+  //   depth_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+  //   depth_info.aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+  //   vk.offscreen_depth_buffer = vk_image_create(depth_info);
+  // }
 }
 
 Handle<GpuMaterial> vk_material_load(Material material) {
@@ -2143,8 +2152,9 @@ intern void vk_swapchain_create(b32 reuse) {
   }
   VK_ImageInfo depth_info = vk_image_info_default(swapchain_extent.width, swapchain_extent.height);
   depth_info.format = vk.device.depth_format;
-  depth_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+  depth_info.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
   depth_info.aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+  depth_info.samples = VK_SAMPLE_COUNT_4_BIT;
   vk.swapchain.depth_attachment = vk_image_create(depth_info);
 }
 
@@ -2207,11 +2217,7 @@ intern void vk_swapchain_recreate() {
 
 intern u32 vk_swapchain_acquire_next_image_index(VkSemaphore image_available_semaphore) {
   u32 image_index;
-  VkResult result = vk.AcquireNextImageKHR(vkdevice, vk.swapchain.handle, U64_MAX,
-                                           image_available_semaphore, null, &image_index);
-  if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-    AssertMsg(false, "vkAcquireNextImageKHR failed with: %s", vk_result_string(result));
-  }
+  VK_CHECK(vk.AcquireNextImageKHR(vkdevice, vk.swapchain.handle, U64_MAX, image_available_semaphore, null, &image_index));
   return image_index;
 }
 
@@ -2224,13 +2230,7 @@ intern void vk_swapchain_present(VkSemaphore render_complete_semaphore, u32 pres
     .pSwapchains = &vk.swapchain.handle,
     .pImageIndices = &present_image_index,
   };
-
-  // VK_CHECK(vkQueuePresentKHR(vk.device.graphics_queue, &present_info));
-  VkResult result = vk.QueuePresentKHR(vk.device.graphics_queue, &present_info);
-  // Info("vkQueuePresentKHR failed with: %s", vk_result_string(result));
-  // Assert(result == VK_SUCCESS);
-  
-  vk.current_frame_idx = (vk.current_frame_idx + 1) % vk.frames_in_flight;
+  VK_CHECK(vk.QueuePresentKHR(vk.device.graphics_queue, &present_info));
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -2831,7 +2831,9 @@ intern void vk_instance_create() {
     {
       switch (message_severity) {
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: {
-          Error(String(callback_data->pMessage))
+          // Error(String(callback_data->pMessage))
+          // NOTE: For some reason Scratch arena is invalid here?
+          ErrorArena({}, "%s", String(callback_data->pMessage));
         } break;
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: {
           Warn(String(callback_data->pMessage));
@@ -2962,40 +2964,12 @@ void vk_init() {
   }
 
   // Target texture render
-  // {
-  //   vk.texture_targets = push_array(vk.arena, VK_Texture, vk.images_in_flight);
-  //   Loop (i, vk.images_in_flight) {
-  //     vk.texture_targets[i].image = vk_image_create(
-  //       VK_IMAGE_TYPE_2D,
-  //       vk.width, vk.height,
-  //       VK_FORMAT_B8G8R8A8_UNORM,
-  //       // VK_FORMAT_R8G8B8A8_UNORM,
-  //       VK_IMAGE_TILING_OPTIMAL,
-  //       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-  //       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-  //       true,
-  //       VK_IMAGE_ASPECT_COLOR_BIT);
-
-  //     VkSamplerCreateInfo sampler_info = {
-  //       .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-  //       .magFilter = VK_FILTER_LINEAR,
-  //       .minFilter = VK_FILTER_LINEAR,
-  //       .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
-  //       .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-  //       .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-  //       .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-  //       .mipLodBias = 0.0f,
-  //       .anisotropyEnable = VK_FALSE,
-  //       .maxAnisotropy = 1,
-  //       .compareEnable = VK_FALSE,
-  //       .compareOp = VK_COMPARE_OP_ALWAYS,
-  //       .minLod = 0.0f,
-  //       .maxLod = 0.0f,
-  //       .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
-  //       .unnormalizedCoordinates = VK_FALSE,
-  //     };
-  //     VK_CHECK(vkCreateSampler(vkdevice, &sampler_info, vk.allocator, &vk.texture_targets[i].sampler));
-  //   }
+  {
+    VK_ImageInfo image_info = vk_image_info_default(vk.width, vk.height);
+    image_info.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    image_info.format = VK_FORMAT_B8G8R8A8_UNORM;
+    image_info.samples = VK_SAMPLE_COUNT_4_BIT;
+    vk.texture_target = vk_image_create(image_info);
 
     // vk.offscreen_depth_buffer = vk_image_create(
     //   VK_IMAGE_TYPE_2D,
@@ -3007,7 +2981,7 @@ void vk_init() {
     //   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     //   true,
     //   VK_IMAGE_ASPECT_DEPTH_BIT);
-  // }
+  }
 
   Info("Vulkan renderer initialized");
 
@@ -3092,7 +3066,7 @@ void vk_begin_frame() {
     vk.height = win_size.y;
     VK_CHECK(vk.DeviceWaitIdle(vkdevice));
     vk_swapchain_recreate();
-    // vk_resize_texture_target();
+    vk_texture_resize_target();
   }
 
   vk.current_image_idx = vk_swapchain_acquire_next_image_index(vk_get_current_image_available_semaphore());
@@ -3169,6 +3143,7 @@ void vk_end_frame() {
   VK_CHECK(vk.QueueSubmit(vk.device.graphics_queue, 1, &submit_info, vk.sync.in_flight_fences[vk.current_frame_idx]));
 
   vk_swapchain_present(vk_get_current_render_complete_semaphore(), vk.current_image_idx);
+  vk.current_frame_idx = (vk.current_frame_idx + 1) % vk.frames_in_flight;
 }
 
 intern VkRenderingAttachmentInfo vk_default_color_attachment_info(VkImageView view) {
@@ -3219,14 +3194,32 @@ void vk_begin_renderpass(RenderpassType renderpass_id) {
   switch (renderpass_id) {
     case RenderpassType_World: {
       // Color
-      vk_image_layout_transition(cmd, vk.swapchain.images[vk.current_image_idx], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+      vk_image_layout_transition(cmd, vk.texture_target, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
       // Depth
       vk_image_layout_transition(cmd, vk.swapchain.depth_attachment, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
       // Render
-      VkRenderingAttachmentInfo color_attachment = vk_default_color_attachment_info(vk.swapchain.views[vk.current_image_idx]);
+      vk_image_layout_transition(cmd, vk.swapchain.images[vk.current_image_idx], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+      VkRenderingAttachmentInfo color_attachment = vk_default_color_attachment_info(vk.texture_target.view);
+      color_attachment.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
+      color_attachment.resolveImageView = vk.swapchain.views[vk.current_image_idx];
+      color_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
       VkRenderingAttachmentInfo depth_attachment = vk_default_depth_attachment_info(vk.swapchain.depth_attachment.view);
+      // depth_attachment
+      
       VkRenderingInfo render_info = vk_default_rendering_info(&color_attachment, &depth_attachment);
       vk.CmdBeginRendering(cmd, &render_info);
+
+      // // Color
+      // vk_image_layout_transition(cmd, vk.swapchain.images[vk.current_image_idx], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+      // // Depth
+      // vk_image_layout_transition(cmd, vk.swapchain.depth_attachment, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+      // // Render
+      // VkRenderingAttachmentInfo color_attachment = vk_default_color_attachment_info(vk.swapchain.views[vk.current_image_idx]);
+      // VkRenderingAttachmentInfo depth_attachment = vk_default_depth_attachment_info(vk.swapchain.depth_attachment.view);
+      // VkRenderingInfo render_info = vk_default_rendering_info(&color_attachment, &depth_attachment);
+      // vk.CmdBeginRendering(cmd, &render_info);
     } break;
     case RenderpassType_UI: {
     } break;
@@ -3241,6 +3234,7 @@ void vk_end_renderpass(RenderpassType renderpass) {
   switch (renderpass) {
     case RenderpassType_World: {
       vk.CmdEndRendering(cmd);
+      // vk_image_layout_transition(cmd, vk.texture_target, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
       vk_image_layout_transition(cmd, vk.swapchain.images[vk.current_image_idx], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
     } break;
     case RenderpassType_UI: {

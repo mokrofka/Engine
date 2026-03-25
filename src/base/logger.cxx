@@ -13,6 +13,16 @@ void _log_output(LogLevel level, String fmt, ...) {
   os_console_write(out_message, level);
 }
 
+void _log_output(Allocator arena, LogLevel level, String fmt, ...) {
+  String level_strings[] = {"[TRACE]: ", "[DEBUG]: ", "[INFO]:  ", "[WARN]:  ", "[ERROR]: ",};
+  VaList argc;
+  va_start(argc, fmt);
+  String formatted = push_strfv(arena, fmt, argc);
+  va_end(argc);
+  String out_message = push_strf(arena, "%s%s\n", level_strings[level-1], formatted);
+  os_console_write(out_message, level);
+}
+
 void print(String fmt, ...) {
   Scratch scratch;
   VaList argc;
