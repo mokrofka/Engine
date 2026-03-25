@@ -201,11 +201,15 @@ intern u32 hex_u64_write(u8* dest, u64 value) {
 // Great sprintf
 
 intern u32 my_sprintf(u8* buf, String fmt, VaList argc) {
-
   // Calculate length
   if (buf == null) {
     u32 length = 0;
+    u32 id = 0;
     for (u8* p = fmt.str; p < fmt.str+fmt.size; ++p) {
+      if (p == fmt.str+fmt.size-1) {
+        i32 a = 1;
+      }
+      ++id;
       if (*p == '%') {
         ++p; // skip '%'
         switch (*p) {
@@ -214,20 +218,22 @@ intern u32 my_sprintf(u8* buf, String fmt, VaList argc) {
               p += 2; // skip "64"
               i64 val = va_arg(argc, i64);
               length += i64_length(val);
-              break;
             }
-            i32 val = va_arg(argc, i32);
-            length += i32_length(val);
+            else {
+              i32 val = va_arg(argc, i32);
+              length += i32_length(val);
+            }
           } break;
           case 'u': {
             if (str_match(String(p+1, 2), "64")) {
               p += 2; // skip "64"
               u64 val = va_arg(argc, u64);
               length += u64_length(val);
-              break;
             }
-            u32 val = va_arg(argc, u32);
-            length += u32_length(val);
+            else {
+              u32 val = va_arg(argc, u32);
+              length += u32_length(val);
+            }
           } break;
           case 'f': {
             f64 val = va_arg(argc, f64); // f64 - because of compiler
@@ -251,6 +257,7 @@ intern u32 my_sprintf(u8* buf, String fmt, VaList argc) {
             length += f64_length(val, precision);
           } break;
           case 'p': {
+            va_arg(argc, void*);
             length += HEX_LENGTH;
           }; break;
           case '%': {
@@ -277,23 +284,26 @@ intern u32 my_sprintf(u8* buf, String fmt, VaList argc) {
             i64 val = va_arg(argc, i64);
             u32 len = i64_write(buf + written, val);
             written += len;
-            break;
           }
-          i32 val = va_arg(argc, i64);
-          u32 len = i32_write(buf + written, val);
-          written += len;
+          else {
+            i32 val = va_arg(argc, i32);
+            u32 len = i32_write(buf + written, val);
+            written += len;
+          }
         } break;
         case 'u': {
           if (str_match(String(p+1, 2), "64")) {
             p += 2; // skip "64"
-            i64 val = va_arg(argc, i64);
-            u32 len = i64_write(buf + written, val);
+            u64 val = va_arg(argc, u64);
+            u32 len = u64_write(buf + written, val);
             written += len;
             break;
           }
-          u32 val = va_arg(argc, u32);
-          u32 len = u32_write(buf + written, val);
-          written += len;
+          else {
+            u32 val = va_arg(argc, u32);
+            u32 len = u32_write(buf + written, val);
+            written += len;
+          }
         } break;
         case 'f': {
           f64 val = va_arg(argc, f64); // f64 - because of compiler

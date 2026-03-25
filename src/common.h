@@ -30,10 +30,6 @@ enum RenderpassType {
   RenderpassType_Screen,
 };
 
-// struct PushConstant {
-//   u32 entity_idx;
-// };
-
 struct PointLight {
   v3 color;
   v3 pos;
