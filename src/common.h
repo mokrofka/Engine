@@ -9,7 +9,7 @@ const v3 ColorBlack = v3(0,0,0);
 const v3 ColorGrey  = v3(0.8,0.8,0.8);
 
 const u32 MaxEntities = KB(1);
-const u32 MaxStaticEntities = KB(1);
+const u32 MaxStaticEntities = MB(1);
 const u32 MaxDebugLines = KB(1);
 
 struct Entity;

@@ -7,5 +7,5 @@ layout (location = 0) out vec3 out_pos;
 layout (location = 1) out vec3 out_norm;
 layout (location = 2) out vec2 out_uv;
 layout (location = 3) out vec3 out_color;
-layout (location = 4) out flat uint out_drawcall_id;
+layout (location = 4) out flat uint out_entity_id;
 

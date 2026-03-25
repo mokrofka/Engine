@@ -22,7 +22,6 @@ typedef i32 b32;
 typedef u64 DenseTime;
 
 template<typename T> using InitializerList = std::initializer_list<T>;
-// TODO: maybe it's possible to move away arg.h?
 typedef va_list VaList;
 
 #if _WIN64
@@ -62,8 +61,7 @@ typedef va_list VaList;
   #endif
 #elif OS_LINUX
   #if HOTRELOAD_BUILD
-    // #define shared_function C_LINKAGE __attribute__((visibility("default")))
-    #define shared_function C_LINKAGE 
+    #define shared_function C_LINKAGE __attribute__((visibility("default")))
     #define KAPI
   #else
     #define KAPI
@@ -254,23 +252,26 @@ struct _Defer {
 ////////////////////////////////////////////////////////////////////////
 // Error handling
 
-// union result with err_info + b32 err? 
-template <typename T>
-struct Ret {
-  T v;
+template <typename T, typename ErrorType = void>
+struct Result {
+  union {
+    T v;
+    ErrorType err_type;
+  };
   b32 err;
 };
-template <>
-struct Ret<void> {
-  b32 err;
-};
-template <typename T>
-inline T _result_return(Ret<T> res) { 
-  return res.v; 
-}
-inline void _result_return(Ret<void> res) {
-}
-#define Try(expr) ({ auto r = expr; if (r.err) return {.err = r.err}; _result_return(r); })
+
+// template <>
+// struct Result<void> {
+//   b32 err;
+// };
+// template <typename T>
+// inline T _result_return(Result<T> res) { 
+//   return res.v; 
+// }
+// inline void _result_return(Result<void> res) {
+// }
+// #define Try(expr) ({ auto r = expr; if (r.err) return {.err = r.err}; _result_return(r); })
 
 ////////////////////////////////////////////////////////////////////////
 // Types

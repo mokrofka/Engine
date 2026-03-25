@@ -4,7 +4,7 @@
 #define KB(n) ((n) << 10)
 #define MB(n) ((n) << 20)
 #define MaxEntities KB(1)
-#define MaxStaticEntities KB(1)
+#define MaxStaticEntities MB(1)
 #define MaxMaterials KB(1)
 #define MaxLights KB(1)
 
@@ -68,6 +68,7 @@ layout(std430, set = 0, binding = 0) readonly buffer Buffer {
   u32 point_light_count;
   u32 dir_light_count;
   u32 spot_light_count;
+  u32 entity_indices[MaxEntities+MaxStaticEntities];
 } st;
 
 layout(set = 0, binding = 1) uniform texture2D textures[];
@@ -80,10 +81,9 @@ layout(set = 0, binding = 7) readonly buffer PointLightBuffer { PointLight point
 layout(set = 0, binding = 8) readonly buffer DirLightBuffer   { DirLight dir_lights[]; };
 layout(set = 0, binding = 9) readonly buffer SpotLightBuffer  { SpotLight spot_lights[]; };
 
-// layout(push_constant) uniform PushConstants {
-//   u32 id;
-//   // u32 material;
-// } push;
+layout(push_constant) uniform PushConstants {
+  u32 drawcall_offset;
+} push;
 
 v3 norm;
 v3 frag_pos;
