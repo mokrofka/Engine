@@ -96,6 +96,7 @@ enum ShaderType {
 struct ShaderDesc {
   ShaderType type;
   ShaderTopology primitive;
+  u32 samples = 4;
   b8 is_transparent;
   b8 use_depth;
 };
@@ -346,8 +347,8 @@ KAPI void event_fire(u32 code, void* sender, EventContext on_event);
 
 KAPI void common_init();
 KAPI void r_shutdown();
-KAPI void r_begin_draw_frame();
-KAPI void r_end_draw_frame();
+KAPI void vk_begin_draw_frame();
+KAPI void vk_end_draw_frame();
 
 KAPI String asset_base_path();
 KAPI Handle<GpuMesh> mesh_load(String name);

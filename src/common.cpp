@@ -1092,31 +1092,6 @@ void r_shutdown() {
   vk_shutdown();
 }
 
-void r_begin_draw_frame() {
-}
-
-void r_end_draw_frame() {
-  vk_begin_frame();
-  // World
-  {
-    vk_begin_renderpass(RenderpassType_World);
-    vk_draw();
-    vk_end_renderpass(RenderpassType_World);
-  }
-  // {
-  //   vk_begin_renderpass(Renderpass_UI);
-  //   ui_begin_frame();
-  //   ui_end_frame();
-  //   vk_end_renderpass(Renderpass_UI);
-  // }
-  {
-    // vk_begin_renderpass(Renderpass_Screen);
-    // vk_draw_screen();
-    // vk_end_renderpass(Renderpass_Screen);
-  }
-  vk_end_frame();
-}
-
 String asset_base_path() {
   return common_st.asset_path;
 }

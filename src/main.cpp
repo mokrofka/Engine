@@ -51,9 +51,9 @@ i32 main(i32 count, char* args[]) {
     last_time = start_time;
 
     // Main logic
-    r_begin_draw_frame();
+    vk_begin_draw_frame();
     st.update(&st.state);
-    r_end_draw_frame();
+    vk_end_draw_frame();
     os_input_update();
     asset_watch_update();
 
