@@ -4,7 +4,7 @@
 #define KB(n) ((n) << 10)
 #define MB(n) ((n) << 20)
 #define MaxEntities KB(1)
-#define MaxStaticEntities MB(1)
+#define MaxStaticEntities KB(100)
 #define MaxMaterials KB(1)
 #define MaxLights KB(1)
 

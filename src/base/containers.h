@@ -7,26 +7,34 @@
 const u32 DEFAULT_CAPACITY = 8;
 const u32 DEFAULT_RESIZE_FACTOR = 2;
 
+const u32 INDEX_BITS = 22;
+const u32 INDEX_MASK = (1u << INDEX_BITS) - 1;
+
 template<typename T>
 struct Handle {
   u32 handle;
+#if BUILD_DEBUG
+  u32 idx() { return handle & INDEX_MASK; }
+  u32 generation() { return handle >> INDEX_BITS; }
+#else
+  u32 idx(Handle<T> handle) { return handle.handle; }
+#endif
 };
 
 ////////////////////////////////////////////////////////////////////////
-// Generic interface
+// C++ crazyness
 
 template <typename T>
-struct InterfaceEqual {
+struct ContainerEqual {
   NO_DEBUG b32 operator()(T a, T b) { return equal(a,b); }
 };
 template <typename T>
-struct InterfaceMemEqual {
+struct ContainerMemEqual {
   NO_DEBUG b32 operator()(T a, T b) { return MemMatchStruct(&a, &b); }
 };
 
 enum EqualMode {
-  EqualDefault,
-  EqualMem
+  EqualMode_Mem
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -38,38 +46,96 @@ struct ObjectPool {
   u32 cap;
   Allocator alloc;
   T* data;
+#if BUILD_DEBUG
+  u32* generations;
+#endif
   ObjectPool() = default;
   ObjectPool(Allocator alloc_) { *this = {}; alloc = alloc_; }
   void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
   void deinit() { if (data) mem_free(alloc, data); }
   T& get(Handle<T> handle) {
-    Assert(handle.handle < cap);
+#if BUILD_DEBUG
+    u32 idx = handle.handle & INDEX_MASK;
+    u32 generation = handle.handle >> INDEX_BITS;
+    Assert(idx < cap);
+    Assert(generations[idx] == generation);
+    return data[idx];
+#else
     return data[handle.handle];
-  }
-  Handle<T> add(T a) {
-    if (head >= cap) {
-      grow();
-    }
-    u32 result = head;
-    head = *(u32*)&data[head];
-    data[result] = a;
-    Handle<T> handle = {result};
-    return handle;
+#endif
   }
   Handle<T> add() {
+#if BUILD_DEBUG
+    u32 head_idx = head & INDEX_MASK;
+    if (head_idx >= cap) {
+      grow();
+    }
+    u32 result = head;
+    u32 idx = result & INDEX_MASK;
+    Assert((idx & INDEX_BITS) < cap);
+    head = *(u32*)&data[idx];
+    Handle<T> handle = {result};
+    return handle;
+#else
     if (head >= cap) {
       grow();
     }
     u32 result = head;
     head = *(u32*)&data[head];
     Handle<T> handle = {result};
+    return handle;
+  #endif
+  }
+  Handle<T> add(T e) {
+    Handle<T> handle = add();
+    get(handle) = e;
     return handle;
   }
   void remove(Handle<T> handle) {
-    *(u32*)&data[handle.handle] = head;
+#if BUILD_DEBUG
+    u32 idx = handle.handle & INDEX_MASK;
+    u32 generation = handle.handle >> INDEX_BITS;
+    Assert(generations[idx] == generation);
+    ++generation;
+    generations[idx] = generation;
+    handle.handle = (generation << INDEX_BITS) | idx;
+    *(u32*)&data[idx] = head;
     head = handle.handle;
+#else
+    *(u32*)&data[idx] = head;
+    head = handle.handle;
+#endif
   }
   void grow() {
+#if BUILD_DEBUG
+    if (data) {
+      u32 cap_old = cap;
+      cap *= DEFAULT_RESIZE_FACTOR;
+      SoA_Field fields[] = {
+        SoA_push_field(&generations, u32),
+        SoA_push_field(&data, T),
+      };
+      mem_realloc_soa(alloc, generations, cap_old, cap, fields, ArrayCount(fields));
+      head = cap_old;
+      for (i32 i = cap_old; i < cap-1; ++i) {
+        *(u32*)&data[i] = i+1;
+      }
+      *(u32*)&data[cap-1] = U32_MAX;
+      MemZeroArray(generations+cap_old, cap-cap_old);
+    } else {
+      cap = DEFAULT_CAPACITY;
+      SoA_Field fields[] = {
+        SoA_push_field(&generations, u32),
+        SoA_push_field(&data, T),
+      };
+      mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
+      Loop (i, cap-1) {
+        *(u32*)&data[i] = i+1;
+      }
+      *(u32*)&data[cap-1] = U32_MAX;
+      MemZeroArray(generations, cap);
+    }
+#else
     if (data) {
       u32 cap_old = cap;
       cap *= DEFAULT_RESIZE_FACTOR;
@@ -87,6 +153,96 @@ struct ObjectPool {
       }
       *(u32*)&data[cap-1] = U32_MAX;
     }
+#endif
+  }
+  void clear() {
+#if BUILD_DEBUG
+    head = 0;
+    Loop (i, cap-1) {
+      *(u32*)&data[i] = i+1;
+    }
+    *(u32*)&data[cap-1] = U32_MAX;
+    MemZeroArray(generations, cap);
+#else
+    head = 0;
+    Loop (i, cap-1) {
+      *(u32*)&data[i] = i+1;
+    }
+    *(u32*)&data[cap-1] = U32_MAX;
+#endif
+  }
+};
+
+template<typename T, i32 cap>
+struct StaticObjectPool {
+  u32 head;
+  T* data;
+#if BUILD_DEBUG
+  u32* generations;
+#endif
+  T& get(Handle<T> handle) {
+#if BUILD_DEBUG
+    u32 idx = handle.handle & INDEX_MASK;
+    u32 generation = handle.handle >> INDEX_BITS;
+    Assert(idx < cap);
+    Assert(generations[idx] == generation);
+    return data[idx];
+#else
+    return data[handle.handle];
+#endif
+  }
+  Handle<T> add() {
+#if BUILD_DEBUG
+    u32 head_idx = head & INDEX_MASK;
+    u32 result = head;
+    u32 idx = result & INDEX_MASK;
+    Assert((idx & INDEX_BITS) < cap);
+    head = *(u32*)&data[idx];
+    Handle<T> handle = {result};
+    return handle;
+#else
+    if (head >= cap) {
+      grow();
+    }
+    u32 result = head;
+    head = *(u32*)&data[head];
+    Handle<T> handle = {result};
+    return handle;
+  #endif
+  }
+  Handle<T> add(T e) {
+    Handle<T> handle = add();
+    get(handle) = e;
+    return handle;
+  }
+  void remove(Handle<T> handle) {
+#if BUILD_DEBUG
+    u32 idx = handle.handle & INDEX_MASK;
+    u32 generation = handle.handle >> INDEX_BITS;
+    Assert(generations[idx] == generation);
+    ++generation;
+    generations[idx] = generation;
+    handle.handle = (generation << INDEX_BITS) | idx;
+    *(u32*)&data[idx] = head;
+    head = handle.handle;
+#else
+    *(u32*)&data[idx] = head;
+    head = handle.handle;
+#endif
+  }
+  void clear() {
+#if BUILD_DEBUG
+    head = 0;
+    Loop (i, cap) {
+      *(u32*)&data[i] = i+1;
+    }
+    MemZeroArray(generations, cap);
+#else
+    head = 0;
+    Loop (i, cap-1) {
+      *(u32*)&data[i] = i+1;
+    }
+#endif
   }
 };
 
@@ -110,13 +266,12 @@ struct Array {
   }
   T* begin() { return data; }
   T* end()   { return data + count; }
-  NO_DEBUG T& operator[](u32 idx) {
+  T& operator[](u32 idx) {
     Assert(idx < cap);
     return data[idx];
   }
   void add(T a) { 
     Assert(count < cap);
-    T& e = data[count];
     data[count++] = a;
   }
   void add(InitializerList<T> slice) {
@@ -142,8 +297,8 @@ struct Array {
     return false;
   }
   INLINE b32 exists(T a, bool(*fn)(T a, T b)) { return exists_impl(a, fn); }
-  INLINE b32 exists(T a)                      { return exists_impl(a, InterfaceEqual<T>{}); }
-  INLINE b32 exists(T a, EqualMode mode)      { return exists_impl(a, InterfaceMemEqual<T>{}); }
+  INLINE b32 exists(T a)                      { return exists_impl(a, ContainerEqual<T>{}); }
+  INLINE b32 exists(T a, EqualMode mode)      { return exists_impl(a, ContainerMemEqual<T>{}); }
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -176,7 +331,6 @@ struct Darray {
         data = mem_alloc_array<T>(alloc, cap);
       }
     }
-    T& e = data[count];
     data[count++] = b;
   }
   void add(InitializerList<T> slice) {
@@ -213,8 +367,8 @@ struct Darray {
     return false;
   }
   b32 exists(T a, bool(*fn)(T a, T b)) { return exists_impl(a, fn); }
-  b32 exists(T a)                      { return exists_impl(a, InterfaceEqual<T>{}); }
-  b32 exists(T a, EqualMode mode)      { return exists_impl(a, InterfaceMemEqual<T>{}); }
+  b32 exists(T a)                      { return exists_impl(a, ContainerEqual<T>{}); }
+  b32 exists(T a, EqualMode mode)      { return exists_impl(a, ContainerMemEqual<T>{}); }
   template<typename Equal>
   b32 exists_at_impl(T e, u32* index, Equal eq) { 
     Loop (i, count) {
@@ -226,8 +380,8 @@ struct Darray {
     return false;
   }
   b32 exists_at(T a, u32* idx, bool(*fn)(T a, T b)) { return exists_at_impl(a, idx, fn); }
-  b32 exists_at(T a, u32* idx)                      { return exists_at_impl(a, idx, InterfaceEqual<T>{}); }
-  b32 exists_at(T a, u32* idx, EqualMode mode)      { return exists_at_impl(a, idx, InterfaceMemEqual<T>{}); }
+  b32 exists_at(T a, u32* idx)                      { return exists_at_impl(a, idx, ContainerEqual<T>{}); }
+  b32 exists_at(T a, u32* idx, EqualMode mode)      { return exists_at_impl(a, idx, ContainerMemEqual<T>{}); }
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -290,13 +444,13 @@ struct SparseSet {
   }
   void grow() {
     if (data) {
-      u32 old_cap = cap;
+      u32 cap_old = cap;
       cap *= DEFAULT_RESIZE_FACTOR;
       SoA_Field fields[] = {
         SoA_push_field(&dense, u32),
         SoA_push_field(&data, T),
       };
-      mem_realloc_soa(alloc, dense, old_cap, cap, fields, ArrayCount(fields));
+      mem_realloc_soa(alloc, dense, cap_old, cap, fields, ArrayCount(fields));
     }
     else {
       cap = DEFAULT_CAPACITY;
@@ -342,34 +496,66 @@ template<typename T, i32 N>
 struct ArrayHandler {
   static constexpr i32 cap = N;
   u32 count;
-  u32 entity_to_index[N];
-  u32 entities[N];
+  u32 sparse[N];
+  u32 dense[N];
   T data[N];
+#if BUILD_DEBUG
+  u32 generations[N];
+#endif
   T* begin() { return data; }
   T* end()   { return data + count; }
   T& get(Handle<T> handle) {
-    Assert(handle < cap);
-    DebugDo(Assert(entity_to_index[handle] != INVALID_ID));
-    u32 index = entity_to_index[handle];
+#if BUILD_DEBUG
+    u32 idx = handle.handle & INDEX_MASK;
+    u32 generation = handle.handle >> INDEX_BITS;
+    u32 index = sparse[idx];
     return data[index];
+#else
+    u32 index = sparse[handle];
+    return data[index];
+#endif
   }
   Handle<T> add(T e) {
-    u32 id = count++;
-    entity_to_index[id] = id;
-    entities[id] = id;
-    data[id] = e;
-    return id;
+#if BUILD_DEBUG
+    u32 idx = count++;
+    sparse[idx] = idx;
+    dense[idx] = idx;
+    data[idx] = e;
+    Handle<T> handle = (generations[idx] << INDEX_BITS) | idx;
+    return handle;
+#else
+    u32 idx = count++;
+    sparse[idx] = idx;
+    dense[idx] = idx;
+    data[idx] = e;
+    Handle<T> handle = {idx};
+    return handle;
+#endif
   }
   void remove(Handle<T> handle) {
-    DebugDo(Assert(entity_to_index[handle] != INVALID_ID));
-    u32 idx_removed = entity_to_index[handle];
+#if BUILD_DEBUG
+    u32 idx = handle.handle & INDEX_MASK;
+    u32 generation = handle.handle >> INDEX_BITS;
+    Assert(generations[idx] == generation);
+    ++generation;
+    generations[idx] = generation;
+
+    u32 idx_removed = sparse[handle];
     u32 idx_last = count - 1;
     data[idx_removed] = data[idx_last];
-    u32 last_entity = entities[idx_last];
-    entity_to_index[last_entity] = idx_removed;
-    entities[idx_removed] = last_entity;
+    u32 last_entity = dense[idx_last];
+    sparse[last_entity] = idx_removed;
+    dense[idx_removed] = last_entity;
     --count;
-    DebugDo(entity_to_index[handle] = INVALID_ID);
+#else
+    u32 idx_removed = sparse[handle];
+    u32 idx_last = count - 1;
+    data[idx_removed] = data[idx_last];
+    u32 last_entity = dense[idx_last];
+    sparse[last_entity] = idx_removed;
+    dense[idx_removed] = last_entity;
+    --count;
+#endif
   }
 };
 
@@ -378,63 +564,125 @@ struct DarrayHandler {
   u32 count;
   u32 cap;
   Allocator alloc;
-  u32* entity_to_index;
-  u32* entities;
+  u32* sparse;
+  u32* dense;
   T* data;
+#if BUILD_DEBUG
+  u32* generations;
+#endif
   DarrayHandler() = default;
   DarrayHandler(Allocator alloc_) { *this = {}; alloc = alloc_; }
   void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
-  void deinit() { if (entity_to_index) mem_free(alloc, entity_to_index); }
+  void deinit() { if (sparse) mem_free(alloc, sparse); }
   T* begin() { return data; }
   T* end()   { return data + count; }
   T& get(Handle<T> handle) {
-    Assert(handle.handle < cap);
-    DebugDo(Assert(entity_to_index[handle.handle] != INVALID_ID));
-    u32 index = entity_to_index[handle.handle];
+#if BUILD_DEBUG
+    Assert(handle.idx() < cap);
+    Assert(handle.generation() == generations[handle.idx()]);
+    u32 index = sparse[handle.idx()];
     return data[index];
+#else
+    Assert(handle.handle < cap);
+    DebugDo(Assert(sparse[handle.handle] != INVALID_ID));
+    u32 index = sparse[handle.handle];
+    return data[index];
+#endif
   }
   Handle<T> add(T e) {
+#if BUILD_DEBUG
     if (count >= cap) {
       grow();
     }
-    u32 id = count++;
-    entity_to_index[id] = id;
-    entities[id] = id;
-    data[id] = e;
-    Handle<T> handle = {id};
+    u32 idx = count++;
+    sparse[idx] = idx;
+    dense[idx] = idx;
+    data[idx] = e;
+    Handle<T> handle = {(generations[idx] << INDEX_BITS) | idx};
     return handle;
+#else
+    if (count >= cap) {
+      grow();
+    }
+    u32 idx = count++;
+    sparse[idx] = idx;
+    dense[idx] = idx;
+    data[idx] = e;
+    Handle<T> handle = {idx};
+    return handle;
+#endif
   }
   void remove(Handle<T> handle) {
-    DebugDo(Assert(entity_to_index[handle.handle] != INVALID_ID));
-    u32 idx_removed = entity_to_index[handle.handle];
+#if BUILD_DEBUG
+    u32 idx = handle.handle & INDEX_MASK;
+    u32 generation = handle.handle >> INDEX_BITS;
+    Assert(generations[idx] == generation);
+    ++generation;
+    generations[idx] = generation;
+
+    u32 idx_removed = sparse[idx];
     u32 idx_last = count - 1;
     data[idx_removed] = data[idx_last];
-    u32 last_entity = entities[idx_last];
-    entity_to_index[last_entity] = idx_removed;
-    entities[idx_removed] = last_entity;
+    u32 last_entity = dense[idx_last];
+    sparse[last_entity] = idx_removed;
+    dense[idx_removed] = last_entity;
     --count;
-    DebugDo(entity_to_index[handle.handle] = INVALID_ID);
+#else
+    u32 idx_removed = sparse[handle];
+    u32 idx_last = count - 1;
+    data[idx_removed] = data[idx_last];
+    u32 last_entity = dense[idx_last];
+    sparse[last_entity] = idx_removed;
+    dense[idx_removed] = last_entity;
+    --count;
+#endif
   }
   void grow() {
+#if BUILD_DEBUG
     if (data) {
       u32 cap_old = cap;
       cap *= DEFAULT_RESIZE_FACTOR;
       SoA_Field fields[] = {
-        SoA_push_field(&entity_to_index, u32),
-        SoA_push_field(&entities, u32),
+        SoA_push_field(&sparse, u32),
+        SoA_push_field(&dense, u32),
         SoA_push_field(&data, T),
+        SoA_push_field(&generations, u32),
       };
-      mem_realloc_soa(alloc, entity_to_index, cap_old, cap, fields, ArrayCount(fields));
+      mem_realloc_soa(alloc, sparse, cap_old, cap, fields, ArrayCount(fields));
+      MemZeroArray(generations+cap_old, cap-cap_old);
     }
     else {
       cap = DEFAULT_CAPACITY;
       SoA_Field fields[] = {
-        SoA_push_field(&entity_to_index, u32),
-        SoA_push_field(&entities, u32),
+        SoA_push_field(&sparse, u32),
+        SoA_push_field(&dense, u32),
+        SoA_push_field(&data, T),
+        SoA_push_field(&generations, u32),
+      };
+      mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
+      MemZeroArray(generations, cap);
+    }
+#else
+    if (data) {
+      u32 cap_old = cap;
+      cap *= DEFAULT_RESIZE_FACTOR;
+      SoA_Field fields[] = {
+        SoA_push_field(&sparse, u32),
+        SoA_push_field(&dense, u32),
+        SoA_push_field(&data, T),
+      };
+      mem_realloc_soa(alloc, sparse, cap_old, cap, fields, ArrayCount(fields));
+    }
+    else {
+      cap = DEFAULT_CAPACITY;
+      SoA_Field fields[] = {
+        SoA_push_field(&sparse, u32),
+        SoA_push_field(&dense, u32),
         SoA_push_field(&data, T),
       };
       mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
     }
+    #endif
   }
   void clear() {
     count = 0;
@@ -445,8 +693,8 @@ struct DarrayIndexHandler {
   u32 count;
   u32 cap;
   Allocator alloc;
-  u32* entity_to_index;
-  u32* entities;
+  u32* sparse;
+  u32* dense;
   u32* begin();
   u32* end();
   DarrayIndexHandler() = default;
@@ -643,3 +891,4 @@ struct MapAuto {
     }
   }
 };
+

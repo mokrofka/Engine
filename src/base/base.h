@@ -157,7 +157,7 @@ KAPI void MemCopy(void* d, void* s, u64 size);
 KAPI b32  MemMatch(void* a, void* b, u64 size);
 
 template<typename T> void MemZeroStruct(T* x)              { MemZero(x, sizeof(*x)); };
-template<typename T> void MemZeroArray(T* x, u64 c)        { MemZero(x, sizeof(*x)) * c; };
+template<typename T> void MemZeroArray(T* x, u64 c)        { MemZero(x, sizeof(*x) * c); };
 template<typename T> void MemCopyStruct(T* d, T* s)        { MemCopy(d, s, sizeof(*d)); }
 template<typename T> void MemCopyArray(T* d, T* s, u64 c)  { MemCopy(d, s, sizeof(*d) * c); }
 template<typename T> b32  MemMatchStruct(T* a, T* b)       { return MemMatch(a, b, sizeof(*a)); }

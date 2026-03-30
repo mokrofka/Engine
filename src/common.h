@@ -9,8 +9,7 @@ const v3 ColorBlack = v3(0,0,0);
 const v3 ColorGrey  = v3(0.8,0.8,0.8);
 
 const u32 MaxEntities = KB(1);
-const u32 MaxStaticEntities = MB(1);
-const u32 MaxDebugLines = KB(1);
+const u32 MaxStaticEntities = KB(100);
 
 struct Entity;
 struct StaticEntity;
@@ -23,12 +22,6 @@ struct GpuInstance;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // vk.cpp
-
-enum RenderpassType {
-  RenderpassType_World,
-  RenderpassType_UI,
-  RenderpassType_Screen,
-};
 
 struct PointLight {
   v3 color;
@@ -80,12 +73,6 @@ struct Mesh {
   u32 index_count;
 };
 
-enum ShaderTopology {
-  ShaderTopology_Triangle,
-  ShaderTopology_Line,
-  ShaderTopology_Point,
-};
-
 enum ShaderType {
   ShaderType_Drawing,
   ShaderType_Screen,
@@ -93,7 +80,14 @@ enum ShaderType {
   ShaderType_Compute,
 };
 
-struct ShaderDesc {
+enum ShaderTopology {
+  ShaderTopology_Triangle,
+  ShaderTopology_Line,
+  ShaderTopology_Point,
+};
+
+struct Shader {
+  String name;
   ShaderType type;
   ShaderTopology primitive;
   u32 samples = 4;
@@ -101,37 +95,23 @@ struct ShaderDesc {
   b8 use_depth;
 };
 
-struct Shader {
-  String path;
-  ShaderDesc desc;
-};
-
-Handle<GpuMesh> vk_mesh_load(Mesh mesh);
-
 void vk_init();
 void vk_shutdown();
 
-void vk_begin_frame();
-void vk_end_frame();
-void vk_begin_renderpass(RenderpassType renderpass);
-void vk_end_renderpass(RenderpassType renderpass);
-
-KAPI Handle<GpuShader> vk_shader_load(String name, ShaderDesc info);
-KAPI Handle<GpuTexture> vk_texture_load(Texture texture_info);
+KAPI Handle<GpuShader> vk_shader_load(Shader shader);
+KAPI void vk_shader_reload(Shader shader, Handle<GpuShader> shader_handle);
+KAPI Handle<GpuTexture> vk_texture_load(Texture texture);
 KAPI Handle<GpuMaterial> vk_material_load(Material material);
 KAPI Handle<GpuCubemap> vk_cubemap_load(Texture* textures);
+KAPI Handle<GpuMesh> vk_mesh_load(Mesh mesh);
 
-void vk_draw();
-void vk_draw_screen();
-void vk_draw_compute();
+KAPI void vk_begin_draw_frame();
+KAPI void vk_end_draw_frame();
 
 // Entity
 KAPI void vk_make_renderable(Handle<Entity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuShader> shader_handle, Handle<GpuMaterial> material_handle);
 KAPI void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuShader> shader_handle, Handle<GpuMaterial> material_handle);
 KAPI void vk_remove_renderable(Handle<Entity> entity_handle);
-// KAPI Handle<GpuInstance> vk_make_instance(Handle<GpuMesh> mesh_handle, Handle<GpuShader> shader_handle);
-// KAPI void vk_push_entity_to_instance(Handle<GpuInstance> instance_handle, Handle<Entity> entity_handle, Handle<GpuMaterial> material_handle);
-
 
 // // Point light
 // KAPI void vk_point_light_create(u32 entity_id);
@@ -148,25 +128,21 @@ KAPI void vk_remove_renderable(Handle<Entity> entity_handle);
 // KAPI void vk_spot_light_destroy(u32 entity_id);
 // KAPI SpotLight& vk_spot_light_get(u32 entity_id);
 
-// Util
-
 mat4& vk_get_view();
 mat4& vk_get_projection();
-KAPI void vk_shader_reload(String name, Handle<GpuShader> shader_handle, ShaderDesc info);
+
+KAPI void debug_draw_line(v3 a, v3 b, v3 color);
+KAPI void debug_draw_aabb(v3 min, v3 max, v3 color);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // common.cpp
 
-////////////////////////////////////////////////////////////////////////
-// Debug drawing
-
-KAPI void debug_draw_line(v3 a, v3 b, v3 color);
-void debug_draw_line_time(v3 a, v3 b, v3 color, f32 time);
-
 KAPI extern f32 g_dt;
 KAPI extern f32 g_time;
-KAPI extern Transform* entities_transforms;
-KAPI extern Transform* static_entities_transforms;
+KAPI Transform& entities_transforms(Handle<Entity> handle);
+KAPI Transform& static_entities_transforms(Handle<StaticEntity> handle);
+KAPI void entities_generations_set(u32* generations);
+KAPI void static_entities_generations_set(u32* generations);
 
 ////////////////////////////////////////////////////////////////////////
 // Assets
@@ -189,9 +165,10 @@ void shader_set(ShaderId id, Handle<GpuShader> shader_handle);
 
 enum MeshId {
   Mesh_MonkeyGlb,
-  Mesh_CubeGlb,
+  // Mesh_CubeGlb,
+  Mesh_Cube,
   Mesh_Load_COUNT,
-
+  
   Mesh_Triangle,
   Mesh_Grid,
   Mesh_Axis,
@@ -347,12 +324,10 @@ KAPI void event_fire(u32 code, void* sender, EventContext on_event);
 
 KAPI void common_init();
 KAPI void r_shutdown();
-KAPI void vk_begin_draw_frame();
-KAPI void vk_end_draw_frame();
 
 KAPI String asset_base_path();
 KAPI Handle<GpuMesh> mesh_load(String name);
-KAPI Handle<GpuShader> shader_load(String name, ShaderDesc info);
+KAPI Handle<GpuShader> shader_load(Shader shader);
 KAPI Handle<GpuTexture> texture_load(String name);
 KAPI Handle<GpuCubemap> cubemap_load(String name);
 

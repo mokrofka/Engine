@@ -9,7 +9,6 @@ const u32 MaxMeshes    = KB(1);
 const u32 MaxShaders   = KB(1);
 const u32 MaxTextures  = KB(1);
 const u32 MaxDrawCalls = KB(1);
-const u32 MaxDebugLines = KB(1);
 
 ///////////////////////////////////
 // Gpu memory layout
@@ -81,42 +80,57 @@ struct PushConstant {
   u32 drawcall_offset;
 };
 
-template<typename T>
 struct MeshBatch {
   Handle<GpuMesh> mesh_handle;
-  Darray<Handle<T>> entities;
+  Darray<Handle<Entity>> entities;
 };
 
-template<typename T>
 struct ShaderBatch {
   // Handle<GpuShader> shader;
-  Darray<MeshBatch<T>> mesh_batches;
+  Darray<MeshBatch> mesh_batches;
   Map<u32, u32> mesh_to_batch;
 };
 
 struct RenderEntity {
-  u32 entity_idx_in_array;
-  Handle<GpuShader> shader;
-  Handle<GpuMesh> mesh;
-#if BUILD_DEBUG
-  b32 is_init;
-#endif
+  Handle<Handle<Entity>> shader_handle;
+  Handle<Handle<Entity>> entity_idx;
 };
 
 ///////////////////////////////////
 // Vulkan
 
+// #if BUILD_DEBUG
+//   #define VK_CHECK(expr)          \
+//     {                             \
+//       Assert(expr == VK_SUCCESS); \
+//     }
+//   #else
+//     #define VK_CHECK(expr) expr
+// #endif
+
 #if BUILD_DEBUG
-  #define VK_CHECK(expr)                     \
-    {                                        \
-      if (expr != VK_SUCCESS) {              \
+  #define VK_CHECK(expr)        \
+    {                           \
+      if (expr != VK_SUCCESS)   \
+      {                         \
         Error("%s", vk_result_string(expr)); \
-        Assert(false);                       \
-      }                                      \
+        Assert(false);          \
+      }                         \
     }
 #else
   #define VK_CHECK(expr) expr
 #endif
+
+// #if BUILD_DEBUG
+//   #define VK_CHECK(expr)        \
+//     {                           \
+//       if (expr != VK_SUCCESS)   \
+//       {                         \
+//       }                         \
+//     }
+// #else
+//   #define VK_CHECK(expr) expr
+// #endif
 
 #define vkdevice vk.device.logical_device
 
@@ -165,6 +179,7 @@ struct VK_Swapchain {
   VkSurfaceFormatKHR image_format;  
   VkPresentModeKHR present_mode;
   VK_Image images[4];
+  VkImageView views[4];
   VK_Image depth_attachment;
 };
 
@@ -195,17 +210,26 @@ struct VK_Device {
   VkFormat depth_format;
 };
 
+struct VK_ShaderStages {
+  VkPipelineShaderStageCreateInfo stages[2];
+};
+
 struct VK_Shader {
   VkPipeline pipeline;
-  ShaderBatch<Entity> batch;
-  ShaderBatch<Entity> batch_indexed;
+  DarrayHandler<Handle<Entity>> entities;
+  DarrayHandler<Handle<Entity>> entities_indexed;
+  DarrayHandler<Handle<StaticEntity>> static_entities;
+  DarrayHandler<Handle<StaticEntity>> static_entities_indexed;
+
+  ShaderBatch batch;
+  ShaderBatch batch_indexed;
 
   u32 static_entities_count;
   u32 static_entities_indexed_count;
   u32 static_entities_count_old;
   u32 static_entities_indexed_count_old;
-  ShaderBatch<StaticEntity> static_batch;
-  ShaderBatch<StaticEntity> static_batch_indexed;
+  ShaderBatch static_batch;
+  ShaderBatch static_batch_indexed;
 
   VkShaderModule module[2];
 };
@@ -222,8 +246,100 @@ struct VK_DrawCallInfo {
     VkDrawIndirectCommand draw_command;
     VkDrawIndexedIndirectCommand index_draw_command;
   };
-  u32 entities_offset_id;
+  union {
+    u32 entity_id;
+    u32 entities_offset_id;
+  };
 };
+
+////////////////////////////////////////////////////////////////////////
+// Darray<ShaderBatch> shader_batches;
+// HashMap<ShaderID, u32> shader_lookup;
+// struct EntityRenderLocation {
+//     u32 shader_batch;
+//     u32 mesh_batch;
+//     u32 entity_index;
+// };
+// EntityRenderLocation entity_locations[MAX_ENTITIES];
+
+// void add_entity(EntityID e, ShaderID shader, MeshID mesh)
+// {
+//     u32 shader_idx;
+
+//     if (!shader_lookup.get(shader, &shader_idx))
+//     {
+//         shader_idx = shader_batches.count;
+//         shader_lookup[shader] = shader_idx;
+
+//         ShaderBatch sb = {};
+//         sb.shader = shader;
+
+//         shader_batches.add(sb);
+//     }
+
+//     ShaderBatch& sb = shader_batches[shader_idx];
+
+//     u32 mesh_idx;
+
+//     if (!sb.mesh_to_batch.get(mesh, &mesh_idx))
+//     {
+//         mesh_idx = sb.meshes.count;
+//         sb.mesh_to_batch[mesh] = mesh_idx;
+
+//         MeshBatch mb = {};
+//         mb.mesh = mesh;
+
+//         sb.meshes.add(mb);
+//     }
+
+//     MeshBatch& mb = sb.meshes[mesh_idx];
+
+//     u32 entity_index = mb.entities.count;
+//     mb.entities.add(e);
+
+//     entity_locations[e] = {
+//         shader_idx,
+//         mesh_idx,
+//         entity_index
+//     };
+// }
+// void remove_entity(EntityID e)
+// {
+//     auto loc = entity_locations[e];
+
+//     ShaderBatch& sb = shader_batches[loc.shader_batch];
+//     MeshBatch& mb = sb.meshes[loc.mesh_batch];
+
+//     u32 idx = loc.entity_index;
+//     u32 last = mb.entities.count - 1;
+
+//     EntityID swapped = mb.entities[last];
+
+//     mb.entities[idx] = swapped;
+//     mb.entities.pop();
+
+//     entity_locations[swapped].entity_index = idx;
+// }
+// for (ShaderBatch& sb : shader_batches)
+// {
+//     bind_pipeline(sb.shader);
+
+//     for (MeshBatch& mb : sb.meshes)
+//     {
+//         bind_mesh(mb.mesh);
+
+//         u32 instanceCount = mb.entities.count;
+
+//         vkCmdDrawIndexed(cmd,
+//             mesh.index_count,
+//             instanceCount,
+//             mesh.first_index,
+//             mesh.vertex_offset,
+//             0);
+//     }
+// }
+
+////////////////////////////////////////////////////////////////////////
 
 struct VK_State {
   Arena arena;
@@ -244,7 +360,6 @@ struct VK_State {
   u32 current_frame_idx;
   u32 width;
   u32 height;
-  f32 scale;
   
   VK_Buffer vert_buffer;
   VK_Buffer index_buffer;
@@ -274,11 +389,13 @@ struct VK_State {
   u32 static_draw_count;
 
   Array<RenderEntity, MaxEntities+MaxStaticEntities> entities;
+  Array<Handle<GpuShader>, MaxEntities+MaxStaticEntities> entities_to_shader;
+  Array<Handle<GpuMesh>, MaxEntities+MaxStaticEntities> entities_to_mesh;
 
   // Array<PushConstant, MaxEntities> push_constants;
   Array<VK_Shader, MaxShaders> shaders;
   Array<VK_Mesh, MaxMeshes> meshes;
-  Array<VK_Image, MaxTextures> textures;
+  Array<VK_Image, MaxTextures> texture;
 
   Array<Darray<Handle<Entity>>, MaxShaders> meshes_;
   Array<Darray<Handle<GpuMesh>>, MaxShaders> shaders_;
@@ -292,9 +409,8 @@ struct VK_State {
   VK_Shader debug_line_shader;
 
   // offscreen rendering
-  VK_Image msaa_texture_target;
   VK_Image offscreen_depth_buffer;
-  VK_Image* texture_targets;
+  VK_Image texture_target;
 
   mat4 view;
   mat4 projection;
@@ -302,10 +418,8 @@ struct VK_State {
   struct DebugDrawLine {
     Vertex vert[2];
   };
-  VkDeviceSize draw_lines_offset;
-  VkDeviceSize immediate_draw_lines_offset;
-  Darray<DebugDrawLine> draw_lines;
-  Darray<DebugDrawLine> immediate_draw_lines;
+  Darray<f32> debug_draw_line_times;
+  Darray<DebugDrawLine> debug_draw_lines;
 
   VkCommandBuffer cmd;
 
@@ -991,6 +1105,31 @@ intern VkPipeline vk_shader_pipeline_create(Shader shader) {
   return result;
 }
 
+intern VK_ShaderStages vk_shader_module_create(String name) {
+  Scratch scratch;
+  VK_ShaderStages result = {};
+  Loop (i, 2) {
+    String stage_type_strs[] = {"vert", "frag"};
+    VkShaderStageFlagBits stage_types[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
+    String filepath = push_strf(scratch, "%s/shaders/compiled/%s.%s.spv", asset_base_path(), name, stage_type_strs[i]);
+    Buffer binary = os_file_path_read_all(scratch, filepath);
+    VkShaderModuleCreateInfo module_info = {
+      .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+      .codeSize = binary.size,
+      .pCode = (u32*)binary.data,
+    };
+    VkShaderModule handle;
+    VK_CHECK(vk.CreateShaderModule(vkdevice, &module_info, vk.allocator, &handle));
+    result.stages[i] = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = stage_types[i],
+      .module = handle,
+      .pName = "main",
+    };
+  }
+  return result;
+}
+
 Handle<GpuShader> vk_shader_load(Shader shader) {
   Scratch scratch;
   switch (shader.type) {
@@ -1540,10 +1679,10 @@ intern void vk_texture_generate_mipmaps(VK_Image image) {
   vk.CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, null, 0, null, 1, &barrier);
 }
 
-Handle<GpuTexture> vk_texture_load(Texture texture) {
-  u64 size = texture.width * texture.height * 4;
-  MemCopy(vk.stage_buffer.mapped_memory, texture.data, size);
-  VK_ImageInfo image_info = vk_image_info_default(texture.width, texture.height);
+Handle<GpuTexture> vk_texture_load(Texture texture_info) {
+  u64 size = texture_info.width * texture_info.height * 4;
+  MemCopy(vk.stage_buffer.mapped_memory, texture_info.data, size);
+  VK_ImageInfo image_info = vk_image_info_default(texture_info.width, texture_info.height);
   image_info.miplevels_count = Floor(Log2(Max(image_info.width, image_info.height))) + 1;
   image_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
   VK_Image image = vk_image_create(image_info);
@@ -1564,15 +1703,15 @@ Handle<GpuTexture> vk_texture_load(Texture texture) {
     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
     .dstSet = vk.descriptor_sets,
     .dstBinding = 1,
-    .dstArrayElement = vk.textures.count,
+    .dstArrayElement = vk.texture.count,
     .descriptorCount = 1,
     .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
     .pImageInfo = &descriptor_image_info,
   };
   VkWriteDescriptorSet descriptors[] = {texture_write_descriptor};
   vk.UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
-  u32 id = vk.textures.count;
-  vk.textures.add(image);
+  u32 id = vk.texture.count;
+  vk.texture.add(image);
   Handle<GpuTexture> handle = {id};
   return handle;
 }
@@ -1580,53 +1719,23 @@ Handle<GpuTexture> vk_texture_load(Texture texture) {
 intern void vk_texture_resize_target() {
   VK_CHECK(vk.DeviceWaitIdle(vkdevice));
   Debug("texture target resized: x = %u y = %u", vk.width, vk.height);
-  u32 width = vk.width * vk.scale;
-  u32 height = vk.height * vk.scale;
-  if (width == 0) width = 1;
-  if (height == 0) height = 1;
-
-  // Msaa
-  vk_image_destroy(vk.msaa_texture_target);
-  VK_ImageInfo image_info = vk_image_info_default(width, height);
+  vk_image_destroy(vk.texture_target);
+  VK_ImageInfo image_info = vk_image_info_default(vk.width, vk.height);
   image_info.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
   image_info.format = VK_FORMAT_B8G8R8A8_UNORM;
   image_info.samples = VK_SAMPLE_COUNT_4_BIT;
-  vk.msaa_texture_target = vk_image_create(image_info);
-
-  // Texture target
-  Loop (i, vk.images_in_flight) {
-    vk_image_destroy(vk.texture_targets[i]);
-    VK_ImageInfo image_info = vk_image_info_default(width, height);
-    image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-    image_info.format = VK_FORMAT_B8G8R8A8_UNORM;
-    vk.texture_targets[i] = vk_image_create(image_info);
-
-    VkDescriptorImageInfo descriptor_image_info = {
-      .sampler = vk.sampler,
-      .imageView = vk.texture_targets[i].view,
-      .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    };
-    VkWriteDescriptorSet texture_write_descriptor = {
-      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-      .dstSet = vk.descriptor_sets,
-      .dstBinding = 1,
-      .dstArrayElement = (u32)i,
-      .descriptorCount = 1,
-      .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-      .pImageInfo = &descriptor_image_info,
-    };
-    VkWriteDescriptorSet descriptors[] = {texture_write_descriptor};
-    vk.UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
-  }
-
-  // Offscreen depth buffer
-  vk_image_destroy(vk.offscreen_depth_buffer);
-  VK_ImageInfo depth_info = vk_image_info_default(width, height);
-  depth_info.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-  depth_info.aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
-  depth_info.format = vk.device.depth_format;
-  depth_info.samples = VK_SAMPLE_COUNT_4_BIT;
-  vk.offscreen_depth_buffer = vk_image_create(depth_info);
+  vk.texture_target = vk_image_create(image_info);
+  // Loop (i, vk.images_in_flight) {
+  //   // vk_image_destroy(vk.texture_targets[i]);
+  //   vk_image_destroy(vk.offscreen_depth_buffer);
+  //   VK_ImageInfo texture_info = vk_image_info_default(vk.width, vk.height);
+  //   texture_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+  //   // vk.texture_targets[i].image = vk_image_create(texture_info);
+  //   VK_ImageInfo depth_info = vk_image_info_default(vk.width, vk.height);
+  //   depth_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+  //   depth_info.aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+  //   vk.offscreen_depth_buffer = vk_image_create(depth_info);
+  // }
 }
 
 Handle<GpuMaterial> vk_material_load(Material material) {
@@ -2071,7 +2180,7 @@ intern void vk_swapchain_create(b32 reuse) {
         .layerCount = 1,
       },
     };
-    VK_CHECK(vk.CreateImageView(vkdevice, &view_create_info, vk.allocator, &vk.swapchain.images[i].view));
+    VK_CHECK(vk.CreateImageView(vkdevice, &view_create_info, vk.allocator, &vk.swapchain.views[i]));
   }
   VK_ImageInfo depth_info = vk_image_info_default(swapchain_extent.width, swapchain_extent.height);
   depth_info.format = vk.device.depth_format;
@@ -2126,7 +2235,7 @@ intern void vk_swapchain_destroy(VK_Swapchain swapchain) {
   VK_CHECK(vk.DeviceWaitIdle(vkdevice));
   vk_image_destroy(swapchain.depth_attachment);
   Loop (i, vk.images_in_flight) {
-    vk.DestroyImageView(vkdevice, swapchain.images[i].view, vk.allocator);
+    vk.DestroyImageView(vkdevice, swapchain.views[i], vk.allocator);
   }
   vk.DestroySwapchainKHR(vkdevice, swapchain.handle, vk.allocator);
 }
@@ -2140,14 +2249,7 @@ intern void vk_swapchain_recreate() {
 
 intern u32 vk_swapchain_acquire_next_image_index(VkSemaphore image_available_semaphore) {
   u32 image_index;
-#if GFX_X11 // NOTE: on x11 errors
-  VkResult res = vk.AcquireNextImageKHR(vkdevice, vk.swapchain.handle, U64_MAX, image_available_semaphore, null, &image_index);
-  if (res != VK_SUCCESS) {
-    Warn("%s", vk_result_string(res));
-  }
-#else
   VK_CHECK(vk.AcquireNextImageKHR(vkdevice, vk.swapchain.handle, U64_MAX, image_available_semaphore, null, &image_index));
-#endif
   return image_index;
 }
 
@@ -2160,14 +2262,7 @@ intern void vk_swapchain_present(VkSemaphore render_complete_semaphore, u32 pres
     .pSwapchains = &vk.swapchain.handle,
     .pImageIndices = &present_image_index,
   };
-#if GFX_X11 // NOTE: on x11 errors
-  VkResult res = vk.QueuePresentKHR(vk.device.graphics_queue, &present_info);
-  if (res != VK_SUCCESS) {
-    Error("%s", vk_result_string(res));
-  }
-#else
   VK_CHECK(vk.QueuePresentKHR(vk.device.graphics_queue, &present_info));
-#endif
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -2304,9 +2399,9 @@ void vk_draw() {
       u32 per_shader_static_indexed_draw_count = 0;
       for (MeshBatch mesh_batch : shader.static_batch_indexed.mesh_batches) {
         if (mesh_batch.entities.count == 0) continue;
-        for (Handle<StaticEntity> entity_handle : mesh_batch.entities) {
+        for (Handle<Entity> entity_handle : mesh_batch.entities) {
           u32 entity_idx = entity_handle.idx();
-          vk.gpu_entities[MaxEntities+entity_idx].model = mat4_transform(static_entities_transforms(entity_handle));
+          vk.gpu_entities[MaxEntities+entity_idx].model = mat4_transform(static_entities_transforms((Handle<StaticEntity>)entity_handle.handle));
           vk.gpu_entities_indexes[MaxEntities+static_entities_draw_count++] = MaxEntities+entity_idx;
         }
         u32 mesh_idx = mesh_batch.mesh_handle.handle;
@@ -2332,9 +2427,9 @@ void vk_draw() {
       u32 per_shader_static_draw_count = 0;
       for (MeshBatch mesh_batch : shader.static_batch.mesh_batches) {
         if (mesh_batch.entities.count == 0) continue;
-        for (Handle<StaticEntity> entity_handle : mesh_batch.entities) {
+        for (Handle<Entity> entity_handle : mesh_batch.entities) {
           u32 entity_idx = entity_handle.idx();
-          vk.gpu_entities[MaxEntities+entity_idx].model = mat4_transform(static_entities_transforms(entity_handle));
+          vk.gpu_entities[MaxEntities+entity_idx].model = mat4_transform(static_entities_transforms((Handle<StaticEntity>)entity_handle.handle));
           vk.gpu_entities_indexes[MaxEntities+static_draw_call_count++] = MaxEntities+entity_idx;
         }
         u32 mesh_idx = mesh_batch.mesh_handle.handle;
@@ -2369,17 +2464,17 @@ void vk_draw() {
   }
 
   // Debug drawing
-  if (vk.draw_lines.count > 0) {
-    vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.debug_line_shader.pipeline);
-    vk.CmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, (VkDeviceSize*)&vk.draw_lines_offset);
-    vk.CmdDraw(cmd, vk.draw_lines.count*2, 1, 0, 0);
-  }
-  if (vk.immediate_draw_lines.count > 0) {
-    vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.debug_line_shader.pipeline);
-    vk.CmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, (VkDeviceSize*)&vk.immediate_draw_lines_offset);
-    vk.CmdDraw(cmd, vk.immediate_draw_lines.count*2, 1, 0, 0);
-    vk.immediate_draw_lines.clear();
-  }
+  // if (vk.draw_lines.count > 0) {
+  //   vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.debug_line_shader.pipeline);
+  //   vk.CmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, (VkDeviceSize*)&vk.draw_lines_offset);
+  //   vk.CmdDraw(cmd, vk.draw_lines.count*2, 1, 0, 0);
+  // }
+  // if (vk.immediate_draw_lines.count > 0) {
+  //   vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.debug_line_shader.pipeline);
+  //   vk.CmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, (VkDeviceSize*)&vk.immediate_draw_lines_offset);
+  //   vk.CmdDraw(cmd, vk.immediate_draw_lines.count*2, 1, 0, 0);
+  //   vk.immediate_draw_lines.clear();
+  // }
 
   // Cube map
   vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.cubemap_shader.pipeline);
@@ -2396,11 +2491,71 @@ void vk_draw() {
 
 void vk_draw_screen() {
   VkCommandBuffer cmd = vk_get_current_cmd();
-  PushConstant push = {vk.current_image_idx};
-  vk.CmdPushConstants(cmd, vk.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstant), &push);
-  vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.screen_shader.pipeline);
-  vk.CmdDraw(cmd, 3, 1, 0, 0);
+
+  // VkPipelineLayout pipeline_layout = vk.screen_shader.pipeline.pipeline_layout;
+  // VkPipeline pipeline = vk.screen_shader.pipeline.handle;
+
+  // vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &vk.screen_descriptor_sets[vk.current_frame], 0, null);
+  // vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+  // vk.CmdDraw(cmd, 3, 1, 0, 0);
 }
+
+// void vk_draw_compute() {
+//   // vk_compute_descriptor_update();
+//   VkCommandBuffer cmd = vk.compute_cmds[vk.current_frame];
+
+//   VkCommandBufferBeginInfo beginInfo = {};
+//   beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+//   VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
+  
+//   // UniformBufferObject* ubo; Assign(ubo, vk.compute_uniform_buffer.maped_memory);
+//   // ubo->projection_view = *vk.projection_view;
+//   // ubo->delta_time = delta_time;
+  
+//   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, vk.compute_shader.pipeline.handle);
+//   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, vk.compute_shader.pipeline.pipeline_layout, 0, 1, &vk.compute_descriptor_sets[vk.current_frame], 0, null);
+
+//   vkCmdDispatch(cmd, ParticleCount / 256, 1, 1);
+  
+//   VK_CHECK(vkEndCommandBuffer(cmd));
+// }
+
+// void vk_compute_descriptor_update() {
+//   i32 i = vk.current_frame;
+//   VkWriteDescriptorSet descriptor_writes[2];
+
+//   VkDescriptorBufferInfo storage_buffer_info_last_frame = {
+//     .buffer = vk.compute_storage_buffers[i].handle,
+//     .offset = 0,
+//     .range = sizeof(Particle) * ParticleCount,
+//   };
+//   descriptor_writes[0] = {
+//     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+//     .dstSet = vk.compute_descriptor_sets[i],
+//     .dstBinding = 1,
+//     .dstArrayElement = 0,
+//     .descriptorCount = 1,
+//     .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+//     .pBufferInfo = &storage_buffer_info_last_frame,
+//   };
+
+//   VkDescriptorBufferInfo storage_buffer_info_current_frame = {
+//     .buffer = vk.compute_storage_buffers[(i + 1) % FramesInFlight].handle,
+//     .offset = 0,
+//     .range = sizeof(Particle) * ParticleCount,
+//   };
+//   descriptor_writes[1] = {
+//     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+//     .dstSet = vk.compute_descriptor_sets[i],
+//     .dstBinding = 2,
+//     .dstArrayElement = 0,
+//     .descriptorCount = 1,
+//     .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+//     .pBufferInfo = &storage_buffer_info_current_frame,
+//   };
+
+//   vkUpdateDescriptorSets(vkdevice, ArrayCount(descriptor_writes), descriptor_writes, 0, null);
+// }
 
 void vk_loader_load_core() {
   vk.lib = os_lib_open("libvulkan.so");
@@ -2745,28 +2900,39 @@ void vk_init() {
     vk.screen_shader.pipeline = vk_shader_pipeline_create(shader);
   }
 
-  vk.scale = 1;
-  // Msaa texture
+  // Target texture render
   {
     VK_ImageInfo image_info = vk_image_info_default(vk.width, vk.height);
     image_info.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     image_info.format = VK_FORMAT_B8G8R8A8_UNORM;
     image_info.samples = VK_SAMPLE_COUNT_4_BIT;
-    vk.msaa_texture_target = vk_image_create(image_info);
-  }
-  // Texture target
-  {
-    vk.texture_targets = push_array_zero(vk.arena, VK_Image, vk.images_in_flight);
-    vk.textures.count += vk.images_in_flight;
-    vk_texture_resize_target();
-  }
+    vk.texture_target = vk_image_create(image_info);
 
-  vk.draw_lines_offset = vk.vert_buffer.size;
-  vk.vert_buffer.size += sizeof(Vertex)*KB(1);
-  vk.immediate_draw_lines_offset = vk.vert_buffer.size;
-  vk.vert_buffer.size += sizeof(Vertex)*KB(1);
+    // vk.offscreen_depth_buffer = vk_image_create(
+    //   VK_IMAGE_TYPE_2D,
+    //   vk.width,
+    //   vk.height,
+    //   vk.device.depth_format,
+    //   VK_IMAGE_TILING_OPTIMAL,
+    //   VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+    //   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    //   true,
+    //   VK_IMAGE_ASPECT_DEPTH_BIT);
+  }
 
   Info("Vulkan renderer initialized");
+
+  // {
+  //   String name = "orange_lines_512.png";
+  //   Texture texture = res_texture_load(name);
+  //   vk_texture_load(texture);
+
+  //   Shader shader = {
+  //     .name = "texture_shader",
+  //     .attribut = {3,3,2},
+  //   };
+  //   shader_create(shader);
+  // }
 }
 
 void vk_shutdown() {
@@ -2778,6 +2944,7 @@ void vk_shutdown() {
     vk.DestroySemaphore(vkdevice, vk.sync.compute_complete_semaphores[i], vk.allocator);
     vk.DestroyFence(vkdevice, vk.sync.in_flight_fences[i], vk.allocator);
     vk_cmd_free(vk.device.cmd_pool, vk.cmds[i]);
+    // vk_cmd_free(vk.device.cmd_pool, vk.compute_cmds[i]);
   }
 
   {
@@ -2822,16 +2989,10 @@ void vk_begin_frame() {
   //   }
   // }
 
-  if (vk.draw_lines.count > 0) {
-    u32 size = vk.draw_lines.count * sizeof(VK_State::DebugDrawLine);
-    void* data = vk.draw_lines.data;
-    vk_buffer_upload_to_gpu(vk.vert_buffer, {vk.draw_lines_offset, size}, data);
-  }
-
-  if (vk.immediate_draw_lines.count > 0) {
-    u32 size = vk.immediate_draw_lines.count * sizeof(VK_State::DebugDrawLine);
-    void* data = vk.immediate_draw_lines.data;
-    vk_buffer_upload_to_gpu(vk.vert_buffer, {vk.immediate_draw_lines_offset, size}, data);
+  if (vk.debug_draw_lines.count > 0) {
+    u32 size = vk.debug_draw_lines.count * sizeof(VK_State::DebugDrawLine);
+    void* data = vk.debug_draw_lines.data;
+    vk_buffer_upload_to_gpu(vk.vert_buffer, {vk.vert_buffer.size, size}, data);
   }
 
   VK_CHECK(vk.WaitForFences(vkdevice, 1, &vk.sync.in_flight_fences[vk.current_frame_idx], true, U64_MAX));
@@ -2862,9 +3023,9 @@ void vk_begin_frame() {
   // NOTE: we flip Y coordinate so Y:0 is on bottom of screen
   VkViewport viewport = {
     .x = 0.0f,
-    .y = (f32)vk.height*vk.scale,
-    .width = (f32)vk.width*vk.scale,
-    .height = -(f32)vk.height*vk.scale,
+    .y = (f32)vk.height,
+    .width = (f32)vk.width,
+    .height = -(f32)vk.height,
     .minDepth = 0.0f,
     .maxDepth = 1.0f,
   };
@@ -2872,24 +3033,35 @@ void vk_begin_frame() {
   VkRect2D scissor = {
     .offset = {.x = 0, .y = 0},
     .extent = {
-      .width = (u32)(vk.width*vk.scale), 
-      .height = (u32)(vk.height*vk.scale)
+      .width = (u32)vk.width, 
+      .height = (u32)vk.height
     },
   };
   vk.CmdSetScissor(cmd, 0, 1, &scissor);
 }
 
 void vk_end_frame() {
+
   VkCommandBuffer cmd = vk_get_current_cmd();
   vk_cmd_end(cmd);
+  
+  
+  // // compute
+  // VkSubmitInfo compute_submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
+  // compute_submit_info.commandBufferCount = 1;
+  // compute_submit_info.pCommandBuffers = &vk.compute_cmds[vk.current_frame].handle;
+  // compute_submit_info.signalSemaphoreCount = 1;
+  // compute_submit_info.pSignalSemaphores = &vk.sync.compute_complete_semaphores[vk.current_frame];
+  
+  // VK_CHECK(vkQueueSubmit(vk.device.graphics_queue, 1, &compute_submit_info, null));
 
   // graphics
   VkSemaphore semaphores_wait[] = {
     vk_get_current_image_available_semaphore(),
+    // vk.sync.compute_complete_semaphores[vk.current_frame]
   };
   VkPipelineStageFlags sync_flags[] = {
     VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-    VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
   };
   VkSemaphore semaphore_render_complete = vk_get_current_render_complete_semaphore();
 
@@ -2957,38 +3129,24 @@ void vk_begin_renderpass(RenderpassType renderpass_id) {
   VkCommandBuffer cmd = vk_get_current_cmd();
   switch (renderpass_id) {
     case RenderpassType_World: {
-      vk_image_layout_transition(cmd, vk.msaa_texture_target, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-      vk_image_layout_transition(cmd, vk.offscreen_depth_buffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
-      vk_image_layout_transition(cmd, vk.texture_targets[vk.current_image_idx], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+      // Color
+      vk_image_layout_transition(cmd, vk.texture_target, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+      // Depth
+      vk_image_layout_transition(cmd, vk.swapchain.depth_attachment, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+      // Render
+      vk_image_layout_transition(cmd, vk.swapchain.images[vk.current_image_idx], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-      VkRenderingAttachmentInfo color_attachment = vk_default_color_attachment_info(vk.msaa_texture_target.view);
+      VkRenderingAttachmentInfo color_attachment = vk_default_color_attachment_info(vk.texture_target.view);
       color_attachment.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
-      color_attachment.resolveImageView = vk.texture_targets[vk.current_image_idx].view;
+      color_attachment.resolveImageView = vk.swapchain.views[vk.current_image_idx];
       color_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-      VkRenderingAttachmentInfo depth_attachment = vk_default_depth_attachment_info(vk.offscreen_depth_buffer.view);
+
+      VkRenderingAttachmentInfo depth_attachment = vk_default_depth_attachment_info(vk.swapchain.depth_attachment.view);
+      // depth_attachment
       
       VkRenderingInfo render_info = vk_default_rendering_info(&color_attachment, &depth_attachment);
-      render_info.renderArea.extent = {vk.texture_targets->info.width, vk.texture_targets->info.height};
       vk.CmdBeginRendering(cmd, &render_info);
 
-      ///////////////////////////////////
-      // vk_image_layout_transition(cmd, vk.msaa_texture_target, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-      // vk_image_layout_transition(cmd, vk.swapchain.depth_attachment, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
-      // vk_image_layout_transition(cmd, vk.swapchain.images[vk.current_image_idx], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-
-      // VkRenderingAttachmentInfo color_attachment = vk_default_color_attachment_info(vk.msaa_texture_target.view);
-      // color_attachment.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
-      // color_attachment.resolveImageView = vk.swapchain.views[vk.current_image_idx];
-      // color_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-      // VkRenderingAttachmentInfo depth_attachment = vk_default_depth_attachment_info(vk.swapchain.depth_attachment.view);
-      // // depth_attachment
-      
-      // VkRenderingInfo render_info = vk_default_rendering_info(&color_attachment, &depth_attachment);
-      // vk.CmdBeginRendering(cmd, &render_info);
-
-      ///////////////////////////////////
-      // // OLD
       // // Color
       // vk_image_layout_transition(cmd, vk.swapchain.images[vk.current_image_idx], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
       // // Depth
@@ -3002,10 +3160,6 @@ void vk_begin_renderpass(RenderpassType renderpass_id) {
     case RenderpassType_UI: {
     } break;
     case RenderpassType_Screen: {
-      vk_image_layout_transition(cmd, vk.swapchain.images[vk.current_image_idx], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-      VkRenderingAttachmentInfo color_attachment = vk_default_color_attachment_info(vk.swapchain.images[vk.current_image_idx].view);
-      VkRenderingInfo render_info = vk_default_rendering_info(&color_attachment);
-      vk.CmdBeginRendering(cmd, &render_info);
     } break;
   }
   return;
@@ -3016,239 +3170,179 @@ void vk_end_renderpass(RenderpassType renderpass) {
   switch (renderpass) {
     case RenderpassType_World: {
       vk.CmdEndRendering(cmd);
-      vk_image_layout_transition(cmd, vk.texture_targets[vk.current_image_idx], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-      ///////////////////////////////////
-      // vk_image_layout_transition(cmd, vk.swapchain.images[vk.current_image_idx], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+      // vk_image_layout_transition(cmd, vk.texture_target, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+      vk_image_layout_transition(cmd, vk.swapchain.images[vk.current_image_idx], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
     } break;
     case RenderpassType_UI: {
     } break;
     case RenderpassType_Screen: {
-      vk.CmdEndRendering(cmd);
-      vk_image_layout_transition(cmd, vk.swapchain.images[vk.current_image_idx], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
     } break;
   }
   return;
-}
-
-void vk_begin_draw_frame() {
-}
-
-void vk_end_draw_frame() {
-  vk_begin_frame();
-  // World
-  {
-    vk_begin_renderpass(RenderpassType_World);
-    vk_draw();
-    vk_end_renderpass(RenderpassType_World);
-  }
-  // {
-  //   vk_begin_renderpass(Renderpass_UI);
-  //   ui_begin_frame();
-  //   ui_end_frame();
-  //   vk_end_renderpass(Renderpass_UI);
-  // }
-  // Screen
-  {
-    VkCommandBuffer cmd = vk_get_current_cmd();
-    VkViewport viewport = {
-      .x = 0.0f,
-      .y = (f32)vk.height,
-      .width = (f32)vk.width,
-      .height = -(f32)vk.height,
-      .minDepth = 0.0f,
-      .maxDepth = 1.0f,
-    };
-    vk.CmdSetViewport(cmd, 0, 1, &viewport);
-    VkRect2D scissor = {
-      .offset = {.x = 0, .y = 0},
-      .extent = {
-        .width = (u32)vk.width, 
-        .height = (u32)vk.height
-      },
-    };
-    vk.CmdSetScissor(cmd, 0, 1, &scissor);
-    vk_begin_renderpass(RenderpassType_Screen);
-    vk_draw_screen();
-    vk_end_renderpass(RenderpassType_Screen);
-  }
-  vk_end_frame();
 }
 
 ////////////////////////////////////////////////////////////////////////
 // Entity
 
 void vk_make_renderable(Handle<Entity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuShader> shader_handle, Handle<GpuMaterial> material_handle) {
-  u32 entity_idx = entity_handle.idx();
-  DebugDo(Assert(!vk.entities[entity_idx].is_init));
-  DebugDo(vk.entities[entity_idx].is_init = true);
-  u32 shader_idx = shader_handle.idx();
-  vk.entities[entity_idx].shader = shader_handle;
-  u32 mesh_idx = mesh_handle.idx();
+  u32 entity_idx = entity_handle.handle;
+  u32 shader_idx = shader_handle.handle;
+  vk.entities_to_shader[entity_idx] = shader_handle;
+  u32 mesh_idx = mesh_handle.handle;
   VK_Mesh mesh = vk.meshes[mesh_idx];
   // Indexed
   if (mesh.index_count) {
-    ShaderBatch<Entity>& shader_batch = vk.shaders[shader_idx].batch_indexed;
+    ShaderBatch& shader_batch = vk.shaders[shader_idx].batch_indexed;
     u32* p_mesh_idx_in_array = shader_batch.mesh_to_batch.get(mesh_idx);
     u32 mesh_idx_in_array;
     if (!p_mesh_idx_in_array) {
       mesh_idx_in_array = shader_batch.mesh_batches.count;
       p_mesh_idx_in_array = &mesh_idx_in_array;
       shader_batch.mesh_to_batch.add(mesh_idx, mesh_idx_in_array);
-      MeshBatch<Entity> mesh_batch = {.mesh_handle = mesh_handle};
+      MeshBatch mesh_batch = {.mesh_handle = mesh_handle};
       shader_batch.mesh_batches.add(mesh_batch);
     }
-    MeshBatch<Entity>& mesh_batch = shader_batch.mesh_batches[*p_mesh_idx_in_array];
-    u32 entity_idx_in_array = mesh_batch.entities.count;
+    MeshBatch& mesh_batch = shader_batch.mesh_batches[*p_mesh_idx_in_array];
     mesh_batch.entities.add(entity_handle);
-    vk.entities[entity_idx].entity_idx_in_array = entity_idx_in_array;
+    u32 entity_idx_in_array = mesh_batch.entities.count;
   }
   // Not Indexed
   else {
-    ShaderBatch<Entity>& shader_batch = vk.shaders[shader_idx].batch;
+    ShaderBatch& shader_batch = vk.shaders[shader_idx].batch;
     u32* p_mesh_idx_in_array = shader_batch.mesh_to_batch.get(mesh_idx);
     u32 mesh_idx_in_array;
     if (!p_mesh_idx_in_array) {
       mesh_idx_in_array = shader_batch.mesh_batches.count;
       p_mesh_idx_in_array = &mesh_idx_in_array;
       shader_batch.mesh_to_batch.add(mesh_idx, mesh_idx_in_array);
-      MeshBatch<Entity> mesh_batch = {.mesh_handle = mesh_handle};
+      MeshBatch mesh_batch = {.mesh_handle = mesh_handle};
       shader_batch.mesh_batches.add(mesh_batch);
     }
-    MeshBatch<Entity>& mesh_batch = shader_batch.mesh_batches[*p_mesh_idx_in_array];
-    u32 entity_idx_in_array = mesh_batch.entities.count;
+    MeshBatch& mesh_batch = shader_batch.mesh_batches[*p_mesh_idx_in_array];
     mesh_batch.entities.add(entity_handle);
-    vk.entities[entity_idx].entity_idx_in_array = entity_idx_in_array;
+    u32 entity_idx_in_array = mesh_batch.entities.count;
   }
-  vk.entities[entity_idx].mesh = mesh_handle;
+  vk.entities_to_mesh[entity_idx] = mesh_handle;
   vk.gpu_entities[entity_idx].material = material_handle;
 }
 
-// void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuShader> shader_handle, Handle<GpuMaterial> material_handle) {
-//   u32 entity_idx = entity_handle.idx() + MaxEntities;
+// void vk_make_renderable(Handle<Entity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuShader> shader_handle, Handle<GpuMaterial> material_handle) {
+//   u32 entity_idx = entity_handle.handle;
 //   u32 shader_idx = shader_handle.handle;
-//   vk.entities[entity_idx].shader = shader_handle;
+//   vk.entities_to_shader[entity_idx] = shader_handle;
 //   u32 mesh_idx = mesh_handle.handle;
 //   VK_Mesh mesh = vk.meshes[mesh_idx];
-//   // Indexed
 //   if (mesh.index_count) {
-//     ++vk.shaders[shader_idx].static_entities_indexed_count;
-//     ShaderBatch<StaticEntity>& shader_batch = vk.shaders[shader_idx].static_batch_indexed;
-//     u32* p_mesh_idx_in_array = shader_batch.mesh_to_batch.get(mesh_idx);
-//     u32 mesh_idx_in_array;
-//     if (!p_mesh_idx_in_array) {
-//       mesh_idx_in_array = shader_batch.mesh_batches.count;
-//       p_mesh_idx_in_array = &mesh_idx_in_array;
-//       shader_batch.mesh_to_batch.add(mesh_idx, mesh_idx_in_array);
-//       MeshBatch<StaticEntity> mesh_batch = {.mesh_handle = mesh_handle};
-//       shader_batch.mesh_batches.add(mesh_batch);
-//     }
-//     MeshBatch<StaticEntity>& mesh_batch = shader_batch.mesh_batches[*p_mesh_idx_in_array];
-//     mesh_batch.entities.add(entity_handle);
-//     u32 entity_idx_in_array = mesh_batch.entities.count;
-//     vk.entities[entity_idx].entity_idx_in_array = entity_idx_in_array;
+//     vk.entities[entity_idx].shader_handle = vk.shaders[shader_idx].entities_indexed.add(entity_handle);
+//     // u32 shader_idx = vk.entities_to_shader[entity_idx].handle;
+//     // ShaderBatch& shader_batch = vk.shaders[shader_idx].batch_indexed;
+//     // u32* p_mesh_idx_in_array = shader_batch.mesh_to_batch.get(mesh_idx);
+//     // u32 mesh_idx_in_array;
+//     // if (!p_mesh_idx_in_array) {
+//     //   mesh_idx_in_array = shader_batch.mesh_batches.count;
+//     //   p_mesh_idx_in_array = &mesh_idx_in_array;
+//     //   shader_batch.mesh_to_batch.add(mesh_idx, mesh_idx_in_array);
+//     //   MeshBatch mesh_batch = {.mesh_handle = mesh_handle};
+//     //   shader_batch.mesh_batches.add(mesh_batch);
+//     // }
+//     // MeshBatch& mesh_batch = shader_batch.mesh_batches[*p_mesh_idx_in_array];
+//     // mesh_batch.entities.add(entity_handle);
+//     // u32 entity_idx_in_array = mesh_batch.entities.count;
+//   } else {
+//     vk.entities[entity_idx].shader_handle = vk.shaders[shader_idx].entities.add(entity_handle);
+//     // u32 shader_idx = vk.entities_to_shader[entity_idx].handle;
+//     // ShaderBatch& shader_batch = vk.shaders[shader_idx].batch;
+//     // u32* p_mesh_idx_in_array = shader_batch.mesh_to_batch.get(mesh_idx);
+//     // u32 mesh_idx_in_array;
+//     // if (!p_mesh_idx_in_array) {
+//     //   mesh_idx_in_array = shader_batch.mesh_batches.count;
+//     //   p_mesh_idx_in_array = &mesh_idx_in_array;
+//     //   shader_batch.mesh_to_batch.add(mesh_idx, mesh_idx_in_array);
+//     //   MeshBatch mesh_batch = {.mesh_handle = mesh_handle};
+//     //   shader_batch.mesh_batches.add(mesh_batch);
+//     // }
+//     // MeshBatch& mesh_batch = shader_batch.mesh_batches[*p_mesh_idx_in_array];
+//     // mesh_batch.entities.add(entity_handle);
+//     // u32 entity_idx_in_array = mesh_batch.entities.count;
 //   }
-//   // Not Indexed
-//   else {
-//     ++vk.shaders[shader_idx].static_entities_count;
-//     ShaderBatch<StaticEntity>& shader_batch = vk.shaders[shader_idx].static_batch;
-//     u32* p_mesh_idx_in_array = shader_batch.mesh_to_batch.get(mesh_idx);
-//     u32 mesh_idx_in_array;
-//     if (!p_mesh_idx_in_array) {
-//       mesh_idx_in_array = shader_batch.mesh_batches.count;
-//       p_mesh_idx_in_array = &mesh_idx_in_array;
-//       shader_batch.mesh_to_batch.add(mesh_idx, mesh_idx_in_array);
-//       MeshBatch<StaticEntity> mesh_batch = {.mesh_handle = mesh_handle};
-//       shader_batch.mesh_batches.add(mesh_batch);
-//     }
-//     MeshBatch<StaticEntity>& mesh_batch = shader_batch.mesh_batches[*p_mesh_idx_in_array];
-//     mesh_batch.entities.add(entity_handle);
-//     u32 entity_idx_in_array = mesh_batch.entities.count;
-//     vk.entities[entity_idx].entity_idx_in_array = entity_idx_in_array;
-//   }
-//   vk.entities[entity_idx].mesh = mesh_handle;
+//   vk.entities_to_mesh[entity_idx] = mesh_handle;
 //   vk.gpu_entities[entity_idx].material = material_handle;
 // }
 
 void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuShader> shader_handle, Handle<GpuMaterial> material_handle) {
-  u32 entity_idx = entity_handle.idx() + MaxEntities;
+  u32 entity_idx = entity_handle.handle + MaxEntities;
   u32 shader_idx = shader_handle.handle;
+  vk.entities_to_shader[entity_idx] = shader_handle;
   u32 mesh_idx = mesh_handle.handle;
   VK_Mesh mesh = vk.meshes[mesh_idx];
   // Indexed
   if (mesh.index_count) {
     ++vk.shaders[shader_idx].static_entities_indexed_count;
-    ShaderBatch<StaticEntity>& shader_batch = vk.shaders[shader_idx].static_batch_indexed;
+    ShaderBatch& shader_batch = vk.shaders[shader_idx].static_batch_indexed;
     u32* p_mesh_idx_in_array = shader_batch.mesh_to_batch.get(mesh_idx);
     u32 mesh_idx_in_array;
     if (!p_mesh_idx_in_array) {
       mesh_idx_in_array = shader_batch.mesh_batches.count;
       p_mesh_idx_in_array = &mesh_idx_in_array;
       shader_batch.mesh_to_batch.add(mesh_idx, mesh_idx_in_array);
-      MeshBatch<StaticEntity> mesh_batch = {.mesh_handle = mesh_handle};
+      MeshBatch mesh_batch = {.mesh_handle = mesh_handle};
       shader_batch.mesh_batches.add(mesh_batch);
     }
-    MeshBatch<StaticEntity>& mesh_batch = shader_batch.mesh_batches[*p_mesh_idx_in_array];
-    mesh_batch.entities.add(entity_handle);
+    MeshBatch& mesh_batch = shader_batch.mesh_batches[*p_mesh_idx_in_array];
+    mesh_batch.entities.add((Handle<Entity>)entity_handle.handle);
     u32 entity_idx_in_array = mesh_batch.entities.count;
   }
   // Not Indexed
   else {
     ++vk.shaders[shader_idx].static_entities_count;
-    ShaderBatch<StaticEntity>& shader_batch = vk.shaders[shader_idx].static_batch;
+    ShaderBatch& shader_batch = vk.shaders[shader_idx].batch;
     u32* p_mesh_idx_in_array = shader_batch.mesh_to_batch.get(mesh_idx);
     u32 mesh_idx_in_array;
     if (!p_mesh_idx_in_array) {
       mesh_idx_in_array = shader_batch.mesh_batches.count;
       p_mesh_idx_in_array = &mesh_idx_in_array;
       shader_batch.mesh_to_batch.add(mesh_idx, mesh_idx_in_array);
-      MeshBatch<StaticEntity> mesh_batch = {.mesh_handle = mesh_handle};
+      MeshBatch mesh_batch = {.mesh_handle = mesh_handle};
       shader_batch.mesh_batches.add(mesh_batch);
     }
-    MeshBatch<StaticEntity>& mesh_batch = shader_batch.mesh_batches[*p_mesh_idx_in_array];
-    mesh_batch.entities.add(entity_handle);
+    MeshBatch& mesh_batch = shader_batch.mesh_batches[*p_mesh_idx_in_array];
+    mesh_batch.entities.add((Handle<Entity>)entity_handle.handle);
     u32 entity_idx_in_array = mesh_batch.entities.count;
   }
+  vk.entities_to_mesh[entity_idx] = mesh_handle;
   // vk.entities[entity_idx].shader_handle = vk.shaders[shader_idx].entities.add(entity_handle);
   vk.gpu_entities[entity_idx].material = material_handle;
 }
 
+// void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuShader> shader_handle, Handle<GpuMaterial> material_handle) {
+//   u32 entity_idx = entity_handle.handle + MaxEntities;
+//   u32 shader_idx = shader_handle.handle;
+//   vk.entities_to_shader[entity_idx] = shader_handle;
+//   u32 mesh_idx = mesh_handle.handle;
+//   VK_Mesh mesh = vk.meshes[mesh_idx];
+//   if (mesh.index_count) {
+//     vk.entities[entity_idx].shader_handle = (Handle<Handle<Entity>>)vk.shaders[shader_idx].static_entities_indexed.add(entity_handle).handle;
+//   } else {
+//     vk.entities[entity_idx].shader_handle = (Handle<Handle<Entity>>)vk.shaders[shader_idx].static_entities.add(entity_handle).handle;
+//   }
+//   vk.entities_to_mesh[entity_idx] = mesh_handle;
+//   // vk.entities[entity_idx].shader_handle = vk.shaders[shader_idx].entities.add(entity_handle);
+//   vk.gpu_entities[entity_idx].material = material_handle;
+// }
 
 void vk_remove_renderable(Handle<Entity> entity_handle) {
-  u32 entity_idx = entity_handle.idx();
-  DebugDo(Assert(vk.entities[entity_idx].is_init == true));
-  DebugDo(vk.entities[entity_idx].is_init = false);
-  u32 shader_idx = vk.entities[entity_idx].shader.handle;
-  u32 mesh_idx = vk.entities[entity_idx].mesh.handle;
+  u32 entity_idx = entity_handle.handle;
+  u32 shader_idx = vk.entities_to_shader[entity_idx].handle;
+  u32 mesh_idx = vk.entities_to_mesh[entity_handle.handle].handle;
   VK_Mesh mesh = vk.meshes[mesh_idx];
   if (mesh.index_count) {
+    Handle<Handle<Entity>> shader_handle = vk.entities[entity_idx].shader_handle;
     VK_Shader& shader = vk.shaders[shader_idx];
-    ShaderBatch<Entity>& shader_batch = shader.batch_indexed;
-    u32* mesh_batch_idx = shader_batch.mesh_to_batch.get(mesh_idx);
-    MeshBatch<Entity>& mesh_batch = shader_batch.mesh_batches[*mesh_batch_idx];
-
-    u32 idx = vk.entities[entity_idx].entity_idx_in_array;
-    u32 last_idx = mesh_batch.entities.count-1;
-    Handle<Entity> swapped = mesh_batch.entities[last_idx];
-    u32 swapped_idx = swapped.idx();
-
-    mesh_batch.entities[idx] = swapped;
-    mesh_batch.entities.pop();
-    vk.entities[swapped_idx].entity_idx_in_array = idx;
+    shader.entities_indexed.remove(shader_handle);
   } else {
+    Handle<Handle<Entity>> shader_handle = vk.entities[entity_idx].shader_handle;
     VK_Shader& shader = vk.shaders[shader_idx];
-    ShaderBatch<Entity>& shader_batch = shader.batch;
-    u32* mesh_batch_idx = shader_batch.mesh_to_batch.get(mesh_idx);
-    MeshBatch<Entity>& mesh_batch = shader_batch.mesh_batches[*mesh_batch_idx];
-
-    u32 idx = vk.entities[entity_idx].entity_idx_in_array;
-    u32 last_idx = mesh_batch.entities.count-1;
-    Handle<Entity> swapped = mesh_batch.entities[last_idx];
-    u32 swapped_idx = swapped.idx();
-
-    mesh_batch.entities[idx] = swapped;
-    mesh_batch.entities.pop();
-    vk.entities[swapped_idx].entity_idx_in_array = idx;
+    shader.entities.remove(shader_handle);
   }
 }
 
@@ -3315,15 +3409,16 @@ void debug_draw_line(v3 a, v3 b, v3 color) {
     {.pos = a, .color = color},
     {.pos = b, .color = color},
   };
-  vk.draw_lines.add({vert[0], vert[1]});
+  // vk.debug_lines.add({vert[0], vert[1]});
 }
 
-void immediate_debug_draw_line(v3 a, v3 b, v3 color) {
+void debug_draw_line_time(v3 a, v3 b, v3 color, f32 time) {
   Vertex vert[] = {
     {.pos = a, .color = color},
     {.pos = b, .color = color},
   };
-  vk.immediate_draw_lines.add({vert[0], vert[1]});
+  vk.debug_draw_lines.add({vert[0], vert[1]});
+  vk.debug_draw_line_times.add(time);
 }
 
 void debug_draw_aabb(v3 min, v3 max, v3 color) {
@@ -3337,21 +3432,64 @@ void debug_draw_aabb(v3 min, v3 max, v3 color) {
   v3 p110 = {max.x, max.y, min.z};
   v3 p111 = {max.x, max.y, max.z};
 
-  immediate_debug_draw_line(p000, p001, color);
-  immediate_debug_draw_line(p000, p010, color);
-  immediate_debug_draw_line(p000, p100, color);
+  debug_draw_line(p000, p001, color);
+  debug_draw_line(p000, p010, color);
+  debug_draw_line(p000, p100, color);
 
-  immediate_debug_draw_line(p111, p110, color);
-  immediate_debug_draw_line(p111, p101, color);
-  immediate_debug_draw_line(p111, p011, color);
+  debug_draw_line(p111, p110, color);
+  debug_draw_line(p111, p101, color);
+  debug_draw_line(p111, p011, color);
 
-  immediate_debug_draw_line(p001, p011, color);
-  immediate_debug_draw_line(p001, p101, color);
+  debug_draw_line(p001, p011, color);
+  debug_draw_line(p001, p101, color);
 
-  immediate_debug_draw_line(p010, p011, color);
-  immediate_debug_draw_line(p010, p110, color);
+  debug_draw_line(p010, p011, color);
+  debug_draw_line(p010, p110, color);
 
-  immediate_debug_draw_line(p100, p101, color);
-  immediate_debug_draw_line(p100, p110, color);
+  debug_draw_line(p100, p101, color);
+  debug_draw_line(p100, p110, color);
 }
 
+void vk_begin_draw_frame() {
+}
+
+void vk_end_draw_frame() {
+  vk_begin_frame();
+  // World
+  {
+    vk_begin_renderpass(RenderpassType_World);
+    vk_draw();
+    vk_end_renderpass(RenderpassType_World);
+  }
+  // {
+  //   vk_begin_renderpass(Renderpass_UI);
+  //   ui_begin_frame();
+  //   ui_end_frame();
+  //   vk_end_renderpass(Renderpass_UI);
+  // }
+  // Screen
+  {
+    VkCommandBuffer cmd = vk_get_current_cmd();
+    VkViewport viewport = {
+      .x = 0.0f,
+      .y = (f32)vk.height,
+      .width = (f32)vk.width,
+      .height = -(f32)vk.height,
+      .minDepth = 0.0f,
+      .maxDepth = 1.0f,
+    };
+    vk.CmdSetViewport(cmd, 0, 1, &viewport);
+    VkRect2D scissor = {
+      .offset = {.x = 0, .y = 0},
+      .extent = {
+        .width = (u32)vk.width, 
+        .height = (u32)vk.height
+      },
+    };
+    vk.CmdSetScissor(cmd, 0, 1, &scissor);
+    vk_begin_renderpass(RenderpassType_Screen);
+    vk_draw_screen();
+    vk_end_renderpass(RenderpassType_Screen);
+  }
+  vk_end_frame();
+}

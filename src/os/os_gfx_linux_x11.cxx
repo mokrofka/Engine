@@ -245,7 +245,7 @@ void os_pump_messages() {
       case XCB_CLIENT_MESSAGE: {
         xcb_client_message_event_t* cm = (xcb_client_message_event_t*)event;
         if (cm->data.data32[0] == gfx_st.wm_delete_window) {
-          gfx_st.should_close = true; // mark window for closing
+          gfx_st.should_close = true;
         }
       } break;
       case XCB_BUTTON_PRESS: {

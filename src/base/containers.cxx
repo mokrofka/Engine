@@ -56,46 +56,46 @@ void SparseSetIndex::grow_max_index(u32 id) {
 
 DarrayIndexHandler::DarrayIndexHandler(Allocator alloc_) { *this = {}; alloc = alloc_; }
 void DarrayIndexHandler::init(Allocator alloc_) { *this = {}; alloc = alloc_; }
-void DarrayIndexHandler::deinit() { if (entity_to_index) mem_free(alloc, entity_to_index); }
-u32* DarrayIndexHandler::begin() { return entities; }
-u32* DarrayIndexHandler::end()   { return entities + count; }
+void DarrayIndexHandler::deinit() { if (sparse) mem_free(alloc, sparse); }
+u32* DarrayIndexHandler::begin() { return dense; }
+u32* DarrayIndexHandler::end()   { return dense + count; }
 
 u32 DarrayIndexHandler::add() {
   if (count >= cap) {
     grow();
   }
   u32 id = count++;
-  entity_to_index[id] = id;
-  entities[id] = id;
+  sparse[id] = id;
+  dense[id] = id;
   return id;
 }
 
 void DarrayIndexHandler::remove(u32 id) {
-  DebugDo(Assert(entity_to_index[id] != INVALID_ID));
-  u32 idx_removed = entity_to_index[id];
+  DebugDo(Assert(sparse[id] != INVALID_ID));
+  u32 idx_removed = sparse[id];
   u32 idx_last = count - 1;
-  u32 last_entity = entities[idx_last];
-  entity_to_index[last_entity] = idx_removed;
-  entities[idx_removed] = last_entity;
+  u32 last_entity = dense[idx_last];
+  sparse[last_entity] = idx_removed;
+  dense[idx_removed] = last_entity;
   --count;
-  DebugDo(entity_to_index[id] = INVALID_ID);
+  DebugDo(sparse[id] = INVALID_ID);
 }
 
 void DarrayIndexHandler::grow() {
-  if (entity_to_index) {
+  if (sparse) {
     u32 cap_old = cap;
     cap *= DEFAULT_RESIZE_FACTOR;
     SoA_Field fields[] = {
-      SoA_push_field(&entity_to_index, u32),
-      SoA_push_field(&entities, u32),
+      SoA_push_field(&sparse, u32),
+      SoA_push_field(&dense, u32),
     };
-    mem_realloc_soa(alloc, entity_to_index, cap_old, cap, fields, ArrayCount(fields));
+    mem_realloc_soa(alloc, sparse, cap_old, cap, fields, ArrayCount(fields));
   }
   else {
     cap = DEFAULT_CAPACITY;
     SoA_Field fields[] = {
-      SoA_push_field(&entity_to_index, u32),
-      SoA_push_field(&entities, u32),
+      SoA_push_field(&sparse, u32),
+      SoA_push_field(&dense, u32),
     };
     mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
   }
@@ -116,9 +116,27 @@ u32 IdPool::alloc() {
   return id;
 }
 
-// TODO: use old implementation
 void IdPool::free(u32 id) {
   Assert(id < next_idx);
   Assert(!array.exists(id));
   array.add(id);
+}
+
+// TODO: use old implementation?
+#define MaxId 100
+u32 id_count;
+u32 ids[MaxId];
+
+void id_init() {
+  Loop (i, MaxId) {
+    ids[i] = i;
+  }
+}
+
+u32 id_make() {
+  return ids[id_count++];
+}
+
+void id_remove(u32 id) {
+  ids[--id_count] = id;
 }

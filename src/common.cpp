@@ -4,8 +4,32 @@
 
 Extern f32 g_dt;
 Extern f32 g_time;
-Extern Transform* entities_transforms;
-Extern Transform* static_entities_transforms;
+
+struct EntitySOA {
+  Transform* transforms;
+  Transform* static_transforms;
+#if BUILD_DEBUG
+  u32* generations;
+  u32* static_generations;
+#endif
+};
+
+global EntitySOA entity_soa;
+
+Transform& entities_transforms(Handle<Entity> handle) { 
+  Assert(handle.generation() == entity_soa.generations[handle.idx()]);
+  return entity_soa.transforms[handle.idx()];
+}
+Transform& static_entities_transforms(Handle<StaticEntity> handle) {
+  Assert(handle.generation() == entity_soa.static_generations[handle.idx()]);
+  return entity_soa.static_transforms[handle.idx()];
+}
+void entities_generations_set(u32* generations) {
+  entity_soa.generations = generations;
+}
+void static_entities_generations_set(u32* generations) {
+  entity_soa.static_generations = generations;
+}
 
 ////////////////////////////////////////////////////////////////////////
 // Assets
@@ -15,40 +39,32 @@ Extern Transform* static_entities_transforms;
 
 global Shader shaders_desc[Shader_COUNT] = {
   [Shader_Color] = {
-    .path = "color",
-    .desc = {
-      .type = ShaderType_Drawing,
-      .primitive = ShaderTopology_Triangle,
-      .is_transparent = false,
-      .use_depth = true,
-    },
+    .name = "color",
+    .type = ShaderType_Drawing,
+    .primitive = ShaderTopology_Triangle,
+    .is_transparent = false,
+    .use_depth = true,
   },
   [Shader_Grid] = {
-    .path = "grid",
-    .desc = {
-      .type = ShaderType_Drawing,
-      .primitive = ShaderTopology_Line,
-      .is_transparent = true,
-      .use_depth = true,
-    },
+    .name = "grid",
+    .type = ShaderType_Drawing,
+    .primitive = ShaderTopology_Line,
+    .is_transparent = true,
+    .use_depth = true,
   },
   [Shader_Axis] = {
-    .path = "axis",
-    .desc = {
-      .type = ShaderType_Drawing,
-      .primitive = ShaderTopology_Line,
-      .is_transparent = true,
-      .use_depth = true,
-    },
+    .name = "axis",
+    .type = ShaderType_Drawing,
+    .primitive = ShaderTopology_Line,
+    .is_transparent = true,
+    .use_depth = true,
   },
   [Shader_Cubemap] = {
-    .path = "cubemap",
-    .desc = {
-      .type = ShaderType_Cube,
-      .primitive = ShaderTopology_Triangle,
-      .is_transparent = false,
-      .use_depth = true,
-    },
+    .name = "cubemap",
+    .type = ShaderType_Cube,
+    .primitive = ShaderTopology_Triangle,
+    .is_transparent = false,
+    .use_depth = true,
   },
 };
 global Handle<GpuShader> shaders_handle[Shader_COUNT];
@@ -60,7 +76,8 @@ void shader_set(ShaderId id, Handle<GpuShader> shader_handle) { shaders_handle[i
 
 global String meshes_path[Mesh_Load_COUNT] = {
   // [Mesh_GltfCube] = "cube.gltf",
-  [Mesh_CubeGlb] = "cube.glb",
+  // [Mesh_CubeGlb] = "cube.glb",
+  [Mesh_Cube] = "cube.glb",
   [Mesh_MonkeyGlb] = "monkey.glb"
 };
 global Handle<GpuMesh> meshes_handle[Mesh_COUNT];
@@ -102,7 +119,7 @@ Handle<GpuMaterial> material_get(MaterialId id) { return materials_handle[id]; }
 
 void asset_load() {
   Loop (i, Shader_COUNT) {
-    shaders_handle[i] = shader_load(shaders_desc[i].path, shaders_desc[i].desc);
+    shaders_handle[i] = shader_load(shaders_desc[i]);
   }
   Loop (i, Mesh_Load_COUNT) {
     meshes_handle[i] = mesh_load(meshes_path[i]);
@@ -763,7 +780,7 @@ intern Mesh mesh_load_obj(Allocator arena, String name) {
       .uv = uvs[uv_idx],
     };
     u32 vertex_index;
-    if (!vertices.exists_at(vertex, &vertex_index, EqualMem)) {
+    if (!vertices.exists_at(vertex, &vertex_index, EqualMode_Mem)) {
       vertex_index = vertices.count;
       vertices.add(vertex);
     }
@@ -1041,7 +1058,7 @@ intern Texture texture_image_load(String name) {
 // Common
 
 struct ShaderReloadInfo {
-  ShaderDesc info;
+  Shader shader;
   Handle<GpuShader> shader_handle;
 };
 struct CommonState {
@@ -1080,11 +1097,15 @@ void common_init() {
       String shader_name_with_format = str_chop_last_dot(name);
       String shader_name = str_chop_last_dot(shader_name_with_format);
       ShaderReloadInfo* info = common_st.shader_map.get(shader_name);
-      vk_shader_reload(shader_name, info->shader_handle, info->info);
+      vk_shader_reload(info->shader, info->shader_handle);
     });
   }
-  entities_transforms = push_array(common_st.arena, Transform, MaxEntities);
-  static_entities_transforms = push_array(common_st.arena, Transform, MaxStaticEntities);
+  entity_soa.transforms = push_array(common_st.arena, Transform, MaxEntities);
+  entity_soa.static_transforms = push_array(common_st.arena, Transform, MaxStaticEntities);
+  DebugDo(
+    // entity_soa.generations = push_array(common_st.arena, u32, MaxEntities);
+    // entity_soa.static_generations = push_array_zero(common_st.arena, u32, MaxStaticEntities);
+  );
   vk_init();
 }
 
@@ -1114,10 +1135,10 @@ Handle<GpuMesh> mesh_load(String name) {
   return handle;
 }
 
-Handle<GpuShader> shader_load(String name, ShaderDesc info) {
-  Handle<GpuShader> handle = vk_shader_load(name, info);
-  ShaderReloadInfo reload_info = {info, handle};
-  common_st.shader_map.add(name, reload_info);
+Handle<GpuShader> shader_load(Shader shader) {
+  Handle<GpuShader> handle = vk_shader_load(shader);
+  ShaderReloadInfo reload_info = {shader, handle};
+  common_st.shader_map.add(shader.name, reload_info);
   return handle;
 }
 
