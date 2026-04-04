@@ -4,6 +4,8 @@
 #include "defines/fragdef.glsl"
 
 void main() {
+  Entity e = entities[in_entity_id];
+  out_color = vec4(e.color);
   f32 val = 0.6;
-  out_color = vec4(val, val, val, 0.6f);
+  // out_color = vec4(val, val, val, 0.6f);
 }

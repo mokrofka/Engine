@@ -65,6 +65,64 @@ Vertex axis_vertices[] = {
   {.pos = v3(0,0,1), .color = v3(0,0,1)},
 };
 
+Mesh sphere_generate(Allocator arena) {
+  u32 lat_steps = 10;
+  u32 lon_steps = 10;
+  u32 vert_count = lat_steps*lon_steps;
+  u32 index_count = (lat_steps - 1) * lon_steps * 6;
+  Vertex* vertices = push_array(arena, Vertex, vert_count);
+  u32* indices = push_array(arena, u32, index_count);
+  f32 lat_step_angle = PI / lat_steps;
+  f32 lon_step_angle = 2*PI / lon_steps;
+  for (u32 i = 0; i < lat_steps; ++i) {
+    f32 lat_angle = -PI/2 + i*lat_step_angle;
+    for (u32 j = 0; j < lon_steps; ++j) {
+      f32 lon_angle = j * lon_step_angle;
+      Vertex vert = {
+        .pos.x = Cos(lat_angle) * Cos(lon_angle),
+        .pos.y = Sin(lat_angle),
+        .pos.z = Cos(lat_angle) * Sin(lon_angle),
+        .uv.x = (f32)j / (lon_steps - 1),  // 0 → 1 across longitude
+        .uv.y = (f32)i / (lat_steps - 1),  // 0 → 1 from bottom to top
+      };
+      vertices[i*lon_steps + j] = vert;
+    }
+  }
+  var idx = [&](u32 i, u32 j) {
+    return i * lon_steps + j;
+  };
+  u32 k = 0;
+  for (u32 i = 0; i < lat_steps - 1; ++i) {
+    for (u32 j = 0; j < lon_steps; ++j) {
+      u32 next_j = (j + 1) % lon_steps; // wrap around
+      u32 v0 = idx(i, j);
+      u32 v1 = idx(i, next_j);
+      u32 v2 = idx(i + 1, j);
+      u32 v3 = idx(i + 1, next_j);
+      indices[k++] = v0;
+      indices[k++] = v2;
+      indices[k++] = v1;
+      indices[k++] = v1;
+      indices[k++] = v2;
+      indices[k++] = v3;
+    }
+  }
+  u32 north_pole_index = vert_count - 1; // last vertex
+  for (u32 j = 0; j < lon_steps; ++j) {
+    u32 next_j = (j + 1) % lon_steps;
+    indices[k++] = idx(lat_steps - 2, j); // last row before pole
+    indices[k++] = north_pole_index;      // pole
+    indices[k++] = idx(lat_steps - 2, next_j);
+  }
+  Mesh mesh = {
+    .vert_count = lat_steps * lon_steps,
+    .vertices = vertices,
+    .index_count = index_count,
+    .indices = indices,
+  };
+  return mesh;
+}
+
 struct AABB {
   v3 min;
   v3 max;
@@ -113,6 +171,124 @@ struct Handle<StaticEntity> {
   v3& scale() { return static_entities_transforms((Handle<StaticEntity>)handle).scale; }
 };
 
+// constexpr ShaderInfo shader_default_info() {
+//   ShaderInfo info = {
+//     .type = ShaderType_Drawing,
+//     .primitive = ShaderTopology_Triangle,
+//     .is_transparent = false,
+//     .use_depth = true,
+//   };
+//   return info;
+// }
+
+// global Shader shaders_desc[Shader_COUNT] = {
+//   [Shader_E_Texture] = {
+//     .name = "e_texture",
+//     .info = shader_default_info(),
+//   },
+//   [Shader_E_Color] = {
+//     .name = "e_color",
+//     .info = shader_default_info(),
+//   },
+//   [Shader_E_ColorTransparent] = {
+//     .name = "e_color",
+//     .info = shaders_desc[Shader_E_Color].info,
+//     .info.is_transparent = true,
+//   },
+//   [Shader_E_ColorLine] = {
+//     .name = "e_color",
+//     .info = shaders_desc[Shader_E_Color].info,
+//     .info.primitive = ShaderTopology_Line,
+//   },
+//   [Shader_E_ColorLineTransparent] = {
+//     .name = "e_color",
+//     .info = shaders_desc[Shader_E_Color].info,
+//     .info.primitive = ShaderTopology_Line,
+//     .info.is_transparent = true,
+//   },
+//   [Shader_E_VertColor] = {
+//     .name = "e_vert_color",
+//     .info = {
+//       .type = ShaderType_Drawing,
+//       .primitive = ShaderTopology_Line,
+//       .is_transparent = true,
+//       .use_depth = true,
+//     },
+//   },
+//   [Shader_Cubemap] = {
+//     .name = "cubemap",
+//     .info = {
+//       .type = ShaderType_Cube,
+//       .primitive = ShaderTopology_Triangle,
+//       .is_transparent = false,
+//       .use_depth = true,
+//     },
+//   },
+// };
+
+// global String meshes_path[Mesh_Load_COUNT] = {
+//   [Mesh_MonkeyGlb] = "monkey.glb",
+//   [Mesh_Cube] = "cube.glb",
+//   [Mesh_Castle] = "castle.obj",
+//   [Mesh_GreenMan] = "greenman.glb",
+// };
+
+// struct Assets {
+//   Handle<GpuShader> shaders_handlers[Shader_COUNT];
+//   Handle<GpuTexture> textures_handlers[Texture_COUNT];
+//   Handle<GpuMaterial> materials_handle[Material_COUNT];
+//   Handle<GpuMesh> meshes_handlers[Mesh_COUNT];
+// };
+
+// global String textures_path[Texture_COUNT] = {
+//   [Texture_OrangeLines] = "orange_lines_512.png",
+//   [Texture_Container] = "container.jpg",
+//   [Texture_Castle] = "castle_diffuse.png"
+// };
+
+// constexpr MaterialProps material_default_props() {
+//   MaterialProps props = {
+//     .ambient = v3_scale(1),
+//     .diffuse = v3_scale(1),
+//     .specular = v3_scale(1),
+//     .shininess = 1,
+//   };
+//   return props;
+// }
+
+// global Material materials_info[Material_COUNT] = {
+//   [Material_RedOrange] = {
+//     .props = material_default_props(),
+//     .texture = Texture_OrangeLines,
+//   },
+//   [Material_Container] = {
+//     .props = material_default_props(),
+//     .texture = Texture_Container,
+//   },
+//   [Material_Castle] = {
+//     .props = material_default_props(),
+//     .texture = Texture_Castle,
+//   },
+// };
+
+// void load_assets(Assets* assets) {
+//   Loop (i, Shader_COUNT) {
+//     assets->shaders_handlers[i] = shader_load(shaders_desc[i]);
+//   }
+//   Loop (i, Mesh_Load_COUNT) {
+//     assets->meshes_handlers[i] = mesh_load(meshes_path[i]);
+//   }
+//   Loop (i, Texture_COUNT) {
+//     assets->textures_handlers[i] = texture_load(textures_path[i]);
+//   }
+//   Loop (i, Material_COUNT) {
+//     if (materials_info[i].texture.handle != INVALID_ID) {
+//       materials_info[i].texture = assets->textures_handlers[materials_info[i].texture.handle];
+//     }
+//     assets->materials_handle[i] = vk_material_load(materials_info[i]);
+//   }
+// }
+
 struct GameState {
   Arena arena;
   Arena persistent_arena;
@@ -122,13 +298,13 @@ struct GameState {
   StaticObjectPool<Entity, MaxEntities> entity_pool;
   StaticObjectPool<StaticEntity, MaxStaticEntities> static_entity_pool;
 
-  Darray<Handle<Entity>> entities;
-  Darray<Handle<StaticEntity>> static_entities;
   DarrayHandler<Handle<Entity>> moving_cubes;
 
   Handle<Entity> axis_attached_to_cam;
+  Handle<Entity> grid;
   Handle<Entity> monkey;
   Handle<Entity> rotating_cube;
+  Handle<Entity> spehre;
 };  
 
 global GameState* st;
@@ -159,14 +335,24 @@ Mesh grid_create(Allocator arena, u32 size, f32 step) {
   return mesh;
 }
 
-Handle<Entity> entity_create(MeshId mesh_id, ShaderId shader_id, MaterialId material_id) {
+Handle<Entity> entity_create(MeshId mesh_id, ShaderId shader_id, MaterialId material_id = {}) {
   Handle<Entity> e = st->entity_pool.add();
-  e.aabb() = { v3_scale(-1.2), v3_scale(1.2) };
-  e.vel() = v3_rand_range(v3_scale(-1), v3_scale(1));
   e.trans() = {};
   e.scale() = v3_one();
   vk_make_renderable(e, mesh_get(mesh_id), shader_get(shader_id), material_get(material_id));
   return e;
+}
+
+struct Prefab {
+  MeshId mesh;
+  ShaderId shader;
+  MaterialId material;
+};
+
+Prefab cube_prefab = { Mesh_Cube, Shader_E_Texture, Material_RedOrange };
+
+Handle<Entity> entity_create(Prefab prefab) {
+  return entity_create(prefab.mesh, prefab.shader, prefab.material);
 }
 
 Handle<StaticEntity> entity_static_create(MeshId mesh_id, ShaderId shader_id, MaterialId material_id) {
@@ -209,7 +395,7 @@ v3 ray_from_camera() {
 
 void select_obj() {
   v3 dir = ray_from_camera();
-  Handle<Entity> e = entity_create(Mesh_Cube, Shader_Color, Material_RedOrange);
+  Handle<Entity> e = entity_create(Mesh_Cube, Shader_E_Texture, Material_RedOrange);
   // e.pos() = st->cam.pos + v3_norm(mat4_forward(st->cam.view));
   e.pos() = st->cam.pos;
   e.scale() = v3_scale(0.3);
@@ -269,6 +455,9 @@ void camera_update() {
     if (os_is_key_down(Key_Shift)) {
       speed *= 20;
     }
+    if (os_is_key_down(Key_LAlt)) {
+      speed *= 0.1;
+    }
     if (velocity != v3_zero()) {
       velocity = v3_norm(velocity);
       cam.pos += velocity * speed * g_dt;
@@ -305,47 +494,58 @@ void game_init() {
     SinD(cam.yaw) * CosD(cam.pitch)
   };
   vk_get_view() = mat4_look_at(cam.pos, cam.dir, v3_up());
-  Handle<Entity> cube = entity_create(Mesh_Cube, Shader_Color, Material_RedOrange);
+  Handle<Entity> cube = entity_create(Mesh_Cube, Shader_E_Texture, Material_RedOrange);
   st->rotating_cube = cube;
-  Handle<Entity> monkey = entity_create(Mesh_MonkeyGlb, Shader_Color, Material_GreenContainer);
+  Handle<Entity> monkey = entity_create(Mesh_MonkeyGlb, Shader_E_Texture, Material_Container);
+  monkey.aabb() = {v3_scale(-1.2), v3_scale(1.2)};
   st->monkey = monkey;
-  st->entities.add(monkey);
   {
-    Handle<Entity> triangle = entity_create(Mesh_Triangle, Shader_Color, Material_RedOrange);
+    Handle<Entity> triangle = entity_create(Mesh_Triangle, Shader_E_Texture, Material_RedOrange);
     triangle.pos() = v3_scale(3);
   }
   {
-    Handle<Entity> grid = entity_create(Mesh_Grid, Shader_Grid, MaterialId(0));
+    Handle<Entity> grid = entity_create(Mesh_Grid, Shader_E_ColorLine);
+    st->grid = grid;
+    vk_set_entity_color(grid, v4_scale(0.6));
     grid.pos() = v3(0,0,-5);
   }
   {
-    st->axis_attached_to_cam = entity_create(Mesh_Axis, Shader_Axis, MaterialId(0));
+    st->axis_attached_to_cam = entity_create(Mesh_Axis, Shader_E_VertColor);
   }
-  {
-  }
-
   Loop (i, 3) {
-    Handle<Entity> cube = entity_create(Mesh_Cube, Shader_Color, Material_RedOrange);
+    Handle<Entity> cube = entity_create(Mesh_Cube, Shader_E_Texture, Material_RedOrange);
     u32 range = 10;
     cube.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
   }
-
 #if 1
   u64 start = os_now_ns();
   // Loop (i, MB(1)-KB(100)) {
   // Loop (i, KB(100)) {
   Loop (i, KB(1)) {
-    Handle<StaticEntity> e = entity_static_create(Mesh_Cube, Shader_Color, Material_RedOrange);
+    Handle<StaticEntity> e = entity_static_create(Mesh_Cube, Shader_E_Texture, Material_RedOrange);
     u32 range = KB(1);
     e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
   }
   u64 end = os_now_ns();
   Info("%f64 s", f64(end - start)/Billion(1));
 #endif
+
+  {
+    st->spehre = entity_create(Mesh_Sphere, Shader_E_Texture, Material_Container);
+    st->spehre.pos() = v3(0,0,-10);
+  }
+  {
+    Handle<Entity> e = entity_create(Mesh_Castle, Shader_E_Texture, Material_Castle);
+    e.pos().z = -100;
+  }
+  {
+    // Handle<Entity> e = entity_create(Mesh_GreenMan, Shader_E_Texture, Material_Container);
+    // e.pos().z = -100;
+  }
+  
 }
 
 void game_deinit() {
-  st->entities = {};
   st->entity_pool = {};
   st->entity_pool.clear();
   arena_clear(&st->arena);
@@ -359,7 +559,7 @@ Darray<Handle<Entity>> arr;
 intern void render_add() {
   Scratch scratch;
   Loop (i, 10) {
-    Handle<Entity> e = entity_create(Mesh_Cube, Shader_Color, Material_GreenContainer);
+    Handle<Entity> e = entity_create(Mesh_Cube, Shader_E_Texture, Material_Container);
     arr.add(e);
     f32 range = 10;
     e.pos() = v3_rand_range(v3_scale(range), -v3_scale(range));
@@ -385,10 +585,14 @@ void game_update() {
   if (os_is_key_pressed(Key_2)) {
     render_remove();
   }
-  st->timer.interval = 1;
-  if (timer_tick(st->timer)) {
-    // Info("%i", st->entities.count);
+  if (os_is_button_pressed(MouseButton_Left)) {
+    // select_obj();
+    v3 dir = ray_from_camera();
+    // debug_draw_line(st->cam.pos - v3(0,0.1,0), st->cam.pos + dir*100, ColorWhite);
+    v3 max = st->cam.pos + v3_one();
+    v3 min = st->cam.pos - v3_one();
   }
+  // moving cube and monkey
   {
     Handle<Entity> cube = st->rotating_cube;
     Handle<Entity> monkey = st->monkey;
@@ -397,14 +601,8 @@ void game_update() {
     cube.pos().z = monkey.pos().z + Cos(g_time) * 4;
     cube.pos().y = monkey.pos().z + Cos(g_time) * 4;
   }
-  if (os_is_button_pressed(MouseButton_Left)) {
-    // select_obj();
-    v3 dir = ray_from_camera();
-    // debug_draw_line(st->cam.pos - v3(0,0.1,0), st->cam.pos + dir*100, ColorWhite);
-    v3 max = st->cam.pos + v3_one();
-    v3 min = st->cam.pos - v3_one();
-  }
-  for (Handle<Entity> e : st->entities) {
+  {
+    Handle<Entity> e = st->monkey;
     debug_draw_aabb(e.pos()+e.aabb().min, e.pos()+e.aabb().max, ColorWhite);
   }
   {
@@ -420,6 +618,9 @@ void game_update() {
     axis.pos() = st->cam.pos + forward*dist + right*xoff + up*yoff;
     axis.scale() = v3_scale(0.1);
   }
+
+  ///////////////////////////////////
+  // Random creating and moving stuff
   Loop (i, 0) {
     MeshId meshes[] = {
       Mesh_MonkeyGlb,
@@ -428,10 +629,10 @@ void game_update() {
     };
     MaterialId materials[] = {
       Material_RedOrange,
-      Material_GreenContainer,
+      Material_Container,
     };
     // Handle<Entity> cube = e_create(Mesh_Cube, Shader_Color, Material_RedOrange);
-    Handle<Entity> e = entity_create(meshes[rand_range_u32(0, ArrayCount(meshes)-1)], Shader_Color, materials[rand_range_u32(0, ArrayCount(materials)-1)]);
+    Handle<Entity> e = entity_create(meshes[rand_range_u32(0, ArrayCount(meshes)-1)], Shader_E_Texture, materials[rand_range_u32(0, ArrayCount(materials)-1)]);
     u32 range = 100;
     e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
     st->moving_cubes.add(e);
@@ -450,6 +651,7 @@ void game_update() {
     e.vel() += tangent * 2.0f * g_dt;
     e.vel() += -dir * 0.5f * g_dt;
   }
+
 }
 
 void main_init(u8** state) {
@@ -463,28 +665,20 @@ void main_init(u8** state) {
     .persistent_arena = arena_init(),
     .gpa{st->arena},
     .timer = timer_init(1),
-    .entities{st->arena},
-    .static_entities{st->arena},
   };
-  Mesh triangle_mesh =  {
-    .vertices = triangle_vertices,
-    .vert_count = ArrayCount(triangle_vertices),
-  };
-  st->entity_pool.data = push_array(st->persistent_arena, Entity, MaxEntities);
-  st->entity_pool.generations = push_array(st->persistent_arena, u32, MaxEntities);
-  st->entity_pool.clear();
-  entities_generations_set(st->entity_pool.generations);
-  st->static_entity_pool.data = push_array(st->persistent_arena, StaticEntity, MaxStaticEntities);
-  st->static_entity_pool.generations = push_array(st->persistent_arena, u32, MaxStaticEntities);
-  st->static_entity_pool.clear();
-  static_entities_generations_set(st->static_entity_pool.generations);
-  Mesh cube_mesh = {.vertices = cube_vertices, .vert_count = ArrayCount(cube_vertices)};
+  st->entity_pool.init(st->persistent_arena, entities_generations());
+  st->static_entity_pool.init(st->persistent_arena, static_entities_generations());
+  // Mesh cube_mesh = {.vertices = cube_vertices, .vert_count = ArrayCount(cube_vertices)};
   // mesh_set(Mesh_Cube, vk_mesh_load(cube_mesh));
+  Mesh triangle_mesh =  {.vertices = triangle_vertices, .vert_count = ArrayCount(triangle_vertices)};
   mesh_set(Mesh_Triangle, vk_mesh_load(triangle_mesh));
   Mesh grid_mesh = grid_create(scratch, 100, 1);
   mesh_set(Mesh_Grid, vk_mesh_load(grid_mesh));
   Mesh axis_mesh = {.vertices = axis_vertices, .vert_count = ArrayCount(axis_vertices)};
   mesh_set(Mesh_Axis, vk_mesh_load(axis_mesh));
+  Mesh sphere = sphere_generate(scratch);
+  mesh_set(Mesh_Sphere, vk_mesh_load(sphere));
+
   cubemap_load("night_cubemap");
   asset_load();
   game_init();
@@ -508,10 +702,6 @@ shared_function void main_update(u8** state) {
     os_close_window();
   }
   game_update();
-}
-
-void foo() {
-
 }
 
 

@@ -214,6 +214,7 @@ KAPI NO_DEBUG f32 v2_dot(v2 a, v2 b);
 KAPI NO_DEBUG f32 v2_cross(v2 a, v2 b);
 KAPI NO_DEBUG v2  v2_lerp(v2 a, f32 t, v2 b);
 KAPI NO_DEBUG v2  v2_skew(v2 a);
+KAPI NO_DEBUG v2 v2_rand_range(v2 a, v2 b);
 KAPI f32 v2_shortest_arc(v2 a, v2 b);
 
 ////////////////////////////////////////////////////////////////////////
@@ -263,6 +264,7 @@ KAPI NO_DEBUG v3 v3_rand_range(v3 a, v3 b);
 
 KAPI NO_DEBUG v4  v4_zero();
 KAPI NO_DEBUG v4  v4_one();
+KAPI NO_DEBUG v4  v4_scale(f32 a);
 KAPI NO_DEBUG v4  operator+(v4 a, v4 b);
 KAPI NO_DEBUG v4  operator-(v4 a, v4 b);
 KAPI NO_DEBUG v4  operator*(v4 a, f32 scalar);

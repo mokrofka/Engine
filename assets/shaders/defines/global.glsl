@@ -3,7 +3,7 @@
 
 #define KB(n) ((n) << 10)
 #define MB(n) ((n) << 20)
-#define MaxEntities KB(1)
+#define MaxEntities KB(10)
 #define MaxStaticEntities KB(100)
 #define MaxMaterials KB(1)
 #define MaxLights KB(1)
@@ -80,6 +80,7 @@ layout(set = 0, binding = 6) readonly buffer MaterialBuffer   { Material materia
 layout(set = 0, binding = 7) readonly buffer PointLightBuffer { PointLight point_lights[]; };
 layout(set = 0, binding = 8) readonly buffer DirLightBuffer   { DirLight dir_lights[]; };
 layout(set = 0, binding = 9) readonly buffer SpotLightBuffer  { SpotLight spot_lights[]; };
+// layout(set = 0, binding = 9) readonly buffer SpotLightBuffer  { SpotLight spot_lights[]; };
 
 layout(push_constant) uniform PushConstants {
   u32 drawcall_offset;

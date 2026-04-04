@@ -1,6 +1,8 @@
 #pragma once
 #include "lib.h"
 
+// TODO: obj selection
+
 const v3 ColorRed   = v3(1,0,0);
 const v3 ColorGreen = v3(0,1,0);
 const v3 ColorBlue  = v3(0,0,1);
@@ -8,7 +10,7 @@ const v3 ColorWhite = v3(1,1,1);
 const v3 ColorBlack = v3(0,0,0);
 const v3 ColorGrey  = v3(0.8,0.8,0.8);
 
-const u32 MaxEntities = KB(1);
+const u32 MaxEntities = KB(10);
 const u32 MaxStaticEntities = KB(100);
 
 struct Entity;
@@ -45,11 +47,15 @@ struct SpotLight {
   f32 outer_cutoff;
 };
 
-struct Material {
+struct MaterialProps {
   v3 ambient;
   v3 diffuse;
   v3 specular;
   f32 shininess;
+};
+
+struct Material {
+  MaterialProps props;
   Handle<GpuTexture> texture;
 };
 
@@ -68,7 +74,7 @@ struct Vertex {
 
 struct Mesh {
   Vertex* vertices;
-  u32* indexes;
+  u32* indices;
   u32 vert_count;
   u32 index_count;
 };
@@ -86,13 +92,22 @@ enum ShaderTopology {
   ShaderTopology_Point,
 };
 
-struct Shader {
-  String name;
+struct ShaderInfo {
   ShaderType type;
   ShaderTopology primitive;
   u32 samples = 4;
   b8 is_transparent;
   b8 use_depth;
+};
+
+struct Shader {
+  String name;
+  // ShaderType type;
+  // ShaderTopology primitive;
+  // u32 samples = 4;
+  // b8 is_transparent;
+  // b8 use_depth;
+  ShaderInfo info;
 };
 
 void vk_init();
@@ -112,6 +127,7 @@ KAPI void vk_end_draw_frame();
 KAPI void vk_make_renderable(Handle<Entity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuShader> shader_handle, Handle<GpuMaterial> material_handle);
 KAPI void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuShader> shader_handle, Handle<GpuMaterial> material_handle);
 KAPI void vk_remove_renderable(Handle<Entity> entity_handle);
+KAPI void vk_set_entity_color(Handle<Entity> entity_handle, v4 color);
 
 // // Point light
 // KAPI void vk_point_light_create(u32 entity_id);
@@ -141,8 +157,8 @@ KAPI extern f32 g_dt;
 KAPI extern f32 g_time;
 KAPI Transform& entities_transforms(Handle<Entity> handle);
 KAPI Transform& static_entities_transforms(Handle<StaticEntity> handle);
-KAPI void entities_generations_set(u32* generations);
-KAPI void static_entities_generations_set(u32* generations);
+u32* entities_generations();
+u32* static_entities_generations();
 
 ////////////////////////////////////////////////////////////////////////
 // Assets
@@ -151,9 +167,12 @@ KAPI void static_entities_generations_set(u32* generations);
 // Shaders
 
 enum ShaderId {
-  Shader_Color,
-  Shader_Grid,
-  Shader_Axis,
+  Shader_E_Texture,
+  Shader_E_Color,
+  Shader_E_ColorTransparent,
+  Shader_E_ColorLine,
+  Shader_E_ColorLineTransparent,
+  Shader_E_VertColor,
   Shader_Cubemap,
   Shader_COUNT,
 };
@@ -165,13 +184,14 @@ void shader_set(ShaderId id, Handle<GpuShader> shader_handle);
 
 enum MeshId {
   Mesh_MonkeyGlb,
-  // Mesh_CubeGlb,
   Mesh_Cube,
+  Mesh_Castle,
   Mesh_Load_COUNT,
   
   Mesh_Triangle,
   Mesh_Grid,
   Mesh_Axis,
+  Mesh_Sphere,
   Mesh_COUNT,
 };
 Handle<GpuMesh> mesh_get(MeshId id);
@@ -183,17 +203,19 @@ void mesh_set(MeshId id, Handle<GpuMesh> mesh_handle);
 enum TextureId {
   Texture_OrangeLines,
   Texture_Container,
+  Texture_Castle,
   Texture_COUNT,
 };
 Handle<GpuTexture> texture_get(TextureId id);
-void texture_set(TextureId id, Handle<GpuTexture> texture_handle);
 
 ///////////////////////////////////
 // Materials
 
 enum MaterialId {
   Material_RedOrange,
-  Material_GreenContainer,
+  Material_Container,
+  Material_Green,
+  Material_Castle,
   Material_COUNT,
 };
 Handle<GpuMaterial> material_get(MaterialId id);

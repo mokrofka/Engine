@@ -3,10 +3,8 @@
 #include "defines/global.glsl"
 #include "defines/fragdef.glsl"
 void main() {
-  // Entity e = entities[drawinfo[in_entity_id].entity_id];
   Entity e = entities[in_entity_id];
   Material material = materials[e.material];
-
   v4 texture_color = texture(sampler2D(textures[material.texture], samplers[0]), in_uv);
   out_color = texture_color;
 } 

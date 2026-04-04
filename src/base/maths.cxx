@@ -186,6 +186,13 @@ f32 v2_dot(v2 a, v2 b)         { return a.x*b.x + a.y*b.y; }
 f32 v2_cross(v2 a, v2 b)       { return a.x*b.y - a.y*b.x; } // if > 0 (b is to the left of a), if < 0 (b is to the right of a), if == 0 (collinear)
 v2  v2_lerp(v2 a, f32 t, v2 b) { return v2(Lerp(a.x, t, b.x), Lerp(a.y, t, b.y));}
 v2  v2_skew(v2 a)              { return v2(-a.y, a.x); }
+v2  v2_rand_range(v2 a, v2 b) {
+  v2 vec = {
+    rand_range_f32(a.x, b.x),
+    rand_range_f32(a.y, b.y),
+  };
+  return vec;
+}
 
 f32 v2_shortest_arc(v2 a, v2 b) {
 	a = v2_norm(a);
@@ -275,6 +282,7 @@ v3 v3_rand_range(v3 a, v3 b) {
 
 v4 v4_zero()       { return v4{}; }
 v4 v4_one()        { return v4(1, 1, 1, 1); }
+v4 v4_scale(f32 a) { return v4(a,a,a,a); }
 
 v4  operator+(v4 a, v4 b)          { return v4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w); }
 v4  operator-(v4 a, v4 b)          { return v4(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w); }

@@ -1,6 +1,5 @@
 #include "common.h"
 #include "vulkan/vulkan_core.h"
-#include "stdio.h"
 
 const u32 MaxMaterials = KB(1);
 const u32 MaxLights    = KB(1);
@@ -60,12 +59,6 @@ struct GpuGlobalState {
   u32 dir_light_count;
   u32 spot_light_count;
   u32 entity_indices[MaxEntities+MaxStaticEntities];
-  // GpuEntity entities[MaxEntities+MaxStaticEntities];
-  // GpuMaterial materials[MaxMaterials];
-  // GpuPointLight point_lights[MaxLights];
-  // GpuDirLight dir_lights[MaxLights];
-  // GpuSpotLight spot_lights[MaxLights];
-  // u32 drawinfo[MaxEntities+MaxStaticEntities];
 };
 
 ///////////////////////////////////
@@ -89,7 +82,6 @@ struct MeshBatch {
 
 template<typename T>
 struct ShaderBatch {
-  // Handle<GpuShader> shader;
   Darray<MeshBatch<T>> mesh_batches;
   Map<u32, u32> mesh_to_batch;
 };
@@ -199,14 +191,12 @@ struct VK_Shader {
   VkPipeline pipeline;
   ShaderBatch<Entity> batch;
   ShaderBatch<Entity> batch_indexed;
-
   u32 static_entities_count;
   u32 static_entities_indexed_count;
   u32 static_entities_count_old;
   u32 static_entities_indexed_count_old;
   ShaderBatch<StaticEntity> static_batch;
   ShaderBatch<StaticEntity> static_batch_indexed;
-
   VkShaderModule module[2];
 };
 
@@ -251,22 +241,23 @@ struct VK_State {
   VK_Buffer stage_buffer;
   VK_Buffer indirect_draw_buffer;
   VK_Buffer storage_buffer;
+  VK_Buffer image_buffer;
   
   VkDescriptorPool descriptor_pool;
   VkDescriptorSetLayout descriptor_set_layout;
   VkDescriptorSet descriptor_sets;
 
   VkCommandBuffer* cmds;
+  VkCommandBuffer upload_cmd;
   VkSampler sampler;
   VkPipelineLayout pipeline_layout;
 
   GpuGlobalState* gpu_global_shader_st;
   GpuEntity* gpu_entities;
   GpuMaterial* gpu_materials;
+  u32 gpu_materials_count;
   VK_DrawCallInfo* gpu_draw_call_infos;
   u32* gpu_entities_indexes;
-
-  u32 gpu_materials_count;
 
   u32 static_draw_indexed_offset;
   u32 static_draw_offset;
@@ -275,26 +266,17 @@ struct VK_State {
 
   Array<RenderEntity, MaxEntities+MaxStaticEntities> entities;
 
-  // Array<PushConstant, MaxEntities> push_constants;
   Array<VK_Shader, MaxShaders> shaders;
   Array<VK_Mesh, MaxMeshes> meshes;
   Array<VK_Image, MaxTextures> textures;
 
-  Array<Darray<Handle<Entity>>, MaxShaders> meshes_;
-  Array<Darray<Handle<GpuMesh>>, MaxShaders> shaders_;
-
-  // SparseSet<PointLight> point_light_data;
-  // SparseSet<DirLight> dir_light_data;
-  // SparseSet<SpotLight> spot_light_data;
+  VK_Image msaa_texture_target;
+  VK_Image offscreen_depth_buffer;
+  VK_Image* texture_targets;
 
   VK_Shader screen_shader;
   VK_Shader cubemap_shader;
   VK_Shader debug_line_shader;
-
-  // offscreen rendering
-  VK_Image msaa_texture_target;
-  VK_Image offscreen_depth_buffer;
-  VK_Image* texture_targets;
 
   mat4 view;
   mat4 projection;
@@ -306,8 +288,6 @@ struct VK_State {
   VkDeviceSize immediate_draw_lines_offset;
   Darray<DebugDrawLine> draw_lines;
   Darray<DebugDrawLine> immediate_draw_lines;
-
-  VkCommandBuffer cmd;
 
   ///////////////////////////////////
   // Vulkan loader
@@ -709,14 +689,14 @@ intern void vk_buffer_unmap_memory(VK_Buffer buffer) {
 
 intern void vk_buffer_upload_to_gpu(VK_Buffer buffer, Range range, void* data) {
   MemCopy(vk.stage_buffer.mapped_memory, data, range.size);
-  vk_cmd_begin(vk.cmd);
+  vk_cmd_begin(vk.upload_cmd);
   VkBufferCopy copy_region = {
     .srcOffset = 0,
     .dstOffset = range.offset,
     .size = range.size,
   };
-  vk.CmdCopyBuffer(vk.cmd, vk.stage_buffer.handle, buffer.handle, 1, &copy_region);
-  vk_cmd_end_submit(vk.cmd);
+  vk.CmdCopyBuffer(vk.upload_cmd, vk.stage_buffer.handle, buffer.handle, 1, &copy_region);
+  vk_cmd_end_submit(vk.upload_cmd);
 }
 
 // intern void vk_buffer_descriptor_update(VK_SubBuffer buf, u32 binding) {
@@ -846,7 +826,7 @@ intern VkPipeline vk_shader_pipeline_create(Shader shader) {
 
   // Input assembly
   VkPrimitiveTopology topology;
-  switch (shader.primitive) {
+  switch (shader.info.primitive) {
     case ShaderTopology_Triangle: topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST; break;
     case ShaderTopology_Line:     topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST; break;
     case ShaderTopology_Point:    topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST; break;
@@ -901,7 +881,7 @@ intern VkPipeline vk_shader_pipeline_create(Shader shader) {
   VkPipelineMultisampleStateCreateInfo multisampling_state_info = {
     .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
     // .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
-    .rasterizationSamples = (VkSampleCountFlagBits)shader.samples,
+    .rasterizationSamples = (VkSampleCountFlagBits)shader.info.samples,
     .sampleShadingEnable = VK_FALSE,
     .minSampleShading = 1.0f,
     .pSampleMask = 0,
@@ -911,9 +891,9 @@ intern VkPipeline vk_shader_pipeline_create(Shader shader) {
 
   // Depth and stencil testing
   VkPipelineDepthStencilStateCreateInfo depth_stencil_state_info = {VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
-  if (shader.use_depth) {
+  if (shader.info.use_depth) {
     depth_stencil_state_info.depthTestEnable = VK_TRUE;
-    if (shader.type == ShaderType_Cube) {
+    if (shader.info.type == ShaderType_Cube) {
       depth_stencil_state_info.depthWriteEnable = VK_FALSE;
       depth_stencil_state_info.depthCompareOp   = VK_COMPARE_OP_LESS_OR_EQUAL;
     } else {
@@ -926,7 +906,7 @@ intern VkPipeline vk_shader_pipeline_create(Shader shader) {
   
   // Blending
   VkPipelineColorBlendAttachmentState color_blend_attachment_state = {};
-  if (shader.is_transparent) {
+  if (shader.info.is_transparent) {
     color_blend_attachment_state.blendEnable = VK_TRUE;
     color_blend_attachment_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
     color_blend_attachment_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
@@ -993,7 +973,7 @@ intern VkPipeline vk_shader_pipeline_create(Shader shader) {
 
 Handle<GpuShader> vk_shader_load(Shader shader) {
   Scratch scratch;
-  switch (shader.type) {
+  switch (shader.info.type) {
     case ShaderType_Drawing: {
       // VK_ShaderStages stages = vk_shader_module_create(shader.name);
       VK_Shader vk_shader = {};
@@ -1030,7 +1010,7 @@ Handle<GpuShader> vk_shader_load(Shader shader) {
 }
 
 void vk_shader_reload(Shader shader, Handle<GpuShader> shader_handle) {
-  switch (shader.type) {
+  switch (shader.info.type) {
     case ShaderType_Drawing: {
       VK_Shader& vk_shader = vk.shaders[shader_handle.handle];
       vk.DeviceWaitIdle(vkdevice);
@@ -1291,6 +1271,22 @@ intern void vk_descriptor_init() {
 ////////////////////////////////////////////////////////////////////////
 // @Image
 
+intern void vk_image_init() {
+  // vk_texture_load(Texture texture);
+
+  // VkMemoryRequirements memory_requirements;
+  // vk.GetImageMemoryRequirements(vkdevice, handle, &memory_requirements);
+  // u32 memory_type = vk_find_memory_idx(memory_requirements.memoryTypeBits, info.memory_flags);
+  // VkMemoryAllocateInfo memory_allocate_info = {
+  //   .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+  //   .allocationSize = memory_requirements.size,
+  //   .memoryTypeIndex = memory_type,
+  // };
+  // VkDeviceMemory memory;
+  // VK_CHECK(vk.AllocateMemory(vkdevice, &allocate_info, vk.allocator, &buffer.memory));
+  // VK_CHECK(vk.BindImageMemory(vkdevice, handle, memory, 0));
+}
+
 intern VK_ImageInfo vk_image_info_default(u32 width, u32 height) {
   VK_ImageInfo result = {
     .image_type = VK_IMAGE_TYPE_2D,
@@ -1481,7 +1477,7 @@ intern void vk_texture_init() {
 };
 
 intern void vk_texture_generate_mipmaps(VK_Image image) {
-  VkCommandBuffer cmd = vk.cmd;
+  VkCommandBuffer cmd = vk.upload_cmd;
   VkImageMemoryBarrier barrier = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
     .srcQueueFamilyIndex = vk.device.graphics_queue_index,
@@ -1548,7 +1544,7 @@ Handle<GpuTexture> vk_texture_load(Texture texture) {
   image_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
   VK_Image image = vk_image_create(image_info);
   {
-    VkCommandBuffer cmd = vk.cmd;
+    VkCommandBuffer cmd = vk.upload_cmd;
     vk_cmd_begin(cmd);
     vk_image_layout_transition(cmd, image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     vk_image_upload_to_gpu(cmd, image);
@@ -1600,7 +1596,6 @@ intern void vk_texture_resize_target() {
     image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     image_info.format = VK_FORMAT_B8G8R8A8_UNORM;
     vk.texture_targets[i] = vk_image_create(image_info);
-
     VkDescriptorImageInfo descriptor_image_info = {
       .sampler = vk.sampler,
       .imageView = vk.texture_targets[i].view,
@@ -1631,10 +1626,10 @@ intern void vk_texture_resize_target() {
 
 Handle<GpuMaterial> vk_material_load(Material material) {
   vk.gpu_materials[vk.gpu_materials_count] = {
-    .ambient = material.ambient,
-    .diffuse = material.diffuse,
-    .specular = material.specular,
-    .shininess = material.shininess, 
+    .ambient = material.props.ambient,
+    .diffuse = material.props.diffuse,
+    .specular = material.props.specular,
+    .shininess = material.props.shininess, 
     .texture = material.texture, 
   };
   u32 id = vk.gpu_materials_count++;
@@ -1656,7 +1651,7 @@ Handle<GpuCubemap> vk_cubemap_load(Texture* textures) {
   image_info.view_type = VK_IMAGE_VIEW_TYPE_CUBE;
   VK_Image image = vk_image_create(image_info);
   {
-    VkCommandBuffer cmd = vk.cmd;
+    VkCommandBuffer cmd = vk.upload_cmd;
     vk_cmd_begin(cmd);
     vk_image_layout_transition(cmd, image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     vk_image_upload_to_gpu(cmd, image);
@@ -2143,7 +2138,7 @@ intern u32 vk_swapchain_acquire_next_image_index(VkSemaphore image_available_sem
 #if GFX_X11 // NOTE: on x11 errors
   VkResult res = vk.AcquireNextImageKHR(vkdevice, vk.swapchain.handle, U64_MAX, image_available_semaphore, null, &image_index);
   if (res != VK_SUCCESS) {
-    Warn("%s", vk_result_string(res));
+    // Warn("%s", vk_result_string(res));
   }
 #else
   VK_CHECK(vk.AcquireNextImageKHR(vkdevice, vk.swapchain.handle, U64_MAX, image_available_semaphore, null, &image_index));
@@ -2162,9 +2157,9 @@ intern void vk_swapchain_present(VkSemaphore render_complete_semaphore, u32 pres
   };
 #if GFX_X11 // NOTE: on x11 errors
   VkResult res = vk.QueuePresentKHR(vk.device.graphics_queue, &present_info);
-  if (res != VK_SUCCESS) {
-    Error("%s", vk_result_string(res));
-  }
+  // if (res != VK_SUCCESS) {
+  //   Error("%s", vk_result_string(res));
+  // }
 #else
   VK_CHECK(vk.QueuePresentKHR(vk.device.graphics_queue, &present_info));
 #endif
@@ -2179,12 +2174,16 @@ Handle<GpuMesh> vk_mesh_load(Mesh mesh) {
   u64 vert_offset = vert_buff.size;
   vert_buff.size += vert_size;
   Range vert_range = { .offset = vert_offset, .size = vert_size };
+  vk_buffer_upload_to_gpu(vk.vert_buffer, vert_range, mesh.vertices);
 
   VK_Buffer& index_buff = vk.index_buffer;
   u64 index_size = mesh.index_count*sizeof(u32);
   u64 index_offset = index_buff.size;
   index_buff.size += index_size;
   Range index_range = { .offset = index_offset, .size = index_size };
+  if (mesh.indices) {
+    vk_buffer_upload_to_gpu(vk.index_buffer, index_range, mesh.indices);
+  }
 
   VK_Mesh vk_mesh = {
     .vert_count = mesh.vert_count,
@@ -2192,12 +2191,6 @@ Handle<GpuMesh> vk_mesh_load(Mesh mesh) {
     .index_count = mesh.index_count,
     .index_offset = index_range.offset,
   };
-
-  vk_buffer_upload_to_gpu(vk.vert_buffer, vert_range, mesh.vertices);
-  if (mesh.indexes) {
-    vk_buffer_upload_to_gpu(vk.index_buffer, index_range, mesh.indexes);
-  }
-
   u32 id = vk.meshes.count;
   vk.meshes.add(vk_mesh);
   Handle<GpuMesh> handle = {id};
@@ -2678,7 +2671,7 @@ void vk_init() {
       vk.cmds[i] = vk_cmd_alloc(vk.device.cmd_pool);
       // vk.compute_cmds[i] = vk_cmd_alloc(vk.device.cmd_pool);
     }
-    vk.cmd = vk_cmd_alloc(vk.device.cmd_pool);
+    vk.upload_cmd = vk_cmd_alloc(vk.device.cmd_pool);
     Info("Command buffers created");
   }
 
@@ -2727,10 +2720,11 @@ void vk_init() {
   {
     Shader shader = {
       .name = "line",
-      .type = ShaderType_Drawing,
-      .primitive = ShaderTopology_Line,
-      .is_transparent = true,
-      .use_depth = true,
+      .info = {
+        .primitive = ShaderTopology_Line,
+        .is_transparent = true,
+        .use_depth = true,
+      },
     };
     vk.debug_line_shader.pipeline = vk_shader_pipeline_create(shader);
   }
@@ -2738,22 +2732,15 @@ void vk_init() {
   {
     Shader shader = {
       .name = "screen",
-      .type = ShaderType_Screen,
-      .primitive = ShaderTopology_Triangle,
-      .samples = 1,
+      .info = {
+        .primitive = ShaderTopology_Triangle,
+        .samples = 1,
+      },
     };
     vk.screen_shader.pipeline = vk_shader_pipeline_create(shader);
   }
 
   vk.scale = 1;
-  // Msaa texture
-  {
-    VK_ImageInfo image_info = vk_image_info_default(vk.width, vk.height);
-    image_info.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    image_info.format = VK_FORMAT_B8G8R8A8_UNORM;
-    image_info.samples = VK_SAMPLE_COUNT_4_BIT;
-    vk.msaa_texture_target = vk_image_create(image_info);
-  }
   // Texture target
   {
     vk.texture_targets = push_array_zero(vk.arena, VK_Image, vk.images_in_flight);
@@ -2851,14 +2838,6 @@ void vk_begin_frame() {
   VkCommandBuffer cmd = vk_get_current_cmd();
   vk_cmd_begin(cmd);
   
-  // VkViewport viewport = {
-  //   .x = 0.0f,
-  //   .y = 0,
-  //   .width = (f32)vk.width,
-  //   .height = (f32)vk.height,
-  //   .minDepth = 0.0f,
-  //   .maxDepth = 1.0f,
-  // };
   // NOTE: we flip Y coordinate so Y:0 is on bottom of screen
   VkViewport viewport = {
     .x = 0.0f,
@@ -2882,17 +2861,13 @@ void vk_begin_frame() {
 void vk_end_frame() {
   VkCommandBuffer cmd = vk_get_current_cmd();
   vk_cmd_end(cmd);
-
-  // graphics
   VkSemaphore semaphores_wait[] = {
     vk_get_current_image_available_semaphore(),
   };
   VkPipelineStageFlags sync_flags[] = {
     VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-    VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
   };
   VkSemaphore semaphore_render_complete = vk_get_current_render_complete_semaphore();
-
   VkSubmitInfo submit_info = {
     .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
     .waitSemaphoreCount = ArrayCount(semaphores_wait),
@@ -2903,9 +2878,7 @@ void vk_end_frame() {
     .signalSemaphoreCount = 1,
     .pSignalSemaphores = &semaphore_render_complete,
   };
-
   VK_CHECK(vk.QueueSubmit(vk.device.graphics_queue, 1, &submit_info, vk.sync.in_flight_fences[vk.current_frame_idx]));
-
   vk_swapchain_present(vk_get_current_render_complete_semaphore(), vk.current_image_idx);
   vk.current_frame_idx = (vk.current_frame_idx + 1) % vk.frames_in_flight;
 }
@@ -3250,6 +3223,10 @@ void vk_remove_renderable(Handle<Entity> entity_handle) {
     mesh_batch.entities.pop();
     vk.entities[swapped_idx].entity_idx_in_array = idx;
   }
+}
+
+void vk_set_entity_color(Handle<Entity> entity_handle, v4 color) {
+  vk.gpu_entities[entity_handle.idx()].color = color;
 }
 
 ////////////////////////////////////////////////////////////////////////

@@ -173,6 +173,7 @@ struct ObjectPool {
   }
 };
 
+// not generic
 template<typename T, i32 cap>
 struct StaticObjectPool {
   u32 head;
@@ -180,6 +181,11 @@ struct StaticObjectPool {
 #if BUILD_DEBUG
   u32* generations;
 #endif
+  void init(Allocator arena, u32* generations_) {
+    data = push_array(arena, T, cap);
+    generations = generations_;
+    clear();
+  }
   T& get(Handle<T> handle) {
 #if BUILD_DEBUG
     u32 idx = handle.handle & INDEX_MASK;
@@ -823,6 +829,9 @@ struct MapAuto {
   T* data = null;
   Key* keys = null;
   MapSlot* is_occupied = null;
+  MapAuto() = default;
+  MapAuto(Allocator alloc_) { *this = {}; alloc = alloc_; }
+  void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
   void insert(Key key, T val) {
     if (count >= cap*LF) { grow(); }
     u64 hash_idx = hash_memory(&key, sizeof(Key));
@@ -835,18 +844,20 @@ struct MapAuto {
     is_occupied[index] = MapSlot_Occupied;
     ++count;
   }
-  T& get(Key key) {
-    u64 hash_idx = hash_memory(&key, sizeof(Key));
+  T* get(Key key) {
+    if (!data) return null;
+    u64 hash_idx = hash_memory(&key, sizeof(key));
     u64 index = ModPow2(hash_idx, cap);
-    while (is_occupied[index] != MapSlot_Empty) {
+    u64 start_idx = index;
+    do {
       if ((is_occupied[index] == MapSlot_Occupied) && (MemMatchStruct(&keys[index], &key))) {
-        goto found;
+        return &data[index];
+      } 
+      else if (is_occupied[index] == MapSlot_Empty) {
+        return null;
       }
-      index = ModPow2(index + 1, cap);
-    }
-    Assert(false);
-    found:
-    return data[index];
+    } while (index != start_idx);
+    return null;
   }
   void erase(Key key) {
     u64 hash_idx = hash_memory(&key, sizeof(Key));

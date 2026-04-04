@@ -24,12 +24,14 @@ Transform& static_entities_transforms(Handle<StaticEntity> handle) {
   Assert(handle.generation() == entity_soa.static_generations[handle.idx()]);
   return entity_soa.static_transforms[handle.idx()];
 }
-void entities_generations_set(u32* generations) {
-  entity_soa.generations = generations;
-}
-void static_entities_generations_set(u32* generations) {
-  entity_soa.static_generations = generations;
-}
+u32* entities_generations() { return entity_soa.generations; }
+u32* static_entities_generations() { return entity_soa.static_generations; }
+// void entities_generations_set(u32* generations) {
+//   entity_soa.generations = generations;
+// }
+// void static_entities_generations_set(u32* generations) {
+//   entity_soa.static_generations = generations;
+// }
 
 ////////////////////////////////////////////////////////////////////////
 // Assets
@@ -37,52 +39,76 @@ void static_entities_generations_set(u32* generations) {
 ///////////////////////////////////
 // Shaders
 
-global Shader shaders_desc[Shader_COUNT] = {
-  [Shader_Color] = {
-    .name = "color",
+constexpr ShaderInfo shader_default_info() {
+  ShaderInfo info = {
     .type = ShaderType_Drawing,
     .primitive = ShaderTopology_Triangle,
     .is_transparent = false,
     .use_depth = true,
+  };
+  return info;
+}
+
+global Shader shaders_desc[Shader_COUNT] = {
+  [Shader_E_Texture] = {
+    .name = "e_texture",
+    .info = shader_default_info(),
   },
-  [Shader_Grid] = {
-    .name = "grid",
-    .type = ShaderType_Drawing,
-    .primitive = ShaderTopology_Line,
-    .is_transparent = true,
-    .use_depth = true,
+  [Shader_E_Color] = {
+    .name = "e_color",
+    .info = shader_default_info(),
   },
-  [Shader_Axis] = {
-    .name = "axis",
-    .type = ShaderType_Drawing,
-    .primitive = ShaderTopology_Line,
-    .is_transparent = true,
-    .use_depth = true,
+  [Shader_E_ColorTransparent] = {
+    .name = "e_color",
+    .info = shaders_desc[Shader_E_Color].info,
+    .info.is_transparent = true,
+  },
+  [Shader_E_ColorLine] = {
+    .name = "e_color",
+    .info = shaders_desc[Shader_E_Color].info,
+    .info.primitive = ShaderTopology_Line,
+  },
+  [Shader_E_ColorLineTransparent] = {
+    .name = "e_color",
+    .info = shaders_desc[Shader_E_Color].info,
+    .info.primitive = ShaderTopology_Line,
+    .info.is_transparent = true,
+  },
+  [Shader_E_VertColor] = {
+    .name = "e_vert_color",
+    .info = {
+      .type = ShaderType_Drawing,
+      .primitive = ShaderTopology_Line,
+      .is_transparent = true,
+      .use_depth = true,
+    },
   },
   [Shader_Cubemap] = {
     .name = "cubemap",
-    .type = ShaderType_Cube,
-    .primitive = ShaderTopology_Triangle,
-    .is_transparent = false,
-    .use_depth = true,
+    .info = {
+      .type = ShaderType_Cube,
+      .primitive = ShaderTopology_Triangle,
+      .is_transparent = false,
+      .use_depth = true,
+    },
   },
 };
-global Handle<GpuShader> shaders_handle[Shader_COUNT];
-Handle<GpuShader> shader_get(ShaderId id) { return shaders_handle[id]; }
-void shader_set(ShaderId id, Handle<GpuShader> shader_handle) { shaders_handle[id] = shader_handle; }
+
+global Handle<GpuShader> shaders_handlers[Shader_COUNT];
+Handle<GpuShader> shader_get(ShaderId id) { return shaders_handlers[id]; }
 
 ///////////////////////////////////
 // Meshes
 
 global String meshes_path[Mesh_Load_COUNT] = {
-  // [Mesh_GltfCube] = "cube.gltf",
-  // [Mesh_CubeGlb] = "cube.glb",
+  [Mesh_MonkeyGlb] = "monkey.glb",
   [Mesh_Cube] = "cube.glb",
-  [Mesh_MonkeyGlb] = "monkey.glb"
+  [Mesh_Castle] = "castle.obj",
 };
-global Handle<GpuMesh> meshes_handle[Mesh_COUNT];
-Handle<GpuMesh> mesh_get(MeshId id) { return meshes_handle[id]; }
-void mesh_set(MeshId id, Handle<GpuMesh> mesh_handle) { meshes_handle[id] = mesh_handle; }
+
+global Handle<GpuMesh> meshes_handlers[Mesh_COUNT];
+Handle<GpuMesh> mesh_get(MeshId id) { return meshes_handlers[id]; }
+void mesh_set(MeshId id, Handle<GpuMesh> mesh_handle) { meshes_handlers[id] = mesh_handle; }
 
 ///////////////////////////////////
 // Textures
@@ -90,28 +116,35 @@ void mesh_set(MeshId id, Handle<GpuMesh> mesh_handle) { meshes_handle[id] = mesh
 global String textures_path[Texture_COUNT] = {
   [Texture_OrangeLines] = "orange_lines_512.png",
   [Texture_Container] = "container.jpg",
+  [Texture_Castle] = "castle_diffuse.png"
 };
-global Handle<GpuTexture> textures_handle[Texture_COUNT];
-Handle<GpuTexture> texture_get(TextureId id) { return textures_handle[id]; };
-void texture_set(TextureId id, Handle<GpuTexture> texture_handle) { textures_handle[id] = texture_handle; }
+global Handle<GpuTexture> textures_handlers[Texture_COUNT];
 
 ///////////////////////////////////
 // Materials
 
+constexpr MaterialProps material_default_props() {
+  MaterialProps props = {
+    .ambient = v3_scale(1),
+    .diffuse = v3_scale(1),
+    .specular = v3_scale(1),
+    .shininess = 1,
+  };
+  return props;
+}
+
 global Material materials_info[Material_COUNT] = {
   [Material_RedOrange] = {
-    .ambient = v3(1,0,0),
-    .diffuse = v3_scale(1),
-    .specular = v3_scale(1),
-    .shininess = 1,
+    .props = material_default_props(),
     .texture = Texture_OrangeLines,
   },
-  [Material_GreenContainer] = {
-    .ambient = v3(0,1,0),
-    .diffuse = v3_scale(1),
-    .specular = v3_scale(1),
-    .shininess = 1,
+  [Material_Container] = {
+    .props = material_default_props(),
     .texture = Texture_Container,
+  },
+  [Material_Castle] = {
+    .props = material_default_props(),
+    .texture = Texture_Castle,
   },
 };
 global Handle<GpuMaterial> materials_handle[Material_COUNT];
@@ -119,16 +152,18 @@ Handle<GpuMaterial> material_get(MaterialId id) { return materials_handle[id]; }
 
 void asset_load() {
   Loop (i, Shader_COUNT) {
-    shaders_handle[i] = shader_load(shaders_desc[i]);
+    shaders_handlers[i] = shader_load(shaders_desc[i]);
   }
   Loop (i, Mesh_Load_COUNT) {
-    meshes_handle[i] = mesh_load(meshes_path[i]);
+    meshes_handlers[i] = mesh_load(meshes_path[i]);
   }
   Loop (i, Texture_COUNT) {
-    textures_handle[i] = texture_load(textures_path[i]);
+    textures_handlers[i] = texture_load(textures_path[i]);
   }
   Loop (i, Material_COUNT) {
-    materials_info[i].texture = textures_handle[materials_info[i].texture.handle];
+    if (materials_info[i].texture.handle != INVALID_ID) {
+      materials_info[i].texture = textures_handlers[materials_info[i].texture.handle];
+    }
     materials_handle[i] = vk_material_load(materials_info[i]);
   }
 }
@@ -770,25 +805,26 @@ intern Mesh mesh_load_obj(Allocator arena, String name) {
   }
   Darray<Vertex> vertices(arena);
   Darray<u32> final_indices(arena);
+  MapAuto<Vertex, u32> map(arena);
   for (v3u idx : indexes) {
-    u32 pos_idx = idx.x;
-    u32 norm_idx = idx.y;
-    u32 uv_idx = idx.z;
     Vertex vertex = {
-      .pos = positions[pos_idx],
-      .norm = normals[norm_idx],
-      .uv = uvs[uv_idx],
+      .pos = positions[idx.x],
+      .norm = normals[idx.y],
+      .uv = uvs[idx.z],
     };
-    u32 vertex_index;
-    if (!vertices.exists_at(vertex, &vertex_index, EqualMode_Mem)) {
-      vertex_index = vertices.count;
+    u32* found = map.get(vertex);
+    if (found) {
+      final_indices.add(*found);
+    } else {
+      u32 new_index = vertices.count;
       vertices.add(vertex);
+      final_indices.add(new_index);
+      map.insert(vertex, new_index);
     }
-    final_indices.add(vertex_index);
   }
   Mesh mesh = {
     .vertices = vertices.data,
-    .indexes = (u32*)final_indices.data,
+    .indices = (u32*)final_indices.data,
     .vert_count = vertices.count,
     .index_count = final_indices.count,
   };
@@ -907,7 +943,7 @@ intern Mesh mesh_load_gltf(Allocator arena, String name) {
   }
   Mesh mesh = {
     .vertices = vertices,
-    .indexes = (u32*)indices,
+    .indices = (u32*)indices,
     .vert_count = info.vert_count,
     .index_count = info.index_count,
   };
@@ -1034,7 +1070,7 @@ intern Mesh mesh_load_glb(Allocator arena, String name) {
   }
   Mesh mesh = {
     .vertices = vertices,
-    .indexes = indices,
+    .indices = indices,
     .vert_count = vertex_count,
     .index_count = index_count,
   };
@@ -1103,9 +1139,9 @@ void common_init() {
   entity_soa.transforms = push_array(common_st.arena, Transform, MaxEntities);
   entity_soa.static_transforms = push_array(common_st.arena, Transform, MaxStaticEntities);
   DebugDo(
-    // entity_soa.generations = push_array(common_st.arena, u32, MaxEntities);
-    // entity_soa.static_generations = push_array_zero(common_st.arena, u32, MaxStaticEntities);
-  );
+    entity_soa.generations = push_array(common_st.arena, u32, MaxEntities);
+    entity_soa.static_generations = push_array(common_st.arena, u32, MaxStaticEntities);
+  )
   vk_init();
 }
 
