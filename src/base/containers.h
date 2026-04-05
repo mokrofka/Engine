@@ -903,3 +903,57 @@ struct MapAuto {
   }
 };
 
+template<typename T>
+struct HashedStrMap {
+  u32 cap;
+  T* data;
+#if BUILD_DEBUG
+  String* strs;
+  MapSlot* is_occupied;
+#endif
+  void init(Allocator alloc, u32 size) {
+#if BUILD_DEBUG
+    cap = size;
+    data = push_array(alloc, T, size);
+    strs = push_array(alloc, String, size);
+    is_occupied = push_array(alloc, MapSlot, size);
+#else
+    cap = size;
+    data = push_array(alloc, T, size);
+#endif
+  }
+  void add(u64 key, T val, String str = {}) {
+#if BUILD_DEBUG
+    u64 idx = ModPow2(key, cap);
+    Assert(is_occupied[idx] != MapSlot_Occupied);
+    strs[idx] = str;
+    data[idx] = val;
+    is_occupied[idx] = MapSlot_Occupied;
+#else
+    u64 index = ModPow2(key, cap);
+    data[index] = val;
+#endif
+  }
+  T* get(u64 key) {
+#if BUILD_DEBUG
+    u64 idx = ModPow2(key, cap);
+    Assert(is_occupied[idx] == MapSlot_Occupied);
+    return &data[idx];
+#else
+    u64 idx = ModPow2(key, cap);
+    return &data[idx];
+#endif
+  }
+  String get_str(u64 key) {
+#if BUILD_DEBUG
+    u64 idx = ModPow2(key, cap);
+    Assert(is_occupied[idx] == MapSlot_Occupied);
+    return strs[idx];
+#else
+    return {};
+#endif
+  }
+};
+
+
+

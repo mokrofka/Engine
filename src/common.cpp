@@ -26,12 +26,6 @@ Transform& static_entities_transforms(Handle<StaticEntity> handle) {
 }
 u32* entities_generations() { return entity_soa.generations; }
 u32* static_entities_generations() { return entity_soa.static_generations; }
-// void entities_generations_set(u32* generations) {
-//   entity_soa.generations = generations;
-// }
-// void static_entities_generations_set(u32* generations) {
-//   entity_soa.static_generations = generations;
-// }
 
 ////////////////////////////////////////////////////////////////////////
 // Assets
@@ -49,7 +43,7 @@ constexpr ShaderInfo shader_default_info() {
   return info;
 }
 
-global Shader shaders_desc[Shader_COUNT] = {
+global Shader shaders_desc[] = {
   [Shader_E_Texture] = {
     .name = "e_texture",
     .info = shader_default_info(),
@@ -150,7 +144,32 @@ global Material materials_info[Material_COUNT] = {
 global Handle<GpuMaterial> materials_handle[Material_COUNT];
 Handle<GpuMaterial> material_get(MaterialId id) { return materials_handle[id]; }
 
+#define MESH_LIST \
+  X(Mesh_Hero, "hero.glb") \
+  X(Mesh_Warrier, "warrier.glb") \
+  X(Mesh_Orc, "orc.glb")
+
+enum {
+#define X(name, str) name,
+  MESH_LIST
+#undef X
+  // Mesh_COUNT,
+};
+String meshes_strs[Mesh_COUNT] = {
+#define X(name, str) [name] = str,
+  MESH_LIST
+#undef X
+};
+Handle<GpuMesh> meshes[Mesh_COUNT];
+
 void asset_load() {
+// #define X(name, str) meshes[name] = mesh_load(str);
+//   MESH_LIST
+// #undef X
+#define X(name, str, param) shader_load()
+  // shader_load()
+#undef X
+
   Loop (i, Shader_COUNT) {
     shaders_handlers[i] = shader_load(shaders_desc[i]);
   }
@@ -1077,12 +1096,11 @@ intern Mesh mesh_load_glb(Allocator arena, String name) {
   return mesh;
 }
 
-intern Texture texture_image_load(String name) {
+intern Texture texture_image_load(String filepath) {
   Scratch scratch;
   Texture texture = {};
   u32 required_channel_count = 4;
   u32 channel_count;
-  String filepath = push_strf(scratch, "%s/%s/%s", asset_base_path(), String("textures"), name);
   Buffer buf = os_file_path_read_all(scratch, filepath);
   u8* data = stbi_load_from_memory(buf.data, buf.size, (i32*)&texture.width, (i32*)&texture.height, (i32*)&channel_count, required_channel_count);
   Assert(data);
@@ -1102,18 +1120,27 @@ struct CommonState {
   String asset_path;
   String shader_dir;
   String shader_compiled_dir;
-  Map<String, ShaderReloadInfo> shader_map;
+  String models_dir;
+  String textures_dir;
+  Map<String, ShaderReloadInfo> shader_reload_map;
+  HashedStrMap<Handle<GpuMesh>> mesh_map;
+  HashedStrMap<Handle<GpuShader>> shader_map;
+  HashedStrMap<Handle<GpuTexture>> texture_map;
+  HashedStrMap<Handle<GpuMaterial>> material_map;
 };
 
 global CommonState common_st;
 
 void common_init() {
+  Scratch scratch;
   {
-    Scratch scratch;
-    common_st.arena = arena_init();
-    common_st.asset_path = push_strf(common_st.arena, "%s/%s", os_get_current_directory(), String("../assets"));
-    common_st.shader_dir = push_str_cat(common_st.arena, asset_base_path(), "/shaders");
-    common_st.shader_compiled_dir = push_str_cat(common_st.arena, common_st.shader_dir, "/compiled");
+    CommonState& st = common_st;
+    st.arena = arena_init();
+    st.asset_path = push_strf(st.arena, "%s/%s", os_get_current_directory(), String("../assets"));
+    st.shader_dir = push_str_cat(st.arena, asset_base_path(), "/shaders");
+    st.shader_compiled_dir = push_str_cat(st.arena, st.shader_dir, "/compiled");
+    st.models_dir = push_str_cat(st.arena, asset_base_path(), "/models");
+    st.textures_dir = push_str_cat(st.arena, asset_base_path(), "/textures");
   }
   {
     asset_watch_directory_add(common_st.shader_dir, OS_WatchFlag_Modify, [](String name) {
@@ -1132,7 +1159,7 @@ void common_init() {
       Scratch scratch;
       String shader_name_with_format = str_chop_last_dot(name);
       String shader_name = str_chop_last_dot(shader_name_with_format);
-      ShaderReloadInfo* info = common_st.shader_map.get(shader_name);
+      ShaderReloadInfo* info = common_st.shader_reload_map.get(shader_name);
       vk_shader_reload(info->shader, info->shader_handle);
     });
   }
@@ -1155,7 +1182,7 @@ String asset_base_path() {
 
 Handle<GpuMesh> mesh_load(String name) {
   Scratch scratch;
-  String filepath = push_strf(scratch, "%s/%s/%s", asset_base_path(), String("models"), name);
+  String filepath = push_strf(scratch, "%s/%s", common_st.models_dir, name);
   String format = str_skip_last_dot(name);
   Mesh mesh = {};
   if (str_match(format, "glb")) {
@@ -1174,12 +1201,14 @@ Handle<GpuMesh> mesh_load(String name) {
 Handle<GpuShader> shader_load(Shader shader) {
   Handle<GpuShader> handle = vk_shader_load(shader);
   ShaderReloadInfo reload_info = {shader, handle};
-  common_st.shader_map.add(shader.name, reload_info);
+  common_st.shader_reload_map.add(shader.name, reload_info);
   return handle;
 }
 
 Handle<GpuTexture> texture_load(String name) {
-  Texture texture = texture_image_load(name);
+  Scratch scratch;
+  String filepath = push_strf(scratch, "%s/%s", common_st.textures_dir, name);
+  Texture texture = texture_image_load(filepath);
   Handle<GpuTexture> handle = vk_texture_load(texture);
   return handle;
 }
@@ -1194,7 +1223,8 @@ Handle<GpuCubemap> cubemap_load(String name) {
   };
   Loop (i, ArrayCount(textures)) {
     String texture_name = push_strf(scratch, "%s/%s%s", name, sides[i], String(".png"));
-    textures[i] = texture_image_load(texture_name);
+    String filepath = push_strf(scratch, "%s/%s", common_st.textures_dir, texture_name);
+    textures[i] = texture_image_load(filepath);
   }
   vk_cubemap_load(textures);
   return {};

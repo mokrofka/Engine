@@ -291,123 +291,127 @@ struct VK_State {
 
   ///////////////////////////////////
   // Vulkan loader
-  #define VK_DECL(name) Glue(PFN_, vk##name) name
-  #define VK_FUNCTION(name) vk.name = (Glue(PFN_, vk##name))os_lib_get_proc(vk.lib, Stringify(vk##name))
-  #define VK_INSTANCE_FUNCTION(name) vk.name = (Glue(PFN_, vk##name))vk.GetInstanceProcAddr(vk.instance, Stringify(vk##name))
-  #define VK_DEVICE_FUNCTION(name) vk.name = (Glue(PFN_, vk##name))vk.GetDeviceProcAddr(vkdevice, Stringify(vk##name))
+  #define VK_GET_PROC_LIST \
+    X(GetInstanceProcAddr) \
+    X(EnumerateInstanceExtensionProperties) \
+    X(EnumerateInstanceVersion) \
+    X(EnumerateInstanceLayerProperties) \
+    X(CreateInstance) \
+
+  #define VK_INSTANCE_GET_PROC_LIST \
+    X(DestroyInstance) \
+    X(EnumeratePhysicalDevices) \
+    X(GetDeviceProcAddr) \
+    X(GetPhysicalDeviceProperties) \
+    X(GetPhysicalDeviceFeatures) \
+    X(GetPhysicalDeviceMemoryProperties) \
+    X(GetPhysicalDeviceQueueFamilyProperties) \
+    X(GetPhysicalDeviceFormatProperties) \
+    X(GetPhysicalDeviceSurfaceFormatsKHR) \
+    X(GetPhysicalDeviceSurfaceCapabilitiesKHR) \
+    X(GetPhysicalDeviceSurfacePresentModesKHR) \
+    X(GetPhysicalDeviceSurfaceSupportKHR) \
+    X(EnumerateDeviceExtensionProperties) \
+    X(CreateDevice) \
+    X(DestroySurfaceKHR) \
+
+  #define VK_DEVICE_GET_PROC_LIST \
+    X(GetDeviceQueue) \
+    X(DeviceWaitIdle) \
+    X(CreateCommandPool) \
+    X(DestroyCommandPool) \
+    X(DestroyDevice) \
+    X(CreateSwapchainKHR) \
+    X(DestroySwapchainKHR) \
+    X(GetSwapchainImagesKHR) \
+    X(CreateImage) \
+    X(CreateImageView) \
+    X(DestroyImage) \
+    X(DestroyImageView) \
+    X(GetImageMemoryRequirements) \
+    X(AllocateMemory) \
+    X(FreeMemory) \
+    X(AllocateCommandBuffers) \
+    X(FreeCommandBuffers) \
+    X(BeginCommandBuffer) \
+    X(EndCommandBuffer) \
+    X(BindImageMemory) \
+    X(CreateSemaphore) \
+    X(DestroySemaphore) \
+    X(CreateFence) \
+    X(DestroyFence) \
+    X(WaitForFences) \
+    X(AcquireNextImageKHR) \
+    X(ResetFences) \
+    X(CreateDescriptorSetLayout) \
+    X(DestroyDescriptorSetLayout) \
+    X(CreateDescriptorPool) \
+    X(DestroyDescriptorPool) \
+    X(CreateShaderModule) \
+    X(DestroyShaderModule) \
+    X(CreateSampler) \
+    X(DestroySampler) \
+    X(CreateBuffer) \
+    X(DestroyBuffer) \
+    X(GetBufferMemoryRequirements) \
+    X(BindBufferMemory) \
+    X(MapMemory) \
+    X(UnmapMemory) \
+    X(FlushMappedMemoryRanges) \
+    X(CreatePipelineLayout) \
+    X(DestroyPipelineLayout) \
+    X(CreateGraphicsPipelines) \
+    X(DestroyPipeline) \
+    X(AllocateDescriptorSets) \
+    X(FreeDescriptorSets) \
+    X(UpdateDescriptorSets) \
+    X(CmdBindPipeline) \
+    X(CmdPipelineBarrier) \
+    X(CmdBlitImage) \
+    X(CmdCopyBuffer) \
+    X(CmdCopyBufferToImage) \
+    X(CmdCopyImageToBuffer) \
+    X(CmdExecuteCommands) \
+    X(CmdSetViewport) \
+    X(CmdSetScissor) \
+    X(CmdSetFrontFace) \
+    X(CmdSetCullMode) \
+    X(CmdSetStencilTestEnable) \
+    X(CmdSetDepthTestEnable) \
+    X(CmdSetDepthWriteEnable) \
+    X(CmdSetStencilReference) \
+    X(CmdSetStencilOp) \
+    X(CmdBeginRendering) \
+    X(CmdEndRendering) \
+    X(CmdSetStencilCompareMask) \
+    X(CmdSetStencilWriteMask) \
+    X(CmdClearColorImage) \
+    X(CmdClearDepthStencilImage) \
+    X(CmdSetPrimitiveTopology) \
+    X(CmdPushConstants) \
+    X(CmdBindVertexBuffers) \
+    X(CmdBindIndexBuffer) \
+    X(CmdDraw) \
+    X(CmdDrawIndexed) \
+    X(CmdDrawIndirect) \
+    X(CmdDrawIndexedIndirect) \
+    X(CmdBindDescriptorSets) \
+    X(QueueSubmit) \
+    X(QueueWaitIdle) \
+    X(QueuePresentKHR) \
+
+  #define VK_DECL(name) Glue(PFN_, vk##name) name;
+  #define VK_GET_PROC(name) vk.name = (Glue(PFN_, vk##name))os_lib_get_proc(vk.lib, Stringify(vk##name));
+  #define VK_INSTANCE_GET_PROC(name) vk.name = (Glue(PFN_, vk##name))vk.GetInstanceProcAddr(vk.instance, Stringify(vk##name));
+  #define VK_DEVICE_GET_PROC(name) vk.name = (Glue(PFN_, vk##name))vk.GetDeviceProcAddr(vkdevice, Stringify(vk##name));
 
   OS_Handle lib;
 
-  // Core functions
-  VK_DECL(GetInstanceProcAddr);
-
-  // Instance functions
-  VK_DECL(EnumerateInstanceExtensionProperties);
-  VK_DECL(EnumerateInstanceVersion);
-  VK_DECL(EnumerateInstanceLayerProperties);
-  VK_DECL(CreateInstance);
-  VK_DECL(DestroyInstance);
-  VK_DECL(EnumeratePhysicalDevices);
-  VK_DECL(GetDeviceProcAddr);
-  VK_DECL(GetPhysicalDeviceProperties);
-  VK_DECL(GetPhysicalDeviceFeatures);
-  VK_DECL(GetPhysicalDeviceMemoryProperties);
-  VK_DECL(GetPhysicalDeviceQueueFamilyProperties);
-  VK_DECL(GetPhysicalDeviceFormatProperties);
-  VK_DECL(GetPhysicalDeviceSurfaceFormatsKHR);
-  VK_DECL(GetPhysicalDeviceSurfaceCapabilitiesKHR);
-  VK_DECL(GetPhysicalDeviceSurfacePresentModesKHR);
-  VK_DECL(GetPhysicalDeviceSurfaceSupportKHR);
-  VK_DECL(EnumerateDeviceExtensionProperties);
-  VK_DECL(CreateDevice);
-  VK_DECL(DestroySurfaceKHR);
-
-  // Device functions.
-  VK_DECL(GetDeviceQueue);
-  VK_DECL(DeviceWaitIdle);
-  VK_DECL(CreateCommandPool);
-  VK_DECL(DestroyCommandPool);
-  VK_DECL(DestroyDevice);
-  VK_DECL(CreateSwapchainKHR);
-  VK_DECL(DestroySwapchainKHR);
-  VK_DECL(GetSwapchainImagesKHR);
-  VK_DECL(CreateImage);
-  VK_DECL(CreateImageView);
-  VK_DECL(DestroyImage);
-  VK_DECL(DestroyImageView);
-  VK_DECL(GetImageMemoryRequirements);
-  VK_DECL(AllocateMemory);
-  VK_DECL(FreeMemory);
-  VK_DECL(AllocateCommandBuffers);
-  VK_DECL(FreeCommandBuffers);
-  VK_DECL(BeginCommandBuffer);
-  VK_DECL(EndCommandBuffer);
-  VK_DECL(BindImageMemory);
-  VK_DECL(CreateSemaphore);
-  VK_DECL(DestroySemaphore);
-  VK_DECL(CreateFence);
-  VK_DECL(DestroyFence);
-  VK_DECL(WaitForFences);
-  VK_DECL(AcquireNextImageKHR);
-  VK_DECL(ResetFences);
-  VK_DECL(CreateDescriptorSetLayout);
-  VK_DECL(DestroyDescriptorSetLayout);
-  VK_DECL(CreateDescriptorPool);
-  VK_DECL(DestroyDescriptorPool);
-  VK_DECL(CreateShaderModule);
-  VK_DECL(DestroyShaderModule);
-  VK_DECL(CreateSampler);
-  VK_DECL(DestroySampler);
-  VK_DECL(CreateBuffer);
-  VK_DECL(DestroyBuffer);
-  VK_DECL(GetBufferMemoryRequirements);
-  VK_DECL(BindBufferMemory);
-  VK_DECL(MapMemory);
-  VK_DECL(UnmapMemory);
-  VK_DECL(FlushMappedMemoryRanges);
-  VK_DECL(CreatePipelineLayout);
-  VK_DECL(DestroyPipelineLayout);
-  VK_DECL(CreateGraphicsPipelines);
-  VK_DECL(DestroyPipeline);
-  VK_DECL(AllocateDescriptorSets);
-  VK_DECL(FreeDescriptorSets);
-  VK_DECL(UpdateDescriptorSets);
-
-  VK_DECL(CmdBindPipeline);
-  VK_DECL(CmdPipelineBarrier);
-  VK_DECL(CmdBlitImage);
-  VK_DECL(CmdCopyBuffer);
-  VK_DECL(CmdCopyBufferToImage);
-  VK_DECL(CmdCopyImageToBuffer);
-  VK_DECL(CmdExecuteCommands);
-  VK_DECL(CmdSetViewport);
-  VK_DECL(CmdSetScissor);
-  VK_DECL(CmdSetFrontFace);
-  VK_DECL(CmdSetCullMode);
-  VK_DECL(CmdSetStencilTestEnable);
-  VK_DECL(CmdSetDepthTestEnable);
-  VK_DECL(CmdSetDepthWriteEnable);
-  VK_DECL(CmdSetStencilReference);
-  VK_DECL(CmdSetStencilOp);
-  VK_DECL(CmdBeginRendering);
-  VK_DECL(CmdEndRendering);
-  VK_DECL(CmdSetStencilCompareMask);
-  VK_DECL(CmdSetStencilWriteMask);
-  VK_DECL(CmdClearColorImage);
-  VK_DECL(CmdClearDepthStencilImage);
-  VK_DECL(CmdSetPrimitiveTopology);
-  VK_DECL(CmdPushConstants);
-  VK_DECL(CmdBindVertexBuffers);
-  VK_DECL(CmdBindIndexBuffer);
-  VK_DECL(CmdDraw);
-  VK_DECL(CmdDrawIndexed);
-  VK_DECL(CmdDrawIndirect);
-  VK_DECL(CmdDrawIndexedIndirect);
-  VK_DECL(CmdBindDescriptorSets);
-
-  VK_DECL(QueueSubmit);
-  VK_DECL(QueueWaitIdle);
-  VK_DECL(QueuePresentKHR);
+#define X(name) VK_DECL(name)
+  VK_GET_PROC_LIST;
+  VK_INSTANCE_GET_PROC_LIST;
+  VK_DEVICE_GET_PROC_LIST;
+#undef X
 };
 
 VK_State vk;
@@ -2397,117 +2401,21 @@ void vk_draw_screen() {
 
 void vk_loader_load_core() {
   vk.lib = os_lib_open("libvulkan.so");
-  VK_FUNCTION(GetInstanceProcAddr);
-  VK_FUNCTION(EnumerateInstanceVersion);
-  VK_FUNCTION(EnumerateInstanceExtensionProperties);
-  VK_FUNCTION(EnumerateInstanceLayerProperties);
-  VK_FUNCTION(CreateInstance);
+#define X(name) VK_GET_PROC(name)
+  VK_GET_PROC_LIST
+#undef X
 }
 
 void vk_loader_load_instance() {
-  VK_INSTANCE_FUNCTION(GetDeviceProcAddr);
-  VK_INSTANCE_FUNCTION(DestroyInstance);
-  VK_INSTANCE_FUNCTION(EnumeratePhysicalDevices);
-  VK_INSTANCE_FUNCTION(GetPhysicalDeviceProperties);
-  VK_INSTANCE_FUNCTION(GetPhysicalDeviceFeatures);
-  VK_INSTANCE_FUNCTION(GetPhysicalDeviceMemoryProperties);
-  VK_INSTANCE_FUNCTION(GetPhysicalDeviceQueueFamilyProperties);
-  VK_INSTANCE_FUNCTION(GetPhysicalDeviceFormatProperties);
-  VK_INSTANCE_FUNCTION(GetPhysicalDeviceSurfaceCapabilitiesKHR);
-  VK_INSTANCE_FUNCTION(GetPhysicalDeviceSurfaceFormatsKHR);
-  VK_INSTANCE_FUNCTION(GetPhysicalDeviceSurfacePresentModesKHR);
-  VK_INSTANCE_FUNCTION(GetPhysicalDeviceSurfaceSupportKHR);
-  VK_INSTANCE_FUNCTION(EnumerateDeviceExtensionProperties);
-  VK_INSTANCE_FUNCTION(CreateDevice);
-  VK_INSTANCE_FUNCTION(DestroySurfaceKHR);
+#define X(name) VK_INSTANCE_GET_PROC(name)
+  VK_INSTANCE_GET_PROC_LIST
+#undef X
 }
 
 void vk_loader_load_device() {
-  VK_DEVICE_FUNCTION(GetDeviceQueue);
-  VK_DEVICE_FUNCTION(DeviceWaitIdle);
-  VK_DEVICE_FUNCTION(CreateCommandPool);
-  VK_DEVICE_FUNCTION(DestroyCommandPool);
-  VK_DEVICE_FUNCTION(DestroyDevice);
-  VK_DEVICE_FUNCTION(CreateSwapchainKHR);
-  VK_DEVICE_FUNCTION(DestroySwapchainKHR);
-  VK_DEVICE_FUNCTION(GetSwapchainImagesKHR);
-  VK_DEVICE_FUNCTION(CreateImage);
-  VK_DEVICE_FUNCTION(CreateImageView);
-  VK_DEVICE_FUNCTION(DestroyImage);
-  VK_DEVICE_FUNCTION(DestroyImageView);
-  VK_DEVICE_FUNCTION(GetImageMemoryRequirements);
-  VK_DEVICE_FUNCTION(AllocateMemory);
-  VK_DEVICE_FUNCTION(FreeMemory);
-  VK_DEVICE_FUNCTION(AllocateCommandBuffers);
-  VK_DEVICE_FUNCTION(FreeCommandBuffers);
-  VK_DEVICE_FUNCTION(BeginCommandBuffer);
-  VK_DEVICE_FUNCTION(EndCommandBuffer);
-  VK_DEVICE_FUNCTION(BindImageMemory);
-  VK_DEVICE_FUNCTION(CreateSemaphore);
-  VK_DEVICE_FUNCTION(DestroySemaphore);
-  VK_DEVICE_FUNCTION(CreateFence);
-  VK_DEVICE_FUNCTION(DestroyFence);
-  VK_DEVICE_FUNCTION(WaitForFences);
-  VK_DEVICE_FUNCTION(AcquireNextImageKHR);
-  VK_DEVICE_FUNCTION(ResetFences);
-  VK_DEVICE_FUNCTION(CreateDescriptorSetLayout);
-  VK_DEVICE_FUNCTION(DestroyDescriptorSetLayout);
-  VK_DEVICE_FUNCTION(CreateDescriptorPool);
-  VK_DEVICE_FUNCTION(DestroyDescriptorPool);
-  VK_DEVICE_FUNCTION(CreateShaderModule);
-  VK_DEVICE_FUNCTION(DestroyShaderModule);
-  VK_DEVICE_FUNCTION(CreateSampler);
-  VK_DEVICE_FUNCTION(DestroySampler);
-  VK_DEVICE_FUNCTION(CreateBuffer);
-  VK_DEVICE_FUNCTION(DestroyBuffer);
-  VK_DEVICE_FUNCTION(GetBufferMemoryRequirements);
-  VK_DEVICE_FUNCTION(BindBufferMemory);
-  VK_DEVICE_FUNCTION(MapMemory);
-  VK_DEVICE_FUNCTION(UnmapMemory);
-  VK_DEVICE_FUNCTION(FlushMappedMemoryRanges);
-  VK_DEVICE_FUNCTION(CreatePipelineLayout);
-  VK_DEVICE_FUNCTION(DestroyPipelineLayout);
-  VK_DEVICE_FUNCTION(CreateGraphicsPipelines);
-  VK_DEVICE_FUNCTION(DestroyPipeline);
-  VK_DEVICE_FUNCTION(CmdBindPipeline);
-  VK_DEVICE_FUNCTION(AllocateDescriptorSets);
-  VK_DEVICE_FUNCTION(FreeDescriptorSets);
-  VK_DEVICE_FUNCTION(UpdateDescriptorSets);
-
-  VK_DEVICE_FUNCTION(CmdPipelineBarrier);
-  VK_DEVICE_FUNCTION(CmdBlitImage);
-  VK_DEVICE_FUNCTION(CmdCopyBuffer);
-  VK_DEVICE_FUNCTION(CmdCopyBufferToImage);
-  VK_DEVICE_FUNCTION(CmdCopyImageToBuffer);
-  VK_DEVICE_FUNCTION(CmdExecuteCommands);
-  VK_DEVICE_FUNCTION(CmdSetViewport);
-  VK_DEVICE_FUNCTION(CmdSetScissor);
-  VK_DEVICE_FUNCTION(CmdSetFrontFace);
-  VK_DEVICE_FUNCTION(CmdSetCullMode);
-  VK_DEVICE_FUNCTION(CmdSetStencilTestEnable);
-  VK_DEVICE_FUNCTION(CmdSetDepthTestEnable);
-  VK_DEVICE_FUNCTION(CmdSetDepthWriteEnable);
-  VK_DEVICE_FUNCTION(CmdSetStencilReference);
-  VK_DEVICE_FUNCTION(CmdSetStencilOp);
-  VK_DEVICE_FUNCTION(CmdBeginRendering);
-  VK_DEVICE_FUNCTION(CmdEndRendering);
-  VK_DEVICE_FUNCTION(CmdSetStencilCompareMask);
-  VK_DEVICE_FUNCTION(CmdSetStencilWriteMask);
-  VK_DEVICE_FUNCTION(CmdClearColorImage);
-  VK_DEVICE_FUNCTION(CmdClearDepthStencilImage);
-  VK_DEVICE_FUNCTION(CmdSetPrimitiveTopology);
-  VK_DEVICE_FUNCTION(CmdPushConstants);
-  VK_DEVICE_FUNCTION(CmdBindVertexBuffers);
-  VK_DEVICE_FUNCTION(CmdBindIndexBuffer);
-  VK_DEVICE_FUNCTION(CmdDraw);
-  VK_DEVICE_FUNCTION(CmdDrawIndexed);
-  VK_DEVICE_FUNCTION(CmdDrawIndirect);
-  VK_DEVICE_FUNCTION(CmdDrawIndexedIndirect);
-  VK_DEVICE_FUNCTION(CmdBindDescriptorSets);
-
-  VK_DEVICE_FUNCTION(QueueSubmit);
-  VK_DEVICE_FUNCTION(QueueWaitIdle);
-  VK_DEVICE_FUNCTION(QueuePresentKHR);
+#define X(name) VK_DEVICE_GET_PROC(name)
+  VK_DEVICE_GET_PROC_LIST
+#undef X
 }
 
 intern void vk_instance_create() {

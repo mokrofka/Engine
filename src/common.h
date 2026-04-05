@@ -97,16 +97,11 @@ struct ShaderInfo {
   ShaderTopology primitive;
   u32 samples = 4;
   b8 is_transparent;
-  b8 use_depth;
+  b8 use_depth = true;
 };
 
 struct Shader {
   String name;
-  // ShaderType type;
-  // ShaderTopology primitive;
-  // u32 samples = 4;
-  // b8 is_transparent;
-  // b8 use_depth;
   ShaderInfo info;
 };
 
@@ -165,6 +160,20 @@ u32* static_entities_generations();
 
 ///////////////////////////////////
 // Shaders
+
+enum ShaderState {
+  State_LineTransparent,
+  State_NoDepthLineTransparent,
+};
+
+#define SHADER_LIST \
+  X(Shader_E_Texture, .info = {})
+  // Shader_E_Color,
+  // Shader_E_ColorTransparent,
+  // Shader_E_ColorLine,
+  // Shader_E_ColorLineTransparent,
+  // Shader_E_VertColor,
+  // Shader_Cubemap,
 
 enum ShaderId {
   Shader_E_Texture,
