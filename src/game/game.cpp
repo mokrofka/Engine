@@ -298,7 +298,7 @@ struct GameState {
   StaticObjectPool<Entity, MaxEntities> entity_pool;
   StaticObjectPool<StaticEntity, MaxStaticEntities> static_entity_pool;
 
-  DarrayHandler<Handle<Entity>> moving_cubes;
+  Darray<Handle<Entity>> moving_cubes;
 
   Handle<Entity> axis_attached_to_cam;
   Handle<Entity> grid;
@@ -335,31 +335,31 @@ Mesh grid_create(Allocator arena, u32 size, f32 step) {
   return mesh;
 }
 
-Handle<Entity> entity_create(MeshId mesh_id, ShaderId shader_id, MaterialId material_id = {}) {
+Handle<Entity> entity_create(MeshId mesh_id, MaterialId material_id) {
   Handle<Entity> e = st->entity_pool.add();
   e.trans() = {};
   e.scale() = v3_one();
-  vk_make_renderable(e, mesh_get(mesh_id), shader_get(shader_id), material_get(material_id));
+  // vk_make_renderable(e, mesh_get(mesh_id), shader_get(shader_id), material_get(material_id));
+  vk_make_renderable_(e, mesh_get(mesh_id), material_get(material_id));
   return e;
 }
 
 struct Prefab {
   MeshId mesh;
-  ShaderId shader;
   MaterialId material;
 };
 
-Prefab cube_prefab = { Mesh_Cube, Shader_E_Texture, Material_RedOrange };
+Prefab cube_prefab = { Mesh_Cube, Material_Orange };
 
 Handle<Entity> entity_create(Prefab prefab) {
-  return entity_create(prefab.mesh, prefab.shader, prefab.material);
+  return entity_create(prefab.mesh, prefab.material);
 }
 
-Handle<StaticEntity> entity_static_create(MeshId mesh_id, ShaderId shader_id, MaterialId material_id) {
+Handle<StaticEntity> entity_static_create(MeshId mesh_id, MaterialId material_id) {
   Handle<StaticEntity> e = st->static_entity_pool.add();
   e.trans() = {};
   e.scale() = v3_one();
-  vk_make_renderable_static(e, mesh_get(mesh_id), shader_get(shader_id), material_get(material_id));
+  vk_make_renderable_static(e, mesh_get(mesh_id), material_get(material_id));
   return e;
 }
 
@@ -395,7 +395,7 @@ v3 ray_from_camera() {
 
 void select_obj() {
   v3 dir = ray_from_camera();
-  Handle<Entity> e = entity_create(Mesh_Cube, Shader_E_Texture, Material_RedOrange);
+  Handle<Entity> e = entity_create(Mesh_Cube, Material_Orange);
   // e.pos() = st->cam.pos + v3_norm(mat4_forward(st->cam.view));
   e.pos() = st->cam.pos;
   e.scale() = v3_scale(0.3);
@@ -494,26 +494,26 @@ void game_init() {
     SinD(cam.yaw) * CosD(cam.pitch)
   };
   vk_get_view() = mat4_look_at(cam.pos, cam.dir, v3_up());
-  Handle<Entity> cube = entity_create(Mesh_Cube, Shader_E_Texture, Material_RedOrange);
+  Handle<Entity> cube = entity_create(Mesh_Cube, Material_Orange);
   st->rotating_cube = cube;
-  Handle<Entity> monkey = entity_create(Mesh_MonkeyGlb, Shader_E_Texture, Material_Container);
+  Handle<Entity> monkey = entity_create(Mesh_MonkeyGlb, Material_Container);
   monkey.aabb() = {v3_scale(-1.2), v3_scale(1.2)};
   st->monkey = monkey;
   {
-    Handle<Entity> triangle = entity_create(Mesh_Triangle, Shader_E_Texture, Material_RedOrange);
+    Handle<Entity> triangle = entity_create(Mesh_Triangle, Material_Orange);
     triangle.pos() = v3_scale(3);
   }
   {
-    Handle<Entity> grid = entity_create(Mesh_Grid, Shader_E_ColorLine);
+    Handle<Entity> grid = entity_create(Mesh_Grid, Material_Line);
     st->grid = grid;
     vk_set_entity_color(grid, v4_scale(0.6));
     grid.pos() = v3(0,0,-5);
   }
   {
-    st->axis_attached_to_cam = entity_create(Mesh_Axis, Shader_E_VertColor);
+    st->axis_attached_to_cam = entity_create(Mesh_Axis, Material_Axis);
   }
   Loop (i, 3) {
-    Handle<Entity> cube = entity_create(Mesh_Cube, Shader_E_Texture, Material_RedOrange);
+    Handle<Entity> cube = entity_create(Mesh_Cube, Material_Orange);
     u32 range = 10;
     cube.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
   }
@@ -522,7 +522,7 @@ void game_init() {
   // Loop (i, MB(1)-KB(100)) {
   // Loop (i, KB(100)) {
   Loop (i, KB(1)) {
-    Handle<StaticEntity> e = entity_static_create(Mesh_Cube, Shader_E_Texture, Material_RedOrange);
+    Handle<StaticEntity> e = entity_static_create(Mesh_Cube, Material_Orange);
     u32 range = KB(1);
     e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
   }
@@ -531,16 +531,27 @@ void game_init() {
 #endif
 
   {
-    st->spehre = entity_create(Mesh_Sphere, Shader_E_Texture, Material_Container);
+    st->spehre = entity_create(Mesh_Sphere, Material_Container);
     st->spehre.pos() = v3(0,0,-10);
   }
   {
-    Handle<Entity> e = entity_create(Mesh_Castle, Shader_E_Texture, Material_Castle);
-    e.pos().z = -100;
+    // Handle<Entity> e = entity_create(Mesh_Castle, Shader_E_Texture, Material_Castle);
+    // e.pos().z = -100;
   }
   {
-    // Handle<Entity> e = entity_create(Mesh_GreenMan, Shader_E_Texture, Material_Container);
-    // e.pos().z = -100;
+    // Loop (i, KB(1)) {
+    //   Handle<Entity> e = entity_create(Mesh_Cube, Material_Screen);
+    //   u32 range = 100;
+    //   e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+    // }
+  }
+  {
+    Loop (i, 0) {
+      Handle<Entity> e = entity_create(Mesh_Cube, Material_Container);
+      u32 range = 100;
+      e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+      st->moving_cubes.add(e);
+    }
   }
   
 }
@@ -559,7 +570,7 @@ Darray<Handle<Entity>> arr;
 intern void render_add() {
   Scratch scratch;
   Loop (i, 10) {
-    Handle<Entity> e = entity_create(Mesh_Cube, Shader_E_Texture, Material_Container);
+    Handle<Entity> e = entity_create(Mesh_Cube, Material_Container);
     arr.add(e);
     f32 range = 10;
     e.pos() = v3_rand_range(v3_scale(range), -v3_scale(range));
@@ -628,26 +639,20 @@ void game_update() {
       Mesh_Cube,
     };
     MaterialId materials[] = {
-      Material_RedOrange,
+      Material_Orange,
       Material_Container,
+      Material_Screen,
     };
-    // Handle<Entity> cube = e_create(Mesh_Cube, Shader_Color, Material_RedOrange);
-    Handle<Entity> e = entity_create(meshes[rand_range_u32(0, ArrayCount(meshes)-1)], Shader_E_Texture, materials[rand_range_u32(0, ArrayCount(materials)-1)]);
+    Handle<Entity> e = entity_create(meshes[rand_range_u32(0, ArrayCount(meshes)-1)], materials[rand_range_u32(0, ArrayCount(materials)-1)]);
     u32 range = 100;
     e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
     st->moving_cubes.add(e);
   }
   for (Handle<Entity> e : st->moving_cubes) {
-    // v3 max = v3_scale(3000);
-    // if (e.pos().x > max.x || e.pos().y > max.y || e.pos().z > max.z) {
-    //   e.dir() *= -1;
-    // }
     e.pos() += e.vel() * g_dt;
     v3 center = {0, 0, 0};
     v3 dir = e.pos() - center;
-    // perpendicular vector (2D style in XZ plane)
     v3 tangent = v3_norm(v3{-dir.z, 0, dir.x});
-    // combine swirl + slight attraction
     e.vel() += tangent * 2.0f * g_dt;
     e.vel() += -dir * 0.5f * g_dt;
   }

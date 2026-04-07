@@ -18,7 +18,6 @@ struct GpuMesh;
 struct GpuShader;
 struct GpuMaterial;
 struct GpuCubemap;
-struct GpuInstance;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // vk.cpp
@@ -101,10 +100,12 @@ struct Shader {
 struct Material {
   Shader shader;
   MaterialProps props;
-  Handle<GpuTexture> texture;
-  Handle<GpuTexture> texture1;
-  Handle<GpuTexture> texture2;
-  Handle<GpuTexture> texture3;
+  String texture;
+  Handle<GpuTexture> texture_handle;
+  // Handle<GpuTexture> texture;
+  // Handle<GpuTexture> texture1;
+  // Handle<GpuTexture> texture2;
+  // Handle<GpuTexture> texture3;
 };
 
 void vk_init();
@@ -113,7 +114,8 @@ void vk_shutdown();
 KAPI Handle<GpuShader> vk_shader_load(Shader shader);
 KAPI void vk_shader_reload(Shader shader, Handle<GpuShader> shader_handle);
 KAPI Handle<GpuTexture> vk_texture_load(Texture texture);
-KAPI Handle<GpuMaterial> vk_material_load(Material material);
+// KAPI Handle<MaterialGPU> vk_material_load(Material material);
+KAPI Handle<GpuMaterial> vk_material_load_(Material material);
 KAPI Handle<GpuCubemap> vk_cubemap_load(Texture* textures);
 KAPI Handle<GpuMesh> vk_mesh_load(Mesh mesh);
 
@@ -121,8 +123,9 @@ KAPI void vk_begin_draw_frame();
 KAPI void vk_end_draw_frame();
 
 // Entity
-KAPI void vk_make_renderable(Handle<Entity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuShader> shader_handle, Handle<GpuMaterial> material_handle);
-KAPI void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuShader> shader_handle, Handle<GpuMaterial> material_handle);
+// KAPI void vk_make_renderable(Handle<Entity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuShader> shader_handle, Handle<GpuMaterial> material_handle);
+KAPI void vk_make_renderable_(Handle<Entity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuMaterial> material_handle);
+KAPI void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuMaterial> material_handle);
 KAPI void vk_remove_renderable(Handle<Entity> entity_handle);
 KAPI void vk_set_entity_color(Handle<Entity> entity_handle, v4 color);
 
@@ -160,30 +163,15 @@ u32* static_entities_generations();
 ////////////////////////////////////////////////////////////////////////
 // Assets
 
-///////////////////////////////////
-// Shaders
-
-enum ShaderId {
-  Shader_E_Texture,
-  Shader_E_Color,
-  Shader_E_ColorTransparent,
-  Shader_E_ColorLine,
-  Shader_E_ColorLineTransparent,
-  Shader_E_VertColor,
-  Shader_Cubemap,
-  Shader_COUNT,
-};
-
-Handle<GpuShader> shader_get(ShaderId id);
-void shader_set(ShaderId id, Handle<GpuShader> shader_handle);
-
-///////////////////////////////////
-// Meshes
+#define MESH_LIST \
+  X(Mesh_MonkeyGlb, monkey.glb) \
+  X(Mesh_Cube, cube.glb) \
+  // X(Mesh_Castle, castle.obj) \
 
 enum MeshId {
-  Mesh_MonkeyGlb,
-  Mesh_Cube,
-  Mesh_Castle,
+#define X(enum_name, name) enum_name,
+  MESH_LIST
+#undef X
   Mesh_Load_COUNT,
   
   Mesh_Triangle,
@@ -192,30 +180,36 @@ enum MeshId {
   Mesh_Sphere,
   Mesh_COUNT,
 };
-Handle<GpuMesh> mesh_get(MeshId id);
-void mesh_set(MeshId id, Handle<GpuMesh> mesh_handle);
 
-///////////////////////////////////
-// Textures
+#define TEXTURE_LIST \
+  X(Texture_Orange, orange_lines_512.png) \
+  X(Texture_Container, container.jpg) \
+  // X(Texture_Castle, castle_diffuse.png) \
 
 enum TextureId {
-  Texture_OrangeLines,
-  Texture_Container,
-  Texture_Castle,
+#define X(enum_name, name) enum_name,
+  TEXTURE_LIST
+#undef X
   Texture_COUNT,
 };
-Handle<GpuTexture> texture_get(TextureId id);
 
-///////////////////////////////////
-// Materials
+#define MATERIAL_LIST \
+  X(Material_Orange, .name = "e_texture", .texture = "orange_lines_512.png") \
+  X(Material_Container, .name = "e_texture", .texture = "container.jpg") \
+  X(Material_Axis, .name = "e_vert_color", .state.topology = ShaderTopology_Line) \
+  X(Material_Line, .name = "e_color", .state.topology = ShaderTopology_Line) \
+  X(Material_Screen, .name = "e_texture", .texture_handle.handle = null, .texture = "") \
 
 enum MaterialId {
-  Material_RedOrange,
-  Material_Container,
-  Material_Green,
-  Material_Castle,
+#define X(enum_name, ...) enum_name,
+  MATERIAL_LIST
+#undef X
   Material_COUNT,
 };
+
+Handle<GpuMesh> mesh_get(MeshId id);
+void mesh_set(MeshId id, Handle<GpuMesh> mesh_handle);
+Handle<GpuTexture> texture_get(TextureId id);
 Handle<GpuMaterial> material_get(MaterialId id);
 
 void asset_load();

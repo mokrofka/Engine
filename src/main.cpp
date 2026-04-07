@@ -68,7 +68,7 @@ i32 main(i32 count, char* args[]) {
       Info("Frame rate: %f, %f fps", g_dt, 1/g_dt);
     }
   }
-  // r_shutdown();
+  // vk_shutdown();
   os_gfx_shutdown();
   os_exit(0);
 }

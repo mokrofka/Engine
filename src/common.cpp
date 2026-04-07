@@ -30,92 +30,36 @@ u32* static_entities_generations() { return entity_soa.static_generations; }
 ////////////////////////////////////////////////////////////////////////
 // Assets
 
-///////////////////////////////////
-// Shaders
+global String meshes_strs[Mesh_Load_COUNT] = {
+#define X(enum_name, name) [enum_name] = Stringify(name),
+  MESH_LIST
+#undef X
+};
+
+global String textures_strs[Texture_COUNT] = {
+#define X(enum_name, name) [enum_name] = Stringify(name),
+  TEXTURE_LIST
+#undef X
+};
+
+global Handle<GpuMesh> meshes_handlers[Mesh_COUNT];
+global Handle<GpuTexture> textures_handlers[Texture_COUNT];
+global Handle<GpuMaterial> materials_handlers[Material_COUNT];
+
+Handle<GpuMesh> mesh_get(MeshId id) { return meshes_handlers[id]; }
+void mesh_set(MeshId id, Handle<GpuMesh> mesh_handle) { meshes_handlers[id] = mesh_handle; }
+Handle<GpuMaterial> material_get(MaterialId id) { return materials_handlers[id]; }
 
 constexpr ShaderState shader_default_info() {
   ShaderState info = {
     .type = ShaderType_Drawing,
     .topology = ShaderTopology_Triangle,
+    .samples = 4,
     .is_transparent = false,
     .use_depth = true,
   };
   return info;
 }
-
-global Shader shaders_desc[] = {
-  [Shader_E_Texture] = {
-    .name = "e_texture",
-    .state = shader_default_info(),
-  },
-  [Shader_E_Color] = {
-    .name = "e_color",
-    .state = shader_default_info(),
-  },
-  [Shader_E_ColorTransparent] = {
-    .name = "e_color",
-    .state = shaders_desc[Shader_E_Color].state,
-    .state.is_transparent = true,
-  },
-  [Shader_E_ColorLine] = {
-    .name = "e_color",
-    .state = shaders_desc[Shader_E_Color].state,
-    .state.topology = ShaderTopology_Line,
-  },
-  [Shader_E_ColorLineTransparent] = {
-    .name = "e_color",
-    .state = shaders_desc[Shader_E_Color].state,
-    .state.topology = ShaderTopology_Line,
-    .state.is_transparent = true,
-  },
-  [Shader_E_VertColor] = {
-    .name = "e_vert_color",
-    .state = {
-      .type = ShaderType_Drawing,
-      .topology = ShaderTopology_Line,
-      .is_transparent = true,
-      .use_depth = true,
-    },
-  },
-  [Shader_Cubemap] = {
-    .name = "cubemap",
-    .state = {
-      .type = ShaderType_Cube,
-      .topology = ShaderTopology_Triangle,
-      .is_transparent = false,
-      .use_depth = true,
-    },
-  },
-};
-
-global Handle<GpuShader> shaders_handlers[Shader_COUNT];
-Handle<GpuShader> shader_get(ShaderId id) { return shaders_handlers[id]; }
-
-///////////////////////////////////
-// Meshes
-
-global String meshes_path[Mesh_Load_COUNT] = {
-  [Mesh_MonkeyGlb] = "monkey.glb",
-  [Mesh_Cube] = "cube.glb",
-  [Mesh_Castle] = "castle.obj",
-};
-
-global Handle<GpuMesh> meshes_handlers[Mesh_COUNT];
-Handle<GpuMesh> mesh_get(MeshId id) { return meshes_handlers[id]; }
-void mesh_set(MeshId id, Handle<GpuMesh> mesh_handle) { meshes_handlers[id] = mesh_handle; }
-
-///////////////////////////////////
-// Textures
-
-global String textures_path[Texture_COUNT] = {
-  [Texture_OrangeLines] = "orange_lines_512.png",
-  [Texture_Container] = "container.jpg",
-  [Texture_Castle] = "castle_diffuse.png"
-};
-global Handle<GpuTexture> textures_handlers[Texture_COUNT];
-
-///////////////////////////////////
-// Materials
 
 constexpr MaterialProps material_default_props() {
   MaterialProps props = {
@@ -125,60 +69,6 @@ constexpr MaterialProps material_default_props() {
     .shininess = 1,
   };
   return props;
-}
-
-global Material materials_info[Material_COUNT] = {
-  [Material_RedOrange] = {
-    .props = material_default_props(),
-    .texture = Texture_OrangeLines,
-  },
-  [Material_Container] = {
-    .props = material_default_props(),
-    .texture = Texture_Container,
-  },
-  [Material_Castle] = {
-    .props = material_default_props(),
-    .texture = Texture_Castle,
-  },
-};
-global Handle<GpuMaterial> materials_handle[Material_COUNT];
-Handle<GpuMaterial> material_get(MaterialId id) { return materials_handle[id]; }
-
-#define MESH_LIST \
-  X(Mesh_Hero, "hero.glb") \
-  X(Mesh_Warrier, "warrier.glb") \
-  X(Mesh_Orc, "orc.glb")
-
-enum {
-#define X(name, str) name,
-  MESH_LIST
-#undef X
-  // Mesh_COUNT,
-};
-String meshes_strs[Mesh_COUNT] = {
-#define X(name, str) [name] = str,
-  MESH_LIST
-#undef X
-};
-Handle<GpuMesh> meshes[Mesh_COUNT];
-
-void asset_load() {
-
-  Loop (i, Shader_COUNT) {
-    shaders_handlers[i] = shader_load(shaders_desc[i]);
-  }
-  Loop (i, Mesh_Load_COUNT) {
-    meshes_handlers[i] = mesh_load(meshes_path[i]);
-  }
-  Loop (i, Texture_COUNT) {
-    textures_handlers[i] = texture_load(textures_path[i]);
-  }
-  Loop (i, Material_COUNT) {
-    if (materials_info[i].texture.handle != INVALID_ID) {
-      materials_info[i].texture = textures_handlers[materials_info[i].texture.handle];
-    }
-    materials_handle[i] = vk_material_load(materials_info[i]);
-  }
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -792,7 +682,7 @@ intern Mesh mesh_load_obj(Allocator arena, String name) {
   }
   Mesh mesh = {
     .vertices = vertices.data,
-    .indices = (u32*)final_indices.data,
+    .indices = final_indices.data,
     .vert_count = vertices.count,
     .index_count = final_indices.count,
   };
@@ -1072,31 +962,12 @@ struct CommonState {
   String models_dir;
   String textures_dir;
   Map<String, ShaderReloadInfo> shader_reload_map;
-
+  Map<String, Handle<GpuTexture>> str_to_texture;
+  Map<String, Handle<GpuMesh>> str_to_mesh;
+  Map<String, Handle<GpuMaterial>> str_to_material;
 };
 
 global CommonState common_st;
-
-#define MATERIAL_LIST \
-  X(Material_Thing0, .name = "e_texture", .state = shader_default_info(), .props = material_default_props(), .texture = Texture_Container) \
-  X(Material_Thing1, .name = "e_texture", .state = shader_default_info(), .props = material_default_props(), .texture = Texture_Container)
-
-enum MaterialID {
-#define X(enum_name, shader_name, state, props, texture) enum_name,
-  MATERIAL_LIST
-#undef X
-};
-
-void foo() {
-  Material mat;
-  shader_load({});
-// vk_material_load(Material material)
-
-#define X(enum_name, shader_name, state, props, texture) 
-  MATERIAL_LIST
-#undef X
-
-}
 
 void common_init() {
   Scratch scratch;
@@ -1139,8 +1010,58 @@ void common_init() {
   vk_init();
 }
 
-void r_shutdown() {
-  vk_shutdown();
+void asset_load() {
+#define X(enum_name, name) \
+  meshes_handlers[enum_name] = mesh_load(meshes_strs[enum_name]); \
+  common_st.str_to_mesh.add(Stringify(name), meshes_handlers[enum_name]);
+
+  MESH_LIST
+#undef X
+#define X(enum_name, name) \
+  textures_handlers[enum_name] = texture_load(textures_strs[enum_name]); \
+  common_st.str_to_texture.add(Stringify(name), textures_handlers[enum_name]);
+
+  TEXTURE_LIST
+#undef X
+
+  struct TakeMaterial { \
+    String name = "e_texture";
+    ShaderState state = shader_default_info();
+    MaterialProps props = material_default_props();
+    String texture = "container.jpg";
+    Handle<GpuTexture> texture_handle;
+    operator Material() {
+      return {
+        .shader = {
+          .name = name,
+          .state = state,
+        },
+        .props = props,
+        .texture = texture,
+        .texture_handle = texture_handle,
+      };
+    }
+  };
+#define X(enum_name, ...) \
+  { \
+    TakeMaterial mat = { \
+      __VA_ARGS__ \
+    }; \
+    Handle<GpuTexture>* texture_hanle = common_st.str_to_texture.get(mat.texture); \
+    if (texture_hanle) \
+      mat.texture_handle = *texture_hanle; \
+    materials_handlers[enum_name] = vk_material_load_(mat); \
+  }
+  MATERIAL_LIST
+#undef X
+
+  // Loop (i, Material_COUNT) {
+  //   Handle<GpuTexture>* texture_hanle = common_st.str_to_texture.get(materials_info[i].texture);
+  //   if (texture_hanle) {
+  //     materials_info[i].texture_handle = *texture_hanle;
+  //   }
+  //   materials_handlers[i] = vk_material_load_(materials_info[i]);
+  // }
 }
 
 String asset_base_path() {

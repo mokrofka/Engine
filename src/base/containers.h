@@ -749,7 +749,7 @@ struct Map {
   Map() = default;
   Map(Allocator alloc_) { *this = {}; alloc = alloc_; }
   void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
-  void add(Key key, T val) {
+  T* add(Key key, T val) {
     if (count >= cap*LF) { grow(); }
     u64 hash_idx = hash(key);
     u64 idx = ModPow2(hash_idx, cap);
@@ -760,6 +760,7 @@ struct Map {
     data[idx] = val;
     is_occupied[idx] = MapSlot_Occupied;
     ++count;
+    return &data[idx];
   }
   T* get(Key key) {
     u64 hash_idx = hash(key);
@@ -794,6 +795,27 @@ struct Map {
     data[idx] = val;
     is_occupied[idx] = MapSlot_Occupied;
     ++count;
+    return &data[idx];
+  }
+  T* get_or_add(Key key, T val, b32* out_was_added) {
+    u64 hash_idx = hash(key);
+    u64 idx = ModPow2(hash_idx, cap);
+    u64 start_idx = idx;
+    Loop (i, cap) {
+      if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx], key))) {
+        return &data[idx];
+      } 
+      else if (is_occupied[idx] == MapSlot_Empty) {
+        break;
+      }
+      idx = ModPow2(idx + 1, cap);
+    }
+    if (count >= cap*LF) { grow(); }
+    keys[idx] = key;
+    data[idx] = val;
+    is_occupied[idx] = MapSlot_Occupied;
+    ++count;
+    *out_was_added = true;
     return &data[idx];
   }
   void remove(Key key) {
