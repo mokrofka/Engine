@@ -8,7 +8,6 @@ f32 BytesToMB(u64 x) { return BytesToKB(x) / 1024; };
 f32 BytesToGB(u64 x) { return BytesToMB(x) / 1024; };
 
 u64 cpu_timer_now() { return __rdtsc(); }
-void DebugBreak()   { __builtin_debugtrap(); }
 
 ////////////////////////////////////////////////////////////////////////
 // Memory
@@ -56,9 +55,14 @@ u64 RoundDown(u64 x, u64 a)    { return x / a * a; }
 u64 Compose64Bit(u64 a, u64 b) { return (a << 32) | b; }
 
 ////////////////////////////////////////////////////////////////////////
+// Asserts
+
+void Trap()      { __builtin_trap(); }
+void DebugTrap() { __builtin_debugtrap(); }
+
+////////////////////////////////////////////////////////////////////////
 // Types
 
-u64 range_size(Range r) {
-  return  r.size - r.offset;
-}
+u64 range_size(Range r) { return  r.size - r.offset; }
+
 

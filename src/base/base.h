@@ -144,7 +144,6 @@ NO_DEBUG KAPI f32 BytesToMB(u64 x);
 NO_DEBUG KAPI f32 BytesToGB(u64 x);
 
 KAPI u64 cpu_timer_now();
-KAPI void DebugBreak();
 
 ////////////////////////////////////////////////////////////////////////
 // Memory
@@ -224,11 +223,33 @@ KAPI u64 Compose64Bit(u64 a, u64 b);
 #define ArrayCount(x)  (sizeof((x)) / sizeof((x)[0]))
 #define Assign(a,b)    (*((u8**)(&(a))) = (u8*)(b))
 #define As(T)          *(T*)
-#define Loop(i, c)     for (i32 i = 0; i < c; ++i)
+#define Loop(it, c)    for (i32 it = 0; it < c; ++it)
 #define _Stringify(S)  #S
 #define Stringify(S)   _Stringify(S)
 #define _Glue(A,B)     A##B
 #define Glue(A,B)      _Glue(A,B)
+
+#define EachElement(it, array) (i32 it = 0; it < ArrayCount(array); ++it)
+#define EachEnumVal(type, it) (type it = (type)0; it < type##_COUNT; it = (type)(it+1))
+#define EachNode(it, T, first) (T *it = first; it != 0; it = it->next)
+
+////////////////////////////////////////////////////////////////////////
+// Asserts
+
+KAPI void Trap();
+KAPI void DebugTrap();
+
+#define InvalidPath    Assert(!"Invalid Path!")
+#define NotImplemented Assert(!"Not Implemented!")
+#define AssertAlways(x) if (!(x)) { Trap(); }
+
+#if BUILD_DEBUG
+  #define Assert(x) if (!(x)) { DebugTrap(); }
+  #define AssertMsg(x, message, ...) if (!(x)) { _log_output(LogLevel_Error, message, ##__VA_ARGS__); DebugTrap(); }
+#else
+  #define Assert(x)
+  #define AssertMsg(x)
+#endif
 
 ////////////////////////////////////////////////////////////////////////
 // Link list

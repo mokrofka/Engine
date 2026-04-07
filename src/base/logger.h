@@ -8,8 +8,6 @@
 #define LOG_WARN_ENABLED 1
 #define LOG_ERROR_ENABLED 1
 
-#define ASSERTIONS_ENABLED 1
-
 enum LogLevel {
   LogLevel_Trace = 1,
   LogLevel_Debug,
@@ -52,28 +50,4 @@ KAPI void println(String fmt, ...);
   #define ErrorArena(arena, message, ...) _log_output(arena, LogLevel_Error, message, ##__VA_ARGS__);
 #else
   #define Error(message, ...)
-#endif
-
-#if ASSERTIONS_ENABLED
-  #define Assert(expr)  \
-    {                   \
-      if (expr) {       \
-      } else {          \
-        Error("Assert") \
-        DebugBreak();   \
-      }                 \
-    }
-
-  #define AssertMsg(expr, message, ...)                      \
-    {                                                        \
-      if (expr) {                                            \
-      } else {                                               \
-        _log_output(LogLevel_Error, message, ##__VA_ARGS__); \
-        DebugBreak();                                        \
-      }                                                      \
-    }
-
-#else
-  #define Assert(expr)
-  #define AssertMsg(expr)
 #endif

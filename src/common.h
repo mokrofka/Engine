@@ -1,8 +1,6 @@
 #pragma once
 #include "lib.h"
 
-// TODO: obj selection
-
 const v3 ColorRed   = v3(1,0,0);
 const v3 ColorGreen = v3(0,1,0);
 const v3 ColorBlue  = v3(0,0,1);
@@ -54,11 +52,6 @@ struct MaterialProps {
   f32 shininess;
 };
 
-struct Material {
-  MaterialProps props;
-  Handle<GpuTexture> texture;
-};
-
 struct Texture {
   u32 width;
   u32 height;
@@ -92,9 +85,9 @@ enum ShaderTopology {
   ShaderTopology_Point,
 };
 
-struct ShaderInfo {
+struct ShaderState {
   ShaderType type;
-  ShaderTopology primitive;
+  ShaderTopology topology;
   u32 samples = 4;
   b8 is_transparent;
   b8 use_depth = true;
@@ -102,7 +95,16 @@ struct ShaderInfo {
 
 struct Shader {
   String name;
-  ShaderInfo info;
+  ShaderState state;
+};
+
+struct Material {
+  Shader shader;
+  MaterialProps props;
+  Handle<GpuTexture> texture;
+  Handle<GpuTexture> texture1;
+  Handle<GpuTexture> texture2;
+  Handle<GpuTexture> texture3;
 };
 
 void vk_init();
@@ -161,20 +163,6 @@ u32* static_entities_generations();
 ///////////////////////////////////
 // Shaders
 
-enum ShaderState {
-  State_LineTransparent,
-  State_NoDepthLineTransparent,
-};
-
-#define SHADER_LIST \
-  X(Shader_E_Texture, .info = {})
-  // Shader_E_Color,
-  // Shader_E_ColorTransparent,
-  // Shader_E_ColorLine,
-  // Shader_E_ColorLineTransparent,
-  // Shader_E_VertColor,
-  // Shader_Cubemap,
-
 enum ShaderId {
   Shader_E_Texture,
   Shader_E_Color,
@@ -185,6 +173,7 @@ enum ShaderId {
   Shader_Cubemap,
   Shader_COUNT,
 };
+
 Handle<GpuShader> shader_get(ShaderId id);
 void shader_set(ShaderId id, Handle<GpuShader> shader_handle);
 
@@ -309,48 +298,6 @@ KAPI void asset_watch_directory_add(String watch_name, OS_WatchFlags flags, void
 KAPI void asset_watch_update();
 
 ////////////////////////////////////////////////////////////////////////
-// Events
-
-union EventContext {
-  void* data;
-  i64 i64[2];
-  u64 u64[2];
-  f64 f64[2];
-  
-  i32 i32[4];
-  u32 u32[4];
-  f32 f32[4];
-  
-  i16 i16[8];
-  u16 u16[8];
-  
-  i8 i8[16];
-  u8 u8[16];
-  
-  char c[16];
-};
-
-enum EventCode {
-  EventCode_ApplicationQuit,
-  EventCode_KeyPressed,
-  EventCode_KeyReleased,
-  EventCode_ButtonPressed,
-  EventCode_ButtonReleased,
-  EventCode_MouseMoved,
-  EventCode_MouseWheel,
-  EventCode_Resized,
-  EventCode_ViewportResized,
-  EventCode_COUNT
-};
-
-// Should return false if you want other listeners to listen
-using PFN_On_Event = b32 (*)(u32 code, void* sender, void* listener_inst, EventContext data);
-
-KAPI void event_register(u32 code, void* listener, PFN_On_Event on_event);
-KAPI void event_unregister(u32 code, void* listener, PFN_On_Event on_event);
-KAPI void event_fire(u32 code, void* sender, EventContext on_event);
-
-////////////////////////////////////////////////////////////////////////
 // Common
 
 KAPI void common_init();
@@ -369,4 +316,3 @@ struct Timer {
 
 KAPI Timer timer_init(f32 interval);
 KAPI b32 timer_tick(Timer& t);
-

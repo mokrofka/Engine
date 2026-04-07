@@ -33,10 +33,10 @@ u32* static_entities_generations() { return entity_soa.static_generations; }
 ///////////////////////////////////
 // Shaders
 
-constexpr ShaderInfo shader_default_info() {
-  ShaderInfo info = {
+constexpr ShaderState shader_default_info() {
+  ShaderState info = {
     .type = ShaderType_Drawing,
-    .primitive = ShaderTopology_Triangle,
+    .topology = ShaderTopology_Triangle,
     .is_transparent = false,
     .use_depth = true,
   };
@@ -46,42 +46,42 @@ constexpr ShaderInfo shader_default_info() {
 global Shader shaders_desc[] = {
   [Shader_E_Texture] = {
     .name = "e_texture",
-    .info = shader_default_info(),
+    .state = shader_default_info(),
   },
   [Shader_E_Color] = {
     .name = "e_color",
-    .info = shader_default_info(),
+    .state = shader_default_info(),
   },
   [Shader_E_ColorTransparent] = {
     .name = "e_color",
-    .info = shaders_desc[Shader_E_Color].info,
-    .info.is_transparent = true,
+    .state = shaders_desc[Shader_E_Color].state,
+    .state.is_transparent = true,
   },
   [Shader_E_ColorLine] = {
     .name = "e_color",
-    .info = shaders_desc[Shader_E_Color].info,
-    .info.primitive = ShaderTopology_Line,
+    .state = shaders_desc[Shader_E_Color].state,
+    .state.topology = ShaderTopology_Line,
   },
   [Shader_E_ColorLineTransparent] = {
     .name = "e_color",
-    .info = shaders_desc[Shader_E_Color].info,
-    .info.primitive = ShaderTopology_Line,
-    .info.is_transparent = true,
+    .state = shaders_desc[Shader_E_Color].state,
+    .state.topology = ShaderTopology_Line,
+    .state.is_transparent = true,
   },
   [Shader_E_VertColor] = {
     .name = "e_vert_color",
-    .info = {
+    .state = {
       .type = ShaderType_Drawing,
-      .primitive = ShaderTopology_Line,
+      .topology = ShaderTopology_Line,
       .is_transparent = true,
       .use_depth = true,
     },
   },
   [Shader_Cubemap] = {
     .name = "cubemap",
-    .info = {
+    .state = {
       .type = ShaderType_Cube,
-      .primitive = ShaderTopology_Triangle,
+      .topology = ShaderTopology_Triangle,
       .is_transparent = false,
       .use_depth = true,
     },
@@ -163,12 +163,6 @@ String meshes_strs[Mesh_COUNT] = {
 Handle<GpuMesh> meshes[Mesh_COUNT];
 
 void asset_load() {
-// #define X(name, str) meshes[name] = mesh_load(str);
-//   MESH_LIST
-// #undef X
-#define X(name, str, param) shader_load()
-  // shader_load()
-#undef X
 
   Loop (i, Shader_COUNT) {
     shaders_handlers[i] = shader_load(shaders_desc[i]);
@@ -725,51 +719,6 @@ void asset_watch_update() {
 }
 
 ////////////////////////////////////////////////////////////////////////
-// Events
-
-struct RegisteredEvent {
-  void* listener;
-  PFN_On_Event callback;
-};
-
-struct EventSystemState {
-  Darray<RegisteredEvent> registered[EventCode_COUNT];
-};
-
-global EventSystemState event_st;
-
-void event_register(u32 code, void* listener, PFN_On_Event on_event) {
-  for (RegisteredEvent e : event_st.registered[code]) {
-    if(e.listener == listener) {
-      Warn("You're registering the same event!");
-      return;
-    }
-  }
-  event_st.registered[code].add({listener, on_event});
-}
-
-void event_unregister(u32 code, void* listener, PFN_On_Event on_event) {
-  if (event_st.registered[code].count == 0) {
-    Assert(!"you're trying to unregister nothing!");
-  }
-  u32 index = 0;
-  for (RegisteredEvent e : event_st.registered[code]) {
-    if (e.listener == listener && e.callback == on_event) {
-      event_st.registered[code].swap_remove(index);
-    }
-    ++index;
-  }
-}
-
-void event_fire(u32 code, void* sender, EventContext context) {
-  for (RegisteredEvent e : event_st.registered[code]) {
-    if (e.callback(code, sender, e.listener, context)) {
-      return;
-    }
-  }
-}
-
-////////////////////////////////////////////////////////////////////////
 // Loaders
 
 intern Mesh mesh_load_obj(Allocator arena, String name) {
@@ -824,7 +773,7 @@ intern Mesh mesh_load_obj(Allocator arena, String name) {
   }
   Darray<Vertex> vertices(arena);
   Darray<u32> final_indices(arena);
-  MapAuto<Vertex, u32> map(arena);
+  MapAuto<Vertex, u32> map(scratch);
   for (v3u idx : indexes) {
     Vertex vertex = {
       .pos = positions[idx.x],
@@ -838,7 +787,7 @@ intern Mesh mesh_load_obj(Allocator arena, String name) {
       u32 new_index = vertices.count;
       vertices.add(vertex);
       final_indices.add(new_index);
-      map.insert(vertex, new_index);
+      map.add(vertex, new_index);
     }
   }
   Mesh mesh = {
@@ -1123,13 +1072,31 @@ struct CommonState {
   String models_dir;
   String textures_dir;
   Map<String, ShaderReloadInfo> shader_reload_map;
-  HashedStrMap<Handle<GpuMesh>> mesh_map;
-  HashedStrMap<Handle<GpuShader>> shader_map;
-  HashedStrMap<Handle<GpuTexture>> texture_map;
-  HashedStrMap<Handle<GpuMaterial>> material_map;
+
 };
 
 global CommonState common_st;
+
+#define MATERIAL_LIST \
+  X(Material_Thing0, .name = "e_texture", .state = shader_default_info(), .props = material_default_props(), .texture = Texture_Container) \
+  X(Material_Thing1, .name = "e_texture", .state = shader_default_info(), .props = material_default_props(), .texture = Texture_Container)
+
+enum MaterialID {
+#define X(enum_name, shader_name, state, props, texture) enum_name,
+  MATERIAL_LIST
+#undef X
+};
+
+void foo() {
+  Material mat;
+  shader_load({});
+// vk_material_load(Material material)
+
+#define X(enum_name, shader_name, state, props, texture) 
+  MATERIAL_LIST
+#undef X
+
+}
 
 void common_init() {
   Scratch scratch;
@@ -1148,11 +1115,11 @@ void common_init() {
       String shader_filepath = push_strf(scratch, "%s/%s", common_st.shader_dir, name);
       String shader_compiled_filepath = push_strf(scratch, "%s/%s%s", common_st.shader_compiled_dir, name, String(".spv"));
       StringList list = {};
-      str_list_pushf(scratch, &list, "glslangValidator");
-      str_list_pushf(scratch, &list, "-V");
-      str_list_pushf(scratch, &list, "%s", shader_filepath);
-      str_list_pushf(scratch, &list, "-o");
-      str_list_pushf(scratch, &list, "%s", shader_compiled_filepath);
+      str_list_push(scratch, &list, "glslangValidator");
+      str_list_push(scratch, &list, "-V");
+      str_list_push(scratch, &list, shader_filepath);
+      str_list_push(scratch, &list, "-o");
+      str_list_push(scratch, &list, shader_compiled_filepath);
       os_process_launch(list);
     });
     asset_watch_directory_add(common_st.shader_compiled_dir, OS_WatchFlag_Modify, [](String name) {
@@ -1192,7 +1159,7 @@ Handle<GpuMesh> mesh_load(String name) {
   } else if (str_match(format, "obj")) {
     mesh = mesh_load_obj(scratch, filepath);
   } else {
-    Assert(false);
+    InvalidPath;
   }
   Handle<GpuMesh> handle = vk_mesh_load(mesh);
   return handle;
@@ -1221,7 +1188,7 @@ Handle<GpuCubemap> cubemap_load(String name) {
     "top", "bottom",
     "front", "back",
   };
-  Loop (i, ArrayCount(textures)) {
+  for EachElement(i, textures) {
     String texture_name = push_strf(scratch, "%s/%s%s", name, sides[i], String(".png"));
     String filepath = push_strf(scratch, "%s/%s", common_st.textures_dir, texture_name);
     textures[i] = texture_image_load(filepath);

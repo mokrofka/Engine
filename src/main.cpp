@@ -14,9 +14,9 @@ void main_update(u8** state);
 
 i32 main(i32 count, char* args[]) {
   u64 start = os_now_ns();
-  global_alloc_init();
+  global_allocator_init();
   tctx_init();
-  test();
+  // test();
   os_init(args[0]);
   os_gfx_init();
   common_init();

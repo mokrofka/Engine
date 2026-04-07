@@ -34,5 +34,5 @@ intern Temp tctx_get_scratch_conflict(Allocator conflict) {
 Scratch::operator Allocator()        { return {.type = AllocatorType_Arena, .ctx = temp.arena}; }
 Scratch::Scratch()                   { temp = tctx_get_scratch(); }
 Scratch::Scratch(Allocator conflict) { temp = tctx_get_scratch_conflict(conflict); }
-Scratch::~Scratch()                  { temp.arena->pos = temp.pos; };
+Scratch::~Scratch()                  { temp.arena->pos = temp.pos; }
 

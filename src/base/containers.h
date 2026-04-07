@@ -752,40 +752,60 @@ struct Map {
   void add(Key key, T val) {
     if (count >= cap*LF) { grow(); }
     u64 hash_idx = hash(key);
-    u64 index = ModPow2(hash_idx, cap);
-    while (is_occupied[index] == MapSlot_Occupied) {
-      index = ModPow2(index + 1, cap);
+    u64 idx = ModPow2(hash_idx, cap);
+    while (is_occupied[idx] == MapSlot_Occupied) {
+      idx = ModPow2(idx + 1, cap);
     }
-    keys[index] = key;
-    data[index] = val;
-    is_occupied[index] = MapSlot_Occupied;
+    keys[idx] = key;
+    data[idx] = val;
+    is_occupied[idx] = MapSlot_Occupied;
     ++count;
   }
   T* get(Key key) {
-    if (!data) return null;
     u64 hash_idx = hash(key);
-    u64 index = ModPow2(hash_idx, cap);
-    u64 start_idx = index;
-    do {
-      if ((is_occupied[index] == MapSlot_Occupied) && (equal(keys[index], key))) {
-        return &data[index];
+    u64 idx = ModPow2(hash_idx, cap);
+    u64 start_idx = idx;
+    Loop (i, cap) {
+      if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx], key))) {
+        return &data[idx];
       } 
-      else if (is_occupied[index] == MapSlot_Empty) {
-        return null;
+      else if (is_occupied[idx] == MapSlot_Empty) {
+        break;
       }
-    } while (index != start_idx);
+      idx = ModPow2(idx + 1, cap);
+    }
     return null;
+  }
+  T* get_or_add(Key key, T val) {
+    u64 hash_idx = hash(key);
+    u64 idx = ModPow2(hash_idx, cap);
+    u64 start_idx = idx;
+    Loop (i, cap) {
+      if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx], key))) {
+        return &data[idx];
+      } 
+      else if (is_occupied[idx] == MapSlot_Empty) {
+        break;
+      }
+      idx = ModPow2(idx + 1, cap);
+    }
+    if (count >= cap*LF) { grow(); }
+    keys[idx] = key;
+    data[idx] = val;
+    is_occupied[idx] = MapSlot_Occupied;
+    ++count;
+    return &data[idx];
   }
   void remove(Key key) {
     u64 hash_idx = hash(key);
-    u64 index = ModPow2(hash_idx, cap);
-    while (is_occupied[index] != MapSlot_Empty) {
-      if ((is_occupied[index] == MapSlot_Occupied) && (keys[index] == key)) {
-        is_occupied[index] = MapSlot_Deleted;
+    u64 idx = ModPow2(hash_idx, cap);
+    while (is_occupied[idx] != MapSlot_Empty) {
+      if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx] == key))) {
+        is_occupied[idx] = MapSlot_Deleted;
         --count;
         return;
       }
-      index = ModPow2(index + 1, cap);
+      idx = ModPow2(idx + 1, cap);
     }
   }
   void grow() {
@@ -823,43 +843,64 @@ struct Map {
 template<typename Key, typename T>
 struct MapAuto {
   static constexpr f32 LF = 0.8;
-  u32 count = 0;
-  u32 cap = 0;
-  Allocator alloc = {};
-  T* data = null;
-  Key* keys = null;
-  MapSlot* is_occupied = null;
+  u32 count;
+  u32 cap;
+  Allocator alloc;
+  T* data;
+  Key* keys;
+  MapSlot* is_occupied;
   MapAuto() = default;
   MapAuto(Allocator alloc_) { *this = {}; alloc = alloc_; }
   void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
-  void insert(Key key, T val) {
+  void add(Key key, T val) {
     if (count >= cap*LF) { grow(); }
     u64 hash_idx = hash_memory(&key, sizeof(Key));
-    u64 index = ModPow2(hash_idx, cap);
-    while (is_occupied[index] == MapSlot_Occupied) {
-      index = ModPow2(index + 1, cap);
+    u64 idx = ModPow2(hash_idx, cap);
+    while (is_occupied[idx] == MapSlot_Occupied) {
+      idx = ModPow2(idx + 1, cap);
     }
-    keys[index] = key;
-    data[index] = val;
-    is_occupied[index] = MapSlot_Occupied;
+    keys[idx] = key;
+    data[idx] = val;
+    is_occupied[idx] = MapSlot_Occupied;
     ++count;
   }
   T* get(Key key) {
     if (!data) return null;
-    u64 hash_idx = hash_memory(&key, sizeof(key));
-    u64 index = ModPow2(hash_idx, cap);
-    u64 start_idx = index;
-    do {
-      if ((is_occupied[index] == MapSlot_Occupied) && (MemMatchStruct(&keys[index], &key))) {
-        return &data[index];
+    u64 hash_idx = hash_memory(&key, sizeof(Key));
+    u64 idx = ModPow2(hash_idx, cap);
+    u64 start_idx = idx;
+    Loop (i, cap) {
+      if ((is_occupied[idx] == MapSlot_Occupied) && (MemMatchStruct(&keys[idx], &key))) {
+        return &data[idx];
       } 
-      else if (is_occupied[index] == MapSlot_Empty) {
-        return null;
+      else if (is_occupied[idx] == MapSlot_Empty) {
+        break;
       }
-    } while (index != start_idx);
+      idx = ModPow2(idx + 1, cap);
+    }
     return null;
   }
-  void erase(Key key) {
+  T* get_or_add(Key key, T val) {
+    u64 hash_idx = hash(key);
+    u64 idx = ModPow2(hash_idx, cap);
+    u64 start_idx = idx;
+    Loop (i, cap) {
+      if ((is_occupied[idx] == MapSlot_Occupied) && (MemMatchStruct(&keys[idx], &key))) {
+        return &data[idx];
+      } 
+      else if (is_occupied[idx] == MapSlot_Empty) {
+        break;
+      }
+      idx = ModPow2(idx + 1, cap);
+    }
+    if (count >= cap*LF) { grow(); }
+    keys[idx] = key;
+    data[idx] = val;
+    is_occupied[idx] = MapSlot_Occupied;
+    ++count;
+    return &data[idx];
+  }
+  void remove(Key key) {
     u64 hash_idx = hash_memory(&key, sizeof(Key));
     u64 index = ModPow2(hash_idx, cap);
     while (is_occupied[index] != MapSlot_Empty) {
@@ -886,7 +927,7 @@ struct MapAuto {
       mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
       Loop (i, old_cap) {
         if (old_is_occupied[i] == MapSlot_Occupied) {
-          insert(old_keys[i], old_data[i]);
+          add(old_keys[i], old_data[i]);
         }
       }
       mem_free(alloc, old_data);

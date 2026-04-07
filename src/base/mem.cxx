@@ -1,5 +1,4 @@
 #include "mem.h"
-#include "logger.h"
 #include "os/os_core.h"
 
 const u32 MEM_ALLOC_HEADER_GUARD   = 0xA110C8;
@@ -32,7 +31,7 @@ struct MemCtx {
 
 global MemCtx global_allocator;
 
-void global_alloc_init() {
+void global_allocator_init() {
   global_allocator.arena = arena_init();
   global_allocator.seglist.init(global_allocator.arena);
 }
@@ -446,7 +445,7 @@ GpuMemHandler GpuAllocSegList::alloc(u64 size, u64 align) {
 
 void GpuAllocSegList::free(u32 idx) {
   RangeList& range = data[idx];
-  AssertMsg(range.is_allocated == true, "not allocated chunk");
+  Assert(range.is_allocated == true);
   u64 pow2_size = next_pow2(range.range.size);
   u64 pool_idx = ctz(pow2_size) - ctz(8);
   u32& p = heads[pool_idx];

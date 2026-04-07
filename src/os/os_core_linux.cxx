@@ -425,7 +425,7 @@ OS_Handle os_process_launch(StringList list) {
   char** argv = push_array(scratch, char*, list.node_count + 1);
   argv[list.node_count] = null;
   u32 i = 0;
-  for (StringNode* n = list.first; n != null; n = n->next) {
+  for EachNode(n, StringNode, list.first) {
     argv[i++] = (char*)n->string.str;
   }
   pid_t pid = 0;
@@ -435,26 +435,6 @@ OS_Handle os_process_launch(StringList list) {
   }
   return handle;
 }
-
-// OS_Handle os_process_launch(StringList list) {
-//   pid_t pid = fork();
-//   // if (pid == 0) {
-//     Scratch scratch;
-//     char** argv = push_array(scratch, char*, 10 + 2);
-//     u32 args_count = 0;
-//     u32 start = 0;
-//     String next_word;
-//     while ((next_word = str_next_word(cmd, start)).size) {
-//       String arg_c = push_str_copy(scratch, next_word);
-//       argv[args_count] = (char*)arg_c.str;
-//       ++args_count;
-//     }
-//     argv[args_count] = null;
-//     execvp(argv[0], argv);
-//     os_exit(0);
-//   // }
-//   return pid;
-// }
 
 i32 os_process_join(OS_Handle handle) {
   int pid = handle.v;

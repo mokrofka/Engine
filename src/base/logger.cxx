@@ -30,7 +30,7 @@ void print(String fmt, ...) {
   String formatted = push_strfv(scratch, fmt, argc);
   va_end(argc);
   String out_message = push_strf(scratch, "%s", formatted);
-  os_console_write(out_message, -1);
+  os_console_write(out_message, 0);
 }
 
 void println(String fmt, ...) {
@@ -40,5 +40,5 @@ void println(String fmt, ...) {
   String formatted = push_strfv(scratch, fmt, argc);
   va_end(argc);
   String out_message = push_strf(scratch, "%s\n", formatted);
-  os_console_write(out_message, -1);
+  os_console_write(out_message, 0);
 }

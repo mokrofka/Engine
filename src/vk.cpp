@@ -103,7 +103,7 @@ struct RenderEntity {
     {                                        \
       if (expr != VK_SUCCESS) {              \
         Error("%s", vk_result_string(expr)); \
-        Assert(false);                       \
+        InvalidPath;                         \
       }                                      \
     }
 #else
@@ -288,6 +288,11 @@ struct VK_State {
   VkDeviceSize immediate_draw_lines_offset;
   Darray<DebugDrawLine> draw_lines;
   Darray<DebugDrawLine> immediate_draw_lines;
+
+  u32 shader_count;
+  Darray<u32> shader_states_counts;
+  Map<String, u32> shader_to_idx;
+  MapAuto<MaterialProps, u32> shader_state_to_idx;
 
   ///////////////////////////////////
   // Vulkan loader
@@ -584,6 +589,7 @@ intern u32 vk_find_memory_idx(u32 type_filter, u32 property_flags) {
     }
   }
   AssertMsg(idx != -1, "Unable to find suitable memory type");
+  // if (idx == -1) Assert(!"Unable to find sutable memory type");
   return idx;
 }
 
@@ -830,7 +836,7 @@ intern VkPipeline vk_shader_pipeline_create(Shader shader) {
 
   // Input assembly
   VkPrimitiveTopology topology;
-  switch (shader.info.primitive) {
+  switch (shader.state.topology) {
     case ShaderTopology_Triangle: topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST; break;
     case ShaderTopology_Line:     topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST; break;
     case ShaderTopology_Point:    topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST; break;
@@ -885,7 +891,7 @@ intern VkPipeline vk_shader_pipeline_create(Shader shader) {
   VkPipelineMultisampleStateCreateInfo multisampling_state_info = {
     .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
     // .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
-    .rasterizationSamples = (VkSampleCountFlagBits)shader.info.samples,
+    .rasterizationSamples = (VkSampleCountFlagBits)shader.state.samples,
     .sampleShadingEnable = VK_FALSE,
     .minSampleShading = 1.0f,
     .pSampleMask = 0,
@@ -895,9 +901,9 @@ intern VkPipeline vk_shader_pipeline_create(Shader shader) {
 
   // Depth and stencil testing
   VkPipelineDepthStencilStateCreateInfo depth_stencil_state_info = {VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
-  if (shader.info.use_depth) {
+  if (shader.state.use_depth) {
     depth_stencil_state_info.depthTestEnable = VK_TRUE;
-    if (shader.info.type == ShaderType_Cube) {
+    if (shader.state.type == ShaderType_Cube) {
       depth_stencil_state_info.depthWriteEnable = VK_FALSE;
       depth_stencil_state_info.depthCompareOp   = VK_COMPARE_OP_LESS_OR_EQUAL;
     } else {
@@ -910,27 +916,16 @@ intern VkPipeline vk_shader_pipeline_create(Shader shader) {
   
   // Blending
   VkPipelineColorBlendAttachmentState color_blend_attachment_state = {};
-  if (shader.info.is_transparent) {
+  if (shader.state.is_transparent) {
     color_blend_attachment_state.blendEnable = VK_TRUE;
     color_blend_attachment_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
     color_blend_attachment_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     color_blend_attachment_state.colorBlendOp = VK_BLEND_OP_ADD;
-
-    color_blend_attachment_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-    color_blend_attachment_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-    color_blend_attachment_state.alphaBlendOp = VK_BLEND_OP_ADD;
-  } else {
-    color_blend_attachment_state.blendEnable = VK_FALSE;
-    color_blend_attachment_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-    color_blend_attachment_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-    color_blend_attachment_state.colorBlendOp = VK_BLEND_OP_ADD;
-
     color_blend_attachment_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
     color_blend_attachment_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     color_blend_attachment_state.alphaBlendOp = VK_BLEND_OP_ADD;
   }
-  color_blend_attachment_state.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                                VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+  color_blend_attachment_state.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
   VkPipelineColorBlendStateCreateInfo color_blend_state_info = {
     .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
     .logicOpEnable = VK_FALSE,
@@ -977,7 +972,7 @@ intern VkPipeline vk_shader_pipeline_create(Shader shader) {
 
 Handle<GpuShader> vk_shader_load(Shader shader) {
   Scratch scratch;
-  switch (shader.info.type) {
+  switch (shader.state.type) {
     case ShaderType_Drawing: {
       // VK_ShaderStages stages = vk_shader_module_create(shader.name);
       VK_Shader vk_shader = {};
@@ -1014,7 +1009,7 @@ Handle<GpuShader> vk_shader_load(Shader shader) {
 }
 
 void vk_shader_reload(Shader shader, Handle<GpuShader> shader_handle) {
-  switch (shader.info.type) {
+  switch (shader.state.type) {
     case ShaderType_Drawing: {
       VK_Shader& vk_shader = vk.shaders[shader_handle.handle];
       vk.DeviceWaitIdle(vkdevice);
@@ -1387,7 +1382,7 @@ intern VkAccessFlags vk_image_layout_to_mem_access_flags(VkImageLayout layout) {
 		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL: return VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 		case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL: return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 		case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:          return NoFlags;
-    default: Assert(false); return 0;
+    default: InvalidPath; return {};
 	}
 }
 
@@ -1400,7 +1395,7 @@ intern VkPipelineStageFlags vk_image_layout_to_pipeline_stage_flags(VkImageLayou
     case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL: return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL: return VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
 		case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:          return VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-    default: Assert(false); return 0;
+    default: InvalidPath; return {};
 	}
 }
 
@@ -1640,6 +1635,13 @@ Handle<GpuMaterial> vk_material_load(Material material) {
   Handle<GpuMaterial> handle = {id};
   return handle;
 }
+
+// Handle<GpuMaterial> vk_material_load(Material material) {
+
+//   // vk.shader_to_idx.
+
+//   return {};
+// }
 
 Handle<GpuCubemap> vk_cubemap_load(Texture* textures) {
   u32 width = textures->width;
@@ -2628,8 +2630,8 @@ void vk_init() {
   {
     Shader shader = {
       .name = "line",
-      .info = {
-        .primitive = ShaderTopology_Line,
+      .state = {
+        .topology = ShaderTopology_Line,
         .is_transparent = true,
         .use_depth = true,
       },
@@ -2640,8 +2642,8 @@ void vk_init() {
   {
     Shader shader = {
       .name = "screen",
-      .info = {
-        .primitive = ShaderTopology_Triangle,
+      .state = {
+        .topology = ShaderTopology_Triangle,
         .samples = 1,
       },
     };
@@ -3239,4 +3241,5 @@ void debug_draw_aabb(v3 min, v3 max, v3 color) {
   immediate_debug_draw_line(p100, p101, color);
   immediate_debug_draw_line(p100, p110, color);
 }
+
 
