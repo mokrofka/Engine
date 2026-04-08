@@ -950,10 +950,6 @@ intern Texture texture_image_load(String filepath) {
 ////////////////////////////////////////////////////////////////////////
 // Common
 
-struct ShaderReloadInfo {
-  Shader shader;
-  Handle<GpuShader> shader_handle;
-};
 struct CommonState {
   Arena arena;
   String asset_path;
@@ -961,7 +957,6 @@ struct CommonState {
   String shader_compiled_dir;
   String models_dir;
   String textures_dir;
-  Map<String, ShaderReloadInfo> shader_reload_map;
   Map<String, Handle<GpuTexture>> str_to_texture;
   Map<String, Handle<GpuMesh>> str_to_mesh;
   Map<String, Handle<GpuMaterial>> str_to_material;
@@ -997,8 +992,7 @@ void common_init() {
       Scratch scratch;
       String shader_name_with_format = str_chop_last_dot(name);
       String shader_name = str_chop_last_dot(shader_name_with_format);
-      ShaderReloadInfo* info = common_st.shader_reload_map.get(shader_name);
-      vk_shader_reload(info->shader, info->shader_handle);
+      vk_shader_reload(shader_name);
     });
   }
   entity_soa.transforms = push_array(common_st.arena, Transform, MaxEntities);
@@ -1017,6 +1011,7 @@ void asset_load() {
 
   MESH_LIST
 #undef X
+
 #define X(enum_name, name) \
   textures_handlers[enum_name] = texture_load(textures_strs[enum_name]); \
   common_st.str_to_texture.add(Stringify(name), textures_handlers[enum_name]);
@@ -1050,18 +1045,11 @@ void asset_load() {
     Handle<GpuTexture>* texture_hanle = common_st.str_to_texture.get(mat.texture); \
     if (texture_hanle) \
       mat.texture_handle = *texture_hanle; \
-    materials_handlers[enum_name] = vk_material_load_(mat); \
+    materials_handlers[enum_name] = vk_material_load(mat); \
   }
   MATERIAL_LIST
 #undef X
 
-  // Loop (i, Material_COUNT) {
-  //   Handle<GpuTexture>* texture_hanle = common_st.str_to_texture.get(materials_info[i].texture);
-  //   if (texture_hanle) {
-  //     materials_info[i].texture_handle = *texture_hanle;
-  //   }
-  //   materials_handlers[i] = vk_material_load_(materials_info[i]);
-  // }
 }
 
 String asset_base_path() {
@@ -1086,12 +1074,12 @@ Handle<GpuMesh> mesh_load(String name) {
   return handle;
 }
 
-Handle<GpuShader> shader_load(Shader shader) {
-  Handle<GpuShader> handle = vk_shader_load(shader);
-  ShaderReloadInfo reload_info = {shader, handle};
-  common_st.shader_reload_map.add(shader.name, reload_info);
-  return handle;
-}
+// Handle<GpuShader> shader_load(Shader shader) {
+  // // Handle<GpuShader> handle = vk_shader_load(shader);
+  // ShaderReloadInfo reload_info = {shader, handle};
+  // common_st.shader_reload_map.add(shader.name, reload_info);
+  // return handle;
+// }
 
 Handle<GpuTexture> texture_load(String name) {
   Scratch scratch;

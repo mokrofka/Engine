@@ -12,6 +12,7 @@ const u32 MaxDebugLines = KB(1);
 
 struct GpuMaterial {
   u32 pipeline_idx;
+  ShaderState shader_state;
   MaterialProps props;
   Handle<GpuTexture> texture;
 };
@@ -221,18 +222,18 @@ struct VK_ShaderModule {
   VkPipelineShaderStageCreateInfo stages[2];
 };
 
-struct VK_Shader {
-  VkPipeline pipeline;
-  ShaderBatch<Entity> batch;
-  ShaderBatch<Entity> batch_indexed;
-  u32 static_entities_count;
-  u32 static_entities_indexed_count;
-  u32 static_entities_count_old;
-  u32 static_entities_indexed_count_old;
-  ShaderBatch<StaticEntity> static_batch;
-  ShaderBatch<StaticEntity> static_batch_indexed;
-  VK_ShaderModule module;
-};
+// struct VK_Shader {
+//   VkPipeline pipeline;
+//   ShaderBatch<Entity> batch;
+//   ShaderBatch<Entity> batch_indexed;
+//   u32 static_entities_count;
+//   u32 static_entities_indexed_count;
+//   u32 static_entities_count_old;
+//   u32 static_entities_indexed_count_old;
+//   ShaderBatch<StaticEntity> static_batch;
+//   ShaderBatch<StaticEntity> static_batch_indexed;
+//   VK_ShaderModule module;
+// };
 
 struct VK_SyncObj {
   VkSemaphore* image_available_semaphores;
@@ -300,7 +301,6 @@ struct VK_State {
 
   Array<RenderEntity, MaxEntities+MaxStaticEntities> entities;
 
-  Array<VK_Shader, MaxShaders> shaders;
   Array<VK_Mesh, MaxMeshes> meshes;
   Array<VK_Image, MaxTextures> textures;
 
@@ -308,9 +308,9 @@ struct VK_State {
   VK_Image offscreen_depth_buffer;
   VK_Image* texture_targets;
 
-  VK_Shader screen_shader;
-  VK_Shader cubemap_shader;
-  VK_Shader debug_line_shader;
+  VkPipeline screen_shader;
+  VkPipeline cubemap_shader;
+  VkPipeline debug_line_shader;
 
   mat4 view;
   mat4 projection;
@@ -324,7 +324,12 @@ struct VK_State {
   Darray<DebugDrawLine> immediate_draw_lines;
 
   Darray<VkPipeline> pipelines;
-  Darray<VK_ShaderModule> modules;
+  struct ModuleEntry {
+    VK_ShaderModule module;
+    Darray<u32> track_pipelines;
+    Darray<u32> track_shader_states;
+  };
+  Darray<ModuleEntry> modules;
   Darray<RenderBatch> batches;
   Darray<GpuMaterial> materials;
   
@@ -1221,80 +1226,15 @@ intern VkPipeline vk_shader_pipeline_create_(VK_ShaderModule module, ShaderState
   return result;
 }
 
-Handle<GpuShader> vk_shader_load(Shader shader) {
-  Scratch scratch;
-  switch (shader.state.type) {
-    case ShaderType_Drawing: {
-      // VK_ShaderStages stages = vk_shader_module_create(shader.name);
-      VK_Shader vk_shader = {};
-      // vk_shader.module[0] = stages.stages[0].module;
-      // vk_shader.module[1] = stages.stages[1].module;
-      vk_shader.pipeline = vk_shader_pipeline_create(shader);
-      u32 id = vk.shaders.count;
-      vk.shaders.add(vk_shader);
-      Handle<GpuShader> handle = {id};
-      return handle;
-    }
-    case ShaderType_Screen: {
-      // VK_Shader &shader = vk.screen_shader;
-      // shader = {
-      //   .stages = vk_shader_module_create(name),
-      // };
-      // shader.pipeline = vk_shader_pipeline_create(type, shader.stages);
-      // u32 id = vk.shaders.count + 100;
-      // append(vk.shaders, shader);
-      // return id;
-      return {};
-    }
-    case ShaderType_Cube: {
-      VK_Shader &vk_shader = vk.cubemap_shader;
-      // VK_ShaderStages stages = vk_shader_module_create(shader.name);
-      vk_shader.pipeline = vk_shader_pipeline_create(shader);
-      Handle<GpuShader> handle = {200};
-      return handle;
-    }
-    case ShaderType_Compute: {
-      return {};
-    } break;
-  }
-}
-
-void vk_shader_reload(Shader shader, Handle<GpuShader> shader_handle) {
-  switch (shader.state.type) {
-    case ShaderType_Drawing: {
-      VK_Shader& vk_shader = vk.shaders[shader_handle.handle];
-      vk.DeviceWaitIdle(vkdevice);
-      vk.DestroyPipeline(vkdevice, vk_shader.pipeline, vk.allocator);
-      Loop (i, 2) {
-        vk.DestroyShaderModule(vkdevice, vk_shader.module.stages[i].module, vk.allocator);
-      }
-      // VK_ShaderStages stages = vk_shader_module_create(name);
-      // shader.module[0] = stages.stages[0].module;
-      // shader.module[1] = stages.stages[1].module;
-      vk_shader.pipeline = vk_shader_pipeline_create(shader);
-    }
-    case ShaderType_Screen: {
-      // VK_Shader& shader = vk.screen_shader;
-      // vk.DeviceWaitIdle(vkdevice);
-      // vk.DestroyPipeline(vkdevice, shader.pipeline, vk.allocator);
-      // Loop (i, 2) {
-      //   vk.DestroyShaderModule(vkdevice, shader.stages[i].module, vk.allocator);
-      // }
-      // shader.stages = vk_shader_module_create(name);
-      // shader.pipeline = vk_shader_pipeline_create(shader.type, shader.stages);
-    }
-    case ShaderType_Cube: {
-      // VK_Shader& shader = vk.cubemap_shader;
-      // vk.DeviceWaitIdle(vkdevice);
-      // vk.DestroyPipeline(vkdevice, shader.pipeline, vk.allocator);
-      // Loop (i, 2) {
-      //   vk.DestroyShaderModule(vkdevice, shader.stages[i].module, vk.allocator);
-      // }
-      // shader.stages = vk_shader_module_create(name);
-      // shader.pipeline = vk_shader_pipeline_create(shader.type, shader.stages);
-    }
-    case ShaderType_Compute: {
-    }
+void vk_shader_reload(String name) {
+  u32* module_idx = vk.shader_to_module.get(name);
+  VK_State::ModuleEntry& entry = vk.modules[*module_idx];
+  entry.module = vk_shader_module_create(name);
+  Loop (i, entry.track_pipelines.count) {
+    u32 pipeline_idx = entry.track_pipelines[i];
+    u32 material_idx = entry.track_shader_states[i];
+    ShaderState state = vk.materials[material_idx].shader_state;
+    vk.pipelines[pipeline_idx] = vk_shader_pipeline_create_(entry.module, state);
   }
 }
 
@@ -1874,21 +1814,21 @@ intern void vk_texture_resize_target() {
   vk.offscreen_depth_buffer = vk_image_create(depth_info);
 }
 
-Handle<MaterialGPU> vk_material_load(Material material) {
-  vk.gpu_materials[vk.gpu_materials_count] = {
-    .ambient = material.props.ambient,
-    .diffuse = material.props.diffuse,
-    .specular = material.props.specular,
-    .shininess = material.props.shininess, 
-    // .texture = material.texture, 
-    .texture = material.texture_handle, 
-  };
-  u32 id = vk.gpu_materials_count++;
-  Handle<MaterialGPU> handle = {id};
-  return handle;
-}
+// Handle<MaterialGPU> vk_material_load(Material material) {
+//   vk.gpu_materials[vk.gpu_materials_count] = {
+//     .ambient = material.props.ambient,
+//     .diffuse = material.props.diffuse,
+//     .specular = material.props.specular,
+//     .shininess = material.props.shininess, 
+//     // .texture = material.texture, 
+//     .texture = material.texture_handle, 
+//   };
+//   u32 id = vk.gpu_materials_count++;
+//   Handle<MaterialGPU> handle = {id};
+//   return handle;
+// }
 
-Handle<GpuMaterial> vk_material_load_(Material material) {
+Handle<GpuMaterial> vk_material_load(Material material) {
   KeyToShaderPipeline key = {material.shader.name, material.shader.state};
   u32* pipeline_idx = vk.shader_to_pipeline.get(key);
   if (!pipeline_idx) {
@@ -1896,12 +1836,16 @@ Handle<GpuMaterial> vk_material_load_(Material material) {
     if (!module_idx) {
       VK_ShaderModule module = vk_shader_module_create(material.shader.name);
       module_idx = vk.shader_to_module.add(material.shader.name, vk.modules.count);
-      vk.modules.add(module);
+      vk.modules.add({module});
     }
-    VkPipeline pipeline = vk_shader_pipeline_create_(vk.modules[*module_idx], material.shader.state);
+    VkPipeline pipeline = vk_shader_pipeline_create_(vk.modules[*module_idx].module, material.shader.state);
     pipeline_idx = vk.shader_to_pipeline.add(key, vk.pipelines.count);
     vk.pipelines.add(pipeline);
     vk.batches.add({{}});
+
+    VK_State::ModuleEntry& entry = vk.modules[*module_idx];
+    entry.track_pipelines.add(*pipeline_idx);
+    entry.track_shader_states.add(vk.materials.count);
   }
   vk.gpu_materials[vk.materials.count] = {
     .ambient = material.props.ambient,
@@ -1912,6 +1856,7 @@ Handle<GpuMaterial> vk_material_load_(Material material) {
   };
   GpuMaterial mat = {
     .pipeline_idx = *pipeline_idx,
+    .shader_state = material.shader.state,
     .texture = material.texture_handle,
     .props = material.props,
   };
@@ -2791,19 +2736,19 @@ void vk_draw() {
 
   // Debug drawing
   if (vk.draw_lines.count > 0) {
-    vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.debug_line_shader.pipeline);
+    vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.debug_line_shader);
     vk.CmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, (VkDeviceSize*)&vk.draw_lines_offset);
     vk.CmdDraw(cmd, vk.draw_lines.count*2, 1, 0, 0);
   }
   if (vk.immediate_draw_lines.count > 0) {
-    vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.debug_line_shader.pipeline);
+    vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.debug_line_shader);
     vk.CmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, (VkDeviceSize*)&vk.immediate_draw_lines_offset);
     vk.CmdDraw(cmd, vk.immediate_draw_lines.count*2, 1, 0, 0);
     vk.immediate_draw_lines.clear();
   }
 
   // Cube map
-  vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.cubemap_shader.pipeline);
+  vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.cubemap_shader);
   Handle<GpuMesh> h = mesh_get(Mesh_Cube);
   VK_Mesh mesh = vk.meshes[h.handle];
   vk.CmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, &mesh.vert_offset);
@@ -2819,7 +2764,7 @@ void vk_draw_screen() {
   VkCommandBuffer cmd = vk_get_current_cmd();
   PushConstant push = {vk.current_image_idx};
   vk.CmdPushConstants(cmd, vk.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstant), &push);
-  vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.screen_shader.pipeline);
+  vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.screen_shader);
   vk.CmdDraw(cmd, 3, 1, 0, 0);
 }
 
@@ -3058,7 +3003,7 @@ void vk_init() {
         .use_depth = true,
       },
     };
-    vk.debug_line_shader.pipeline = vk_shader_pipeline_create(shader);
+    vk.debug_line_shader = vk_shader_pipeline_create(shader);
   }
   // Screen drawing
   {
@@ -3069,7 +3014,7 @@ void vk_init() {
         .samples = 1,
       },
     };
-    vk.screen_shader.pipeline = vk_shader_pipeline_create(shader);
+    vk.screen_shader = vk_shader_pipeline_create(shader);
   }
   {
     Shader shader = {
@@ -3081,7 +3026,7 @@ void vk_init() {
         .use_depth = true,
       },
     };
-    vk.cubemap_shader.pipeline = vk_shader_pipeline_create(shader);
+    vk.cubemap_shader = vk_shader_pipeline_create(shader);
   }
 
   vk.scale = 1;
@@ -3566,41 +3511,39 @@ void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMes
 }
 
 void vk_remove_renderable(Handle<Entity> entity_handle) {
-  // u32 entity_idx = entity_handle.idx();
-  // DebugDo(Assert(vk.entities[entity_idx].is_init == true));
-  // DebugDo(vk.entities[entity_idx].is_init = false);
-  // u32 shader_idx = vk.entities[entity_idx].pipeline.handle;
-  // u32 mesh_idx = vk.entities[entity_idx].mesh.handle;
-  // VK_Mesh mesh = vk.meshes[mesh_idx];
-  // if (mesh.index_count) {
-  //   VK_Shader& shader = vk.shaders[shader_idx];
-  //   ShaderBatch<Entity>& shader_batch = shader.batch_indexed;
-  //   u32* mesh_batch_idx = shader_batch.mesh_to_batch.get(mesh_idx);
-  //   MeshBatch<Entity>& mesh_batch = shader_batch.mesh_batches[*mesh_batch_idx];
+  u32 entity_idx = entity_handle.idx();
+  Assert(vk.entities[entity_idx].is_init == true);
+  DebugDo(vk.entities[entity_idx].is_init = false);
+  u32 pipeline_idx = vk.entities[entity_idx].pipeline;
+  u32 mesh_idx = vk.entities[entity_idx].mesh.handle;
+  VK_Mesh mesh = vk.meshes[mesh_idx];
+  if (mesh.index_count) {
+    ShaderBatch<Entity>& shader_batch = vk.batches[pipeline_idx].batch_indexed;
+    u32* mesh_batch_idx = shader_batch.mesh_to_batch.get(mesh_idx);
+    MeshBatch<Entity>& mesh_batch = shader_batch.mesh_batches[*mesh_batch_idx];
 
-  //   u32 idx = vk.entities[entity_idx].entity_idx_in_array;
-  //   u32 last_idx = mesh_batch.entities.count-1;
-  //   Handle<Entity> swapped = mesh_batch.entities[last_idx];
-  //   u32 swapped_idx = swapped.idx();
+    u32 idx = vk.entities[entity_idx].entity_idx_in_array;
+    u32 last_idx = mesh_batch.entities.count-1;
+    Handle<Entity> swapped = mesh_batch.entities[last_idx];
+    u32 swapped_idx = swapped.idx();
 
-  //   mesh_batch.entities[idx] = swapped;
-  //   mesh_batch.entities.pop();
-  //   vk.entities[swapped_idx].entity_idx_in_array = idx;
-  // } else {
-  //   VK_Shader& shader = vk.shaders[shader_idx];
-  //   ShaderBatch<Entity>& shader_batch = shader.batch;
-  //   u32* mesh_batch_idx = shader_batch.mesh_to_batch.get(mesh_idx);
-  //   MeshBatch<Entity>& mesh_batch = shader_batch.mesh_batches[*mesh_batch_idx];
+    mesh_batch.entities[idx] = swapped;
+    mesh_batch.entities.pop();
+    vk.entities[swapped_idx].entity_idx_in_array = idx;
+  } else {
+    ShaderBatch<Entity>& shader_batch = vk.batches[pipeline_idx].batch;
+    u32* mesh_batch_idx = shader_batch.mesh_to_batch.get(mesh_idx);
+    MeshBatch<Entity>& mesh_batch = shader_batch.mesh_batches[*mesh_batch_idx];
 
-  //   u32 idx = vk.entities[entity_idx].entity_idx_in_array;
-  //   u32 last_idx = mesh_batch.entities.count-1;
-  //   Handle<Entity> swapped = mesh_batch.entities[last_idx];
-  //   u32 swapped_idx = swapped.idx();
+    u32 idx = vk.entities[entity_idx].entity_idx_in_array;
+    u32 last_idx = mesh_batch.entities.count-1;
+    Handle<Entity> swapped = mesh_batch.entities[last_idx];
+    u32 swapped_idx = swapped.idx();
 
-  //   mesh_batch.entities[idx] = swapped;
-  //   mesh_batch.entities.pop();
-  //   vk.entities[swapped_idx].entity_idx_in_array = idx;
-  // }
+    mesh_batch.entities[idx] = swapped;
+    mesh_batch.entities.pop();
+    vk.entities[swapped_idx].entity_idx_in_array = idx;
+  }
 }
 
 void vk_set_entity_color(Handle<Entity> entity_handle, v4 color) {

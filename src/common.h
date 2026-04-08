@@ -111,19 +111,17 @@ struct Material {
 void vk_init();
 void vk_shutdown();
 
-KAPI Handle<GpuShader> vk_shader_load(Shader shader);
-KAPI void vk_shader_reload(Shader shader, Handle<GpuShader> shader_handle);
 KAPI Handle<GpuTexture> vk_texture_load(Texture texture);
-// KAPI Handle<MaterialGPU> vk_material_load(Material material);
-KAPI Handle<GpuMaterial> vk_material_load_(Material material);
+KAPI Handle<GpuMaterial> vk_material_load(Material material);
 KAPI Handle<GpuCubemap> vk_cubemap_load(Texture* textures);
 KAPI Handle<GpuMesh> vk_mesh_load(Mesh mesh);
+
+KAPI void vk_shader_reload(String name);
 
 KAPI void vk_begin_draw_frame();
 KAPI void vk_end_draw_frame();
 
 // Entity
-// KAPI void vk_make_renderable(Handle<Entity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuShader> shader_handle, Handle<GpuMaterial> material_handle);
 KAPI void vk_make_renderable_(Handle<Entity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuMaterial> material_handle);
 KAPI void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuMaterial> material_handle);
 KAPI void vk_remove_renderable(Handle<Entity> entity_handle);

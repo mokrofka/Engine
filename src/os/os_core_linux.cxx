@@ -357,7 +357,6 @@ StringList os_watch_check(Allocator arena, OS_Watch watch) {
   while (offset < read_size) {
     struct inotify_event* event = (struct inotify_event*)&buf[offset];
     if (event->len) {
-      int lnx_flags = 0;
       str_list_push(arena, &result, event->name);
     }
     offset += sizeof(struct inotify_event) + event->len;
