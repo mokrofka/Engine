@@ -1,6 +1,8 @@
 #include "common.h"
 #include "stb_image.h"
-#include "lib.h"
+
+u64 hash(Vertex x) { return hash_memory(&x, sizeof(x)); }
+b32 equal(Vertex a, Vertex b) { return MemMatchStruct(&a, &b); }
 
 Extern f32 g_dt;
 Extern f32 g_time;
@@ -24,8 +26,10 @@ Transform& static_entities_transforms(Handle<StaticEntity> handle) {
   Assert(handle.generation() == entity_soa.static_generations[handle.idx()]);
   return entity_soa.static_transforms[handle.idx()];
 }
+#if BUILD_DEBUG
 u32* entities_generations() { return entity_soa.generations; }
 u32* static_entities_generations() { return entity_soa.static_generations; }
+#endif
 
 ////////////////////////////////////////////////////////////////////////
 // Assets
@@ -77,6 +81,7 @@ constexpr MaterialProps material_default_props() {
 ///////////////////////////////////
 // Allocators
 
+const u32 TEST_SAMPLES = 100;
 global i32 test_alignments[] = { 8, 16, 32, 64 };
 
 intern void test_global_alloc() {
@@ -356,6 +361,10 @@ intern void test_handle_darray() {
   }
 }
 
+intern void test_id_pool() {
+
+}
+
 void test() {
   test_global_alloc();
   test_arena_alloc();
@@ -363,6 +372,8 @@ void test() {
   test_seglist_alloc();
   test_gpu_seglist_alloc();
   test_object_pool();
+  test_handle_darray();
+  test_id_pool();
 }
 
 // ////////////////////////////////////////////////////////////////////////
@@ -448,9 +459,9 @@ void profiler_end_and_print_() {
   }
 }
 
-// https://github.com/rxi/sj.h.git
 ////////////////////////////////////////////////////////////////////////
 // Json
+// https://github.com/rxi/sj.h.git
 
 JsonValue json_read(JsonReader* r) {
   JsonValue res = {};
@@ -663,7 +674,7 @@ intern Mesh mesh_load_obj(Allocator arena, String name) {
   }
   Darray<Vertex> vertices(arena);
   Darray<u32> final_indices(arena);
-  MapAuto<Vertex, u32> map(scratch);
+  Map<Vertex, u32> map(scratch);
   for (v3u idx : indexes) {
     Vertex vertex = {
       .pos = positions[idx.x],
@@ -964,8 +975,10 @@ struct CommonState {
 
 global CommonState common_st;
 
+void foo();
 void common_init() {
   Scratch scratch;
+  // foo();
   {
     CommonState& st = common_st;
     st.arena = arena_init();
@@ -1120,4 +1133,279 @@ b32 timer_tick(Timer& t) {
     return true;
   }
   return false;
+}
+
+void insert_sort(i32* arr, i32 size) {
+  for (i32 i = 1; i < size; ++i) {
+    i32 key = arr[i];
+    i32 j = i - 1;
+    while (j >= 0 && arr[j] > key) {
+      arr[j + 1] = arr[j];
+      j--;
+    }
+    arr[j + 1] = key;
+  }
+}
+
+static i32 partition(i32 *arr, i32 low, i32 high) {
+  i32 pivot = arr[high]; // choose last element as pivot
+  i32 i = low;           // place for next smaller element
+  for (i32 j = low; j < high; ++j) {
+    if (arr[j] < pivot) {
+      Swap(arr[i], arr[j]);
+      i++;
+    }
+  }
+  Swap(arr[i], arr[high]); // place pivot in correct position
+  return i;
+}
+
+void quick_sort(i32* arr, i32 low, i32 high) {
+  if (low < high) {
+    i32 p = partition(arr, low, high);
+    quick_sort(arr, low, p - 1);
+    quick_sort(arr, p + 1, high);
+  }
+}
+
+struct Transform1 {
+  v3 pos;
+  // v3 arr[2];
+};
+
+void thread_pool_init(i32 num_threads);
+void task_queue_push(Task t);
+u32 task_queue_count();
+
+struct TransformTask {
+  Transform1* transforms;
+  u32* idx_arr;       // optional for random access
+  u64 count;
+  v3* out_sum;        // where the thread accumulates
+  b32 use_random;
+};
+
+void transform_task_func(void* arg) {
+  TransformTask* t = (TransformTask*)arg;
+  v3 sum = {0, 0, 0};
+  if (t->use_random) {
+    for (u64 i = 0; i < t->count; ++i) {
+      sum += t->transforms[t->idx_arr[i]].pos;
+    }
+  }
+  else {
+    for (u64 i = 0; i < t->count; ++i) {
+      sum += t->transforms[i].pos;
+    }
+  }
+  // store result (safe if each thread writes to its own slot)
+  *t->out_sum = sum;
+}
+
+// Debug
+// MB(10) iteration
+// 1 thread
+// 0.52, 0.16gb
+
+// 2 thread
+// 1.00, 0.32
+
+// 3 thread
+// 1.40, 0.50
+
+// 4 thread
+// 1.7, 0.70
+
+// Release
+// MB(10) iteration
+// 1 thread
+// linear: 5.00gb, random access: 1.0gb
+
+// 2 thread
+// linear: 7.78gb, random access: 2.32gb
+
+// 3 thread
+// linear: 7.60gb, random access: 3.16gb
+
+// 4 thread
+// linear: 7.6gb, random access: 3.90gb
+
+void foo() {
+  Scratch scratch;
+  thread_pool_init(4);
+
+  u64 cpu_frequ = profiler_cpu_frequency();
+  Info("%.2f Ghz/s cpu frequency", (f64)cpu_frequ / Billion(1));
+  #define IterationNum (MB(10))
+  #define NUM_THREADS 4
+  #define IterationChunk (IterationNum / NUM_THREADS)
+  #define SIZE (IterationNum * sizeof(Transform1))
+  #define USEFUL_SIZE (IterationNum * sizeof(v3))
+  Info("%.2f mb Memory size", (f64)SIZE / MB(1));
+
+  u8* idx_buf = os_reserve(IterationNum*sizeof(u32));
+  os_commit(idx_buf, IterationNum*sizeof(u32));
+  u8* buf = os_reserve(SIZE);
+  os_commit(buf, SIZE);
+
+  u32* idx_arr = (u32*)idx_buf;
+  Loop(i, IterationNum) {
+    idx_arr[i] = i;
+  }
+  for (u32 i = IterationNum - 1; i > 0; --i) {
+    u32 j = rand_range_u32(0, i);
+    Swap(idx_arr[i], idx_arr[j]);
+  }
+  Transform1* transforms = (Transform1*)buf;
+  Loop (i, IterationNum) {
+    transforms[i].pos = v3_rand_range(v3_scale(-10), v3_scale(10));
+  }
+
+#if 0
+  Loop (i, 1) {
+    u64 now = cpu_timer_now();
+    v3 vec_res = {};
+    Loop (i, IterationNum) {
+      vec_res += transforms[i].pos;
+    }
+    u64 end = cpu_timer_now();
+    f64 seconds = f64(end-now) / cpu_frequ;
+    f64 bandwidth_gb = SIZE / seconds / GB(1);
+    f64 useful_bandwidth_gb = USEFUL_SIZE / seconds / GB(1);
+    Info("%.2f GB/s", bandwidth_gb);
+    Info("%.2f useful GB/s", useful_bandwidth_gb);
+    Info("%f took sec", seconds);
+    Info("%f %f %f\n\n", vec_res.x, vec_res.y, vec_res.z);
+  }
+  Info("------------- RANDOM ACCESS");
+  Loop (i, 1) {
+    u64 now = cpu_timer_now();
+    v3 vec_res = {};
+    Loop (i, IterationNum) {
+      vec_res += transforms[idx_arr[i]].pos;
+    }
+    u64 end = cpu_timer_now();
+    f64 seconds = f64(end-now) / cpu_frequ;
+    f64 bandwidth_gb = SIZE / seconds / GB(1);
+    f64 useful_bandwidth_gb = USEFUL_SIZE / seconds / GB(1);
+    Info("%.2f GB/s", bandwidth_gb);
+    Info("%.2f useful GB/s", useful_bandwidth_gb);
+    Info("%f took sec", seconds);
+    Info("%f %f %f\n\n", vec_res.x, vec_res.y, vec_res.z);
+  }
+#else
+
+  Loop (k, 2) {
+    Info("---------------- LINEAR ACCESS");
+    Loop (m, 2) {
+      u64 now = cpu_timer_now();
+      v3 thread_sums[NUM_THREADS] = {};
+      TransformTask trans_tasks[NUM_THREADS] = {};
+      Task tasks[NUM_THREADS] = {};
+      Loop (i, NUM_THREADS) {
+        trans_tasks[i] = {
+          .transforms = transforms + i*IterationChunk,
+          .idx_arr = idx_arr + i*IterationChunk,
+          .count = IterationChunk,
+          .out_sum = &thread_sums[i],
+          .use_random = false,
+        };
+        tasks[i] = {
+          .func = transform_task_func,
+          .arg = &trans_tasks[i],
+        };
+        task_queue_push(tasks[i]);
+      }
+      while (true) {
+        if (task_queue_count() == 0) {
+          break;
+        }
+        os_sleep_ms(5);
+      }
+      u64 end = cpu_timer_now();
+      f64 seconds = f64(end-now) / cpu_frequ;
+      f64 bandwidth_gb = SIZE / seconds / GB(1);
+      f64 useful_bandwidth_gb = USEFUL_SIZE / seconds / GB(1);
+      Info("%.2f GB/s", bandwidth_gb);
+      Info("%.2f useful GB/s", useful_bandwidth_gb);
+      Info("%f took sec", seconds);
+      v3 vec_res = {};
+      Loop (i, NUM_THREADS) {
+        vec_res += thread_sums[i];
+      }
+      Info("%f %f %f\n\n", vec_res.x, vec_res.y, vec_res.z);
+    }
+
+    Info("---------------- RANDOM ACCESS");
+    Loop (m, 2) {
+      u64 now = cpu_timer_now();
+      v3 thread_sums[NUM_THREADS] = {};
+      TransformTask trans_tasks[NUM_THREADS] = {};
+      Task tasks[NUM_THREADS] = {};
+      Loop (i, NUM_THREADS) {
+        trans_tasks[i] = {
+          .transforms = transforms,
+          .idx_arr = idx_arr + i*IterationChunk,
+          .count = IterationChunk,
+          .out_sum = &thread_sums[i],
+          .use_random = true,
+        };
+        tasks[i] = {
+          .func = transform_task_func,
+          .arg = &trans_tasks[i],
+        };
+        task_queue_push(tasks[i]);
+      }
+      while (true) {
+        if (task_queue_count() == 0) {
+          break;
+        }
+      }
+      u64 end = cpu_timer_now();
+      f64 seconds = f64(end-now) / cpu_frequ;
+      f64 bandwidth_gb = SIZE / seconds / GB(1);
+      f64 useful_bandwidth_gb = USEFUL_SIZE / seconds / GB(1);
+      Info("%.2f GB/s", bandwidth_gb);
+      Info("%.2f useful GB/s", useful_bandwidth_gb);
+      Info("%f took sec", seconds);
+      v3 vec_res = {};
+      Loop (i, NUM_THREADS) {
+        vec_res += thread_sums[i];
+      }
+      Info("%f %f %f\n\n", vec_res.x, vec_res.y, vec_res.z);
+    }
+  }
+
+
+#endif
+
+  os_exit(0);
+  
+  // u8* 
+
+  // i32 arr[] = {5, 2, 9, 1, 5, 6};
+  // i32 n = sizeof(arr)/sizeof(arr[0]);
+  // for (var i : arr) {
+  //   print("%i ", i);
+  // }
+  // quick_sort(arr, 0, n - 1);
+  // print("\n");
+  // for (var i : arr) {
+  //   print("%i ", i);
+  // }
+
+  // RingBuffer ring = {
+  //   .base = push_buffer(scratch, KB(1)),
+  //   .size = KB(1),
+  // };
+  // u64 size = 128;
+  // u8* buf0 = push_buffer(scratch, size);
+  // Loop (i, size) { buf0[i] = 0; }
+  // u8* buf1 = push_buffer(scratch, size);
+  // ring_write(ring, buf0, size);
+  // ring_read(ring, buf1, size);
+  // Loop (i, size) { Info("%i", buf1[i]); }
+
+  // ring_read(ring, Slice(buf0, size));
+
 }

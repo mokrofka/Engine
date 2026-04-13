@@ -61,7 +61,7 @@ typedef va_list VaList;
   #endif
 #elif OS_LINUX
   #if HOTRELOAD_BUILD
-    #define shared_function C_LINKAGE __attribute__((visibility("default")))
+    #define shared_function C_LINKAGE
     #define KAPI
   #else
     #define KAPI
@@ -131,6 +131,7 @@ template<typename T> void Swap(T& a, T& b) {
   a = b;
   b = temp;
 }
+template<typename T> b32 equal(T a, T b) { return a == b; }
 
 NO_DEBUG constexpr u64 KB(u64 x) { return x << 10; }
 NO_DEBUG constexpr u64 MB(u64 x) { return x << 20; }
@@ -248,8 +249,15 @@ KAPI void DebugTrap();
   #define AssertMsg(x, message, ...) if (!(x)) { _log_output(LogLevel_Error, message, ##__VA_ARGS__); DebugTrap(); }
 #else
   #define Assert(x)
-  #define AssertMsg(x)
+  #define AssertMsg(x, message, ...)
 #endif
+
+////////////////////////////////////////////////////////////////////////
+// Atomic Operations
+
+#define atomic_u32_inc_eval(x) (__atomic_fetch_add((u32*)(x), 1, __ATOMIC_SEQ_CST) + 1)
+#define atomic_u32_dec_eval(x) (__atomic_fetch_sub((u32*)(x), 1, __ATOMIC_SEQ_CST) - 1)
+#define atomic_u32_eval(x)     __atomic_load_n(x, __ATOMIC_SEQ_CST)
 
 ////////////////////////////////////////////////////////////////////////
 // Link list
@@ -273,7 +281,7 @@ struct _Defer {
 ////////////////////////////////////////////////////////////////////////
 // Error handling
 
-template <typename T, typename ErrorType = void>
+template <typename T, typename ErrorType = i32>
 struct Result {
   union {
     T v;
@@ -297,6 +305,21 @@ struct Result {
 ////////////////////////////////////////////////////////////////////////
 // Types
 
+template<typename T>
+struct Slice {
+  T* data;
+  u64 count;
+  Slice(T* data_, u64 count_) {
+    data = data_;
+    count = count_;
+  }
+  T& operator[](u32 idx) {
+    Assert(idx < count);
+    return data[idx];
+  }
+};
+#define ArraySlice(arr) Slice(arr, ArrayCount(arr))
+
 struct Buffer {
   u8* data;
   u64 size;
@@ -308,5 +331,18 @@ struct Range {
 };
 
 KAPI u64 range_size(Range r);
+
+struct RingBuffer {
+  u8* base;
+  u64 size;
+  u64 write_pos;
+  u64 read_pos;
+};
+
+void ring_write(RingBuffer& ring, void *src, u64 src_size);
+void ring_read(RingBuffer& ring, void *dst, u64 read_size);
+#define ring_write_struct(ring, ptr) ring_write((ring), (ptr), sizeof(*(ptr)))
+#define ring_read_struct(ring, ptr) ring_read((ring) (ptr), sizeof(*(ptr)))
+
 
 

@@ -31,14 +31,13 @@ struct WaylandState {
   
   i32 width = 1;
   i32 height = 1;
-  b8 should_close = false;
+  b8 should_close;
   struct KeyboardState {
     b8 keys[256];
   };
   struct MouseState {
     f32 x;
     f32 y;
-    b8 buttons[MouseButton_COUNT];
   };
   struct {
     KeyboardState keyboard_current;
@@ -154,17 +153,13 @@ intern u32 lnx_keycode_translate(u32 code) {
     case KEY_RIGHTBRACE:  return Key_RBracket;
     case KEY_BACKSLASH:   return Key_Backslash;
 
-    default: return Key_COUNT;
-  }
-}
 
-#define WL_LBUTTON 272
-#define WL_RBUTTON 273
-intern u32 lnx_mouse_buttoncode_translate(u32 code) {
-  switch (code) {
-    case WL_LBUTTON: return MouseButton_Left;
-    case WL_RBUTTON: return MouseButton_Right;
-    default: return MouseButton_COUNT;
+    #define WL_LBUTTON 272
+    #define WL_RBUTTON 273
+    case WL_LBUTTON: return MouseKey_Left;
+    case WL_RBUTTON: return MouseKey_Right;
+
+    default: NotImplemented; return {};
   }
 }
 
@@ -196,10 +191,8 @@ intern void wl_seat_capabilities(void* data, wl_seat* seat, u32 capabilities) {
         wl_st.input.mouse_current.y = y;
       },
       .button = [](void* data, struct wl_pointer* wl_pointer, u32 serial, u32 time, u32 button, u32 state) {
-        #define WL_LBUTTON 272
-        #define WL_RBUTTON 273
-        u32 my_button = lnx_mouse_buttoncode_translate(button);
-        wl_st.input.mouse_current.buttons[my_button] = state;
+        u32 my_button = lnx_keycode_translate(button);
+        wl_st.input.keyboard_current.keys[my_button] = state;
       },
     };
     wl_pointer_add_listener(wl_st.pointer, &wl_st.pointer_listener, data);
@@ -284,8 +277,12 @@ b32 os_window_should_close() {
   return wl_st.should_close;
 }
 
-v2i os_get_window_size() {
-  return v2i(wl_st.width, wl_st.height);
+v2u os_get_window_size() {
+  return v2u(wl_st.width, wl_st.height);
+}
+
+v2 os_get_mouse_pos() {
+  return v2(wl_st.input.mouse_current.x, wl_st.input.mouse_current.y);
 }
 
 void os_get_gfx_api_handlers(void* out) {
@@ -313,19 +310,5 @@ b32 os_was_key_down(Key key)      { return wl_st.input.keyboard_previous.keys[ke
 b32 os_was_key_up(Key key)        { return wl_st.input.keyboard_previous.keys[key] == false; }
 b32 os_is_key_pressed(Key key)    { return os_is_key_down(key) && os_was_key_up(key); }
 b32 os_is_key_released(Key key)   { return os_is_key_up(key) && os_was_key_down(key); }
-
-////////////////////////////////////////////////////////////////////////
-// mouse
-
-b32 os_is_button_down(MouseButtons button)          { return wl_st.input.mouse_current.buttons[button] == true; }
-b32 os_is_button_up(MouseButtons button)            { return wl_st.input.mouse_current.buttons[button] == false; }
-b32 os_was_button_down(MouseButtons button)         { return wl_st.input.mouse_previous.buttons[button] == true; }
-b32 os_was_button_up(MouseButtons button)           { return wl_st.input.mouse_previous.buttons[button] == false; }
-b32 os_is_button_pressed(MouseButtons button)       { return os_is_button_down(button) && os_was_button_up(button); }
-b32 os_is_button_released(MouseButtons button)      { return os_is_button_up(button) && os_was_button_down(button); }
-
-v2 os_get_mouse_pos() {
-  return v2(wl_st.input.mouse_current.x, wl_st.input.mouse_current.y);
-}
 
 #endif

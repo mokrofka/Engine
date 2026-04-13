@@ -16,7 +16,7 @@ i32 main(i32 count, char* args[]) {
   u64 start = os_now_ns();
   global_allocator_init();
   tctx_init();
-  // test();
+  test();
   os_init(args[0]);
   os_gfx_init();
   common_init();
@@ -52,7 +52,9 @@ i32 main(i32 count, char* args[]) {
 
     // Main logic
     vk_begin_draw_frame();
+    ui_begin();
     st.update(&st.state);
+    ui_end();
     vk_end_draw_frame();
     os_input_update();
     asset_watch_update();

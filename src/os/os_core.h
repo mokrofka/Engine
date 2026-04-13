@@ -2,7 +2,21 @@
 #include "base/base.h"
 #include "base/str.h"
 #include "base/mem.h"
-#include "base/maths.h"
+
+struct Thread {
+  u64 v;
+};
+
+typedef void ThreadEntryPointFunctionType(void* p);
+
+struct Task {
+  void (*func)(void* arg);
+  void* arg;
+};
+
+struct Mutex {
+  u64 v;
+};
 
 struct OS_Handle {
   u64 v;
@@ -50,9 +64,9 @@ enum {
 
 typedef u32 OS_WatchFlags;
 enum {
-  OS_WatchFlag_Create     = Bit(0),
-  OS_WatchFlag_Delete     = Bit(1),
-  OS_WatchFlag_Modify     = Bit(2),
+  OS_WatchFlag_Create = Bit(0),
+  OS_WatchFlag_Delete = Bit(1),
+  OS_WatchFlag_Modify = Bit(2),
 };
 
 struct OS_Watch{
@@ -81,8 +95,6 @@ KAPI u8*  os_reserve(u64 size);
 KAPI b32  os_commit(void* ptr, u64 size);
 KAPI void os_decommit(void* ptr, u64 size);
 KAPI void os_release(void* ptr, u64 size);
-KAPI u8*  os_reserve_large(u64 size);
-KAPI b32  os_commit_large(void* ptr, u64 size);
 
 //////////////////////////////////////////////////////////////////////////
 // Files
@@ -123,6 +135,13 @@ KAPI void         os_file_iter_end(OS_FileIter* iter);
 
 KAPI OS_Handle os_process_launch(StringList list);
 KAPI i32       os_process_join(OS_Handle handle);
+
+////////////////////////////////////////////////////////////////////////
+// Threads
+
+KAPI Thread os_thread_launch(ThreadEntryPointFunctionType *func, void *ptr);
+KAPI b32 os_thread_join(Thread handle, u64 endt_us);
+KAPI void os_thread_detach(Thread handle);
 
 ////////////////////////////////////////////////////////////////////////
 // Lib

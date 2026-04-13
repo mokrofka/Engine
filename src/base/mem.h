@@ -150,8 +150,8 @@ struct SoA_Field {
 };
 #define SoA_push_field(ptr,T) {(void**)(ptr), sizeof(T), alignof(T)}
 
-KAPI u8* mem_alloc_soa(Allocator alloc, u32 count, SoA_Field* fields, u32 fields_count);
-KAPI u8* mem_realloc_soa(Allocator alloc, void* ptr, u32 old_count, u32 new_count, SoA_Field* fields, u32 fields_count);
+KAPI u8* mem_alloc_soa(Allocator alloc, u32 count, Slice<SoA_Field> fields);
+KAPI u8* mem_realloc_soa(Allocator alloc, u32 old_count, u32 new_count, Slice<SoA_Field> fields);
 
 struct OffsetMemPusher {
   void* offset;

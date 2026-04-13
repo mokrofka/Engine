@@ -16,24 +16,21 @@ struct X11State {
 
   xcb_atom_t wm_delete_window;
 
-  // Input
-  i32 width = 1;
-  i32 height = 1;
-  b8 should_close = false;
-
+  u32 width = 1;
+  u32 height = 1;
+  b8 should_close;
   struct KeyboardState {
     b8 keys[256];
   };
   struct MouseState {
     f32 x;
     f32 y;
-    b8 buttons[MouseButton_COUNT];
   };
   struct {
-    struct KeyboardState keyboard_current;
-    struct KeyboardState keyboard_previous;
-    struct MouseState mouse_current;
-    struct MouseState mouse_previous;
+    KeyboardState keyboard_current;
+    KeyboardState keyboard_previous;
+    MouseState mouse_current;
+    MouseState mouse_previous;
   } input;
 };
 
@@ -43,7 +40,7 @@ intern u32 lnx_mouse_button_translate(u32 button) {
   switch (button) {
     // case Button1: return MouseButton_Left;
     // case Button3: return MouseButton_Right;
-    default: return MouseButton_COUNT;
+    // default: return MouseKey_COUNT;
   }
   return 0;
 }
@@ -251,17 +248,23 @@ void os_pump_messages() {
       case XCB_BUTTON_PRESS: {
         xcb_button_press_event_t* bp = (xcb_button_press_event_t*)event;
         switch (bp->detail) {
-          case 1: gfx_st.input.mouse_current.buttons[MouseButton_Left] = true; break;
-          case 2: gfx_st.input.mouse_current.buttons[MouseButton_Middle] = true; break;
-          case 3: gfx_st.input.mouse_current.buttons[MouseButton_Right] = true; break;
+          // case 1: gfx_st.input.mouse_current.buttons[MouseKey_Left] = true; break;
+          // case 2: gfx_st.input.mouse_current.buttons[MouseKey_Middle] = true; break;
+          // case 3: gfx_st.input.mouse_current.buttons[MouseKey_Right] = true; break;
+          case 1: gfx_st.input.keyboard_current.keys[MouseKey_Left] = true; break;
+          case 2: gfx_st.input.keyboard_current.keys[MouseKey_Middle] = true; break;
+          case 3: gfx_st.input.keyboard_current.keys[MouseKey_Right] = true; break;
         }
       } break;
       case XCB_BUTTON_RELEASE: {
         xcb_button_press_event_t* bp = (xcb_button_press_event_t*)event;
         switch (bp->detail) {
-          case 1: gfx_st.input.mouse_current.buttons[MouseButton_Left] = false; break;
-          case 2: gfx_st.input.mouse_current.buttons[MouseButton_Middle] = false; break;
-          case 3: gfx_st.input.mouse_current.buttons[MouseButton_Right] = false; break;
+          // case 1: gfx_st.input.mouse_current.buttons[MouseKey_Left] = false; break;
+          // case 2: gfx_st.input.mouse_current.buttons[MouseKey_Middle] = false; break;
+          // case 3: gfx_st.input.mouse_current.buttons[MouseKey_Right] = false; break;
+          case 1: gfx_st.input.keyboard_current.keys[MouseKey_Left] = false; break;
+          case 2: gfx_st.input.keyboard_current.keys[MouseKey_Middle] = false; break;
+          case 3: gfx_st.input.keyboard_current.keys[MouseKey_Right] = false; break;
         }
       } break;
       case XCB_MOTION_NOTIFY: {
@@ -274,7 +277,7 @@ void os_pump_messages() {
 }
 
 b32 os_window_should_close() { return gfx_st.should_close; }
-v2i os_get_window_size() { return v2i(gfx_st.width, gfx_st.height); }
+v2u os_get_window_size() { return v2u(gfx_st.width, gfx_st.height); }
 v2 os_get_mouse_pos() { return v2(gfx_st.input.mouse_current.x, gfx_st.input.mouse_current.y); }
 
 void os_get_gfx_api_handlers(void* out) {
@@ -287,27 +290,18 @@ void os_get_gfx_api_handlers(void* out) {
 
 void  os_close_window() { gfx_st.should_close = true; }
 
-////////////////////////////////////////////////////////////////////////
-// keyboard
 void os_input_update() {
   MemCopyStruct(&gfx_st.input.keyboard_previous, &gfx_st.input.keyboard_current);
   MemCopyStruct(&gfx_st.input.mouse_previous, &gfx_st.input.mouse_current);
 }
 
+////////////////////////////////////////////////////////////////////////
+// keyboard
 b32 os_is_key_down(Key key)       { return gfx_st.input.keyboard_current.keys[key] == true; }
 b32 os_is_key_up(Key key)         { return gfx_st.input.keyboard_current.keys[key] == false; }
 b32 os_was_key_down(Key key)      { return gfx_st.input.keyboard_previous.keys[key] == true; }
 b32 os_was_key_up(Key key)        { return gfx_st.input.keyboard_previous.keys[key] == false; }
 b32 os_is_key_pressed(Key key)    { return os_is_key_down(key) && os_was_key_up(key); }
 b32 os_is_key_released(Key key)   { return os_is_key_up(key) && os_was_key_down(key); }
-
-////////////////////////////////////////////////////////////////////////
-// mouse
-b32 os_is_button_down(MouseButtons button)          { return gfx_st.input.mouse_current.buttons[button] == true; }
-b32 os_is_button_up(MouseButtons button)            { return gfx_st.input.mouse_current.buttons[button] == false; }
-b32 os_was_button_down(MouseButtons button)         { return gfx_st.input.mouse_previous.buttons[button] == true; }
-b32 os_was_button_up(MouseButtons button)           { return gfx_st.input.mouse_previous.buttons[button] == false; }
-b32 os_is_button_pressed(MouseButtons button)       { return os_is_button_down(button) && os_was_button_up(button); }
-b32 os_is_button_released(MouseButtons button)      { return os_is_button_up(button) && os_was_button_down(button); }
 
 #endif

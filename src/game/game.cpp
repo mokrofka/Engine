@@ -370,7 +370,7 @@ void entity_remove(Handle<Entity> e) {
 
 v3 ray_from_camera() {
   v2 mouse_pos = os_get_mouse_pos();
-  v2i win_size = os_get_window_size();
+  v2u win_size = os_get_window_size();
   v2 norm_coords = v2(2 * (mouse_pos.x/win_size.x) - 1, 2 * -(mouse_pos.y/win_size.y) + 1);
   v4 clip_coords = v4(norm_coords.x, norm_coords.y, -1, 1);
   v4 eye_coord = mat4_inverse(vk_get_projection()) * clip_coords;
@@ -404,7 +404,7 @@ void select_obj() {
 
 void camera_update() {
   Camera& cam = st->cam;
-  v2 win_size = v2_of_v2i(os_get_window_size());
+  v2 win_size = v2_of_v2u(os_get_window_size());
   mat4& projection = vk_get_projection();
   mat4& view = vk_get_view();
   projection = mat4_perspective(degtorad(cam.fov), win_size.x / win_size.y, 0.1f, 10000.0f);
@@ -596,7 +596,7 @@ void game_update() {
   if (os_is_key_pressed(Key_2)) {
     render_remove();
   }
-  if (os_is_button_pressed(MouseButton_Left)) {
+  if (os_is_key_pressed(MouseKey_Left)) {
     // select_obj();
     v3 dir = ray_from_camera();
     // debug_draw_line(st->cam.pos - v3(0,0.1,0), st->cam.pos + dir*100, ColorWhite);
@@ -621,7 +621,7 @@ void game_update() {
     v3 forward = mat4_forward(view);
     v3 right   = mat4_right(view);
     v3 up      = mat4_up(view);
-    v2i win_size = os_get_window_size();
+    v2u win_size = os_get_window_size();
     f32 dist = 1.0f;
     f32 xoff = 0.3f;
     f32 yoff = 0.3f;
@@ -657,6 +657,42 @@ void game_update() {
     e.vel() += -dir * 0.5f * g_dt;
   }
 
+  
+  {
+    // f32 range = 0.1;
+    // v2 mouse_pos = os_get_mouse_pos();
+    // Rect rect = {
+    //   .min = v2_scale(-range),
+    //   .max = v2_scale(range),
+    // };
+    // if (v2_in_rect(rect, v2_map_to_v2_11(mouse_pos, v2_of_v2u(os_get_window_size())))) {
+    //   draw_square(rect.min, rect.max, ColorGrey);
+    //   if (os_is_key_pressed(Key_1)) {
+    //     Info("pressed 1 ");
+    //   }
+    // } else {
+    //   draw_square(rect.min, rect.max, ColorWhite);
+    // }
+
+    v2 window_size = {200,200};
+
+    ui_push_box("first box");
+      ui_push_box("first box");
+        ui_push_box("first box");
+
+        ui_pop_box();
+      ui_pop_box();
+    ui_pop_box();
+
+    if (ui_begin_window(2, window_size)) {
+    
+    }
+
+    // if (ui_button(1, v2(100,100), v2(200,200))) {
+    //   Info("click");
+    // }
+  }
+
 }
 
 void main_init(u8** state) {
@@ -671,8 +707,10 @@ void main_init(u8** state) {
     .gpa{st->arena},
     .timer = timer_init(1),
   };
+#if BUILD_DEBUG
   st->entity_pool.init(st->persistent_arena, entities_generations());
   st->static_entity_pool.init(st->persistent_arena, static_entities_generations());
+#endif
   // Mesh cube_mesh = {.vertices = cube_vertices, .vert_count = ArrayCount(cube_vertices)};
   // mesh_set(Mesh_Cube, vk_mesh_load(cube_mesh));
   Mesh triangle_mesh =  {.vertices = triangle_vertices, .vert_count = ArrayCount(triangle_vertices)};

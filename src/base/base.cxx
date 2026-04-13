@@ -65,4 +65,27 @@ void DebugTrap() { __builtin_debugtrap(); }
 
 u64 range_size(Range r) { return  r.size - r.offset; }
 
+void ring_write(RingBuffer& ring, void *src, u64 src_size) {
+  Assert(src_size <= (ring.size - (ring.write_pos - ring.read_pos)));
+  u64 offset = ModPow2(ring.write_pos, ring.size);
+  u64 first = Min(ring.size - offset, src_size);
+  u64 second = src_size - first;
+  MemCopy(ring.base + offset, src, first);
+  if (second) {
+    MemCopy(ring.base, Offset(src, first), second);
+  }
+  ring.write_pos += src_size;
+}
+
+void ring_read(RingBuffer& ring, void *dst, u64 dst_size) {
+  Assert(dst_size <= (ring.write_pos - ring.read_pos));
+  u64 offset = ModPow2(ring.read_pos, ring.size);
+  u64 first = Min(ring.size - offset, dst_size);
+  u64 second = dst_size - first;
+  MemCopy(dst, ring.base+offset, first);
+  if (second) {
+    MemCopy(Offset(dst, first), ring.base, second);
+  }
+  ring.read_pos += dst_size;
+}
 

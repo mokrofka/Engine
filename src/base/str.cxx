@@ -191,8 +191,8 @@ global u8 HEX[] = "0123456789ABCDEF";
 intern u32 hex_u64_write(u8* dest, u64 value) {
   u32 len = HEX_LENGTH;
   for (i32 i = len - 1; i >= 0; --i) {
-    dest[i] = HEX[value & 0xF]; // last 4 bits
-    value >>= 4;                // shift right 4 bits
+    dest[i] = HEX[value & 0xF];
+    value >>= 4;
   }
   return len;
 }
@@ -204,12 +204,7 @@ intern u32 my_sprintf(u8* buf, String fmt, VaList argc) {
   // Calculate length
   if (buf == null) {
     u32 length = 0;
-    u32 id = 0;
     for (u8* p = fmt.str; p < fmt.str+fmt.size; ++p) {
-      if (p == fmt.str+fmt.size-1) {
-        i32 a = 1;
-      }
-      ++id;
       if (*p == '%') {
         ++p; // skip '%'
         switch (*p) {
@@ -798,15 +793,12 @@ String str_skip_last_dot(String string) {
 
 u64 wchar_to_char(char* out, const wchar_t* in, u64 out_size) {
   u64 out_len = 0;
-
   while (*in && out_len < out_size) {
     u16 wc = *in++;
     out[out_len++] = (char)wc;
   }
-
   if (out_len < out_size)
-    out[out_len] = '\0'; // null-terminate
-
+    out[out_len] = '\0';
   return out_len;
 }
 

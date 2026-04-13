@@ -311,17 +311,19 @@ struct VK_State {
   VkPipeline screen_shader;
   VkPipeline cubemap_shader;
   VkPipeline debug_line_shader;
+  VkPipeline ui_shader;
 
   mat4 view;
   mat4 projection;
 
-  struct DebugDrawLine {
-    Vertex vert[2];
-  };
-  VkDeviceSize draw_lines_offset;
+  struct DebugDrawLine { Vertex vert[2]; };
   VkDeviceSize immediate_draw_lines_offset;
-  Darray<DebugDrawLine> draw_lines;
   Darray<DebugDrawLine> immediate_draw_lines;
+
+  struct DebugDrawSquare { Vertex vert[6]; };
+  VkDeviceSize immediate_draw_squares_offset;
+  Darray<DebugDrawSquare> immediate_draw_squares;
+  Darray<u32> immediate_draw_vert_offsets;
 
   Darray<VkPipeline> pipelines;
   struct ModuleEntry {
@@ -2735,11 +2737,6 @@ void vk_draw() {
   }
 
   // Debug drawing
-  if (vk.draw_lines.count > 0) {
-    vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.debug_line_shader);
-    vk.CmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, (VkDeviceSize*)&vk.draw_lines_offset);
-    vk.CmdDraw(cmd, vk.draw_lines.count*2, 1, 0, 0);
-  }
   if (vk.immediate_draw_lines.count > 0) {
     vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.debug_line_shader);
     vk.CmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, (VkDeviceSize*)&vk.immediate_draw_lines_offset);
@@ -2758,6 +2755,15 @@ void vk_draw() {
   } else {
     vk.CmdDraw(cmd, mesh.vert_count, 1, 0, 0);
   }
+
+  vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ui_shader);
+  if (vk.immediate_draw_squares.count > 0) {
+    vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ui_shader);
+    vk.CmdBindVertexBuffers(cmd, 0, 1, &vk.vert_buffer.handle, (VkDeviceSize*)&vk.immediate_draw_squares_offset);
+    vk.CmdDraw(cmd, vk.immediate_draw_squares.count*6, 1, 0, 0);
+    vk.immediate_draw_squares.clear();
+  }
+
 }
 
 void vk_draw_screen() {
@@ -2932,7 +2938,7 @@ void vk_init() {
     VK_CHECK(vk.CreateCommandPool(vkdevice, &graphics_pool_create_info, vk.allocator, &vk.device.cmd_pool));
     Info("Graphics command pool created");
 
-    v2i win_size = os_get_window_size();
+    v2u win_size = os_get_window_size();
     vk.width = win_size.x;
     vk.height = win_size.y;
 
@@ -3028,6 +3034,18 @@ void vk_init() {
     };
     vk.cubemap_shader = vk_shader_pipeline_create(shader);
   }
+  {
+    Shader shader = {
+      .name = "ui",
+      .state = {
+        .type = ShaderType_Drawing,
+        .topology = ShaderTopology_Triangle,
+        .is_transparent = false,
+        .use_depth = false,
+      },
+    };
+    vk.ui_shader = vk_shader_pipeline_create(shader);
+  }
 
   vk.scale = 1;
   // Texture target
@@ -3037,9 +3055,10 @@ void vk_init() {
     vk_texture_resize_target();
   }
 
-  vk.draw_lines_offset = vk.vert_buffer.size;
-  vk.vert_buffer.size += sizeof(Vertex)*KB(1);
   vk.immediate_draw_lines_offset = vk.vert_buffer.size;
+  vk.vert_buffer.size += sizeof(Vertex)*KB(1);
+
+  vk.immediate_draw_squares_offset = vk.vert_buffer.size;
   vk.vert_buffer.size += sizeof(Vertex)*KB(1);
 
   Info("Vulkan renderer initialized");
@@ -3098,22 +3117,22 @@ void vk_begin_frame() {
   //   }
   // }
 
-  if (vk.draw_lines.count > 0) {
-    u32 size = vk.draw_lines.count * sizeof(VK_State::DebugDrawLine);
-    void* data = vk.draw_lines.data;
-    vk_buffer_upload_to_gpu(vk.vert_buffer, {vk.draw_lines_offset, size}, data);
-  }
-
   if (vk.immediate_draw_lines.count > 0) {
     u32 size = vk.immediate_draw_lines.count * sizeof(VK_State::DebugDrawLine);
     void* data = vk.immediate_draw_lines.data;
     vk_buffer_upload_to_gpu(vk.vert_buffer, {vk.immediate_draw_lines_offset, size}, data);
   }
 
+  if (vk.immediate_draw_squares.count > 0) {
+    u32 size = vk.immediate_draw_squares.count * sizeof(VK_State::DebugDrawSquare);
+    void* data = vk.immediate_draw_squares.data;
+    vk_buffer_upload_to_gpu(vk.vert_buffer, {vk.immediate_draw_squares_offset, size}, data);
+  }
+
   VK_CHECK(vk.WaitForFences(vkdevice, 1, &vk.sync.in_flight_fences[vk.current_frame_idx], true, U64_MAX));
   VK_CHECK(vk.ResetFences(vkdevice, 1, &vk.sync.in_flight_fences[vk.current_frame_idx]));
 
-  v2i win_size = os_get_window_size();
+  v2u win_size = os_get_window_size();
   if (vk.width != win_size.x || vk.height != win_size.y) {
     vk.width = win_size.x;
     vk.height = win_size.y;
@@ -3613,14 +3632,6 @@ void debug_draw_line(v3 a, v3 b, v3 color) {
     {.pos = a, .color = color},
     {.pos = b, .color = color},
   };
-  vk.draw_lines.add({vert[0], vert[1]});
-}
-
-void immediate_debug_draw_line(v3 a, v3 b, v3 color) {
-  Vertex vert[] = {
-    {.pos = a, .color = color},
-    {.pos = b, .color = color},
-  };
   vk.immediate_draw_lines.add({vert[0], vert[1]});
 }
 
@@ -3635,22 +3646,171 @@ void debug_draw_aabb(v3 min, v3 max, v3 color) {
   v3 p110 = {max.x, max.y, min.z};
   v3 p111 = {max.x, max.y, max.z};
 
-  immediate_debug_draw_line(p000, p001, color);
-  immediate_debug_draw_line(p000, p010, color);
-  immediate_debug_draw_line(p000, p100, color);
+  debug_draw_line(p000, p001, color);
+  debug_draw_line(p000, p010, color);
+  debug_draw_line(p000, p100, color);
 
-  immediate_debug_draw_line(p111, p110, color);
-  immediate_debug_draw_line(p111, p101, color);
-  immediate_debug_draw_line(p111, p011, color);
+  debug_draw_line(p111, p110, color);
+  debug_draw_line(p111, p101, color);
+  debug_draw_line(p111, p011, color);
 
-  immediate_debug_draw_line(p001, p011, color);
-  immediate_debug_draw_line(p001, p101, color);
+  debug_draw_line(p001, p011, color);
+  debug_draw_line(p001, p101, color);
 
-  immediate_debug_draw_line(p010, p011, color);
-  immediate_debug_draw_line(p010, p110, color);
+  debug_draw_line(p010, p011, color);
+  debug_draw_line(p010, p110, color);
 
-  immediate_debug_draw_line(p100, p101, color);
-  immediate_debug_draw_line(p100, p110, color);
+  debug_draw_line(p100, p101, color);
+  debug_draw_line(p100, p110, color);
 }
 
+void draw_quad(v2 min, v2 max, v3 color) {
+  v2 size = v2_of_v2u(os_get_window_size());
+  min = v2_map_to_v2_11(min, size);
+  max = v2_map_to_v2_11(max, size);
+  VK_State::DebugDrawSquare square = {
+    .vert = {
+      {.pos = v2_to_v3(min,0),              .color = color},
+      {.pos = v2_to_v3(v2(min.x, max.y),0), .color = color},
+      {.pos = v2_to_v3(max,0),              .color = color},
+      {.pos = v2_to_v3(max,0),              .color = color},
+      {.pos = v2_to_v3(v2(max.x, min.y),0), .color = color},
+      {.pos = v2_to_v3(min,0),              .color = color},
+    }
+  };
+  vk.immediate_draw_squares.add(square);
+}
+
+struct UI_Window {
+  v2 pos;
+  v2 size;
+};
+
+struct UI_Box {
+  v2 pos;
+  v2 size;
+  u64 hash;
+};
+
+struct UI_State {
+  u32 hot;
+  u32 last_hot;
+  u32 active;
+  u32 active_window;
+  v2 drag_offset;
+  UI_Window windows[10];
+  UI_Box boxes[10];
+  u32 boxes_count;
+  HashedStrMap<u32> hashes;
+};
+
+UI_State ui_state;
+
+void ui_begin() {
+  UI_State& ui = ui_state;
+  ui.last_hot = ui.hot;
+  ui_state.hot = 0;
+}
+
+void ui_end() {
+  if (os_is_key_released(MouseKey_Left)) {
+    ui_state.active = 0;
+  }
+}
+
+void ui_push_box(String str) {
+  UI_State& ui = ui_state;
+
+  UI_Box& parent = ui.boxes[ui.boxes_count];
+  ++ui.boxes_count;
+
+  u64 hash_idx = hash(str);
+  UI_Box box = {
+    .pos = v2(parent.pos + parent.size),
+    .size = {100 + parent.size.x, 100 + parent.pos.y},
+    .hash = (hash(hash_idx, parent.hash))
+  };
+  ui.boxes[ui.boxes_count] = box;
+
+  ui_button(box.hash, box.pos, box.pos+box.size);
+}
+
+void ui_pop_box() {
+  UI_State& ui = ui_state;
+  if (ui.boxes_count > 0) {
+    --ui.boxes_count;
+  }
+}
+
+b32 ui_begin_window(u32 id, v2 size) {
+  UI_State& ui = ui_state;
+  v2& pos = ui.windows[id].pos;
+  v2 mouse = os_get_mouse_pos();
+  Rect title_rect(pos, v2(pos.x + size.x, pos.y + 20));
+
+  b32 hovered = v2_in_rect(title_rect, mouse);
+  if (hovered) {
+    ui.hot = id;
+  }
+
+  // PRESS → start dragging
+  if (ui.last_hot == id && os_is_key_pressed(MouseKey_Left)) {
+    ui.active = id;
+    ui.active_window = id;
+
+    // store offset
+    ui.drag_offset = v2(mouse.x - pos.x, mouse.y - pos.y);
+  }
+
+  // DRAG
+  if (ui.active == id && os_is_key_down(MouseKey_Left)) {
+    pos.x = mouse.x - ui.drag_offset.x;
+    pos.y = mouse.y - ui.drag_offset.y;
+  }
+
+  // RELEASE
+  if (ui.active == id && os_is_key_released(MouseKey_Left)) {
+    ui.active = 0;
+  }
+
+  // 🎨 Draw window body
+  draw_quad(pos, v2(pos.x + size.x, pos.y + size.y), v3(0.2f,0.2f,0.2f));
+
+  // 🎨 Draw title bar
+  v3 title_color = v3(0.3f,0.3f,0.3f);
+  if (ui.hot == id) title_color = v3(0.4f,0.4f,0.4f);
+  if (ui.active == id) title_color = v3(0.2f,0.2f,0.2f);
+
+  title_rect = {pos, v2(pos.x + size.x, pos.y + 20)};
+  draw_quad(title_rect.min, title_rect.max, title_color);
+
+  return true;
+}
+
+b32 ui_button(u32 id, v2 min, v2 max) {
+  UI_State* ui = &ui_state;
+  b32 hovered = v2_in_rect({min, max}, os_get_mouse_pos());
+  if (hovered) {
+    ui->hot = id;
+  }
+
+  if (ui->last_hot == id && os_is_key_pressed(MouseKey_Left)) {
+    ui->active = id;
+  }
+
+  b32 clicked = 0;
+  if (ui->active == id && os_is_key_released(MouseKey_Left)) {
+    if (ui->hot == id) {
+      clicked = true;
+    }
+    ui->active = 0;
+  }
+
+  v3 color = {0.6f, 0.6f, 0.6f};
+  if (ui->hot == id) color = v3(0.8f, 0.8f, 0.8f);
+  if (ui->active == id) color = v3(0.4f, 0.4f, 0.4f);
+
+  draw_quad(min, max, color);
+  return clicked;
+}
 

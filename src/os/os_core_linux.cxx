@@ -16,6 +16,7 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#include <pthread.h>
 
 struct OS_LNX_FileIter {
   DIR* dir;
@@ -96,10 +97,8 @@ String os_get_environment(String name) {
 
 u8*  os_reserve(u64 size)                  { return (u8*)mmap(null, size, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0); }
 b32  os_commit(void* ptr, u64 size)        { return mprotect(ptr, size, PROT_READ | PROT_WRITE); }
-void os_decommit(void* ptr, u64 size)      { }
+void os_decommit(void* ptr, u64 size)      { mprotect(ptr, size, PROT_NONE);}
 void os_release(void* ptr, u64 size)       { munmap(ptr, size);}
-u8*  os_reserve_large(u64 size)            { return 0; }
-b32  os_commit_large(void* ptr, u64 size)  { return 0; }
 
 //////////////////////////////////////////////////////////////////////////
 // Files
@@ -242,6 +241,90 @@ Buffer os_file_path_read_all(Allocator arena, String path) {
   };
   return result;
 }
+////////////////////////////////////////////////////////////////////////
+
+// Result<OS_Handle> os_file_open_(String path, OS_AccessFlags flags) {
+//   Scratch scratch;
+//   String path_c = push_str_copy(scratch, path);
+//   int lnx_flags = 0;
+//   if(flags & OS_AccessFlag_Read && flags & OS_AccessFlag_Write) {
+//     lnx_flags = O_RDWR;
+//   }
+//   else if(flags & OS_AccessFlag_Write) {
+//     lnx_flags = O_WRONLY;
+//   }
+//   else if(flags & OS_AccessFlag_Read) {
+//     lnx_flags = O_RDONLY;
+//   }
+//   if(flags & OS_AccessFlag_Append) {
+//     lnx_flags |= O_APPEND;
+//   }
+//   if(flags & (OS_AccessFlag_Write|OS_AccessFlag_Append)) {
+//     lnx_flags |= O_CREAT;
+//   }
+//   int fd = open((char*)path_c.str, lnx_flags, 0755);
+//   OS_Handle handle;
+//   handle.v = fd;
+//   if (fd == -1) {
+//     return {.err = true};
+//   }
+//   return {.v = handle};
+// }
+
+// Result<FileProperties> os_file_properties_(OS_Handle file) {
+//   if (file.v == 0) { return {.err = true}; }
+//   Scratch scratch;
+//   struct stat fd_stat = {};
+//   int fd = file.v;
+//   int fstat_result = fstat(fd, &fd_stat);
+//   FileProperties props = {};
+//   props = os_lnx_file_properties_from_stat(fd_stat);
+//   if (fstat_result == -1) {
+//     return {.err = true};
+//   }
+//   return {.v = props};
+// }
+
+
+// Result<u64> os_file_size_(OS_Handle file) {
+//   FileProperties props = Try(os_file_properties_(file));
+//   return {.v=props.size};
+// }
+
+// Result<u64> os_file_read_(OS_Handle file, u64 size, void* out_data) {
+//   if (file.v == 0) { return {.err=true}; }
+//   int fd = file.v;
+//   u64 read_result = read(fd, out_data, size);
+//   return {.v=read_result};
+// }
+
+// Result<Buffer> os_file_path_read_all_(Allocator arena, String path) {
+//   Scratch scratch(arena);
+//   OS_Handle f = os_file_open_(path, OS_AccessFlag_Read);
+//   defer(os_file_close(f));
+//   // u64 file_size = Try(os_file_size_(f));
+//   Result<u64> file_size = os_file_size_(f); if (file_size.err) return {.err=file_size.err};
+//   u8* buffer = push_buffer(arena, file_size.v);
+//   u64 read_size = Try(os_file_read_(f, file_size.v, buffer));
+//   Buffer result = {
+//     .data = buffer,
+//     .size = file_size,
+//   };
+//   return {.v=result};
+// }
+
+// void foo1() {
+//   Scratch scratch;
+//   Result<Buffer> buf = os_file_path_read_all_(scratch, "/home/pc/dev/Engine/assets/shaders/cubemap.vert");
+//   if (buf.err) {
+//     Info("bad");
+//   }
+//   if (buf.err) {
+//     Info("err");
+//   }
+// }
+
+////////////////////////////////////////////////////////////////////////
 
 b32 os_file_path_equal_mtime(String a, String b) {
   FileProperties props_a = os_file_path_properties(a);
@@ -441,6 +524,110 @@ i32 os_process_join(OS_Handle handle) {
   waitpid(pid, &status, 0);
   return status;
 }
+
+////////////////////////////////////////////////////////////////////////
+// Threads
+
+#define MAX_TASKS 1024
+
+struct TaskQueue {
+  Task tasks[MAX_TASKS];
+  u32 head;
+  u32 tail;
+  u32 count;
+  u32 remain_tasks;
+  pthread_mutex_t mutex;
+  pthread_cond_t cond;
+};
+
+struct ThreadPool {
+  pthread_t threads[16];
+  u32 num_threads;
+  TaskQueue queue;
+};
+
+global ThreadPool thread_pool;
+
+void task_queue_init() {
+  TaskQueue& q = thread_pool.queue;
+  pthread_mutex_init(&q.mutex, null);
+  pthread_cond_init(&q.cond, null);
+}
+
+void task_queue_push(Task t) {
+  TaskQueue& q = thread_pool.queue;
+  pthread_mutex_lock(&q.mutex);
+  while (q.count == MAX_TASKS) {
+    pthread_cond_wait(&q.cond, &q.mutex);
+  }
+  q.tasks[q.tail] = t;
+  q.tail = ModPow2(q.tail + 1, MAX_TASKS);
+  ++q.count;
+  ++q.remain_tasks;
+  pthread_cond_broadcast(&q.cond);
+  pthread_mutex_unlock(&q.mutex);
+}
+
+intern Task task_queue_pop() {
+  TaskQueue& q = thread_pool.queue;
+  pthread_mutex_lock(&q.mutex);
+  while (q.count == 0) {
+    pthread_cond_wait(&q.cond, &q.mutex);
+  }
+  Task t = q.tasks[q.head];
+  q.head = ModPow2(q.head + 1, MAX_TASKS);
+  --q.count;
+  pthread_cond_broadcast(&q.cond);
+  pthread_mutex_unlock(&q.mutex);
+  return t;
+}
+
+intern void* worker(void* arg) {
+  tctx_init();
+  while (true) {
+    Task t = task_queue_pop();
+    t.func(t.arg);
+    atomic_u32_dec_eval(&thread_pool.queue.remain_tasks);
+  }
+  return null;
+}
+
+void thread_pool_init(i32 num_threads) {
+  thread_pool.num_threads = num_threads;
+  task_queue_init();
+  Loop (i, num_threads) {
+    pthread_create(&thread_pool.threads[i], null, worker, null);
+  }
+}
+
+u32 task_queue_count() {
+  return atomic_u32_eval(&thread_pool.queue.remain_tasks);
+}
+
+Thread os_thread_launch(ThreadEntryPointFunctionType *func, void *ptr) {
+  {
+    // pthread_t 
+    // int pthread_result = pthread_create();
+  }
+  // Thread handle = {(u64)entity};
+  // return handle;
+  return {};
+}
+
+// b32 os_thread_join(Thread handle, U64 endt_us) {
+//   if(MemoryIsZeroStruct(&handle)) { return 0; }
+//   OS_LNX_Entity *entity = (OS_LNX_Entity *)handle.u64[0];
+//   int join_result = pthread_join(entity->thread.handle, 0);
+//   B32 result = (join_result == 0);
+//   os_lnx_entity_release(entity);
+//   return result;
+// }
+
+// void os_thread_detach(Thread handle) {
+//   if(MemoryIsZeroStruct(&handle)) { return; }
+//   OS_LNX_Entity *entity = (OS_LNX_Entity *)handle.u64[0];
+//   os_lnx_entity_release(entity);
+// }
 
 ////////////////////////////////////////////////////////////////////////
 // Lib

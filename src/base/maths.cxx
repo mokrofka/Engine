@@ -122,8 +122,8 @@ u64 hash_memory(void* data, u64 size) {
 }
 
 u64 hash(u64 x) { return squirrel3(x); }
+u64 hash(u64 x, u64 seed) { return squirrel3(x + seed); }
 u64 hash(String str) { return str_hash_FNV(str); }
-b32 equal(i64 a, i64 b) { return a == b; }
 
 ////////////////////////////////////////////////////////////////////////
 // Random
@@ -163,6 +163,7 @@ v2 v2_of_v4(v4 a)                { return v2(a.x, a.y); }
 v3 v2_to_v3(v2 a, f32 b)         { return v3(a.x, a.y, b); }
 v4 v2_to_v4(v2 a, f32 b, f32 c)  { return v4(a.x, a.y, b, c); }
 v2 v2_of_v2i(v2i a)              { return v2(a.x, a.y); }
+v2 v2_of_v2u(v2u a)              { return v2(a.x, a.y); }
 v2i v2i_of_v2(v2 a)              { return v2i(a.x, a.y); }
 
 v2  operator+(v2 a, v2 b)          { return v2(a.x + b.x, a.y + b.y); }
@@ -204,6 +205,18 @@ f32 v2_shortest_arc(v2 a, v2 b) {
 		return theta;
 	else
 		return -theta;
+}
+
+b32 v2_in_rect(Rect rect, v2 p) {
+    return (p.x >= rect.min.x &&
+            p.y >= rect.min.y &&
+            p.x <= rect.max.x &&
+            p.y <= rect.max.y);
+}
+
+v2 v2_map_to_v2_11(v2 pos, v2 size) {
+  v2 result = v2(2 * (pos.x/size.x) - 1, 2 * -(pos.y/size.y) + 1);
+  return result;
 }
 
 ////////////////////////////////////////////////////////////////////////

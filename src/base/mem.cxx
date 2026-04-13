@@ -1,4 +1,5 @@
 #include "mem.h"
+#include "maths.h"
 #include "os/os_core.h"
 
 const u32 MEM_ALLOC_HEADER_GUARD   = 0xA110C8;
@@ -460,41 +461,42 @@ u64 GpuAllocSegList::get(u32 idx) {
 ////////////////////////////////////////////////////////////////////////
 // Utils
 
-u8* mem_alloc_soa(Allocator alloc, u32 count, SoA_Field* fields, u32 fields_count) {
+u8* mem_alloc_soa(Allocator alloc, u32 count, Slice<SoA_Field> fields) {
   u64 mem_offset = 0;
   u64 offsets[10] = {};
-  Loop (i, fields_count) {
+  Loop (i, fields.count) {
     mem_offset = AlignUp(mem_offset, fields[i].align);
     offsets[i] = mem_offset;
     mem_offset += fields[i].elem_size * count;
   }
   u64 alloc_size = mem_offset;
   u8* buf = mem_alloc(alloc, alloc_size, fields[0].align);
-  Loop (i, fields_count) {
+  Loop (i, fields.count) {
     void* new_ptr = Offset(buf, offsets[i]);
     *(fields[i].dst_ptr) = new_ptr;
   }
   return buf;
 }
 
-u8* mem_realloc_soa(Allocator alloc, void* ptr, u32 old_count, u32 new_count, SoA_Field* fields, u32 fields_count) {
+u8* mem_realloc_soa(Allocator alloc, u32 old_count, u32 new_count, Slice<SoA_Field> fields) {
+  void* old_ptr = *fields[0].dst_ptr;
   u64 mem_offset = 0;
   u64 offsets[10] = {};
-  Loop (i, fields_count) {
+  Loop (i, fields.count) {
     mem_offset = AlignUp(mem_offset, fields[i].align);
     offsets[i] = mem_offset;
     mem_offset += fields[i].elem_size * new_count;
   }
   u64 new_size = mem_offset;
   u8* buf = mem_alloc(alloc, new_size, fields[0].align);
-  Loop (i, fields_count) {
+  Loop (i, fields.count) {
     void* old_ptr = *(fields[i].dst_ptr);
     void* new_ptr = Offset(buf, offsets[i]);
     u64 old_ptr_size = fields[i].elem_size * old_count;
     MemCopy(new_ptr, old_ptr, old_ptr_size);
     *(fields[i].dst_ptr) = new_ptr;
   }
-  mem_free(alloc, ptr);
+  mem_free(alloc, old_ptr);
   return buf;
 }
 

@@ -1,6 +1,15 @@
 #pragma once
 #include "lib.h"
 
+// TODO:
+// dummy assets/null 
+// memory visualisation
+// thread graph visualisation
+// obj mouse selection
+// serelization/deserialization
+// UI rendering
+// profiler
+
 const v3 ColorRed   = v3(1,0,0);
 const v3 ColorGreen = v3(0,1,0);
 const v3 ColorBlue  = v3(0,0,1);
@@ -63,6 +72,8 @@ struct Vertex {
   v2 uv;
   v3 color;
 };
+u64 hash(Vertex vert);
+b32 equal(Vertex a, Vertex b);
 
 struct Mesh {
   Vertex* vertices;
@@ -147,6 +158,14 @@ mat4& vk_get_projection();
 
 KAPI void debug_draw_line(v3 a, v3 b, v3 color);
 KAPI void debug_draw_aabb(v3 min, v3 max, v3 color);
+KAPI void draw_squad(v2 min, v2 max, v3 color);
+
+void ui_begin();
+void ui_end();
+void ui_push_box(String str);
+void ui_pop_box();
+b32 ui_begin_window(u32 id, v2 size);
+b32 ui_button(u32 id, v2 min, v2 max);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // common.cpp
@@ -155,8 +174,11 @@ KAPI extern f32 g_dt;
 KAPI extern f32 g_time;
 KAPI Transform& entities_transforms(Handle<Entity> handle);
 KAPI Transform& static_entities_transforms(Handle<StaticEntity> handle);
+
+#if BUILD_DEBUG
 u32* entities_generations();
 u32* static_entities_generations();
+#endif
 
 ////////////////////////////////////////////////////////////////////////
 // Assets
@@ -308,3 +330,6 @@ struct Timer {
 
 KAPI Timer timer_init(f32 interval);
 KAPI b32 timer_tick(Timer& t);
+
+
+

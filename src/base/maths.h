@@ -99,8 +99,15 @@ union Rect {
     f32 x,y;
     f32 width,height;
   };
-  v2 min;
-  v2 max;
+  struct {
+    v2 min;
+    v2 max;
+  };
+  Rect() = default;
+  Rect(v2 min_, v2 max_) {
+    min = min_;
+    max = max_;
+  }
 };
 
 union RectI {
@@ -108,8 +115,10 @@ union RectI {
     i32 x,y;
     i32 width,height;
   };
-  v2i min;
-  v2i max;
+  struct {
+    v2i min;
+    v2i max;
+  };
 };
 
 struct Transform {
@@ -159,8 +168,8 @@ KAPI u64 squirrel3(u64 at);
 KAPI u64 str_hash_FNV(String str);
 KAPI u64 hash_memory(void* data, u64 size);
 KAPI u64 hash(u64 x);
+KAPI u64 hash(u64 x, u64 seed);
 KAPI u64 hash(String str);
-KAPI b32 equal(i64 a, i64 b);
 
 ////////////////////////////////////////////////////////////////////////
 // Random
@@ -193,6 +202,7 @@ KAPI NO_DEBUG v2 v2_of_v4(v4 a);
 KAPI NO_DEBUG v3 v2_to_v3(v2 a, f32 b);
 KAPI NO_DEBUG v4 v2_to_v4(v2 a, f32 b, f32 c);
 KAPI NO_DEBUG v2 v2_of_v2i(v2i a);
+KAPI NO_DEBUG v2 v2_of_v2u(v2u a);
 KAPI NO_DEBUG v2i v2i_of_v2(v2 a);
 KAPI NO_DEBUG v2  operator+(v2 a, v2 b);
 KAPI NO_DEBUG v2  operator-(v2 a, v2 b);
@@ -216,6 +226,8 @@ KAPI NO_DEBUG v2  v2_lerp(v2 a, f32 t, v2 b);
 KAPI NO_DEBUG v2  v2_skew(v2 a);
 KAPI NO_DEBUG v2 v2_rand_range(v2 a, v2 b);
 KAPI f32 v2_shortest_arc(v2 a, v2 b);
+KAPI b32 v2_in_rect(Rect rect, v2 p);
+KAPI v2 v2_map_to_v2_11(v2 pos, v2 size);
 
 ////////////////////////////////////////////////////////////////////////
 // Vector3

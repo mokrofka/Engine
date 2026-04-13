@@ -17,31 +17,18 @@ struct Handle {
   u32 idx() { return handle & INDEX_MASK; }
   u32 generation() { return handle >> INDEX_BITS; }
 #else
-  u32 idx(Handle<T> handle) { return handle.handle; }
+  u32 idx() { return handle; }
 #endif
 };
 
-////////////////////////////////////////////////////////////////////////
-// C++ crazyness
-
-template <typename T>
-struct ContainerEqual {
-  NO_DEBUG b32 operator()(T a, T b) { return equal(a,b); }
-};
-template <typename T>
-struct ContainerMemEqual {
-  NO_DEBUG b32 operator()(T a, T b) { return MemMatchStruct(&a, &b); }
-};
-
-enum EqualMode {
-  EqualMode_Mem
-};
+// Start using slices?
 
 ////////////////////////////////////////////////////////////////////////
 // Pool
 
 template<typename T>
 struct ObjectPool {
+  static_assert(sizeof(T) >= 4);
   u32 head;
   u32 cap;
   Allocator alloc;
@@ -55,10 +42,9 @@ struct ObjectPool {
   void deinit() { if (data) mem_free(alloc, data); }
   T& get(Handle<T> handle) {
 #if BUILD_DEBUG
-    u32 idx = handle.handle & INDEX_MASK;
-    u32 generation = handle.handle >> INDEX_BITS;
+    u32 idx = handle.idx();
     Assert(idx < cap);
-    Assert(generations[idx] == generation);
+    Assert(generations[idx] == handle.generation());
     return data[idx];
 #else
     return data[handle.handle];
@@ -102,6 +88,7 @@ struct ObjectPool {
     *(u32*)&data[idx] = head;
     head = handle.handle;
 #else
+    u32 idx = handle.idx();
     *(u32*)&data[idx] = head;
     head = handle.handle;
 #endif
@@ -115,7 +102,7 @@ struct ObjectPool {
         SoA_push_field(&generations, u32),
         SoA_push_field(&data, T),
       };
-      mem_realloc_soa(alloc, generations, cap_old, cap, fields, ArrayCount(fields));
+      mem_realloc_soa(alloc, cap_old, cap, ArraySlice(fields));
       head = cap_old;
       for (i32 i = cap_old; i < cap-1; ++i) {
         *(u32*)&data[i] = i+1;
@@ -128,7 +115,7 @@ struct ObjectPool {
         SoA_push_field(&generations, u32),
         SoA_push_field(&data, T),
       };
-      mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
+      mem_alloc_soa(alloc, cap, ArraySlice(fields));
       Loop (i, cap-1) {
         *(u32*)&data[i] = i+1;
       }
@@ -182,9 +169,14 @@ struct StaticObjectPool {
   u32* generations;
 #endif
   void init(Allocator arena, u32* generations_) {
-    data = push_array(arena, T, cap);
-    generations = generations_;
-    clear();
+#if BUILD_DEBUG
+  data = push_array(arena, T, cap);
+  generations = generations_;
+  clear();
+#else
+  data = push_array(arena, T, cap);
+  clear();
+#endif
   }
   T& get(Handle<T> handle) {
 #if BUILD_DEBUG
@@ -207,9 +199,6 @@ struct StaticObjectPool {
     Handle<T> handle = {result};
     return handle;
 #else
-    if (head >= cap) {
-      grow();
-    }
     u32 result = head;
     head = *(u32*)&data[head];
     Handle<T> handle = {result};
@@ -232,6 +221,7 @@ struct StaticObjectPool {
     *(u32*)&data[idx] = head;
     head = handle.handle;
 #else
+    u32 idx = handle.handle;
     *(u32*)&data[idx] = head;
     head = handle.handle;
 #endif
@@ -295,16 +285,12 @@ struct Array {
   T pop() {
     return data[--count];
   }
-  template<typename Eq>
-  b32 exists_impl(T a, Eq eq) {
+  b32 exists(T a, b32(*fn)(T a, T b) = equal) {
     for (T x : data) {
-      if (eq(x, a)) return true;
+      if (fn(x, a)) return true;
     }
     return false;
   }
-  INLINE b32 exists(T a, bool(*fn)(T a, T b)) { return exists_impl(a, fn); }
-  INLINE b32 exists(T a)                      { return exists_impl(a, ContainerEqual<T>{}); }
-  INLINE b32 exists(T a, EqualMode mode)      { return exists_impl(a, ContainerMemEqual<T>{}); }
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -365,29 +351,21 @@ struct Darray {
   T pop() {
     return data[--count];
   }
-  template<typename Eq>
-  b32 exists_impl(T a, Eq eq) { 
+  b32 exists(T a, b32(*fn)(T a, T b) = equal) {
     for (T x : *this) {
-      if (eq(x, a)) return true;
+      if (fn(x, a)) return true;
     }
     return false;
   }
-  b32 exists(T a, bool(*fn)(T a, T b)) { return exists_impl(a, fn); }
-  b32 exists(T a)                      { return exists_impl(a, ContainerEqual<T>{}); }
-  b32 exists(T a, EqualMode mode)      { return exists_impl(a, ContainerMemEqual<T>{}); }
-  template<typename Equal>
-  b32 exists_at_impl(T e, u32* index, Equal eq) { 
+  b32 exists_at(T e, u32* index, b32(*fn)(T a, T b) = equal) { 
     Loop (i, count) {
-      if (eq(data[i], e)) {
+      if (fn(data[i], e)) {
         *index = i;
         return true;
       }
     }
     return false;
   }
-  b32 exists_at(T a, u32* idx, bool(*fn)(T a, T b)) { return exists_at_impl(a, idx, fn); }
-  b32 exists_at(T a, u32* idx)                      { return exists_at_impl(a, idx, ContainerEqual<T>{}); }
-  b32 exists_at(T a, u32* idx, EqualMode mode)      { return exists_at_impl(a, idx, ContainerMemEqual<T>{}); }
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -456,7 +434,7 @@ struct SparseSet {
         SoA_push_field(&dense, u32),
         SoA_push_field(&data, T),
       };
-      mem_realloc_soa(alloc, dense, cap_old, cap, fields, ArrayCount(fields));
+      mem_realloc_soa(alloc, cap_old, cap, ArraySlice(fields));
     }
     else {
       cap = DEFAULT_CAPACITY;
@@ -464,7 +442,7 @@ struct SparseSet {
         SoA_push_field(&dense, u32),
         SoA_push_field(&data, T),
       };
-      mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
+      mem_alloc_soa(alloc, cap, ArraySlice(fields));
       sparse = mem_alloc_array<u32>(alloc, cap);
     }
   }
@@ -634,7 +612,7 @@ struct DarrayHandler {
     dense[idx_removed] = last_entity;
     --count;
 #else
-    u32 idx_removed = sparse[handle];
+    u32 idx_removed = sparse[handle.idx()];
     u32 idx_last = count - 1;
     data[idx_removed] = data[idx_last];
     u32 last_entity = dense[idx_last];
@@ -654,7 +632,7 @@ struct DarrayHandler {
         SoA_push_field(&data, T),
         SoA_push_field(&generations, u32),
       };
-      mem_realloc_soa(alloc, sparse, cap_old, cap, fields, ArrayCount(fields));
+      mem_realloc_soa(alloc, cap_old, cap, ArraySlice(fields));
       MemZeroArray(generations+cap_old, cap-cap_old);
     }
     else {
@@ -665,7 +643,7 @@ struct DarrayHandler {
         SoA_push_field(&data, T),
         SoA_push_field(&generations, u32),
       };
-      mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
+      mem_alloc_soa(alloc, cap, ArraySlice(fields));
       MemZeroArray(generations, cap);
     }
 #else
@@ -677,7 +655,7 @@ struct DarrayHandler {
         SoA_push_field(&dense, u32),
         SoA_push_field(&data, T),
       };
-      mem_realloc_soa(alloc, sparse, cap_old, cap, fields, ArrayCount(fields));
+      mem_realloc_soa(alloc, cap_old, cap, ArraySlice(fields));
     }
     else {
       cap = DEFAULT_CAPACITY;
@@ -686,7 +664,7 @@ struct DarrayHandler {
         SoA_push_field(&dense, u32),
         SoA_push_field(&data, T),
       };
-      mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
+      mem_alloc_soa(alloc, cap, ArraySlice(fields));
     }
     #endif
   }
@@ -754,6 +732,7 @@ struct Map {
     u64 hash_idx = hash(key);
     u64 idx = ModPow2(hash_idx, cap);
     while (is_occupied[idx] == MapSlot_Occupied) {
+      Assert(!equal(keys[idx], key));
       idx = ModPow2(idx + 1, cap);
     }
     keys[idx] = key;
@@ -797,7 +776,7 @@ struct Map {
     ++count;
     return &data[idx];
   }
-  T* get_or_add(Key key, T val, b32* out_was_added) {
+  T* get_or_add_was(Key key, T val, b32* out_was_added) {
     u64 hash_idx = hash(key);
     u64 idx = ModPow2(hash_idx, cap);
     u64 start_idx = idx;
@@ -842,7 +821,7 @@ struct Map {
         SoA_push_field(&keys, Key),
         SoA_push_field(&is_occupied, MapSlot),
       };
-      mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
+      mem_alloc_soa(alloc, cap, ArraySlice(fields));
       Loop (i, old_cap) {
         if (old_is_occupied[i] == MapSlot_Occupied) {
           add(old_keys[i], old_data[i]);
@@ -857,111 +836,7 @@ struct Map {
         SoA_push_field(&keys, Key),
         SoA_push_field(&is_occupied, MapSlot),
       };
-      mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
-    }
-  }
-};
-
-template<typename Key, typename T>
-struct MapAuto {
-  static constexpr f32 LF = 0.8;
-  u32 count;
-  u32 cap;
-  Allocator alloc;
-  T* data;
-  Key* keys;
-  MapSlot* is_occupied;
-  MapAuto() = default;
-  MapAuto(Allocator alloc_) { *this = {}; alloc = alloc_; }
-  void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
-  void add(Key key, T val) {
-    if (count >= cap*LF) { grow(); }
-    u64 hash_idx = hash_memory(&key, sizeof(Key));
-    u64 idx = ModPow2(hash_idx, cap);
-    while (is_occupied[idx] == MapSlot_Occupied) {
-      idx = ModPow2(idx + 1, cap);
-    }
-    keys[idx] = key;
-    data[idx] = val;
-    is_occupied[idx] = MapSlot_Occupied;
-    ++count;
-  }
-  T* get(Key key) {
-    if (!data) return null;
-    u64 hash_idx = hash_memory(&key, sizeof(Key));
-    u64 idx = ModPow2(hash_idx, cap);
-    u64 start_idx = idx;
-    Loop (i, cap) {
-      if ((is_occupied[idx] == MapSlot_Occupied) && (MemMatchStruct(&keys[idx], &key))) {
-        return &data[idx];
-      } 
-      else if (is_occupied[idx] == MapSlot_Empty) {
-        break;
-      }
-      idx = ModPow2(idx + 1, cap);
-    }
-    return null;
-  }
-  T* get_or_add(Key key, T val) {
-    u64 hash_idx = hash(key);
-    u64 idx = ModPow2(hash_idx, cap);
-    u64 start_idx = idx;
-    Loop (i, cap) {
-      if ((is_occupied[idx] == MapSlot_Occupied) && (MemMatchStruct(&keys[idx], &key))) {
-        return &data[idx];
-      } 
-      else if (is_occupied[idx] == MapSlot_Empty) {
-        break;
-      }
-      idx = ModPow2(idx + 1, cap);
-    }
-    if (count >= cap*LF) { grow(); }
-    keys[idx] = key;
-    data[idx] = val;
-    is_occupied[idx] = MapSlot_Occupied;
-    ++count;
-    return &data[idx];
-  }
-  void remove(Key key) {
-    u64 hash_idx = hash_memory(&key, sizeof(Key));
-    u64 index = ModPow2(hash_idx, cap);
-    while (is_occupied[index] != MapSlot_Empty) {
-      if ((is_occupied[index] == MapSlot_Occupied) && (keys[index] == key)) {
-        is_occupied[index] = MapSlot_Deleted;
-        --count;
-        return;
-      }
-      index = ModPow2(index + 1, cap);
-    }
-  }
-  void grow() {
-    if (data) {
-      T* old_data = data;
-      Key* old_keys = keys;
-      MapSlot* old_is_occupied = is_occupied;
-      u32 old_cap = cap;
-      cap *= DEFAULT_RESIZE_FACTOR;
-      SoA_Field fields[] = {
-        SoA_push_field(&data, T),
-        SoA_push_field(&keys, Key),
-        SoA_push_field(&is_occupied, MapSlot),
-      };
-      mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
-      Loop (i, old_cap) {
-        if (old_is_occupied[i] == MapSlot_Occupied) {
-          add(old_keys[i], old_data[i]);
-        }
-      }
-      mem_free(alloc, old_data);
-    }
-    else {
-      cap = DEFAULT_CAPACITY;
-      SoA_Field fields[] = {
-        SoA_push_field(&data, T),
-        SoA_push_field(&keys, Key),
-        SoA_push_field(&is_occupied, MapSlot),
-      };
-      mem_alloc_soa(alloc, cap, fields, ArrayCount(fields));
+      mem_alloc_soa(alloc, cap, ArraySlice(fields));
     }
   }
 };
@@ -1017,6 +892,4 @@ struct HashedStrMap {
 #endif
   }
 };
-
-
 
