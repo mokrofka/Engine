@@ -1,4 +1,5 @@
 #include "common.h"
+#include "imgui/imgui.h"
 
 Vertex cube_vertices[] = {
   // Front face (0, 0, 1)
@@ -557,9 +558,9 @@ void game_init() {
 }
 
 void game_deinit() {
-  st->entity_pool = {};
-  st->entity_pool.clear();
-  arena_clear(&st->arena);
+  // st->entity_pool = {};
+  // st->entity_pool.clear();
+  // arena_clear(&st->arena);
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -693,6 +694,27 @@ void game_update() {
     // }
   }
 
+  ImGui::ShowDemoWindow();
+
+  ImGuiIO& io = ImGui::GetIO();
+  static float f = 0.0f;
+  static int counter = 0;
+  static ImVec4 clear_color = ImVec4(0.1f, 0.1f, 0.1f, 1.00f);
+
+  ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!" and append into it.
+
+  ImGui::Text("This is some useful text.");          // Display some text (you can use a format strings too)
+
+  ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+  ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+
+  if (ImGui::Button("Button")) // Buttons return true when clicked (most widgets return true when edited/activated)
+    counter++;
+  ImGui::SameLine();
+  ImGui::Text("counter = %d", counter);
+
+  ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+  ImGui::End();
 }
 
 void main_init(u8** state) {
@@ -746,5 +768,6 @@ shared_function void main_update(u8** state) {
   }
   game_update();
 }
+
 
 

@@ -17,15 +17,16 @@ enum Key {
   Key_Backspace,
   Key_Enter,
   Key_Tab,
+  Key_Delete,
   Key_LShift,
-  Key_RShift,
   Key_Shift = Key_LShift,
-  Key_Control,
+  Key_RShift,
   Key_LControl,
+  Key_Ctrl = Key_LControl,
   Key_RControl,
   Key_LAlt,
-  Key_RAlt,
   Key_Alt = Key_LAlt,
+  Key_RAlt,
   Key_Escape,
   Key_Capslock,
 
@@ -44,7 +45,6 @@ enum Key {
   Key_Pause,
   Key_Print,
   Key_Printscreen,
-  Key_Delete,
   Key_Lsuper,
   Key_Rsuper,
   Key_Apps,
@@ -108,14 +108,14 @@ enum Key {
   Key_Semicolon,
   Key_Apostrophe,
   Key_Quote = Key_Apostrophe,
-  Key_Equal,
   Key_Comma,
-  Key_Minus,
   Key_Dot,
-  Key_Slash,
+  Key_Equal,
+  Key_Minus,
   Key_Grave,
   Key_LBracket,
   Key_RBracket,
+  Key_Slash,
   Key_Backslash,
 
   // Mouse
@@ -126,10 +126,42 @@ enum Key {
   Key_COUNT
 };
 
-void os_input_update();
+typedef u32 OS_Modifiers;
+enum {
+  OS_Modifier_Ctrl  = Bit(0),
+  OS_Modifier_Shift = Bit(1),
+  OS_Modifier_Alt   = Bit(2),
+};
 
-////////////////////////////////////////////////////////////////////////
-// keyboard
+enum OS_EventKind {
+  OS_EventKind_Key,
+  OS_EventKind_MouseButton,
+  OS_EventKind_MouseMove,
+  OS_EventKind_Scroll,
+};
+
+struct OS_InputEvent {
+  OS_EventKind type;
+  union {
+    struct {
+      Key key;
+      u32 character;
+      b32 is_pressed;
+      OS_Modifiers modifier;
+    };
+    struct {
+      f32 x, y;
+    };
+    struct {
+      f32 scroll_x, scroll_y;
+    };
+  };
+};
+
+u32 os_key_to_str(Key key, OS_Modifiers modifiers);
+Slice<OS_InputEvent> os_get_events();
+
+void os_input_update();
 
 KAPI b32 os_is_key_down(Key key);
 KAPI b32 os_is_key_up(Key key);

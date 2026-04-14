@@ -222,19 +222,6 @@ struct VK_ShaderModule {
   VkPipelineShaderStageCreateInfo stages[2];
 };
 
-// struct VK_Shader {
-//   VkPipeline pipeline;
-//   ShaderBatch<Entity> batch;
-//   ShaderBatch<Entity> batch_indexed;
-//   u32 static_entities_count;
-//   u32 static_entities_indexed_count;
-//   u32 static_entities_count_old;
-//   u32 static_entities_indexed_count_old;
-//   ShaderBatch<StaticEntity> static_batch;
-//   ShaderBatch<StaticEntity> static_batch_indexed;
-//   VK_ShaderModule module;
-// };
-
 struct VK_SyncObj {
   VkSemaphore* image_available_semaphores;
   VkSemaphore* render_complete_semaphores;
@@ -3313,6 +3300,7 @@ void vk_end_renderpass(RenderpassType renderpass) {
 }
 
 void vk_begin_draw_frame() {
+  imgui_begin_frame();
 }
 
 void vk_end_draw_frame() {
@@ -3351,6 +3339,7 @@ void vk_end_draw_frame() {
     vk.CmdSetScissor(cmd, 0, 1, &scissor);
     vk_begin_renderpass(RenderpassType_Screen);
     vk_draw_screen();
+    imgui_end_frame();
     vk_end_renderpass(RenderpassType_Screen);
   }
   vk_end_frame();
@@ -3812,5 +3801,76 @@ b32 ui_button(u32 id, v2 min, v2 max) {
 
   draw_quad(min, max, color);
   return clicked;
+}
+
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_vulkan.h"
+#include "imgui/imgui_impl_x11.h"
+
+struct ImguiState {
+  VkDescriptorPool descriptor_pool;
+};
+
+global ImguiState imgui_st;
+
+PFN_vkVoidFunction imgui_load_fn(const char* function_name, void* user_data) {
+  return (PFN_vkVoidFunction)os_lib_get_proc(vk.lib, function_name);
+}
+
+void imgui_init() {
+  ImGui::CreateContext();
+
+  ImGuiIO& io = ImGui::GetIO();
+  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;   
+  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+  imgui_impl_x11_init();
+
+  VkDescriptorPoolSize pool_sizes[] = {
+    {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
+  };
+  VkDescriptorPoolCreateInfo pool_info = {
+    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+    .poolSizeCount = ArrayCount(pool_sizes),
+    .pPoolSizes = pool_sizes,
+    .maxSets = 1000,
+    .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+  };
+  VK_CHECK(vk.CreateDescriptorPool(vkdevice, &pool_info, null, &imgui_st.descriptor_pool));
+  VkFormat format = VK_FORMAT_B8G8R8A8_UNORM;
+  ImGui_ImplVulkan_InitInfo init_info = {
+    .Instance = vk.instance,
+    .PhysicalDevice = vk.device.physical_device,
+    .Device = vk.device.logical_device,
+    .QueueFamily = vk.device.graphics_queue_index,
+    .Queue = vk.device.graphics_queue,
+    .DescriptorPool = imgui_st.descriptor_pool,
+    .MinImageCount = vk.frames_in_flight,
+    .ImageCount = vk.images_in_flight,
+    .PipelineInfoMain = {
+      .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
+      .PipelineRenderingCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
+        .colorAttachmentCount = 1,
+        .pColorAttachmentFormats = &format,
+      },
+    },
+    .UseDynamicRendering = true,
+  };
+  ImGui_ImplVulkan_LoadFunctions(VK_API_VERSION_1_4, imgui_load_fn, null);
+  ImGui_ImplVulkan_Init(&init_info);
+}
+
+void imgui_begin_frame() {
+  ImGui_ImplVulkan_NewFrame();
+  imgui_impl_x11_new_frame();
+  ImGui::NewFrame();
+}
+
+void imgui_end_frame() {
+  ImGui::Render();
+  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk.cmds[vk.current_frame_idx]);
+  ImGui::UpdatePlatformWindows();
+  ImGui::RenderPlatformWindowsDefault();
 }
 

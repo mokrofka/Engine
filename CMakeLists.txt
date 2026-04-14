@@ -3,7 +3,7 @@ set(CMAKE_CXX_STANDARD 23)
 project(Engine)
 
 # options
-  set(hotreload true)
+  set(hotreload false)
   set(X11_use true)
   set(sanitize_address true)
   set(binary_dir "${CMAKE_SOURCE_DIR}/bin")
@@ -36,21 +36,19 @@ project(Engine)
   endif()
 
 # Linker
-  add_link_options(-nostdlib++ "-fuse-ld=lld")
+  add_link_options("-fuse-ld=lld") # "-nostdlib++" but imgui depends
   message("Linker path: ${CMAKE_LINKER}")
 
 # Build
   if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_definitions(BUILD_DEBUG=1)
-  # elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
-  elseif (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-    message("hello")
+  elseif (CMAKE_BUILD_TYPE STREQUAL "Release" OR
+          CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     add_compile_options(-flto -ffast-math)
   endif()
   message("Build: ${CMAKE_BUILD_TYPE}")
 
   if (X11_use)
-    find_package(X11 REQUIRED)
     add_compile_definitions(GFX_X11=1)
   endif()
   include_directories(src)
@@ -67,11 +65,12 @@ project(Engine)
       src/vk.cpp
       src/stb_impl.c
       src/common.cpp
+      vendor/imgui/imgui_impl.cpp
     )
     target_compile_definitions(lib PRIVATE KEXPORT)
     if (UNIX)
       if (X11_use)
-        target_link_libraries(lib ${X11_LIBRARIES} libxcb-keysyms.so -lxcb)
+        target_link_libraries(lib -lxcb libxcb-keysyms.so )
       endif()
         target_link_libraries(lib wayland-client.so)
     endif()
@@ -95,10 +94,11 @@ project(Engine)
       src/common.cpp
       src/game/game.cpp
       src/main.cpp
+      vendor/imgui/imgui_impl.cpp
     )
     if (UNIX)
       if (X11_use)
-        target_link_libraries(exe ${X11_LIBRARIES} libxcb-keysyms.so -lxcb)
+        target_link_libraries(exe -lxcb libxcb-keysyms.so)
       else()
         target_link_libraries(exe wayland-client.so)
       endif()
@@ -112,4 +112,4 @@ project(Engine)
 #   src/os/os_impl.cpp
 #   src/compiling_shaders.cpp
 # )
-# target_link_libraries(compiling_shaders ${X11_LIBRARIES} libxcb-keysyms.so -lxcb)
+# target_link_libraries(compiling_shaders -lxcb libxcb-keysyms.so)

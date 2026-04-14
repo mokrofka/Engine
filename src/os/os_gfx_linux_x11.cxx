@@ -6,16 +6,14 @@
 #include <xcb/xcb.h>
 #include <xcb/xcb_keysyms.h>
 
-#include "stdlib.h"
-
 struct X11State {
+  Arena arena;
+  AllocSegList gpa;
   xcb_connection_t* connection;
   xcb_screen_t* screen;
   xcb_window_t window;
   xcb_key_symbols_t* key_symbols;
-
   xcb_atom_t wm_delete_window;
-
   u32 width = 1;
   u32 height = 1;
   b8 should_close;
@@ -32,18 +30,10 @@ struct X11State {
     MouseState mouse_current;
     MouseState mouse_previous;
   } input;
+  Darray<OS_InputEvent> events;
 };
 
 global X11State gfx_st;
-
-intern u32 lnx_mouse_button_translate(u32 button) {
-  switch (button) {
-    // case Button1: return MouseButton_Left;
-    // case Button3: return MouseButton_Right;
-    // default: return MouseKey_COUNT;
-  }
-  return 0;
-}
 
 Key lnx_keycode_translate(u32 keysym) {
   switch (keysym) {
@@ -51,6 +41,7 @@ Key lnx_keycode_translate(u32 keysym) {
     case XK_BackSpace:    return Key_Backspace;
     case XK_Return:       return Key_Enter;
     case XK_Tab:          return Key_Tab;
+    case XK_Delete:        return Key_Delete;
     case XK_Shift_L:      return Key_LShift;
     case XK_Shift_R:      return Key_RShift;
     case XK_Control_L:    return Key_LControl;
@@ -142,7 +133,121 @@ Key lnx_keycode_translate(u32 keysym) {
   }
 }
 
+u32 os_key_to_str(Key key, OS_Modifiers modifiers) {
+  if (!FlagHas(modifiers, OS_Modifier_Shift)) {
+    switch (key) {
+      case Key_Space: return ' ';
+      case Key_0: return '0';
+      case Key_1: return '1';
+      case Key_2: return '2';
+      case Key_3: return '3';
+      case Key_4: return '4';  
+      case Key_5: return '5'; 
+      case Key_6: return '6'; 
+      case Key_7: return '7'; 
+      case Key_8: return '8'; 
+      case Key_9: return '9'; 
+      case Key_A: return 'a'; 
+      case Key_B: return 'b'; 
+      case Key_C: return 'c'; 
+      case Key_D: return 'd'; 
+      case Key_E: return 'e'; 
+      case Key_F: return 'f'; 
+      case Key_G: return 'g'; 
+      case Key_H: return 'h'; 
+      case Key_I: return 'i'; 
+      case Key_J: return 'j'; 
+      case Key_K: return 'k'; 
+      case Key_L: return 'l'; 
+      case Key_M: return 'm'; 
+      case Key_N: return 'n'; 
+      case Key_O: return 'o'; 
+      case Key_P: return 'p'; 
+      case Key_Q: return 'q'; 
+      case Key_R: return 'r'; 
+      case Key_S: return 's'; 
+      case Key_T: return 't'; 
+      case Key_U: return 'u'; 
+      case Key_V: return 'v'; 
+      case Key_W: return 'w'; 
+      case Key_X: return 'x'; 
+      case Key_Y: return 'y'; 
+      case Key_Z: return 'z'; 
+      case Key_Semicolon: return ';';
+      case Key_Apostrophe: return '\'';
+      case Key_Comma: return ',';
+      case Key_Dot: return '.';
+      case Key_Equal: return '=';
+      case Key_Minus: return '-';
+      case Key_Grave: return '`';
+      case Key_LBracket: return '[';
+      case Key_RBracket: return ']';
+      case Key_Slash: return '/';
+      case Key_Backslash: return '\\';
+      default: return 0;
+    }
+  }
+  if (FlagHas(modifiers, OS_Modifier_Shift)) {
+    switch (key) {
+      case Key_Space: return ' ';
+      case Key_0: return ')';
+      case Key_1: return '!';
+      case Key_2: return '@';
+      case Key_3: return '#';
+      case Key_4: return '$';  
+      case Key_5: return '%'; 
+      case Key_6: return '^'; 
+      case Key_7: return '&'; 
+      case Key_8: return '*'; 
+      case Key_9: return '('; 
+      case Key_A: return 'A'; 
+      case Key_B: return 'B'; 
+      case Key_C: return 'C'; 
+      case Key_D: return 'D'; 
+      case Key_E: return 'E'; 
+      case Key_F: return 'F'; 
+      case Key_G: return 'G'; 
+      case Key_H: return 'H'; 
+      case Key_I: return 'I'; 
+      case Key_J: return 'J'; 
+      case Key_K: return 'K'; 
+      case Key_L: return 'L'; 
+      case Key_M: return 'M'; 
+      case Key_N: return 'N'; 
+      case Key_O: return 'O'; 
+      case Key_P: return 'P'; 
+      case Key_Q: return 'Q'; 
+      case Key_R: return 'R'; 
+      case Key_S: return 'S'; 
+      case Key_T: return 'T'; 
+      case Key_U: return 'U'; 
+      case Key_V: return 'V'; 
+      case Key_W: return 'W'; 
+      case Key_X: return 'X'; 
+      case Key_Y: return 'Y'; 
+      case Key_Z: return 'Z'; 
+      case Key_Semicolon: return ':';
+      case Key_Apostrophe: return '\"';
+      case Key_Comma: return '<';
+      case Key_Dot: return '>';
+      case Key_Equal: return '+';
+      case Key_Minus: return '_';
+      case Key_Grave: return '~';
+      case Key_LBracket: return '{';
+      case Key_RBracket: return '}';
+      case Key_Slash: return '?';
+      case Key_Backslash: return '|';
+      default: return 0;
+    }
+  }
+  return 0;
+}
+
 void os_gfx_init() {
+  gfx_st.arena = arena_init();
+  gfx_st.gpa.init(gfx_st.arena);
+  gfx_st.events.init(gfx_st.gpa);
+
   int screen_number;
   gfx_st.connection = xcb_connect(null, &screen_number);
   xcb_connection_has_error(gfx_st.connection);
@@ -168,14 +273,14 @@ void os_gfx_init() {
 
   xcb_create_window(
     gfx_st.connection,
-    XCB_COPY_FROM_PARENT,         // depth
-    gfx_st.window,                    // window ID
-    gfx_st.screen->root,              // parent
-    100, 100, 800, 600,           // x, y, width, height
-    1,                            // border width
-    XCB_WINDOW_CLASS_INPUT_OUTPUT,// class
-    gfx_st.screen->root_visual,       // visual
-    mask, values                  // masks
+    XCB_COPY_FROM_PARENT,
+    gfx_st.window,
+    gfx_st.screen->root,
+    100, 100, 800, 600,
+    1,
+    XCB_WINDOW_CLASS_INPUT_OUTPUT,
+    gfx_st.screen->root_visual,
+    mask, values
   );
 
   const char* title = "XCB Window Example";
@@ -205,17 +310,17 @@ void os_gfx_init() {
     1,
     &delete_reply->atom
   );
-
   xcb_map_window(gfx_st.connection, gfx_st.window);
   xcb_flush(gfx_st.connection);
   gfx_st.key_symbols = xcb_key_symbols_alloc(gfx_st.connection);
 }
 
-void os_gfx_shutdown() {
-  xcb_disconnect(gfx_st.connection);
-}
+void os_gfx_shutdown() { xcb_disconnect(gfx_st.connection); }
 
 void os_pump_messages() {
+  gfx_st.events.clear();
+  OS_Modifiers modifiers = 0;
+
   xcb_generic_event_t* event;
   while ((event = xcb_poll_for_event(gfx_st.connection))) {
     switch (event->response_type & ~0x80) {
@@ -224,12 +329,44 @@ void os_pump_messages() {
         xcb_keysym_t sym = xcb_key_symbols_get_keysym(gfx_st.key_symbols, kp->detail, 0);
         Key key = lnx_keycode_translate(sym);
         gfx_st.input.keyboard_current.keys[key] = true;
+        if (key == Key_Shift) {
+          modifiers |= OS_Modifier_Shift;
+        }
+        if (key == Key_Alt) {
+          modifiers |= OS_Modifier_Alt;
+        }
+        if (key == Key_Ctrl) {
+          modifiers |= OS_Modifier_Ctrl;
+        }
+        OS_InputEvent event = {
+          .type = OS_EventKind_Key,
+          .key = key,
+          .is_pressed = true,
+          .modifier = modifiers,
+        };
+        gfx_st.events.add(event);
       } break;
       case XCB_KEY_RELEASE: {
         xcb_key_press_event_t* kp = (xcb_key_press_event_t*)event;
         xcb_keysym_t sym = xcb_key_symbols_get_keysym(gfx_st.key_symbols, kp->detail, 0);
         Key key = lnx_keycode_translate(sym);
         gfx_st.input.keyboard_current.keys[key] = false;
+        if (key == Key_Shift) {
+          modifiers = FlagClear(modifiers, OS_Modifier_Shift);
+        }
+        if (key == Key_Alt) {
+          modifiers = FlagClear(modifiers, OS_Modifier_Alt);
+        }
+        if (key == Key_Ctrl) {
+          modifiers = FlagClear(modifiers, OS_Modifier_Ctrl);
+        }
+        OS_InputEvent event = {
+          .type = OS_EventKind_Key,
+          .key = key,
+          .is_pressed = false,
+          .modifier = modifiers,
+        };
+        gfx_st.events.add(event);
       } break;
       case XCB_CONFIGURE_NOTIFY: {
         xcb_configure_notify_event_t* cfg = (xcb_configure_notify_event_t*)event;
@@ -246,31 +383,57 @@ void os_pump_messages() {
         }
       } break;
       case XCB_BUTTON_PRESS: {
+        #define XK_MouseLeft 1
+        #define XK_MouseMiddle 2
+        #define XK_MouseRight 3
+        #define XK_ScrollUp 4
+        #define XK_ScrollDown 5
+        #define XK_ScrollLeft 6
+        #define XK_ScrollRight 7
         xcb_button_press_event_t* bp = (xcb_button_press_event_t*)event;
-        switch (bp->detail) {
-          // case 1: gfx_st.input.mouse_current.buttons[MouseKey_Left] = true; break;
-          // case 2: gfx_st.input.mouse_current.buttons[MouseKey_Middle] = true; break;
-          // case 3: gfx_st.input.mouse_current.buttons[MouseKey_Right] = true; break;
-          case 1: gfx_st.input.keyboard_current.keys[MouseKey_Left] = true; break;
-          case 2: gfx_st.input.keyboard_current.keys[MouseKey_Middle] = true; break;
-          case 3: gfx_st.input.keyboard_current.keys[MouseKey_Right] = true; break;
+        OS_InputEvent event = {};
+        if (bp->detail >= XK_MouseLeft && bp->detail <= XK_MouseRight) {
+          switch (bp->detail) {
+            case XK_MouseLeft: gfx_st.input.keyboard_current.keys[MouseKey_Left] = true; event.key = MouseKey_Left; break;
+            case XK_MouseMiddle: gfx_st.input.keyboard_current.keys[MouseKey_Middle] = true; event.key = MouseKey_Middle; break;
+            case XK_MouseRight: gfx_st.input.keyboard_current.keys[MouseKey_Right] = true; event.key = MouseKey_Right; break;
+          }
+          event.type = OS_EventKind_MouseButton;
+          event.is_pressed = true;
         }
+        else {
+          switch (bp->detail) {
+            case XK_ScrollUp: event.scroll_y = 1; break;
+            case XK_ScrollDown: event.scroll_y = -1; break;
+            case XK_ScrollLeft: event.scroll_x = -1; break;
+            case XK_ScrollRight: event.scroll_x = 1; break;
+          }
+          event.type = OS_EventKind_Scroll;
+        }
+        gfx_st.events.add(event);
       } break;
       case XCB_BUTTON_RELEASE: {
         xcb_button_press_event_t* bp = (xcb_button_press_event_t*)event;
-        switch (bp->detail) {
-          // case 1: gfx_st.input.mouse_current.buttons[MouseKey_Left] = false; break;
-          // case 2: gfx_st.input.mouse_current.buttons[MouseKey_Middle] = false; break;
-          // case 3: gfx_st.input.mouse_current.buttons[MouseKey_Right] = false; break;
-          case 1: gfx_st.input.keyboard_current.keys[MouseKey_Left] = false; break;
-          case 2: gfx_st.input.keyboard_current.keys[MouseKey_Middle] = false; break;
-          case 3: gfx_st.input.keyboard_current.keys[MouseKey_Right] = false; break;
+        OS_InputEvent event = {};
+        if (bp->detail >= XK_MouseLeft && bp->detail <= XK_MouseRight) {
+          switch (bp->detail) {
+            case XK_MouseLeft: gfx_st.input.keyboard_current.keys[MouseKey_Left] = false; event.key = MouseKey_Left; break;
+            case XK_MouseMiddle: gfx_st.input.keyboard_current.keys[MouseKey_Middle] = false; event.key = MouseKey_Middle; break;
+            case XK_MouseRight: gfx_st.input.keyboard_current.keys[MouseKey_Right] = false; event.key = MouseKey_Right; break;
+          }
+          event.type = OS_EventKind_MouseButton;
+          event.is_pressed = false;
         }
+        gfx_st.events.add(event);
       } break;
       case XCB_MOTION_NOTIFY: {
         xcb_motion_notify_event_t* motion = (xcb_motion_notify_event_t*)event;
         gfx_st.input.mouse_current.x = motion->event_x;
         gfx_st.input.mouse_current.y = motion->event_y;
+        OS_InputEvent event = {.type = OS_EventKind_MouseMove};
+        event.x = gfx_st.input.mouse_current.x;
+        event.y = gfx_st.input.mouse_current.y;
+        gfx_st.events.add(event);
       } break;
     }
   }
@@ -279,6 +442,7 @@ void os_pump_messages() {
 b32 os_window_should_close() { return gfx_st.should_close; }
 v2u os_get_window_size() { return v2u(gfx_st.width, gfx_st.height); }
 v2 os_get_mouse_pos() { return v2(gfx_st.input.mouse_current.x, gfx_st.input.mouse_current.y); }
+void os_close_window() { gfx_st.should_close = true; }
 
 void os_get_gfx_api_handlers(void* out) {
   struct Surface {
@@ -288,15 +452,13 @@ void os_get_gfx_api_handlers(void* out) {
   *(Surface*)out = { gfx_st.connection, gfx_st.window };
 }
 
-void  os_close_window() { gfx_st.should_close = true; }
+Slice<OS_InputEvent> os_get_events() { return {gfx_st.events.data, gfx_st.events.count}; }
 
 void os_input_update() {
   MemCopyStruct(&gfx_st.input.keyboard_previous, &gfx_st.input.keyboard_current);
   MemCopyStruct(&gfx_st.input.mouse_previous, &gfx_st.input.mouse_current);
 }
 
-////////////////////////////////////////////////////////////////////////
-// keyboard
 b32 os_is_key_down(Key key)       { return gfx_st.input.keyboard_current.keys[key] == true; }
 b32 os_is_key_up(Key key)         { return gfx_st.input.keyboard_current.keys[key] == false; }
 b32 os_was_key_down(Key key)      { return gfx_st.input.keyboard_previous.keys[key] == true; }

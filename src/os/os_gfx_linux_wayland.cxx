@@ -3,9 +3,9 @@
 #if OS_LINUX && !GFX_X11
 
 #undef global
+#include <wayland-client.h>
 #include "wayland_extensions/xdg-shell-client-protocol.h"
 #include "wayland_extensions/xdg-shell-protocol.c"
-#include <wayland-client.h>
 #define global static
 
 #include <linux/input-event-codes.h>
@@ -269,21 +269,11 @@ void os_gfx_shutdown() {
   wl_display_disconnect(wl_st.display);
 }
 
-void os_pump_messages() { 
-  wl_display_dispatch_pending(wl_st.display);
-}
-
-b32 os_window_should_close() {
-  return wl_st.should_close;
-}
-
-v2u os_get_window_size() {
-  return v2u(wl_st.width, wl_st.height);
-}
-
-v2 os_get_mouse_pos() {
-  return v2(wl_st.input.mouse_current.x, wl_st.input.mouse_current.y);
-}
+void os_pump_messages() { wl_display_dispatch_pending(wl_st.display); }
+b32 os_window_should_close() { return wl_st.should_close; }
+v2u os_get_window_size() { return v2u(wl_st.width, wl_st.height); }
+v2 os_get_mouse_pos() { return v2(wl_st.input.mouse_current.x, wl_st.input.mouse_current.y); }
+void os_close_window() { wl_st.should_close = true; }
 
 void os_get_gfx_api_handlers(void* out) {
   struct Surface {
@@ -292,12 +282,6 @@ void os_get_gfx_api_handlers(void* out) {
   };
   *(Surface*)out = {.wl_display = wl_st.display, .wl_surface = wl_st.surface};
 }
-void  os_close_window() {
-  wl_st.should_close = true; 
-}
-
-////////////////////////////////////////////////////////////////////////
-// keyboard
 
 void os_input_update() {
   MemCopyStruct(&wl_st.input.keyboard_previous, &wl_st.input.keyboard_current);

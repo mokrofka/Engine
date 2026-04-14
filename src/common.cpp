@@ -1015,6 +1015,7 @@ void common_init() {
     entity_soa.static_generations = push_array(common_st.arena, u32, MaxStaticEntities);
   )
   vk_init();
+  imgui_init();
 }
 
 void asset_load() {
