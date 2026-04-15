@@ -975,7 +975,7 @@ struct CommonState {
 
 global CommonState common_st;
 
-void foo();
+void foo__();
 void common_init() {
   Scratch scratch;
   // foo();
@@ -1231,7 +1231,7 @@ void transform_task_func(void* arg) {
 // 4 thread
 // linear: 7.6gb, random access: 3.90gb
 
-void foo() {
+void foo__() {
   Scratch scratch;
   thread_pool_init(4);
 

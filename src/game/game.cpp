@@ -749,6 +749,20 @@ void main_init(u8** state) {
   game_init();
 }
 
+void foo() {
+  Scratch scratch;
+  
+  if (os_is_key_pressed(Key_C)) {
+    String str_write = "written";
+    os_clipboard_write(str_write);
+  }
+  if (os_is_key_pressed(Key_V)) {
+    String result = os_clipboard_read(scratch);
+    Info("%s", result);
+  }
+
+}
+
 shared_function void main_update(u8** state) {
   Scratch scratch;
   if (*state == null) {
@@ -767,7 +781,7 @@ shared_function void main_update(u8** state) {
     os_close_window();
   }
   game_update();
+
+  foo();
 }
-
-
 

@@ -54,6 +54,7 @@ typedef va_list VaList;
       #define KAPI __declspec(dllexport)
     #else
       #define KAPI __declspec(dllimport)
+      #define hello
     #endif
   #else
     #define KAPI

@@ -170,3 +170,6 @@ KAPI b32 os_was_key_up(Key key);
 KAPI b32 os_is_key_pressed(Key key);
 KAPI b32 os_is_key_released(Key key);
 
+void os_clipboard_write(String str);
+String os_clipboard_read(Allocator arena);
+

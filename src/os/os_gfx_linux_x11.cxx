@@ -6,6 +6,18 @@
 #include <xcb/xcb.h>
 #include <xcb/xcb_keysyms.h>
 
+#include <stdlib.h>
+
+struct Clipboard {
+  xcb_atom_t atom;
+  xcb_atom_t targets_atom;
+  // xcb_atom_t string_atom;
+  xcb_atom_t property_atom;
+  xcb_atom_t utf8_atom;
+  String64 str_to_write;
+  String str_to_read;
+};
+
 struct X11State {
   Arena arena;
   AllocSegList gpa;
@@ -14,6 +26,7 @@ struct X11State {
   xcb_window_t window;
   xcb_key_symbols_t* key_symbols;
   xcb_atom_t wm_delete_window;
+  Clipboard clipboard;
   u32 width = 1;
   u32 height = 1;
   b8 should_close;
@@ -31,6 +44,7 @@ struct X11State {
     MouseState mouse_previous;
   } input;
   Darray<OS_InputEvent> events;
+  Darray<xcb_generic_event_t*> xcb_events;
 };
 
 global X11State gfx_st;
@@ -243,25 +257,33 @@ u32 os_key_to_str(Key key, OS_Modifiers modifiers) {
   return 0;
 }
 
+xcb_atom_t intern_(String name) {
+  xcb_intern_atom_cookie_t cookie = xcb_intern_atom(gfx_st.connection, 0, name.size, (const char*)name.str);
+  xcb_intern_atom_reply_t* reply = xcb_intern_atom_reply(gfx_st.connection, cookie, null);
+  if (!reply) return XCB_NONE;
+  xcb_atom_t atom = reply->atom;
+  return atom;
+}
+
 void os_gfx_init() {
-  gfx_st.arena = arena_init();
-  gfx_st.gpa.init(gfx_st.arena);
-  gfx_st.events.init(gfx_st.gpa);
+  X11State& g = gfx_st;
+  g.arena = arena_init();
+  g.gpa.init(g.arena);
+  g.events.init(g.gpa);
 
-  int screen_number;
-  gfx_st.connection = xcb_connect(null, &screen_number);
-  xcb_connection_has_error(gfx_st.connection);
-
-  const xcb_setup_t* setup = xcb_get_setup(gfx_st.connection);
+  i32 screen_number;
+  g.connection = xcb_connect(null, &screen_number);
+  xcb_connection_has_error(g.connection);
+  const xcb_setup_t* setup = xcb_get_setup(g.connection);
   xcb_screen_iterator_t iter = xcb_setup_roots_iterator(setup);
-  for (int i = 0; i < screen_number; ++i)
+  Loop (i, screen_number) {
     xcb_screen_next(&iter);
-  gfx_st.screen = iter.data;
-
-  gfx_st.window = xcb_generate_id(gfx_st.connection);
+  }
+  g.screen = iter.data;
+  g.window = xcb_generate_id(g.connection);
   u32 mask = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK;
   u32 values[] = {
-    gfx_st.screen->black_pixel,
+    g.screen->black_pixel,
     XCB_EVENT_MASK_EXPOSURE |
     XCB_EVENT_MASK_KEY_PRESS |
     XCB_EVENT_MASK_KEY_RELEASE |
@@ -270,65 +292,51 @@ void os_gfx_init() {
     XCB_EVENT_MASK_POINTER_MOTION |
     XCB_EVENT_MASK_STRUCTURE_NOTIFY
   };
-
-  xcb_create_window(
-    gfx_st.connection,
-    XCB_COPY_FROM_PARENT,
-    gfx_st.window,
-    gfx_st.screen->root,
+  xcb_create_window(g.connection, XCB_COPY_FROM_PARENT, g.window, g.screen->root,
     100, 100, 800, 600,
-    1,
-    XCB_WINDOW_CLASS_INPUT_OUTPUT,
-    gfx_st.screen->root_visual,
-    mask, values
-  );
-
+    1, XCB_WINDOW_CLASS_INPUT_OUTPUT, g.screen->root_visual, mask, values);
   const char* title = "XCB Window Example";
-  xcb_change_property(
-    gfx_st.connection,
-    XCB_PROP_MODE_REPLACE,
-    gfx_st.window,
-    XCB_ATOM_WM_NAME,
-    XCB_ATOM_STRING,
-    8,
-    cstr_length(title),
-    title
-  );
+  xcb_change_property(g.connection, XCB_PROP_MODE_REPLACE, g.window, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, cstr_length(title), title);
 
-  xcb_intern_atom_cookie_t protocols_cookie = xcb_intern_atom(gfx_st.connection, 1, 12, "WM_PROTOCOLS");
-  xcb_intern_atom_reply_t* protocols_reply = xcb_intern_atom_reply(gfx_st.connection, protocols_cookie, null);
-  xcb_intern_atom_cookie_t delete_cookie = xcb_intern_atom(gfx_st.connection, 0, 16, "WM_DELETE_WINDOW");
-  xcb_intern_atom_reply_t* delete_reply = xcb_intern_atom_reply(gfx_st.connection, delete_cookie, null);
-  gfx_st.wm_delete_window = delete_reply->atom;
-  xcb_change_property(
-    gfx_st.connection,
-    XCB_PROP_MODE_REPLACE,
-    gfx_st.window,
-    protocols_reply->atom,
-    4,
-    32,
-    1,
-    &delete_reply->atom
-  );
-  xcb_map_window(gfx_st.connection, gfx_st.window);
-  xcb_flush(gfx_st.connection);
-  gfx_st.key_symbols = xcb_key_symbols_alloc(gfx_st.connection);
+  xcb_intern_atom_cookie_t protocols_cookie = xcb_intern_atom(g.connection, 1, 12, "WM_PROTOCOLS");
+  xcb_intern_atom_reply_t* protocols_reply = xcb_intern_atom_reply(g.connection, protocols_cookie, null);
+  xcb_intern_atom_cookie_t delete_cookie = xcb_intern_atom(g.connection, 0, 16, "WM_DELETE_WINDOW");
+  xcb_intern_atom_reply_t* delete_reply = xcb_intern_atom_reply(g.connection, delete_cookie, null);
+  g.clipboard.atom = intern_("CLIPBOARD");
+  g.clipboard.targets_atom = intern_("TARGETS");
+  g.clipboard.utf8_atom = intern_("UTF8_STRING");
+  g.clipboard.property_atom = intern_("XSEL_DATA");
+
+  g.wm_delete_window = delete_reply->atom;
+  xcb_change_property(g.connection, XCB_PROP_MODE_REPLACE, g.window, protocols_reply->atom, 4, 32, 1, &delete_reply->atom);
+  xcb_map_window(g.connection, g.window);
+  xcb_flush(g.connection);
+  g.key_symbols = xcb_key_symbols_alloc(g.connection);
 }
 
 void os_gfx_shutdown() { xcb_disconnect(gfx_st.connection); }
 
 void os_pump_messages() {
-  gfx_st.events.clear();
+  X11State& g = gfx_st;
+  g.events.clear();
   OS_Modifiers modifiers = 0;
 
   xcb_generic_event_t* event;
-  while ((event = xcb_poll_for_event(gfx_st.connection))) {
+  u32 i = 0;
+  while (true) {
+    event = xcb_poll_for_event(g.connection);
+    if (event) {
+    } else if (i < g.xcb_events.count) {
+      event = g.xcb_events[i++];
+    } else {
+      break;
+    }
     switch (event->response_type & ~0x80) {
       case XCB_KEY_PRESS: {
         xcb_key_press_event_t* kp = (xcb_key_press_event_t*)event;
-        xcb_keysym_t sym = xcb_key_symbols_get_keysym(gfx_st.key_symbols, kp->detail, 0);
+        xcb_keysym_t sym = xcb_key_symbols_get_keysym(g.key_symbols, kp->detail, 0);
         Key key = lnx_keycode_translate(sym);
-        gfx_st.input.keyboard_current.keys[key] = true;
+        g.input.keyboard_current.keys[key] = true;
         if (key == Key_Shift) {
           modifiers |= OS_Modifier_Shift;
         }
@@ -344,13 +352,13 @@ void os_pump_messages() {
           .is_pressed = true,
           .modifier = modifiers,
         };
-        gfx_st.events.add(event);
+        g.events.add(event);
       } break;
       case XCB_KEY_RELEASE: {
         xcb_key_press_event_t* kp = (xcb_key_press_event_t*)event;
-        xcb_keysym_t sym = xcb_key_symbols_get_keysym(gfx_st.key_symbols, kp->detail, 0);
+        xcb_keysym_t sym = xcb_key_symbols_get_keysym(g.key_symbols, kp->detail, 0);
         Key key = lnx_keycode_translate(sym);
-        gfx_st.input.keyboard_current.keys[key] = false;
+        g.input.keyboard_current.keys[key] = false;
         if (key == Key_Shift) {
           modifiers = FlagClear(modifiers, OS_Modifier_Shift);
         }
@@ -366,20 +374,20 @@ void os_pump_messages() {
           .is_pressed = false,
           .modifier = modifiers,
         };
-        gfx_st.events.add(event);
+        g.events.add(event);
       } break;
       case XCB_CONFIGURE_NOTIFY: {
         xcb_configure_notify_event_t* cfg = (xcb_configure_notify_event_t*)event;
         if (!cfg->width || !cfg->height) {
           return;
         }
-        gfx_st.width = cfg->width;
-        gfx_st.height = cfg->height;
+        g.width = cfg->width;
+        g.height = cfg->height;
       } break;
       case XCB_CLIENT_MESSAGE: {
         xcb_client_message_event_t* cm = (xcb_client_message_event_t*)event;
-        if (cm->data.data32[0] == gfx_st.wm_delete_window) {
-          gfx_st.should_close = true;
+        if (cm->data.data32[0] == g.wm_delete_window) {
+          g.should_close = true;
         }
       } break;
       case XCB_BUTTON_PRESS: {
@@ -394,9 +402,9 @@ void os_pump_messages() {
         OS_InputEvent event = {};
         if (bp->detail >= XK_MouseLeft && bp->detail <= XK_MouseRight) {
           switch (bp->detail) {
-            case XK_MouseLeft: gfx_st.input.keyboard_current.keys[MouseKey_Left] = true; event.key = MouseKey_Left; break;
-            case XK_MouseMiddle: gfx_st.input.keyboard_current.keys[MouseKey_Middle] = true; event.key = MouseKey_Middle; break;
-            case XK_MouseRight: gfx_st.input.keyboard_current.keys[MouseKey_Right] = true; event.key = MouseKey_Right; break;
+            case XK_MouseLeft: g.input.keyboard_current.keys[MouseKey_Left] = true; event.key = MouseKey_Left; break;
+            case XK_MouseMiddle: g.input.keyboard_current.keys[MouseKey_Middle] = true; event.key = MouseKey_Middle; break;
+            case XK_MouseRight: g.input.keyboard_current.keys[MouseKey_Right] = true; event.key = MouseKey_Right; break;
           }
           event.type = OS_EventKind_MouseButton;
           event.is_pressed = true;
@@ -410,33 +418,126 @@ void os_pump_messages() {
           }
           event.type = OS_EventKind_Scroll;
         }
-        gfx_st.events.add(event);
+        g.events.add(event);
       } break;
       case XCB_BUTTON_RELEASE: {
         xcb_button_press_event_t* bp = (xcb_button_press_event_t*)event;
         OS_InputEvent event = {};
         if (bp->detail >= XK_MouseLeft && bp->detail <= XK_MouseRight) {
           switch (bp->detail) {
-            case XK_MouseLeft: gfx_st.input.keyboard_current.keys[MouseKey_Left] = false; event.key = MouseKey_Left; break;
-            case XK_MouseMiddle: gfx_st.input.keyboard_current.keys[MouseKey_Middle] = false; event.key = MouseKey_Middle; break;
-            case XK_MouseRight: gfx_st.input.keyboard_current.keys[MouseKey_Right] = false; event.key = MouseKey_Right; break;
+            case XK_MouseLeft: g.input.keyboard_current.keys[MouseKey_Left] = false; event.key = MouseKey_Left; break;
+            case XK_MouseMiddle: g.input.keyboard_current.keys[MouseKey_Middle] = false; event.key = MouseKey_Middle; break;
+            case XK_MouseRight: g.input.keyboard_current.keys[MouseKey_Right] = false; event.key = MouseKey_Right; break;
           }
           event.type = OS_EventKind_MouseButton;
           event.is_pressed = false;
         }
-        gfx_st.events.add(event);
+        g.events.add(event);
       } break;
       case XCB_MOTION_NOTIFY: {
         xcb_motion_notify_event_t* motion = (xcb_motion_notify_event_t*)event;
-        gfx_st.input.mouse_current.x = motion->event_x;
-        gfx_st.input.mouse_current.y = motion->event_y;
+        g.input.mouse_current.x = motion->event_x;
+        g.input.mouse_current.y = motion->event_y;
         OS_InputEvent event = {.type = OS_EventKind_MouseMove};
-        event.x = gfx_st.input.mouse_current.x;
-        event.y = gfx_st.input.mouse_current.y;
-        gfx_st.events.add(event);
+        event.x = g.input.mouse_current.x;
+        event.y = g.input.mouse_current.y;
+        g.events.add(event);
       } break;
+      case XCB_SELECTION_REQUEST: {
+        xcb_selection_request_event_t* req = (xcb_selection_request_event_t*)event;
+        xcb_selection_notify_event_t notify = {
+          .response_type = XCB_SELECTION_NOTIFY,
+          .sequence = 0,
+          .time = req->time,
+          .requestor = req->requestor,
+          .selection = req->selection,
+          .target = req->target,
+          .property = req->property,
+        };
+        if (req->target == g.clipboard.targets_atom) {
+          xcb_atom_t supported[] = {
+            g.clipboard.utf8_atom,
+            g.clipboard.targets_atom
+          };
+          xcb_change_property(g.connection, XCB_PROP_MODE_REPLACE, req->requestor, req->property, XCB_ATOM_ATOM, 32, ArrayCount(supported), supported);
+          notify.property = req->property;
+        }
+        if (req->target == g.clipboard.utf8_atom) {
+          xcb_change_property(g.connection, XCB_PROP_MODE_REPLACE, req->requestor, req->property, req->target, 8, g.clipboard.str_to_write.size, g.clipboard.str_to_write.str);
+        }
+        xcb_send_event(g.connection, 0, req->requestor, XCB_EVENT_MASK_NO_EVENT, (char*)&notify);
+        xcb_flush(g.connection);
+      }
     }
   }
+  g.xcb_events.clear();
+}
+
+void os_clipboard_write(String str) {
+  X11State& g = gfx_st;
+  str_copy(g.clipboard.str_to_write, str);
+  xcb_set_selection_owner(g.connection, g.window, g.clipboard.atom, XCB_CURRENT_TIME);
+  xcb_flush(g.connection);
+}
+
+String os_clipboard_read(Allocator arena) {
+  X11State& g = gfx_st;
+  xcb_convert_selection(g.connection, g.window, g.clipboard.atom, g.clipboard.utf8_atom, g.clipboard.property_atom, XCB_CURRENT_TIME);
+  xcb_flush(g.connection);
+
+  xcb_generic_event_t* event;
+  while (true) {
+    event = xcb_wait_for_event(g.connection);
+    u8 type = event->response_type & ~0x80;
+    if (type == XCB_SELECTION_REQUEST) {
+      xcb_window_t owner = xcb_get_selection_owner_reply(g.connection, xcb_get_selection_owner(g.connection, g.clipboard.atom), NULL)->owner;
+      if (g.window != owner) {
+        goto add_event;
+      }
+      xcb_selection_request_event_t* req = (xcb_selection_request_event_t*)event;
+      xcb_selection_notify_event_t notify = {
+        .response_type = XCB_SELECTION_NOTIFY,
+        .sequence = 0,
+        .time = req->time,
+        .requestor = req->requestor,
+        .selection = req->selection,
+        .target = req->target,
+        .property = req->property,
+      };
+      if (req->target == g.clipboard.targets_atom) {
+        xcb_atom_t supported[] = {
+          g.clipboard.utf8_atom,
+          g.clipboard.targets_atom
+        };
+        xcb_change_property(g.connection, XCB_PROP_MODE_REPLACE, req->requestor, req->property, XCB_ATOM_ATOM, 32, ArrayCount(supported), supported);
+        notify.property = req->property;
+      }
+      if (req->target == g.clipboard.utf8_atom) {
+        xcb_change_property(g.connection, XCB_PROP_MODE_REPLACE, req->requestor, req->property, req->target, 8, g.clipboard.str_to_write.size, g.clipboard.str_to_write.str);
+      }
+      xcb_send_event(g.connection, 0, req->requestor, XCB_EVENT_MASK_NO_EVENT, (char*)&notify);
+      xcb_flush(g.connection);
+    }
+    else if (type == XCB_SELECTION_NOTIFY) {
+      xcb_selection_notify_event_t* notify = (xcb_selection_notify_event_t*)event;
+      if (notify->property == XCB_NONE) {
+        break;
+      }
+      xcb_get_property_cookie_t cookie = xcb_get_property(g.connection, 0, g.window, notify->property, XCB_GET_PROPERTY_TYPE_ANY, 0, 4096);
+      xcb_get_property_reply_t* reply = xcb_get_property_reply(g.connection, cookie, null);
+      if (reply) {
+        u8* data = (u8*)xcb_get_property_value(reply);
+        u32 len = xcb_get_property_value_length(reply);
+        g.clipboard.str_to_read = push_str_copy(arena, String(data, len));
+      }
+      break;
+    }
+    else {
+      add_event:
+      g.xcb_events.add(event);
+    }
+  }
+  return g.clipboard.str_to_read;
 }
 
 b32 os_window_should_close() { return gfx_st.should_close; }
@@ -467,3 +568,93 @@ b32 os_is_key_pressed(Key key)    { return os_is_key_down(key) && os_was_key_up(
 b32 os_is_key_released(Key key)   { return os_is_key_up(key) && os_was_key_down(key); }
 
 #endif
+
+// static const char* getSelectionString(Atom selection) {
+//   char** selectionString = NULL;
+//   const Atom targets[] = {_glfw.x11.UTF8_STRING, XA_STRING};
+//   const size_t targetCount = sizeof(targets) / sizeof(targets[0]);
+
+//   if (selection == _glfw.x11.PRIMARY)
+//     selectionString = &_glfw.x11.primarySelectionString;
+//   else
+//     selectionString = &_glfw.x11.clipboardString;
+
+//   if (XGetSelectionOwner(_glfw.x11.display, selection) == _glfw.x11.helperWindowHandle) {
+//     // Instead of doing a large number of X round-trips just to put this
+//     // string into a window property and then read it back, just return it
+//     return *selectionString;
+//   }
+
+//   _glfw_free(*selectionString);
+//   *selectionString = NULL;
+
+//   for (size_t i = 0; i < targetCount; i++) {
+//     char* data;
+//     Atom actualType;
+//     int actualFormat;
+//     unsigned long itemCount, bytesAfter;
+//     XEvent notification, dummy;
+
+//     XConvertSelection(_glfw.x11.display, selection, targets[i], _glfw.x11.GLFW_SELECTION, _glfw.x11.helperWindowHandle, CurrentTime);
+
+//     while (!XCheckTypedWindowEvent(_glfw.x11.display, _glfw.x11.helperWindowHandle, SelectionNotify, &notification)) {
+//       waitForX11Event(NULL);
+//     }
+
+//     if (notification.xselection.property == None)
+//       continue;
+
+//     XCheckIfEvent(_glfw.x11.display, &dummy, isSelPropNewValueNotify, (XPointer)&notification);
+
+//     XGetWindowProperty(_glfw.x11.display, notification.xselection.requestor, notification.xselection.property, 0, LONG_MAX, True, AnyPropertyType, &actualType, &actualFormat, &itemCount, &bytesAfter, (unsigned char**)&data);
+
+//     if (actualType == _glfw.x11.INCR) {
+//       size_t size = 1;
+//       char* string = NULL;
+
+//       for (;;) {
+//         while (!XCheckIfEvent(_glfw.x11.display, &dummy, isSelPropNewValueNotify, (XPointer)&notification)) {
+//           waitForX11Event(NULL);
+//         }
+
+//         XFree(data);
+//         XGetWindowProperty(_glfw.x11.display, notification.xselection.requestor, notification.xselection.property, 0, LONG_MAX, True, AnyPropertyType, &actualType, &actualFormat, &itemCount, &bytesAfter, (unsigned char**)&data);
+
+//         if (itemCount) {
+//           size += itemCount;
+//           string = _glfw_realloc(string, size);
+//           string[size - itemCount - 1] = '\0';
+//           strcat(string, data);
+//         }
+
+//         if (!itemCount) {
+//           if (string) {
+//             if (targets[i] == XA_STRING) {
+//               *selectionString = convertLatin1toUTF8(string);
+//               _glfw_free(string);
+//             } else
+//               *selectionString = string;
+//           }
+
+//           break;
+//         }
+//       }
+//     } else if (actualType == targets[i]) {
+//       if (targets[i] == XA_STRING)
+//         *selectionString = convertLatin1toUTF8(data);
+//       else
+//         *selectionString = _glfw_strdup(data);
+//     }
+
+//     XFree(data);
+
+//     if (*selectionString)
+//       break;
+//   }
+
+//   if (!*selectionString) {
+//     _glfwInputError(GLFW_FORMAT_UNAVAILABLE, "X11: Failed to convert selection to string");
+//   }
+
+//   return *selectionString;
+// }
