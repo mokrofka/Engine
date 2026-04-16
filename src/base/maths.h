@@ -167,9 +167,8 @@ KAPI u32 u32_from_argb(v4 argb);
 KAPI u64 squirrel3(u64 at);
 KAPI u64 str_hash_FNV(String str);
 KAPI u64 hash_memory(void* data, u64 size);
-KAPI u64 hash(u64 x);
-KAPI u64 hash(u64 x, u64 seed);
-KAPI u64 hash(String str);
+KAPI u64 hash(u64 x, u64 seed = 0);
+KAPI u64 hash(String str, u64 seed = 0);
 
 ////////////////////////////////////////////////////////////////////////
 // Random

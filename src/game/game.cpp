@@ -1,4 +1,8 @@
 #include "common.h"
+
+#define IM_VEC2_CLASS_EXTRA                               \
+        constexpr ImVec2(const v2& f) : x(f.x), y(f.y) {} \
+        operator v2() const { return v2(x,y); }
 #include "imgui/imgui.h"
 
 Vertex cube_vertices[] = {
@@ -591,6 +595,7 @@ intern void render_remove() {
 }
 
 void game_update() {
+  Scratch scratch;
   if (os_is_key_pressed(Key_1)) {
     render_add();
   }
@@ -658,6 +663,43 @@ void game_update() {
   }
 
   ImGui::ShowDemoWindow();
+
+  Slice<ProfileAnchor> anchors = profile_get_anchors();
+
+  ImGui::Begin("Profiler");
+  u64 cpu_freq = cpu_frequency();
+  u64 total_tsc_elapsed = profile_get_tsc_elapsed();
+  ImGui::Text("Total time: %0.4fms (CPU freq %lu)\n", 1000.0 * (f64)total_tsc_elapsed / (f64)cpu_freq, cpu_freq);
+  Loop (i, anchors.count) {
+    ImGui::PushID(i);
+    ProfileAnchor anchor = anchors[i];
+    f32 percent = 100 * ((f64)anchor.tsc_elapsed_exclusive / (f64)total_tsc_elapsed);
+    f32 percent_with_children = 0;
+    v2 size = ImGui::GetContentRegionAvail();
+    size.y = 30;
+    if (anchor.tsc_elapsed_inclusive != anchor.tsc_elapsed_exclusive) {
+      percent_with_children *= 100.0 * ((f64)anchor.tsc_elapsed_inclusive / (f64)total_tsc_elapsed);
+      size.x *= percent_with_children / 100;
+    } else {
+      size.x *= percent / 100;
+    }
+    
+    ImGui::InvisibleButton("box", size);
+    v2 p0 = ImGui::GetItemRectMin();
+    v2 p1 = ImGui::GetItemRectMax();
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    draw->AddRectFilled(p0, p1, IM_COL32(50, 50, 50, 255));
+    draw->AddRect(p0, p1, IM_COL32(200, 200, 200, 255));
+    String str = push_strf(scratch, "%s %.3f", anchor.label, percent);
+    v2 text_size = ImGui::CalcTextSize((char*)str.str);
+    v2 text_pos = v2(
+      p0.x + (p1.x - p0.x - text_size.x) * 0.5f,
+      p0.y + (p1.y - p0.y - text_size.y) * 0.5f
+    );
+    draw->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), (char*)str.str);
+    ImGui::PopID();
+  }
+  ImGui::End();
 }
 
 void main_init(u8** state) {
@@ -707,6 +749,9 @@ void foo() {
 }
 
 shared_function void main_update(u8** state) {
+  TimeFunction;
+  // __FUNCTION__ ;
+  // __func__
   Scratch scratch;
   if (*state == null) {
     main_init(state);
@@ -728,4 +773,5 @@ shared_function void main_update(u8** state) {
 
   foo();
 }
+
 

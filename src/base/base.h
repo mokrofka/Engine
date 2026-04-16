@@ -299,6 +299,7 @@ struct Slice {
   u64 count;
   T* begin() { return data; }
   T* end()   { return data + count; }
+  Slice() = default;
   Slice(T* data_, u64 count_) {
     data = data_;
     count = count_;
@@ -339,5 +340,5 @@ const u32 DEFAULT_RESIZE_FACTOR = 2;
 
 KAPI u64 cpu_timer_now();
 KAPI u64 cpu_frequency();
-KAPI u64 estimate_cpu_frequency();
+KAPI void estimate_cpu_frequency();
 

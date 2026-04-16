@@ -121,9 +121,8 @@ u64 hash_memory(void* data, u64 size) {
   return h;
 }
 
-u64 hash(u64 x) { return squirrel3(x); }
 u64 hash(u64 x, u64 seed) { return squirrel3(x + seed); }
-u64 hash(String str) { return str_hash_FNV(str); }
+u64 hash(String str, u64 seed) { return str_hash_FNV(str) + seed; }
 
 ////////////////////////////////////////////////////////////////////////
 // Random

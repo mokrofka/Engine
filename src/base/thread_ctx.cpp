@@ -36,3 +36,4 @@ Scratch::Scratch()                   { temp = tctx_get_scratch(); }
 Scratch::Scratch(Allocator conflict) { temp = tctx_get_scratch_conflict(conflict); }
 Scratch::~Scratch()                  { temp.arena->pos = temp.pos; }
 
+

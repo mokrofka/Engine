@@ -93,7 +93,7 @@ global u64 _cpu_frequency;
 u64 cpu_timer_now() { return __rdtsc(); }
 u64 cpu_frequency() { return _cpu_frequency; }
 
-u64 estimate_cpu_frequency() {
+void estimate_cpu_frequency() {
   u64 os_freq = os_timer_frequency();
   u64 cpu_start = cpu_timer_now();
   u64 os_start = os_timer_now();
@@ -111,6 +111,6 @@ u64 estimate_cpu_frequency() {
   if (cpu_elapsed) {
     cpu_freq = os_freq * cpu_elapsed / os_elapsed;
   }
-  return cpu_freq;
+  _cpu_frequency = cpu_freq;
 }
 

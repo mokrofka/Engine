@@ -37,13 +37,14 @@ i32 main(i32 count, char* args[]) {
 #endif
   u64 target_fps = Billion(1) / 60;
   u64 last_time = os_now_ns();
-  f32 timer = 0;
+  Timer timer = timer_init(1);
 
   u64 end = os_now_ns();
   Info("main init took: %f64 sec", f64(end - start) / Billion(1));
 
   // Main loop
   while (!os_window_should_close()) {
+    profile_begin();
     os_pump_messages();
     u64 start_time = os_now_ns();
     g_dt = f32(start_time - last_time) / Billion(1);
@@ -51,6 +52,8 @@ i32 main(i32 count, char* args[]) {
     last_time = start_time;
 
     // Main logic
+    {
+    TimeBlock("start");
     vk_begin_draw_frame();
     ui_begin();
     st.update(&st.state);
@@ -58,20 +61,20 @@ i32 main(i32 count, char* args[]) {
     vk_end_draw_frame();
     os_input_update();
     asset_watch_update();
+    }
 
     u64 frame_duration = os_now_ns() - start_time;
     if (frame_duration < target_fps) {
       u64 sleep_time = target_fps - frame_duration;
       os_sleep_ms(sleep_time / Million(1));
     }
-    timer += g_dt;
-    if (timer >= 1.0) {
-      timer = 0;
+    if (timer_tick(timer)) {
       Info("Frame rate: %f, %f fps", g_dt, 1/g_dt);
     }
+    profile_end();
   }
   // vk_shutdown();
-  os_gfx_shutdown();
+  // os_gfx_shutdown();
   os_exit(0);
 }
 

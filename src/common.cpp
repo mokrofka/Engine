@@ -6,6 +6,7 @@ b32 equal(Vertex a, Vertex b) { return MemMatchStruct(&a, &b); }
 
 Extern f32 g_dt;
 Extern f32 g_time;
+Extern b32 g_was_hotreload;
 
 struct EntitySOA {
   Transform* transforms;
@@ -375,65 +376,109 @@ void test() {
   test_id_pool();
 }
 
-// ////////////////////////////////////////////////////////////////////////
-// // Profiler
+////////////////////////////////////////////////////////////////////////
+// Profiler
 
-struct Profiler {
-  Array<ProfileAnchor*, 4096> anchors;
-  u64 start_TSC;
-  u64 end_TSC;
-  ProfileAnchor* profiler_parent;
+struct ProfilerState {
+  ProfileAnchor anchors[KB(4)];
+  u32 anchors_count = 1;
+  u64 start_tsc;
+  u64 end_tsc;
+  u32 profiler_parent;
+  // Map<String, u32> map;
+  u32 hash_to_indices[KB(4)];
+
+  ProfileAnchor prev_anchors[4096];
+  u32 prev_anchors_count = 1;
+  u64 prev_tsc_elapsed;
 };
 
-global Profiler profiler_st;
+static ProfilerState profiler_st;
 
-ProfileBlock::ProfileBlock(String label_, ProfileAnchor& anchor_) {
-  if (!anchor_.label.size) {
-    profiler_st.anchors.add(&anchor_);
+ProfileBlock::ProfileBlock(String label_, String func, String str_to_hash) {
+  ProfilerState& g = profiler_st;
+  // b32 exists = false;
+  // anchor_idx = *g.map.exists_or_add(str_to_hash, g.anchors_count, &exists);
+  u32 idx = ModPow2(hash(str_to_hash, hash(func)), KB(4));
+  anchor_idx = g.hash_to_indices[idx];
+  // if (!exists) {
+  //   ++g.anchors_count;
+  // }
+  if (anchor_idx == 0) {
+    anchor_idx = g.anchors_count;
+    ++g.anchors_count;
   }
-  parent = profiler_st.profiler_parent;
-  anchor = &anchor_;
+  parent_idx = profiler_st.profiler_parent;
+  ProfileAnchor* anchor = profiler_st.anchors + anchor_idx;
   anchor->label = label_;
-  profiler_st.profiler_parent = anchor;
-  old_TSC_elapsed_at_root = anchor->TSC_elapsed_at_root;
-  start_TSC = cpu_timer_now();
+  anchor->parent_idx = parent_idx;
+  old_tsc_elapsed_inclusive = anchor->tsc_elapsed_inclusive;
+  profiler_st.profiler_parent = anchor_idx;
+  start_tsc = cpu_timer_now();
 }
 
 ProfileBlock::~ProfileBlock() {
-  u64 elapsed = cpu_timer_now() - start_TSC;
-  profiler_st.profiler_parent = parent;
-  if (parent) {
-    parent->TSC_elapsed_children += elapsed;
+  ProfilerState& g = profiler_st;
+  u64 Elapsed = cpu_timer_now() - start_tsc;
+  g.profiler_parent = parent_idx;
+  ProfileAnchor* Parent = g.anchors + parent_idx;
+  ProfileAnchor* Anchor = g.anchors + anchor_idx;
+  Parent->tsc_elapsed_exclusive -= Elapsed;
+  Anchor->tsc_elapsed_exclusive += Elapsed;
+  Anchor->tsc_elapsed_inclusive = old_tsc_elapsed_inclusive + Elapsed;
+  ++Anchor->hit_count;
+}
+
+void profile_begin() {
+  ProfilerState& g = profiler_st;
+  g.start_tsc = cpu_timer_now();
+  MemZeroArray(g.anchors, g.anchors_count);
+  MemZeroArray(g.hash_to_indices, g.anchors_count);
+  g.anchors_count = 1;
+  // g.map.clear();
+}
+
+void profile_end() {
+  ProfilerState& g = profiler_st;
+  g.end_tsc = cpu_timer_now();
+  g.prev_tsc_elapsed = g.end_tsc - g.start_tsc;
+  MemCopyArray(g.prev_anchors, g.anchors, g.anchors_count);
+  g.prev_anchors_count = g.anchors_count;
+}
+
+Slice<ProfileAnchor> profile_get_anchors() {
+  if (g_was_hotreload) return {};
+  ProfilerState& g = profiler_st;
+  return Slice(g.prev_anchors+1, g.prev_anchors_count-1);
+}
+
+u64 profile_get_tsc_elapsed() { return profiler_st.prev_tsc_elapsed; }
+
+intern void print_time_elapsed(u64 total_tsc_elapsed, ProfileAnchor* anchor) {
+  Scratch scratch;
+  String label_c = push_str_copy(scratch, anchor->label);
+  f64 percent = 100.0 * ((f64)anchor->tsc_elapsed_exclusive / (f64)total_tsc_elapsed);
+  printf("  %s[%lu]: %lu (%.2f%%)", label_c.str, anchor->hit_count, anchor->tsc_elapsed_exclusive, percent);
+  if (anchor->tsc_elapsed_inclusive != anchor->tsc_elapsed_exclusive) {
+    f64 percent_with_children = 100.0 * ((f64)anchor->tsc_elapsed_inclusive / (f64)total_tsc_elapsed);
+    printf(", %.2f%% w/children", percent_with_children);
   }
-  anchor->TSC_elapsed_at_root = old_TSC_elapsed_at_root + elapsed;
-  anchor->TSC_elapsed += elapsed;
-  ++anchor->hit_count;
+  printf(")\n");
 }
 
-void profiler_print_time_elapsed(u64 total_TSC_elapsed, ProfileAnchor* anchor) {
-  u64 elapsed = anchor->TSC_elapsed - anchor->TSC_elapsed_children;
-  f64 percent = 100.0 * ((f64)elapsed / (f64)total_TSC_elapsed);
-  print("  %s[%u64]: %u64 (%.2f%%)", anchor->label, anchor->hit_count, elapsed, percent);
-  if (anchor->TSC_elapsed_at_root != elapsed) {
-    f64 percent_with_children = 100.0 * ((f64)anchor->TSC_elapsed / (f64)total_TSC_elapsed);
-    print(", %.2f%% w/children", percent_with_children);
-  }
-  println("");
-}
-
-void profiler_begin() {
-  profiler_st.start_TSC = cpu_timer_now();
-}
-
-void profiler_end_and_print_() {
-  profiler_st.end_TSC = cpu_timer_now();
-  u64 cpu_freq = estimate_cpu_frequency();
-  u64 total_CPU_elapsed = profiler_st.end_TSC - profiler_st.start_TSC;
+void end_and_print_profile() {
+  ProfilerState& g = profiler_st;
+  g.end_tsc = cpu_timer_now();
+  u64 cpu_freq = cpu_frequency();
+  u64 total_cpu_elapsed = g.end_tsc - g.start_tsc;
   if (cpu_freq) {
-    Info("Total time: %.4fms (CPU freq %u64)", 1000.0 * (f64)total_CPU_elapsed / (f64)cpu_freq, cpu_freq);
+    printf("\nTotal time: %0.4fms (CPU freq %lu)\n", 1000.0 * (f64)total_cpu_elapsed / (f64)cpu_freq, cpu_freq);
   }
-  for (ProfileAnchor* x : profiler_st.anchors) {
-    profiler_print_time_elapsed(total_CPU_elapsed, x);
+  Loop (anchor_idx, g.anchors_count) {
+    ProfileAnchor* anchor = g.anchors + anchor_idx;
+    if (anchor->tsc_elapsed_inclusive) {
+      print_time_elapsed(total_cpu_elapsed, anchor);
+    }
   }
 }
 
@@ -582,11 +627,13 @@ void asset_watch_directory_add(String watch_name, OS_WatchFlags flags, void (*re
 
 void asset_watch_update() {
   Scratch scratch;
+  g_was_hotreload = false;
   for (FileWatch& x : asset_watch_st.watches) {
     FileProperties props = os_file_path_properties(x.path);
     if (props.modified > x.modified) {
       x.callback();
       x.modified = props.modified;
+      g_was_hotreload = true;
     }
   }
   for (DirectoryWatch x : asset_watch_st.directories) {
@@ -954,7 +1001,10 @@ struct CommonState {
 global CommonState common_st;
 
 void foo__();
+void profiler_foo();
 void common_init() {
+  estimate_cpu_frequency();
+  profiler_foo();
   Scratch scratch;
   // foo();
   {
@@ -1181,39 +1231,11 @@ void transform_task_func(void* arg) {
   *t->out_sum = sum;
 }
 
-// Debug
-// MB(10) iteration
-// 1 thread
-// 0.52, 0.16gb
-
-// 2 thread
-// 1.00, 0.32
-
-// 3 thread
-// 1.40, 0.50
-
-// 4 thread
-// 1.7, 0.70
-
-// Release
-// MB(10) iteration
-// 1 thread
-// linear: 5.00gb, random access: 1.0gb
-
-// 2 thread
-// linear: 7.78gb, random access: 2.32gb
-
-// 3 thread
-// linear: 7.60gb, random access: 3.16gb
-
-// 4 thread
-// linear: 7.6gb, random access: 3.90gb
-
 void foo__() {
   Scratch scratch;
   thread_pool_init(4);
 
-  u64 cpu_frequ = estimate_cpu_frequency();
+  u64 cpu_frequ = cpu_frequency();
   Info("%.2f Ghz/s cpu frequency", (f64)cpu_frequ / Billion(1));
   #define IterationNum (MB(10))
   #define NUM_THREADS 4
@@ -1388,3 +1410,37 @@ void foo__() {
   // ring_read(ring, Slice(buf0, size));
 
 }
+
+void profiler_bar() {
+  TimeFunction;
+  {
+  TimeBlock("block in bar");
+  os_sleep_ms(1);
+  }
+  os_sleep_ms(2);
+}
+
+void profiler_der() {
+  TimeFunction;
+  os_sleep_ms(10);
+}
+
+void profiler_die(i32 i) {
+  TimeFunction;
+  os_sleep_ms(1);
+  if (--i) {
+    profiler_die(i);
+  }
+}
+
+void profiler_foo() {
+  profile_begin();
+  profiler_bar();
+  profiler_bar();
+  profiler_der();
+  profiler_die(10);
+  end_and_print_profile();
+  // os_exit(0);
+}
+
+

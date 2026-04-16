@@ -310,6 +310,19 @@ struct Darray {
     return data[idx];
   }
   Slice<T> slice() { return {data, count}; }
+  void add() {
+    if (count >= cap) {
+      if (data) {
+        u32 old_cap = cap;
+        cap *= DEFAULT_RESIZE_FACTOR;
+        data = mem_realloc_array(alloc, data, old_cap, cap);
+      } else {
+        cap = DEFAULT_CAPACITY;
+        data = mem_alloc_array<T>(alloc, cap);
+      }
+    }
+    ++count;
+  }
   void add(T b) { 
     if (count >= cap) {
       if (data) {
@@ -742,6 +755,7 @@ struct Map {
     return &data[idx];
   }
   T* get(Key key) {
+    if (count >= cap*LF) { grow(); }
     u64 hash_idx = hash(key);
     u64 idx = ModPow2(hash_idx, cap);
     Loop (i, cap) {
@@ -756,6 +770,7 @@ struct Map {
     return null;
   }
   T* get_or_add(Key key, T val) {
+    if (count >= cap*LF) { grow(); }
     u64 hash_idx = hash(key);
     u64 idx = ModPow2(hash_idx, cap);
     Loop (i, cap) {
@@ -767,7 +782,6 @@ struct Map {
       }
       idx = ModPow2(idx + 1, cap);
     }
-    if (count >= cap*LF) { grow(); }
     keys[idx] = key;
     data[idx] = val;
     is_occupied[idx] = MapSlot_Occupied;
@@ -775,6 +789,7 @@ struct Map {
     return &data[idx];
   }
   T* get_or_add_was(Key key, T val, b32* out_was_added) {
+    if (count >= cap*LF) { grow(); }
     u64 hash_idx = hash(key);
     u64 idx = ModPow2(hash_idx, cap);
     Loop (i, cap) {
@@ -786,12 +801,31 @@ struct Map {
       }
       idx = ModPow2(idx + 1, cap);
     }
-    if (count >= cap*LF) { grow(); }
     keys[idx] = key;
     data[idx] = val;
     is_occupied[idx] = MapSlot_Occupied;
     ++count;
     *out_was_added = true;
+    return &data[idx];
+  }
+  T* exists_or_add(Key key, T val, b32* exists) {
+    if (count >= cap*LF) { grow(); }
+    u64 hash_idx = hash(key);
+    u64 idx = ModPow2(hash_idx, cap);
+    Loop (i, cap) {
+      if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx], key))) {
+        *exists = true;
+        return &data[idx];
+      } 
+      else if (is_occupied[idx] == MapSlot_Empty) {
+        break;
+      }
+      idx = ModPow2(idx + 1, cap);
+    }
+    keys[idx] = key;
+    data[idx] = val;
+    is_occupied[idx] = MapSlot_Occupied;
+    ++count;
     return &data[idx];
   }
   void remove(Key key) {
@@ -805,6 +839,11 @@ struct Map {
       }
       idx = ModPow2(idx + 1, cap);
     }
+  }
+  void clear() {
+    MemZeroArray(data, cap);
+    MemZeroArray(keys, cap);
+    MemZeroArray(is_occupied, cap);
   }
   void grow() {
     if (data) {

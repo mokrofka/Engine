@@ -150,7 +150,8 @@ intern u32 f32_write(u8* dest, f32 value, u32 precision) {
     for (u32 i = 0; i < precision; ++i) multiplier *= 10;
     u32 frac_part = (u32)(value * multiplier + 0.5); // rounding since possible 0.02 * multi = 1.999...
     u32 frac_len = u32_length(frac_part);
-    for (u32 i = 0; i < precision - frac_len; ++i) {
+    u32 pad = (frac_len < precision) ? (precision - frac_len) : 0;
+    for (u32 i = 0; i < pad; ++i) {
       dest[len++] = '0';
     }
     len += u32_write(dest + len, frac_part);
@@ -177,7 +178,8 @@ intern u32 f64_write(u8* dest, f64 value, u32 precision) {
     for (u32 i = 0; i < precision; ++i) multiplier *= 10;
     u64 frac_part = (u64)(value * multiplier + 0.5); // rounding since possible 0.02 * multi = 1.999...
     u32 frac_len = u64_length(frac_part);
-    for (u32 i = 0; i < precision - frac_len; ++i) {
+    u32 pad = (frac_len < precision) ? (precision - frac_len) : 0;
+    for (u32 i = 0; i < pad; ++i) {
       dest[len++] = '0';
     }
     len += u64_write(dest + len, frac_part);

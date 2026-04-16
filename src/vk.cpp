@@ -3995,6 +3995,8 @@ void imgui_init() {
   ImGuiIO& io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;   
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+  ImGuiStyle& style = ImGui::GetStyle();
+  style.FontScaleDpi = 1.3;
 
   imgui_impl_x11_init();
 

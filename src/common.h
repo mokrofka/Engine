@@ -9,6 +9,8 @@
 // serelization/deserialization
 // UI rendering
 // profiler
+// make wayland backend work
+// linux crushes when I try sleep and mount?
 
 const v3 ColorRed   = v3(1,0,0);
 const v3 ColorGreen = v3(0,1,0);
@@ -176,6 +178,7 @@ void imgui_end_frame();
 
 KAPI extern f32 g_dt;
 KAPI extern f32 g_time;
+KAPI extern b32 g_was_hotreload;
 KAPI Transform& entities_transforms(Handle<Entity> handle);
 KAPI Transform& static_entities_transforms(Handle<StaticEntity> handle);
 
@@ -246,32 +249,35 @@ KAPI void test();
 ////////////////////////////////////////////////////////////////////////
 // Profiler
 
-KAPI u64 estimate_cpu_frequency();
-
 struct ProfileAnchor {
-  u64 TSC_elapsed;
-  u64 TSC_elapsed_children;
-  u64 TSC_elapsed_at_root;
+  u64 tsc_elapsed_exclusive; // without children
+  u64 tsc_elapsed_inclusive; // with children
   u64 hit_count;
   String label;
+  // for fraph
+  u32 parent_idx;
 };
 
 struct ProfileBlock {
-  ProfileAnchor* anchor;
-  ProfileAnchor* parent;
-  u64 start_TSC;
-  u64 old_TSC_elapsed_at_root;
-  ProfileBlock(String label_, ProfileAnchor& anchor_);
+  u64 old_tsc_elapsed_inclusive;
+  u64 start_tsc;
+  u32 parent_idx;
+  u32 anchor_idx;
+  ProfileBlock(String label_, String func, String str_to_hash);
   ~ProfileBlock();
 };
 
-KAPI void profiler_print_time_elapsed(u64 total_TSC_elapsed, ProfileAnchor* anchor);
-KAPI void profiler_begin();
-KAPI void profiler_end_and_print_();
+void profile_begin();
+void profile_end();
+Slice<ProfileAnchor> profile_get_anchors();
+u64 profile_get_tsc_elapsed();
 
+// #define TimeBlock(Name) ProfileBlock Glue(__profiler_block, __LINE__)(Name, SomeMacro(__func__) ":" Name)
+#define TimeBlock(Name) ProfileBlock Glue(__profiler_block, __LINE__)(Name, __func__, Name)
 #define TimeFunction TimeBlock(__func__)
-#define TimeBlock(name) \
-static ProfileAnchor Glue(_anchor, __LINE__); ProfileBlock Glue(_block, __LINE__)(name, Glue(_anchor, __LINE__))
+
+// #define TimeBlock(Name)
+// #define TimeFunction
 
 ////////////////////////////////////////////////////////////////////////
 // Json
