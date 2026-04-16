@@ -362,6 +362,30 @@ String::String(u8* str_){
   size = cstr_length(str_) ;
 }
 
+void DString::init(Allocator alloc_) { *this = {}; alloc = alloc_;}
+
+void DString::add(String x) {
+  if (x.size + size > cap) {
+    if (str) {
+      u32 modifier = CeilIntDiv(x.size+size, cap);
+      u32 old_cap = cap;
+      cap *= modifier;
+      str = mem_realloc_array(alloc, str, old_cap, cap);
+    } else {
+      cap = Max(x.size, (u64)DEFAULT_CAPACITY);
+      str = mem_alloc(alloc, cap);
+    }
+  }
+  MemCopy(str+size, x.str, x.size);
+  size += x.size;
+}
+
+void DString::clear() { size = 0; }
+
+DString::operator String() { return {str, size}; }
+
+String64::operator String() { return {str, size}; }
+
 ////////////////////////////////////////////////////////////////////////
 // Character Classification & Conversion Functions
 

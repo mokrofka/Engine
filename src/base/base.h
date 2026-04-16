@@ -347,5 +347,7 @@ void ring_read(RingBuffer& ring, void *dst, u64 read_size);
 #define ring_write_struct(ring, ptr) ring_write((ring), (ptr), sizeof(*(ptr)))
 #define ring_read_struct(ring, ptr) ring_read((ring) (ptr), sizeof(*(ptr)))
 
+const u32 DEFAULT_CAPACITY = 8;
+const u32 DEFAULT_RESIZE_FACTOR = 2;
 
 

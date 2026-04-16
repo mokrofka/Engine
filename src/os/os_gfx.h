@@ -138,24 +138,17 @@ enum OS_EventKind {
   OS_EventKind_MouseButton,
   OS_EventKind_MouseMove,
   OS_EventKind_Scroll,
+  OS_EventKind_Modifier,
 };
 
 struct OS_InputEvent {
   OS_EventKind type;
-  union {
-    struct {
-      Key key;
-      u32 character;
-      b32 is_pressed;
-      OS_Modifiers modifier;
-    };
-    struct {
-      f32 x, y;
-    };
-    struct {
-      f32 scroll_x, scroll_y;
-    };
-  };
+  Key key;
+  u32 character;
+  b32 is_pressed;
+  OS_Modifiers modifier;
+  f32 x, y;
+  f32 scroll_x, scroll_y;
 };
 
 u32 os_key_to_str(Key key, OS_Modifiers modifiers);
@@ -171,5 +164,5 @@ KAPI b32 os_is_key_pressed(Key key);
 KAPI b32 os_is_key_released(Key key);
 
 void os_clipboard_write(String str);
-String os_clipboard_read(Allocator arena);
+String os_clipboard_read();
 

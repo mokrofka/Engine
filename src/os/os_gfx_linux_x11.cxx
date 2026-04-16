@@ -11,11 +11,10 @@
 struct Clipboard {
   xcb_atom_t atom;
   xcb_atom_t targets_atom;
-  // xcb_atom_t string_atom;
   xcb_atom_t property_atom;
   xcb_atom_t utf8_atom;
-  String64 str_to_write;
-  String str_to_read;
+  DString str_to_write;
+  DString str_to_read;
 };
 
 struct X11State {
@@ -43,8 +42,9 @@ struct X11State {
     MouseState mouse_current;
     MouseState mouse_previous;
   } input;
-  Darray<OS_InputEvent> events;
+  Darray<OS_InputEvent> input_events;
   Darray<xcb_generic_event_t*> xcb_events;
+  OS_Modifiers modifiers = 0;
 };
 
 global X11State gfx_st;
@@ -55,7 +55,7 @@ Key lnx_keycode_translate(u32 keysym) {
     case XK_BackSpace:    return Key_Backspace;
     case XK_Return:       return Key_Enter;
     case XK_Tab:          return Key_Tab;
-    case XK_Delete:        return Key_Delete;
+    case XK_Delete:       return Key_Delete;
     case XK_Shift_L:      return Key_LShift;
     case XK_Shift_R:      return Key_RShift;
     case XK_Control_L:    return Key_LControl;
@@ -269,7 +269,7 @@ void os_gfx_init() {
   X11State& g = gfx_st;
   g.arena = arena_init();
   g.gpa.init(g.arena);
-  g.events.init(g.gpa);
+  g.input_events.init(g.gpa);
 
   i32 screen_number;
   g.connection = xcb_connect(null, &screen_number);
@@ -318,8 +318,7 @@ void os_gfx_shutdown() { xcb_disconnect(gfx_st.connection); }
 
 void os_pump_messages() {
   X11State& g = gfx_st;
-  g.events.clear();
-  OS_Modifiers modifiers = 0;
+  g.input_events.clear();
 
   xcb_generic_event_t* event;
   u32 i = 0;
@@ -337,44 +336,78 @@ void os_pump_messages() {
         xcb_keysym_t sym = xcb_key_symbols_get_keysym(g.key_symbols, kp->detail, 0);
         Key key = lnx_keycode_translate(sym);
         g.input.keyboard_current.keys[key] = true;
+        b32 modifier_changed = false;
         if (key == Key_Shift) {
-          modifiers |= OS_Modifier_Shift;
+          if (!FlagHas(g.modifiers, OS_Modifier_Shift)) {
+            modifier_changed = true;
+          }
+          g.modifiers |= OS_Modifier_Shift;
         }
         if (key == Key_Alt) {
-          modifiers |= OS_Modifier_Alt;
+          if (!FlagHas(g.modifiers, OS_Modifier_Alt)) {
+            modifier_changed = true;
+          }
+          g.modifiers |= OS_Modifier_Alt;
         }
         if (key == Key_Ctrl) {
-          modifiers |= OS_Modifier_Ctrl;
+          if (!FlagHas(g.modifiers, OS_Modifier_Ctrl)) {
+            modifier_changed = true;
+          }
+          g.modifiers |= OS_Modifier_Ctrl;
+        }
+        if (modifier_changed) {
+          OS_InputEvent event = {
+            .type = OS_EventKind_Modifier,
+            .modifier = g.modifiers,
+          };
+          g.input_events.add(event);
         }
         OS_InputEvent event = {
           .type = OS_EventKind_Key,
-          .key = key,
           .is_pressed = true,
-          .modifier = modifiers,
+          .key = key,
+          .modifier = g.modifiers,
         };
-        g.events.add(event);
+        g.input_events.add(event);
       } break;
       case XCB_KEY_RELEASE: {
         xcb_key_press_event_t* kp = (xcb_key_press_event_t*)event;
         xcb_keysym_t sym = xcb_key_symbols_get_keysym(g.key_symbols, kp->detail, 0);
         Key key = lnx_keycode_translate(sym);
         g.input.keyboard_current.keys[key] = false;
+        b32 modifier_changed = false;
         if (key == Key_Shift) {
-          modifiers = FlagClear(modifiers, OS_Modifier_Shift);
+          if (FlagHas(g.modifiers, OS_Modifier_Shift)) {
+            modifier_changed = true;
+          }
+          g.modifiers = FlagClear(g.modifiers, OS_Modifier_Shift);
         }
         if (key == Key_Alt) {
-          modifiers = FlagClear(modifiers, OS_Modifier_Alt);
+          if (FlagHas(g.modifiers, OS_Modifier_Alt)) {
+            modifier_changed = true;
+          }
+          g.modifiers = FlagClear(g.modifiers, OS_Modifier_Alt);
         }
         if (key == Key_Ctrl) {
-          modifiers = FlagClear(modifiers, OS_Modifier_Ctrl);
+          if (FlagHas(g.modifiers, OS_Modifier_Ctrl)) {
+            modifier_changed = true;
+          }
+          g.modifiers = FlagClear(g.modifiers, OS_Modifier_Ctrl);
+        }
+        if (modifier_changed) {
+          OS_InputEvent event = {
+            .type = OS_EventKind_Modifier,
+            .modifier = g.modifiers,
+          };
+          g.input_events.add(event);
         }
         OS_InputEvent event = {
           .type = OS_EventKind_Key,
           .key = key,
           .is_pressed = false,
-          .modifier = modifiers,
+          .modifier = g.modifiers,
         };
-        g.events.add(event);
+        g.input_events.add(event);
       } break;
       case XCB_CONFIGURE_NOTIFY: {
         xcb_configure_notify_event_t* cfg = (xcb_configure_notify_event_t*)event;
@@ -418,7 +451,7 @@ void os_pump_messages() {
           }
           event.type = OS_EventKind_Scroll;
         }
-        g.events.add(event);
+        g.input_events.add(event);
       } break;
       case XCB_BUTTON_RELEASE: {
         xcb_button_press_event_t* bp = (xcb_button_press_event_t*)event;
@@ -432,7 +465,7 @@ void os_pump_messages() {
           event.type = OS_EventKind_MouseButton;
           event.is_pressed = false;
         }
-        g.events.add(event);
+        g.input_events.add(event);
       } break;
       case XCB_MOTION_NOTIFY: {
         xcb_motion_notify_event_t* motion = (xcb_motion_notify_event_t*)event;
@@ -441,7 +474,7 @@ void os_pump_messages() {
         OS_InputEvent event = {.type = OS_EventKind_MouseMove};
         event.x = g.input.mouse_current.x;
         event.y = g.input.mouse_current.y;
-        g.events.add(event);
+        g.input_events.add(event);
       } break;
       case XCB_SELECTION_REQUEST: {
         xcb_selection_request_event_t* req = (xcb_selection_request_event_t*)event;
@@ -475,12 +508,13 @@ void os_pump_messages() {
 
 void os_clipboard_write(String str) {
   X11State& g = gfx_st;
-  str_copy(g.clipboard.str_to_write, str);
+  g.clipboard.str_to_write.clear();
+  g.clipboard.str_to_write.add(str);
   xcb_set_selection_owner(g.connection, g.window, g.clipboard.atom, XCB_CURRENT_TIME);
   xcb_flush(g.connection);
 }
 
-String os_clipboard_read(Allocator arena) {
+String os_clipboard_read() {
   X11State& g = gfx_st;
   xcb_convert_selection(g.connection, g.window, g.clipboard.atom, g.clipboard.utf8_atom, g.clipboard.property_atom, XCB_CURRENT_TIME);
   xcb_flush(g.connection);
@@ -528,7 +562,8 @@ String os_clipboard_read(Allocator arena) {
       if (reply) {
         u8* data = (u8*)xcb_get_property_value(reply);
         u32 len = xcb_get_property_value_length(reply);
-        g.clipboard.str_to_read = push_str_copy(arena, String(data, len));
+        g.clipboard.str_to_read.clear();
+        g.clipboard.str_to_read.add(String(data, len));
       }
       break;
     }
@@ -553,7 +588,7 @@ void os_get_gfx_api_handlers(void* out) {
   *(Surface*)out = { gfx_st.connection, gfx_st.window };
 }
 
-Slice<OS_InputEvent> os_get_events() { return {gfx_st.events.data, gfx_st.events.count}; }
+Slice<OS_InputEvent> os_get_events() { return {gfx_st.input_events.data, gfx_st.input_events.count}; }
 
 void os_input_update() {
   MemCopyStruct(&gfx_st.input.keyboard_previous, &gfx_st.input.keyboard_current);

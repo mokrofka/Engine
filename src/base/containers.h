@@ -4,9 +4,6 @@
 #include "mem.h"
 #include "maths.h"
 
-const u32 DEFAULT_CAPACITY = 8;
-const u32 DEFAULT_RESIZE_FACTOR = 2;
-
 const u32 INDEX_BITS = 22;
 const u32 INDEX_MASK = (1u << INDEX_BITS) - 1;
 
@@ -21,7 +18,7 @@ struct Handle {
 #endif
 };
 
-// Start using slices?
+// TODO: improve deinit
 
 ////////////////////////////////////////////////////////////////////////
 // Pool
@@ -266,6 +263,7 @@ struct Array {
     Assert(idx < cap);
     return data[idx];
   }
+  Slice<T> slice() { return {data, count}; }
   void add(T a) { 
     Assert(count < cap);
     data[count++] = a;
@@ -312,6 +310,7 @@ struct Darray {
     Assert(idx < cap);
     return data[idx];
   }
+  Slice<T> slice() { return {data, count}; }
   void add(T b) { 
     if (count >= cap) {
       if (data) {
@@ -447,13 +446,14 @@ struct SparseSet {
     }
   }
   void grow_max_index(u32 handle) {
-    u32 modifier = CeilIntDiv(handle+1, sparse_count);
+    u32 modifier = CeilIntDiv(handle+1, sparse_count); // +1 since hanlde is idx in array
     u32 old_count = sparse_count;
     sparse_count *= modifier;
     sparse = mem_realloc_array(alloc, sparse, old_count, sparse_count);
   }
 };
 
+// it returns indexes and iterate through them
 struct SparseSetIndex {
   u32 count;
   u32 cap;

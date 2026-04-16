@@ -14,6 +14,17 @@ struct String {
   NO_DEBUG String(u8* str_);
 };
 
+struct DString {
+  u8* str;
+  u32 size;
+  u32 cap;
+  Allocator alloc;
+  void init(Allocator alloc_);
+  void add(String str);
+  void clear();
+  operator String();
+};
+
 struct StringArray {
   String* v;
   u64 count;
@@ -34,6 +45,7 @@ struct StringList {
 struct String64 {
   u8 str[64];
   u32 size;
+  operator String();
 };
 
 KAPI u64 cstr_length(const void* c);

@@ -752,14 +752,14 @@ void main_init(u8** state) {
 void foo() {
   Scratch scratch;
   
-  if (os_is_key_pressed(Key_C)) {
-    String str_write = "written";
-    os_clipboard_write(str_write);
-  }
-  if (os_is_key_pressed(Key_V)) {
-    String result = os_clipboard_read(scratch);
-    Info("%s", result);
-  }
+  // if (os_is_key_pressed(Key_C)) {
+  //   String str_write = "written";
+  //   os_clipboard_write(str_write);
+  // }
+  // if (os_is_key_pressed(Key_V)) {
+  //   String result = os_clipboard_read();
+  //   Info("%s", result);
+  // }
 
 }
 
