@@ -3,7 +3,7 @@ set(CMAKE_CXX_STANDARD 23)
 project(Engine)
 
 # options
-  set(hotreload false)
+  set(hotreload true)
   set(X11_use true)
   set(sanitize_address true)
   set(binary_dir "${CMAKE_SOURCE_DIR}/bin")
@@ -26,7 +26,7 @@ project(Engine)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO "${binary_dir}")
 
 # Compiler
-  add_compile_options(-Wuninitialized -fno-exceptions -fno-rtti -Wno-c99-designator)
+  add_compile_options(-Wunused-variable -Wno-unused-const-variable -Wuninitialized -fno-exceptions -fno-rtti -Wno-c99-designator)
   message("Compiler: ${CMAKE_CXX_COMPILER_ID}")
 
 # Sanitizer

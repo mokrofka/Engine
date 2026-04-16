@@ -241,6 +241,7 @@ intern u32 my_sprintf(u8* buf, String fmt, VaList argc) {
           } break;
           case 'c': {
             i32 val = va_arg(argc, i32); // i32 - because of compiler
+            NotUsed(val);
             length += 1;
           } break;
           case '.': {
@@ -689,7 +690,6 @@ f64 f64_from_str(String str) {
   f64 x = 0.0;
   f64 frac = 0.0;
   f64 factor = 0.1;
-  b32 is_fraction = false;
   b32 negative = false;
   i32 j = 0;
   // handle optional sign
@@ -702,7 +702,6 @@ f64 f64_from_str(String str) {
   for (; j < str.size; ++j) {
     u8 ch = str.str[j];
     if (ch == '.') {
-      is_fraction = true;
       ++j;
       break;
     }

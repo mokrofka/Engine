@@ -1,4 +1,5 @@
 #include "base.h"
+#include "../os/os_core.h"
 
 ////////////////////////////////////////////////////////////////////////
 // Basic
@@ -6,8 +7,6 @@
 f32 BytesToKB(u64 x) { return (f32)x / 1024; };
 f32 BytesToMB(u64 x) { return BytesToKB(x) / 1024; };
 f32 BytesToGB(u64 x) { return BytesToMB(x) / 1024; };
-
-u64 cpu_timer_now() { return __rdtsc(); }
 
 ////////////////////////////////////////////////////////////////////////
 // Memory
@@ -87,5 +86,31 @@ void ring_read(RingBuffer& ring, void *dst, u64 dst_size) {
     MemCopy(Offset(dst, first), ring.base, second);
   }
   ring.read_pos += dst_size;
+}
+
+global u64 _cpu_frequency;
+
+u64 cpu_timer_now() { return __rdtsc(); }
+u64 cpu_frequency() { return _cpu_frequency; }
+
+u64 estimate_cpu_frequency() {
+  u64 os_freq = os_timer_frequency();
+  u64 cpu_start = cpu_timer_now();
+  u64 os_start = os_timer_now();
+  u64 milliseconds = 1;
+  u64 os_end = 0;
+  u64 os_elapsed = 0;
+  u64 os_wait_time = os_freq * milliseconds / 1000;
+  while (os_elapsed < os_wait_time) {
+    os_end = os_timer_now();
+    os_elapsed = os_end - os_start;
+  }
+  u64 cpu_end = cpu_timer_now();
+  u64 cpu_elapsed = cpu_end - cpu_start;
+  u64 cpu_freq = 0;
+  if (cpu_elapsed) {
+    cpu_freq = os_freq * cpu_elapsed / os_elapsed;
+  }
+  return cpu_freq;
 }
 

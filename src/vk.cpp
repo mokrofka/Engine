@@ -2374,6 +2374,7 @@ intern void vk_swapchain_present(VkSemaphore render_complete_semaphore, u32 pres
   };
 #if GFX_X11 // NOTE: on x11 errors
   VkResult res = vk.QueuePresentKHR(vk.device.graphics_queue, &present_info);
+  NotUsed(res);
   // if (res != VK_SUCCESS) {
   //   Error("%s", vk_result_string(res));
   // }
@@ -3499,6 +3500,7 @@ void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMes
     MeshBatch<StaticEntity>& mesh_batch = shader_batch.mesh_batches[*mesh_idx_in_array];
     mesh_batch.entities.add(entity_handle);
     u32 entity_idx_in_array = mesh_batch.entities.count;
+    NotUsed(entity_idx_in_array); // TODO: remove static entity
   }
   // Not Indexed
   else {
@@ -3513,6 +3515,7 @@ void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMes
     MeshBatch<StaticEntity>& mesh_batch = shader_batch.mesh_batches[*mesh_idx_in_array];
     mesh_batch.entities.add(entity_handle);
     u32 entity_idx_in_array = mesh_batch.entities.count;
+    NotUsed(entity_idx_in_array); // TODO: remove static entity
   }
   // vk.entities[entity_idx].shader_handle = vk.shaders[shader_idx].entities.add(entity_handle);
   vk.gpu_entities[entity_idx].material = material_handle.idx();
@@ -3935,7 +3938,6 @@ void imgui_impl_x11_new_frame() {
   io.DeltaTime = g_dt;
   v2u win_size = os_get_window_size();
   io.DisplaySize = ImVec2(win_size.x, win_size.y);
-  v2 mouse_pos = os_get_mouse_pos();
   Slice<OS_InputEvent> events = os_get_events();
   for (OS_InputEvent event : events) {
     switch (event.type) {

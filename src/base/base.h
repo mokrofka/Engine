@@ -145,8 +145,6 @@ NO_DEBUG KAPI f32 BytesToKB(u64 x);
 NO_DEBUG KAPI f32 BytesToMB(u64 x);
 NO_DEBUG KAPI f32 BytesToGB(u64 x);
 
-KAPI u64 cpu_timer_now();
-
 ////////////////////////////////////////////////////////////////////////
 // Memory
 
@@ -244,6 +242,7 @@ KAPI void DebugTrap();
 #define InvalidPath    Assert(!"Invalid Path!")
 #define NotImplemented Assert(!"Not Implemented!")
 #define AssertAlways(x) if (!(x)) { Trap(); }
+#define NotUsed(x) (void)&x
 
 #if BUILD_DEBUG
   #define Assert(x) if (!(x)) { DebugTrap(); }
@@ -290,18 +289,6 @@ struct Result {
   };
   b32 err;
 };
-
-// template <>
-// struct Result<void> {
-//   b32 err;
-// };
-// template <typename T>
-// inline T _result_return(Result<T> res) { 
-//   return res.v; 
-// }
-// inline void _result_return(Result<void> res) {
-// }
-// #define Try(expr) ({ auto r = expr; if (r.err) return {.err = r.err}; _result_return(r); })
 
 ////////////////////////////////////////////////////////////////////////
 // Types
@@ -350,4 +337,7 @@ void ring_read(RingBuffer& ring, void *dst, u64 read_size);
 const u32 DEFAULT_CAPACITY = 8;
 const u32 DEFAULT_RESIZE_FACTOR = 2;
 
+KAPI u64 cpu_timer_now();
+KAPI u64 cpu_frequency();
+KAPI u64 estimate_cpu_frequency();
 

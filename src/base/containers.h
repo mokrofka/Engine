@@ -188,7 +188,6 @@ struct StaticObjectPool {
   }
   Handle<T> add() {
 #if BUILD_DEBUG
-    u32 head_idx = head & INDEX_MASK;
     u32 result = head;
     u32 idx = result & INDEX_MASK;
     Assert((idx & INDEX_BITS) < cap);
@@ -492,6 +491,7 @@ struct ArrayHandler {
 #if BUILD_DEBUG
     u32 idx = handle.handle & INDEX_MASK;
     u32 generation = handle.handle >> INDEX_BITS;
+    Assert(generations[idx] == generation);
     u32 index = sparse[idx];
     return data[index];
 #else
@@ -744,7 +744,6 @@ struct Map {
   T* get(Key key) {
     u64 hash_idx = hash(key);
     u64 idx = ModPow2(hash_idx, cap);
-    u64 start_idx = idx;
     Loop (i, cap) {
       if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx], key))) {
         return &data[idx];
@@ -759,7 +758,6 @@ struct Map {
   T* get_or_add(Key key, T val) {
     u64 hash_idx = hash(key);
     u64 idx = ModPow2(hash_idx, cap);
-    u64 start_idx = idx;
     Loop (i, cap) {
       if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx], key))) {
         return &data[idx];
@@ -779,7 +777,6 @@ struct Map {
   T* get_or_add_was(Key key, T val, b32* out_was_added) {
     u64 hash_idx = hash(key);
     u64 idx = ModPow2(hash_idx, cap);
-    u64 start_idx = idx;
     Loop (i, cap) {
       if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx], key))) {
         return &data[idx];

@@ -237,94 +237,10 @@ Buffer os_file_path_read_all(Allocator arena, String path) {
   os_file_close(f);
   Buffer result = {
     .data = buffer,
-    .size = file_size,
+    .size = read_size,
   };
   return result;
 }
-////////////////////////////////////////////////////////////////////////
-
-// Result<OS_Handle> os_file_open_(String path, OS_AccessFlags flags) {
-//   Scratch scratch;
-//   String path_c = push_str_copy(scratch, path);
-//   int lnx_flags = 0;
-//   if(flags & OS_AccessFlag_Read && flags & OS_AccessFlag_Write) {
-//     lnx_flags = O_RDWR;
-//   }
-//   else if(flags & OS_AccessFlag_Write) {
-//     lnx_flags = O_WRONLY;
-//   }
-//   else if(flags & OS_AccessFlag_Read) {
-//     lnx_flags = O_RDONLY;
-//   }
-//   if(flags & OS_AccessFlag_Append) {
-//     lnx_flags |= O_APPEND;
-//   }
-//   if(flags & (OS_AccessFlag_Write|OS_AccessFlag_Append)) {
-//     lnx_flags |= O_CREAT;
-//   }
-//   int fd = open((char*)path_c.str, lnx_flags, 0755);
-//   OS_Handle handle;
-//   handle.v = fd;
-//   if (fd == -1) {
-//     return {.err = true};
-//   }
-//   return {.v = handle};
-// }
-
-// Result<FileProperties> os_file_properties_(OS_Handle file) {
-//   if (file.v == 0) { return {.err = true}; }
-//   Scratch scratch;
-//   struct stat fd_stat = {};
-//   int fd = file.v;
-//   int fstat_result = fstat(fd, &fd_stat);
-//   FileProperties props = {};
-//   props = os_lnx_file_properties_from_stat(fd_stat);
-//   if (fstat_result == -1) {
-//     return {.err = true};
-//   }
-//   return {.v = props};
-// }
-
-
-// Result<u64> os_file_size_(OS_Handle file) {
-//   FileProperties props = Try(os_file_properties_(file));
-//   return {.v=props.size};
-// }
-
-// Result<u64> os_file_read_(OS_Handle file, u64 size, void* out_data) {
-//   if (file.v == 0) { return {.err=true}; }
-//   int fd = file.v;
-//   u64 read_result = read(fd, out_data, size);
-//   return {.v=read_result};
-// }
-
-// Result<Buffer> os_file_path_read_all_(Allocator arena, String path) {
-//   Scratch scratch(arena);
-//   OS_Handle f = os_file_open_(path, OS_AccessFlag_Read);
-//   defer(os_file_close(f));
-//   // u64 file_size = Try(os_file_size_(f));
-//   Result<u64> file_size = os_file_size_(f); if (file_size.err) return {.err=file_size.err};
-//   u8* buffer = push_buffer(arena, file_size.v);
-//   u64 read_size = Try(os_file_read_(f, file_size.v, buffer));
-//   Buffer result = {
-//     .data = buffer,
-//     .size = file_size,
-//   };
-//   return {.v=result};
-// }
-
-// void foo1() {
-//   Scratch scratch;
-//   Result<Buffer> buf = os_file_path_read_all_(scratch, "/home/pc/dev/Engine/assets/shaders/cubemap.vert");
-//   if (buf.err) {
-//     Info("bad");
-//   }
-//   if (buf.err) {
-//     Info("err");
-//   }
-// }
-
-////////////////////////////////////////////////////////////////////////
 
 b32 os_file_path_equal_mtime(String a, String b) {
   FileProperties props_a = os_file_path_properties(a);

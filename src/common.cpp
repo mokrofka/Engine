@@ -85,47 +85,47 @@ const u32 TEST_SAMPLES = 100;
 global i32 test_alignments[] = { 8, 16, 32, 64 };
 
 intern void test_global_alloc() {
-  Array<u8*, 100> arr = {};
+  Array<u8*, TEST_SAMPLES> arr = {};
   Allocator alloc = mem_get_global_allocator();
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     u64 size = rand_range_u32(8, KB(1));
     u64 align = test_alignments[rand_range_u32(0, 3)];
     arr.add(mem_alloc(alloc, size, align));
     MemZero(arr[i], size);
   }
-  Array<u32, 100> indices = {};
-  Loop(i, 100) indices.add(i);
+  Array<u32, TEST_SAMPLES> indices = {};
+  Loop(i, TEST_SAMPLES) indices.add(i);
   for (u32 i = indices.count - 1; i > 0; --i) {
     u32 j = rand_range_u32(0, i);
     Swap(indices[i], indices[j]);
   }
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     mem_free(alloc, arr[indices[i]]);
   }
   arr.clear();
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     u64 size = rand_range_u32(8, KB(1));
     u64 align = test_alignments[rand_range_u32(0, 3)];
     arr.add(mem_alloc(alloc, size, align));
     MemZero(arr[i], size);
   }
   indices.clear();
-  Loop(i, 100) indices.add(i);
+  Loop(i, TEST_SAMPLES) indices.add(i);
   for (u32 i = indices.count - 1; i > 0; --i) {
     u32 j = rand_range_u32(0, i);
     Swap(indices[i], indices[j]);
   }
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     mem_free(alloc, arr[indices[i]]);
   }
 }
 
 intern void test_arena_alloc() {
   Arena arena = arena_init();
-  Array<u8*, 100> arr = {};
-  Array<u32, 100> sizes = {};
-  Array<u32, 100> values = {};
-  Loop (i, 100) {
+  Array<u8*, TEST_SAMPLES> arr = {};
+  Array<u32, TEST_SAMPLES> sizes = {};
+  Array<u32, TEST_SAMPLES> values = {};
+  Loop (i, TEST_SAMPLES) {
     u32 size = rand_range_u32(8, KB(1));
     u64 align = test_alignments[rand_range_u32(0, 3)];
     arr[i] = push_buffer(arena, size, align);
@@ -133,7 +133,7 @@ intern void test_arena_alloc() {
     values[i] = rand_range_u32(0, 255);
     MemSet(arr[i], values[i], size);
   }
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     u8* buf = arr[i];
     u32 size = sizes[i];
     u32 value = values[i];
@@ -147,10 +147,10 @@ intern void test_arena_alloc() {
 intern void test_arena_list_alloc() {
   Scratch scratch;
   ArenaList arena(scratch);
-  Array<u8*, 100> arr = {};
-  Array<u32, 100> sizes = {};
-  Array<u32, 100> values = {};
-  Loop (i, 100) {
+  Array<u8*, TEST_SAMPLES> arr = {};
+  Array<u32, TEST_SAMPLES> sizes = {};
+  Array<u32, TEST_SAMPLES> values = {};
+  Loop (i, TEST_SAMPLES) {
     u32 size = rand_range_u32(8, KB(1));
     u64 align = test_alignments[rand_range_u32(0, 3)];
     arr[i] = push_buffer(arena, size, align);
@@ -158,7 +158,7 @@ intern void test_arena_list_alloc() {
     values[i] = rand_range_u32(0, 255);
     MemSet(arr[i], values[i], size);
   }
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     u8* buf = arr[i];
     u32 size = sizes[i];
     u32 value = values[i];
@@ -167,7 +167,7 @@ intern void test_arena_list_alloc() {
     }
   }
   arena.clear();
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     u32 size = rand_range_u32(8, KB(1));
     u64 align = test_alignments[rand_range_u32(0, 3)];
     arr[i] = push_buffer(arena, size, align);
@@ -175,7 +175,7 @@ intern void test_arena_list_alloc() {
     values[i] = rand_range_u32(0, 255);
     MemSet(arr[i], values[i], size);
   }
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     u8* buf = arr[i];
     u32 size = sizes[i];
     u32 value = values[i];
@@ -189,36 +189,36 @@ intern void test_arena_list_alloc() {
 intern void test_seglist_alloc() {
   Scratch scratch;
   AllocSegList alloc(scratch);
-  Array<u8*, 100> arr = {};
-  Loop (i, 100) {
+  Array<u8*, TEST_SAMPLES> arr = {};
+  Loop (i, TEST_SAMPLES) {
     u64 size = rand_range_u32(8, KB(1));
     u64 align = test_alignments[rand_range_u32(0, 3)];
     arr.add(mem_alloc(alloc, size, align));
     MemZero(arr[i], size);
   }
-  Array<u32, 100> indices = {};
-  Loop(i, 100) indices.add(i);
+  Array<u32, TEST_SAMPLES> indices = {};
+  Loop(i, TEST_SAMPLES) indices.add(i);
   for (u32 i = indices.count - 1; i > 0; --i) {
     u32 j = rand_range_u32(0, i);
     Swap(indices[i], indices[j]);
   }
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     mem_free(alloc, arr[indices[i]]);
   }
   arr.clear();
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     u64 size = rand_range_u32(8, KB(1));
     u64 align = test_alignments[rand_range_u32(0, 3)];
     arr.add(mem_alloc(alloc, size, align));
     MemZero(arr[i], size);
   }
   indices.clear();
-  Loop(i, 100) indices.add(i);
+  Loop(i, TEST_SAMPLES) indices.add(i);
   for (u32 i = indices.count - 1; i > 0; --i) {
     u32 j = rand_range_u32(0, i);
     Swap(indices[i], indices[j]);
   }
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     mem_free(alloc, arr[indices[i]]);
   }
 }
@@ -227,35 +227,34 @@ intern void test_gpu_seglist_alloc() {
   Scratch scratch;
   GpuAllocSegList alloc = {.cap = MB(1)};
   alloc.init(scratch);
-  Array<GpuMemHandler, 100> arr = {};
-  Loop (i, 100) {
+  Array<GpuMemHandler, TEST_SAMPLES> arr = {};
+  Loop (i, TEST_SAMPLES) {
     u64 size = rand_range_u32(8, KB(1));
     u64 align = test_alignments[rand_range_u32(0, 3)];
     arr.add(alloc.alloc(size, align));
-    GpuAllocSegList::RangeList range = alloc.data[arr[i]];
   }
-  Array<u32, 100> indices = {};
-  Loop(i, 100) indices.add(i);
+  Array<u32, TEST_SAMPLES> indices = {};
+  Loop(i, TEST_SAMPLES) indices.add(i);
   for (u32 i = indices.count - 1; i > 0; --i) {
     u32 j = rand_range_u32(0, i);
     Swap(indices[i], indices[j]);
   }
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     alloc.free(arr[indices[i]]);
   }
   arr.clear();
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     u64 size = rand_range_u32(8, KB(1));
     u64 align = test_alignments[rand_range_u32(0, 3)];
     arr.add(alloc.alloc(size, align));
   }
   indices.clear();
-  Loop(i, 100) indices.add(i);
+  Loop(i, TEST_SAMPLES) indices.add(i);
   for (u32 i = indices.count - 1; i > 0; --i) {
     u32 j = rand_range_u32(0, i);
     Swap(indices[i], indices[j]);
   }
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     alloc.free(arr[indices[i]]);
   }
 }
@@ -270,44 +269,44 @@ intern void test_object_pool() {
     u32 b;
   };
   ObjectPool<A> pool(scratch);
-  Array<A, 100> values = {};
-  Array<Handle<A>, 100> handlers = {};
-  Loop (i, 100) {
-    values[i].a = rand_range_u32(0, 100);
-    values[i].b = rand_range_u32(0, 100);
+  Array<A, TEST_SAMPLES> values = {};
+  Array<Handle<A>, TEST_SAMPLES> handlers = {};
+  Loop (i, TEST_SAMPLES) {
+    values[i].a = rand_range_u32(0, TEST_SAMPLES);
+    values[i].b = rand_range_u32(0, TEST_SAMPLES);
   };
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     handlers[i] = pool.add(values[i]);
   }
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     Assert(MemMatchStruct(&values[i], &pool.get(handlers[i])));
   }
-  Array<u32, 100> indices = {};
-  Loop(i, 100) indices.add(i);
+  Array<u32, TEST_SAMPLES> indices = {};
+  Loop(i, TEST_SAMPLES) indices.add(i);
   for (u32 i = indices.count - 1; i > 0; --i) {
     u32 j = rand_range_u32(0, i);
     Swap(indices[i], indices[j]);
   }
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     pool.remove(handlers[i]);
   }
   indices.clear();
-  Loop (i, 100) {
-    values[i].a = rand_range_u32(0, 100);
-    values[i].b = rand_range_u32(0, 100);
+  Loop (i, TEST_SAMPLES) {
+    values[i].a = rand_range_u32(0, TEST_SAMPLES);
+    values[i].b = rand_range_u32(0, TEST_SAMPLES);
   };
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     handlers[i] = pool.add(values[i]);
   }
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     Assert(MemMatchStruct(&values[i], &pool.get(handlers[i])));
   }
-  Loop(i, 100) indices.add(i);
+  Loop(i, TEST_SAMPLES) indices.add(i);
   for (u32 i = indices.count - 1; i > 0; --i) {
     u32 j = rand_range_u32(0, i);
     Swap(indices[i], indices[j]);
   }
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     pool.remove(handlers[i]);
   }
 }
@@ -319,44 +318,44 @@ intern void test_handle_darray() {
     u32 b;
   };
   DarrayHandler<A> arr = {};
-  Array<A, 100> values = {};
-  Array<Handle<A>, 100> handlers = {};
-  Loop (i, 100) {
-    values[i].a = rand_range_u32(0, 100);
-    values[i].b = rand_range_u32(0, 100);
+  Array<A, TEST_SAMPLES> values = {};
+  Array<Handle<A>, TEST_SAMPLES> handlers = {};
+  Loop (i, TEST_SAMPLES) {
+    values[i].a = rand_range_u32(0, TEST_SAMPLES);
+    values[i].b = rand_range_u32(0, TEST_SAMPLES);
   };
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     handlers[i] = arr.add(values[i]);
   }
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     Assert(MemMatchStruct(&values[i], &arr.get(handlers[i])));
   }
-  Array<u32, 100> indices = {};
-  Loop(i, 100) indices.add(i);
+  Array<u32, TEST_SAMPLES> indices = {};
+  Loop(i, TEST_SAMPLES) indices.add(i);
   for (u32 i = indices.count - 1; i > 0; --i) {
     u32 j = rand_range_u32(0, i);
     Swap(indices[i], indices[j]);
   }
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     arr.remove(handlers[i]);
   }
   indices.clear();
-  Loop (i, 100) {
-    values[i].a = rand_range_u32(0, 100);
-    values[i].b = rand_range_u32(0, 100);
+  Loop (i, TEST_SAMPLES) {
+    values[i].a = rand_range_u32(0, TEST_SAMPLES);
+    values[i].b = rand_range_u32(0, TEST_SAMPLES);
   };
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     handlers[i] = arr.add(values[i]);
   }
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     Assert(MemMatchStruct(&values[i], &arr.get(handlers[i])));
   }
-  Loop(i, 100) indices.add(i);
+  Loop(i, TEST_SAMPLES) indices.add(i);
   for (u32 i = indices.count - 1; i > 0; --i) {
     u32 j = rand_range_u32(0, i);
     Swap(indices[i], indices[j]);
   }
-  Loop (i, 100) {
+  Loop (i, TEST_SAMPLES) {
     arr.remove(handlers[i]);
   }
 }
@@ -387,27 +386,6 @@ struct Profiler {
 };
 
 global Profiler profiler_st;
-
-u64 profiler_cpu_frequency() {
-  u64 os_freq = os_timer_frequency();
-  u64 cpu_start = cpu_timer_now();
-  u64 os_start = os_timer_now();
-  u64 milliseconds = 1;
-  u64 os_end = 0;
-  u64 os_elapsed = 0;
-  u64 os_wait_time = os_freq * milliseconds / 1000;
-  while (os_elapsed < os_wait_time) {
-    os_end = os_timer_now();
-    os_elapsed = os_end - os_start;
-  }
-  u64 cpu_end = cpu_timer_now();
-  u64 cpu_elapsed = cpu_end - cpu_start;
-  u64 cpu_freq = 0;
-  if (cpu_elapsed) {
-    cpu_freq = os_freq * cpu_elapsed / os_elapsed;
-  }
-  return cpu_freq;
-}
 
 ProfileBlock::ProfileBlock(String label_, ProfileAnchor& anchor_) {
   if (!anchor_.label.size) {
@@ -449,7 +427,7 @@ void profiler_begin() {
 
 void profiler_end_and_print_() {
   profiler_st.end_TSC = cpu_timer_now();
-  u64 cpu_freq = profiler_cpu_frequency();
+  u64 cpu_freq = estimate_cpu_frequency();
   u64 total_CPU_elapsed = profiler_st.end_TSC - profiler_st.start_TSC;
   if (cpu_freq) {
     Info("Total time: %.4fms (CPU freq %u64)", 1000.0 * (f64)total_CPU_elapsed / (f64)cpu_freq, cpu_freq);
@@ -1235,7 +1213,7 @@ void foo__() {
   Scratch scratch;
   thread_pool_init(4);
 
-  u64 cpu_frequ = profiler_cpu_frequency();
+  u64 cpu_frequ = estimate_cpu_frequency();
   Info("%.2f Ghz/s cpu frequency", (f64)cpu_frequ / Billion(1));
   #define IterationNum (MB(10))
   #define NUM_THREADS 4

@@ -742,7 +742,7 @@ mat4 quat_to_mat4(quat q) {
 
   // https://stackoverflow.com/questions/1556260/convert-quaternion-rotation-to-rotation-matrix
 
-  quat n = quat_normalize(q);
+  // quat n = quat_normalize(q);
 
   // out_matrix.e[0] = 1.0f - 2.0f * n.y * n.y - 2.0f * n.z * n.z;
   // out_matrix.e[1] = 2.0f * n.x * n.y - 2.0f * n.z * n.w;

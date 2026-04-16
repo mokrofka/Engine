@@ -277,7 +277,6 @@ intern void seglist_free(AllocSegList* allocator, void* ptr) {
   Assert(*tail == MEM_ALLOC_TAIL_GUARD);
   u32* pool_idx = (u32*)OffsetBack(ptr, header->pad);
   MemPoolPow2& p = *(MemPoolPow2*)&allocator->pools[*pool_idx];
-  u64 pow2_size = 8 << *pool_idx;
   MemGuardDealloc(ptr, header->size+sizeof(u32));
   AsanPoisonMemRegion(ptr, header->size+sizeof(u32));
   PoolFreeNode* node = (PoolFreeNode*)Offset(pool_idx, sizeof(u32));

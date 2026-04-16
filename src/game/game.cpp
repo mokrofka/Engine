@@ -599,10 +599,10 @@ void game_update() {
   }
   if (os_is_key_pressed(MouseKey_Left)) {
     // select_obj();
-    v3 dir = ray_from_camera();
+    // v3 dir = ray_from_camera();
     // debug_draw_line(st->cam.pos - v3(0,0.1,0), st->cam.pos + dir*100, ColorWhite);
-    v3 max = st->cam.pos + v3_one();
-    v3 min = st->cam.pos - v3_one();
+    // v3 max = st->cam.pos + v3_one();
+    // v3 min = st->cam.pos - v3_one();
   }
   // moving cube and monkey
   {
@@ -622,7 +622,6 @@ void game_update() {
     v3 forward = mat4_forward(view);
     v3 right   = mat4_right(view);
     v3 up      = mat4_up(view);
-    v2u win_size = os_get_window_size();
     f32 dist = 1.0f;
     f32 xoff = 0.3f;
     f32 yoff = 0.3f;
@@ -658,63 +657,7 @@ void game_update() {
     e.vel() += -dir * 0.5f * g_dt;
   }
 
-  
-  {
-    // f32 range = 0.1;
-    // v2 mouse_pos = os_get_mouse_pos();
-    // Rect rect = {
-    //   .min = v2_scale(-range),
-    //   .max = v2_scale(range),
-    // };
-    // if (v2_in_rect(rect, v2_map_to_v2_11(mouse_pos, v2_of_v2u(os_get_window_size())))) {
-    //   draw_square(rect.min, rect.max, ColorGrey);
-    //   if (os_is_key_pressed(Key_1)) {
-    //     Info("pressed 1 ");
-    //   }
-    // } else {
-    //   draw_square(rect.min, rect.max, ColorWhite);
-    // }
-
-    v2 window_size = {200,200};
-
-    ui_push_box("first box");
-      ui_push_box("first box");
-        ui_push_box("first box");
-
-        ui_pop_box();
-      ui_pop_box();
-    ui_pop_box();
-
-    if (ui_begin_window(2, window_size)) {
-    
-    }
-
-    // if (ui_button(1, v2(100,100), v2(200,200))) {
-    //   Info("click");
-    // }
-  }
-
   ImGui::ShowDemoWindow();
-
-  ImGuiIO& io = ImGui::GetIO();
-  static float f = 0.0f;
-  static int counter = 0;
-  static ImVec4 clear_color = ImVec4(0.1f, 0.1f, 0.1f, 1.00f);
-
-  ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!" and append into it.
-
-  ImGui::Text("This is some useful text.");          // Display some text (you can use a format strings too)
-
-  ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-  ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-
-  if (ImGui::Button("Button")) // Buttons return true when clicked (most widgets return true when edited/activated)
-    counter++;
-  ImGui::SameLine();
-  ImGui::Text("counter = %d", counter);
-
-  ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-  ImGui::End();
 }
 
 void main_init(u8** state) {
@@ -769,6 +712,7 @@ shared_function void main_update(u8** state) {
     main_init(state);
   }
   Assign(st, *state);
+
   camera_update();
   if (os_is_key_down(Key_T)) {
     game_deinit();

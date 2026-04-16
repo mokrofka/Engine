@@ -246,7 +246,7 @@ KAPI void test();
 ////////////////////////////////////////////////////////////////////////
 // Profiler
 
-KAPI u64 profiler_cpu_frequency();
+KAPI u64 estimate_cpu_frequency();
 
 struct ProfileAnchor {
   u64 TSC_elapsed;
