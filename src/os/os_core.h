@@ -74,49 +74,49 @@ struct OS_Watch{
   OS_WatchFlags flags;
 };
 
-KAPI String os_get_current_filepath();
-KAPI String os_get_current_directory();
-KAPI String os_get_current_binary_name();
+String os_get_current_filepath();
+String os_get_current_directory();
+String os_get_current_binary_name();
 
-KAPI void os_init(String name);
-KAPI void os_exit(i32 exit_code);
+void os_init(String name);
+void os_exit(i32 exit_code);
 
-KAPI u64 os_timer_frequency();
-KAPI u64 os_timer_now();
-KAPI u64 os_now_ns();
-KAPI void os_sleep_ms(u64 ms);
-KAPI void os_console_write(String message, u32 color);
-KAPI String os_get_environment(String name);
+u64 os_timer_frequency();
+u64 os_timer_now();
+u64 os_now_ns();
+void os_sleep_ms(u64 ms);
+void os_console_write(String message, u32 color);
+String os_get_environment(String name);
 
 //////////////////////////////////////////////////////////////////////////
 // Memory
 
-KAPI u8*  os_reserve(u64 size);
-KAPI b32  os_commit(void* ptr, u64 size);
-KAPI void os_decommit(void* ptr, u64 size);
-KAPI void os_release(void* ptr, u64 size);
+u8*  os_reserve(u64 size);
+b32  os_commit(void* ptr, u64 size);
+void os_decommit(void* ptr, u64 size);
+void os_release(void* ptr, u64 size);
 
 //////////////////////////////////////////////////////////////////////////
 // Files
 
-KAPI OS_Handle      os_file_open(String path, OS_AccessFlags flags);
-KAPI void           os_file_close(OS_Handle file);
-KAPI u64            os_file_read(OS_Handle file, u64 size, void* out_data);
-KAPI u64            os_file_write(OS_Handle file, u64 size, void* data);
-KAPI u64            os_file_size(OS_Handle file);
-KAPI FileProperties os_file_properties(OS_Handle file);
-KAPI Buffer         os_file_path_read_all(Allocator arena, String path);
-KAPI b32            os_file_path_exists(String path);
-KAPI b32            os_file_path_copy(String dst, String src);
-KAPI void           os_file_path_copy_mtime(String src, String dst);
-KAPI FileProperties os_file_path_properties(String path);
-KAPI b32            os_file_path_equal_mtime(String a, String b);
+OS_Handle      os_file_open(String path, OS_AccessFlags flags);
+void           os_file_close(OS_Handle file);
+u64            os_file_read(OS_Handle file, u64 size, void* out_data);
+u64            os_file_write(OS_Handle file, u64 size, void* data);
+u64            os_file_size(OS_Handle file);
+FileProperties os_file_properties(OS_Handle file);
+Buffer         os_file_path_read_all(Allocator arena, String path);
+b32            os_file_path_exists(String path);
+b32            os_file_path_copy(String dst, String src);
+void           os_file_path_copy_mtime(String src, String dst);
+FileProperties os_file_path_properties(String path);
+b32            os_file_path_equal_mtime(String a, String b);
 
 // Directory
-KAPI OS_Handle os_directory_open(String path);
-KAPI OS_Handle os_directory_create(String path);
-KAPI OS_Handle os_directory_create_p(String path);
-KAPI b32       os_directory_path_exist(String path);
+OS_Handle os_directory_open(String path);
+OS_Handle os_directory_create(String path);
+OS_Handle os_directory_create_p(String path);
+b32       os_directory_path_exist(String path);
 
 // Watch
 OS_Watch   os_watch_open(OS_WatchFlags flags);
@@ -126,27 +126,27 @@ void       os_watch_deattach(OS_Watch watch, OS_Handle attached);
 StringList os_watch_check(Allocator arena, OS_Watch watch);
 
 // Directory iteration
-KAPI OS_FileIter* os_file_iter_begin(Allocator arena, String path, OS_FileIterFlags flags);
-KAPI b32          os_file_iter_next(Allocator arena, OS_FileIter *iter, OS_FileInfo *info_out);
-KAPI void         os_file_iter_end(OS_FileIter* iter);
+OS_FileIter* os_file_iter_begin(Allocator arena, String path, OS_FileIterFlags flags);
+b32          os_file_iter_next(Allocator arena, OS_FileIter *iter, OS_FileInfo *info_out);
+void         os_file_iter_end(OS_FileIter* iter);
 
 ////////////////////////////////////////////////////////////////////////
 // Processes
 
-KAPI OS_Handle os_process_launch(StringList list);
-KAPI i32       os_process_join(OS_Handle handle);
+OS_Handle os_process_launch(StringList list);
+i32       os_process_join(OS_Handle handle);
 
 ////////////////////////////////////////////////////////////////////////
 // Threads
-
-KAPI Thread os_thread_launch(ThreadEntryPointFunctionType *func, void *ptr);
-KAPI b32 os_thread_join(Thread handle, u64 endt_us);
-KAPI void os_thread_detach(Thread handle);
+void thread_pool_init(u32 num_threads);
+Thread os_thread_launch(ThreadEntryPointFunctionType *func, void *ptr);
+b32 os_thread_join(Thread handle, u64 endt_us);
+void os_thread_detach(Thread handle);
 
 ////////////////////////////////////////////////////////////////////////
 // Lib
 
-KAPI OS_Handle os_lib_open(String path);
-KAPI void      os_lib_close(OS_Handle lib);
-KAPI void*     os_lib_get_proc(OS_Handle lib, String name);
+OS_Handle os_lib_open(String path);
+void      os_lib_close(OS_Handle lib);
+void*     os_lib_get_proc(OS_Handle lib, String name);
 

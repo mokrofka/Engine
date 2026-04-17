@@ -18,8 +18,8 @@ struct Allocator {
 ////////////////////////////////////////////////////////////////////////
 // Global allocator
 
-KAPI void global_allocator_init();
-KAPI Allocator mem_get_global_allocator();
+void global_allocator_init();
+Allocator mem_get_global_allocator();
 
 ////////////////////////////////////////////////////////////////////////
 // Arena (page allocator)
@@ -32,17 +32,17 @@ struct Arena {
   operator Allocator();
 };
 
-KAPI Arena arena_init();
-KAPI void  arena_deinit(Arena* arena);
-KAPI void  arena_clear(Arena* arena);
+Arena arena_init();
+void  arena_deinit(Arena* arena);
+void  arena_clear(Arena* arena);
 
 struct Temp {
   Arena* arena;
   u64 pos;
 };
 
-KAPI Temp temp_begin(Arena* arena);
-KAPI void temp_end(Temp temp);
+Temp temp_begin(Arena* arena);
+void temp_end(Temp temp);
 
 ////////////////////////////////////////////////////////////////////////
 // ArenaList
@@ -87,7 +87,7 @@ struct AllocSegList {
 //   u32 sub_bin_bitmaps[BinCount];
 // };
 // TLSF_Allocator tlsf_init();
-// KAPI u8* tlsf_alloc(TLSF_Allocator& allocator, u64 size, u64 alignment = MEM_DEFAULT_ALIGNMENT);
+// u8* tlsf_alloc(TLSF_Allocator& allocator, u64 size, u64 alignment = MEM_DEFAULT_ALIGNMENT);
 
 ////////////////////////////////////////////////////////////////////////
 // atlas TODO: implement
@@ -95,11 +95,11 @@ struct AllocSegList {
 ////////////////////////////////////////////////////////////////////////
 // Allocator Interface
 
-KAPI u8*  mem_alloc(Allocator alloc, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
-KAPI u8*  mem_alloc_zero(Allocator alloc, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
-KAPI u8*  mem_realloc(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 align = MEM_DEFAULT_ALIGNMENT);
-KAPI u8*  mem_realloc_zero(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 align = MEM_DEFAULT_ALIGNMENT);
-KAPI void mem_free(Allocator alloc, void* ptr);
+u8*  mem_alloc(Allocator alloc, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
+u8*  mem_alloc_zero(Allocator alloc, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
+u8*  mem_realloc(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 align = MEM_DEFAULT_ALIGNMENT);
+u8*  mem_realloc_zero(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 align = MEM_DEFAULT_ALIGNMENT);
+void mem_free(Allocator alloc, void* ptr);
 
 template<typename T> T* mem_alloc_struct(Allocator a)                                 { return (T*)mem_alloc(a,             sizeof(T),                    alignof(T)); }
 template<typename T> T* mem_alloc_struct_zero(Allocator a)                            { return (T*)mem_alloc_zero(a,        sizeof(T),                    alignof(T)); }
@@ -150,8 +150,8 @@ struct SoA_Field {
 };
 #define SoA_push_field(ptr,T) {(void**)(ptr), sizeof(T), alignof(T)}
 
-KAPI u8* mem_alloc_soa(Allocator alloc, u32 count, Slice<SoA_Field> fields);
-KAPI u8* mem_realloc_soa(Allocator alloc, u32 old_count, u32 new_count, Slice<SoA_Field> fields);
+u8* mem_alloc_soa(Allocator alloc, u32 count, Slice<SoA_Field> fields);
+u8* mem_realloc_soa(Allocator alloc, u32 old_count, u32 new_count, Slice<SoA_Field> fields);
 
 struct OffsetMemPusher {
   void* offset;

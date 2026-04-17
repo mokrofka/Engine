@@ -62,9 +62,7 @@ project(Engine)
     add_library(lib SHARED 
       src/base/base_impl.cpp
       src/os/os_impl.cpp
-      src/vk.cpp
-      src/stb_impl.c
-      src/common.cpp
+      vendor/stb_impl.c
       vendor/imgui/imgui_impl.cpp
     )
     target_compile_definitions(lib PRIVATE KEXPORT)
@@ -76,7 +74,11 @@ project(Engine)
     endif()
 
     # Game
-    add_library(game SHARED src/game/game.cpp)
+    add_library(game SHARED
+      # src/game/game.cpp
+      src/vk.cpp
+      src/common.cpp
+    )
     target_include_directories(game PRIVATE src/game)
     target_link_libraries(game ${binary_dir}/liblib.so)
 
@@ -90,10 +92,9 @@ project(Engine)
       src/base/base_impl.cpp
       src/os/os_impl.cpp
       src/vk.cpp
-      src/stb_impl.c
       src/common.cpp
-      src/game/game.cpp
       src/main.cpp
+      vendor/stb_impl.c
       vendor/imgui/imgui_impl.cpp
     )
     if (UNIX)

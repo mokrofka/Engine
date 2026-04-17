@@ -2,15 +2,15 @@
 #include "os/os_core.h"
 #include "base/maths.h"
 
-KAPI void os_gfx_init();
-KAPI void os_gfx_shutdown();
+void os_gfx_init();
+void os_gfx_shutdown();
 
-KAPI void os_pump_messages();
-KAPI b32  os_window_should_close();
-KAPI v2u  os_get_window_size();
-KAPI v2   os_get_mouse_pos();
-KAPI void os_get_gfx_api_handlers(void* out);
-KAPI void os_close_window();
+void os_pump_messages();
+b32  os_window_should_close();
+v2u  os_get_window_size();
+v2   os_get_mouse_pos();
+void os_get_gfx_api_handlers(void* out);
+void os_close_window();
 
 enum Key {
   // Control keys
@@ -156,12 +156,12 @@ Slice<OS_InputEvent> os_get_events();
 
 void os_input_update();
 
-KAPI b32 os_is_key_down(Key key);
-KAPI b32 os_is_key_up(Key key);
-KAPI b32 os_was_key_down(Key key);
-KAPI b32 os_was_key_up(Key key);
-KAPI b32 os_is_key_pressed(Key key);
-KAPI b32 os_is_key_released(Key key);
+b32 os_is_key_down(Key key);
+b32 os_is_key_up(Key key);
+b32 os_was_key_down(Key key);
+b32 os_was_key_up(Key key);
+b32 os_is_key_pressed(Key key);
+b32 os_is_key_released(Key key);
 
 void os_clipboard_write(String str);
 String os_clipboard_read();

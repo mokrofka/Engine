@@ -1,40 +1,135 @@
 #include "common.h"
 #include "stb_image.h"
+#include "test.cpp"
+#include "gltf.cpp"
+#include "game/game.cpp"
 
-u64 hash(Vertex x) { return hash_memory(&x, sizeof(x)); }
-b32 equal(Vertex a, Vertex b) { return MemMatchStruct(&a, &b); }
+void game_update();
+void* game_init();
+void game_hotreload(void* ctx);
 
-Extern f32 g_dt;
-Extern f32 g_time;
-Extern b32 g_was_hotreload;
+struct ProfilerState {
+  ProfileAnchor anchors[KB(4)];
+  u32 anchors_count;
+  u64 tsc_start;
+  u64 tsc_end;
+  u32 profiler_parent;
+  // Map<String, u32> map;
+  u32 hash_to_indices[KB(4)];
 
-struct EntitySOA {
+  ProfileAnchor prev_anchors[4096];
+  u32 prev_anchors_count;
+  u64 prev_tsc_start;
+  u64 prev_tsc_end;
+  u64 prev_tsc_elapsed;
+};
+
+struct WatchFile {
+  String path;
+  DenseTime modified;
+  void (**callback)();
+};
+
+struct WatchDirectory {
+  String path;
+  OS_Watch watch;
+  void (**callback)(String name);
+};
+
+struct WatchState {
+  Allocator alloc;
+  Array<WatchFile, 128> watches;
+  Array<WatchDirectory, 128> directories;
+};
+
+struct GlobalState {
+  Arena arena;
+  f32 dt;
+  f32 time;
+  b32 should_hotreload;
   Transform* transforms;
   Transform* static_transforms;
 #if BUILD_DEBUG
   u32* generations;
   u32* static_generations;
 #endif
+
+  Handle<GpuMesh> meshes_handlers[Mesh_COUNT];
+  Handle<GpuTexture> textures_handlers[Texture_COUNT];
+  Handle<GpuMaterial> materials_handlers[Material_COUNT];
+
+  String asset_path;
+  String shader_dir;
+  String shader_compiled_dir;
+  String models_dir;
+  String textures_dir;
+  Map<String, Handle<GpuTexture>> str_to_texture;
+  Map<String, Handle<GpuMesh>> str_to_mesh;
+  Map<String, Handle<GpuMaterial>> str_to_material;
+
+  WatchState watch;
+  ProfilerState profiler;
+
+  void* game_st;
+  void* vk_st;
+
+  void (*callback_should_reload)();
+  void (*callback_shader_compile)(String name);
+  void (*callback_shader_reload)(String name);
 };
 
-global EntitySOA entity_soa;
+global GlobalState* g_st;
 
-Transform& entities_transforms(Handle<Entity> handle) { 
-  Assert(handle.generation() == entity_soa.generations[handle.idx()]);
-  return entity_soa.transforms[handle.idx()];
+void _callback_should_hotreload() {
+  g_st->should_hotreload = true;
 }
-Transform& static_entities_transforms(Handle<StaticEntity> handle) {
-  Assert(handle.generation() == entity_soa.static_generations[handle.idx()]);
-  return entity_soa.static_transforms[handle.idx()];
+void _callback_shader_compile(String name) {
+  GlobalState& g = *g_st;
+  Scratch scratch;
+  String shader_filepath = push_strf(scratch, "%s/%s", g.shader_dir, name);
+  String shader_compiled_filepath = push_strf(scratch, "%s/%s%s", g.shader_compiled_dir, name, String(".spv"));
+  StringList list = {};
+  str_list_push(scratch, &list, "glslangValidator");
+  str_list_push(scratch, &list, "-V");
+  str_list_push(scratch, &list, shader_filepath);
+  str_list_push(scratch, &list, "-o");
+  str_list_push(scratch, &list, shader_compiled_filepath);
+  os_process_launch(list);
+}
+void _callback_shader_reload(String name) {
+  Scratch scratch;
+  String shader_name_with_format = str_chop_last_dot(name);
+  String shader_name = str_chop_last_dot(shader_name_with_format);
+  vk_shader_reload(shader_name);
+}
+void global_st_update_callback() {
+  GlobalState& g = *g_st;
+  g.callback_should_reload = _callback_should_hotreload;
+  g.callback_shader_compile = _callback_shader_compile;
+  g.callback_shader_reload = _callback_shader_reload;
+}
+
+f32 get_dt() { return g_st->dt; }
+f32 get_time() { return g_st->time; }
+f32 get_was_hotreload() { return g_st->should_hotreload; }
+
+Transform& entity_transform(Handle<Entity> handle) { 
+  Assert(handle.generation() == g_st->generations[handle.idx()]);
+  return g_st->transforms[handle.idx()];
+}
+Transform& static_entity_transform(Handle<StaticEntity> handle) {
+  Assert(handle.generation() == g_st->static_generations[handle.idx()]);
+  return g_st->static_transforms[handle.idx()];
 }
 #if BUILD_DEBUG
-u32* entities_generations() { return entity_soa.generations; }
-u32* static_entities_generations() { return entity_soa.static_generations; }
+u32* entities_generations() { return g_st->generations; }
+u32* static_entities_generations() { return g_st->static_generations; }
 #endif
 
 ////////////////////////////////////////////////////////////////////////
 // Assets
 
+// TODO: allocate in hotreload build?
 global String meshes_strs[Mesh_Load_COUNT] = {
 #define X(enum_name, name) [enum_name] = Stringify(name),
   MESH_LIST
@@ -47,13 +142,9 @@ global String textures_strs[Texture_COUNT] = {
 #undef X
 };
 
-global Handle<GpuMesh> meshes_handlers[Mesh_COUNT];
-global Handle<GpuTexture> textures_handlers[Texture_COUNT];
-global Handle<GpuMaterial> materials_handlers[Material_COUNT];
-
-Handle<GpuMesh> mesh_get(MeshId id) { return meshes_handlers[id]; }
-void mesh_set(MeshId id, Handle<GpuMesh> mesh_handle) { meshes_handlers[id] = mesh_handle; }
-Handle<GpuMaterial> material_get(MaterialId id) { return materials_handlers[id]; }
+Handle<GpuMesh> mesh_get(MeshId id) { return g_st->meshes_handlers[id]; }
+void mesh_set(MeshId id, Handle<GpuMesh> mesh_handle) { g_st->meshes_handlers[id] = mesh_handle; }
+Handle<GpuMaterial> material_get(MaterialId id) { return g_st->materials_handlers[id]; }
 
 constexpr ShaderState shader_default_info() {
   ShaderState info = {
@@ -77,326 +168,10 @@ constexpr MaterialProps material_default_props() {
 }
 
 ////////////////////////////////////////////////////////////////////////
-// Test
-
-///////////////////////////////////
-// Allocators
-
-const u32 TEST_SAMPLES = 100;
-global i32 test_alignments[] = { 8, 16, 32, 64 };
-
-intern void test_global_alloc() {
-  Array<u8*, TEST_SAMPLES> arr = {};
-  Allocator alloc = mem_get_global_allocator();
-  Loop (i, TEST_SAMPLES) {
-    u64 size = rand_range_u32(8, KB(1));
-    u64 align = test_alignments[rand_range_u32(0, 3)];
-    arr.add(mem_alloc(alloc, size, align));
-    MemZero(arr[i], size);
-  }
-  Array<u32, TEST_SAMPLES> indices = {};
-  Loop(i, TEST_SAMPLES) indices.add(i);
-  for (u32 i = indices.count - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
-    Swap(indices[i], indices[j]);
-  }
-  Loop (i, TEST_SAMPLES) {
-    mem_free(alloc, arr[indices[i]]);
-  }
-  arr.clear();
-  Loop (i, TEST_SAMPLES) {
-    u64 size = rand_range_u32(8, KB(1));
-    u64 align = test_alignments[rand_range_u32(0, 3)];
-    arr.add(mem_alloc(alloc, size, align));
-    MemZero(arr[i], size);
-  }
-  indices.clear();
-  Loop(i, TEST_SAMPLES) indices.add(i);
-  for (u32 i = indices.count - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
-    Swap(indices[i], indices[j]);
-  }
-  Loop (i, TEST_SAMPLES) {
-    mem_free(alloc, arr[indices[i]]);
-  }
-}
-
-intern void test_arena_alloc() {
-  Arena arena = arena_init();
-  Array<u8*, TEST_SAMPLES> arr = {};
-  Array<u32, TEST_SAMPLES> sizes = {};
-  Array<u32, TEST_SAMPLES> values = {};
-  Loop (i, TEST_SAMPLES) {
-    u32 size = rand_range_u32(8, KB(1));
-    u64 align = test_alignments[rand_range_u32(0, 3)];
-    arr[i] = push_buffer(arena, size, align);
-    sizes[i] = size;
-    values[i] = rand_range_u32(0, 255);
-    MemSet(arr[i], values[i], size);
-  }
-  Loop (i, TEST_SAMPLES) {
-    u8* buf = arr[i];
-    u32 size = sizes[i];
-    u32 value = values[i];
-    Loop (j, size) {
-      Assert(buf[j] == value);
-    }
-  }
-  arena_deinit(&arena);
-}
-
-intern void test_arena_list_alloc() {
-  Scratch scratch;
-  ArenaList arena(scratch);
-  Array<u8*, TEST_SAMPLES> arr = {};
-  Array<u32, TEST_SAMPLES> sizes = {};
-  Array<u32, TEST_SAMPLES> values = {};
-  Loop (i, TEST_SAMPLES) {
-    u32 size = rand_range_u32(8, KB(1));
-    u64 align = test_alignments[rand_range_u32(0, 3)];
-    arr[i] = push_buffer(arena, size, align);
-    sizes[i] = size;
-    values[i] = rand_range_u32(0, 255);
-    MemSet(arr[i], values[i], size);
-  }
-  Loop (i, TEST_SAMPLES) {
-    u8* buf = arr[i];
-    u32 size = sizes[i];
-    u32 value = values[i];
-    Loop (j, size) {
-      Assert(buf[j] == value);
-    }
-  }
-  arena.clear();
-  Loop (i, TEST_SAMPLES) {
-    u32 size = rand_range_u32(8, KB(1));
-    u64 align = test_alignments[rand_range_u32(0, 3)];
-    arr[i] = push_buffer(arena, size, align);
-    sizes[i] = size;
-    values[i] = rand_range_u32(0, 255);
-    MemSet(arr[i], values[i], size);
-  }
-  Loop (i, TEST_SAMPLES) {
-    u8* buf = arr[i];
-    u32 size = sizes[i];
-    u32 value = values[i];
-    Loop (j, size) {
-      Assert(buf[j] == value);
-    }
-  }
-  arena.clear();
-}
-
-intern void test_seglist_alloc() {
-  Scratch scratch;
-  AllocSegList alloc(scratch);
-  Array<u8*, TEST_SAMPLES> arr = {};
-  Loop (i, TEST_SAMPLES) {
-    u64 size = rand_range_u32(8, KB(1));
-    u64 align = test_alignments[rand_range_u32(0, 3)];
-    arr.add(mem_alloc(alloc, size, align));
-    MemZero(arr[i], size);
-  }
-  Array<u32, TEST_SAMPLES> indices = {};
-  Loop(i, TEST_SAMPLES) indices.add(i);
-  for (u32 i = indices.count - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
-    Swap(indices[i], indices[j]);
-  }
-  Loop (i, TEST_SAMPLES) {
-    mem_free(alloc, arr[indices[i]]);
-  }
-  arr.clear();
-  Loop (i, TEST_SAMPLES) {
-    u64 size = rand_range_u32(8, KB(1));
-    u64 align = test_alignments[rand_range_u32(0, 3)];
-    arr.add(mem_alloc(alloc, size, align));
-    MemZero(arr[i], size);
-  }
-  indices.clear();
-  Loop(i, TEST_SAMPLES) indices.add(i);
-  for (u32 i = indices.count - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
-    Swap(indices[i], indices[j]);
-  }
-  Loop (i, TEST_SAMPLES) {
-    mem_free(alloc, arr[indices[i]]);
-  }
-}
-
-intern void test_gpu_seglist_alloc() {
-  Scratch scratch;
-  GpuAllocSegList alloc = {.cap = MB(1)};
-  alloc.init(scratch);
-  Array<GpuMemHandler, TEST_SAMPLES> arr = {};
-  Loop (i, TEST_SAMPLES) {
-    u64 size = rand_range_u32(8, KB(1));
-    u64 align = test_alignments[rand_range_u32(0, 3)];
-    arr.add(alloc.alloc(size, align));
-  }
-  Array<u32, TEST_SAMPLES> indices = {};
-  Loop(i, TEST_SAMPLES) indices.add(i);
-  for (u32 i = indices.count - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
-    Swap(indices[i], indices[j]);
-  }
-  Loop (i, TEST_SAMPLES) {
-    alloc.free(arr[indices[i]]);
-  }
-  arr.clear();
-  Loop (i, TEST_SAMPLES) {
-    u64 size = rand_range_u32(8, KB(1));
-    u64 align = test_alignments[rand_range_u32(0, 3)];
-    arr.add(alloc.alloc(size, align));
-  }
-  indices.clear();
-  Loop(i, TEST_SAMPLES) indices.add(i);
-  for (u32 i = indices.count - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
-    Swap(indices[i], indices[j]);
-  }
-  Loop (i, TEST_SAMPLES) {
-    alloc.free(arr[indices[i]]);
-  }
-}
-
-///////////////////////////////////
-// Containters
-
-intern void test_object_pool() {
-  Scratch scratch;
-  struct A {
-    u32 a;
-    u32 b;
-  };
-  ObjectPool<A> pool(scratch);
-  Array<A, TEST_SAMPLES> values = {};
-  Array<Handle<A>, TEST_SAMPLES> handlers = {};
-  Loop (i, TEST_SAMPLES) {
-    values[i].a = rand_range_u32(0, TEST_SAMPLES);
-    values[i].b = rand_range_u32(0, TEST_SAMPLES);
-  };
-  Loop (i, TEST_SAMPLES) {
-    handlers[i] = pool.add(values[i]);
-  }
-  Loop (i, TEST_SAMPLES) {
-    Assert(MemMatchStruct(&values[i], &pool.get(handlers[i])));
-  }
-  Array<u32, TEST_SAMPLES> indices = {};
-  Loop(i, TEST_SAMPLES) indices.add(i);
-  for (u32 i = indices.count - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
-    Swap(indices[i], indices[j]);
-  }
-  Loop (i, TEST_SAMPLES) {
-    pool.remove(handlers[i]);
-  }
-  indices.clear();
-  Loop (i, TEST_SAMPLES) {
-    values[i].a = rand_range_u32(0, TEST_SAMPLES);
-    values[i].b = rand_range_u32(0, TEST_SAMPLES);
-  };
-  Loop (i, TEST_SAMPLES) {
-    handlers[i] = pool.add(values[i]);
-  }
-  Loop (i, TEST_SAMPLES) {
-    Assert(MemMatchStruct(&values[i], &pool.get(handlers[i])));
-  }
-  Loop(i, TEST_SAMPLES) indices.add(i);
-  for (u32 i = indices.count - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
-    Swap(indices[i], indices[j]);
-  }
-  Loop (i, TEST_SAMPLES) {
-    pool.remove(handlers[i]);
-  }
-}
-
-intern void test_handle_darray() {
-  Scratch scratch;
-  struct A {
-    u32 a;
-    u32 b;
-  };
-  DarrayHandler<A> arr = {};
-  Array<A, TEST_SAMPLES> values = {};
-  Array<Handle<A>, TEST_SAMPLES> handlers = {};
-  Loop (i, TEST_SAMPLES) {
-    values[i].a = rand_range_u32(0, TEST_SAMPLES);
-    values[i].b = rand_range_u32(0, TEST_SAMPLES);
-  };
-  Loop (i, TEST_SAMPLES) {
-    handlers[i] = arr.add(values[i]);
-  }
-  Loop (i, TEST_SAMPLES) {
-    Assert(MemMatchStruct(&values[i], &arr.get(handlers[i])));
-  }
-  Array<u32, TEST_SAMPLES> indices = {};
-  Loop(i, TEST_SAMPLES) indices.add(i);
-  for (u32 i = indices.count - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
-    Swap(indices[i], indices[j]);
-  }
-  Loop (i, TEST_SAMPLES) {
-    arr.remove(handlers[i]);
-  }
-  indices.clear();
-  Loop (i, TEST_SAMPLES) {
-    values[i].a = rand_range_u32(0, TEST_SAMPLES);
-    values[i].b = rand_range_u32(0, TEST_SAMPLES);
-  };
-  Loop (i, TEST_SAMPLES) {
-    handlers[i] = arr.add(values[i]);
-  }
-  Loop (i, TEST_SAMPLES) {
-    Assert(MemMatchStruct(&values[i], &arr.get(handlers[i])));
-  }
-  Loop(i, TEST_SAMPLES) indices.add(i);
-  for (u32 i = indices.count - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
-    Swap(indices[i], indices[j]);
-  }
-  Loop (i, TEST_SAMPLES) {
-    arr.remove(handlers[i]);
-  }
-}
-
-intern void test_id_pool() {
-
-}
-
-void test() {
-  test_global_alloc();
-  test_arena_alloc();
-  test_arena_list_alloc();
-  test_seglist_alloc();
-  test_gpu_seglist_alloc();
-  test_object_pool();
-  test_handle_darray();
-  test_id_pool();
-}
-
-////////////////////////////////////////////////////////////////////////
 // Profiler
 
-struct ProfilerState {
-  ProfileAnchor anchors[KB(4)];
-  u32 anchors_count = 1;
-  u64 start_tsc;
-  u64 end_tsc;
-  u32 profiler_parent;
-  // Map<String, u32> map;
-  u32 hash_to_indices[KB(4)];
-
-  ProfileAnchor prev_anchors[4096];
-  u32 prev_anchors_count = 1;
-  u64 prev_tsc_elapsed;
-};
-
-static ProfilerState profiler_st;
-
 ProfileBlock::ProfileBlock(String label_, String func, String str_to_hash) {
-  ProfilerState& g = profiler_st;
+  ProfilerState& g = g_st->profiler;
   // b32 exists = false;
   // anchor_idx = *g.map.exists_or_add(str_to_hash, g.anchors_count, &exists);
   u32 idx = ModPow2(hash(str_to_hash, hash(func)), KB(4));
@@ -408,78 +183,384 @@ ProfileBlock::ProfileBlock(String label_, String func, String str_to_hash) {
     anchor_idx = g.anchors_count;
     ++g.anchors_count;
   }
-  parent_idx = profiler_st.profiler_parent;
-  ProfileAnchor* anchor = profiler_st.anchors + anchor_idx;
+  parent_idx = g.profiler_parent;
+  ProfileAnchor* anchor = g.anchors + anchor_idx;
   anchor->label = label_;
-  anchor->parent_idx = parent_idx;
   old_tsc_elapsed_inclusive = anchor->tsc_elapsed_inclusive;
-  profiler_st.profiler_parent = anchor_idx;
+  g.profiler_parent = anchor_idx;
   start_tsc = cpu_timer_now();
+
+  anchor->parent_idx = parent_idx;
+  anchor->tsc_start = start_tsc;
 }
 
 ProfileBlock::~ProfileBlock() {
-  ProfilerState& g = profiler_st;
-  u64 Elapsed = cpu_timer_now() - start_tsc;
+  ProfilerState& g = g_st->profiler;
+  u64 elapsed = cpu_timer_now() - start_tsc;
   g.profiler_parent = parent_idx;
-  ProfileAnchor* Parent = g.anchors + parent_idx;
-  ProfileAnchor* Anchor = g.anchors + anchor_idx;
-  Parent->tsc_elapsed_exclusive -= Elapsed;
-  Anchor->tsc_elapsed_exclusive += Elapsed;
-  Anchor->tsc_elapsed_inclusive = old_tsc_elapsed_inclusive + Elapsed;
-  ++Anchor->hit_count;
+  ProfileAnchor* parent = g.anchors + parent_idx;
+  ProfileAnchor* anchor = g.anchors + anchor_idx;
+  parent->tsc_elapsed_exclusive -= elapsed;
+  anchor->tsc_elapsed_exclusive += elapsed;
+  anchor->tsc_elapsed_inclusive = old_tsc_elapsed_inclusive + elapsed;
+  ++anchor->hit_count;
+
+  anchor->tsc_end = cpu_timer_now();
 }
 
-void profile_begin() {
-  ProfilerState& g = profiler_st;
-  g.start_tsc = cpu_timer_now();
+void profiler_begin() {
+  ProfilerState& g = g_st->profiler;
+  if (g.anchors_count == 0) {
+    g.anchors_count = 1;
+    g.prev_anchors_count = 1;
+  }
+  g.tsc_start = cpu_timer_now();
   MemZeroArray(g.anchors, g.anchors_count);
   MemZeroArray(g.hash_to_indices, g.anchors_count);
   g.anchors_count = 1;
   // g.map.clear();
 }
 
-void profile_end() {
-  ProfilerState& g = profiler_st;
-  g.end_tsc = cpu_timer_now();
-  g.prev_tsc_elapsed = g.end_tsc - g.start_tsc;
+void profiler_end() {
+  ProfilerState& g = g_st->profiler;
+  g.tsc_end = cpu_timer_now();
+  g.prev_tsc_elapsed = g.tsc_end - g.tsc_start;
+  g.prev_tsc_start = g.tsc_start;
+  g.prev_tsc_end = g.tsc_end;
   MemCopyArray(g.prev_anchors, g.anchors, g.anchors_count);
   g.prev_anchors_count = g.anchors_count;
 }
 
-Slice<ProfileAnchor> profile_get_anchors() {
-  if (g_was_hotreload) return {};
-  ProfilerState& g = profiler_st;
+Slice<ProfileAnchor> profiler_get_anchors() {
+  if (get_was_hotreload()) return {};
+  ProfilerState& g = g_st->profiler;
   return Slice(g.prev_anchors+1, g.prev_anchors_count-1);
 }
 
-u64 profile_get_tsc_elapsed() { return profiler_st.prev_tsc_elapsed; }
+u64 profiler_get_tsc_elapsed() { return g_st->profiler.prev_tsc_elapsed; }
 
-intern void print_time_elapsed(u64 total_tsc_elapsed, ProfileAnchor* anchor) {
-  Scratch scratch;
-  String label_c = push_str_copy(scratch, anchor->label);
-  f64 percent = 100.0 * ((f64)anchor->tsc_elapsed_exclusive / (f64)total_tsc_elapsed);
-  printf("  %s[%lu]: %lu (%.2f%%)", label_c.str, anchor->hit_count, anchor->tsc_elapsed_exclusive, percent);
-  if (anchor->tsc_elapsed_inclusive != anchor->tsc_elapsed_exclusive) {
-    f64 percent_with_children = 100.0 * ((f64)anchor->tsc_elapsed_inclusive / (f64)total_tsc_elapsed);
-    printf(", %.2f%% w/children", percent_with_children);
-  }
-  printf(")\n");
+ProfilerInfo profiler_get_info() {
+  ProfilerState& g = g_st->profiler;
+  ProfilerInfo info = {
+    .tsc_start = g.prev_tsc_start,
+    .tsc_end = g.prev_tsc_end,
+    .tsc_elapsed = g.prev_tsc_elapsed,
+  };
+  return info;
 }
 
-void end_and_print_profile() {
-  ProfilerState& g = profiler_st;
-  g.end_tsc = cpu_timer_now();
-  u64 cpu_freq = cpu_frequency();
-  u64 total_cpu_elapsed = g.end_tsc - g.start_tsc;
-  if (cpu_freq) {
-    printf("\nTotal time: %0.4fms (CPU freq %lu)\n", 1000.0 * (f64)total_cpu_elapsed / (f64)cpu_freq, cpu_freq);
-  }
-  Loop (anchor_idx, g.anchors_count) {
-    ProfileAnchor* anchor = g.anchors + anchor_idx;
-    if (anchor->tsc_elapsed_inclusive) {
-      print_time_elapsed(total_cpu_elapsed, anchor);
+u64 profiler_get_start_tsc() { return g_st->profiler.tsc_start; }
+u64 profiler_get_end_tsc() { return g_st->profiler.tsc_end; }
+
+////////////////////////////////////////////////////////////////////////
+// Watch
+
+void watch_add(String watch_name, void (**callback)()) {
+  WatchState& g = g_st->watch;
+  FileProperties props = os_file_path_properties(watch_name);
+  WatchFile file_watch = {
+    .path = watch_name,
+    .modified = props.modified,
+    .callback = callback,
+  };
+  g.watches.add(file_watch);
+}
+
+void watch_directory_add(String watch_name, void (**reload_callback)(String name), OS_WatchFlags flags) {
+  WatchState& g = g_st->watch;
+  String dir_path = push_strf(g.alloc, "%s", watch_name);
+  OS_Watch watch = os_watch_open(flags);
+  os_watch_attach(watch, dir_path);
+  WatchDirectory dir_watch = {
+    .path = dir_path,
+    .watch = watch,
+    .callback = reload_callback,
+  };
+  g.directories.add(dir_watch);
+}
+
+void watch_update() {
+  WatchState& g = g_st->watch;
+  Scratch scratch;
+  for (WatchFile& x : g.watches) {
+    FileProperties props = os_file_path_properties(x.path);
+    if (props.modified > x.modified) {
+      (*x.callback)();
+      x.modified = props.modified;
     }
   }
+  for (WatchDirectory x : g.directories) {
+    StringList list = os_watch_check(scratch, x.watch);
+    for (StringNode* node = list.first; node != null; node = node->next) {
+      (*x.callback)(node->string);
+    }
+  }
+}
+
+
+intern Texture texture_image_load(String filepath) {
+  Scratch scratch;
+  Texture texture = {};
+  u32 required_channel_count = 4;
+  u32 channel_count;
+  Buffer buf = os_file_path_read_all(scratch, filepath);
+  u8* data = stbi_load_from_memory(buf.data, buf.size, (i32*)&texture.width, (i32*)&texture.height, (i32*)&channel_count, required_channel_count);
+  Assert(data);
+  texture.data = data;
+  return texture;
+}
+
+////////////////////////////////////////////////////////////////////////
+// Common
+
+void asset_load() {
+  GlobalState& g = *g_st;
+#define X(enum_name, name) \
+  g.meshes_handlers[enum_name] = mesh_load(meshes_strs[enum_name]); \
+  g.str_to_mesh.add(Stringify(name), g.meshes_handlers[enum_name]);
+
+  MESH_LIST
+#undef X
+
+#define X(enum_name, name) \
+  g.textures_handlers[enum_name] = texture_load(textures_strs[enum_name]); \
+  g.str_to_texture.add(Stringify(name), g.textures_handlers[enum_name]);
+
+  TEXTURE_LIST
+#undef X
+
+  struct TakeMaterial { \
+    String name = "e_texture";
+    ShaderState state = shader_default_info();
+    MaterialProps props = material_default_props();
+    String texture = "container.jpg";
+    Handle<GpuTexture> texture_handle;
+    operator Material() {
+      return {
+        .shader = {
+          .name = name,
+          .state = state,
+        },
+        .props = props,
+        .texture = texture,
+        .texture_handle = texture_handle,
+      };
+    }
+  };
+#define X(enum_name, ...) \
+  { \
+    TakeMaterial mat = { \
+      __VA_ARGS__ \
+    }; \
+    Handle<GpuTexture>* texture_hanle = g.str_to_texture.get(mat.texture); \
+    if (texture_hanle) \
+      mat.texture_handle = *texture_hanle; \
+    g.materials_handlers[enum_name] = vk_material_load(mat); \
+  }
+  MATERIAL_LIST
+#undef X
+
+}
+
+String asset_base_path() { return g_st->asset_path; }
+
+Handle<GpuMesh> mesh_load(String name) {
+  GlobalState& g = *g_st;
+  Scratch scratch;
+  String filepath = push_strf(scratch, "%s/%s", g.models_dir, name);
+  String format = str_skip_last_dot(name);
+  Mesh mesh = {};
+  if (str_match(format, "glb")) {
+    mesh = mesh_load_glb(scratch, filepath);
+  } else if (str_match(format, "gltf")) {
+    mesh = mesh_load_gltf(scratch, filepath);
+  } else if (str_match(format, "obj")) {
+    mesh = mesh_load_obj(scratch, filepath);
+  } else {
+    InvalidPath;
+  }
+  Handle<GpuMesh> handle = vk_mesh_load(mesh);
+  return handle;
+}
+
+Handle<GpuTexture> texture_load(String name) {
+  GlobalState& g = *g_st;
+  Scratch scratch;
+  String filepath = push_strf(scratch, "%s/%s", g.textures_dir, name);
+  Texture texture = texture_image_load(filepath);
+  Handle<GpuTexture> handle = vk_texture_load(texture);
+  return handle;
+}
+
+Handle<GpuCubemap> cubemap_load(String name) {
+  GlobalState& g = *g_st;
+  Scratch scratch;
+  Texture textures[6];
+  String sides[] = {
+    "right", "left",
+    "top", "bottom",
+    "front", "back",
+  };
+  for EachElement(i, textures) {
+    String texture_name = push_strf(scratch, "%s/%s%s", name, sides[i], String(".png"));
+    String filepath = push_strf(scratch, "%s/%s", g.textures_dir, texture_name);
+    textures[i] = texture_image_load(filepath);
+  }
+  vk_cubemap_load(textures);
+  return {};
+}
+
+Timer timer_init(f32 interval) {
+  Timer timer = {
+    .interval = interval,
+  };
+  return timer;
+}
+
+b32 timer_tick(Timer& t) {
+  t.passed += g_st->dt;
+  if (t.passed >= t.interval) {
+    t.passed = 0;
+    return true;
+  }
+  return false;
+}
+
+void insert_sort(i32* arr, i32 size) {
+  for (i32 i = 1; i < size; ++i) {
+    i32 key = arr[i];
+    i32 j = i - 1;
+    while (j >= 0 && arr[j] > key) {
+      arr[j + 1] = arr[j];
+      j--;
+    }
+    arr[j + 1] = key;
+  }
+}
+
+static i32 partition(i32 *arr, i32 low, i32 high) {
+  i32 pivot = arr[high]; // choose last element as pivot
+  i32 i = low;           // place for next smaller element
+  for (i32 j = low; j < high; ++j) {
+    if (arr[j] < pivot) {
+      Swap(arr[i], arr[j]);
+      i++;
+    }
+  }
+  Swap(arr[i], arr[high]); // place pivot in correct position
+  return i;
+}
+
+void quick_sort(i32* arr, i32 low, i32 high) {
+  if (low < high) {
+    i32 p = partition(arr, low, high);
+    quick_sort(arr, low, p - 1);
+    quick_sort(arr, p + 1, high);
+  }
+}
+
+void common_init() {
+  GlobalState& g = *g_st;
+  global_allocator_init();
+  // test();
+  os_gfx_init();
+  estimate_cpu_frequency();
+  g.arena = arena_init();
+  g.asset_path = push_strf(g.arena, "%s/%s", os_get_current_directory(), String("../assets"));
+  g.shader_dir = push_str_cat(g.arena, asset_base_path(), "/shaders");
+  g.shader_compiled_dir = push_str_cat(g.arena, g.shader_dir, "/compiled");
+  g.models_dir = push_str_cat(g.arena, asset_base_path(), "/models");
+  g.textures_dir = push_str_cat(g.arena, asset_base_path(), "/textures");
+  watch_directory_add(g.shader_dir, &g.callback_shader_compile);
+  watch_directory_add(g.shader_compiled_dir, &g.callback_shader_compile);
+  g.transforms = push_array(g.arena, Transform, MaxEntities);
+  g.static_transforms = push_array(g.arena, Transform, MaxStaticEntities);
+#if BUILD_DEBUG
+  g.generations = push_array(g.arena, u32, MaxEntities);
+  g.static_generations = push_array(g.arena, u32, MaxStaticEntities);
+#endif
+  g.vk_st = vk_init();
+  imgui_init();
+  g.game_st = game_init();
+}
+
+shared_function void common_update(HotReloadData* data) {
+  Scratch scratch;
+
+if (data->ctx == null) {
+    Arena arena = arena_init();
+    data->ctx = push_struct_zero(arena, GlobalState);
+    g_st = (GlobalState*)data->ctx;
+    g_st->arena = arena;
+    common_init();
+    global_st_update_callback();
+#if HOTRELOAD_BUILD
+    GlobalState& g = *g_st;
+    watch_add(data->lib, &g.callback_should_reload);
+#endif
+  }
+  if (data->was_hotreload) {
+    g_st = (GlobalState*)data->ctx;
+    GlobalState& g = *g_st;
+    g.should_hotreload = false;
+    data->was_hotreload = false;
+
+    global_st_update_callback();
+
+    game_hotreload(g.game_st);
+    vk_hotreload(g.vk_st);
+  }
+
+  GlobalState& g = *g_st;
+
+  u64 target_fps = Billion(1) / 60;
+  u64 last_time = os_now_ns();
+  Timer timer = timer_init(1);
+
+  while (!os_window_should_close()) {
+    if (g_st->should_hotreload) {
+      data->was_hotreload = true;
+      goto hotreload;
+    }
+
+    profiler_begin();
+    {TimeBlock("frame");
+    os_pump_messages();
+    u64 start_time = os_now_ns();
+    g.dt = f32(start_time - last_time) / Billion(1);
+    g.time += g.dt;
+    last_time = start_time;
+    {
+      // TimeBlock("main");
+
+    // Main logic
+    vk_begin_draw_frame();
+    ui_begin();
+    game_update();
+    ui_end();
+    vk_end_draw_frame();
+    os_input_update();
+    watch_update();
+    }
+
+    u64 frame_duration = os_now_ns() - start_time;
+    if (frame_duration < target_fps) {
+      u64 sleep_time = target_fps - frame_duration;
+      os_sleep_ms(sleep_time / Million(1));
+    }
+    if (timer_tick(timer)) {
+      Info("Frame rate: %f, %f fps", g.dt, 1/g.dt);
+    }
+    }
+    profiler_end();
+  }
+
+  // deinit
+  // vk_shutdown();
+  // os_gfx_shutdown();
+  os_exit(0);
+
+  hotreload:
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -575,872 +656,3 @@ b32 json_iter_array(JsonReader* r, JsonValue arr, JsonValue* val) {
   if (val->type == JsonType_Error || val->type == JsonType_End) { return false; }
   return true;
 }
-
-////////////////////////////////////////////////////////////////////////
-// Asset watcher
-
-struct FileWatch {
-  String path;
-  DenseTime modified;
-  void (*callback)();
-};
-
-struct DirectoryWatch {
-  String path;
-  OS_Watch watch;
-  void (*callback)(String name);
-};
-
-struct AssetWatchState {
-  Allocator alloc;
-  Array<FileWatch, 128> watches;
-  Array<DirectoryWatch, 128> directories;
-};
-
-global AssetWatchState asset_watch_st;
-
-void asset_watch_init(Allocator alloc) {
-  asset_watch_st.alloc = alloc;
-}
-
-void asset_watch_add(String watch_name, void (*callback)()) {
-  FileProperties props = os_file_path_properties(watch_name);
-  FileWatch file_watch = {
-    .path = watch_name,
-    .modified = props.modified,
-    .callback = callback,
-  };
-  asset_watch_st.watches.add(file_watch);
-}
-
-void asset_watch_directory_add(String watch_name, OS_WatchFlags flags, void (*reload_callback)(String name)) {
-  String dir_path = push_strf(asset_watch_st.alloc, "%s", watch_name);
-  OS_Watch watch = os_watch_open(flags);
-  os_watch_attach(watch, dir_path);
-  DirectoryWatch dir_watch = {
-    .path = dir_path,
-    .watch = watch,
-    .callback = reload_callback,
-  };
-  asset_watch_st.directories.add(dir_watch);
-}
-
-void asset_watch_update() {
-  Scratch scratch;
-  g_was_hotreload = false;
-  for (FileWatch& x : asset_watch_st.watches) {
-    FileProperties props = os_file_path_properties(x.path);
-    if (props.modified > x.modified) {
-      x.callback();
-      x.modified = props.modified;
-      g_was_hotreload = true;
-    }
-  }
-  for (DirectoryWatch x : asset_watch_st.directories) {
-    StringList list = os_watch_check(scratch, x.watch);
-    for (StringNode* node = list.first; node != null; node = node->next) {
-      x.callback(node->string);
-    }
-  }
-}
-
-////////////////////////////////////////////////////////////////////////
-// Loaders
-
-intern Mesh mesh_load_obj(Allocator arena, String name) {
-  Scratch scratch(arena);
-  Darray<v3> positions(scratch);
-  Darray<v3> normals(scratch);
-  Darray<v2> uvs(scratch);
-  Darray<v3u> indexes(scratch);
-  Buffer buf = os_file_path_read_all(scratch, name);
-  Lexer lexer = lexer_init({buf.data, buf.size});
-  String word;
-  while ((word = lexer_next_token(&lexer)).size) {
-    // vert
-    if (str_match(word, "v")) {
-      v3 v = {};
-      for (f32& e : v.e) {
-        e = f32_from_str(lexer_next_token(&lexer));
-      }
-      // Info("v %f, %f, %f", v.x, v.y, v.z);
-      positions.add(v);
-    }
-    // norm
-    else if (str_match(word, "vn")) {
-      v3 v = {};
-      for (f32& e : v.e) {
-        e = f32_from_str(lexer_next_token(&lexer));
-      }
-      // Info("vn %f, %f, %f", v.x, v.y, v.z);
-      normals.add(v);
-    }
-    // uv
-    else if (str_match(word, "vt")) {
-      v2 v = {};
-      for (f32& e : v.e) {
-        e = f32_from_str(lexer_next_token(&lexer));
-      }
-      // Info("vt %f, %f", v.x, v.y);
-      uvs.add(v);
-    }
-    // indexes
-    else if (str_match(word, "f")) {
-      Loop (i, 3) {
-        v3u raw = {};
-        for (u32& e : raw.e) {
-          e = u32_from_str(lexer_next_integer(&lexer)) - 1;
-        }
-        v3u v = {raw.x, raw.z, raw.y};
-        // Info("%i, %i, %i", v.x, v.y, v.z);
-        indexes.add(v);
-      }
-    }
-  }
-  Darray<Vertex> vertices(arena);
-  Darray<u32> final_indices(arena);
-  Map<Vertex, u32> map(scratch);
-  for (v3u idx : indexes) {
-    Vertex vertex = {
-      .pos = positions[idx.x],
-      .norm = normals[idx.y],
-      .uv = uvs[idx.z],
-    };
-    u32* found = map.get(vertex);
-    if (found) {
-      final_indices.add(*found);
-    } else {
-      u32 new_index = vertices.count;
-      vertices.add(vertex);
-      final_indices.add(new_index);
-      map.add(vertex, new_index);
-    }
-  }
-  Mesh mesh = {
-    .vertices = vertices.data,
-    .indices = final_indices.data,
-    .vert_count = vertices.count,
-    .index_count = final_indices.count,
-  };
-  return mesh;
-}
-
-intern Mesh mesh_load_gltf(Allocator arena, String name) {
-  Scratch scratch(arena);
-  Buffer buf = os_file_path_read_all(scratch, name);
-  JsonReader r = json_reader_init({buf.data, buf.size});
-  struct MeshInfo {
-    // u32 pos_idx;
-    // u32 norm_idx;
-    // u32 uv_idx;
-    // u32 indices_idx;
-    // b32 arr[10];
-    // u32 vert_count[10];
-    u32 vert_count;
-    u32 index_count;
-    Range ranges[10];
-    String file_name;
-    u32 file_size;
-  } info = {};
-  // Parsing json
-  JSON_OBJ(r, r.base_obj) {
-  //   if (k.match("meshes")) {
-  //     JSON_ARR(r, v) JSON_OBJ(r, obj) {
-  //       if (k.match("primitives")) {
-  //         u32 i = 0;
-  //         JSON_ARR(r, v) JSON_OBJ(r, obj) {
-  //           if (k.match("attributes")) {
-  //             JSON_OBJ_(r, v) {
-  //               if (key.match("POSITION")) {
-  //                 info.pos_idx = i;
-  //                 // info.arr[i] = true;
-  //               }
-  //               else if (key.match("NORMAL")) {
-  //                 info.norm_idx = i;
-  //                 // info.arr[i] = true;
-  //               }
-  //               else if (key.match("TEXCOORD_0")) {
-  //                 info.uv_idx = i;
-  //                 // info.arr[i] = true;
-  //               }
-  //               ++i;
-  //             }
-  //           }
-  //           else if (k.match("indices")) {
-  //             info.indices_idx = i;
-  //             // info.arr[i] = true;
-  //           }
-  //         }
-  //       }
-  //     }
-  //   }
-    if (k.match("accessors")) {
-      u32 i = 0;
-      JSON_ARR(r, v) {
-        JSON_OBJ(r, obj) {
-          if (k.match("count")) {
-            if (i == 0) {
-              info.vert_count = u32_from_str(v.str);
-            }
-            else if (i == 3) {
-              info.index_count = u32_from_str(v.str);
-            }
-          }
-        }
-        ++i;
-      }
-    }
-    else if (k.match("bufferViews")) {
-      u32 i = 0;
-      JSON_ARR(r, v) {
-        JSON_OBJ(r, obj) {
-          if (k.match("byteLength")) {
-            info.ranges[i].size = u32_from_str(v.str);
-          }
-          else if (k.match("byteOffset")) {
-            info.ranges[i].offset = u32_from_str(v.str);
-          }
-        }
-        ++i;
-      }
-    }
-    else if (k.match("buffers")) {
-      JSON_ARR(r, v) {
-        JSON_OBJ(r, obj) {
-          if (k.match("byteLength")) {
-            info.file_size = u32_from_str(v.str);
-          }
-          else if (k.match("uri")) {
-            info.file_name = v.str;
-          }
-        }
-      }
-    }
-  }
-  String model_dir = str_chop_last_slash(name);
-  Buffer buff1 = os_file_path_read_all(scratch, push_strf(scratch, "%s/%s", model_dir, info.file_name));
-  v3* vertices_pos = (v3*)Offset(buff1.data, info.ranges[0].offset);
-  v3* vertices_norm = (v3*)Offset(buff1.data, info.ranges[1].offset);
-  v2* vertices_uv = (v2*)Offset(buff1.data, info.ranges[2].offset);
-  u16* vertices_indices = (u16*)Offset(buff1.data, info.ranges[3].offset);
-  Vertex* vertices = push_array(arena, Vertex, info.vert_count);
-  u32* indices = push_array(arena, u32, info.index_count);
-  Loop (i, info.index_count) {
-    indices[i] = vertices_indices[i];
-  }
-  Loop (i, info.vert_count) {
-    vertices[i] = {
-      .pos = vertices_pos[i],
-      .norm = vertices_norm[i],
-      .uv = vertices_uv[i],
-    };
-  }
-  Mesh mesh = {
-    .vertices = vertices,
-    .indices = (u32*)indices,
-    .vert_count = info.vert_count,
-    .index_count = info.index_count,
-  };
-  return mesh;
-}
-
-intern Mesh mesh_load_glb(Allocator arena, String name) {
-  Scratch scratch(arena);
-  Buffer buf = os_file_path_read_all(scratch, name);
-  struct FileHeader {
-    u32 magic;
-    u32 version;
-    u32 length;
-  };
-  struct Chunk {
-    u32 chunk_length;
-    u32 chunk_type;
-    u32 chunk_data;
-  };
-  FileHeader* header = (FileHeader*)buf.data;
-  Assert(str_match(String((u8*)&header->magic, 4), "glTF"));
-  Chunk* json_chunk = (Chunk*)Offset(header, sizeof(FileHeader));
-  Assert(str_match(String((u8*)&json_chunk->chunk_type, 4), "JSON"));
-  Chunk* bin_chunk = (Chunk*)Offset(json_chunk, sizeof(Chunk)-4 + json_chunk->chunk_length);
-  Assert(str_match(String((u8*)&bin_chunk->chunk_type, 3), "BIN"));
-  struct Accessor{
-    u32 count;
-  };
-  struct Primitives {
-    u32 pos;
-    u32 norm;
-    u32 uv;
-    u32 index;
-  };
-  struct MeshInfo {
-    Accessor accessors[10];
-    Range buffer_views[10];
-    Primitives primitives;
-    String file_name;
-    u32 file_size;
-  } info = {};
-  JsonReader r = json_reader_init({(u8*)&json_chunk->chunk_data, buf.size});
-  JSON_OBJ(r, r.base_obj) {
-    if (k.match("meshes")) {
-      JSON_ARR(r, v) JSON_OBJ(r, obj) {
-        if (k.match("primitives")) {
-          JSON_ARR(r, v) JSON_OBJ(r, obj) {
-            if (k.match("attributes")) {
-              JSON_OBJ_(r, v) {
-                if (key.match("POSITION")) {
-                  info.primitives.pos = u32_from_str(val.str);
-                }
-                else if (key.match("NORMAL")) {
-                  info.primitives.norm = u32_from_str(val.str);
-                }
-                else if (key.match("TEXCOORD_0")) {
-                  info.primitives.uv = u32_from_str(val.str);
-                }
-              }
-            }
-            else if (k.match("indices")) {
-              info.primitives.index = u32_from_str(v.str);
-            }
-          }
-        }
-      }
-    }
-    if (k.match("accessors")) {
-      u32 i = 0;
-      JSON_ARR(r, v) {
-        JSON_OBJ(r, obj) {
-          if (k.match("count")) {
-            info.accessors[i].count = u32_from_str(v.str);
-          }
-        }
-        ++i;
-      }
-    }
-    else if (k.match("bufferViews")) {
-      u32 i = 0;
-      JSON_ARR(r, v) {
-        JSON_OBJ(r, obj) {
-          if (k.match("byteLength")) {
-            info.buffer_views[i].size = u32_from_str(v.str);
-          }
-          else if (k.match("byteOffset")) {
-            info.buffer_views[i].offset = u32_from_str(v.str);
-          }
-        }
-        ++i;
-      }
-    }
-    else if (k.match("buffers")) {
-      JSON_ARR(r, v) {
-        JSON_OBJ(r, obj) {
-          if (k.match("byteLength")) {
-            info.file_size = u32_from_str(v.str);
-          }
-          else if (k.match("uri")) {
-            info.file_name = v.str;
-          }
-        }
-      }
-    }
-  }
-  u8* data = (u8*)&bin_chunk->chunk_data;
-  v3* vertices_pos = (v3*)Offset(data, info.buffer_views[info.primitives.pos].offset);
-  v3* vertices_norm = (v3*)Offset(data, info.buffer_views[info.primitives.norm].offset);
-  v2* vertices_uv = (v2*)Offset(data, info.buffer_views[info.primitives.uv].offset);
-  u16* vertices_indices = (u16*)Offset(data, info.buffer_views[info.primitives.index].offset);
-  u32 vertex_count = info.accessors[info.primitives.pos].count;
-  u32 index_count = info.accessors[info.primitives.index].count;
-  Vertex* vertices = push_array(arena, Vertex, vertex_count);
-  u32* indices = push_array(arena, u32, index_count);
-  Loop (i, index_count) {
-    indices[i] = vertices_indices[i];
-  }
-  Loop (i, vertex_count) {
-    vertices[i] = {
-      .pos = vertices_pos[i],
-      .norm = vertices_norm[i],
-      .uv = vertices_uv[i],
-    };
-  }
-  Mesh mesh = {
-    .vertices = vertices,
-    .indices = indices,
-    .vert_count = vertex_count,
-    .index_count = index_count,
-  };
-  return mesh;
-}
-
-intern Texture texture_image_load(String filepath) {
-  Scratch scratch;
-  Texture texture = {};
-  u32 required_channel_count = 4;
-  u32 channel_count;
-  Buffer buf = os_file_path_read_all(scratch, filepath);
-  u8* data = stbi_load_from_memory(buf.data, buf.size, (i32*)&texture.width, (i32*)&texture.height, (i32*)&channel_count, required_channel_count);
-  Assert(data);
-  texture.data = data;
-  return texture;
-}
-
-////////////////////////////////////////////////////////////////////////
-// Common
-
-struct CommonState {
-  Arena arena;
-  String asset_path;
-  String shader_dir;
-  String shader_compiled_dir;
-  String models_dir;
-  String textures_dir;
-  Map<String, Handle<GpuTexture>> str_to_texture;
-  Map<String, Handle<GpuMesh>> str_to_mesh;
-  Map<String, Handle<GpuMaterial>> str_to_material;
-};
-
-global CommonState common_st;
-
-void foo__();
-void profiler_foo();
-void common_init() {
-  estimate_cpu_frequency();
-  profiler_foo();
-  Scratch scratch;
-  // foo();
-  {
-    CommonState& st = common_st;
-    st.arena = arena_init();
-    st.asset_path = push_strf(st.arena, "%s/%s", os_get_current_directory(), String("../assets"));
-    st.shader_dir = push_str_cat(st.arena, asset_base_path(), "/shaders");
-    st.shader_compiled_dir = push_str_cat(st.arena, st.shader_dir, "/compiled");
-    st.models_dir = push_str_cat(st.arena, asset_base_path(), "/models");
-    st.textures_dir = push_str_cat(st.arena, asset_base_path(), "/textures");
-  }
-  {
-    asset_watch_directory_add(common_st.shader_dir, OS_WatchFlag_Modify, [](String name) {
-      Scratch scratch;
-      String shader_filepath = push_strf(scratch, "%s/%s", common_st.shader_dir, name);
-      String shader_compiled_filepath = push_strf(scratch, "%s/%s%s", common_st.shader_compiled_dir, name, String(".spv"));
-      StringList list = {};
-      str_list_push(scratch, &list, "glslangValidator");
-      str_list_push(scratch, &list, "-V");
-      str_list_push(scratch, &list, shader_filepath);
-      str_list_push(scratch, &list, "-o");
-      str_list_push(scratch, &list, shader_compiled_filepath);
-      os_process_launch(list);
-    });
-    asset_watch_directory_add(common_st.shader_compiled_dir, OS_WatchFlag_Modify, [](String name) {
-      Scratch scratch;
-      String shader_name_with_format = str_chop_last_dot(name);
-      String shader_name = str_chop_last_dot(shader_name_with_format);
-      vk_shader_reload(shader_name);
-    });
-  }
-  entity_soa.transforms = push_array(common_st.arena, Transform, MaxEntities);
-  entity_soa.static_transforms = push_array(common_st.arena, Transform, MaxStaticEntities);
-  DebugDo(
-    entity_soa.generations = push_array(common_st.arena, u32, MaxEntities);
-    entity_soa.static_generations = push_array(common_st.arena, u32, MaxStaticEntities);
-  )
-  vk_init();
-  imgui_init();
-}
-
-void asset_load() {
-#define X(enum_name, name) \
-  meshes_handlers[enum_name] = mesh_load(meshes_strs[enum_name]); \
-  common_st.str_to_mesh.add(Stringify(name), meshes_handlers[enum_name]);
-
-  MESH_LIST
-#undef X
-
-#define X(enum_name, name) \
-  textures_handlers[enum_name] = texture_load(textures_strs[enum_name]); \
-  common_st.str_to_texture.add(Stringify(name), textures_handlers[enum_name]);
-
-  TEXTURE_LIST
-#undef X
-
-  struct TakeMaterial { \
-    String name = "e_texture";
-    ShaderState state = shader_default_info();
-    MaterialProps props = material_default_props();
-    String texture = "container.jpg";
-    Handle<GpuTexture> texture_handle;
-    operator Material() {
-      return {
-        .shader = {
-          .name = name,
-          .state = state,
-        },
-        .props = props,
-        .texture = texture,
-        .texture_handle = texture_handle,
-      };
-    }
-  };
-#define X(enum_name, ...) \
-  { \
-    TakeMaterial mat = { \
-      __VA_ARGS__ \
-    }; \
-    Handle<GpuTexture>* texture_hanle = common_st.str_to_texture.get(mat.texture); \
-    if (texture_hanle) \
-      mat.texture_handle = *texture_hanle; \
-    materials_handlers[enum_name] = vk_material_load(mat); \
-  }
-  MATERIAL_LIST
-#undef X
-
-}
-
-String asset_base_path() {
-  return common_st.asset_path;
-}
-
-Handle<GpuMesh> mesh_load(String name) {
-  Scratch scratch;
-  String filepath = push_strf(scratch, "%s/%s", common_st.models_dir, name);
-  String format = str_skip_last_dot(name);
-  Mesh mesh = {};
-  if (str_match(format, "glb")) {
-    mesh = mesh_load_glb(scratch, filepath);
-  } else if (str_match(format, "gltf")) {
-    mesh = mesh_load_gltf(scratch, filepath);
-  } else if (str_match(format, "obj")) {
-    mesh = mesh_load_obj(scratch, filepath);
-  } else {
-    InvalidPath;
-  }
-  Handle<GpuMesh> handle = vk_mesh_load(mesh);
-  return handle;
-}
-
-// Handle<GpuShader> shader_load(Shader shader) {
-  // // Handle<GpuShader> handle = vk_shader_load(shader);
-  // ShaderReloadInfo reload_info = {shader, handle};
-  // common_st.shader_reload_map.add(shader.name, reload_info);
-  // return handle;
-// }
-
-Handle<GpuTexture> texture_load(String name) {
-  Scratch scratch;
-  String filepath = push_strf(scratch, "%s/%s", common_st.textures_dir, name);
-  Texture texture = texture_image_load(filepath);
-  Handle<GpuTexture> handle = vk_texture_load(texture);
-  return handle;
-}
-
-Handle<GpuCubemap> cubemap_load(String name) {
-  Scratch scratch;
-  Texture textures[6];
-  String sides[] = {
-    "right", "left",
-    "top", "bottom",
-    "front", "back",
-  };
-  for EachElement(i, textures) {
-    String texture_name = push_strf(scratch, "%s/%s%s", name, sides[i], String(".png"));
-    String filepath = push_strf(scratch, "%s/%s", common_st.textures_dir, texture_name);
-    textures[i] = texture_image_load(filepath);
-  }
-  vk_cubemap_load(textures);
-  return {};
-}
-
-Timer timer_init(f32 interval) {
-  Timer timer = {
-    .interval = interval,
-  };
-  return timer;
-}
-
-b32 timer_tick(Timer& t) {
-  t.passed += g_dt;
-  if (t.passed >= t.interval) {
-    t.passed = 0;
-    return true;
-  }
-  return false;
-}
-
-void insert_sort(i32* arr, i32 size) {
-  for (i32 i = 1; i < size; ++i) {
-    i32 key = arr[i];
-    i32 j = i - 1;
-    while (j >= 0 && arr[j] > key) {
-      arr[j + 1] = arr[j];
-      j--;
-    }
-    arr[j + 1] = key;
-  }
-}
-
-static i32 partition(i32 *arr, i32 low, i32 high) {
-  i32 pivot = arr[high]; // choose last element as pivot
-  i32 i = low;           // place for next smaller element
-  for (i32 j = low; j < high; ++j) {
-    if (arr[j] < pivot) {
-      Swap(arr[i], arr[j]);
-      i++;
-    }
-  }
-  Swap(arr[i], arr[high]); // place pivot in correct position
-  return i;
-}
-
-void quick_sort(i32* arr, i32 low, i32 high) {
-  if (low < high) {
-    i32 p = partition(arr, low, high);
-    quick_sort(arr, low, p - 1);
-    quick_sort(arr, p + 1, high);
-  }
-}
-
-struct Transform1 {
-  v3 pos;
-  // v3 arr[2];
-};
-
-void thread_pool_init(i32 num_threads);
-void task_queue_push(Task t);
-u32 task_queue_count();
-
-struct TransformTask {
-  Transform1* transforms;
-  u32* idx_arr;       // optional for random access
-  u64 count;
-  v3* out_sum;        // where the thread accumulates
-  b32 use_random;
-};
-
-void transform_task_func(void* arg) {
-  TransformTask* t = (TransformTask*)arg;
-  v3 sum = {0, 0, 0};
-  if (t->use_random) {
-    for (u64 i = 0; i < t->count; ++i) {
-      sum += t->transforms[t->idx_arr[i]].pos;
-    }
-  }
-  else {
-    for (u64 i = 0; i < t->count; ++i) {
-      sum += t->transforms[i].pos;
-    }
-  }
-  // store result (safe if each thread writes to its own slot)
-  *t->out_sum = sum;
-}
-
-void foo__() {
-  Scratch scratch;
-  thread_pool_init(4);
-
-  u64 cpu_frequ = cpu_frequency();
-  Info("%.2f Ghz/s cpu frequency", (f64)cpu_frequ / Billion(1));
-  #define IterationNum (MB(10))
-  #define NUM_THREADS 4
-  #define IterationChunk (IterationNum / NUM_THREADS)
-  #define SIZE (IterationNum * sizeof(Transform1))
-  #define USEFUL_SIZE (IterationNum * sizeof(v3))
-  Info("%.2f mb Memory size", (f64)SIZE / MB(1));
-
-  u8* idx_buf = os_reserve(IterationNum*sizeof(u32));
-  os_commit(idx_buf, IterationNum*sizeof(u32));
-  u8* buf = os_reserve(SIZE);
-  os_commit(buf, SIZE);
-
-  u32* idx_arr = (u32*)idx_buf;
-  Loop(i, IterationNum) {
-    idx_arr[i] = i;
-  }
-  for (u32 i = IterationNum - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
-    Swap(idx_arr[i], idx_arr[j]);
-  }
-  Transform1* transforms = (Transform1*)buf;
-  Loop (i, IterationNum) {
-    transforms[i].pos = v3_rand_range(v3_scale(-10), v3_scale(10));
-  }
-
-#if 0
-  Loop (i, 1) {
-    u64 now = cpu_timer_now();
-    v3 vec_res = {};
-    Loop (i, IterationNum) {
-      vec_res += transforms[i].pos;
-    }
-    u64 end = cpu_timer_now();
-    f64 seconds = f64(end-now) / cpu_frequ;
-    f64 bandwidth_gb = SIZE / seconds / GB(1);
-    f64 useful_bandwidth_gb = USEFUL_SIZE / seconds / GB(1);
-    Info("%.2f GB/s", bandwidth_gb);
-    Info("%.2f useful GB/s", useful_bandwidth_gb);
-    Info("%f took sec", seconds);
-    Info("%f %f %f\n\n", vec_res.x, vec_res.y, vec_res.z);
-  }
-  Info("------------- RANDOM ACCESS");
-  Loop (i, 1) {
-    u64 now = cpu_timer_now();
-    v3 vec_res = {};
-    Loop (i, IterationNum) {
-      vec_res += transforms[idx_arr[i]].pos;
-    }
-    u64 end = cpu_timer_now();
-    f64 seconds = f64(end-now) / cpu_frequ;
-    f64 bandwidth_gb = SIZE / seconds / GB(1);
-    f64 useful_bandwidth_gb = USEFUL_SIZE / seconds / GB(1);
-    Info("%.2f GB/s", bandwidth_gb);
-    Info("%.2f useful GB/s", useful_bandwidth_gb);
-    Info("%f took sec", seconds);
-    Info("%f %f %f\n\n", vec_res.x, vec_res.y, vec_res.z);
-  }
-#else
-
-  Loop (k, 2) {
-    Info("---------------- LINEAR ACCESS");
-    Loop (m, 2) {
-      u64 now = cpu_timer_now();
-      v3 thread_sums[NUM_THREADS] = {};
-      TransformTask trans_tasks[NUM_THREADS] = {};
-      Task tasks[NUM_THREADS] = {};
-      Loop (i, NUM_THREADS) {
-        trans_tasks[i] = {
-          .transforms = transforms + i*IterationChunk,
-          .idx_arr = idx_arr + i*IterationChunk,
-          .count = IterationChunk,
-          .out_sum = &thread_sums[i],
-          .use_random = false,
-        };
-        tasks[i] = {
-          .func = transform_task_func,
-          .arg = &trans_tasks[i],
-        };
-        task_queue_push(tasks[i]);
-      }
-      while (true) {
-        if (task_queue_count() == 0) {
-          break;
-        }
-        os_sleep_ms(5);
-      }
-      u64 end = cpu_timer_now();
-      f64 seconds = f64(end-now) / cpu_frequ;
-      f64 bandwidth_gb = SIZE / seconds / GB(1);
-      f64 useful_bandwidth_gb = USEFUL_SIZE / seconds / GB(1);
-      Info("%.2f GB/s", bandwidth_gb);
-      Info("%.2f useful GB/s", useful_bandwidth_gb);
-      Info("%f took sec", seconds);
-      v3 vec_res = {};
-      Loop (i, NUM_THREADS) {
-        vec_res += thread_sums[i];
-      }
-      Info("%f %f %f\n\n", vec_res.x, vec_res.y, vec_res.z);
-    }
-
-    Info("---------------- RANDOM ACCESS");
-    Loop (m, 2) {
-      u64 now = cpu_timer_now();
-      v3 thread_sums[NUM_THREADS] = {};
-      TransformTask trans_tasks[NUM_THREADS] = {};
-      Task tasks[NUM_THREADS] = {};
-      Loop (i, NUM_THREADS) {
-        trans_tasks[i] = {
-          .transforms = transforms,
-          .idx_arr = idx_arr + i*IterationChunk,
-          .count = IterationChunk,
-          .out_sum = &thread_sums[i],
-          .use_random = true,
-        };
-        tasks[i] = {
-          .func = transform_task_func,
-          .arg = &trans_tasks[i],
-        };
-        task_queue_push(tasks[i]);
-      }
-      while (true) {
-        if (task_queue_count() == 0) {
-          break;
-        }
-      }
-      u64 end = cpu_timer_now();
-      f64 seconds = f64(end-now) / cpu_frequ;
-      f64 bandwidth_gb = SIZE / seconds / GB(1);
-      f64 useful_bandwidth_gb = USEFUL_SIZE / seconds / GB(1);
-      Info("%.2f GB/s", bandwidth_gb);
-      Info("%.2f useful GB/s", useful_bandwidth_gb);
-      Info("%f took sec", seconds);
-      v3 vec_res = {};
-      Loop (i, NUM_THREADS) {
-        vec_res += thread_sums[i];
-      }
-      Info("%f %f %f\n\n", vec_res.x, vec_res.y, vec_res.z);
-    }
-  }
-
-
-#endif
-
-  os_exit(0);
-  
-  // u8* 
-
-  // i32 arr[] = {5, 2, 9, 1, 5, 6};
-  // i32 n = sizeof(arr)/sizeof(arr[0]);
-  // for (var i : arr) {
-  //   print("%i ", i);
-  // }
-  // quick_sort(arr, 0, n - 1);
-  // print("\n");
-  // for (var i : arr) {
-  //   print("%i ", i);
-  // }
-
-  // RingBuffer ring = {
-  //   .base = push_buffer(scratch, KB(1)),
-  //   .size = KB(1),
-  // };
-  // u64 size = 128;
-  // u8* buf0 = push_buffer(scratch, size);
-  // Loop (i, size) { buf0[i] = 0; }
-  // u8* buf1 = push_buffer(scratch, size);
-  // ring_write(ring, buf0, size);
-  // ring_read(ring, buf1, size);
-  // Loop (i, size) { Info("%i", buf1[i]); }
-
-  // ring_read(ring, Slice(buf0, size));
-
-}
-
-void profiler_bar() {
-  TimeFunction;
-  {
-  TimeBlock("block in bar");
-  os_sleep_ms(1);
-  }
-  os_sleep_ms(2);
-}
-
-void profiler_der() {
-  TimeFunction;
-  os_sleep_ms(10);
-}
-
-void profiler_die(i32 i) {
-  TimeFunction;
-  os_sleep_ms(1);
-  if (--i) {
-    profiler_die(i);
-  }
-}
-
-void profiler_foo() {
-  profile_begin();
-  profiler_bar();
-  profiler_bar();
-  profiler_der();
-  profiler_die(10);
-  end_and_print_profile();
-  // os_exit(0);
-}
-
-

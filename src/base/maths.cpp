@@ -147,6 +147,9 @@ f32 rand_range_f32(f32 min, f32 max)  { return rand_f32_01()*(max - min) + min ;
 b32 rand_b32()                        { return rand_u32() % 2; }
 void rand_seed()                      { _seed = cpu_timer_now(); }
 
+f32 inverse_lerp(f32 a, f32 x, f32 b) { return (x - a) / (b - a); }
+f64 inverse_lerp_f64(f64 a, f64 x, f64 b) { return (x - a) / (b - a); }
+
 ////////////////////////////////////////////////////////////////////////
 // Vector2
 

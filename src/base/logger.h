@@ -16,10 +16,10 @@ enum LogLevel {
   LogLevel_Error,
 };
 
-KAPI void _log_output(LogLevel level, String fmt, ...); // with \n
-KAPI void _log_output(Allocator arena, LogLevel level, String fmt, ...);
-KAPI void print(String fmt, ...);
-KAPI void println(String fmt, ...);
+void _log_output(LogLevel level, String fmt, ...); // with \n
+void _log_output(Allocator arena, LogLevel level, String fmt, ...);
+void print(String fmt, ...);
+void println(String fmt, ...);
 
 #if LOG_TRACE_ENABLED
   #define Trace(message, ...) _log_output(LogLevel_Trace, message, ##__VA_ARGS__)

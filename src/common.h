@@ -30,6 +30,10 @@ struct GpuShader;
 struct GpuMaterial;
 struct GpuCubemap;
 
+f32 get_dt();
+f32 get_time();
+f32 get_was_hotreload();
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // vk.cpp
 
@@ -121,46 +125,32 @@ struct Material {
   // Handle<GpuTexture> texture3;
 };
 
-void vk_init();
+void* vk_init();
 void vk_shutdown();
+void vk_hotreload(void* ctx);
 
-KAPI Handle<GpuTexture> vk_texture_load(Texture texture);
-KAPI Handle<GpuMaterial> vk_material_load(Material material);
-KAPI Handle<GpuCubemap> vk_cubemap_load(Texture* textures);
-KAPI Handle<GpuMesh> vk_mesh_load(Mesh mesh);
+Handle<GpuTexture> vk_texture_load(Texture texture);
+Handle<GpuMaterial> vk_material_load(Material material);
+Handle<GpuCubemap> vk_cubemap_load(Texture* textures);
+Handle<GpuMesh> vk_mesh_load(Mesh mesh);
 
-KAPI void vk_shader_reload(String name);
+void vk_shader_reload(String name);
 
-KAPI void vk_begin_draw_frame();
-KAPI void vk_end_draw_frame();
+void vk_begin_draw_frame();
+void vk_end_draw_frame();
 
 // Entity
-KAPI void vk_make_renderable_(Handle<Entity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuMaterial> material_handle);
-KAPI void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuMaterial> material_handle);
-KAPI void vk_remove_renderable(Handle<Entity> entity_handle);
-KAPI void vk_set_entity_color(Handle<Entity> entity_handle, v4 color);
-
-// // Point light
-// KAPI void vk_point_light_create(u32 entity_id);
-// KAPI void vk_point_light_remoove(u32 entity_id);
-// KAPI PointLight& vk_get_point_light_shader(u32 entity_id);
-
-// // Directional light
-// KAPI void vk_dir_light_make(u32 entity_id);
-// KAPI void vk_dir_light_remove(u32 entity_id);
-// KAPI DirLight& vk_dir_light_get(u32 entity_id);
-
-// // Spot light
-// KAPI void vk_spot_light_create(u32 entity_id);
-// KAPI void vk_spot_light_destroy(u32 entity_id);
-// KAPI SpotLight& vk_spot_light_get(u32 entity_id);
+void vk_make_renderable_(Handle<Entity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuMaterial> material_handle);
+void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuMaterial> material_handle);
+void vk_remove_renderable(Handle<Entity> entity_handle);
+void vk_set_entity_color(Handle<Entity> entity_handle, v4 color);
 
 mat4& vk_get_view();
 mat4& vk_get_projection();
 
-KAPI void debug_draw_line(v3 a, v3 b, v3 color);
-KAPI void debug_draw_aabb(v3 min, v3 max, v3 color);
-KAPI void draw_squad(v2 min, v2 max, v3 color);
+void debug_draw_line(v3 a, v3 b, v3 color);
+void debug_draw_aabb(v3 min, v3 max, v3 color);
+void draw_squad(v2 min, v2 max, v3 color);
 
 void ui_begin();
 void ui_end();
@@ -176,11 +166,8 @@ void imgui_end_frame();
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // common.cpp
 
-KAPI extern f32 g_dt;
-KAPI extern f32 g_time;
-KAPI extern b32 g_was_hotreload;
-KAPI Transform& entities_transforms(Handle<Entity> handle);
-KAPI Transform& static_entities_transforms(Handle<StaticEntity> handle);
+Transform& entity_transform(Handle<Entity> handle);
+Transform& static_entity_transform(Handle<StaticEntity> handle);
 
 #if BUILD_DEBUG
 u32* entities_generations();
@@ -242,12 +229,13 @@ Handle<GpuMaterial> material_get(MaterialId id);
 void asset_load();
 
 ////////////////////////////////////////////////////////////////////////
-// Test
-
-KAPI void test();
-
-////////////////////////////////////////////////////////////////////////
 // Profiler
+
+struct ProfilerInfo {
+  u64 tsc_start;
+  u64 tsc_end;
+  u64 tsc_elapsed;
+};
 
 struct ProfileAnchor {
   u64 tsc_elapsed_exclusive; // without children
@@ -256,6 +244,8 @@ struct ProfileAnchor {
   String label;
   // for fraph
   u32 parent_idx;
+  u64 tsc_start;
+  u64 tsc_end;
 };
 
 struct ProfileBlock {
@@ -267,17 +257,44 @@ struct ProfileBlock {
   ~ProfileBlock();
 };
 
-void profile_begin();
-void profile_end();
-Slice<ProfileAnchor> profile_get_anchors();
-u64 profile_get_tsc_elapsed();
+void profiler_begin();
+void profiler_end();
+Slice<ProfileAnchor> profiler_get_anchors();
+u64 profiler_get_tsc_elapsed();
+ProfilerInfo profiler_get_info();
 
-// #define TimeBlock(Name) ProfileBlock Glue(__profiler_block, __LINE__)(Name, SomeMacro(__func__) ":" Name)
 #define TimeBlock(Name) ProfileBlock Glue(__profiler_block, __LINE__)(Name, __func__, Name)
 #define TimeFunction TimeBlock(__func__)
 
 // #define TimeBlock(Name)
 // #define TimeFunction
+
+////////////////////////////////////////////////////////////////////////
+// Asset watcher
+
+void watch_add(String watch_name, void (**callback)());
+void watch_directory_add(String watch_name, void (**reload_callback)(String name), OS_WatchFlags flags = OS_WatchFlag_Modify);
+void watch_update();
+
+////////////////////////////////////////////////////////////////////////
+// Common
+
+void common_init();
+void r_shutdown();
+
+String asset_base_path();
+Handle<GpuMesh> mesh_load(String name);
+Handle<GpuShader> shader_load(Shader shader);
+Handle<GpuTexture> texture_load(String name);
+Handle<GpuCubemap> cubemap_load(String name);
+
+struct Timer {
+  f32 passed;
+  f32 interval;
+};
+
+Timer timer_init(f32 interval);
+b32 timer_tick(Timer& t);
 
 ////////////////////////////////////////////////////////////////////////
 // Json
@@ -309,37 +326,9 @@ struct JsonReader {
 };
 
 JsonReader json_reader_init(String buffer);
+b32 json_iter_object(JsonReader* r, JsonValue obj, JsonValue *key, JsonValue *val);
+b32 json_iter_array(JsonReader* r, JsonValue arr, JsonValue* val);
 
 #define JSON_OBJ(r, o) for (JsonValue k, v; json_iter_object(&r, o, &k, &v);)
 #define JSON_OBJ_(r, o) for (JsonValue key, val; json_iter_object(&r, o, &key, &val);)
 #define JSON_ARR(r, val) for (JsonValue obj; json_iter_array(&r, val, &obj);)
-
-////////////////////////////////////////////////////////////////////////
-// Asset watcher
-
-KAPI void asset_watch_add(String watch_name, void (*callback)());
-KAPI void asset_watch_directory_add(String watch_name, OS_WatchFlags flags, void (*reload_callback)(String filename));
-KAPI void asset_watch_update();
-
-////////////////////////////////////////////////////////////////////////
-// Common
-
-KAPI void common_init();
-KAPI void r_shutdown();
-
-KAPI String asset_base_path();
-KAPI Handle<GpuMesh> mesh_load(String name);
-KAPI Handle<GpuShader> shader_load(Shader shader);
-KAPI Handle<GpuTexture> texture_load(String name);
-KAPI Handle<GpuCubemap> cubemap_load(String name);
-
-struct Timer {
-  f32 passed;
-  f32 interval;
-};
-
-KAPI Timer timer_init(f32 interval);
-KAPI b32 timer_tick(Timer& t);
-
-
-

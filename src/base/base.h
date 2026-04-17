@@ -48,26 +48,9 @@ typedef va_list VaList;
 // OS
 
 #if OS_WINDOWS
-  #if HOTRELOAD_BUILD
-    #define shared_function C_LINKAGE __declspec(dllexport)
-    #ifdef KEXPORT
-      #define KAPI __declspec(dllexport)
-    #else
-      #define KAPI __declspec(dllimport)
-      #define hello
-    #endif
-  #else
-    #define KAPI
-    #define shared_function
-  #endif
+  #define shared_function C_LINKAGE __declspec(dllexport)
 #elif OS_LINUX
-  #if HOTRELOAD_BUILD
-    #define shared_function C_LINKAGE
-    #define KAPI
-  #else
-    #define KAPI
-    #define shared_function
-  #endif
+  #define shared_function C_LINKAGE
 #else
   #error OS not supported.
 #endif
@@ -141,19 +124,19 @@ NO_DEBUG constexpr u64 TB(u64 x) { return x << 40; }
 NO_DEBUG constexpr u64 Thousand(u64 x) { return x * 1000; }
 NO_DEBUG constexpr u64 Million(u64 x)  { return x * 1000000; }
 NO_DEBUG constexpr u64 Billion(u64 x)  { return x * 1000000000; }
-NO_DEBUG KAPI f32 BytesToKB(u64 x);
-NO_DEBUG KAPI f32 BytesToMB(u64 x);
-NO_DEBUG KAPI f32 BytesToGB(u64 x);
+NO_DEBUG f32 BytesToKB(u64 x);
+NO_DEBUG f32 BytesToMB(u64 x);
+NO_DEBUG f32 BytesToGB(u64 x);
 
 ////////////////////////////////////////////////////////////////////////
 // Memory
 
 #define OffsetOf(T,m) (u64)(&((T*)0)->m)
 
-KAPI void MemSet(void *d, i32 byte, u64 size);
-KAPI void MemZero(void *d, u64 size);
-KAPI void MemCopy(void* d, void* s, u64 size);
-KAPI b32  MemMatch(void* a, void* b, u64 size);
+void MemSet(void *d, i32 byte, u64 size);
+void MemZero(void *d, u64 size);
+void MemCopy(void* d, void* s, u64 size);
+b32  MemMatch(void* a, void* b, u64 size);
 
 template<typename T> void MemZeroStruct(T* x)              { MemZero(x, sizeof(*x)); };
 template<typename T> void MemZeroArray(T* x, u64 c)        { MemZero(x, sizeof(*x) * c); };
@@ -162,33 +145,33 @@ template<typename T> void MemCopyArray(T* d, T* s, u64 c)  { MemCopy(d, s, sizeo
 template<typename T> b32  MemMatchStruct(T* a, T* b)       { return MemMatch(a, b, sizeof(*a)); }
 template<typename T> b32  MemMatchArray(T* a, T* b, u64 c) { return MemMatch(a, b, sizeof(*a) * c); }
 
-KAPI u64 AlignUp(u64 x, u64 a);
-KAPI u64 AlignDown(u64 x, u64 a);
-KAPI u64 AlignPadUp(u64 x, u64 a);
-KAPI u64 AlignPadDown(u64 x, u64 a);
-KAPI b32 IsPow2(u64 x);
-KAPI b32 IsAligned(u64 x, u64 a);
-KAPI u8* Offset(void* x, u64 a);
-KAPI u8* OffsetBack(void* x, u64 a);
-KAPI u64 MemDiff(void* x, void* a);
-KAPI b32 PtrMatch(void* a, void* b);
+u64 AlignUp(u64 x, u64 a);
+u64 AlignDown(u64 x, u64 a);
+u64 AlignPadUp(u64 x, u64 a);
+u64 AlignPadDown(u64 x, u64 a);
+b32 IsPow2(u64 x);
+b32 IsAligned(u64 x, u64 a);
+u8* Offset(void* x, u64 a);
+u8* OffsetBack(void* x, u64 a);
+u64 MemDiff(void* x, void* a);
+b32 PtrMatch(void* a, void* b);
 
 ////////////////////////////////////////////////////////////////////////
 // Bits
 
-KAPI u32 clz(u64 val);
-KAPI u32 ctz(u64 val);
-KAPI u32 count_bits_set(u64 val);
-KAPI u32 most_significant_bit(u64 size);
+u32 clz(u64 val);
+u32 ctz(u64 val);
+u32 count_bits_set(u64 val);
+u32 most_significant_bit(u64 size);
 
 constexpr u64 Bit(u64 x) { return 1 << x; }
-KAPI u64 BitHas(u64 x, u64 pos);
-KAPI u64 FlagSet(u64 x, u64 f);
-KAPI u64 FlagClear(u64 x, u64 f);
-KAPI u64 FlagToggle(u64 x, u64 f);
-KAPI b32 FlagHas(u64 x, u64 f);
-KAPI b32 FlagEquals(u64 x, u64 f);
-KAPI b32 FlagIntersects(u64 x, u64 f);
+u64 BitHas(u64 x, u64 pos);
+u64 FlagSet(u64 x, u64 f);
+u64 FlagClear(u64 x, u64 f);
+u64 FlagToggle(u64 x, u64 f);
+b32 FlagHas(u64 x, u64 f);
+b32 FlagEquals(u64 x, u64 f);
+b32 FlagIntersects(u64 x, u64 f);
 
 ////////////////////////////////////////////////////////////////////////
 // Common operations
@@ -210,12 +193,12 @@ template <typename T> T Abs(T x)                     { return (x < 0) ? -x : x; 
 template <typename T> b32 IsInRangeIncl(T a, T x, T b) { return (a <= x) && (x <= b); };
 template <typename T> b32 IsInRangeExcl(T a, T x, T b) { return (a < x) && (x < b); };
 template <typename T> b32 IsInRange(T a, T x, T b)     { return (a <= x) && (x < b); };
-KAPI u64 ModPow2(u64 x, u64 b);
-KAPI u64 DivPow2(u64 x, u64 b);
-KAPI u64 CeilIntDiv(u64 x, u64 b);
-KAPI u64 RoundUp(u64 x, u64 a);
-KAPI u64 RoundDown(u64 x, u64 a);
-KAPI u64 Compose64Bit(u64 a, u64 b);
+u64 ModPow2(u64 x, u64 b);
+u64 DivPow2(u64 x, u64 b);
+u64 CeilIntDiv(u64 x, u64 b);
+u64 RoundUp(u64 x, u64 a);
+u64 RoundDown(u64 x, u64 a);
+u64 Compose64Bit(u64 a, u64 b);
 
 ////////////////////////////////////////////////////////////////////////
 // Shenanigans
@@ -236,8 +219,8 @@ KAPI u64 Compose64Bit(u64 a, u64 b);
 ////////////////////////////////////////////////////////////////////////
 // Asserts
 
-KAPI void Trap();
-KAPI void DebugTrap();
+void Trap();
+void DebugTrap();
 
 #define InvalidPath    Assert(!"Invalid Path!")
 #define NotImplemented Assert(!"Not Implemented!")
@@ -321,7 +304,7 @@ struct Range {
   u64 size;
 };
 
-KAPI u64 range_size(Range r);
+u64 range_size(Range r);
 
 struct RingBuffer {
   u8* base;
@@ -338,7 +321,8 @@ void ring_read(RingBuffer& ring, void *dst, u64 read_size);
 const u32 DEFAULT_CAPACITY = 8;
 const u32 DEFAULT_RESIZE_FACTOR = 2;
 
-KAPI u64 cpu_timer_now();
-KAPI u64 cpu_frequency();
-KAPI void estimate_cpu_frequency();
+u64 cpu_timer_now();
+u64 cpu_frequency();
+void estimate_cpu_frequency();
+
 

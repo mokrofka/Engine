@@ -9,4 +9,4 @@ struct Scratch {
   NO_DEBUG ~Scratch();
 };
 
-KAPI void tctx_init();
+void tctx_init();

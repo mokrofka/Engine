@@ -10,5 +10,10 @@
 #include "os/os_core.h"
 #include "os/os_gfx.h"
 
+struct HotReloadData {
+  void* ctx;
+  b32 was_hotreload;
+  String lib;
+};
 
 

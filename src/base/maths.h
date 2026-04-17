@@ -10,8 +10,8 @@ const f32 GoldSmall      = 0.61803398875f;
 const f32 FloatEpsilon   = 1e-5f;
 const f32 MachineEpsilon = 1.1920929e-7f;
 
-KAPI f32 degtorad(f32 degrees);
-KAPI f32 radtodeg(f32 radians);
+f32 degtorad(f32 degrees);
+f32 radtodeg(f32 radians);
 
 union v2 {
   struct {
@@ -127,221 +127,224 @@ struct Transform {
   v3 scale;
 };
 
-KAPI NO_DEBUG f32 Sin(f32 a);
-KAPI NO_DEBUG f32 Cos(f32 a);
-KAPI NO_DEBUG f32 Tan(f32 a);
-KAPI NO_DEBUG f32 Asin(f32 a);
-KAPI NO_DEBUG f32 Acos(f32 a);
-KAPI NO_DEBUG f32 Atan2(f32 y, f32 x);
-KAPI NO_DEBUG f32 Sqrt(f32 a);
-KAPI NO_DEBUG f32 Pow(f32 a, f32 b);
-KAPI NO_DEBUG f32 Floor(f32 a);
-KAPI NO_DEBUG f32 Ceil(f32 a);
-KAPI NO_DEBUG f32 Round(f32 a);
-KAPI NO_DEBUG f32 Mod(f32 a, f32 b);
-KAPI NO_DEBUG f32 Exp(f32 a);
-KAPI NO_DEBUG f32 LogE(f32 a);
-KAPI NO_DEBUG f32 Log2(f32 a);
-KAPI NO_DEBUG f32 Log10(f32 a);
+NO_DEBUG f32 Sin(f32 a);
+NO_DEBUG f32 Cos(f32 a);
+NO_DEBUG f32 Tan(f32 a);
+NO_DEBUG f32 Asin(f32 a);
+NO_DEBUG f32 Acos(f32 a);
+NO_DEBUG f32 Atan2(f32 y, f32 x);
+NO_DEBUG f32 Sqrt(f32 a);
+NO_DEBUG f32 Pow(f32 a, f32 b);
+NO_DEBUG f32 Floor(f32 a);
+NO_DEBUG f32 Ceil(f32 a);
+NO_DEBUG f32 Round(f32 a);
+NO_DEBUG f32 Mod(f32 a, f32 b);
+NO_DEBUG f32 Exp(f32 a);
+NO_DEBUG f32 LogE(f32 a);
+NO_DEBUG f32 Log2(f32 a);
+NO_DEBUG f32 Log10(f32 a);
 
-KAPI NO_DEBUG void SinCos(f32 angle, f32* a, f32* b);
+NO_DEBUG void SinCos(f32 angle, f32* a, f32* b);
 
-KAPI NO_DEBUG f32 SinD(f32 a);
-KAPI NO_DEBUG f32 CosD(f32 a);
-KAPI NO_DEBUG f32 Lerp(f32 a, f32 t, f32 b);
-KAPI NO_DEBUG f32 Atan2_360(f32 y, f32 x);
+NO_DEBUG f32 SinD(f32 a);
+NO_DEBUG f32 CosD(f32 a);
+NO_DEBUG f32 Lerp(f32 a, f32 t, f32 b);
+NO_DEBUG f32 Atan2_360(f32 y, f32 x);
 
-KAPI u32 next_pow2(u32 v);
-KAPI u32 prev_pow2(u32 n);
+u32 next_pow2(u32 v);
+u32 prev_pow2(u32 n);
 
 ////////////////////////////////////////////////////////////////////////
 // Color
 
-KAPI v4 rgba_from_u32(u32 hex);
-KAPI u32 u32_from_rgba(v4 rgba);
-KAPI u32 u32_from_argb(v4 argb);
+v4 rgba_from_u32(u32 hex);
+u32 u32_from_rgba(v4 rgba);
+u32 u32_from_argb(v4 argb);
 
 ////////////////////////////////////////////////////////////////////////
 // Hash
 
-KAPI u64 squirrel3(u64 at);
-KAPI u64 str_hash_FNV(String str);
-KAPI u64 hash_memory(void* data, u64 size);
-KAPI u64 hash(u64 x, u64 seed = 0);
-KAPI u64 hash(String str, u64 seed = 0);
+u64 squirrel3(u64 at);
+u64 str_hash_FNV(String str);
+u64 hash_memory(void* data, u64 size);
+u64 hash(u64 x, u64 seed = 0);
+u64 hash(String str, u64 seed = 0);
 
 ////////////////////////////////////////////////////////////////////////
 // Random
 
-KAPI u32 xorshift32(u32* seed);
+u32 xorshift32(u32* seed);
 
-KAPI NO_DEBUG u32 rand_u32();
-KAPI NO_DEBUG u32 rand_range_u32(u32 min, u32 max);
-KAPI NO_DEBUG i32 rand_i32();
-KAPI NO_DEBUG i32 rand_range_i32(i32 min, i32 max);
-KAPI NO_DEBUG f32 rand_f32_01();
-KAPI NO_DEBUG f32 rand_f32_11();
-KAPI NO_DEBUG f32 rand_f32();
-KAPI NO_DEBUG f32 rand_range_f32(f32 min, f32 max);
-KAPI NO_DEBUG b32 rand_b32();
-KAPI NO_DEBUG void rand_seed();
+NO_DEBUG u32 rand_u32();
+NO_DEBUG u32 rand_range_u32(u32 min, u32 max);
+NO_DEBUG i32 rand_i32();
+NO_DEBUG i32 rand_range_i32(i32 min, i32 max);
+NO_DEBUG f32 rand_f32_01();
+NO_DEBUG f32 rand_f32_11();
+NO_DEBUG f32 rand_f32();
+NO_DEBUG f32 rand_range_f32(f32 min, f32 max);
+NO_DEBUG b32 rand_b32();
+NO_DEBUG void rand_seed();
+
+f32 inverse_lerp(f32 a, f32 x, f32 b);
+f64 inverse_lerp_f64(f64 a, f64 x, f64 b);
 
 ////////////////////////////////////////////////////////////////////////
 // Vector2
 
-KAPI NO_DEBUG v2 v2_zero();
-KAPI NO_DEBUG v2 v2_one();
-KAPI NO_DEBUG v2 v2_scale(f32 a);
-KAPI NO_DEBUG v2 v2_up();
-KAPI NO_DEBUG v2 v2_down();
-KAPI NO_DEBUG v2 v2_left();
-KAPI NO_DEBUG v2 v2_right();
-KAPI NO_DEBUG v2 v2_of_v3(v3 a);
-KAPI NO_DEBUG v2 v2_of_v4(v4 a);
-KAPI NO_DEBUG v3 v2_to_v3(v2 a, f32 b);
-KAPI NO_DEBUG v4 v2_to_v4(v2 a, f32 b, f32 c);
-KAPI NO_DEBUG v2 v2_of_v2i(v2i a);
-KAPI NO_DEBUG v2 v2_of_v2u(v2u a);
-KAPI NO_DEBUG v2i v2i_of_v2(v2 a);
-KAPI NO_DEBUG v2  operator+(v2 a, v2 b);
-KAPI NO_DEBUG v2  operator-(v2 a, v2 b);
-KAPI NO_DEBUG v2  operator*(v2 a, f32 scalar);
-KAPI NO_DEBUG v2  operator*(f32 scalar, v2 a);
-KAPI NO_DEBUG v2  operator/(v2 a, f32 scalar);
-KAPI NO_DEBUG v2  operator+=(v2& a, v2 b);
-KAPI NO_DEBUG v2  operator-=(v2& a, v2 b);
-KAPI NO_DEBUG v2  operator*=(v2& a, f32 scalar);
-KAPI NO_DEBUG v2  operator/=(v2& a, f32 scalar);
-KAPI NO_DEBUG b32 operator==(v2 a, v2 b);
-KAPI NO_DEBUG b32 operator!=(v2 a, v2 b);
-KAPI NO_DEBUG v2  operator-(v2 a);
-KAPI NO_DEBUG f32 v2_length_squared(v2 a);
-KAPI NO_DEBUG f32 v2_length(v2 a);
-KAPI NO_DEBUG v2  v2_norm(v2 a);
-KAPI NO_DEBUG f32 v2_distance(v2 a, v2 b);
-KAPI NO_DEBUG f32 v2_dot(v2 a, v2 b);
-KAPI NO_DEBUG f32 v2_cross(v2 a, v2 b);
-KAPI NO_DEBUG v2  v2_lerp(v2 a, f32 t, v2 b);
-KAPI NO_DEBUG v2  v2_skew(v2 a);
-KAPI NO_DEBUG v2 v2_rand_range(v2 a, v2 b);
-KAPI f32 v2_shortest_arc(v2 a, v2 b);
-KAPI b32 v2_in_rect(Rect rect, v2 p);
-KAPI v2 v2_map_to_v2_11(v2 pos, v2 size);
+NO_DEBUG v2 v2_zero();
+NO_DEBUG v2 v2_one();
+NO_DEBUG v2 v2_scale(f32 a);
+NO_DEBUG v2 v2_up();
+NO_DEBUG v2 v2_down();
+NO_DEBUG v2 v2_left();
+NO_DEBUG v2 v2_right();
+NO_DEBUG v2 v2_of_v3(v3 a);
+NO_DEBUG v2 v2_of_v4(v4 a);
+NO_DEBUG v3 v2_to_v3(v2 a, f32 b);
+NO_DEBUG v4 v2_to_v4(v2 a, f32 b, f32 c);
+NO_DEBUG v2 v2_of_v2i(v2i a);
+NO_DEBUG v2 v2_of_v2u(v2u a);
+NO_DEBUG v2i v2i_of_v2(v2 a);
+NO_DEBUG v2  operator+(v2 a, v2 b);
+NO_DEBUG v2  operator-(v2 a, v2 b);
+NO_DEBUG v2  operator*(v2 a, f32 scalar);
+NO_DEBUG v2  operator*(f32 scalar, v2 a);
+NO_DEBUG v2  operator/(v2 a, f32 scalar);
+NO_DEBUG v2  operator+=(v2& a, v2 b);
+NO_DEBUG v2  operator-=(v2& a, v2 b);
+NO_DEBUG v2  operator*=(v2& a, f32 scalar);
+NO_DEBUG v2  operator/=(v2& a, f32 scalar);
+NO_DEBUG b32 operator==(v2 a, v2 b);
+NO_DEBUG b32 operator!=(v2 a, v2 b);
+NO_DEBUG v2  operator-(v2 a);
+NO_DEBUG f32 v2_length_squared(v2 a);
+NO_DEBUG f32 v2_length(v2 a);
+NO_DEBUG v2  v2_norm(v2 a);
+NO_DEBUG f32 v2_distance(v2 a, v2 b);
+NO_DEBUG f32 v2_dot(v2 a, v2 b);
+NO_DEBUG f32 v2_cross(v2 a, v2 b);
+NO_DEBUG v2  v2_lerp(v2 a, f32 t, v2 b);
+NO_DEBUG v2  v2_skew(v2 a);
+NO_DEBUG v2 v2_rand_range(v2 a, v2 b);
+f32 v2_shortest_arc(v2 a, v2 b);
+b32 v2_in_rect(Rect rect, v2 p);
+v2 v2_map_to_v2_11(v2 pos, v2 size);
 
 ////////////////////////////////////////////////////////////////////////
 // Vector3
 
-KAPI NO_DEBUG v3 v3_zero();
-KAPI NO_DEBUG v3 v3_one();
-KAPI NO_DEBUG v3 v3_scale(f32 a);
-KAPI NO_DEBUG v3 v3_up();
-KAPI NO_DEBUG v3 v3_down();
-KAPI NO_DEBUG v3 v3_left();
-KAPI NO_DEBUG v3 v3_right();
-KAPI NO_DEBUG v3 v3_forward();
-KAPI NO_DEBUG v3 v3_back();
-KAPI NO_DEBUG v3 v3_of_v4(v4 a);
-KAPI NO_DEBUG v4 v3_to_v4(v3 a, f32 b);
-KAPI NO_DEBUG v3  operator+(v3 a, v3 b);
-KAPI NO_DEBUG v3  operator-(v3 a, v3 b);
-KAPI NO_DEBUG v3  operator*(v3 a, f32 scalar);
-KAPI NO_DEBUG v3  operator*(f32 scalar, v3 a);
-KAPI NO_DEBUG v3  operator/(v3 a, f32 scalar);
-KAPI NO_DEBUG v3  operator+=(v3& a, v3 b);
-KAPI NO_DEBUG v3  operator-=(v3& a, v3 b);
-KAPI NO_DEBUG v3  operator*=(v3& a, f32 scalar);
-KAPI NO_DEBUG v3  operator/=(v3& a, f32 scalar);
-KAPI NO_DEBUG b32 operator==(v3 a, v3 b);
-KAPI NO_DEBUG b32 operator==(v3u a, v3u b);
-KAPI NO_DEBUG b32 operator!=(v3 a, v3 b);
-KAPI NO_DEBUG v3  operator-(v3 a);
-KAPI NO_DEBUG f32 v3_length_squared(v3 a);
-KAPI NO_DEBUG f32 v3_length(v3 a);
-KAPI NO_DEBUG v3  v3_norm(v3 a);
-KAPI NO_DEBUG f32 v3_distance(v3 a, v3 b);
-KAPI NO_DEBUG f32 v3_dot(v3 a, v3 b);
-KAPI NO_DEBUG v3  v3_cross(v3 a, v3 b);
-KAPI NO_DEBUG v3  v3_lerp(v3 a, f32 t, v3 b);
-KAPI NO_DEBUG v3  v3_hadamard_div(v3 a, v3 b);
-KAPI NO_DEBUG v3  v3_greater(v3 a, v3 b);
-KAPI NO_DEBUG v3  v3_less(v3 a, v3 b);
-KAPI NO_DEBUG v3 v3_pos_of_mat4(mat4 mat);
-// KAPI NO_DEBUG v3 v3_rot_of_mat4(mat4 mat);
-// KAPI NO_DEBUG v3 v3_scale_of_mat4(mat4 mat);
-KAPI NO_DEBUG v3 v3_rand_range(v3 a, v3 b);
+NO_DEBUG v3 v3_zero();
+NO_DEBUG v3 v3_one();
+NO_DEBUG v3 v3_scale(f32 a);
+NO_DEBUG v3 v3_up();
+NO_DEBUG v3 v3_down();
+NO_DEBUG v3 v3_left();
+NO_DEBUG v3 v3_right();
+NO_DEBUG v3 v3_forward();
+NO_DEBUG v3 v3_back();
+NO_DEBUG v3 v3_of_v4(v4 a);
+NO_DEBUG v4 v3_to_v4(v3 a, f32 b);
+NO_DEBUG v3  operator+(v3 a, v3 b);
+NO_DEBUG v3  operator-(v3 a, v3 b);
+NO_DEBUG v3  operator*(v3 a, f32 scalar);
+NO_DEBUG v3  operator*(f32 scalar, v3 a);
+NO_DEBUG v3  operator/(v3 a, f32 scalar);
+NO_DEBUG v3  operator+=(v3& a, v3 b);
+NO_DEBUG v3  operator-=(v3& a, v3 b);
+NO_DEBUG v3  operator*=(v3& a, f32 scalar);
+NO_DEBUG v3  operator/=(v3& a, f32 scalar);
+NO_DEBUG b32 operator==(v3 a, v3 b);
+NO_DEBUG b32 operator==(v3u a, v3u b);
+NO_DEBUG b32 operator!=(v3 a, v3 b);
+NO_DEBUG v3  operator-(v3 a);
+NO_DEBUG f32 v3_length_squared(v3 a);
+NO_DEBUG f32 v3_length(v3 a);
+NO_DEBUG v3  v3_norm(v3 a);
+NO_DEBUG f32 v3_distance(v3 a, v3 b);
+NO_DEBUG f32 v3_dot(v3 a, v3 b);
+NO_DEBUG v3  v3_cross(v3 a, v3 b);
+NO_DEBUG v3  v3_lerp(v3 a, f32 t, v3 b);
+NO_DEBUG v3  v3_hadamard_div(v3 a, v3 b);
+NO_DEBUG v3  v3_greater(v3 a, v3 b);
+NO_DEBUG v3  v3_less(v3 a, v3 b);
+NO_DEBUG v3 v3_pos_of_mat4(mat4 mat);
+// NO_DEBUG v3 v3_rot_of_mat4(mat4 mat);
+// NO_DEBUG v3 v3_scale_of_mat4(mat4 mat);
+NO_DEBUG v3 v3_rand_range(v3 a, v3 b);
 
 ////////////////////////////////////////////////////////////////////////
 // Vector4
 
-KAPI NO_DEBUG v4  v4_zero();
-KAPI NO_DEBUG v4  v4_one();
-KAPI NO_DEBUG v4  v4_scale(f32 a);
-KAPI NO_DEBUG v4  operator+(v4 a, v4 b);
-KAPI NO_DEBUG v4  operator-(v4 a, v4 b);
-KAPI NO_DEBUG v4  operator*(v4 a, f32 scalar);
-KAPI NO_DEBUG v4  operator*(f32 scalar, v4 a);
-KAPI NO_DEBUG v4  operator/(v4 a, f32 scalar);
-KAPI NO_DEBUG v4  operator+=(v4& a, v4 b);
-KAPI NO_DEBUG v4  operator-=(v4& a, v4 b);
-KAPI NO_DEBUG v4  operator*=(v4& a, f32 scalar);
-KAPI NO_DEBUG v4  operator/=(v4& a, f32 scalar);
-KAPI NO_DEBUG v4  operator-(v4 a);
-KAPI NO_DEBUG f32 v4_length_squared(v4 a);
-KAPI NO_DEBUG f32 v4_length(v4 a);
-KAPI NO_DEBUG v4  v4_normalize(v4 a);
-KAPI NO_DEBUG v4  v4_hadamard(v4 a, v4 b);
+NO_DEBUG v4  v4_zero();
+NO_DEBUG v4  v4_one();
+NO_DEBUG v4  v4_scale(f32 a);
+NO_DEBUG v4  operator+(v4 a, v4 b);
+NO_DEBUG v4  operator-(v4 a, v4 b);
+NO_DEBUG v4  operator*(v4 a, f32 scalar);
+NO_DEBUG v4  operator*(f32 scalar, v4 a);
+NO_DEBUG v4  operator/(v4 a, f32 scalar);
+NO_DEBUG v4  operator+=(v4& a, v4 b);
+NO_DEBUG v4  operator-=(v4& a, v4 b);
+NO_DEBUG v4  operator*=(v4& a, f32 scalar);
+NO_DEBUG v4  operator/=(v4& a, f32 scalar);
+NO_DEBUG v4  operator-(v4 a);
+NO_DEBUG f32 v4_length_squared(v4 a);
+NO_DEBUG f32 v4_length(v4 a);
+NO_DEBUG v4  v4_normalize(v4 a);
+NO_DEBUG v4  v4_hadamard(v4 a, v4 b);
 
 ////////////////////////////////////////////////////////////////////////
 // Matrix3
 
-KAPI NO_DEBUG mat3 mat3_identity();
-KAPI NO_DEBUG mat3 mat3_translate(v2 pos);
-KAPI NO_DEBUG mat3 mat3_scale(v2 scale);
-KAPI NO_DEBUG mat3 operator*(mat3 a, mat3 b);
-KAPI NO_DEBUG mat3& operator*=(mat3& a, mat3 b);
-KAPI NO_DEBUG v3 operator*(mat3 mat, v3 vec);
+NO_DEBUG mat3 mat3_identity();
+NO_DEBUG mat3 mat3_translate(v2 pos);
+NO_DEBUG mat3 mat3_scale(v2 scale);
+NO_DEBUG mat3 operator*(mat3 a, mat3 b);
+NO_DEBUG mat3& operator*=(mat3& a, mat3 b);
+NO_DEBUG v3 operator*(mat3 mat, v3 vec);
 
 ////////////////////////////////////////////////////////////////////////
 // Matrix4
 
-KAPI mat4 mat4_identity();
-KAPI mat4 mat4_translate(v3 pos);
-KAPI mat4 mat4_scale(v3 scale);
-KAPI mat4 mat4_rotate_x(f32 angle_radians);
-KAPI mat4 mat4_rotate_y(f32 angle_radians);
-KAPI mat4 mat4_rotate_z(f32 angle_radians);
-KAPI mat4 operator*(mat4 a, mat4 b);
-KAPI mat4& operator*=(mat4& a, mat4 b);
-KAPI v4 operator*(mat4 mat, v4 vec);
-KAPI mat4 mat4_rotate_xyz(v3 rot);
-KAPI mat4 mat4_transform(v3 pos, v3 rot, v3 scale);
-KAPI mat4 mat4_transform(Transform trans);
-KAPI mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far);
-KAPI mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 Near, f32 Far);
-KAPI mat4 mat4_look_at(v3 pos, v3 dir, v3 up);
-KAPI mat4 mat4_transpose(mat4 matrix);
-KAPI mat4 mat4_inverse(mat4 matrix);
-KAPI v3 mat4_forward(mat4 matrix);
-KAPI v3 mat4_backward(mat4 matrix);
-KAPI v3 mat4_up(mat4 matrix);
-KAPI v3 mat4_down(mat4 matrix);
-KAPI v3 mat4_right(mat4 matrix);
-KAPI v3 mat4_left(mat4 matrix);
+mat4 mat4_identity();
+mat4 mat4_translate(v3 pos);
+mat4 mat4_scale(v3 scale);
+mat4 mat4_rotate_x(f32 angle_radians);
+mat4 mat4_rotate_y(f32 angle_radians);
+mat4 mat4_rotate_z(f32 angle_radians);
+mat4 operator*(mat4 a, mat4 b);
+mat4& operator*=(mat4& a, mat4 b);
+v4 operator*(mat4 mat, v4 vec);
+mat4 mat4_rotate_xyz(v3 rot);
+mat4 mat4_transform(v3 pos, v3 rot, v3 scale);
+mat4 mat4_transform(Transform trans);
+mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far);
+mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 Near, f32 Far);
+mat4 mat4_look_at(v3 pos, v3 dir, v3 up);
+mat4 mat4_transpose(mat4 matrix);
+mat4 mat4_inverse(mat4 matrix);
+v3 mat4_forward(mat4 matrix);
+v3 mat4_backward(mat4 matrix);
+v3 mat4_up(mat4 matrix);
+v3 mat4_down(mat4 matrix);
+v3 mat4_right(mat4 matrix);
+v3 mat4_left(mat4 matrix);
 
 ////////////////////////////////////////////////////////////////////////
 // Quaternions
 
-KAPI quat quat_identity();
-KAPI f32 quat_normal(quat q);
-KAPI quat quat_normalize(quat q);
-KAPI quat quat_conjugate(quat q);
-KAPI quat quat_inverse(quat q);
-KAPI quat quat_mul(quat q_0, quat q_1);
-KAPI f32 quat_dot(quat q_0, quat q_1);
-KAPI mat4 quat_to_mat4(quat q);
-KAPI mat4 quat_to_rotation_matrix(quat q, v3 center);
-KAPI quat quat_from_axis_angle(v3 axis, f32 angle, b32 normalize);
-KAPI quat quat_slerp(quat q_0, quat q_1, f32 percentage);
+quat quat_identity();
+f32 quat_normal(quat q);
+quat quat_normalize(quat q);
+quat quat_conjugate(quat q);
+quat quat_inverse(quat q);
+quat quat_mul(quat q_0, quat q_1);
+f32 quat_dot(quat q_0, quat q_1);
+mat4 quat_to_mat4(quat q);
+mat4 quat_to_rotation_matrix(quat q, v3 center);
+quat quat_from_axis_angle(v3 axis, f32 angle, b32 normalize);
+quat quat_slerp(quat q_0, quat q_1, f32 percentage);
 
-KAPI f32 map_range_f32(f32 v, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
+f32 map_range_f32(f32 v, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
 

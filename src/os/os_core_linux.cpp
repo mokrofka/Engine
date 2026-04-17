@@ -508,7 +508,7 @@ intern void* worker(void* arg) {
   return null;
 }
 
-void thread_pool_init(i32 num_threads) {
+void thread_pool_init(u32 num_threads) {
   thread_pool.num_threads = num_threads;
   task_queue_init();
   Loop (i, num_threads) {
