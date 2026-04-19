@@ -304,115 +304,6 @@ intern void render_remove() {
   arr.clear();
 }
 
-void profiler_view() {
-  Scratch scratch;
-  GameState& g = g_st->game;
-  if (os_is_key_pressed(Key_4)) {
-    if (g.fullscreen) {
-      ImGui::SetNextWindowPos(g.win_pos);
-      ImGui::SetNextWindowSize(g.win_size);
-    }
-    g.fullscreen = !g.fullscreen;
-  }
-  ImGuiWindowFlags flags = {};
-  if (g.fullscreen) {
-    ImGui::SetNextWindowPos(ImVec2(0, 0));
-    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
-    flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
-  }
-  if (ImGui::Begin("Profiler", null, flags)) {
-    if (!g.fullscreen) {
-      g.win_pos = ImGui::GetWindowPos();
-      g.win_size = ImGui::GetWindowSize();
-    }
-
-    Slice<ProfileAnchor> anchors = profiler_get_anchors();
-    u64 cpu_freq = cpu_frequency();
-    u64 tsc_total_elapsed = profiler_get_info().tsc_elapsed;
-    u64 tsc_start = profiler_get_info().tsc_start;
-    u64 tsc_end = profiler_get_info().tsc_end;
-
-    if (ImGui::IsWindowHovered()) {
-      f32 wheel = os_get_scroll();
-      if (wheel) {
-        f32 zoom_factor = wheel > 0 ? 1.1 : 0.8;
-        g.scale_x *= zoom_factor;
-        g.scale_y *= zoom_factor;
-      }
-      f32 move_x = os_get_touchpad();
-      if (move_x) {
-        f32 offset_factor = move_x < 0 ? 1 : -1;
-        g.offset_x += offset_factor * 100;
-      }
-    }
-
-    ImGui::Text("%u moving cubes count", g.moving_cubes.count);
-    ImGui::Text("%.1ffps %0.1fms CPU %.1fGhz", 1/get_dt(), 1000*(f64)tsc_total_elapsed/cpu_freq, (f64)cpu_freq/Billion(1));
-    // ImGui::Text("%.1ffps %0.1fms CPU %.1fGhz", 1.0/(3.0/1000), 1000*(f64)tsc_total_elapsed/cpu_freq, (f64)cpu_freq/Billion(1));
-    // v2 avail_size = ImGui::GetContentRegionAvail();
-    // v2 avail_size = ImGui::GetWindowSize() * g.scale_x;
-    v2 avail_size = ImGui::GetWindowSize() * g.scale_x;
-    v2 draw_offset_min = ImGui::GetItemRectMin();
-    v2 draw_offset_max = ImGui::GetItemRectMax();
-    v2 mouse_pos = os_get_mouse_pos();
-    Loop (i, anchors.count) {
-      ImGui::PushID(i);
-      ProfileAnchor anchor = anchors[i];
-      f64 width_percent = (f64)anchor.tsc_elapsed_inclusive / tsc_total_elapsed;
-      // f64 width_percent_offset = inverse_lerp_f64(tsc_start, anchor.tsc_start, tsc_end);
-      f64 width_percent_offset = inverse_lerp_f64(tsc_start, anchor.tsc_start, tsc_end);
-      f64 width_percent_with_children = 0;
-      f32 width = avail_size.x;
-      f32 height = 30;
-      if (anchor.tsc_elapsed_inclusive != anchor.tsc_elapsed_exclusive) {
-        width_percent_with_children = ((f64)anchor.tsc_elapsed_inclusive / (f64)tsc_total_elapsed);
-        width *= width_percent_with_children;
-      } else {
-        width *= width_percent;
-      }
-      width *= g.scale_x;
-      height *= g.scale_y;
-      if (width_percent > 0.02 || width_percent_with_children > 0.02) {
-        v2 offset = v2(avail_size.x * width_percent_offset, anchor.depth * height) + draw_offset_min;
-        offset.x += g.offset_x;
-        offset.y += draw_offset_max.y - draw_offset_min.y;
-        v2 size = v2(width, height);
-        Rect rect = Rect(offset, size + offset);
-        ImDrawList* draw = ImGui::GetWindowDrawList();
-        draw->AddRectFilled(rect.min, rect.max, IM_COL32(50, 50, 50, 255));
-        draw->AddRect(rect.min, rect.max, IM_COL32(200, 200, 200, 255));
-        String str = {};
-        if (v2_in_rect(rect, mouse_pos)) {
-          ImGui::BeginTooltip();
-          ImGui::Text("Label: %s", anchor.label.str);
-          ImGui::Text("Percent: %f%%", width_percent * 100);
-          ImGui::Text("Hits: %lu", anchor.hit_count);
-          ImGui::Text("Time: %fms", (f64)anchor.tsc_elapsed_inclusive / cpu_freq * 1000);
-          ImGui::EndTooltip();
-        }
-        if (width_percent > 0.05 || width_percent_with_children > 0.05) {
-          str = push_strf(scratch, "%s %.3f", anchor.label, (f64)anchor.tsc_elapsed_inclusive / cpu_freq * 1000);
-          v2 text_size = ImGui::CalcTextSize((char*)str.str);
-          v2 text_pos = {};
-          if (text_size.x > size.x) {
-            text_pos.x = rect.min.x;
-            text_pos.y = rect.y + (size.y - text_size.y) * 0.5;
-          } else {
-            text_pos = v2(
-              rect.x + (size.x - text_size.x) * 0.5f,
-              rect.y + (size.y - text_size.y) * 0.5
-            );
-          }
-          draw->PushClipRect(rect.min, rect.max); 
-          draw->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), (char*)str.str);
-          draw->PopClipRect();
-        }
-      }
-      ImGui::PopID();
-    }
-  } ImGui::End();
-}
-
 ////////////////////////////////////////////////////////////////////////
 // Init
 
@@ -612,8 +503,6 @@ void game_init() {
   g.persistent_arena = arena_init();
   g.gpa.init(g.arena);
   g.timer = timer_init(1);
-  g.scale_x = 1;
-  g.scale_y = 1;
   g.entity_id_pool.init(g.persistent_arena, MaxEntities);
   g.static_entity_id_pool.init(g.persistent_arena, MaxStaticEntities);
   g.entities = push_array(g.persistent_arena, Entity, MaxEntities);
@@ -648,7 +537,6 @@ void game_update() {
     os_close_window();
   }
   scene_update();
-  profiler_view();
   ImGui::ShowDemoWindow();
 }
 

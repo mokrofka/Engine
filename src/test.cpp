@@ -391,7 +391,7 @@ intern void test_profile_print_time_elapsed(u64 total_tsc_elapsed, ProfileAnchor
 
 intern void test_profiler_print() {
   u64 cpu_freq = cpu_frequency();
-  u64 total_cpu_elapsed = profiler_get_tsc_elapsed();
+  u64 total_cpu_elapsed = g_st->profiler.prev_tsc_elapsed;
   if (cpu_freq) {
     print("\nTotal time: %0.4fms (CPU freq %lu)\n", 1000.0 * (f64)total_cpu_elapsed / (f64)cpu_freq, cpu_freq);
   }

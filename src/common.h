@@ -6,6 +6,7 @@
         operator v2() const { return v2(x,y); }
 #include "imgui/imgui.h"
 
+
 // TODO:
 // dummy assets/null 
 // obj mouse selection
@@ -201,7 +202,6 @@ Handle<GpuMesh> mesh_load(String name);
 Handle<GpuShader> shader_load(Shader shader);
 Handle<GpuCubemap> cubemap_load(String name);
 void asset_load();
-String asset_base_path();
 
 ////////////////////////////////////////////////////////////////////////
 // Profiler
@@ -247,13 +247,23 @@ struct ProfilerState {
   u64 prev_tsc_start;
   u64 prev_tsc_end;
   u64 prev_tsc_elapsed;
+
+  struct {
+    f32 scale_x;
+    f32 scale_y;
+    f32 offset_x;
+    f32 offset_y;
+    b32 fullscreen;
+    v2 pos;
+    v2 size;
+  } window;
+
 };
 
 void profiler_begin();
 void profiler_end();
 Slice<ProfileAnchor> profiler_get_anchors();
 u64 profiler_get_tsc_elapsed();
-ProfilerInfo profiler_get_info();
 
 #if PROFILE_BUILD
   #define TimeBlock(Name) ProfileBlock Glue(__profiler_block, __LINE__)(Name, __func__, Name)
@@ -266,16 +276,22 @@ ProfilerInfo profiler_get_info();
 ////////////////////////////////////////////////////////////////////////
 // Watch
 
+enum WatchOp {
+  WatchOp_NotifyHotreload = 1,
+  WatchOp_RecompileShader,
+  WatchOp_ShaderReload,
+};
+
 struct WatchFile {
   String path;
   DenseTime modified;
-  void (*callback)();
+  WatchOp op;
 };
 
 struct WatchDirectory {
   String path;
   OS_Watch watch;
-  void (*callback)(String name);
+  WatchOp op;
 };
 
 struct WatchState {
@@ -284,8 +300,8 @@ struct WatchState {
   Array<WatchDirectory, 128> directories;
 };
 
-void watch_add(String watch_name, void (*callback)());
-void watch_directory_add(String watch_name, void (*reload_callback)(String name), OS_WatchFlags flags = OS_WatchFlag_Modify);
+void watch_add(String watch_name, WatchOp op);
+void watch_directory_add(String watch_name, WatchOp op, OS_WatchFlags flags = OS_WatchFlag_Modify);
 void watch_update();
 
 ////////////////////////////////////////////////////////////////////////
@@ -392,15 +408,6 @@ struct GameState {
   Handle<Entity> monkey;
   Handle<Entity> rotating_cube;
   Handle<Entity> sphere;
-
-  // profile view
-  f32 scale_x;
-  f32 scale_y;
-  f32 offset_x;
-  f32 offset_y;
-  b32 fullscreen;
-  v2 win_pos;
-  v2 win_size;
 };  
 
 struct GlobalState {

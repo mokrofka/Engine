@@ -5,7 +5,7 @@ project(Engine)
 # options
   set(hotreload true)
   set(X11_use true)
-  set(sanitize_address true)
+  set(sanitize_address false)
   set(binary_dir "${CMAKE_SOURCE_DIR}/bin")
   set(dear_imgui true)
   set(profile true)

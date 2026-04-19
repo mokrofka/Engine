@@ -872,4 +872,3 @@ String lexer_next_integer(Lexer* l) {
   String result = {current, (u64)l->cur - (u64)current};
   return result;
 }
-

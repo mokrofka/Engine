@@ -502,8 +502,6 @@ void asset_load() {
 #undef X
 }
 
-String asset_base_path() { return g_st->asset_path; }
-
 ////////////////////////////////////////////////////////////////////////
 // Profiler
 
@@ -569,36 +567,132 @@ Slice<ProfileAnchor> profiler_get_anchors() {
   return Slice(g.prev_anchors+1, g.prev_anchors_count-1);
 }
 
-u64 profiler_get_tsc_elapsed() { return g_st->profiler.prev_tsc_elapsed; }
+void profiler_view() {
+  Scratch scratch;
+  GameState& game = g_st->game;
+  ProfilerState& profiler = g_st->profiler;
+  var& window = profiler.window;
+  if (os_is_key_pressed(Key_4)) {
+    if (window.fullscreen) {
+      ImGui::SetNextWindowPos(window.pos);
+      ImGui::SetNextWindowSize(window.size);
+    }
+    window.fullscreen = !window.fullscreen;
+  }
+  ImGuiWindowFlags flags = {};
+  if (window.fullscreen) {
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+    flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
+  }
+  if (ImGui::Begin("Profiler", null, flags)) {
+    if (!window.fullscreen) {
+      window.pos = ImGui::GetWindowPos();
+      window.size = ImGui::GetWindowSize();
+    }
 
-ProfilerInfo profiler_get_info() {
-  ProfilerState& g = g_st->profiler;
-  ProfilerInfo info = {
-    .tsc_start = g.prev_tsc_start,
-    .tsc_end = g.prev_tsc_end,
-    .tsc_elapsed = g.prev_tsc_elapsed,
-  };
-  return info;
+    Slice<ProfileAnchor> anchors = profiler_get_anchors();
+    u64 cpu_freq = cpu_frequency();
+    u64 tsc_total_elapsed = profiler.prev_tsc_elapsed;
+    u64 tsc_start = profiler.prev_tsc_start;
+    u64 tsc_end = profiler.prev_tsc_end;
+
+    if (ImGui::IsWindowHovered()) {
+      f32 wheel = os_get_scroll();
+      if (wheel) {
+        f32 zoom_factor = wheel > 0 ? 1.1 : 0.8;
+        window.scale_x *= zoom_factor;
+        window.scale_y *= zoom_factor;
+      }
+      f32 move_x = os_get_touchpad();
+      if (move_x) {
+        f32 offset_factor = move_x < 0 ? 1 : -1;
+        window.offset_x += offset_factor * 100;
+      }
+    }
+
+    ImGui::Text("%u moving cubes count", game.moving_cubes.count);
+    ImGui::Text("%.1ffps %0.1fms CPU %.1fGhz", 1/get_dt(), 1000*(f64)tsc_total_elapsed/cpu_freq, (f64)cpu_freq/Billion(1));
+    // ImGui::Text("%.1ffps %0.1fms CPU %.1fGhz", 1.0/(3.0/1000), 1000*(f64)tsc_total_elapsed/cpu_freq, (f64)cpu_freq/Billion(1));
+    // v2 avail_size = ImGui::GetContentRegionAvail();
+    // v2 avail_size = ImGui::GetWindowSize() * g.scale_x;
+    v2 avail_size = ImGui::GetWindowSize() * window.scale_x;
+    v2 draw_offset_min = ImGui::GetItemRectMin();
+    v2 draw_offset_max = ImGui::GetItemRectMax();
+    v2 mouse_pos = os_get_mouse_pos();
+    Loop (i, anchors.count) {
+      ImGui::PushID(i);
+      ProfileAnchor anchor = anchors[i];
+      f64 width_percent = (f64)anchor.tsc_elapsed_inclusive / tsc_total_elapsed;
+      // f64 width_percent_offset = inverse_lerp_f64(tsc_start, anchor.tsc_start, tsc_end);
+      f64 width_percent_offset = inverse_lerp_f64(tsc_start, anchor.tsc_start, tsc_end);
+      f64 width_percent_with_children = 0;
+      f32 width = avail_size.x;
+      f32 height = 30;
+      if (anchor.tsc_elapsed_inclusive != anchor.tsc_elapsed_exclusive) {
+        width_percent_with_children = ((f64)anchor.tsc_elapsed_inclusive / (f64)tsc_total_elapsed);
+        width *= width_percent_with_children;
+      } else {
+        width *= width_percent;
+      }
+      width *= window.scale_x;
+      height *= window.scale_y;
+      if (width_percent > 0.02 || width_percent_with_children > 0.02) {
+        v2 offset = v2(avail_size.x * width_percent_offset, anchor.depth * height) + draw_offset_min;
+        offset.x += window.offset_x;
+        offset.y += draw_offset_max.y - draw_offset_min.y;
+        v2 size = v2(width, height);
+        Rect rect = Rect(offset, size + offset);
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        draw->AddRectFilled(rect.min, rect.max, IM_COL32(50, 50, 50, 255));
+        draw->AddRect(rect.min, rect.max, IM_COL32(200, 200, 200, 255));
+        String str = {};
+        if (v2_in_rect(rect, mouse_pos)) {
+          ImGui::BeginTooltip();
+          ImGui::Text("Label: %s", anchor.label.str);
+          ImGui::Text("Percent: %f%%", width_percent * 100);
+          ImGui::Text("Hits: %lu", anchor.hit_count);
+          ImGui::Text("Time: %fms", (f64)anchor.tsc_elapsed_inclusive / cpu_freq * 1000);
+          ImGui::EndTooltip();
+        }
+        if (width_percent > 0.05 || width_percent_with_children > 0.05) {
+          str = push_strf(scratch, "%s %.3f", anchor.label, (f64)anchor.tsc_elapsed_inclusive / cpu_freq * 1000);
+          v2 text_size = ImGui::CalcTextSize((char*)str.str);
+          v2 text_pos = {};
+          if (text_size.x > size.x) {
+            text_pos.x = rect.min.x;
+            text_pos.y = rect.y + (size.y - text_size.y) * 0.5;
+          } else {
+            text_pos = v2(
+              rect.x + (size.x - text_size.x) * 0.5f,
+              rect.y + (size.y - text_size.y) * 0.5
+            );
+          }
+          draw->PushClipRect(rect.min, rect.max); 
+          draw->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), (char*)str.str);
+          draw->PopClipRect();
+        }
+      }
+      ImGui::PopID();
+    }
+  } ImGui::End();
 }
-
-u64 profiler_get_start_tsc() { return g_st->profiler.tsc_start; }
-u64 profiler_get_end_tsc() { return g_st->profiler.tsc_end; }
 
 ////////////////////////////////////////////////////////////////////////
 // Watch
 
-void watch_add(String watch_name, void (*callback)()) {
+void watch_add(String watch_name, WatchOp op) {
   WatchState& g = g_st->watch;
   FileProperties props = os_file_path_properties(watch_name);
   WatchFile file_watch = {
     .path = watch_name,
     .modified = props.modified,
-    .callback = callback,
+    .op = op,
   };
   g.watches.add(file_watch);
 }
 
-void watch_directory_add(String watch_name, void (*reload_callback)(String name), OS_WatchFlags flags) {
+void watch_directory_add(String watch_name, WatchOp op, OS_WatchFlags flags) {
   WatchState& g = g_st->watch;
   String dir_path = push_strf(g.alloc, "%s", watch_name);
   OS_Watch watch = os_watch_open(flags);
@@ -606,7 +700,7 @@ void watch_directory_add(String watch_name, void (*reload_callback)(String name)
   WatchDirectory dir_watch = {
     .path = dir_path,
     .watch = watch,
-    .callback = reload_callback,
+    .op = op,
   };
   g.directories.add(dir_watch);
 }
@@ -617,14 +711,40 @@ void watch_update() {
   for (WatchFile& x : g.watches) {
     FileProperties props = os_file_path_properties(x.path);
     if (props.modified > x.modified) {
-      (*x.callback)();
+      switch (x.op) {
+        case WatchOp_NotifyHotreload: {
+          g_st->should_hotreload = true;
+        } break;
+        InvalidDefaultCase break;
+      }
       x.modified = props.modified;
     }
   }
   for (WatchDirectory x : g.directories) {
     StringList list = os_watch_check(scratch, x.watch);
-    for (StringNode* node = list.first; node != null; node = node->next) {
-      (*x.callback)(node->string);
+    for EachNode(it, StringNode, list.first) {
+      String name = it->string;
+      switch (x.op) {
+        case WatchOp_RecompileShader: {
+          GlobalState& g = *g_st;
+          Scratch scratch;
+          String shader_filepath = push_strf(scratch, "%s/%s", g.shader_dir, name);
+          String shader_compiled_filepath = push_strf(scratch, "%s/%s%s", g.shader_compiled_dir, name, String(".spv"));
+          StringList list = {};
+          str_list_push(scratch, &list, "glslangValidator");
+          str_list_push(scratch, &list, "-V");
+          str_list_push(scratch, &list, shader_filepath);
+          str_list_push(scratch, &list, "-o");
+          str_list_push(scratch, &list, shader_compiled_filepath);
+          os_process_launch(list);
+        } break;
+        case WatchOp_ShaderReload: {
+          String shader_name_with_format = str_chop_last_dot(name);
+          String shader_name = str_chop_last_dot(shader_name_with_format);
+          vk_shader_reload(shader_name);
+        } break;
+        InvalidDefaultCase break;
+      }
     }
   }
 }
@@ -749,39 +869,34 @@ void common_init() {
   estimate_cpu_frequency();
   g.arena = arena_init();
   g.asset_path = push_strf(g.arena, "%s/%s", os_get_current_directory(), String("../assets"));
-  g.shader_dir = push_str_cat(g.arena, asset_base_path(), "/shaders");
+  g.shader_dir = push_str_cat(g.arena, g.asset_path, "/shaders");
   g.shader_compiled_dir = push_str_cat(g.arena, g.shader_dir, "/compiled");
-  g.models_dir = push_str_cat(g.arena, asset_base_path(), "/models");
-  g.textures_dir = push_str_cat(g.arena, asset_base_path(), "/textures");
-  watch_directory_add(g.shader_dir, [](String name) {
-    GlobalState& g = *g_st;
-    Scratch scratch;
-    String shader_filepath = push_strf(scratch, "%s/%s", g.shader_dir, name);
-    String shader_compiled_filepath = push_strf(scratch, "%s/%s%s", g.shader_compiled_dir, name, String(".spv"));
-    StringList list = {};
-    str_list_push(scratch, &list, "glslangValidator");
-    str_list_push(scratch, &list, "-V");
-    str_list_push(scratch, &list, shader_filepath);
-    str_list_push(scratch, &list, "-o");
-    str_list_push(scratch, &list, shader_compiled_filepath);
-    os_process_launch(list);
-  });
-  watch_directory_add(g.shader_compiled_dir, [](String name) {
-    Scratch scratch;
-    String shader_name_with_format = str_chop_last_dot(name);
-    String shader_name = str_chop_last_dot(shader_name_with_format);
-    vk_shader_reload(shader_name);
-  });
+  g.models_dir = push_str_cat(g.arena, g.asset_path, "/models");
+  g.textures_dir = push_str_cat(g.arena, g.asset_path, "/textures");
+  watch_directory_add(g.shader_dir, WatchOp_RecompileShader);
+  watch_directory_add(g.shader_compiled_dir, WatchOp_ShaderReload);
   g.transforms = push_array(g.arena, Transform, MaxEntities);
   g.static_transforms = push_array(g.arena, Transform, MaxStaticEntities);
   g.vk_st = vk_init();
+  g.profiler.window = {
+    .scale_x = 1,
+    .scale_y = 1,
+  };
 #if DEAR_IMGUI
   vk_imgui_init();
 #endif
   game_init();
 }
 
-shared_function void common_update(HotReloadData* data) {
+void common_update() {
+  profiler_view();
+}
+
+void foo_m() {
+  g_st->should_hotreload = true;
+}
+
+shared_function void common_main(HotReloadData* data) {
   Scratch scratch;
 if (data->ctx == null) {
     Arena arena = arena_init();
@@ -790,11 +905,12 @@ if (data->ctx == null) {
     g_st->arena = arena;
     common_init();
 #if HOTRELOAD_BUILD
-    watch_add(data->lib, []{ g_st->should_hotreload = true; });
+    watch_add(data->lib, WatchOp_NotifyHotreload);
 #endif
   }
   if (!g_st) {
     g_st = (GlobalState*)data->ctx;
+    // g_st->foo_m = foo_m;
     vk_hotreload(g_st->vk_st);
     g_st->should_hotreload = false;
   }
@@ -819,6 +935,7 @@ if (data->ctx == null) {
     last_time = start_time;
     vk_begin_draw_frame();
     ui_begin();
+    common_update();
     game_update();
     ui_end();
     vk_end_draw_frame();
@@ -894,5 +1011,3 @@ void quick_sort(i32* arr, i32 low, i32 high) {
     quick_sort(arr, p + 1, high);
   }
 }
-
-

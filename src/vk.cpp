@@ -799,7 +799,7 @@ intern VkPipeline vk_shader_pipeline_create(Shader shader) {
     Loop (i, 2) {
       String stage_type_strs[] = {"vert", "frag"};
       VkShaderStageFlagBits stage_types[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
-      String filepath = push_strf(scratch, "%s/shaders/compiled/%s.%s.spv", asset_base_path(), shader.name, stage_type_strs[i]);
+      String filepath = push_strf(scratch, "%s/%s.%s.spv", g_st->shader_compiled_dir, shader.name, stage_type_strs[i]);
       Buffer binary = os_file_path_read_all(scratch, filepath);
       VkShaderModuleCreateInfo module_info = {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -1011,7 +1011,7 @@ VK_ShaderModule vk_shader_module_create(String name) {
   Loop (i, 2) {
     String stage_type_strs[] = {"vert", "frag"};
     VkShaderStageFlagBits stage_types[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
-    String filepath = push_strf(scratch, "%s/shaders/compiled/%s.%s.spv", asset_base_path(), name, stage_type_strs[i]);
+    String filepath = push_strf(scratch, "%s/%s.%s.spv", g_st->shader_compiled_dir, name, stage_type_strs[i]);
     Buffer binary = os_file_path_read_all(scratch, filepath);
     VkShaderModuleCreateInfo module_info = {
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
