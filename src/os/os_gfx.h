@@ -9,6 +9,8 @@ void os_pump_messages();
 b32  os_window_should_close();
 v2u  os_get_window_size();
 v2   os_get_mouse_pos();
+f32  os_get_scroll();
+f32  os_get_touchpad();
 void os_get_gfx_api_handlers(void* out);
 void os_close_window();
 
@@ -123,6 +125,8 @@ enum Key {
   MouseKey_Right,
   MouseKey_Middle,
 
+  ScrollKey,
+
   Key_COUNT
 };
 
@@ -148,7 +152,7 @@ struct OS_InputEvent {
   b32 is_pressed;
   OS_Modifiers modifier;
   f32 x, y;
-  f32 scroll_x, scroll_y;
+  f32 scroll;
 };
 
 u32 os_key_to_str(Key key, OS_Modifiers modifiers);

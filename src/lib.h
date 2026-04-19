@@ -12,8 +12,6 @@
 
 struct HotReloadData {
   void* ctx;
-  b32 was_hotreload;
   String lib;
 };
-
 

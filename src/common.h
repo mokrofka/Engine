@@ -1,16 +1,22 @@
 #pragma once
 #include "lib.h"
 
+#define IM_VEC2_CLASS_EXTRA                               \
+        constexpr ImVec2(const v2& f) : x(f.x), y(f.y) {} \
+        operator v2() const { return v2(x,y); }
+#include "imgui/imgui.h"
+
 // TODO:
 // dummy assets/null 
-// memory visualisation
-// thread graph visualisation
 // obj mouse selection
 // serelization/deserialization
 // UI rendering
+// memory visualisation
+// thread graph visualisation
 // profiler
 // make wayland backend work
 // linux crushes when I try sleep and mount?
+// fix static non indexed - doesn't render
 
 const v3 ColorRed   = v3(1,0,0);
 const v3 ColorGreen = v3(0,1,0);
@@ -19,8 +25,8 @@ const v3 ColorWhite = v3(1,1,1);
 const v3 ColorBlack = v3(0,0,0);
 const v3 ColorGrey  = v3(0.8,0.8,0.8);
 
-const u32 MaxEntities = KB(10);
-const u32 MaxStaticEntities = KB(100);
+const u32 MaxEntities = KB(1);
+const u32 MaxStaticEntities = KB(10);
 
 struct Entity;
 struct StaticEntity;
@@ -29,13 +35,6 @@ struct GpuMesh;
 struct GpuShader;
 struct GpuMaterial;
 struct GpuCubemap;
-
-f32 get_dt();
-f32 get_time();
-f32 get_was_hotreload();
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// vk.cpp
 
 struct PointLight {
   v3 color;
@@ -125,49 +124,23 @@ struct Material {
   // Handle<GpuTexture> texture3;
 };
 
-void* vk_init();
-void vk_shutdown();
-void vk_hotreload(void* ctx);
+struct Timer {
+  f32 passed;
+  f32 interval;
+};
 
-Handle<GpuTexture> vk_texture_load(Texture texture);
-Handle<GpuMaterial> vk_material_load(Material material);
-Handle<GpuCubemap> vk_cubemap_load(Texture* textures);
-Handle<GpuMesh> vk_mesh_load(Mesh mesh);
+Timer timer_init(f32 interval);
+b32 timer_tick(Timer& t);
 
-void vk_shader_reload(String name);
-
-void vk_begin_draw_frame();
-void vk_end_draw_frame();
-
-// Entity
-void vk_make_renderable_(Handle<Entity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuMaterial> material_handle);
-void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuMaterial> material_handle);
-void vk_remove_renderable(Handle<Entity> entity_handle);
-void vk_set_entity_color(Handle<Entity> entity_handle, v4 color);
-
-mat4& vk_get_view();
-mat4& vk_get_projection();
-
-void debug_draw_line(v3 a, v3 b, v3 color);
-void debug_draw_aabb(v3 min, v3 max, v3 color);
 void draw_squad(v2 min, v2 max, v3 color);
 
-void ui_begin();
-void ui_end();
-void ui_push_box(String str);
-void ui_pop_box();
-b32 ui_begin_window(u32 id, v2 size);
-b32 ui_button(u32 id, v2 min, v2 max);
+// Transform& entity_transform(Handle<Entity> handle);
+// Transform& static_entity_transform(Handle<StaticEntity> handle);
 
-void imgui_init();
-void imgui_begin_frame();
-void imgui_end_frame();
+f32 get_dt();
+f32 get_time();
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// common.cpp
-
-Transform& entity_transform(Handle<Entity> handle);
-Transform& static_entity_transform(Handle<StaticEntity> handle);
+f32 get_was_hotreload();
 
 #if BUILD_DEBUG
 u32* entities_generations();
@@ -223,10 +196,12 @@ enum MaterialId {
 
 Handle<GpuMesh> mesh_get(MeshId id);
 void mesh_set(MeshId id, Handle<GpuMesh> mesh_handle);
-Handle<GpuTexture> texture_get(TextureId id);
 Handle<GpuMaterial> material_get(MaterialId id);
-
+Handle<GpuMesh> mesh_load(String name);
+Handle<GpuShader> shader_load(Shader shader);
+Handle<GpuCubemap> cubemap_load(String name);
 void asset_load();
+String asset_base_path();
 
 ////////////////////////////////////////////////////////////////////////
 // Profiler
@@ -243,7 +218,7 @@ struct ProfileAnchor {
   u64 hit_count;
   String label;
   // for fraph
-  u32 parent_idx;
+  u32 depth;
   u64 tsc_start;
   u64 tsc_end;
 };
@@ -257,78 +232,206 @@ struct ProfileBlock {
   ~ProfileBlock();
 };
 
+struct ProfilerState {
+  ProfileAnchor anchors[KB(4)];
+  u32 anchors_count;
+  u64 tsc_start;
+  u64 tsc_end;
+  u32 profiler_parent;
+  // Map<String, u32> map;
+  u32 hash_to_indices[KB(4)];
+  u32 depth;
+
+  ProfileAnchor prev_anchors[4096];
+  u32 prev_anchors_count;
+  u64 prev_tsc_start;
+  u64 prev_tsc_end;
+  u64 prev_tsc_elapsed;
+};
+
 void profiler_begin();
 void profiler_end();
 Slice<ProfileAnchor> profiler_get_anchors();
 u64 profiler_get_tsc_elapsed();
 ProfilerInfo profiler_get_info();
 
-#define TimeBlock(Name) ProfileBlock Glue(__profiler_block, __LINE__)(Name, __func__, Name)
-#define TimeFunction TimeBlock(__func__)
-
-// #define TimeBlock(Name)
-// #define TimeFunction
+#if PROFILE_BUILD
+  #define TimeBlock(Name) ProfileBlock Glue(__profiler_block, __LINE__)(Name, __func__, Name)
+  #define TimeFunction TimeBlock(__func__)
+#else
+  #define TimeBlock(Name)
+  #define TimeFunction
+#endif
 
 ////////////////////////////////////////////////////////////////////////
-// Asset watcher
+// Watch
 
-void watch_add(String watch_name, void (**callback)());
-void watch_directory_add(String watch_name, void (**reload_callback)(String name), OS_WatchFlags flags = OS_WatchFlag_Modify);
+struct WatchFile {
+  String path;
+  DenseTime modified;
+  void (*callback)();
+};
+
+struct WatchDirectory {
+  String path;
+  OS_Watch watch;
+  void (*callback)(String name);
+};
+
+struct WatchState {
+  Allocator alloc;
+  Array<WatchFile, 128> watches;
+  Array<WatchDirectory, 128> directories;
+};
+
+void watch_add(String watch_name, void (*callback)());
+void watch_directory_add(String watch_name, void (*reload_callback)(String name), OS_WatchFlags flags = OS_WatchFlag_Modify);
 void watch_update();
 
 ////////////////////////////////////////////////////////////////////////
-// Common
+// UI
 
-void common_init();
-void r_shutdown();
-
-String asset_base_path();
-Handle<GpuMesh> mesh_load(String name);
-Handle<GpuShader> shader_load(Shader shader);
-Handle<GpuTexture> texture_load(String name);
-Handle<GpuCubemap> cubemap_load(String name);
-
-struct Timer {
-  f32 passed;
-  f32 interval;
+struct UI_Window {
+  v2 pos;
+  v2 size;
 };
 
-Timer timer_init(f32 interval);
-b32 timer_tick(Timer& t);
+struct UI_Box {
+  v2 pos;
+  v2 size;
+  u64 hash;
+};
+
+struct UI_State {
+  u32 hot;
+  u32 last_hot;
+  u32 active;
+  u32 active_window;
+  v2 drag_offset;
+  UI_Window windows[10];
+  UI_Box boxes[10];
+  u32 boxes_count;
+  HashedStrMap<u32> hashes;
+};
+
+void ui_begin();
+void ui_end();
+void ui_push_box(String str);
+void ui_pop_box();
+b32 ui_begin_window(u32 id, v2 size);
+b32 ui_button(u32 id, v2 min, v2 max);
 
 ////////////////////////////////////////////////////////////////////////
-// Json
+// game
 
-enum JsonType {
-  JsonType_Error,
-  JsonType_Bool,
-  JsonType_Number,
-  JsonType_String,
-  JsonType_Array,
-  JsonType_Object,
-  JsonType_Null,
-  JsonType_End,
+struct Camera {
+  v3 pos;
+  v3 dir;
+  f32 yaw;
+  f32 pitch;
+  f32 fov;
 };
 
-struct JsonValue {
-  JsonType type;
-  String str;
-  i32 depth;
-  b32 match(String name) { return str_match(str, name); };
+struct Entity {
+  v3 vel;
+  AABB aabb;
 };
 
-struct JsonReader {
-  u8* cur;
-  u8* end;
-  i32 depth;
-  String error;
-  JsonValue base_obj;
+template<>
+struct Handle<Entity> {
+  u32 handle;
+  Transform& trans();
+  v3& pos();
+  v3& rot();
+  v3& scale();
+  Entity& get();
+  AABB& aabb();
+  v3& vel();
+#if BUILD_DEBUG
+  u32 idx() { return handle & INDEX_MASK; }
+  u32 generation() { return handle >> INDEX_BITS; }
+#else
+  u32 idx() { return handle; }
+#endif
 };
 
-JsonReader json_reader_init(String buffer);
-b32 json_iter_object(JsonReader* r, JsonValue obj, JsonValue *key, JsonValue *val);
-b32 json_iter_array(JsonReader* r, JsonValue arr, JsonValue* val);
+struct StaticEntity {
+};
 
-#define JSON_OBJ(r, o) for (JsonValue k, v; json_iter_object(&r, o, &k, &v);)
-#define JSON_OBJ_(r, o) for (JsonValue key, val; json_iter_object(&r, o, &key, &val);)
-#define JSON_ARR(r, val) for (JsonValue obj; json_iter_array(&r, val, &obj);)
+template<>
+struct Handle<StaticEntity> {
+  u32 handle;
+  Transform& trans();
+  v3& pos();
+  v3& rot();
+  v3& scale();
+#if BUILD_DEBUG
+  u32 idx() { return handle & INDEX_MASK; }
+  u32 generation() { return handle >> INDEX_BITS; }
+#else
+  u32 idx() { return handle; }
+#endif
+};
+
+struct GameState {
+  Arena arena;
+  Arena persistent_arena;
+  AllocSegList gpa;
+  Camera cam;
+  Timer timer;
+
+  Entity* entities;
+  StaticEntity* static_entities;
+  StaticIdPool entity_id_pool;
+  StaticIdPool static_entity_id_pool;
+
+  Darray<Handle<Entity>> moving_cubes;
+
+  Handle<Entity> axis_attached_to_cam;
+  Handle<Entity> grid;
+  Handle<Entity> monkey;
+  Handle<Entity> rotating_cube;
+  Handle<Entity> sphere;
+
+  // profile view
+  f32 scale_x;
+  f32 scale_y;
+  f32 offset_x;
+  f32 offset_y;
+  b32 fullscreen;
+  v2 win_pos;
+  v2 win_size;
+};  
+
+struct GlobalState {
+  Arena arena;
+  f32 dt;
+  f32 time;
+  b32 should_hotreload;
+  Transform* transforms;
+  Transform* static_transforms;
+
+  Handle<GpuMesh> meshes_handlers[Mesh_COUNT];
+  Handle<GpuTexture> textures_handlers[Texture_COUNT];
+  Handle<GpuMaterial> materials_handlers[Material_COUNT];
+
+  String asset_path;
+  String shader_dir;
+  String shader_compiled_dir;
+  String models_dir;
+  String textures_dir;
+  Map<String, Handle<GpuTexture>> str_to_texture;
+  Map<String, Handle<GpuMesh>> str_to_mesh;
+  Map<String, Handle<GpuMaterial>> str_to_material;
+
+  WatchState watch;
+  ProfilerState profiler;
+  UI_State ui;
+  GameState game;
+
+  void* vk_st;
+};
+
+extern GlobalState* g_st;
+
+void common_init();

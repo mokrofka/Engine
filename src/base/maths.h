@@ -127,6 +127,16 @@ struct Transform {
   v3 scale;
 };
 
+struct AABB {
+  v3 min;
+  v3 max;
+};
+
+struct Ray {
+  v3 origin;
+  v3 dir;
+};
+
 NO_DEBUG f32 Sin(f32 a);
 NO_DEBUG f32 Cos(f32 a);
 NO_DEBUG f32 Tan(f32 a);
@@ -185,6 +195,13 @@ NO_DEBUG f32 rand_f32();
 NO_DEBUG f32 rand_range_f32(f32 min, f32 max);
 NO_DEBUG b32 rand_b32();
 NO_DEBUG void rand_seed();
+NO_DEBUG u32 rand_get_seed();
+template<typename T> void rand_shuffle(Slice<T> slice) {
+  Loop (i, slice.count) {
+    u32 j = rand_range_u32(i, slice.count - 1);
+    Swap(slice[i], slice[j]);
+  }
+}
 
 f32 inverse_lerp(f32 a, f32 x, f32 b);
 f64 inverse_lerp_f64(f64 a, f64 x, f64 b);

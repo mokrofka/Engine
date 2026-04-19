@@ -7,10 +7,13 @@ project(Engine)
   set(X11_use true)
   set(sanitize_address true)
   set(binary_dir "${CMAKE_SOURCE_DIR}/bin")
+  set(dear_imgui true)
+  set(profile true)
 
   message("hotreload: ${hotreload}")
   message("binary path: ${binary_dir}")
   message("sanitizer: ${sanitize_address}")
+  message("dear imgui: ${dear_imgui}")
 
 # binary output
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${binary_dir}")
@@ -36,7 +39,7 @@ project(Engine)
   endif()
 
 # Linker
-  add_link_options("-fuse-ld=lld") # "-nostdlib++" but imgui depends
+  add_link_options("-fuse-ld=lld")
   message("Linker path: ${CMAKE_LINKER}")
 
 # Build
@@ -51,20 +54,38 @@ project(Engine)
   if (X11_use)
     add_compile_definitions(GFX_X11=1)
   endif()
+  if (profile)
+    add_compile_definitions(PROFILE_BUILD)
+  endif()
   include_directories(src)
   include_directories(vendor)
   
+  set(lib_source
+    src/base/base_impl.cpp
+    vendor/stb_impl.c
+  )
+  set(game_source src/common.cpp)
+  set(exe_source src/main.cpp)
+
+  if (dear_imgui)
+    list(APPEND lib_source vendor/imgui/imgui_impl.cpp)
+    set_source_files_properties(
+      vendor/imgui/imgui_impl.cpp
+      vendor/stb_impl.c
+      PROPERTIES
+      COMPILE_OPTIONS "-O0;-g"
+    )
+    add_compile_definitions(DEAR_IMGUI=1)
+  else()
+    add_link_options("-nostdlib++")
+  endif()
+
 # Hotreload
   if (hotreload)
     add_compile_definitions(HOTRELOAD_BUILD=1)
 
     # Lib
-    add_library(lib SHARED 
-      src/base/base_impl.cpp
-      src/os/os_impl.cpp
-      vendor/stb_impl.c
-      vendor/imgui/imgui_impl.cpp
-    )
+    add_library(lib SHARED ${lib_source})
     target_compile_definitions(lib PRIVATE KEXPORT)
     if (UNIX)
       if (X11_use)
@@ -74,28 +95,20 @@ project(Engine)
     endif()
 
     # Game
-    add_library(game SHARED
-      # src/game/game.cpp
-      src/vk.cpp
-      src/common.cpp
-    )
+    add_library(game SHARED ${game_source})
     target_include_directories(game PRIVATE src/game)
     target_link_libraries(game ${binary_dir}/liblib.so)
 
     # Exe
-    add_executable(exe src/main.cpp)
+    add_executable(exe ${exe_source})
     target_link_libraries(exe ${binary_dir}/liblib.so)
 
 # One Exe
   else()
     add_executable(exe
-      src/base/base_impl.cpp
-      src/os/os_impl.cpp
-      src/vk.cpp
-      src/common.cpp
-      src/main.cpp
-      vendor/stb_impl.c
-      vendor/imgui/imgui_impl.cpp
+      ${lib_source}
+      ${game_source}
+      ${exe_source}
     )
     if (UNIX)
       if (X11_use)

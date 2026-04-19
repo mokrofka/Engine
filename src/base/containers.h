@@ -18,6 +18,8 @@ struct Handle {
 #endif
 };
 
+inline u32 id_idx(u32 id) { return id & INDEX_MASK; }
+
 // TODO: improve deinit
 
 ////////////////////////////////////////////////////////////////////////
@@ -706,14 +708,30 @@ struct DarrayIndexHandler {
 ////////////////////////////////////////////////////////////////////////
 // IdPool
 
-// TODO: make array that allocates as idpool
-
 struct IdPool {
-  u32 next_idx;
-  Darray<u32> array;
+  u32 count;
+  u32 cap;
+  u32* ids;
+  Allocator allocator;
+#if BUILD_DEBUG
+  u32* generations;
+#endif
   IdPool() = default;
   IdPool(Allocator alloc);
   void init(Allocator alloc);
+  void clear();
+  u32 alloc();
+  void free(u32 id);
+};
+
+struct StaticIdPool {
+  u32 count;
+  u32 cap;
+  u32* ids;
+#if BUILD_DEBUG
+  u32* generations;
+#endif
+  void init(Allocator alloc, u32 cap_);
   void clear();
   u32 alloc();
   void free(u32 id);

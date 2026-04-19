@@ -41,6 +41,8 @@ struct X11State {
     KeyboardState keyboard_previous;
     MouseState mouse_current;
     MouseState mouse_previous;
+    f32 mouse_scroll;
+    f32 touchpad_move_x;
   } input;
   Darray<OS_InputEvent> input_events;
   Darray<xcb_generic_event_t*> xcb_events;
@@ -319,6 +321,8 @@ void os_gfx_shutdown() { xcb_disconnect(gfx_st.connection); }
 void os_pump_messages() {
   X11State& g = gfx_st;
   g.input_events.clear();
+  g.input.mouse_scroll = 0;
+  g.input.touchpad_move_x = 0;
 
   xcb_generic_event_t* event;
   u32 i = 0;
@@ -444,11 +448,12 @@ void os_pump_messages() {
         }
         else {
           switch (bp->detail) {
-            case XK_ScrollUp: event.scroll_y = 1; break;
-            case XK_ScrollDown: event.scroll_y = -1; break;
-            case XK_ScrollLeft: event.scroll_x = -1; break;
-            case XK_ScrollRight: event.scroll_x = 1; break;
+            case XK_ScrollUp: ; event.scroll = 1; break;
+            case XK_ScrollDown: event.scroll = -1; break;
+            case XK_ScrollLeft: g.input.touchpad_move_x = -1; break;
+            case XK_ScrollRight: g.input.touchpad_move_x = 1; break;
           }
+          g.input.mouse_scroll = event.scroll;
           event.type = OS_EventKind_Scroll;
         }
         g.input_events.add(event);
@@ -500,7 +505,7 @@ void os_pump_messages() {
         }
         xcb_send_event(g.connection, 0, req->requestor, XCB_EVENT_MASK_NO_EVENT, (char*)&notify);
         xcb_flush(g.connection);
-      }
+      } break;
     }
   }
   g.xcb_events.clear();
@@ -578,6 +583,8 @@ String os_clipboard_read() {
 b32 os_window_should_close() { return gfx_st.should_close; }
 v2u os_get_window_size() { return v2u(gfx_st.width, gfx_st.height); }
 v2 os_get_mouse_pos() { return v2(gfx_st.input.mouse_current.x, gfx_st.input.mouse_current.y); }
+f32 os_get_scroll() { return gfx_st.input.mouse_scroll; }
+f32  os_get_touchpad() { return gfx_st.input.touchpad_move_x; }
 void os_close_window() { gfx_st.should_close = true; }
 
 void os_get_gfx_api_handlers(void* out) {

@@ -1,9 +1,5 @@
 #include "common.h"
-
-#define IM_VEC2_CLASS_EXTRA                               \
-        constexpr ImVec2(const v2& f) : x(f.x), y(f.y) {} \
-        operator v2() const { return v2(x,y); }
-#include "imgui/imgui.h"
+#include "vk.h"
 
 Vertex cube_vertices[] = {
   // Front face (0, 0, 1)
@@ -128,98 +124,6 @@ Mesh sphere_generate(Allocator arena) {
   return mesh;
 }
 
-struct AABB {
-  v3 min;
-  v3 max;
-};
-
-struct Ray {
-  v3 origin;
-  v3 dir;
-};
-
-struct Camera {
-  v3 pos;
-  v3 dir;
-  f32 yaw;
-  f32 pitch;
-  f32 fov;
-};
-
-struct Entity {
-  v3 vel;
-  AABB aabb;
-};
-
-template<>
-struct Handle<Entity> {
-  u32 handle;
-  Transform& trans() { return entity_transform((Handle<Entity>)handle); }
-  v3& pos() { return trans().pos; }
-  v3& rot() { return trans().rot; }
-  v3& scale() { return trans().scale; }
-  Entity& get();
-  AABB& aabb();
-  v3& vel();
-#if BUILD_DEBUG
-  u32 idx() { return handle & INDEX_MASK; }
-  u32 generation() { return handle >> INDEX_BITS; }
-#else
-  u32 idx() { return handle; }
-#endif
-};
-
-struct StaticEntity {
-  u32 some;
-
-};
-
-template<>
-struct Handle<StaticEntity> {
-  u32 handle;
-  Transform& trans() { return static_entity_transform((Handle<StaticEntity>)handle); }
-  v3& pos() { return static_entity_transform((Handle<StaticEntity>)handle).pos; }
-  v3& rot() { return static_entity_transform((Handle<StaticEntity>)handle).rot; }
-  v3& scale() { return static_entity_transform((Handle<StaticEntity>)handle).scale; }
-#if BUILD_DEBUG
-  u32 idx() { return handle & INDEX_MASK; }
-  u32 generation() { return handle >> INDEX_BITS; }
-#else
-  u32 idx() { return handle; }
-#endif
-};
-
-struct GameState {
-  Arena arena;
-  Arena persistent_arena;
-  AllocSegList gpa;
-  Camera cam;
-  Timer timer;
-  StaticObjectPool<Entity, MaxEntities> entity_pool;
-  StaticObjectPool<StaticEntity, MaxStaticEntities> static_entity_pool;
-
-  Darray<Handle<Entity>> moving_cubes;
-
-  Handle<Entity> axis_attached_to_cam;
-  Handle<Entity> grid;
-  Handle<Entity> monkey;
-  Handle<Entity> rotating_cube;
-  Handle<Entity> spehre;
-
-  // profiler
-  b32 show_ms;
-};  
-
-global GameState* game_st;
-void game_hotreload(void* ctx) { game_st = (GameState*)ctx; }
-
-Entity& Handle<Entity>::get() { return game_st->entity_pool.get((Handle<Entity>)handle); }
-AABB& Handle<Entity>::aabb() { return get().aabb; }
-v3& Handle<Entity>::vel() { return get().vel; }
-
-////////////////////////////////////////////////////////////////////////
-// Utils
-
 Mesh grid_create(Allocator arena, u32 size, f32 step) {
   Vertex* vertices = push_array(arena, Vertex, size*4);
   v3 pos_offset = v3(-(i32)size/2, 0, -(i32)size/2);
@@ -239,28 +143,23 @@ Mesh grid_create(Allocator arena, u32 size, f32 step) {
   return mesh;
 }
 
+////////////////////////////////////////////////////////////////////////
+// Utils
+
 Handle<Entity> entity_create(MeshId mesh_id, MaterialId material_id) {
-  Handle<Entity> e = game_st->entity_pool.add();
+  GameState& g = g_st->game;
+  u32 e_id = g.entity_id_pool.alloc();
+  Handle<Entity> e = {e_id};
   e.trans() = {};
   e.scale() = v3_one();
-  // vk_make_renderable(e, mesh_get(mesh_id), shader_get(shader_id), material_get(material_id));
-  vk_make_renderable_(e, mesh_get(mesh_id), material_get(material_id));
+  vk_make_renderable(e, mesh_get(mesh_id), material_get(material_id));
   return e;
 }
 
-struct Prefab {
-  MeshId mesh;
-  MaterialId material;
-};
-
-Prefab cube_prefab = { Mesh_Cube, Material_Orange };
-
-Handle<Entity> entity_create(Prefab prefab) {
-  return entity_create(prefab.mesh, prefab.material);
-}
-
 Handle<StaticEntity> entity_static_create(MeshId mesh_id, MaterialId material_id) {
-  Handle<StaticEntity> e = game_st->static_entity_pool.add();
+  GameState& g = g_st->game;
+  u32 e_id = g.static_entity_id_pool.alloc();
+  Handle<StaticEntity> e = {e_id};
   e.trans() = {};
   e.scale() = v3_one();
   vk_make_renderable_static(e, mesh_get(mesh_id), material_get(material_id));
@@ -268,7 +167,8 @@ Handle<StaticEntity> entity_static_create(MeshId mesh_id, MaterialId material_id
 }
 
 void entity_remove(Handle<Entity> e) {
-  game_st->entity_pool.remove(e);
+  GameState& g = g_st->game;
+  g.entity_id_pool.free(e.handle);
   vk_remove_renderable(e);
 }
 
@@ -298,16 +198,18 @@ v3 ray_from_camera() {
 // };
 
 void select_obj() {
+  GameState& g = g_st->game;
   v3 dir = ray_from_camera();
   Handle<Entity> e = entity_create(Mesh_Cube, Material_Orange);
   // e.pos() = st->cam.pos + v3_norm(mat4_forward(st->cam.view));
-  e.pos() = game_st->cam.pos;
+  e.pos() = g.cam.pos;
   e.scale() = v3_scale(0.3);
   e.vel() = dir * 4;
 }
 
 void camera_update() {
-  Camera& cam = game_st->cam;
+  GameState& g = g_st->game;
+  Camera& cam = g.cam;
   v2 win_size = v2_of_v2u(os_get_window_size());
   mat4& projection = vk_get_projection();
   mat4& view = vk_get_view();
@@ -378,97 +280,6 @@ void camera_update() {
   view = mat4_look_at(cam.pos, cam.dir, v3_up());
 }
 
-////////////////////////////////////////////////////////////////////////
-// Init
-
-void new_init() {
-}
-
-void scene_init() {
-  Scratch scratch;
-  Camera& cam = game_st->cam;
-  cam = {
-    .pos = v3(0,0,5),
-    .yaw = -90,
-    .fov = 45,
-  };
-  cam.dir = {
-    CosD(cam.yaw) * CosD(cam.pitch),
-    SinD(cam.pitch),
-    SinD(cam.yaw) * CosD(cam.pitch)
-  };
-  vk_get_view() = mat4_look_at(cam.pos, cam.dir, v3_up());
-  Handle<Entity> cube = entity_create(Mesh_Cube, Material_Orange);
-  game_st->rotating_cube = cube;
-  Handle<Entity> monkey = entity_create(Mesh_MonkeyGlb, Material_Container);
-  monkey.aabb() = {v3_scale(-1.2), v3_scale(1.2)};
-  game_st->monkey = monkey;
-  {
-    Handle<Entity> triangle = entity_create(Mesh_Triangle, Material_Orange);
-    triangle.pos() = v3_scale(3);
-  }
-  {
-    Handle<Entity> grid = entity_create(Mesh_Grid, Material_Line);
-    game_st->grid = grid;
-    vk_set_entity_color(grid, v4_scale(0.6));
-    grid.pos() = v3(0,0,-5);
-  }
-  {
-    game_st->axis_attached_to_cam = entity_create(Mesh_Axis, Material_Axis);
-  }
-  Loop (i, 3) {
-    Handle<Entity> cube = entity_create(Mesh_Cube, Material_Orange);
-    u32 range = 10;
-    cube.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
-  }
-#if 1
-  u64 start = os_now_ns();
-  // Loop (i, MB(1)-KB(100)) {
-  // Loop (i, KB(100)) {
-  Loop (i, KB(1)) {
-    Handle<StaticEntity> e = entity_static_create(Mesh_Cube, Material_Orange);
-    u32 range = KB(1);
-    e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
-  }
-  u64 end = os_now_ns();
-  Info("%f64 s", f64(end - start)/Billion(1));
-#endif
-
-  {
-    game_st->spehre = entity_create(Mesh_Sphere, Material_Container);
-    game_st->spehre.pos() = v3(0,0,-10);
-  }
-  {
-    // Handle<Entity> e = entity_create(Mesh_Castle, Shader_E_Texture, Material_Castle);
-    // e.pos().z = -100;
-  }
-  {
-    // Loop (i, KB(1)) {
-    //   Handle<Entity> e = entity_create(Mesh_Cube, Material_Screen);
-    //   u32 range = 100;
-    //   e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
-    // }
-  }
-  {
-    Loop (i, 0) {
-      Handle<Entity> e = entity_create(Mesh_Cube, Material_Container);
-      u32 range = 100;
-      e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
-      game_st->moving_cubes.add(e);
-    }
-  }
-  
-}
-
-void scene_deinit() {
-  // st->entity_pool = {};
-  // st->entity_pool.clear();
-  // arena_clear(&st->arena);
-}
-
-////////////////////////////////////////////////////////////////////////
-// Update
-
 Darray<Handle<Entity>> arr;
 
 intern void render_add() {
@@ -493,9 +304,240 @@ intern void render_remove() {
   arr.clear();
 }
 
-void scene_update() {
-  GameState& g = *game_st;
+void profiler_view() {
   Scratch scratch;
+  GameState& g = g_st->game;
+  if (os_is_key_pressed(Key_4)) {
+    if (g.fullscreen) {
+      ImGui::SetNextWindowPos(g.win_pos);
+      ImGui::SetNextWindowSize(g.win_size);
+    }
+    g.fullscreen = !g.fullscreen;
+  }
+  ImGuiWindowFlags flags = {};
+  if (g.fullscreen) {
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+    flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
+  }
+  if (ImGui::Begin("Profiler", null, flags)) {
+    if (!g.fullscreen) {
+      g.win_pos = ImGui::GetWindowPos();
+      g.win_size = ImGui::GetWindowSize();
+    }
+
+    Slice<ProfileAnchor> anchors = profiler_get_anchors();
+    u64 cpu_freq = cpu_frequency();
+    u64 tsc_total_elapsed = profiler_get_info().tsc_elapsed;
+    u64 tsc_start = profiler_get_info().tsc_start;
+    u64 tsc_end = profiler_get_info().tsc_end;
+
+    if (ImGui::IsWindowHovered()) {
+      f32 wheel = os_get_scroll();
+      if (wheel) {
+        f32 zoom_factor = wheel > 0 ? 1.1 : 0.8;
+        g.scale_x *= zoom_factor;
+        g.scale_y *= zoom_factor;
+      }
+      f32 move_x = os_get_touchpad();
+      if (move_x) {
+        f32 offset_factor = move_x < 0 ? 1 : -1;
+        g.offset_x += offset_factor * 100;
+      }
+    }
+
+    ImGui::Text("%u moving cubes count", g.moving_cubes.count);
+    ImGui::Text("%.1ffps %0.1fms CPU %.1fGhz", 1/get_dt(), 1000*(f64)tsc_total_elapsed/cpu_freq, (f64)cpu_freq/Billion(1));
+    // ImGui::Text("%.1ffps %0.1fms CPU %.1fGhz", 1.0/(3.0/1000), 1000*(f64)tsc_total_elapsed/cpu_freq, (f64)cpu_freq/Billion(1));
+    // v2 avail_size = ImGui::GetContentRegionAvail();
+    // v2 avail_size = ImGui::GetWindowSize() * g.scale_x;
+    v2 avail_size = ImGui::GetWindowSize() * g.scale_x;
+    v2 draw_offset_min = ImGui::GetItemRectMin();
+    v2 draw_offset_max = ImGui::GetItemRectMax();
+    v2 mouse_pos = os_get_mouse_pos();
+    Loop (i, anchors.count) {
+      ImGui::PushID(i);
+      ProfileAnchor anchor = anchors[i];
+      f64 width_percent = (f64)anchor.tsc_elapsed_inclusive / tsc_total_elapsed;
+      // f64 width_percent_offset = inverse_lerp_f64(tsc_start, anchor.tsc_start, tsc_end);
+      f64 width_percent_offset = inverse_lerp_f64(tsc_start, anchor.tsc_start, tsc_end);
+      f64 width_percent_with_children = 0;
+      f32 width = avail_size.x;
+      f32 height = 30;
+      if (anchor.tsc_elapsed_inclusive != anchor.tsc_elapsed_exclusive) {
+        width_percent_with_children = ((f64)anchor.tsc_elapsed_inclusive / (f64)tsc_total_elapsed);
+        width *= width_percent_with_children;
+      } else {
+        width *= width_percent;
+      }
+      width *= g.scale_x;
+      height *= g.scale_y;
+      if (width_percent > 0.02 || width_percent_with_children > 0.02) {
+        v2 offset = v2(avail_size.x * width_percent_offset, anchor.depth * height) + draw_offset_min;
+        offset.x += g.offset_x;
+        offset.y += draw_offset_max.y - draw_offset_min.y;
+        v2 size = v2(width, height);
+        Rect rect = Rect(offset, size + offset);
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        draw->AddRectFilled(rect.min, rect.max, IM_COL32(50, 50, 50, 255));
+        draw->AddRect(rect.min, rect.max, IM_COL32(200, 200, 200, 255));
+        String str = {};
+        if (v2_in_rect(rect, mouse_pos)) {
+          ImGui::BeginTooltip();
+          ImGui::Text("Label: %s", anchor.label.str);
+          ImGui::Text("Percent: %f%%", width_percent * 100);
+          ImGui::Text("Hits: %lu", anchor.hit_count);
+          ImGui::Text("Time: %fms", (f64)anchor.tsc_elapsed_inclusive / cpu_freq * 1000);
+          ImGui::EndTooltip();
+        }
+        if (width_percent > 0.05 || width_percent_with_children > 0.05) {
+          str = push_strf(scratch, "%s %.3f", anchor.label, (f64)anchor.tsc_elapsed_inclusive / cpu_freq * 1000);
+          v2 text_size = ImGui::CalcTextSize((char*)str.str);
+          v2 text_pos = {};
+          if (text_size.x > size.x) {
+            text_pos.x = rect.min.x;
+            text_pos.y = rect.y + (size.y - text_size.y) * 0.5;
+          } else {
+            text_pos = v2(
+              rect.x + (size.x - text_size.x) * 0.5f,
+              rect.y + (size.y - text_size.y) * 0.5
+            );
+          }
+          draw->PushClipRect(rect.min, rect.max); 
+          draw->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), (char*)str.str);
+          draw->PopClipRect();
+        }
+      }
+      ImGui::PopID();
+    }
+  } ImGui::End();
+}
+
+////////////////////////////////////////////////////////////////////////
+// Init
+
+void scene_init() {
+  Scratch scratch;
+  GameState& g = g_st->game;
+  Camera& cam = g.cam;
+  cam = {
+    .pos = v3(0,0,5),
+    .yaw = -90,
+    .fov = 45,
+  };
+  cam.dir = {
+    CosD(cam.yaw) * CosD(cam.pitch),
+    SinD(cam.pitch),
+    SinD(cam.yaw) * CosD(cam.pitch)
+  };
+  vk_get_view() = mat4_look_at(cam.pos, cam.dir, v3_up());
+  Handle<Entity> cube = entity_create(Mesh_Cube, Material_Orange);
+  g.rotating_cube = cube;
+  Handle<Entity> monkey = entity_create(Mesh_MonkeyGlb, Material_Container);
+  monkey.aabb() = {v3_scale(-1.2), v3_scale(1.2)};
+  g.monkey = monkey;
+  {
+    Handle<Entity> triangle = entity_create(Mesh_Triangle, Material_Orange);
+    triangle.pos() = v3_scale(3);
+  }
+  {
+    Handle<Entity> grid = entity_create(Mesh_Grid, Material_Line);
+    g.grid = grid;
+    vk_set_entity_color(grid, v4_scale(0.6));
+    grid.pos() = v3(0,0,-5);
+  }
+  {
+    g.axis_attached_to_cam = entity_create(Mesh_Axis, Material_Axis);
+  }
+  Loop (i, 3) {
+    Handle<Entity> cube = entity_create(Mesh_Cube, Material_Orange);
+    u32 range = 10;
+    cube.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+  }
+#if 1
+  u64 start = os_now_ns();
+  // Loop (i, MB(1)-KB(1)) {
+  // Loop (i, KB(100)) {
+  Loop (i, KB(1)) {
+    // Handle<StaticEntity> e = entity_static_create(Mesh_Cube, Material_Orange);
+    // u32 range = KB(1);
+    // e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+
+    MeshId meshes[] = {
+      // Mesh_MonkeyGlb,
+      // Mesh_Triangle,
+      Mesh_Cube,
+    };
+    MaterialId materials[] = {
+      Material_Orange,
+      // Material_Container,
+      // Material_Screen,
+    };
+    Handle<StaticEntity> e = entity_static_create(meshes[rand_range_u32(0, ArrayCount(meshes)-1)], materials[rand_range_u32(0, ArrayCount(materials)-1)]);
+    u32 range = KB(1);
+    e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+
+  }
+  u64 end = os_now_ns();
+  Info("%f64 s", f64(end - start)/Billion(1));
+#endif
+
+  {
+    g.sphere = entity_create(Mesh_Sphere, Material_Container);
+    g.sphere.pos() = v3(0,0,-10);
+  }
+  {
+    // Handle<Entity> e = entity_create(Mesh_Castle, Shader_E_Texture, Material_Castle);
+    // e.pos().z = -100;
+  }
+  {
+    // Loop (i, KB(1)) {
+    //   Handle<Entity> e = entity_create(Mesh_Cube, Material_Screen);
+    //   u32 range = 100;
+    //   e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+    // }
+  }
+  {
+    // Loop (i, KB(400)) {
+    // Loop (i, MB(1)-KB(1)) {
+    Loop (i, 0) {
+      Handle<Entity> e = entity_create(Mesh_Cube, Material_Container);
+      u32 range = KB(1);
+      e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+      g.moving_cubes.add(e);
+    }
+  }
+
+  Loop (i, 0) {
+    MeshId meshes[] = {
+      Mesh_MonkeyGlb,
+      Mesh_Triangle,
+      Mesh_Cube,
+    };
+    MaterialId materials[] = {
+      // Material_Orange,
+      Material_Container,
+      // Material_Screen,
+    };
+    Handle<Entity> e = entity_create(meshes[rand_range_u32(0, ArrayCount(meshes)-1)], materials[rand_range_u32(0, ArrayCount(materials)-1)]);
+    u32 range = 100;
+    e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+    g.moving_cubes.add(e);
+  }
+}
+
+void scene_deinit() {
+  // st->entity_pool = {};
+  // st->entity_pool.clear();
+  // arena_clear(&st->arena);
+}
+
+////////////////////////////////////////////////////////////////////////
+// Update
+
+void scene_update() {
+  Scratch scratch;
+  GameState& g = g_st->game;
   if (os_is_key_pressed(Key_1)) {
     render_add();
   }
@@ -511,16 +553,16 @@ void scene_update() {
   }
   // moving cube and monkey
   {
-    Handle<Entity> cube = game_st->rotating_cube;
-    Handle<Entity> monkey = game_st->monkey;
+    Handle<Entity> cube = g.rotating_cube;
+    Handle<Entity> monkey = g.monkey;
     monkey.pos().x += 0.1 * get_dt();
     cube.pos().x = monkey.pos().x + Sin(get_time()) * 4;
     cube.pos().z = monkey.pos().z + Cos(get_time()) * 4;
     cube.pos().y = monkey.pos().z + Cos(get_time()) * 4;
   }
   {
-    Handle<Entity> e = game_st->monkey;
-    debug_draw_aabb(e.pos()+e.aabb().min, e.pos()+e.aabb().max, ColorWhite);
+    Handle<Entity> e = g.monkey;
+    vk_draw_aabb(e.pos()+e.aabb().min, e.pos()+e.aabb().max, ColorWhite);
   }
   {
     mat4& view = vk_get_view();
@@ -530,8 +572,8 @@ void scene_update() {
     f32 dist = 1.0f;
     f32 xoff = 0.3f;
     f32 yoff = 0.3f;
-    Handle<Entity> axis = game_st->axis_attached_to_cam;
-    axis.pos() = game_st->cam.pos + forward*dist + right*xoff + up*yoff;
+    Handle<Entity> axis = g.axis_attached_to_cam;
+    axis.pos() = g.cam.pos + forward*dist + right*xoff + up*yoff;
     axis.scale() = v3_scale(0.1);
   }
 
@@ -539,21 +581,21 @@ void scene_update() {
   // Random creating and moving stuff
   Loop (i, 0) {
     MeshId meshes[] = {
-      Mesh_MonkeyGlb,
-      Mesh_Triangle,
+      // Mesh_MonkeyGlb,
+      // Mesh_Triangle,
       Mesh_Cube,
     };
     MaterialId materials[] = {
       Material_Orange,
-      Material_Container,
-      Material_Screen,
+      // Material_Container,
+      // Material_Screen,
     };
     Handle<Entity> e = entity_create(meshes[rand_range_u32(0, ArrayCount(meshes)-1)], materials[rand_range_u32(0, ArrayCount(materials)-1)]);
-    u32 range = 100;
+    u32 range = 1000;
     e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
-    game_st->moving_cubes.add(e);
+    g.moving_cubes.add(e);
   }
-  for (Handle<Entity> e : game_st->moving_cubes) {
+  for (Handle<Entity> e : g.moving_cubes) {
     e.pos() += e.vel() * get_dt();
     v3 center = {0, 0, 0};
     v3 dir = e.pos() - center;
@@ -561,89 +603,22 @@ void scene_update() {
     e.vel() += tangent * 2.0f * get_dt();
     e.vel() += -dir * 0.5f * get_dt();
   }
-
-  {
-    // TimeBlock("Imgui window");
-  ImGui::ShowDemoWindow();
-
-  Slice<ProfileAnchor> anchors = profiler_get_anchors();
-
-  ImGui::Begin("Profiler");
-  u64 cpu_freq = cpu_frequency();
-  u64 tsc_total_elapsed = profiler_get_info().tsc_elapsed;
-  u64 tsc_start = profiler_get_info().tsc_start;
-  u64 tsc_end = profiler_get_info().tsc_end;
-  ImGui::Checkbox("show ms", (bool*)&g.show_ms);
-  
-  ImGui::Text("%.1ffps %0.1fms CPU %.1fGhz", 1/get_dt(), 1000*(f64)tsc_total_elapsed/cpu_freq, (f64)cpu_freq/Billion(1));
-  v2 avail_size = ImGui::GetContentRegionAvail();
-  v2 draw_offset_min = ImGui::GetItemRectMin();
-  v2 draw_offset_max = ImGui::GetItemRectMax();
-  v2 mouse_pos = os_get_mouse_pos();
-  Loop (i, anchors.count) {
-    ImGui::PushID(i);
-    ProfileAnchor anchor = anchors[i];
-    f64 width_percent = (f64)anchor.tsc_elapsed_inclusive / tsc_total_elapsed;
-    f64 width_percent_offset = inverse_lerp_f64(tsc_start, anchor.tsc_start, tsc_end);
-    f64 width_percent_with_children = 0;
-    f32 width = avail_size.x;
-    f32 height = 30;
-    if (anchor.tsc_elapsed_inclusive != anchor.tsc_elapsed_exclusive) {
-      width_percent_with_children = ((f64)anchor.tsc_elapsed_inclusive / (f64)tsc_total_elapsed);
-      width *= width_percent_with_children;
-    } else {
-      width *= width_percent;
-    }
-    v2 offset = v2(avail_size.x * width_percent_offset, anchor.parent_idx * height) + draw_offset_min;
-    offset.y += draw_offset_max.y - draw_offset_min.y;
-    v2 size = v2(width, height);
-    Rect rect = Rect(offset, size + offset);
-    ImDrawList* draw = ImGui::GetWindowDrawList();
-    draw->AddRectFilled(rect.min, rect.max, IM_COL32(50, 50, 50, 255));
-    draw->AddRect(rect.min, rect.max, IM_COL32(200, 200, 200, 255));
-    String str = {};
-    if (v2_in_rect(rect, mouse_pos)) {
-      // ImGui::SetItemTooltip("%s", (char*)str.str);
-      ImGui::BeginTooltip();
-      ImGui::Text("Label: %s", anchor.label.str);
-      ImGui::Text("Percent: %f%%", width_percent * 100);
-      ImGui::Text("Hits: %lu", anchor.hit_count);
-      ImGui::Text("Time: %fms", (f64)anchor.tsc_elapsed_inclusive / cpu_freq);
-      ImGui::EndTooltip();
-    }
-    str = push_strf(scratch, "%.3fms", (f64)anchor.tsc_elapsed_inclusive / cpu_freq);
-    // String str = push_strf(scratch, "%s %.3fms", anchor.label, );
-    // v2 text_size = ImGui::CalcTextSize((char*)str.str);
-    // v2 text_pos = v2(
-    //   p0.x + (p1.x - p0.x - text_size.x) * 0.5f,
-    //   p0.y + (p1.y - p0.y - text_size.y) * 0.5f
-    // );
-    // draw->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), (char*)str.str);
-    draw->AddText(rect.min, ImGui::GetColorU32(ImGuiCol_Text), (char*)str.str);
-    ImGui::PopID();
-  }
-  ImGui::End();
-  }
-  // {TimeBlock("upate things");
-  //   os_sleep_ms(1);
-  // }
-  // {TimeBlock("upate things2");
-  //   os_sleep_ms(2);
-  // }
 }
 
-void* game_init() {
+void game_init() {
+  GameState& g = g_st->game;
   Scratch scratch;
-  Arena arena = arena_init();
-  game_st = push_struct_zero(arena, GameState);
-  game_st->arena = arena;
-  game_st->persistent_arena = arena_init();
-  game_st->gpa.init(game_st->arena);
-  game_st->timer = timer_init(1);
-#if BUILD_DEBUG
-  game_st->entity_pool.init(game_st->persistent_arena, entities_generations());
-  game_st->static_entity_pool.init(game_st->persistent_arena, static_entities_generations());
-#endif
+  g.arena = arena_init();
+  g.persistent_arena = arena_init();
+  g.gpa.init(g.arena);
+  g.timer = timer_init(1);
+  g.scale_x = 1;
+  g.scale_y = 1;
+  g.entity_id_pool.init(g.persistent_arena, MaxEntities);
+  g.static_entity_id_pool.init(g.persistent_arena, MaxStaticEntities);
+  g.entities = push_array(g.persistent_arena, Entity, MaxEntities);
+  g.static_entities = push_array(g.persistent_arena, StaticEntity, MaxStaticEntities);
+
   // Mesh cube_mesh = {.vertices = cube_vertices, .vert_count = ArrayCount(cube_vertices)};
   // mesh_set(Mesh_Cube, vk_mesh_load(cube_mesh));
   Mesh triangle_mesh =  {.vertices = triangle_vertices, .vert_count = ArrayCount(triangle_vertices)};
@@ -654,15 +629,13 @@ void* game_init() {
   mesh_set(Mesh_Axis, vk_mesh_load(axis_mesh));
   Mesh sphere = sphere_generate(scratch);
   mesh_set(Mesh_Sphere, vk_mesh_load(sphere));
-
   cubemap_load("night_cubemap");
   asset_load();
   scene_init();
-  return game_st;
 }
 
 void game_update() {
-  // TimeFunction;
+  TimeFunction;
   Scratch scratch;
   camera_update();
   if (os_is_key_down(Key_T)) {
@@ -670,12 +643,15 @@ void game_update() {
     scene_init();
   }
   if (os_is_key_pressed(Key_N)) {
-    new_init();
   }
   if (os_is_key_down(Key_Escape)) {
     os_close_window();
   }
   scene_update();
+  profiler_view();
+  ImGui::ShowDemoWindow();
 }
+
+
 
 

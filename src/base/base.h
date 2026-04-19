@@ -222,9 +222,10 @@ u64 Compose64Bit(u64 a, u64 b);
 void Trap();
 void DebugTrap();
 
-#define InvalidPath    Assert(!"Invalid Path!")
-#define NotImplemented Assert(!"Not Implemented!")
-#define AssertAlways(x) if (!(x)) { Trap(); }
+#define InvalidPath         Assert(!"Invalid Path!")
+#define InvalidDefaultCase  default: {InvalidPath;}
+#define NotImplemented      Assert(!"Not Implemented!")
+#define AssertAlways(x)     if (!(x)) { Trap(); }
 #define NotUsed(x) (void)&x
 
 #if BUILD_DEBUG
@@ -324,5 +325,4 @@ const u32 DEFAULT_RESIZE_FACTOR = 2;
 u64 cpu_timer_now();
 u64 cpu_frequency();
 void estimate_cpu_frequency();
-
 

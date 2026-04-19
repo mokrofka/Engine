@@ -1,5 +1,7 @@
-#include "lib.h"
 #include "common.h"
+
+////////////////////////////////////////////////////////////////////////
+// Test
 
 ///////////////////////////////////
 // Allocators
@@ -18,8 +20,8 @@ intern void test_global_alloc() {
   }
   Array<u32, TEST_SAMPLES> indices = {};
   Loop(i, TEST_SAMPLES) indices.add(i);
-  for (u32 i = indices.count - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
+  Loop (i, indices.count) {
+    u32 j = rand_range_u32(i, indices.count - 1);
     Swap(indices[i], indices[j]);
   }
   Loop (i, TEST_SAMPLES) {
@@ -34,8 +36,8 @@ intern void test_global_alloc() {
   }
   indices.clear();
   Loop(i, TEST_SAMPLES) indices.add(i);
-  for (u32 i = indices.count - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
+  Loop (i, indices.count) {
+    u32 j = rand_range_u32(i, indices.count - 1);
     Swap(indices[i], indices[j]);
   }
   Loop (i, TEST_SAMPLES) {
@@ -121,8 +123,8 @@ intern void test_seglist_alloc() {
   }
   Array<u32, TEST_SAMPLES> indices = {};
   Loop(i, TEST_SAMPLES) indices.add(i);
-  for (u32 i = indices.count - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
+  Loop (i, indices.count) {
+    u32 j = rand_range_u32(i, indices.count - 1);
     Swap(indices[i], indices[j]);
   }
   Loop (i, TEST_SAMPLES) {
@@ -137,8 +139,8 @@ intern void test_seglist_alloc() {
   }
   indices.clear();
   Loop(i, TEST_SAMPLES) indices.add(i);
-  for (u32 i = indices.count - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
+  Loop (i, indices.count) {
+    u32 j = rand_range_u32(i, indices.count - 1);
     Swap(indices[i], indices[j]);
   }
   Loop (i, TEST_SAMPLES) {
@@ -158,8 +160,8 @@ intern void test_gpu_seglist_alloc() {
   }
   Array<u32, TEST_SAMPLES> indices = {};
   Loop(i, TEST_SAMPLES) indices.add(i);
-  for (u32 i = indices.count - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
+  Loop (i, indices.count) {
+    u32 j = rand_range_u32(i, indices.count - 1);
     Swap(indices[i], indices[j]);
   }
   Loop (i, TEST_SAMPLES) {
@@ -173,8 +175,8 @@ intern void test_gpu_seglist_alloc() {
   }
   indices.clear();
   Loop(i, TEST_SAMPLES) indices.add(i);
-  for (u32 i = indices.count - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
+  Loop (i, indices.count) {
+    u32 j = rand_range_u32(i, indices.count - 1);
     Swap(indices[i], indices[j]);
   }
   Loop (i, TEST_SAMPLES) {
@@ -206,8 +208,8 @@ intern void test_object_pool() {
   }
   Array<u32, TEST_SAMPLES> indices = {};
   Loop(i, TEST_SAMPLES) indices.add(i);
-  for (u32 i = indices.count - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
+  Loop (i, indices.count) {
+    u32 j = rand_range_u32(i, indices.count - 1);
     Swap(indices[i], indices[j]);
   }
   Loop (i, TEST_SAMPLES) {
@@ -225,8 +227,8 @@ intern void test_object_pool() {
     Assert(MemMatchStruct(&values[i], &pool.get(handlers[i])));
   }
   Loop(i, TEST_SAMPLES) indices.add(i);
-  for (u32 i = indices.count - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
+  Loop (i, indices.count) {
+    u32 j = rand_range_u32(i, indices.count - 1);
     Swap(indices[i], indices[j]);
   }
   Loop (i, TEST_SAMPLES) {
@@ -255,8 +257,8 @@ intern void test_handle_darray() {
   }
   Array<u32, TEST_SAMPLES> indices = {};
   Loop(i, TEST_SAMPLES) indices.add(i);
-  for (u32 i = indices.count - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
+  Loop (i, indices.count) {
+    u32 j = rand_range_u32(i, indices.count - 1);
     Swap(indices[i], indices[j]);
   }
   Loop (i, TEST_SAMPLES) {
@@ -274,8 +276,8 @@ intern void test_handle_darray() {
     Assert(MemMatchStruct(&values[i], &arr.get(handlers[i])));
   }
   Loop(i, TEST_SAMPLES) indices.add(i);
-  for (u32 i = indices.count - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
+  Loop (i, indices.count) {
+    u32 j = rand_range_u32(i, indices.count - 1);
     Swap(indices[i], indices[j]);
   }
   Loop (i, TEST_SAMPLES) {
@@ -284,13 +286,76 @@ intern void test_handle_darray() {
 }
 
 intern void test_id_pool() {
+  Scratch scratch;
+  {
+    IdPool id_pool;
+    id_pool.init(scratch);
+    Array<u32, TEST_SAMPLES> arr = {};
+    Loop (i, TEST_SAMPLES) {
+      u32 id = id_pool.alloc();
+      arr.add(id);
+    }
+    rand_shuffle(arr.slice());
+    Loop (i, arr.count) {
+      id_pool.free(arr[i]);
+    }
+    Array<u32, TEST_SAMPLES> new_arr = {};
+    Loop (i, arr.count) {
+      u32 id = id_pool.alloc();
+      new_arr.add(id);
+    }
+    Loop (i, arr.count) {
+      b32 exists = false;
+      Loop (j, arr.count) {
+        if (id_idx(arr[i]) == id_idx(new_arr[j])) {
+          Assert(exists == false);
+          exists = true;
+        }
+      }
+      Assert(exists);
+    }
+    Loop (i, arr.count) {
+      id_pool.free(new_arr[i]);
+    }
+  }
 
+  {
+    StaticIdPool static_id_pool;
+    static_id_pool.init(scratch, TEST_SAMPLES);
+    Array<u32, TEST_SAMPLES> arr = {};
+    Loop (i, TEST_SAMPLES) {
+      u32 id = static_id_pool.alloc();
+      arr.add(id);
+    }
+    rand_shuffle(arr.slice());
+    Loop (i, arr.count) {
+      static_id_pool.free(i);
+    }
+    Array<u32, TEST_SAMPLES> new_arr = {};
+    Loop (i, arr.count) {
+      u32 id = static_id_pool.alloc();
+      new_arr.add(id);
+    }
+    Loop (i, arr.count) {
+      b32 exists = false;
+      Loop (j, arr.count) {
+        if (id_idx(arr[i]) == id_idx(new_arr[j])) {
+          Assert(exists == false);
+          exists = true;
+        }
+      }
+      Assert(exists);
+    }
+    Loop (i, arr.count) {
+      static_id_pool.free(new_arr[i]);
+    }
+  }
 }
 
 ///////////////////////////////////
 // Profiler
 
-intern void profiler_bar() {
+intern void test_profiler_bar() {
   TimeFunction;
   {
   TimeBlock("block in bar");
@@ -299,20 +364,20 @@ intern void profiler_bar() {
   os_sleep_ms(2);
 }
 
-intern void profiler_der() {
+intern void test_profiler_der() {
   TimeFunction;
   os_sleep_ms(10);
 }
 
-intern void profiler_die(i32 i) {
+intern void test_profiler_die(i32 i) {
   TimeFunction;
   os_sleep_ms(1);
   if (--i) {
-    profiler_die(i);
+    test_profiler_die(i);
   }
 }
 
-intern void profile_print_time_elapsed(u64 total_tsc_elapsed, ProfileAnchor anchor) {
+intern void test_profile_print_time_elapsed(u64 total_tsc_elapsed, ProfileAnchor anchor) {
   Scratch scratch;
   String label_c = push_str_copy(scratch, anchor.label);
   f64 percent = 100.0 * ((f64)anchor.tsc_elapsed_exclusive / (f64)total_tsc_elapsed);
@@ -324,7 +389,7 @@ intern void profile_print_time_elapsed(u64 total_tsc_elapsed, ProfileAnchor anch
   print(")\n");
 }
 
-intern void profiler_print() {
+intern void test_profiler_print() {
   u64 cpu_freq = cpu_frequency();
   u64 total_cpu_elapsed = profiler_get_tsc_elapsed();
   if (cpu_freq) {
@@ -334,17 +399,17 @@ intern void profiler_print() {
   Loop (anchor_idx, anchors.count) {
     ProfileAnchor anchor = anchors[anchor_idx];
     if (anchor.tsc_elapsed_inclusive) {
-      profile_print_time_elapsed(total_cpu_elapsed, anchor);
+      test_profile_print_time_elapsed(total_cpu_elapsed, anchor);
     }
   }
 }
 
 intern void profiler_test() {
   profiler_begin();
-  profiler_bar();
-  profiler_bar();
-  profiler_der();
-  profiler_die(10);
+  test_profiler_bar();
+  test_profiler_bar();
+  test_profiler_der();
+  test_profiler_die(10);
 }
 
 struct Transform1 {
@@ -357,9 +422,9 @@ u32 task_queue_count();
 
 struct TransformTask {
   Transform1* transforms;
-  u32* idx_arr;       // optional for random access
+  u32* idx_arr;
   u64 count;
-  v3* out_sum;        // where the thread accumulates
+  v3* out_sum;
   b32 use_random;
 };
 
@@ -379,7 +444,6 @@ void transform_task_func(void* arg) {
   // store result (safe if each thread writes to its own slot)
   *t->out_sum = sum;
 }
-
 
 void test_bandwidth() {
   Scratch scratch;
@@ -561,8 +625,7 @@ void test_bandwidth() {
 
 }
 
-
-intern void test() {
+void test() {
   test_global_alloc();
   test_arena_alloc();
   test_arena_list_alloc();
