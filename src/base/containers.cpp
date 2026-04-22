@@ -38,9 +38,9 @@ void SparseSetIndex::grow() {
   }
   else {
     cap = DEFAULT_CAPACITY;
-    dense = mem_alloc_array<u32>(alloc, cap);
+    dense = push_array(alloc, u32, cap);
     sparse_count = cap;
-    sparse = mem_alloc_array<u32>(alloc, sparse_count);
+    sparse = push_array(alloc, u32, sparse_count);
   }
 }
 
@@ -120,8 +120,8 @@ u32 IdPool::alloc() {
       }
     } else {
       cap = DEFAULT_CAPACITY;
-      ids = mem_alloc_array<u32>(allocator, cap);
-      generations = mem_alloc_array_zero<u32>(allocator, cap);
+      ids = push_array(allocator, u32, cap);
+      generations = push_array_zero(allocator, u32, cap);
       for (u32 i = 0; i < cap; ++i) {
         ids[i] = i;
       }

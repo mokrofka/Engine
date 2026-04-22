@@ -1,5 +1,4 @@
 #include "base.h"
-#include "../os/os_core.h"
 
 ////////////////////////////////////////////////////////////////////////
 // Basic
@@ -52,6 +51,24 @@ u64 CeilIntDiv(u64 x, u64 b)   { return (x + b - 1) / b; }
 u64 RoundUp(u64 x, u64 a)      { return CeilIntDiv(x, a) * a; }
 u64 RoundDown(u64 x, u64 a)    { return x / a * a; }
 u64 Compose64Bit(u64 a, u64 b) { return (a << 32) | b; }
+u32 next_pow2(u32 v) {
+  v--;
+  v |= v >> 1;
+  v |= v >> 2;
+  v |= v >> 4;
+  v |= v >> 8;
+  v |= v >> 16;
+  v++;
+  return v;
+}
+u32 prev_pow2(u32 n) {
+	n |= n >> 1;
+	n |= n >> 2;
+	n |= n >> 4;
+	n |= n >> 8;
+	n |= n >> 16;
+	return n - (n >> 1);
+}
 
 ////////////////////////////////////////////////////////////////////////
 // Asserts
@@ -59,10 +76,35 @@ u64 Compose64Bit(u64 a, u64 b) { return (a << 32) | b; }
 void Trap()      { __builtin_trap(); }
 void DebugTrap() { __builtin_debugtrap(); }
 
+global u64 _cpu_frequency;
+
+u64 cpu_timer_now() { return __rdtsc(); }
+u64 cpu_frequency() { return _cpu_frequency; }
+
+#include "../os/os_core.h"
+void estimate_cpu_frequency() {
+  u64 os_freq = os_timer_frequency();
+  u64 cpu_start = cpu_timer_now();
+  u64 os_start = os_timer_now();
+  u64 milliseconds = 1;
+  u64 os_end = 0;
+  u64 os_elapsed = 0;
+  u64 os_wait_time = os_freq * milliseconds / 1000;
+  while (os_elapsed < os_wait_time) {
+    os_end = os_timer_now();
+    os_elapsed = os_end - os_start;
+  }
+  u64 cpu_end = cpu_timer_now();
+  u64 cpu_elapsed = cpu_end - cpu_start;
+  u64 cpu_freq = 0;
+  if (cpu_elapsed) {
+    cpu_freq = os_freq * cpu_elapsed / os_elapsed;
+  }
+  _cpu_frequency = cpu_freq;
+}
+
 ////////////////////////////////////////////////////////////////////////
 // Types
-
-u64 range_size(Range r) { return  r.size - r.offset; }
 
 void ring_write(RingBuffer& ring, void *src, u64 src_size) {
   Assert(src_size <= (ring.size - (ring.write_pos - ring.read_pos)));
@@ -86,31 +128,5 @@ void ring_read(RingBuffer& ring, void *dst, u64 dst_size) {
     MemCopy(Offset(dst, first), ring.base, second);
   }
   ring.read_pos += dst_size;
-}
-
-global u64 _cpu_frequency;
-
-u64 cpu_timer_now() { return __rdtsc(); }
-u64 cpu_frequency() { return _cpu_frequency; }
-
-void estimate_cpu_frequency() {
-  u64 os_freq = os_timer_frequency();
-  u64 cpu_start = cpu_timer_now();
-  u64 os_start = os_timer_now();
-  u64 milliseconds = 1;
-  u64 os_end = 0;
-  u64 os_elapsed = 0;
-  u64 os_wait_time = os_freq * milliseconds / 1000;
-  while (os_elapsed < os_wait_time) {
-    os_end = os_timer_now();
-    os_elapsed = os_end - os_start;
-  }
-  u64 cpu_end = cpu_timer_now();
-  u64 cpu_elapsed = cpu_end - cpu_start;
-  u64 cpu_freq = 0;
-  if (cpu_elapsed) {
-    cpu_freq = os_freq * cpu_elapsed / os_elapsed;
-  }
-  _cpu_frequency = cpu_freq;
 }
 

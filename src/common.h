@@ -6,7 +6,6 @@
         operator v2() const { return v2(x,y); }
 #include "imgui/imgui.h"
 
-
 // TODO:
 // dummy assets/null 
 // obj mouse selection
@@ -26,7 +25,7 @@ const v3 ColorWhite = v3(1,1,1);
 const v3 ColorBlack = v3(0,0,0);
 const v3 ColorGrey  = v3(0.8,0.8,0.8);
 
-const u32 MaxEntities = KB(1);
+const u32 MaxEntities = KB(10);
 const u32 MaxStaticEntities = KB(10);
 
 struct Entity;
@@ -206,12 +205,6 @@ void asset_load();
 ////////////////////////////////////////////////////////////////////////
 // Profiler
 
-struct ProfilerInfo {
-  u64 tsc_start;
-  u64 tsc_end;
-  u64 tsc_elapsed;
-};
-
 struct ProfileAnchor {
   u64 tsc_elapsed_exclusive; // without children
   u64 tsc_elapsed_inclusive; // with children
@@ -233,6 +226,14 @@ struct ProfileBlock {
 };
 
 struct ProfilerState {
+  struct FrameState {
+    ProfileAnchor anchors[KB(4)];
+    u32 anchors_count;
+    u64 tsc_start;
+    u64 tsc_end;
+    u32 profiler_parent;
+  } frames[120];
+
   ProfileAnchor anchors[KB(4)];
   u32 anchors_count;
   u64 tsc_start;
@@ -350,7 +351,7 @@ struct Camera {
 
 struct Entity {
   v3 vel;
-  AABB aabb;
+  Rng3 aabb;
 };
 
 template<>
@@ -361,7 +362,7 @@ struct Handle<Entity> {
   v3& rot();
   v3& scale();
   Entity& get();
-  AABB& aabb();
+  Rng3& aabb();
   v3& vel();
 #if BUILD_DEBUG
   u32 idx() { return handle & INDEX_MASK; }
@@ -442,3 +443,4 @@ struct GlobalState {
 extern GlobalState* g_st;
 
 void common_init();
+

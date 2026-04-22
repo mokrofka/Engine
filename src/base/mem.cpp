@@ -1,6 +1,7 @@
 #include "mem.h"
 #include "maths.h"
 #include "os/os_core.h"
+#include "containers.h"
 
 const u32 MEM_ALLOC_HEADER_GUARD   = 0xA110C8;
 const u32 MEM_DEALLOC_HEADER_GUARD = 0xDE1E7E;
@@ -25,37 +26,57 @@ const u32 ARENA_LIST_BLOCK_SIZE      = KB(64);
 ////////////////////////////////////////////////////////////////////////
 // Global allocator
 
-struct MemCtx {
+struct MemState {
   Arena arena;
   AllocSegList seglist;
+
+#if VIEW_MEMORY
+  // Array<AllocatorInfo, 128> infos;
+  AllocatorInfo* arena_list;
+  StaticNObjectPool<AllocatorInfo, 128> infos;
+#endif
 };
 
-global MemCtx global_allocator;
+global MemState mem_st;
 
-void global_allocator_init() {
-  global_allocator.arena = arena_init();
-  global_allocator.seglist.init(global_allocator.arena);
+Slice<AllocatorInfo> get_allocators_info() {
+  // return mem_st.infos.slice();
+  return {};
 }
 
-Allocator mem_get_global_allocator()                                             { return global_allocator.seglist; }
-intern u8* global_alloc(u64 size, u64 align)                                     { return mem_alloc(global_allocator.seglist, size, align); }
-intern u8* global_alloc_zero(u64 size, u64 align)                                { return mem_alloc_zero(global_allocator.seglist, size, align); }
-intern u8* global_realloc(void* ptr, u64 old_size, u64 new_size, u64 align)      { return mem_realloc(global_allocator.seglist, ptr, old_size, new_size, align); }
-intern u8* global_realloc_zero(void* ptr, u64 old_size, u64 new_size, u64 align) { return mem_realloc_zero(global_allocator.seglist, ptr, old_size, new_size, align); }
-intern void global_free(void* ptr)                                               { mem_free(global_allocator.seglist, ptr); }
+void global_allocator_init() {
+  mem_st.arena = arena_init();
+  mem_st.seglist.init(mem_st.arena);
+}
+
+intern u8* global_alloc(u64 size, u64 align)                                     { return mem_alloc(mem_st.seglist, size, align); }
+intern u8* global_alloc_zero(u64 size, u64 align)                                { return mem_alloc_zero(mem_st.seglist, size, align); }
+intern u8* global_realloc(void* ptr, u64 old_size, u64 new_size, u64 align)      { return mem_realloc(mem_st.seglist, ptr, old_size, new_size, align); }
+intern u8* global_realloc_zero(void* ptr, u64 old_size, u64 new_size, u64 align) { return mem_realloc_zero(mem_st.seglist, ptr, old_size, new_size, align); }
+intern void global_free(void* ptr)                                               { mem_free(mem_st.seglist, ptr); }
 
 ////////////////////////////////////////////////////////////////////////
 // Arena
 
 Arena::operator Allocator() { return {.type = AllocatorType_Arena, .ctx = this}; }
 
-Arena arena_init() {
+Arena arena_init_named(String name) {
+  return arena_init_(name);
+}
+
+Arena arena_init_(String name) {
   u64 reserve_size = ARENA_DEFAULT_RESERVE_SIZE;
   u8* base = os_reserve(reserve_size);
   Arena result = {
     .base = base,
     .cap = reserve_size,
   };
+#if VIEW_MEMORY
+  // result.name = name;
+  // result.info_idx = mem_st.infos.count++;
+  // mem_st.infos[result.info_idx].res = reserve_size;
+  // mem_st.infos[result.info_idx].name = name;
+#endif
   return result;
 }
 
@@ -83,6 +104,11 @@ intern u8* arena_alloc(Arena* arena, u64 size, u64 align) {
   MemGuardAlloc(Offset(arena->base, arena->pos), size + pad);
   u8* result = Offset(arena->base, pos);
   arena->pos = pos + size;
+#if VIEW_MEMORY
+  // mem_st.infos[arena->info_idx].pos = arena->pos;
+  // mem_st.infos[arena->info_idx].cmt = arena->cmt;
+  // mem_st.infos[arena->info_idx].cap = arena->cap;
+#endif
   return result;
 }
 
@@ -417,7 +443,7 @@ void mem_free(Allocator alloc, void* ptr) {
 void GpuAllocSegList::init(Allocator alloc_) {
   allocator = alloc_;
   range_cap = 8;
-  data = mem_alloc_array<RangeList>(allocator, range_cap);
+  data = push_array(allocator, RangeList, range_cap);
 }
 
 GpuMemHandler GpuAllocSegList::alloc(u64 size, u64 align) {
@@ -499,14 +525,31 @@ u8* mem_realloc_soa(Allocator alloc, u32 old_count, u32 new_count, Slice<SoA_Fie
   return buf;
 }
 
-void* OffsetMemPusher::push(u64 size, u64 align) {
+
+void* offset_pusher_mem_push(void*& offset, u64 size, u64 align) {
   void* result = (void*)AlignUp((u64)offset, align);
   offset = Offset(result, size);
   return result;
 }
 
-u64 OffsetPusher::push(u64 size, u64 align) {
+u64 offset_pusher_push(u64& offset, u64 size, u64 align) {
   u64 result = AlignUp(offset, align);
   offset = result + size;
   return result;
 }
+
+global String mem_units[] = {"B", "KB", "MB", "GB", "TB"};
+MemFormatSize mem_format_size(f32 value) {
+  u32 unit = 0;
+  while (value >= 1024) {
+    value /= 1024;
+    ++unit;
+  }
+  MemFormatSize result = {
+    .format = mem_units[unit],
+    .format_id = unit,
+    .size = value,
+  };
+  return result;
+}
+

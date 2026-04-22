@@ -1,7 +1,7 @@
-#include "common.h"
 #include "stb_image.h"
-#include "json.cpp"
 #include "game.cpp"
+#include "common.h"
+#include "json.cpp"
 #include "vk.cpp"
 #include "test.cpp"
 
@@ -9,29 +9,25 @@ Extern GlobalState* g_st;
 
 f32 get_dt() { return g_st->dt; }
 f32 get_time() { return g_st->time; }
-f32 get_was_hotreload() { return g_st->should_hotreload; }
 
-Transform& entity_transform(Handle<Entity> handle) { 
-  Assert(handle.generation() == g_st->game.entity_id_pool.generations[handle.idx()]);
-  return g_st->transforms[handle.idx()];
+Transform& Handle<Entity>::trans() { 
+  Assert(id_generation(handle) == g_st->game.entity_id_pool.generations[id_idx(handle)]);
+  return g_st->transforms[id_idx(handle)];
 }
-Transform& static_entity_transform(Handle<StaticEntity> handle) {
-  Assert(handle.generation() == g_st->game.static_entity_id_pool.generations[handle.idx()]);
-  return g_st->static_transforms[handle.idx()];
-}
-
-Transform& Handle<Entity>::trans() { return entity_transform((Handle<Entity>)handle); }
 v3& Handle<Entity>::pos() { return trans().pos; }
 v3& Handle<Entity>::rot() { return trans().rot; }
 v3& Handle<Entity>::scale() { return trans().scale; }
 Entity& Handle<Entity>::get() { return g_st->game.entities[handle & INDEX_MASK]; }
-AABB& Handle<Entity>::aabb() { return get().aabb; }
+Rng3& Handle<Entity>::aabb() { return get().aabb; }
 v3& Handle<Entity>::vel() { return get().vel; }
 
-Transform& Handle<StaticEntity>::trans() { return static_entity_transform((Handle<StaticEntity>)handle); }
-v3& Handle<StaticEntity>::pos() { return static_entity_transform((Handle<StaticEntity>)handle).pos; }
-v3& Handle<StaticEntity>::rot() { return static_entity_transform((Handle<StaticEntity>)handle).rot; }
-v3& Handle<StaticEntity>::scale() { return static_entity_transform((Handle<StaticEntity>)handle).scale; }
+Transform& Handle<StaticEntity>::trans() {
+  Assert(id_generation(handle) == g_st->game.static_entity_id_pool.generations[id_idx(handle)]);
+  return g_st->static_transforms[id_idx(handle)];
+}
+v3& Handle<StaticEntity>::pos() { return trans().pos; }
+v3& Handle<StaticEntity>::rot() { return trans().rot; }
+v3& Handle<StaticEntity>::scale() { return trans().scale; }
 
 intern Mesh mesh_load_obj(Allocator arena, String name) {
   Scratch scratch(arena);
@@ -39,14 +35,14 @@ intern Mesh mesh_load_obj(Allocator arena, String name) {
   Darray<v3> normals(scratch);
   Darray<v2> uvs(scratch);
   Darray<v3u> indexes(scratch);
-  Buffer buf = os_file_path_read_all(scratch, name);
-  Lexer lexer = lexer_init({buf.data, buf.size});
+  Slice buf = os_file_path_read_all(scratch, name);
+  Lexer lexer = lexer_init({buf.data, buf.count});
   String word;
   while ((word = lexer_next_token(&lexer)).size) {
     // vert
     if (str_match(word, "v")) {
       v3 v = {};
-      for (f32& e : v.e) {
+      for (f32& e : v.v) {
         e = f32_from_str(lexer_next_token(&lexer));
       }
       // Info("v %f, %f, %f", v.x, v.y, v.z);
@@ -55,7 +51,7 @@ intern Mesh mesh_load_obj(Allocator arena, String name) {
     // norm
     else if (str_match(word, "vn")) {
       v3 v = {};
-      for (f32& e : v.e) {
+      for (f32& e : v.v) {
         e = f32_from_str(lexer_next_token(&lexer));
       }
       // Info("vn %f, %f, %f", v.x, v.y, v.z);
@@ -64,7 +60,7 @@ intern Mesh mesh_load_obj(Allocator arena, String name) {
     // uv
     else if (str_match(word, "vt")) {
       v2 v = {};
-      for (f32& e : v.e) {
+      for (f32& e : v.v) {
         e = f32_from_str(lexer_next_token(&lexer));
       }
       // Info("vt %f, %f", v.x, v.y);
@@ -74,7 +70,7 @@ intern Mesh mesh_load_obj(Allocator arena, String name) {
     else if (str_match(word, "f")) {
       Loop (i, 3) {
         v3u raw = {};
-        for (u32& e : raw.e) {
+        for (u32& e : raw.v) {
           e = u32_from_str(lexer_next_integer(&lexer)) - 1;
         }
         v3u v = {raw.x, raw.z, raw.y};
@@ -113,8 +109,8 @@ intern Mesh mesh_load_obj(Allocator arena, String name) {
 
 intern Mesh mesh_load_gltf(Allocator arena, String name) {
   Scratch scratch(arena);
-  Buffer buf = os_file_path_read_all(scratch, name);
-  JsonReader r = json_reader_init({buf.data, buf.size});
+  Slice buf = os_file_path_read_all(scratch, name);
+  JsonReader r = json_reader_init({buf.data, buf.count});
   struct MeshInfo {
     // u32 pos_idx;
     // u32 norm_idx;
@@ -124,7 +120,7 @@ intern Mesh mesh_load_gltf(Allocator arena, String name) {
     // u32 vert_count[10];
     u32 vert_count;
     u32 index_count;
-    Range ranges[10];
+    BufferRegion ranges[10];
     String file_name;
     u32 file_size;
   } info = {};
@@ -204,11 +200,11 @@ intern Mesh mesh_load_gltf(Allocator arena, String name) {
     }
   }
   String model_dir = str_chop_last_slash(name);
-  Buffer buff1 = os_file_path_read_all(scratch, push_strf(scratch, "%s/%s", model_dir, info.file_name));
-  v3* vertices_pos = (v3*)Offset(buff1.data, info.ranges[0].offset);
-  v3* vertices_norm = (v3*)Offset(buff1.data, info.ranges[1].offset);
-  v2* vertices_uv = (v2*)Offset(buff1.data, info.ranges[2].offset);
-  u16* vertices_indices = (u16*)Offset(buff1.data, info.ranges[3].offset);
+  Slice buf1 = os_file_path_read_all(scratch, push_strf(scratch, "%s/%s", model_dir, info.file_name));
+  v3* vertices_pos = (v3*)Offset(buf1.data, info.ranges[0].offset);
+  v3* vertices_norm = (v3*)Offset(buf1.data, info.ranges[1].offset);
+  v2* vertices_uv = (v2*)Offset(buf1.data, info.ranges[2].offset);
+  u16* vertices_indices = (u16*)Offset(buf1.data, info.ranges[3].offset);
   Vertex* vertices = push_array(arena, Vertex, info.vert_count);
   u32* indices = push_array(arena, u32, info.index_count);
   Loop (i, info.index_count) {
@@ -232,7 +228,7 @@ intern Mesh mesh_load_gltf(Allocator arena, String name) {
 
 intern Mesh mesh_load_glb(Allocator arena, String name) {
   Scratch scratch(arena);
-  Buffer buf = os_file_path_read_all(scratch, name);
+  Slice buf = os_file_path_read_all(scratch, name);
   struct FileHeader {
     u32 magic;
     u32 version;
@@ -260,12 +256,12 @@ intern Mesh mesh_load_glb(Allocator arena, String name) {
   };
   struct MeshInfo {
     Accessor accessors[10];
-    Range buffer_views[10];
+    BufferRegion buffer_views[10];
     Primitives primitives;
     String file_name;
     u32 file_size;
   } info = {};
-  JsonReader r = json_reader_init({(u8*)&json_chunk->chunk_data, buf.size});
+  JsonReader r = json_reader_init({(u8*)&json_chunk->chunk_data, buf.count});
   JSON_OBJ(r, r.base_obj) {
     if (k.match("meshes")) {
       JSON_ARR(r, v) JSON_OBJ(r, obj) {
@@ -362,8 +358,8 @@ intern Texture texture_image_load(String filepath) {
   Texture texture = {};
   u32 required_channel_count = 4;
   u32 channel_count;
-  Buffer buf = os_file_path_read_all(scratch, filepath);
-  u8* data = stbi_load_from_memory(buf.data, buf.size, (i32*)&texture.width, (i32*)&texture.height, (i32*)&channel_count, required_channel_count);
+  Slice buf = os_file_path_read_all(scratch, filepath);
+  u8* data = stbi_load_from_memory(buf.data, buf.count, (i32*)&texture.width, (i32*)&texture.height, (i32*)&channel_count, required_channel_count);
   Assert(data);
   texture.data = data;
   return texture;
@@ -585,95 +581,177 @@ void profiler_view() {
     ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
     flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
   }
+
+  Slice<ProfileAnchor> anchors = profiler_get_anchors();
+  u64 cpu_freq = cpu_frequency();
+  u64 tsc_total_elapsed = profiler.prev_tsc_elapsed;
+  u64 tsc_start = profiler.prev_tsc_start;
+  u64 tsc_end = profiler.prev_tsc_end;
+
   if (ImGui::Begin("Profiler", null, flags)) {
     if (!window.fullscreen) {
       window.pos = ImGui::GetWindowPos();
       window.size = ImGui::GetWindowSize();
     }
-
-    Slice<ProfileAnchor> anchors = profiler_get_anchors();
-    u64 cpu_freq = cpu_frequency();
-    u64 tsc_total_elapsed = profiler.prev_tsc_elapsed;
-    u64 tsc_start = profiler.prev_tsc_start;
-    u64 tsc_end = profiler.prev_tsc_end;
-
-    if (ImGui::IsWindowHovered()) {
-      f32 wheel = os_get_scroll();
-      if (wheel) {
-        f32 zoom_factor = wheel > 0 ? 1.1 : 0.8;
-        window.scale_x *= zoom_factor;
-        window.scale_y *= zoom_factor;
-      }
-      f32 move_x = os_get_touchpad();
-      if (move_x) {
-        f32 offset_factor = move_x < 0 ? 1 : -1;
-        window.offset_x += offset_factor * 100;
-      }
-    }
-
-    ImGui::Text("%u moving cubes count", game.moving_cubes.count);
-    ImGui::Text("%.1ffps %0.1fms CPU %.1fGhz", 1/get_dt(), 1000*(f64)tsc_total_elapsed/cpu_freq, (f64)cpu_freq/Billion(1));
-    // ImGui::Text("%.1ffps %0.1fms CPU %.1fGhz", 1.0/(3.0/1000), 1000*(f64)tsc_total_elapsed/cpu_freq, (f64)cpu_freq/Billion(1));
-    // v2 avail_size = ImGui::GetContentRegionAvail();
-    // v2 avail_size = ImGui::GetWindowSize() * g.scale_x;
-    v2 avail_size = ImGui::GetWindowSize() * window.scale_x;
-    v2 draw_offset_min = ImGui::GetItemRectMin();
-    v2 draw_offset_max = ImGui::GetItemRectMax();
-    v2 mouse_pos = os_get_mouse_pos();
-    Loop (i, anchors.count) {
-      ImGui::PushID(i);
-      ProfileAnchor anchor = anchors[i];
-      f64 width_percent = (f64)anchor.tsc_elapsed_inclusive / tsc_total_elapsed;
-      // f64 width_percent_offset = inverse_lerp_f64(tsc_start, anchor.tsc_start, tsc_end);
-      f64 width_percent_offset = inverse_lerp_f64(tsc_start, anchor.tsc_start, tsc_end);
-      f64 width_percent_with_children = 0;
-      f32 width = avail_size.x;
-      f32 height = 30;
-      if (anchor.tsc_elapsed_inclusive != anchor.tsc_elapsed_exclusive) {
-        width_percent_with_children = ((f64)anchor.tsc_elapsed_inclusive / (f64)tsc_total_elapsed);
-        width *= width_percent_with_children;
-      } else {
-        width *= width_percent;
-      }
-      width *= window.scale_x;
-      height *= window.scale_y;
-      if (width_percent > 0.02 || width_percent_with_children > 0.02) {
-        v2 offset = v2(avail_size.x * width_percent_offset, anchor.depth * height) + draw_offset_min;
-        offset.x += window.offset_x;
-        offset.y += draw_offset_max.y - draw_offset_min.y;
-        v2 size = v2(width, height);
-        Rect rect = Rect(offset, size + offset);
-        ImDrawList* draw = ImGui::GetWindowDrawList();
-        draw->AddRectFilled(rect.min, rect.max, IM_COL32(50, 50, 50, 255));
-        draw->AddRect(rect.min, rect.max, IM_COL32(200, 200, 200, 255));
-        String str = {};
-        if (v2_in_rect(rect, mouse_pos)) {
-          ImGui::BeginTooltip();
-          ImGui::Text("Label: %s", anchor.label.str);
-          ImGui::Text("Percent: %f%%", width_percent * 100);
-          ImGui::Text("Hits: %lu", anchor.hit_count);
-          ImGui::Text("Time: %fms", (f64)anchor.tsc_elapsed_inclusive / cpu_freq * 1000);
-          ImGui::EndTooltip();
-        }
-        if (width_percent > 0.05 || width_percent_with_children > 0.05) {
-          str = push_strf(scratch, "%s %.3f", anchor.label, (f64)anchor.tsc_elapsed_inclusive / cpu_freq * 1000);
-          v2 text_size = ImGui::CalcTextSize((char*)str.str);
-          v2 text_pos = {};
-          if (text_size.x > size.x) {
-            text_pos.x = rect.min.x;
-            text_pos.y = rect.y + (size.y - text_size.y) * 0.5;
-          } else {
-            text_pos = v2(
-              rect.x + (size.x - text_size.x) * 0.5f,
-              rect.y + (size.y - text_size.y) * 0.5
-            );
+    if (ImGui::BeginTabBar("MyTabBar")) {
+      if (ImGui::BeginTabItem("frame")) {
+        if (ImGui::IsWindowHovered()) {
+          f32 wheel = os_get_scroll();
+          if (wheel) {
+            f32 zoom_factor = wheel > 0 ? 1.1 : 0.8;
+            window.scale_x *= zoom_factor;
+            window.scale_y *= zoom_factor;
           }
-          draw->PushClipRect(rect.min, rect.max); 
-          draw->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), (char*)str.str);
-          draw->PopClipRect();
+          f32 move_x = os_get_touchpad();
+          if (move_x) {
+            f32 offset_factor = move_x < 0 ? 1 : -1;
+            window.offset_x += offset_factor * 100;
+          }
         }
+        ImGui::Text("%u moving cubes count", game.moving_cubes.count);
+        ImGui::Text("%.1ffps %0.1fms CPU %.1fGhz", 1 / get_dt(), 1000 * (f64)tsc_total_elapsed / cpu_freq, (f64)cpu_freq / Billion(1));
+        v2 avail_size = ImGui::GetWindowSize();
+        v2 cursor_pos = ImGui::GetCursorScreenPos();
+        v2 mouse_pos = os_get_mouse_pos();
+        Loop(i, anchors.count) {
+          ImGui::PushID(i);
+          ProfileAnchor anchor = anchors[i];
+          f64 width_percent = (f64)anchor.tsc_elapsed_inclusive / tsc_total_elapsed;
+          f64 width_percent_offset = inverse_lerp_f64(tsc_start, anchor.tsc_start, tsc_end);
+          f64 width_percent_with_children = 0;
+          f32 width = avail_size.x;
+          f32 height = 30;
+          if (anchor.tsc_elapsed_inclusive != anchor.tsc_elapsed_exclusive) {
+            width_percent_with_children = ((f64)anchor.tsc_elapsed_inclusive / (f64)tsc_total_elapsed);
+            width *= width_percent_with_children;
+          } else {
+            width *= width_percent;
+          }
+          width *= window.scale_x;
+          height *= window.scale_y;
+          if (width_percent > 0.02 || width_percent_with_children > 0.02) {
+            v2 offset = v2(avail_size.x * width_percent_offset * window.scale_x, anchor.depth * height) + cursor_pos;
+            offset.x += window.offset_x;
+            v2 size = v2(width, height);
+            Rng2 rect = Rng2(offset, size + offset);
+            ImDrawList* draw = ImGui::GetWindowDrawList();
+            draw->AddRectFilled(rect.min, rect.max, IM_COL32(50, 50, 50, 255));
+            draw->AddRect(rect.min, rect.max, IM_COL32(200, 200, 200, 255));
+            String str = {};
+            if (contains_2f32(rect, mouse_pos)) {
+              ImGui::BeginTooltip();
+              ImGui::Text("Label: %s", anchor.label.str);
+              ImGui::Text("Percent: %f%%", width_percent * 100);
+              ImGui::Text("Hits: %lu", anchor.hit_count);
+              ImGui::Text("Time: %fms", (f64)anchor.tsc_elapsed_inclusive / cpu_freq * 1000);
+              ImGui::EndTooltip();
+            }
+            if (width_percent > 0.05 || width_percent_with_children > 0.05) {
+              str = push_strf(scratch, "%s %.3f", anchor.label, (f64)anchor.tsc_elapsed_inclusive / cpu_freq * 1000);
+              v2 text_size = ImGui::CalcTextSize((char*)str.str);
+              v2 text_pos = {};
+              if (text_size.x > size.x) {
+                text_pos.x = rect.min.x;
+                text_pos.y = rect.min.y + (size.y - text_size.y) * 0.5;
+              } else {
+                text_pos = v2(
+                  rect.x0 + (size.x - text_size.x) * 0.5f,
+                  rect.y0 + (size.y - text_size.y) * 0.5
+                );
+              }
+              draw->PushClipRect(rect.min, rect.max);
+              draw->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), (char*)str.str);
+              draw->PopClipRect();
+            }
+          }
+          ImGui::PopID();
+        }
+        ImGui::EndTabItem();
       }
-      ImGui::PopID();
+      if (ImGui::BeginTabItem("cycles")) {
+        v2 cursor_pos = ImGui::GetCursorScreenPos();
+        v2 avail_size = ImGui::GetWindowSize();
+
+        var sorted_anchors = slice_clone(scratch, anchors);
+        sort_insert(sorted_anchors, [](ProfileAnchor a, ProfileAnchor b) { return a.tsc_elapsed_exclusive > b.tsc_elapsed_exclusive; });
+
+        Loop (i, anchors.count) {
+          ImGui::PushID(i);
+          ProfileAnchor anchor = sorted_anchors[i];
+          f64 width_exclusive_percent = (f64)anchor.tsc_elapsed_exclusive / tsc_total_elapsed;
+          // f64 width_percent_with_children = 0;
+          // f32 width_inclusive = avail_size.x * 0.8;
+          f32 width_exclusive = avail_size.x * 0.8;
+          f32 height = 30;
+          // if (anchor.tsc_elapsed_inclusive != anchor.tsc_elapsed_exclusive) {
+          //   width_percent_with_children = ((f64)anchor.tsc_elapsed_inclusive / (f64)tsc_total_elapsed);
+          //   width_inclusive *= width_percent_with_children;
+          // } else {
+          // }
+          width_exclusive *= width_exclusive_percent;
+
+          v2 offset = v2(0,  i * height) + cursor_pos;
+          v2 size = v2(width_exclusive, height);
+          Rng2 rect = Rng2(offset, size + offset);
+
+          ImDrawList* draw = ImGui::GetWindowDrawList();
+          draw->AddRectFilled(rect.min, rect.max, IM_COL32(50, 50, 50, 255));
+          draw->AddRect(rect.min, rect.max, IM_COL32(200, 200, 200, 255));
+
+          String name_str = push_strf(scratch, "%s", anchor.label);
+          String ms_str = push_strf(scratch, "%.3fms", (f64)anchor.tsc_elapsed_exclusive / cpu_freq * 1000);
+          v2 name_offset = v2(0, height * i) + cursor_pos;
+          v2 ms_offset = v2(avail_size.x * 0.82, height * i) + cursor_pos;
+
+          draw->AddText(name_offset, ImGui::GetColorU32(ImGuiCol_Text), (char*)name_str.str);
+          draw->AddText(ms_offset, ImGui::GetColorU32(ImGuiCol_Text), (char*)ms_str.str);
+
+          ImGui::PopID();
+        }
+        ImGui::EndTabItem();
+      }
+      
+      if (ImGui::BeginTabItem("memory")) {
+        // v2 cursor_pos = ImGui::GetCursorScreenPos();
+        // v2 avail_size = ImGui::GetWindowSize();
+
+        // var infos = get_allocators_info();
+        // var infos_sorted = slice_clone(scratch, infos);
+        // sort_insert(infos_sorted, [](var a, var b) { return a.cmt > b.cmt; });
+        // f32 max_cmt = infos_sorted[0].cmt;
+
+        // Loop (i, infos.count) {
+        //   ImGui::PushID(i);
+        //   var info = infos[i];
+        //   f32 width = avail_size.x * info.cmt / max_cmt;
+        //   f32 height = 30;
+
+        //   v2 offset = v2(0,  i * height) + cursor_pos;
+        //   v2 size = v2(width, height);
+        //   Rect rect = Rect(offset, size + offset);
+
+        //   ImDrawList* draw = ImGui::GetWindowDrawList();
+        //   draw->AddRectFilled(rect.min, rect.max, IM_COL32(50, 50, 50, 255));
+        //   draw->AddRect(rect.min, rect.max, IM_COL32(200, 200, 200, 255));
+
+        //   MemFormatSize pos = mem_format_size(info.pos);
+        //   MemFormatSize cmt = mem_format_size(info.cmt);
+        //   MemFormatSize cap = mem_format_size(info.cap);
+
+        //   String name_str = push_strf(scratch, "%s", info.name);
+        //   String ms_str = push_strf(scratch, "%.2f%s pos, %.2f%s cmt, %.2f%s cap", pos.size,pos.format, cmt.size,cmt.format, cap.size, cap.format);
+        //   v2 name_offset = v2(0, height * i) + cursor_pos;
+        //   v2 ms_offset = v2(avail_size.x * 0.5, height * i) + cursor_pos;
+
+        //   draw->AddText(name_offset, ImGui::GetColorU32(ImGuiCol_Text), (char*)name_str.str);
+        //   draw->AddText(ms_offset, ImGui::GetColorU32(ImGuiCol_Text), (char*)ms_str.str);
+
+        //   ImGui::PopID();
+        // }
+
+        ImGui::EndTabItem();
+      }
+      ImGui::EndTabBar();
     }
   } ImGui::End();
 }
@@ -793,9 +871,9 @@ b32 ui_begin_window(u32 id, v2 size) {
   UI_State& g = g_st->ui;
   v2& pos = g.windows[id].pos;
   v2 mouse = os_get_mouse_pos();
-  Rect title_rect(pos, v2(pos.x + size.x, pos.y + 20));
+  Rng2 title_rect(pos, v2(pos.x + size.x, pos.y + 20));
 
-  b32 hovered = v2_in_rect(title_rect, mouse);
+  b32 hovered = contains_2f32(title_rect, mouse);
   if (hovered) {
     g.hot = id;
   }
@@ -836,7 +914,7 @@ b32 ui_begin_window(u32 id, v2 size) {
 
 b32 ui_button(u32 id, v2 min, v2 max) {
   UI_State& g = g_st->ui;
-  b32 hovered = v2_in_rect({min, max}, os_get_mouse_pos());
+  b32 hovered = contains_2f32({min, max}, os_get_mouse_pos());
   if (hovered) {
     g.hot = id;
   }
@@ -867,7 +945,7 @@ void common_init() {
   test();
   os_gfx_init();
   estimate_cpu_frequency();
-  g.arena = arena_init();
+  g.arena = arena_init_named("common arena");
   g.asset_path = push_strf(g.arena, "%s/%s", os_get_current_directory(), String("../assets"));
   g.shader_dir = push_str_cat(g.arena, g.asset_path, "/shaders");
   g.shader_compiled_dir = push_str_cat(g.arena, g.shader_dir, "/compiled");
@@ -890,10 +968,7 @@ void common_init() {
 
 void common_update() {
   profiler_view();
-}
-
-void foo_m() {
-  g_st->should_hotreload = true;
+  ImGui::ShowDemoWindow();
 }
 
 shared_function void common_main(HotReloadData* data) {
@@ -910,7 +985,6 @@ if (data->ctx == null) {
   }
   if (!g_st) {
     g_st = (GlobalState*)data->ctx;
-    // g_st->foo_m = foo_m;
     vk_hotreload(g_st->vk_st);
     g_st->should_hotreload = false;
   }
@@ -1011,3 +1085,23 @@ void quick_sort(i32* arr, i32 low, i32 high) {
     quick_sort(arr, p + 1, high);
   }
 }
+
+void foo0() {
+  Scratch scratch;
+  // Slice slice = slice_make<u8>(scratch, KB(1));
+  // Slice slice1 = slice_make<u32>(scratch, KB(1));
+  // Loop (i, 100) {
+
+  // }
+  // for Loop(i, 100) {
+
+  // }
+  // for (u32 i = 0; i < 100; ++i) {
+
+  // }
+  // Range rng = {5, 10};
+  // for EachInRange(i, rng) {
+
+  // }
+}
+

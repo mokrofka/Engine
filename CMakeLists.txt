@@ -3,17 +3,17 @@ set(CMAKE_CXX_STANDARD 23)
 project(Engine)
 
 # options
+  set(binary_dir "${CMAKE_SOURCE_DIR}/bin")
   set(hotreload true)
   set(X11_use true)
-  set(sanitize_address false)
-  set(binary_dir "${CMAKE_SOURCE_DIR}/bin")
-  set(dear_imgui true)
+  set(sanitize_address true)
+  set(dev_build true)
   set(profile true)
 
   message("hotreload: ${hotreload}")
   message("binary path: ${binary_dir}")
   message("sanitizer: ${sanitize_address}")
-  message("dear imgui: ${dear_imgui}")
+  message("dev build: ${dev_build}")
 
 # binary output
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${binary_dir}")
@@ -62,23 +62,24 @@ project(Engine)
   
   set(lib_source
     src/base/base_impl.cpp
-    vendor/stb_impl.c
+    vendor/vendor_impl.cpp
   )
   set(game_source src/common.cpp)
   set(exe_source src/main.cpp)
+  set(cpp_modules src/module.ixx)
 
-  if (dear_imgui)
-    list(APPEND lib_source vendor/imgui/imgui_impl.cpp)
+  if (dev_build) # reduce build time in release build
+    add_compile_definitions(DEAR_IMGUI=1)
     set_source_files_properties(
-      vendor/imgui/imgui_impl.cpp
-      vendor/stb_impl.c
+      vendor/vendor_impl.cpp
       PROPERTIES
       COMPILE_OPTIONS "-O0;-g"
     )
-    add_compile_definitions(DEAR_IMGUI=1)
   else()
-    add_link_options("-nostdlib++")
+    add_link_options("-nostdlib++") # imgui depends on it
   endif()
+  
+  add_executable(exe)
 
 # Hotreload
   if (hotreload)
@@ -86,7 +87,6 @@ project(Engine)
 
     # Lib
     add_library(lib SHARED ${lib_source})
-    target_compile_definitions(lib PRIVATE KEXPORT)
     if (UNIX)
       if (X11_use)
         target_link_libraries(lib -lxcb libxcb-keysyms.so )
@@ -100,12 +100,12 @@ project(Engine)
     target_link_libraries(game ${binary_dir}/liblib.so)
 
     # Exe
-    add_executable(exe ${exe_source})
+    target_sources(exe PRIVATE ${exe_source})
     target_link_libraries(exe ${binary_dir}/liblib.so)
 
 # One Exe
   else()
-    add_executable(exe
+    target_sources(exe PRIVATE
       ${lib_source}
       ${game_source}
       ${exe_source}

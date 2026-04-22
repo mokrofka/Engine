@@ -243,7 +243,7 @@ intern u32 my_sprintf(u8* buf, String fmt, VaList argc) {
           } break;
           case 'c': {
             i32 val = va_arg(argc, i32); // i32 - because of compiler
-            NotUsed(val);
+            UnusedVariable(val);
             length += 1;
           } break;
           case '.': {
@@ -473,11 +473,11 @@ b32 equal(String a, String b) { return str_match(a, b); }
 ////////////////////////////////////////////////////////////////////////
 // String Slicing
 
-String str_substr(String str, Range range) {
-  range.offset = ClampTop(range.offset, str.size);
-  range.size = ClampTop(range.size, str.size);
-  str.str += range.offset;
-  str.size = range_size(range);
+String str_substr(String str, Rng1u32 range) {
+  range.min = ClampTop(range.min, (u32)str.size);
+  range.max = ClampTop(range.max, (u32)str.size);
+  str.str += range.min;
+  str.size = dim_1u32(range);
   return str;
 }
 
@@ -601,37 +601,37 @@ String str_next_word(String line, u32& start) {
   return {line.str + token_start, start - token_start};
 }
 
-String str_read_line(Range* range) {
-  while (range->offset < range->size) {
-    u8* line_start = (u8*)range->offset;
-    u8* start = (u8*)range->offset;
-    u8* end = (u8*)range->size;
-#if OS_WINDOWS
-    while (start < end && *start != '\r') {
-      ++start;
-    }
-    u32 len = start - line_start;
-    // move to next line and handle \r\n
-    range->offset += len + 2;
-#else
-    while (start < end && *start != '\n') {
-      ++start;
-    }
-    u32 len = start - line_start;
-    // move to next line and handle \n
-    range->offset += len + 1;
-#endif
-    // If line is not empty, return it
-    if (len > 0) {
-      String result = {line_start, len};
-      return result;
-    }
-    // If line was empty, loop to read the next one
-  }
-  // If nothing left
-  String result = {0, 0};
-  return result;
-}
+// String str_read_line(Range* range) {
+//   while (range->offset < range->size) {
+//     u8* line_start = (u8*)range->offset;
+//     u8* start = (u8*)range->offset;
+//     u8* end = (u8*)range->size;
+// #if OS_WINDOWS
+//     while (start < end && *start != '\r') {
+//       ++start;
+//     }
+//     u32 len = start - line_start;
+//     // move to next line and handle \r\n
+//     range->offset += len + 2;
+// #else
+//     while (start < end && *start != '\n') {
+//       ++start;
+//     }
+//     u32 len = start - line_start;
+//     // move to next line and handle \n
+//     range->offset += len + 1;
+// #endif
+//     // If line is not empty, return it
+//     if (len > 0) {
+//       String result = {line_start, len};
+//       return result;
+//     }
+//     // If line was empty, loop to read the next one
+//   }
+//   // If nothing left
+//   String result = {0, 0};
+//   return result;
+// }
 
 String str_trim(String string) {
   String result;

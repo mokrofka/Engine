@@ -1,18 +1,10 @@
 #pragma once
 #include "base.h"
 #include "mem.h"
+#include "maths.h"
 
 ////////////////////////////////////////////////////////////////////////
 // Base
-
-struct String {
-  u8* str;
-  u64 size;
-  String() = default;
-  NO_DEBUG String(u8* str_, u64 size_);
-  NO_DEBUG String(const char* str_);
-  NO_DEBUG String(u8* str_);
-};
 
 struct DString {
   u8* str;
@@ -94,7 +86,7 @@ b32 equal(String a, String b);
 // hello_world
 // range {1, 4}
 // result: ello
-String str_substr(String str, Range range);
+String str_substr(String str, Rng1u32 range);
 
 // hello_world
 // size 3
@@ -136,7 +128,7 @@ StringNode* str_list_pushf(Allocator arena, StringList* list, String fmt, ...);
 
 void str_copy(String64& dest, String str);
 String str_next_word(String line, u32& start);
-String str_read_line(Range* range);
+// String str_read_line(Range* range);
 String str_trim(String string);
 i32 str_index_of(String str, u8 c);
 

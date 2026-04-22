@@ -1,6 +1,8 @@
 #pragma once
 #include "base.h"
 
+#define VIEW_MEMORY 1
+
 const u32 MEM_DEFAULT_ALIGNMENT = sizeof(void*);
 
 enum AllocatorType {
@@ -16,10 +18,56 @@ struct Allocator {
 };
 
 ////////////////////////////////////////////////////////////////////////
+// Allocator Interface
+
+u8*  mem_alloc(Allocator alloc, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
+u8*  mem_alloc_zero(Allocator alloc, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
+u8*  mem_realloc(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 align = MEM_DEFAULT_ALIGNMENT);
+u8*  mem_realloc_zero(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 align = MEM_DEFAULT_ALIGNMENT);
+void mem_free(Allocator alloc, void* ptr);
+
+template<typename T> T* mem_realloc_array(Allocator a, T* ptr, u32 old_c, u32 c)      { return (T*)mem_realloc(a, ptr,      sizeof(T)*old_c, sizeof(T)*c, alignof(T)); }
+template<typename T> T* mem_realloc_array_zero(Allocator a, T* ptr, u32 old_c, u32 c) { return (T*)mem_realloc_zero(a, ptr, sizeof(T)*old_c, sizeof(T)*c, alignof(T)); }
+
+#define push_buffer(a, z, ...)           mem_alloc(a,      z, ##__VA_ARGS__)
+#define push_buffer_zero(a, z, ...)      mem_alloc_zero(a, z, ##__VA_ARGS__)
+#define push_struct(a, T)            (T*)mem_alloc(a,      sizeof(T),     alignof(T))
+#define push_struct_zero(a, T)       (T*)mem_alloc_zero(a, sizeof(T),     alignof(T))
+#define push_array(a, T, c)          (T*)mem_alloc(a,      sizeof(T)*(c), alignof(T))
+#define push_array_zero(a, T, c)     (T*)mem_alloc_zero(a, sizeof(T)*(c), alignof(T))
+
+template<typename T> Slice<T> slice_free(Allocator alloc, Slice<T> slice) {
+  mem_free(alloc, slice.data);
+}
+template<typename T> Slice<T> slice_clone(Allocator alloc, Slice<T> slice) {
+  T* data = push_array(alloc, T, slice.count);
+  MemCopyArray(data, slice.data, slice.count);
+  return {data, slice.count};
+}
+#define push_slice(a, T, c) Slice(push_array(a, T, c), c)
+
+////////////////////////////////////////////////////////////////////////
+// Mem visualizer
+
+struct AllocatorInfo {
+  AllocatorInfo* first;
+  AllocatorInfo* last;
+  AllocatorInfo* next;
+  AllocatorInfo* prev;
+  AllocatorInfo* parent;
+  u64 pos;
+  u64 cmt;
+  u64 cap;
+  u64 res;
+  String name;
+};
+
+Slice<AllocatorInfo> get_allocators_info();
+
+////////////////////////////////////////////////////////////////////////
 // Global allocator
 
 void global_allocator_init();
-Allocator mem_get_global_allocator();
 
 ////////////////////////////////////////////////////////////////////////
 // Arena (page allocator)
@@ -30,9 +78,16 @@ struct Arena {
   u64 cmt;
   u64 cap;
   operator Allocator();
+#if VIEW_MEMORY
+  String name;
+  u32 info_idx;
+  // AllocatorInfo* debug;
+#endif
 };
 
-Arena arena_init();
+#define arena_init(...) arena_init_(__func__)
+Arena arena_init_named(String name);
+Arena arena_init_(String name);
 void  arena_deinit(Arena* arena);
 void  arena_clear(Arena* arena);
 
@@ -93,30 +148,6 @@ struct AllocSegList {
 // atlas TODO: implement
 
 ////////////////////////////////////////////////////////////////////////
-// Allocator Interface
-
-u8*  mem_alloc(Allocator alloc, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
-u8*  mem_alloc_zero(Allocator alloc, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
-u8*  mem_realloc(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 align = MEM_DEFAULT_ALIGNMENT);
-u8*  mem_realloc_zero(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 align = MEM_DEFAULT_ALIGNMENT);
-void mem_free(Allocator alloc, void* ptr);
-
-template<typename T> T* mem_alloc_struct(Allocator a)                                 { return (T*)mem_alloc(a,             sizeof(T),                    alignof(T)); }
-template<typename T> T* mem_alloc_struct_zero(Allocator a)                            { return (T*)mem_alloc_zero(a,        sizeof(T),                    alignof(T)); }
-template<typename T> T* mem_alloc_array(Allocator a, u32 c)                           { return (T*)mem_alloc(a,             sizeof(T)*c,                  alignof(T)); }
-template<typename T> T* mem_alloc_array_zero(Allocator a, u32 c)                      { return (T*)mem_alloc_zero(a,        sizeof(T)*c,                  alignof(T)); }
-template<typename T> T* mem_realloc_array(Allocator a, T* ptr, u32 old_c, u32 c)      { return (T*)mem_realloc(a, ptr,      sizeof(T)*old_c, sizeof(T)*c, alignof(T)); }
-template<typename T> T* mem_realloc_array_zero(Allocator a, T* ptr, u32 old_c, u32 c) { return (T*)mem_realloc_zero(a, ptr, sizeof(T)*old_c, sizeof(T)*c, alignof(T)); }
-
-// I like push name
-#define push_buffer(a, z, ...)           mem_alloc(a,      z, ##__VA_ARGS__)
-#define push_buffer_zero(a, z, ...)      mem_alloc_zero(a, z, ##__VA_ARGS__)
-#define push_struct(a, T)            (T*)mem_alloc(a,      sizeof(T),     alignof(T))
-#define push_struct_zero(a, T)       (T*)mem_alloc_zero(a, sizeof(T),     alignof(T))
-#define push_array(a, T, c)          (T*)mem_alloc(a,      sizeof(T)*(c), alignof(T))
-#define push_array_zero(a, T, c)     (T*)mem_alloc_zero(a, sizeof(T)*(c), alignof(T))
-
-////////////////////////////////////////////////////////////////////////
 // General GPU allocator (segregated pow2)
 
 typedef u32 GpuMemHandler;
@@ -128,7 +159,7 @@ struct GpuAllocSegList {
   struct RangeList {
     u32 next;
     b32 is_allocated;
-    Range range;
+    BufferRegion range;
   };
   RangeList* data;
   u32 range_count;
@@ -153,15 +184,16 @@ struct SoA_Field {
 u8* mem_alloc_soa(Allocator alloc, u32 count, Slice<SoA_Field> fields);
 u8* mem_realloc_soa(Allocator alloc, u32 old_count, u32 new_count, Slice<SoA_Field> fields);
 
-struct OffsetMemPusher {
-  void* offset;
-  void* push(u64 size, u64 align);
-};
-struct OffsetPusher {
-  u64 offset;
-  u64 push(u64 size, u64 align);
-};
-#define offset_push_struct(a, T) (T*)a.push(sizeof(T), alignof(T))
-#define offset_push_array(a, T, c) (T*)a.push(sizeof(T)*(c), alignof(T))
+void* offset_pusher_mem_push(void*& offset, u64 size, u64 align);
+u64 offset_pusher_push(u64& offset, u64 size, u64 align);
+#define offset_mem_push_struct(a, T)  (T*)offset_pusher_mem_push(a, sizeof(T), alignof(T))
+#define offset_mem_push_array(a, T, c)(T*)offset_pusher_mem_push(a, sizeof(T)*(c), alignof(T))
+#define offset_push_struct(a, T)          offset_pusher_push(a, sizeof(T), alignof(T))
+#define offset_push_array(a, T, c)        offset_pusher_push(a, sizeof(T)*(c), alignof(T))
 
-
+struct MemFormatSize {
+  String format;
+  u32 format_id;
+  f32 size;
+};
+MemFormatSize mem_format_size(f32 value);

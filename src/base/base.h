@@ -20,8 +20,6 @@ typedef u8  b8;
 typedef i32 b32;
 
 typedef u64 DenseTime;
-
-template<typename T> using InitializerList = std::initializer_list<T>;
 typedef va_list VaList;
 
 #if _WIN64
@@ -49,6 +47,7 @@ typedef va_list VaList;
 
 #if OS_WINDOWS
   #define shared_function C_LINKAGE __declspec(dllexport)
+  #error not implemented
 #elif OS_LINUX
   #define shared_function C_LINKAGE
 #else
@@ -60,8 +59,9 @@ typedef va_list VaList;
 
 #if COMPILER_CLANG
   #define NO_DEBUG __attribute__((nodebug))
-  #define INLINE   NO_DEBUG inline __attribute__((always_inline))
+  #define INLINE   inline __attribute__((always_inline))
   #define NO_ASAN  __attribute__((no_sanitize("address")))
+  #define read_only __attribute__((section(".rodata")))
 #else
   #error Compiler not supported.
 #endif
@@ -105,9 +105,7 @@ const u64 U8_MAX  = 0xFF;
 const u64 U16_MAX = 0xFFFF;
 const u64 U32_MAX = 0xFFFFFFFF;
 const u64 U64_MAX = 0xFFFFFFFFFFFFFFFF;
-const u64 INVALID_ID     = U32_MAX;
-const u64 INVALID_ID_U16 = U16_MAX;
-const u64 INVALID_ID_U8  = U8_MAX;
+const u64 INVALID_ID = U32_MAX;
 const u64 PAGE_SIZE = 4096;
 
 template<typename T> void Swap(T& a, T& b) {
@@ -164,7 +162,7 @@ u32 ctz(u64 val);
 u32 count_bits_set(u64 val);
 u32 most_significant_bit(u64 size);
 
-constexpr u64 Bit(u64 x) { return 1 << x; }
+constexpr u64 Bit(u32 x) { return 1 << x; }
 u64 BitHas(u64 x, u64 pos);
 u64 FlagSet(u64 x, u64 f);
 u64 FlagClear(u64 x, u64 f);
@@ -190,31 +188,33 @@ template <typename T> T Cube(T x)                    { return x * x * x; };
 template <typename T> T Sign(T x)                    { return (x < 0) ? -1 : (x > 0) ? 1 : 0; };
 template <typename T> T Abs(T x)                     { return (x < 0) ? -x : x; };
 
-template <typename T> b32 IsInRangeIncl(T a, T x, T b) { return (a <= x) && (x <= b); };
-template <typename T> b32 IsInRangeExcl(T a, T x, T b) { return (a < x) && (x < b); };
-template <typename T> b32 IsInRange(T a, T x, T b)     { return (a <= x) && (x < b); };
 u64 ModPow2(u64 x, u64 b);
 u64 DivPow2(u64 x, u64 b);
 u64 CeilIntDiv(u64 x, u64 b);
 u64 RoundUp(u64 x, u64 a);
 u64 RoundDown(u64 x, u64 a);
 u64 Compose64Bit(u64 a, u64 b);
+u32 next_pow2(u32 v);
+u32 prev_pow2(u32 n);
 
 ////////////////////////////////////////////////////////////////////////
 // Shenanigans
 
 #define ArrayCount(x)  (sizeof((x)) / sizeof((x)[0]))
+#define ArraySlice(arr) Slice(arr, ArrayCount(arr))
+#define ArrayRand(arr) arr[rand_range_u32(0, ArrayCount(arr)-1)]
 #define Assign(a,b)    (*((u8**)(&(a))) = (u8*)(b))
-#define As(T)          *(T*)
-#define Loop(it, c)    for (i32 it = 0; it < c; ++it)
 #define _Stringify(S)  #S
 #define Stringify(S)   _Stringify(S)
 #define _Glue(A,B)     A##B
 #define Glue(A,B)      _Glue(A,B)
 
-#define EachElement(it, array) (i32 it = 0; it < ArrayCount(array); ++it)
-#define EachEnumVal(type, it) (type it = (type)0; it < type##_COUNT; it = (type)(it+1))
-#define EachNode(it, T, first) (T *it = first; it != 0; it = it->next)
+#define Loop(it, c)                  for (i32 it = 0; it < c; ++it)
+#define EachElement(it, array)       (i32 it = 0; it < ArrayCount(array); ++it)
+#define EachEnumVal(type, it)        (type it = (type)0; it < type##_COUNT; it = (type)(it+1))
+#define EachNonZeroEnumVal(type, it) (type it = (type)1; it < type##_COUNT; it = (type)(it+1))
+#define EachInRange(it, range)       (u64 it = (range).min; it < (range).max; ++it)
+#define EachNode(it, T, first)       (T *it = first; it != 0; it = it->next)
 
 ////////////////////////////////////////////////////////////////////////
 // Asserts
@@ -226,7 +226,7 @@ void DebugTrap();
 #define InvalidDefaultCase  default: {InvalidPath;}
 #define NotImplemented      Assert(!"Not Implemented!")
 #define AssertAlways(x)     if (!(x)) { Trap(); }
-#define NotUsed(x) (void)&x
+#define UnusedVariable(x)   (void)x
 
 #if BUILD_DEBUG
   #define Assert(x) if (!(x)) { DebugTrap(); }
@@ -249,6 +249,8 @@ void DebugTrap();
 #define SLLQueuePush(f,l,n) (f == null) ? \
                             (f = l = n, (n)->next = null) : \
                             ((l)->next = n, l = n, (n)->next = null)
+
+// TODO: more
 
 ////////////////////////////////////////////////////////////////////////
 // Defer
@@ -274,38 +276,20 @@ struct Result {
   b32 err;
 };
 
+u64 cpu_timer_now();
+u64 cpu_frequency();
+void estimate_cpu_frequency();
+
+const u32 DEFAULT_CAPACITY = 8;
+const u32 DEFAULT_RESIZE_FACTOR = 2;
+
 ////////////////////////////////////////////////////////////////////////
 // Types
 
-template<typename T>
-struct Slice {
-  T* data;
-  u64 count;
-  T* begin() { return data; }
-  T* end()   { return data + count; }
-  Slice() = default;
-  Slice(T* data_, u64 count_) {
-    data = data_;
-    count = count_;
-  }
-  T& operator[](u32 idx) {
-    Assert(idx < count);
-    return data[idx];
-  }
-};
-#define ArraySlice(arr) Slice(arr, ArrayCount(arr))
-
-struct Buffer {
-  u8* data;
-  u64 size;
-};
-
-struct Range {
+struct BufferRegion {
   u64 offset;
   u64 size;
 };
-
-u64 range_size(Range r);
 
 struct RingBuffer {
   u8* base;
@@ -319,10 +303,35 @@ void ring_read(RingBuffer& ring, void *dst, u64 read_size);
 #define ring_write_struct(ring, ptr) ring_write((ring), (ptr), sizeof(*(ptr)))
 #define ring_read_struct(ring, ptr) ring_read((ring) (ptr), sizeof(*(ptr)))
 
-const u32 DEFAULT_CAPACITY = 8;
-const u32 DEFAULT_RESIZE_FACTOR = 2;
+template<typename T>
+struct Slice {
+  T* data;
+  union {
+    u64 count;
+    u64 size;
+  };
+  T* begin() { return data; }
+  T* end()   { return data + count; }
+  Slice() = default;
+  Slice(T* data_, u64 count_) {
+    data = data_;
+    count = count_;
+  }
+  T& operator[](u32 idx) {
+    Assert(idx < count);
+    return data[idx];
+  }
+  Slice slice(u32 li, u32 hi) {
+    Assert(0 <= li && li <= hi && hi <= count);
+    return Slice(data + li, hi - li);
+  }
+};
 
-u64 cpu_timer_now();
-u64 cpu_frequency();
-void estimate_cpu_frequency();
-
+struct String {
+  u8* str;
+  u64 size;
+  String() = default;
+  NO_DEBUG String(u8* str_, u64 size_);
+  NO_DEBUG String(const char* str_);
+  NO_DEBUG String(u8* str_);
+};

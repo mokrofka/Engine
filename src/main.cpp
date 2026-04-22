@@ -21,7 +21,7 @@ i32 main(i32 count, char* args[]) {
   st.lib = os_lib_open(st.lib_filepath);
   Assign(st.update, os_lib_get_proc(st.lib, "common_main"));
 #else
-  st.update = common_update;
+  st.update = common_main;
 #endif
 
   while (true) {
@@ -32,4 +32,6 @@ i32 main(i32 count, char* args[]) {
     Assign(st.update, os_lib_get_proc(st.lib, "common_main"));
   }
 }
+
+
 

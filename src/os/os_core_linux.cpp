@@ -106,8 +106,8 @@ void os_release(void* ptr, u64 size)       { munmap(ptr, size);}
 FileProperties os_lnx_file_properties_from_stat(struct stat fd_stat) {
   FileProperties props = {
     .size = (u64)fd_stat.st_size,
-    .modified = fd_stat.st_mtim.tv_sec*Billion(1) + fd_stat.st_mtim.tv_nsec,
-    .created = fd_stat.st_ctim.tv_sec*Billion(1) + fd_stat.st_ctim.tv_nsec,
+    .modified = (u64)fd_stat.st_mtim.tv_sec*Billion(1) + fd_stat.st_mtim.tv_nsec,
+    .created = (u64)fd_stat.st_ctim.tv_sec*Billion(1) + fd_stat.st_ctim.tv_nsec,
   };
   if(fd_stat.st_mode & S_IFDIR) {
     props.flags |= FilePropertyFlag_IsFolder;
@@ -228,18 +228,14 @@ FileProperties os_file_path_properties(String path) {
   return props;
 }
 
-Buffer os_file_path_read_all(Allocator arena, String path) {
+Slice<u8> os_file_path_read_all(Allocator arena, String path) {
   Scratch scratch(arena);
   OS_Handle f = os_file_open(path, OS_AccessFlag_Read);
   u64 file_size = os_file_size(f);
   u8* buffer = push_buffer(arena, file_size);
   u64 read_size = os_file_read(f, file_size, buffer);
   os_file_close(f);
-  Buffer result = {
-    .data = buffer,
-    .size = read_size,
-  };
-  return result;
+  return {buffer, read_size};
 }
 
 b32 os_file_path_equal_mtime(String a, String b) {

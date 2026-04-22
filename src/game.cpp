@@ -482,7 +482,7 @@ void scene_update() {
       // Material_Screen,
     };
     Handle<Entity> e = entity_create(meshes[rand_range_u32(0, ArrayCount(meshes)-1)], materials[rand_range_u32(0, ArrayCount(materials)-1)]);
-    u32 range = 1000;
+    u32 range = 100;
     e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
     g.moving_cubes.add(e);
   }
@@ -499,8 +499,8 @@ void scene_update() {
 void game_init() {
   GameState& g = g_st->game;
   Scratch scratch;
-  g.arena = arena_init();
-  g.persistent_arena = arena_init();
+  g.arena = arena_init_named("game arena");
+  g.persistent_arena = arena_init_named("persistent game arena");
   g.gpa.init(g.arena);
   g.timer = timer_init(1);
   g.entity_id_pool.init(g.persistent_arena, MaxEntities);
@@ -523,8 +523,15 @@ void game_init() {
   scene_init();
 }
 
+void foo();
 void game_update() {
+  foo();
   TimeFunction;
+  // var& g = g_st->game;
+  // push_array(g.arena, u32, 1);
+  // if (os_is_key_pressed(Key_X)) {
+  //   arena_clear(&g.arena);
+  // }
   Scratch scratch;
   camera_update();
   if (os_is_key_down(Key_T)) {
@@ -537,7 +544,41 @@ void game_update() {
     os_close_window();
   }
   scene_update();
-  ImGui::ShowDemoWindow();
+}
+
+struct Thing {
+  Handle<Thing> first;
+  Handle<Thing> last;
+  Handle<Thing> next;
+  Handle<Thing> prev;
+  Handle<Thing> parent;
+  i32 data;
+};
+
+// p - pool, f - first, n - node, h - handle
+#define SLLStackPush(p, fh, nh) var& (n) = p.get(nh); (n.next=fh, fh = nh)
+#define SLLStackPop(p, fh) var& (f) = p.get(fh); (fh = f.next)
+
+void foo() {
+  // StaticNObjectPool<Thing, 128> pool = {};
+  // Handle<Thing> thing = pool.add();
+  // Loop (i, 10) {
+  //   SLLStackPush(pool, thing, pool.add());
+  // }
+  // // for EachNode(it, )
+  // Handle<Thing> a = pool.add();
+  // Handle<Thing> b = pool.add();
+  // Handle<Thing> c = pool.add();
+  // Handle<Thing> d = pool.add();
+  // Handle<Thing> e = pool.add();
+  // pool.get(a).data = 0;
+
+  // SLLStackPush(pool, a, b);
+
+  // a.
+
+
+
 }
 
 

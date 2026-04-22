@@ -732,7 +732,7 @@ intern void vk_buffer_unmap_memory(VK_Buffer buffer) {
   vk->UnmapMemory(vkdevice, buffer.memory);
 }
 
-intern void vk_buffer_upload_to_gpu(VK_Buffer buffer, Range range, void* data) {
+intern void vk_buffer_upload_to_gpu(VK_Buffer buffer, BufferRegion range, void* data) {
   MemCopy(vk->stage_buffer.mapped_memory, data, range.size);
   vk_cmd_begin(vk->upload_cmd);
   VkBufferCopy copy_region = {
@@ -800,7 +800,7 @@ intern VkPipeline vk_shader_pipeline_create(Shader shader) {
       String stage_type_strs[] = {"vert", "frag"};
       VkShaderStageFlagBits stage_types[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
       String filepath = push_strf(scratch, "%s/%s.%s.spv", g_st->shader_compiled_dir, shader.name, stage_type_strs[i]);
-      Buffer binary = os_file_path_read_all(scratch, filepath);
+      Slice binary = os_file_path_read_all(scratch, filepath);
       VkShaderModuleCreateInfo module_info = {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
         .codeSize = binary.size,
@@ -1012,7 +1012,7 @@ VK_ShaderModule vk_shader_module_create(String name) {
     String stage_type_strs[] = {"vert", "frag"};
     VkShaderStageFlagBits stage_types[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
     String filepath = push_strf(scratch, "%s/%s.%s.spv", g_st->shader_compiled_dir, name, stage_type_strs[i]);
-    Buffer binary = os_file_path_read_all(scratch, filepath);
+    Slice binary = os_file_path_read_all(scratch, filepath);
     VkShaderModuleCreateInfo module_info = {
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
       .codeSize = binary.size,
@@ -1370,10 +1370,10 @@ intern void vk_descriptor_init() {
 
   // Descriptor
   {
-    OffsetPusher pusher = {};
-    offset_push_struct(pusher, GlobalStateGPU);
-    u64 entities_offset = (u64)offset_push_array(pusher, EntityGPU, MaxEntities+MaxStaticEntities);
-    u64 materials_offset = (u64)offset_push_array(pusher, MaterialGPU, MaxMaterials);
+    u64 offset = 0;
+    offset_push_struct(offset, GlobalStateGPU);
+    u64 entities_offset = offset_push_array(offset, EntityGPU, MaxEntities+MaxStaticEntities);
+    u64 materials_offset = offset_push_array(offset, MaterialGPU, MaxMaterials);
     // Global
     VkDescriptorBufferInfo global_state_buffer_info = {
       .buffer = vk->storage_buffer.handle,
@@ -1440,11 +1440,11 @@ intern void vk_descriptor_init() {
 
   // Set pointers to shader data
   {
-    OffsetMemPusher pusher = {.offset = vk->storage_buffer.mapped_memory};
-    vk->gpu_global_shader_st = offset_push_struct(pusher, GlobalStateGPU);
+    void* offset = vk->storage_buffer.mapped_memory;
+    vk->gpu_global_shader_st = offset_mem_push_struct(offset, GlobalStateGPU);
     vk->gpu_entities_indexes = vk->gpu_global_shader_st->entity_indices;
-    vk->gpu_entities = offset_push_array(pusher, EntityGPU, MaxEntities+MaxStaticEntities);
-    vk->gpu_materials = offset_push_array(pusher, MaterialGPU, MaxMaterials);
+    vk->gpu_entities = offset_mem_push_array(offset, EntityGPU, MaxEntities+MaxStaticEntities);
+    vk->gpu_materials = offset_mem_push_array(offset, MaterialGPU, MaxMaterials);
 
     vk->gpu_draw_call_infos = (VK_DrawCallInfo*)vk->indirect_draw_buffer.mapped_memory;
   }
@@ -1829,12 +1829,12 @@ Handle<GpuMaterial> vk_material_load(Material material) {
     if (!module_idx) {
       VK_ShaderModule module = vk_shader_module_create(material.shader.name);
       module_idx = vk->shader_to_module.add(material.shader.name, vk->modules.count);
-      vk->modules.add({module});
+      vk->modules.add({.module = module});
     }
     VkPipeline pipeline = vk_shader_pipeline_create_(vk->modules[*module_idx].module, material.shader.state);
     pipeline_idx = vk->shader_to_pipeline.add(key, vk->pipelines.count);
     vk->pipelines.add(pipeline);
-    vk->batches.add({{}});
+    vk->batches.add({});
 
     VK_State::ModuleEntry& entry = vk->modules[*module_idx];
     entry.track_pipelines.add(*pipeline_idx);
@@ -2378,7 +2378,7 @@ intern void vk_swapchain_present(VkSemaphore render_complete_semaphore, u32 pres
   };
 #if GFX_X11 // NOTE: on x11 errors
   VkResult res = vk->QueuePresentKHR(vk->device.graphics_queue, &present_info);
-  NotUsed(res);
+  UnusedVariable(res);
   // if (res != VK_SUCCESS) {
   //   Error("%s", vk_result_string(res));
   // }
@@ -2395,14 +2395,14 @@ Handle<GpuMesh> vk_mesh_load(Mesh mesh) {
   u64 vert_size = mesh.vert_count*sizeof(Vertex);
   u64 vert_offset = vert_buff.size;
   vert_buff.size += vert_size;
-  Range vert_range = { .offset = vert_offset, .size = vert_size };
+  BufferRegion vert_range = { .offset = vert_offset, .size = vert_size };
   vk_buffer_upload_to_gpu(vk->vert_buffer, vert_range, mesh.vertices);
 
   VK_Buffer& index_buff = vk->index_buffer;
   u64 index_size = mesh.index_count*sizeof(u32);
   u64 index_offset = index_buff.size;
   index_buff.size += index_size;
-  Range index_range = { .offset = index_offset, .size = index_size };
+  BufferRegion index_range = { .offset = index_offset, .size = index_size };
   if (mesh.indices) {
     vk_buffer_upload_to_gpu(vk->index_buffer, index_range, mesh.indices);
   }
@@ -2648,8 +2648,13 @@ intern void vk_instance_create() {
     .apiVersion = VK_API_VERSION_1_4
   };
   
-  Array<const char*, 1> required_validation_layer_names = {};
-  Array<const char*, 3> required_extensions = { VK_KHR_SURFACE_EXTENSION_NAME, VK_SURFACE_NAME };
+  Darray<const char*> required_validation_layer_names(scratch);
+  Darray<const char*> required_extensions(scratch);
+  required_extensions.add(VK_KHR_SURFACE_EXTENSION_NAME, VK_SURFACE_NAME);
+
+  // Darray<i32> arr = darray_init(scratch);
+  // Darray<u32> arr1 = darray_init(scratch);
+  // Some some = {x,x,x};
 
 #if BUILD_DEBUG
 
@@ -2948,9 +2953,10 @@ void vk_shutdown() {
   Debug("Destroying Vulkan surface...");
   vk->DestroySurfaceKHR(vk->instance, vk->surface, vk->allocator);
   
-#if DUILD_DEBUG
+#if BUILD_DEBUG
   Debug("Destroying Vulkan debugger...");
-  PFN_vkDestroyDebugUtilsMessengerEXT func; Assign(func, vkGetInstanceProcAddr(vk->instance, "vkDestroyDebugUtilsMessengerEXT"));
+  PFN_vkDestroyDebugUtilsMessengerEXT func = null;
+  Assign(func, vk->GetInstanceProcAddr(vk->instance, "vkDestroyDebugUtilsMessengerEXT"));
   func(vk->instance, vk->debug_messenger, vk->allocator);
 #endif
 
@@ -3283,7 +3289,7 @@ void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMes
     MeshBatch<StaticEntity>& mesh_batch = shader_batch.mesh_batches[*mesh_idx_in_array];
     mesh_batch.entities.add(entity_handle);
     u32 entity_idx_in_array = mesh_batch.entities.count;
-    NotUsed(entity_idx_in_array); // TODO: remove static entity
+    UnusedVariable(entity_idx_in_array); // TODO: remove static entity
   }
   // Not Indexed
   else {
@@ -3298,7 +3304,7 @@ void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMes
     MeshBatch<StaticEntity>& mesh_batch = shader_batch.mesh_batches[*mesh_idx_in_array];
     mesh_batch.entities.add(entity_handle);
     u32 entity_idx_in_array = mesh_batch.entities.count;
-    NotUsed(entity_idx_in_array); // TODO: remove static entity
+    UnusedVariable(entity_idx_in_array); // TODO: remove static entity
   }
   // vk->entities[entity_idx].shader_handle = vk->shaders[shader_idx].entities.add(entity_handle);
   vk->gpu_entities[entity_idx].material = material_handle.idx();
@@ -3635,6 +3641,7 @@ void vk_imgui_end_frame() {
   ImGui::UpdatePlatformWindows();
   ImGui::RenderPlatformWindowsDefault();
 }
+
 #endif
 
 

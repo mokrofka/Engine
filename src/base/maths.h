@@ -1,6 +1,5 @@
 #pragma once
 #include "base.h"
-#include "str.h"
 
 const f32 PI             = 3.14159265358f;
 const f32 Tau            = (PI * 2);
@@ -13,12 +12,15 @@ const f32 MachineEpsilon = 1.1920929e-7f;
 f32 degtorad(f32 degrees);
 f32 radtodeg(f32 radians);
 
+///////////////////////////////////
+// v2
+
 union v2 {
   struct {
     f32 x;
     f32 y;
   };
-  f32 e[2];
+  f32 v[2];
   v2() = default;
   v2(f32 x_, f32 y_);
 };
@@ -28,7 +30,7 @@ union v2i {
     i32 x;
     i32 y;
   };
-  i32 e[2];
+  i32 v[2];
   v2i() = default;
   v2i(i32 x_, i32 y_);
 };
@@ -38,10 +40,13 @@ union v2u {
     u32 x;
     u32 y;
   };
-  u32 e[2];
+  u32 v[2];
   v2u() = default;
   v2u(u32 x_, u32 y_);
 };
+
+///////////////////////////////////
+// v3
 
 union v3 {
   struct {
@@ -49,7 +54,7 @@ union v3 {
     f32 y;
     f32 z;
   };
-  f32 e[3];
+  f32 v[3];
   v3() = default;
   v3(f32 x_, f32 y_, f32 z_);
 };
@@ -60,10 +65,22 @@ union v3u {
     u32 y;
     u32 z;
   };
-  u32 e[3];
+  u32 v[3];
   v3u() = default;
   v3u(u32 x_, u32 y_, u32 z_);
 };
+
+union v3b {
+  struct {
+    b32 x;
+    b32 y;
+    b32 z;
+  };
+  u32 v[3];
+};
+
+///////////////////////////////////
+// v4
 
 union v4 {
   struct {
@@ -72,18 +89,18 @@ union v4 {
     f32 z;
     f32 w;
   };
-  f32 e[4];
+  f32 v[4];
   v4() = default;
   v4(f32 x_, f32 y_, f32 z_, f32 w_);
 };
 
 union mat3 {
-  f32 e[9];
+  f32 v[9];
   f32& operator[](u32 a);
 };
 
 union mat4 {
-  f32 e[4][4];
+  f32 v[4][4];
   struct {
     v4 x;
     v4 y;
@@ -92,34 +109,98 @@ union mat4 {
   };
 };
 
-typedef v4 quat;
+////////////////////////////////////////////////////////////////////////
+// Ranges
 
-union Rect {
-  struct {
-    f32 x,y;
-    f32 width,height;
-  };
+///////////////////////////////////
+// dim1
+
+struct Rng1u32 {
+  u32 min;
+  u32 max;
+  Rng1u32() = default;
+  Rng1u32(u32 min_, u32 max_);
+};
+
+struct Rng1i32 {
+  i32 min;
+  i32 max;
+  Rng1i32() = default;
+  Rng1i32(i32 min_, i32 max_);
+};
+
+struct Rng1u64 {
+  u64 min;
+  u64 max;
+  Rng1u64() = default;
+  Rng1u64(u64 min_, u64 max_);
+};
+
+struct Rng1f32 {
+  f32 min;
+  f32 max;
+  Rng1f32() = default;
+  Rng1f32(f32 min_, f32 max_);
+};
+
+///////////////////////////////////
+// Dim2
+
+union Rng2f32 {
   struct {
     v2 min;
     v2 max;
   };
-  Rect() = default;
-  Rect(v2 min_, v2 max_) {
-    min = min_;
-    max = max_;
-  }
+  struct {
+    f32 x0;
+    f32 y0;
+    f32 x1;
+    f32 y1;
+  };
+  Rng2f32() = default;
+  Rng2f32(v2 min_, v2 max_);
 };
 
-union RectI {
+///////////////////////////////////
+// Dim3
+
+struct Rng3f32 {
+  v3 min;
+  v3 max;
   struct {
-    i32 x,y;
-    i32 width,height;
+    f32 x0;
+    f32 y0;
+    f32 z0;
+    f32 x1;
+    f32 y1;
+    f32 z1;
   };
-  struct {
-    v2i min;
-    v2i max;
-  };
+  Rng3f32() = default;
+  Rng3f32(v3 min_, v3 max_);
 };
+
+typedef Rng1f32 Rng1;
+typedef Rng2f32 Rng2;
+typedef Rng3f32 Rng3;
+
+///////////////////////////////////
+// Misc
+
+// union Rect {
+//   struct {
+//     f32 x,y;
+//     f32 width,height;
+//   };
+//   struct {
+//     v2 min;
+//     v2 max;
+//   };
+//   Rect() = default;
+//   Rect(v2 min_, v2 max_) {
+//     min = min_;
+//     max = max_;
+//   }
+// };
 
 struct Transform {
   v3 pos;
@@ -127,15 +208,13 @@ struct Transform {
   v3 scale;
 };
 
-struct AABB {
-  v3 min;
-  v3 max;
-};
-
 struct Ray {
   v3 origin;
   v3 dir;
 };
+
+////////////////////////////////////////////////////////////////////////
+// Float Ops
 
 NO_DEBUG f32 Sin(f32 a);
 NO_DEBUG f32 Cos(f32 a);
@@ -158,11 +237,23 @@ NO_DEBUG void SinCos(f32 angle, f32* a, f32* b);
 
 NO_DEBUG f32 SinD(f32 a);
 NO_DEBUG f32 CosD(f32 a);
-NO_DEBUG f32 Lerp(f32 a, f32 t, f32 b);
 NO_DEBUG f32 Atan2_360(f32 y, f32 x);
 
-u32 next_pow2(u32 v);
-u32 prev_pow2(u32 n);
+////////////////////////////////////////////////////////////////////////
+// Sort
+
+template<typename T, typename Compare> void sort_insert(Slice<T> slice, Compare cmp) {
+  for (i32 i = 1; i < slice.count; ++i) {
+    T key = slice[i];
+    i32 j = i - 1;
+    while (j >= 0 && cmp(key, slice[j])) {
+      slice[j + 1] = slice[j];
+      j--;
+    }
+    slice[j + 1] = key;
+  }
+}
+#define sort_insert_l(data, ...) sort_insert(data, [](var a, var b) __VA_ARGS__)
 
 ////////////////////////////////////////////////////////////////////////
 // Color
@@ -203,8 +294,13 @@ template<typename T> void rand_shuffle(Slice<T> slice) {
   }
 }
 
+////////////////////////////////////////////////////////////////////////
+// Misc
+
+NO_DEBUG f32 Lerp(f32 a, f32 t, f32 b);
 f32 inverse_lerp(f32 a, f32 x, f32 b);
 f64 inverse_lerp_f64(f64 a, f64 x, f64 b);
+f32 map_range_f32(f32 v, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
 
 ////////////////////////////////////////////////////////////////////////
 // Vector2
@@ -245,7 +341,6 @@ NO_DEBUG v2  v2_lerp(v2 a, f32 t, v2 b);
 NO_DEBUG v2  v2_skew(v2 a);
 NO_DEBUG v2 v2_rand_range(v2 a, v2 b);
 f32 v2_shortest_arc(v2 a, v2 b);
-b32 v2_in_rect(Rect rect, v2 p);
 v2 v2_map_to_v2_11(v2 pos, v2 size);
 
 ////////////////////////////////////////////////////////////////////////
@@ -337,7 +432,7 @@ mat4 mat4_rotate_xyz(v3 rot);
 mat4 mat4_transform(v3 pos, v3 rot, v3 scale);
 mat4 mat4_transform(Transform trans);
 mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far);
-mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 Near, f32 Far);
+mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far);
 mat4 mat4_look_at(v3 pos, v3 dir, v3 up);
 mat4 mat4_transpose(mat4 matrix);
 mat4 mat4_inverse(mat4 matrix);
@@ -349,19 +444,65 @@ v3 mat4_right(mat4 matrix);
 v3 mat4_left(mat4 matrix);
 
 ////////////////////////////////////////////////////////////////////////
-// Quaternions
+// Range Ops
 
-quat quat_identity();
-f32 quat_normal(quat q);
-quat quat_normalize(quat q);
-quat quat_conjugate(quat q);
-quat quat_inverse(quat q);
-quat quat_mul(quat q_0, quat q_1);
-f32 quat_dot(quat q_0, quat q_1);
-mat4 quat_to_mat4(quat q);
-mat4 quat_to_rotation_matrix(quat q, v3 center);
-quat quat_from_axis_angle(v3 axis, f32 angle, b32 normalize);
-quat quat_slerp(quat q_0, quat q_1, f32 percentage);
+///////////////////////////////////
+// Dim 1
+Rng1u32 shift_1u32(Rng1u32 r, u32 x);
+Rng1u32 pad_1u32(Rng1u32 r, u32 x);
+u32 center_1u32(Rng1u32 r);
+b32 contains_1u32(Rng1u32 r, u32 x);
+u32 dim_1u32(Rng1u32 r);
+Rng1u32 union_1u32(Rng1u32 a, Rng1u32 b);
+Rng1u32 intersect_1u32(Rng1u32 a, Rng1u32 b);
+u32 clamp_1u32(Rng1u32 r, u32 v);
 
-f32 map_range_f32(f32 v, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
+Rng1i32 shift_1i32(Rng1i32 r, i32 x);
+Rng1i32 pad_1i32(Rng1i32 r, i32 x);
+i32 center_1i32(Rng1i32 r);
+b32 contains_1i32(Rng1i32 r, i32 x);
+i32 dim_1i32(Rng1i32 r);
+Rng1i32 union_1i32(Rng1i32 a, Rng1i32 b);
+Rng1i32 intersect_1i32(Rng1i32 a, Rng1i32 b);
+i32 clamp_1i32(Rng1i32 r, i32 v);
+
+Rng1u64 shift_1u64(Rng1u64 r, u64 x);
+Rng1u64 pad_1u64(Rng1u64 r, u64 x);
+u64 center_1u64(Rng1u64 r);
+b32 contains_1u64(Rng1u64 r, u64 x);
+u64 dim_1u64(Rng1u64 r);
+Rng1u64 union_1u64(Rng1u64 a, Rng1u64 b);
+Rng1u64 intersect_1u64(Rng1u64 a, Rng1u64 b);
+u64 clamp_1u64(Rng1u64 r, u64 v);
+
+Rng1f32 shift_1f32(Rng1f32 r, f32 x);
+Rng1f32 pad_1f32(Rng1f32 r, f32 x);
+f32 center_1f32(Rng1f32 r);
+b32 contains_1f32(Rng1f32 r, f32 x);
+f32 dim_1f32(Rng1f32 r);
+Rng1f32 union_1f32(Rng1f32 a, Rng1f32 b);
+Rng1f32 intersect_1f32(Rng1f32 a, Rng1f32 b);
+f32 clamp_1f32(Rng1f32 r, f32 v);
+
+///////////////////////////////////
+// Dim 2
+Rng2f32 shift_2f32(Rng2f32 r, v2 x);
+Rng2f32 pad_2f32(Rng2f32 r, f32 x);
+v2 center_2f32(Rng2f32 r);
+b32 contains_2f32(Rng2f32 r, v2 x);
+v2 dim_2f32(Rng2f32 r);
+Rng2f32 union_2f32(Rng2f32 a, Rng2f32 b);
+Rng2f32 intersect_2f32(Rng2f32 a, Rng2f32 b);
+v2 clamp_2f32(Rng2f32 r, v2 v);
+
+///////////////////////////////////
+// Dim3
+Rng3f32 shift_3f32(Rng3f32 r, v3 x);
+Rng3f32 pad_3f32(Rng3f32 r, f32 x);
+v3 center_3f32(Rng3f32 r);
+b32 contains_3f32(Rng3f32 r, v3 x);
+v3 dim_3f32(Rng3f32 r);
+Rng3f32 union_3f32(Rng3f32 a, Rng3f32 b);
+Rng3f32 intersect_3f32(Rng3f32 a, Rng3f32 b);
+v3 clamp_3f32(Rng3f32 r, v3 v);
 
