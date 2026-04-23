@@ -376,3 +376,28 @@ struct String {
   NO_DEBUG String(const char* str_);
   NO_DEBUG String(u8* str_);
 };
+
+
+// AllocatorInfo* data = ...;
+// struct StackNode {
+//   AllocatorInfo* v;
+//   StackNode* next;
+// };
+// StackNode* stack = null;
+// StackNode* node = push_struct_zero(scratch, StackNode);
+// node->v = data;
+// SLLStackPush(stack, node);
+// while (stack) {
+//   StackNode* node = stack;
+//   SLLStackPop(stack);
+//   do stuff
+//   for EachNode(it, AllocatorInfo, node->v->first) {
+//     StackNode* s = push_struct_zero(scratch, StackNode);
+//     s->v = it;
+//     SLLStackPush(stack, s);
+//   }
+// }
+
+
+
+

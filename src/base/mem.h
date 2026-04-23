@@ -1,7 +1,7 @@
 #pragma once
 #include "base.h"
 
-#define VIEW_MEMORY 1
+#define MEM_TRACK 1
 
 const u32 MEM_DEFAULT_ALIGNMENT = sizeof(void*);
 
@@ -47,22 +47,32 @@ template<typename T> Slice<T> slice_clone(Allocator alloc, Slice<T> slice) {
 #define push_slice(a, T, c) Slice(push_array(a, T, c), c)
 
 ////////////////////////////////////////////////////////////////////////
-// Mem visualizer
+// Mem track
 
 struct AllocatorInfo {
+  AllocatorType type;
   AllocatorInfo* first;
   AllocatorInfo* last;
   AllocatorInfo* next;
   AllocatorInfo* prev;
   AllocatorInfo* parent;
+  u64 exclusive_pos;
   u64 pos;
   u64 cmt;
   u64 cap;
   u64 res;
+  u64 temp_pos;
+  u64 temp_exclusive_pos;
   String name;
 };
 
-Slice<AllocatorInfo> get_allocators_info();
+struct AllocatorInfoList {
+  AllocatorInfo* first;
+  AllocatorInfo* last;
+  u32 count;
+};
+
+AllocatorInfoList get_allocators_info();
 
 ////////////////////////////////////////////////////////////////////////
 // Global allocator
@@ -73,16 +83,14 @@ void global_allocator_init();
 // Arena (page allocator)
 
 struct Arena {
+#if MEM_TRACK
+  AllocatorInfo* info;
+#endif
   u8* base;
   u64 pos;
   u64 cmt;
   u64 cap;
   operator Allocator();
-#if VIEW_MEMORY
-  String name;
-  u32 info_idx;
-  // AllocatorInfo* debug;
-#endif
 };
 
 #define arena_init(...) arena_init_(__func__)
@@ -120,14 +128,17 @@ struct ArenaList {
 };
 
 ////////////////////////////////////////////////////////////////////////
-// General allocator (segregated pow2 list)
+// Segregated pow2 list
 
 struct AllocSegList {
+#if MEM_TRACK
+  AllocatorInfo* info;
+#endif
   Allocator alloc;
   u8* pools[32];
   AllocSegList() = default;
   AllocSegList(Allocator alloc_);
-  void init(Allocator alloc_);
+  void init(Allocator alloc_, String name = {});
   operator Allocator();
 };
 

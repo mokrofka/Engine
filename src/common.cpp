@@ -2,7 +2,6 @@
 #include "game.cpp"
 #include "common.h"
 #include "json.cpp"
-#include "vk.cpp"
 #include "test.cpp"
 
 Extern GlobalState* g_st;
@@ -712,42 +711,153 @@ void profiler_view() {
       }
       
       if (ImGui::BeginTabItem("memory")) {
-        // v2 cursor_pos = ImGui::GetCursorScreenPos();
-        // v2 avail_size = ImGui::GetWindowSize();
+        v2 cursor_pos = ImGui::GetCursorScreenPos();
+        v2 avail_size = ImGui::GetWindowSize();
 
-        // var infos = get_allocators_info();
-        // var infos_sorted = slice_clone(scratch, infos);
-        // sort_insert(infos_sorted, [](var a, var b) { return a.cmt > b.cmt; });
-        // f32 max_cmt = infos_sorted[0].cmt;
+        AllocatorInfoList infos = get_allocators_info();
+        var infos_sorted = push_slice(scratch, AllocatorInfo, infos.count);
+        u32 i_it = 0;
+        for EachNode(it, AllocatorInfo, infos.first) {
+          infos_sorted[i_it] = *it;
+          ++i_it;
+        }
+        sort_insert(infos_sorted, [](var a, var b) { return a.pos > b.pos; });
 
-        // Loop (i, infos.count) {
-        //   ImGui::PushID(i);
-        //   var info = infos[i];
-        //   f32 width = avail_size.x * info.cmt / max_cmt;
-        //   f32 height = 30;
+        f32 mem_levels[] = {KB(1), KB(10), KB(100), MB(1), MB(10), MB(100), GB(1)};
+        b32 is_mem_levels_drawn[ArrayCount(mem_levels)] = {};
 
-        //   v2 offset = v2(0,  i * height) + cursor_pos;
-        //   v2 size = v2(width, height);
-        //   Rect rect = Rect(offset, size + offset);
+        v2 mouse_pos = os_get_mouse_pos();
+        u32 height_level = 0;
+        Loop (i, infos.count) {
+          ImGui::PushID(i);
+          var info = infos_sorted[i];
+          u32 mem_level = 0;
+          for EachElement(i, mem_levels) {
+            if (info.pos < mem_levels[i]) {
+              mem_level = i;
+              break;
+            }
+          }
 
-        //   ImDrawList* draw = ImGui::GetWindowDrawList();
-        //   draw->AddRectFilled(rect.min, rect.max, IM_COL32(50, 50, 50, 255));
-        //   draw->AddRect(rect.min, rect.max, IM_COL32(200, 200, 200, 255));
+          ///////////////////////////////////
+          // Mem level
+          f32 height = 30;
+          if (!is_mem_levels_drawn[mem_level] || 0) {
+            is_mem_levels_drawn[mem_level] = true;
+            ImDrawList* draw = ImGui::GetWindowDrawList();
 
-        //   MemFormatSize pos = mem_format_size(info.pos);
-        //   MemFormatSize cmt = mem_format_size(info.cmt);
-        //   MemFormatSize cap = mem_format_size(info.cap);
+            MemFormatSize pos = mem_format_size(mem_levels[mem_level]);
+            String mem_level_str = push_strf(scratch, "%.0f%s", pos.size, pos.format);
+            v2 text_size = ImGui::CalcTextSize((char*)mem_level_str.str);
 
-        //   String name_str = push_strf(scratch, "%s", info.name);
-        //   String ms_str = push_strf(scratch, "%.2f%s pos, %.2f%s cmt, %.2f%s cap", pos.size,pos.format, cmt.size,cmt.format, cap.size, cap.format);
-        //   v2 name_offset = v2(0, height * i) + cursor_pos;
-        //   v2 ms_offset = v2(avail_size.x * 0.5, height * i) + cursor_pos;
+            Rng2 win_rect = Rng2(cursor_pos, cursor_pos + avail_size);
+            f32 y = cursor_pos.y + height_level * height;
+            Rng2 row = Rng2(v2(win_rect.x0, y), v2(win_rect.x1, y + height));
 
-        //   draw->AddText(name_offset, ImGui::GetColorU32(ImGuiCol_Text), (char*)name_str.str);
-        //   draw->AddText(ms_offset, ImGui::GetColorU32(ImGuiCol_Text), (char*)ms_str.str);
+            Rng2 text_rect = center_size_2f32(row, text_size);
+            Rng2 pad_text_rect = pad_2f32(text_rect, 5);
+            draw->AddRectFilled(pad_text_rect.min, pad_text_rect.max, IM_COL32(80, 90, 130, 120));
+            draw->AddText(text_rect.min, IM_COL32(255,255,255,255), (char*)mem_level_str.str);
+            ++height_level;
+          }
 
-        //   ImGui::PopID();
-        // }
+          ///////////////////////////////////
+          // Arena
+          u32 height_level_old = height_level;
+          // u64 children_mem_size = 0;
+
+          ///////////////////////////////////
+          // Childs
+          struct StackNode {
+            AllocatorInfo* v;
+            StackNode* next;
+          };
+          StackNode* stack = null;
+          for EachNode(it, AllocatorInfo, info.first) {
+            StackNode* node = push_struct_zero(scratch, StackNode);
+            node->v = it;
+            SLLStackPush(stack, node);
+          }
+          while (stack) {
+            StackNode* node = stack;
+            SLLStackPop(stack);
+
+            // children_mem_size += node->v->inclusive_pos;
+            {
+              ++height_level;
+              AllocatorInfo& child_info = *node->v;
+              v2 child_offset = v2(10, height_level * height) + cursor_pos;
+              v2 child_size = v2(avail_size.x * child_info.pos / mem_levels[mem_level], height);
+              Rng2 child_rect = Rng2(child_offset, child_offset + child_size);
+
+              ImDrawList* draw = ImGui::GetWindowDrawList();
+              draw->AddRectFilled(child_rect.min, child_rect.max, IM_COL32(50, 50, 50, 255));
+              draw->AddRect(IM_RECT(child_rect), IM_COL32(200, 200, 200, 255));
+
+              MemFormatSize pos = mem_format_size(child_info.pos);
+              // String child_name_str = push_strf(scratch, "%s", String("child"));
+              ImString child_name_str = push_strf(scratch, "%s", child_info.name);
+              ImString child_meta_str = push_strf(scratch, "%.2f%s pos", pos.size, pos.format);
+              v2 name_offset = child_offset;
+              v2 meta_offset = v2(name_offset);
+              meta_offset.x += 100;
+              draw->AddText(name_offset, ImGui::GetColorU32(ImGuiCol_Text), child_name_str);
+              draw->AddText(meta_offset, ImGui::GetColorU32(ImGuiCol_Text), child_meta_str);
+            }
+
+            for EachNode(it, AllocatorInfo, node->v->first) {
+              StackNode* s = push_struct_zero(scratch, StackNode);
+              s->v = it;
+              SLLStackPush(stack, s);
+            }
+          }
+
+          u64 inclusive_mem_size = info.pos;
+          u64 exclusive_mem_size = info.exclusive_pos;
+          f32 width_inclusive = avail_size.x * (inclusive_mem_size / mem_levels[mem_level]);
+          f32 width_exclusive = avail_size.x * (exclusive_mem_size / mem_levels[mem_level]);
+          v2 size_inclusive = v2(width_inclusive, height);
+          v2 size_exclusive = v2(width_exclusive, height);
+  
+          v2 offset = v2(0,  height_level_old * height) + cursor_pos;
+          Rng2 rect_inclusive = Rng2(v2_add_x(offset, size_exclusive.x), v2_add_x(size_inclusive + offset, -size_exclusive.x));
+          Rng2 rect_exclusive = Rng2(offset, size_exclusive + offset);
+          ImDrawList* draw = ImGui::GetWindowDrawList();
+          // inclusive draw
+          draw->AddRectFilled(IM_RECT(rect_inclusive), IM_COL32(40, 70, 120, 255));
+          draw->AddRect(IM_RECT(rect_inclusive), IM_COL32(200, 200, 200, 255));
+          // exclusive draw
+          draw->AddRectFilled(IM_RECT(rect_exclusive), IM_COL32(70, 80, 50, 255));
+          draw->AddRect(IM_RECT(rect_exclusive), IM_COL32(200, 200, 200, 255));
+  
+          MemFormatSize pos = mem_format_size(info.pos);
+          MemFormatSize pos_exclusive = mem_format_size(exclusive_mem_size);
+          MemFormatSize cmt = mem_format_size(info.cmt);
+          MemFormatSize cap = mem_format_size(info.cap);
+  
+          String name_str = push_strf(scratch, "%s", info.name);
+          String ms_str = push_strf(scratch, "%.2f%s pos, %.2f%s cmt, %.2f%s cap", pos.size,pos.format, cmt.size,cmt.format, cap.size, cap.format);
+          v2 name_offset = v2(0, height_level_old * height) + cursor_pos;
+          v2 ms_offset = v2(avail_size.x * 0.5, height_level_old * height) + cursor_pos;
+  
+          draw->AddText(name_offset, ImGui::GetColorU32(ImGuiCol_Text), (char*)name_str.str);
+          draw->AddText(ms_offset, ImGui::GetColorU32(ImGuiCol_Text), (char*)ms_str.str);
+
+          if (contains_2f32(union_2f32(rect_inclusive, rect_exclusive), mouse_pos)) {
+            ImGui::BeginTooltip();
+            ImString inclusive = push_strf(scratch, "inclusive: %.2f%s", pos.size, pos.format);
+            ImGui::Text("%s", inclusive.str);
+            ImString exclusive = push_strf(scratch, "exclusive: %.2f%s", pos_exclusive.size, pos_exclusive.format);
+            ImGui::Text("%s", exclusive.str);
+            ImGui::EndTooltip();
+          }
+
+          ++height_level;
+          ImGui::PopID();
+        }
+
+
+
 
         ImGui::EndTabItem();
       }
@@ -945,7 +1055,6 @@ void common_init() {
   test();
   os_gfx_init();
   estimate_cpu_frequency();
-  g.arena = arena_init_named("common arena");
   g.asset_path = push_strf(g.arena, "%s/%s", os_get_current_directory(), String("../assets"));
   g.shader_dir = push_str_cat(g.arena, g.asset_path, "/shaders");
   g.shader_compiled_dir = push_str_cat(g.arena, g.shader_dir, "/compiled");
@@ -1088,6 +1197,7 @@ void quick_sort(i32* arr, i32 low, i32 high) {
 
 void foo0() {
   Scratch scratch;
+  // foo_();
   // Slice slice = slice_make<u8>(scratch, KB(1));
   // Slice slice1 = slice_make<u32>(scratch, KB(1));
   // Loop (i, 100) {
@@ -1104,4 +1214,5 @@ void foo0() {
 
   // }
 }
+
 

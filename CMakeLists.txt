@@ -64,7 +64,7 @@ project(Engine)
     src/base/base_impl.cpp
     vendor/vendor_impl.cpp
   )
-  set(game_source src/common.cpp)
+  set(game_source src/common.cpp src/vk.cpp)
   set(exe_source src/main.cpp)
   set(cpp_modules src/module.ixx)
 

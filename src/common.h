@@ -6,6 +6,15 @@
         operator v2() const { return v2(x,y); }
 #include "imgui/imgui.h"
 
+struct ImString {
+  u8* str;
+  u64 size;
+  ImString(const String& f) : str(f.str), size(f.size) {}
+  operator char*() { return (char*)str; }
+};
+
+#define IM_RECT(rect) rect.min, rect.max
+
 // TODO:
 // dummy assets/null 
 // obj mouse selection
@@ -226,13 +235,13 @@ struct ProfileBlock {
 };
 
 struct ProfilerState {
-  struct FrameState {
-    ProfileAnchor anchors[KB(4)];
-    u32 anchors_count;
-    u64 tsc_start;
-    u64 tsc_end;
-    u32 profiler_parent;
-  } frames[120];
+  // struct FrameState {
+  //   ProfileAnchor anchors[KB(4)];
+  //   u32 anchors_count;
+  //   u64 tsc_start;
+  //   u64 tsc_end;
+  //   u32 profiler_parent;
+  // } frames[10];
 
   ProfileAnchor anchors[KB(4)];
   u32 anchors_count;
@@ -394,6 +403,10 @@ struct GameState {
   Arena arena;
   Arena persistent_arena;
   AllocSegList gpa;
+  AllocSegList gpa_arena0;
+  AllocSegList gpa_arena1;
+  AllocSegList gpa_gpa0;
+  AllocSegList gpa_gpa1;
   Camera cam;
   Timer timer;
 
@@ -443,4 +456,5 @@ struct GlobalState {
 extern GlobalState* g_st;
 
 void common_init();
+
 

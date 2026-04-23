@@ -52,18 +52,10 @@ v4 rgba_from_u32(u32 hex) {
 }
 u32 u32_from_rgba(v4 rgba) {
   u32 result = 0;
-  result |= ((u32)((u8)(rgba.x*255.f))) << 24;
-  result |= ((u32)((u8)(rgba.y*255.f))) << 16;
-  result |= ((u32)((u8)(rgba.z*255.f))) <<  8;
-  result |= ((u32)((u8)(rgba.w*255.f))) <<  0;
-  return result;
-}
-u32 u32_from_argb(v4 argb) {
-  u32 result = 0;
-  result |= ((u32)((u8)(argb.w*255.f))) << 24;
-  result |= ((u32)((u8)(argb.x*255.f))) << 16;
-  result |= ((u32)((u8)(argb.y*255.f))) << 8;
-  result |= ((u32)((u8)(argb.z*255.f))) << 0;
+  result |= ((u32)((u8)(rgba.w*255.f))) << 24;
+  result |= ((u32)((u8)(rgba.z*255.f))) << 16;
+  result |= ((u32)((u8)(rgba.y*255.f))) <<  8;
+  result |= ((u32)((u8)(rgba.x*255.f))) <<  0;
   return result;
 }
 
@@ -155,6 +147,8 @@ v4 v2_to_v4(v2 a, f32 b, f32 c)  { return v4(a.x, a.y, b, c); }
 v2 v2_of_v2i(v2i a)              { return v2(a.x, a.y); }
 v2 v2_of_v2u(v2u a)              { return v2(a.x, a.y); }
 v2i v2i_of_v2(v2 a)              { return v2i(a.x, a.y); }
+v2 v2_add_x(v2 a, f32 x)         { return v2(a.x + x, a.y); }
+v2 v2_add_y(v2 a, f32 y)         { return v2(a.x, a.y + y); }
 
 v2  operator+(v2 a, v2 b)          { return v2(a.x + b.x, a.y + b.y); }
 v2  operator-(v2 a, v2 b)          { return v2(a.x - b.x, a.y - b.y); }
@@ -689,6 +683,7 @@ v2 dim_2f32(Rng2f32 r)                       { return v2(r.max.x - r.min.x, r.ma
 Rng2f32 union_2f32(Rng2f32 a, Rng2f32 b)     { return Rng2f32{v2(Min(a.min.x, b.min.x), Min(a.min.y, b.min.y)), v2(Max(a.max.x, b.max.x), Max(a.max.y, b.max.y))}; }
 Rng2f32 intersect_2f32(Rng2f32 a, Rng2f32 b) { return Rng2f32{v2(Max(a.min.x, b.min.x), Max(a.min.y, b.min.y)), v2(Min(a.max.x, b.max.x), Min(a.max.y, b.max.y))}; }
 v2 clamp_2f32(Rng2f32 r, v2 v)               { return v2(Clamp(r.min.x, v.x, r.max.x), Clamp(r.min.y, v.y, r.max.y)); }
+Rng2f32 center_size_2f32(Rng2f32 r, v2 x)    { v2 center = center_2f32(r); return Rng2f32(v2(center.x - x.x / 2, center.y - x.y / 2), v2(center.x + x.x / 2, center.y + x.y / 2)); }
 
 ///////////////////////////////////
 // Dim3

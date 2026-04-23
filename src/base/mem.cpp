@@ -30,18 +30,45 @@ struct MemState {
   Arena arena;
   AllocSegList seglist;
 
-#if VIEW_MEMORY
-  // Array<AllocatorInfo, 128> infos;
-  AllocatorInfo* arena_list;
-  StaticNObjectPool<AllocatorInfo, 128> infos;
+#if MEM_TRACK
+  AllocatorInfo* free;
+  AllocatorInfoList list;
+  AllocatorInfo infos[128];
+  u32 count_alloc;
 #endif
 };
 
 global MemState mem_st;
 
-Slice<AllocatorInfo> get_allocators_info() {
-  // return mem_st.infos.slice();
-  return {};
+////////////////////////////////////////////////////////////////////////
+// Mem track
+
+AllocatorInfo* allocator_info_alloc() {
+  AllocatorInfo* info = mem_st.free;
+  if (info) {
+    SLLStackPop(mem_st.free);
+  } else {
+    info = &mem_st.infos[mem_st.count_alloc++];
+  }
+  MemZeroStruct(info);
+  return info;
+}
+
+void allocator_info_free(AllocatorInfo* info) {
+  SLLStackPush(mem_st.free, info);
+  DLLRemove(mem_st.list.first, mem_st.list.last, info);
+  mem_st.list.count--;
+}
+
+void allocator_inherit(Allocator parent_, Allocator child_) {
+  AllocatorInfo* parent = *(AllocatorInfo**)(parent_.ctx);
+  AllocatorInfo* child = *(AllocatorInfo**)(child_.ctx) = allocator_info_alloc();
+  child->parent = parent;
+  DLLPushBack(parent->first, parent->last, child);
+}
+
+AllocatorInfoList get_allocators_info() {
+  return mem_st.list;
 }
 
 void global_allocator_init() {
@@ -71,11 +98,14 @@ Arena arena_init_(String name) {
     .base = base,
     .cap = reserve_size,
   };
-#if VIEW_MEMORY
-  // result.name = name;
-  // result.info_idx = mem_st.infos.count++;
-  // mem_st.infos[result.info_idx].res = reserve_size;
-  // mem_st.infos[result.info_idx].name = name;
+#if MEM_TRACK
+  AllocatorInfo* info = allocator_info_alloc();
+  DLLPushBack(mem_st.list.first, mem_st.list.last, info);
+  mem_st.list.count++;
+  info->type = AllocatorType_Arena;
+  info->name = name;
+  info->res = reserve_size;
+  result.info = info;
 #endif
   return result;
 }
@@ -87,6 +117,8 @@ void arena_deinit(Arena* arena) {
 void arena_clear(Arena* arena) { 
   arena->pos = 0;
   AsanPoisonMemRegion(arena->base, arena->cmt);
+#if MEM_TRACK
+#endif
 };
 
 intern u8* arena_alloc(Arena* arena, u64 size, u64 align) {
@@ -104,10 +136,12 @@ intern u8* arena_alloc(Arena* arena, u64 size, u64 align) {
   MemGuardAlloc(Offset(arena->base, arena->pos), size + pad);
   u8* result = Offset(arena->base, pos);
   arena->pos = pos + size;
-#if VIEW_MEMORY
-  // mem_st.infos[arena->info_idx].pos = arena->pos;
-  // mem_st.infos[arena->info_idx].cmt = arena->cmt;
-  // mem_st.infos[arena->info_idx].cap = arena->cap;
+#if MEM_TRACK
+  AllocatorInfo* info = arena->info;
+  info->pos += size;
+  info->exclusive_pos += size;
+  info->cmt = arena->cmt;
+  info->cap = arena->cap;
 #endif
   return result;
 }
@@ -131,8 +165,20 @@ intern u8* arena_realloc_zero(Arena* arena, void* ptr, u64 old_size, u64 new_siz
   return result;
 }
 
-Temp temp_begin(Arena* arena) { return Temp{arena, arena->pos}; };
-void temp_end(Temp temp)      { temp.arena->pos = temp.pos; }
+Temp temp_begin(Arena* arena) {
+#if MEM_TRACK
+  arena->info->temp_pos = arena->info->pos;
+  arena->info->temp_exclusive_pos = arena->info->exclusive_pos;
+#endif
+  return Temp{arena, arena->pos};
+};
+void temp_end(Temp temp) {
+  temp.arena->pos = temp.pos;
+#if MEM_TRACK
+  temp.arena->info->pos = temp.arena->info->temp_pos;
+  temp.arena->info->exclusive_pos = temp.arena->info->temp_exclusive_pos;
+#endif
+}
 
 ////////////////////////////////////////////////////////////////////////
 // ArenaList
@@ -208,7 +254,7 @@ intern u8* arena_list_realloc_zero(ArenaList* arena, void* ptr, u64 old_size, u6
 }
 
 ////////////////////////////////////////////////////////////////////////
-// General allocator (segregated pow2)
+// Segregated pow2 list
 
 struct PoolFreeNode {
   PoolFreeNode* next;
@@ -226,8 +272,14 @@ struct SegListHeader {
   u32 pad;
 };
 
-AllocSegList::AllocSegList(Allocator alloc_) { *this = {}; alloc = alloc_; }
-void AllocSegList::init(Allocator alloc_) { *this = {}; alloc = alloc_; }
+AllocSegList::AllocSegList(Allocator alloc_) { init(alloc_, {}); }
+void AllocSegList::init(Allocator alloc_, String name) {
+  *this = {}; alloc = alloc_;
+  allocator_inherit(alloc_, *this);
+  info->type = AllocatorType_SegList;
+  info->name = name;
+}
+
 AllocSegList::operator Allocator() { return {.type = AllocatorType_SegList, .ctx = this}; }
 
 // NOTE: memory: header + pad -> u8* memory -> u32 tail_guard
@@ -239,7 +291,8 @@ intern u8* seglist_alloc(AllocSegList* alloc, u64 size, u64 align) {
   u64 pool_idx = ctz(pow2_size) - ctz(8);
   MemPoolPow2& p = *(MemPoolPow2*)&alloc->pools[pool_idx];
   if (p.head == null) {
-    u8* buf = mem_alloc(alloc->alloc, sizeof(u32) + pow2_size);
+    // u8* buf = mem_alloc(alloc->alloc, sizeof(u32) + pow2_size); // NOTE: I don't remember for what sizeof(u32) here is
+    u8* buf = mem_alloc(alloc->alloc, pow2_size);
     *(u32*)buf = pool_idx;
     u8* result_no_aligned = Offset(buf+sizeof(u32)+sizeof(void*), sizeof(SegListHeader));
     u8* result = (u8*)AlignUp(((u64)result_no_aligned), align);
@@ -253,6 +306,12 @@ intern u8* seglist_alloc(AllocSegList* alloc, u64 size, u64 align) {
     *tail = MEM_ALLOC_TAIL_GUARD;
     MemGuardDealloc(Offset(result, size+sizeof(u32)), pow2_size - alloc_size);
     AsanPoisonMemRegion(Offset(result, size+sizeof(u32)), pow2_size - alloc_size);
+#if MEM_TRACK
+    AllocatorInfo* info = alloc->info;
+    info->pos += pow2_size;
+    info->cap += pow2_size;
+    info->parent->exclusive_pos -= pow2_size;
+#endif
     return result;
   }
   PoolFreeNode* alloc_buff = p.head;
@@ -269,6 +328,10 @@ intern u8* seglist_alloc(AllocSegList* alloc, u64 size, u64 align) {
   u32* tail = (u32*)Offset(result, size);
   *tail = MEM_ALLOC_TAIL_GUARD;
   MemGuardAlloc(result, size);
+#if MEM_TRACK
+  AllocatorInfo* info = alloc->info;
+  info->pos += pow2_size;
+#endif
   return result;
 #else
   // size = size + alignment;
@@ -293,7 +356,7 @@ intern u8* seglist_alloc_zero(AllocSegList* alloc, u64 size, u64 align) {
   return result;
 }
 
-intern void seglist_free(AllocSegList* allocator, void* ptr) {
+intern void seglist_free(AllocSegList* alloc, void* ptr) {
   Assert(ptr);
 #if MEM_GUARD
   SegListHeader* header = (SegListHeader*)OffsetBack(ptr, sizeof(SegListHeader));
@@ -302,12 +365,18 @@ intern void seglist_free(AllocSegList* allocator, void* ptr) {
   u32* tail = (u32*)Offset(ptr, header->size);
   Assert(*tail == MEM_ALLOC_TAIL_GUARD);
   u32* pool_idx = (u32*)OffsetBack(ptr, header->pad);
-  MemPoolPow2& p = *(MemPoolPow2*)&allocator->pools[*pool_idx];
+  MemPoolPow2& p = *(MemPoolPow2*)&alloc->pools[*pool_idx];
   MemGuardDealloc(ptr, header->size+sizeof(u32));
   AsanPoisonMemRegion(ptr, header->size+sizeof(u32));
   PoolFreeNode* node = (PoolFreeNode*)Offset(pool_idx, sizeof(u32));
 	node->next = p.head;
 	p.head = node;
+
+#if MEM_TRACK
+  AllocatorInfo* info = alloc->info;
+  u64 pow2_size = (1 << (*pool_idx + 3));
+  info->pos -= pow2_size;
+#endif
 #endif
 }
 

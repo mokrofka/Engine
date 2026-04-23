@@ -501,12 +501,18 @@ void game_init() {
   Scratch scratch;
   g.arena = arena_init_named("game arena");
   g.persistent_arena = arena_init_named("persistent game arena");
-  g.gpa.init(g.arena);
+  g.gpa.init(g.arena, "game gpa");
   g.timer = timer_init(1);
   g.entity_id_pool.init(g.persistent_arena, MaxEntities);
   g.static_entity_id_pool.init(g.persistent_arena, MaxStaticEntities);
   g.entities = push_array(g.persistent_arena, Entity, MaxEntities);
   g.static_entities = push_array(g.persistent_arena, StaticEntity, MaxStaticEntities);
+
+  g.gpa_arena0.init(g.arena, "gpu_arena0");
+  g.gpa_arena1.init(g.arena, "gpu_arena1");
+
+  // g.gpa_gpa0.init(g.gpa, "gpu_gpu0");
+  // g.gpa_gpa1.init(g.gpa, "gpu_gpu1");
 
   // Mesh cube_mesh = {.vertices = cube_vertices, .vert_count = ArrayCount(cube_vertices)};
   // mesh_set(Mesh_Cube, vk_mesh_load(cube_mesh));
@@ -525,10 +531,20 @@ void game_init() {
 
 void foo();
 void game_update() {
-  foo();
+  // foo();
   TimeFunction;
-  // var& g = g_st->game;
-  // push_array(g.arena, u32, 1);
+  var& g = g_st->game;
+  if (os_is_key_pressed(Key_0)) {
+    arena_clear(&g.arena);
+  }
+  // push_array(g.arena, u32, 100);
+  if (timer_tick(g.timer)) {
+    push_array(g.gpa, u32, 10000);
+    // push_array(g.gpa_arena0, u32, 200);
+    // push_array(g.gpa_arena1, u32, 300);
+    // push_array(g.gpa_gpa0, u32, 100);
+    // push_array(g.gpa_gpa1, u32, 150);
+  }
   // if (os_is_key_pressed(Key_X)) {
   //   arena_clear(&g.arena);
   // }

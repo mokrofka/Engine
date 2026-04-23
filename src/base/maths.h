@@ -260,7 +260,6 @@ template<typename T, typename Compare> void sort_insert(Slice<T> slice, Compare 
 
 v4 rgba_from_u32(u32 hex);
 u32 u32_from_rgba(v4 rgba);
-u32 u32_from_argb(v4 argb);
 
 ////////////////////////////////////////////////////////////////////////
 // Hash
@@ -319,6 +318,8 @@ NO_DEBUG v4 v2_to_v4(v2 a, f32 b, f32 c);
 NO_DEBUG v2 v2_of_v2i(v2i a);
 NO_DEBUG v2 v2_of_v2u(v2u a);
 NO_DEBUG v2i v2i_of_v2(v2 a);
+NO_DEBUG v2 v2_add_x(v2 a, f32 x);
+NO_DEBUG v2 v2_add_y(v2 a, f32 y);
 NO_DEBUG v2  operator+(v2 a, v2 b);
 NO_DEBUG v2  operator-(v2 a, v2 b);
 NO_DEBUG v2  operator*(v2 a, f32 scalar);
@@ -494,6 +495,7 @@ v2 dim_2f32(Rng2f32 r);
 Rng2f32 union_2f32(Rng2f32 a, Rng2f32 b);
 Rng2f32 intersect_2f32(Rng2f32 a, Rng2f32 b);
 v2 clamp_2f32(Rng2f32 r, v2 v);
+Rng2f32 center_size_2f32(Rng2f32 r, v2 x);
 
 ///////////////////////////////////
 // Dim3
