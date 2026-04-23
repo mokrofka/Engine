@@ -547,40 +547,78 @@ void game_update() {
 }
 
 struct Thing {
-  Handle<Thing> first;
-  Handle<Thing> last;
-  Handle<Thing> next;
-  Handle<Thing> prev;
-  Handle<Thing> parent;
+  Thing* first;
+  Thing* last;
+  Thing* next;
+  Thing* prev;
+  Thing* parent;
   i32 data;
 };
 
-// p - pool, f - first, n - node, h - handle
-#define SLLStackPush(p, fh, nh) var& (n) = p.get(nh); (n.next=fh, fh = nh)
-#define SLLStackPop(p, fh) var& (f) = p.get(fh); (fh = f.next)
-
 void foo() {
-  // StaticNObjectPool<Thing, 128> pool = {};
-  // Handle<Thing> thing = pool.add();
-  // Loop (i, 10) {
-  //   SLLStackPush(pool, thing, pool.add());
-  // }
-  // // for EachNode(it, )
-  // Handle<Thing> a = pool.add();
-  // Handle<Thing> b = pool.add();
-  // Handle<Thing> c = pool.add();
-  // Handle<Thing> d = pool.add();
-  // Handle<Thing> e = pool.add();
-  // pool.get(a).data = 0;
+  Scratch scratch;
+  Thing* thing = push_struct_zero(scratch, Thing);
+  Thing* thing1 = push_struct_zero(scratch, Thing);
+  Thing* thing2 = push_struct_zero(scratch, Thing);
+  Thing* thing3 = push_struct_zero(scratch, Thing);
+  Thing* thing4 = push_struct_zero(scratch, Thing);
+  Thing* thing5 = push_struct_zero(scratch, Thing);
+  Thing* thing6 = push_struct_zero(scratch, Thing);
+  Thing* thing7 = push_struct_zero(scratch, Thing);
 
-  // SLLStackPush(pool, a, b);
+  thing->data = 0;
+  thing1->data = 1;
+  thing2->data = 2;
+  thing3->data = 3;
+  thing4->data = 4;
+  thing5->data = 5;
+  thing6->data = 6;
+  thing7->data = 7;
 
-  // a.
+  Thing* first = null;
+  Thing* last = null;
 
+  #if 0
+  SLLStackPush(head, thing1);
+  SLLStackPush(head, thing2);
+  SLLStackPush(head, thing3);
 
+  for EachNode(it, Thing, head) {
+    Info("%i", it->data);
+  }
+
+  SLLStackPop(head);
+  SLLStackPop(head);
+  for EachNode(it, Thing, head) {
+    Info("%i", it->data);
+  }
+  #endif
+
+  #if 0
+  SLLQueuePush(first, last, thing);
+  SLLQueuePush(first, last, thing1);
+  SLLQueuePush(first, last, thing2);
+  SLLQueuePush(first, last, thing3);
+
+  for EachNode (it, Thing, first) {
+    Info("%i", it->data);
+  }
+  #endif
+
+  DLLPushBack(first, last, thing);
+  DLLPushBack(first, last, thing1);
+  DLLPushBack(first, last, thing2);
+  DLLPushBack(first, last, thing3);
+
+  DLLPushFront(first, last, thing4);
+  DLLPushFront(first, last, thing5);
+  DLLPushFront(first, last, thing6);
+  DLLPushFront(first, last, thing7);
+
+  DLLRemove(first, last, thing5);
+
+  for EachNode (it, Thing, first) {
+    Info("%i", it->data);
+  }
 
 }
-
-
-
-

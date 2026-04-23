@@ -214,7 +214,7 @@ u32 prev_pow2(u32 n);
 #define EachEnumVal(type, it)        (type it = (type)0; it < type##_COUNT; it = (type)(it+1))
 #define EachNonZeroEnumVal(type, it) (type it = (type)1; it < type##_COUNT; it = (type)(it+1))
 #define EachInRange(it, range)       (u64 it = (range).min; it < (range).max; ++it)
-#define EachNode(it, T, first)       (T *it = first; it != 0; it = it->next)
+#define EachNode(it, T, first)       (T* it = first; it != 0; it = it->next)
 
 ////////////////////////////////////////////////////////////////////////
 // Asserts
@@ -246,11 +246,52 @@ void DebugTrap();
 ////////////////////////////////////////////////////////////////////////
 // Link list
 
-#define SLLQueuePush(f,l,n) (f == null) ? \
-                            (f = l = n, (n)->next = null) : \
-                            ((l)->next = n, l = n, (n)->next = null)
+#define _DLLInsert(f, l, p, n, next, prev) \
+  {                                        \
+    if (f == null) {                       \
+      f = l = n;                           \
+      n->next = null;                      \
+      n->prev = null;                      \
+    } else if (p == null) {                \
+      n->next = f;                         \
+      f->prev = n;                         \
+      f = n;                               \
+      n->prev = null;                      \
+    } else if (p == l) {                   \
+      l->next = n;                         \
+      n->prev = l;                         \
+      l = n;                               \
+      n->next = null;                      \
+    } else {                               \
+      p->next->prev = n;                   \
+      n->next = p->next;                   \
+      p->next = n;                         \
+      n->prev = p;                         \
+    }                                      \
+  }
 
-// TODO: more
+#define DLLRemove(f, l, n)                \
+  {                                       \
+    if (n == f) f = n->next;              \
+    if (n == l) l = n->prev;              \
+    if (n->prev) n->prev->next = n->next; \
+    if (n->next) n->next->prev = n->prev; \
+    n->next = n->prev = null;             \
+  }
+
+#define DLLPushBack(f,l,n) _DLLInsert(f,l,l,n,next,prev)
+#define DLLPushFront(f,l,n) _DLLInsert(l,f,f,n,prev,next)
+#define DLLInsert(f,l,p,n) _DLLInsert(f,l,p,n,next,prev)
+
+#define SLLQueuePush(f,l,n) (f == null) ? \
+                            (f = l = n, n->next = null) : \
+                            (l->next = n, l = n, n->next = null)
+#define SLLQueuePop(f,l,next) (f == l) ? \
+                              (f = null), (l = null) : \
+                              (f = f->next)
+
+#define SLLStackPush(f, n) (n->next = f, f = n)
+#define SLLStackPop(f) (f = f->next)
 
 ////////////////////////////////////////////////////////////////////////
 // Defer
