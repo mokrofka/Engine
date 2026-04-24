@@ -56,13 +56,16 @@ struct AllocatorInfo {
   AllocatorInfo* next;
   AllocatorInfo* prev;
   AllocatorInfo* parent;
+  u32 first_count;
   u64 exclusive_pos;
   u64 pos;
   u64 cmt;
   u64 cap;
   u64 res;
-  u64 temp_pos;
-  u64 temp_exclusive_pos;
+  u64 allocs;
+  u64 frees;
+  u64 current_allocs;
+  u64 allocs_per_frame;
   String name;
 };
 
@@ -102,10 +105,22 @@ void  arena_clear(Arena* arena);
 struct Temp {
   Arena* arena;
   u64 pos;
+
+#if MEM_TRACK
+  u64 temp_exclusive_pos;
+#endif
 };
 
 Temp temp_begin(Arena* arena);
 void temp_end(Temp temp);
+
+struct Scratch {
+  Temp temp;
+  NO_DEBUG operator Allocator();
+  Scratch();
+  NO_DEBUG Scratch(Allocator conflict);
+  NO_DEBUG ~Scratch();
+};
 
 ////////////////////////////////////////////////////////////////////////
 // ArenaList

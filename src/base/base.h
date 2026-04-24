@@ -210,6 +210,7 @@ u32 prev_pow2(u32 n);
 #define Glue(A,B)      _Glue(A,B)
 
 #define Loop(it, c)                  for (i32 it = 0; it < c; ++it)
+#define ReverseLoop(i, count)        for (i32 i = count - 1; i >= 0; --i)
 #define EachElement(it, array)       (i32 it = 0; it < ArrayCount(array); ++it)
 #define EachEnumVal(type, it)        (type it = (type)0; it < type##_COUNT; it = (type)(it+1))
 #define EachNonZeroEnumVal(type, it) (type it = (type)1; it < type##_COUNT; it = (type)(it+1))

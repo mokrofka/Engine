@@ -1061,3 +1061,28 @@ struct HashedStrMap {
   }
 };
 
+////////////////////////////////////////////////////////////////////////
+// Sort
+
+template<typename T, typename Compare> void sort_insert(Slice<T> slice, Compare cmp) {
+  for (i32 i = 1; i < slice.count; ++i) {
+    T key = slice[i];
+    i32 j = i - 1;
+    while (j >= 0 && cmp(key, slice[j])) {
+      slice[j + 1] = slice[j];
+      j--;
+    }
+    slice[j + 1] = key;
+  }
+}
+#define sort_insert_l(data, ...) sort_insert(data, [](var a, var b) __VA_ARGS__)
+
+template<typename T, typename Compare> Slice<T> sort_list_insert(Allocator arena, T first, Compare cmp) {
+  Darray<T> sorted_arr(arena);
+  for (T it = first; it != 0; it = it->next) {
+    sorted_arr.add(it);
+  }
+  sort_insert(sorted_arr.slice(), cmp);
+  return sorted_arr.slice();
+}
+

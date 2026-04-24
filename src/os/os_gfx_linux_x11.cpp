@@ -269,7 +269,7 @@ xcb_atom_t intern_(String name) {
 
 void os_gfx_init() {
   X11State& g = gfx_st;
-  g.arena = arena_init();
+  g.arena = arena_init_named("gfx arena");
   g.gpa.init(g.arena);
   g.input_events.init(g.gpa);
 

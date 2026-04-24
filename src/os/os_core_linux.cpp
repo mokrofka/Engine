@@ -38,7 +38,7 @@ String os_get_current_directory()    { return os_st.binary_directory; }
 String os_get_current_binary_name()  { return os_st.binary_name; }
 
 void os_init(String name) {
-  os_st.arena = arena_init();
+  os_st.arena = arena_init_named("os arena");
   os_st.binary_filepath = name;
   os_st.binary_directory = str_chop_last_slash(name);
   os_st.binary_name = str_skip_last_slash(name);

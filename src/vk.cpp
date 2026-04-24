@@ -2099,6 +2099,7 @@ intern VK_Device vk_device_select_physical() {
     Info("Available device: '%s'", String(properties.deviceName));
     // GPU type, etc.
     switch (properties.deviceType) {
+      default: break;
       case VK_PHYSICAL_DEVICE_TYPE_OTHER: {
         Info("GPU type is Unkown");
         fallback_gpu_idx = i;
@@ -2119,7 +2120,6 @@ intern VK_Device vk_device_select_physical() {
         Info("GPU type is CPU");
         fallback_gpu_idx = i;
       } break;
-      default:;
     }
 
     Info("GPU Driver version: %i.%i.%i",
@@ -2731,21 +2731,21 @@ intern void vk_instance_create() {
       void* user_data) -> VkBool32 
     {
       switch (message_severity) {
+        default:break;
+        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT: {
+          Trace(String(callback_data->pMessage));
+        } break;
+        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT: {
+          Info(String(callback_data->pMessage));
+        } break;
+        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: {
+          Warn(String(callback_data->pMessage));
+        } break;
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: {
           // Error(String(callback_data->pMessage))
           // NOTE: For some reason Scratch arena is invalid here?
           ErrorArena({}, "%s", String(callback_data->pMessage));
         } break;
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: {
-          Warn(String(callback_data->pMessage));
-        } break;
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT: {
-          Info(String(callback_data->pMessage));
-        } break;
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT: {
-          Trace(String(callback_data->pMessage));
-        } break;
-        default: break;
       }
       return false;
     },
@@ -2762,7 +2762,7 @@ intern void vk_instance_create() {
 
 void* vk_init() {
   Scratch scratch;
-  Arena arena = arena_init();
+  Arena arena = arena_init_named("vk arena");
   vk = push_struct_zero(arena, VK_State);
   vk->arena = arena;
   
@@ -3530,8 +3530,7 @@ ImGuiKey imgui_keycode_translate(Key key) {
     case MouseKey_Right:  return (ImGuiKey)ImGuiMouseButton_Right;
     case MouseKey_Middle: return (ImGuiKey)ImGuiMouseButton_Middle;
 
-    default:
-    return ImGuiKey_None;
+    default: return ImGuiKey_None;
   }
 }
 

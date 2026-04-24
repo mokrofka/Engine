@@ -240,22 +240,6 @@ NO_DEBUG f32 CosD(f32 a);
 NO_DEBUG f32 Atan2_360(f32 y, f32 x);
 
 ////////////////////////////////////////////////////////////////////////
-// Sort
-
-template<typename T, typename Compare> void sort_insert(Slice<T> slice, Compare cmp) {
-  for (i32 i = 1; i < slice.count; ++i) {
-    T key = slice[i];
-    i32 j = i - 1;
-    while (j >= 0 && cmp(key, slice[j])) {
-      slice[j + 1] = slice[j];
-      j--;
-    }
-    slice[j + 1] = key;
-  }
-}
-#define sort_insert_l(data, ...) sort_insert(data, [](var a, var b) __VA_ARGS__)
-
-////////////////////////////////////////////////////////////////////////
 // Color
 
 v4 rgba_from_u32(u32 hex);
@@ -496,6 +480,7 @@ Rng2f32 union_2f32(Rng2f32 a, Rng2f32 b);
 Rng2f32 intersect_2f32(Rng2f32 a, Rng2f32 b);
 v2 clamp_2f32(Rng2f32 r, v2 v);
 Rng2f32 center_size_2f32(Rng2f32 r, v2 x);
+Rng2f32 push_right_2f32(Rng2f32 r, v2 x);
 
 ///////////////////////////////////
 // Dim3

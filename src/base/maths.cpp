@@ -684,6 +684,7 @@ Rng2f32 union_2f32(Rng2f32 a, Rng2f32 b)     { return Rng2f32{v2(Min(a.min.x, b.
 Rng2f32 intersect_2f32(Rng2f32 a, Rng2f32 b) { return Rng2f32{v2(Max(a.min.x, b.min.x), Max(a.min.y, b.min.y)), v2(Min(a.max.x, b.max.x), Min(a.max.y, b.max.y))}; }
 v2 clamp_2f32(Rng2f32 r, v2 v)               { return v2(Clamp(r.min.x, v.x, r.max.x), Clamp(r.min.y, v.y, r.max.y)); }
 Rng2f32 center_size_2f32(Rng2f32 r, v2 x)    { v2 center = center_2f32(r); return Rng2f32(v2(center.x - x.x / 2, center.y - x.y / 2), v2(center.x + x.x / 2, center.y + x.y / 2)); }
+Rng2f32 push_right_2f32(Rng2f32 r, v2 x)     { return Rng2f32(v2(r.x1, r.y0), v2(r.x1 + x.x, r.y0 + x.y)); }
 
 ///////////////////////////////////
 // Dim3

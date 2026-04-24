@@ -727,7 +727,8 @@ void profiler_view() {
         b32 is_mem_levels_drawn[ArrayCount(mem_levels)] = {};
 
         v2 mouse_pos = os_get_mouse_pos();
-        u32 height_level = 0;
+        f32 height_level = 0;
+        f32 height_offset = 0;
         Loop (i, infos.count) {
           ImGui::PushID(i);
           var info = infos_sorted[i];
@@ -742,7 +743,7 @@ void profiler_view() {
           ///////////////////////////////////
           // Mem level
           f32 height = 30;
-          if (!is_mem_levels_drawn[mem_level] || 0) {
+          if (!is_mem_levels_drawn[mem_level]) {
             is_mem_levels_drawn[mem_level] = true;
             ImDrawList* draw = ImGui::GetWindowDrawList();
 
@@ -751,7 +752,7 @@ void profiler_view() {
             v2 text_size = ImGui::CalcTextSize((char*)mem_level_str.str);
 
             Rng2 win_rect = Rng2(cursor_pos, cursor_pos + avail_size);
-            f32 y = cursor_pos.y + height_level * height;
+            f32 y = cursor_pos.y + height_level * height + height_offset;
             Rng2 row = Rng2(v2(win_rect.x0, y), v2(win_rect.x1, y + height));
 
             Rng2 text_rect = center_size_2f32(row, text_size);
@@ -763,8 +764,47 @@ void profiler_view() {
 
           ///////////////////////////////////
           // Arena
-          u32 height_level_old = height_level;
-          // u64 children_mem_size = 0;
+          {
+            u64 inclusive_mem_size = info.pos;
+            u64 exclusive_mem_size = info.exclusive_pos;
+            f32 width_inclusive = avail_size.x * (inclusive_mem_size / mem_levels[mem_level]);
+            f32 width_exclusive = avail_size.x * (exclusive_mem_size / mem_levels[mem_level]);
+            v2 size_inclusive = v2(width_inclusive, height);
+            v2 size_exclusive = v2(width_exclusive, height);
+    
+            v2 offset = v2(0,  height_level * height + height_offset) + cursor_pos;
+            Rng2 rect_inclusive = Rng2(v2_add_x(offset, size_exclusive.x), v2_add_x(size_inclusive + offset, -size_exclusive.x));
+            Rng2 rect_exclusive = Rng2(offset, size_exclusive + offset);
+            ImDrawList* draw = ImGui::GetWindowDrawList();
+            // inclusive draw
+            draw->AddRectFilled(IM_RECT(rect_inclusive), IM_COL32(40, 70, 120, 255));
+            draw->AddRect(IM_RECT(rect_inclusive), IM_COL32(200, 200, 200, 255));
+            // exclusive draw
+            draw->AddRectFilled(IM_RECT(rect_exclusive), IM_COL32(70, 80, 50, 255));
+            draw->AddRect(IM_RECT(rect_exclusive), IM_COL32(200, 200, 200, 255));
+    
+            MemFormatSize pos = mem_format_size(info.pos);
+            MemFormatSize pos_exclusive = mem_format_size(exclusive_mem_size);
+            MemFormatSize cmt = mem_format_size(info.cmt);
+    
+            String name_str = push_strf(scratch, "%s", info.name);
+            String ms_str = push_strf(scratch, "%.2f%s pos, %.2f%s cmt", pos.size,pos.format, cmt.size,cmt.format);
+            v2 name_offset = v2(0, height_level * height + height_offset) + cursor_pos;
+            v2 ms_offset = v2(avail_size.x * 0.5, height_level * height + height_offset) + cursor_pos;
+    
+            draw->AddText(name_offset, ImGui::GetColorU32(ImGuiCol_Text), (char*)name_str.str);
+            draw->AddText(ms_offset, ImGui::GetColorU32(ImGuiCol_Text), (char*)ms_str.str);
+  
+            if (contains_2f32(union_2f32(rect_inclusive, rect_exclusive), mouse_pos)) {
+              ImGui::BeginTooltip();
+              ImString inclusive = push_strf(scratch, "inclusive: %.2f%s", pos.size, pos.format);
+              ImGui::Text("%s", inclusive.str);
+              ImString exclusive = push_strf(scratch, "exclusive: %.2f%s", pos_exclusive.size, pos_exclusive.format);
+              ImGui::Text("%s", exclusive.str);
+              ImGui::EndTooltip();
+            }
+            ++height_level;
+          }
 
           ///////////////////////////////////
           // Childs
@@ -773,92 +813,55 @@ void profiler_view() {
             StackNode* next;
           };
           StackNode* stack = null;
-          for EachNode(it, AllocatorInfo, info.first) {
+          Slice first_childs_sorted = sort_list_insert(scratch, info.first, [](var a, var b) { return a->pos > b->pos; });
+          ReverseLoop (i, first_childs_sorted.count) {
             StackNode* node = push_struct_zero(scratch, StackNode);
-            node->v = it;
+            node->v = first_childs_sorted[i];
             SLLStackPush(stack, node);
           }
           while (stack) {
             StackNode* node = stack;
             SLLStackPop(stack);
 
-            // children_mem_size += node->v->inclusive_pos;
             {
-              ++height_level;
               AllocatorInfo& child_info = *node->v;
-              v2 child_offset = v2(10, height_level * height) + cursor_pos;
-              v2 child_size = v2(avail_size.x * child_info.pos / mem_levels[mem_level], height);
+              v2 child_offset = v2(10, height_level * height + height_offset) + cursor_pos;
+              height_offset += 20;
+              v2 child_size = v2(avail_size.x * child_info.pos / mem_levels[mem_level], height * 0.6);
+              v2 child_size_cap = v2(avail_size.x * child_info.cap / mem_levels[mem_level], height * 0.6);
               Rng2 child_rect = Rng2(child_offset, child_offset + child_size);
+              Rng2 child_rect_cap = push_right_2f32(child_rect, v2_add_x(child_size_cap, -child_size.x));
 
+              // pos
               ImDrawList* draw = ImGui::GetWindowDrawList();
-              draw->AddRectFilled(child_rect.min, child_rect.max, IM_COL32(50, 50, 50, 255));
+              draw->AddRectFilled(IM_RECT(child_rect), IM_COL32(70, 70, 70, 255));
               draw->AddRect(IM_RECT(child_rect), IM_COL32(200, 200, 200, 255));
+              // cap
+              draw->AddRectFilled(IM_RECT(child_rect_cap), IM_COL32(80, 40, 40, 255));
+              draw->AddRect(IM_RECT(child_rect_cap), IM_COL32(100, 100, 100, 255));
 
               MemFormatSize pos = mem_format_size(child_info.pos);
-              // String child_name_str = push_strf(scratch, "%s", String("child"));
+              MemFormatSize cap = mem_format_size(child_info.cap);
               ImString child_name_str = push_strf(scratch, "%s", child_info.name);
-              ImString child_meta_str = push_strf(scratch, "%.2f%s pos", pos.size, pos.format);
+              ImString child_meta_str = push_strf(scratch, "%.2f%s pos, %.2f%s cap, alloc count: %u, free count: %u, current alloc count: %u", pos.size, pos.format, cap.size, cap.format, child_info.allocs, child_info.frees, child_info.current_allocs);
               v2 name_offset = child_offset;
               v2 meta_offset = v2(name_offset);
-              meta_offset.x += 100;
               draw->AddText(name_offset, ImGui::GetColorU32(ImGuiCol_Text), child_name_str);
-              draw->AddText(meta_offset, ImGui::GetColorU32(ImGuiCol_Text), child_meta_str);
+              draw->AddText(v2_add_x(meta_offset, 200), ImGui::GetColorU32(ImGuiCol_Text), child_meta_str);
             }
 
-            for EachNode(it, AllocatorInfo, node->v->first) {
-              StackNode* s = push_struct_zero(scratch, StackNode);
-              s->v = it;
-              SLLStackPush(stack, s);
+            first_childs_sorted = sort_list_insert(scratch, node->v->first, [](var a, var b) { return a->pos > b->pos; });
+            ReverseLoop (i, first_childs_sorted.count) {
+              StackNode* node = push_struct_zero(scratch, StackNode);
+              node->v = first_childs_sorted[i];
+              SLLStackPush(stack, node);
             }
           }
-
-          u64 inclusive_mem_size = info.pos;
-          u64 exclusive_mem_size = info.exclusive_pos;
-          f32 width_inclusive = avail_size.x * (inclusive_mem_size / mem_levels[mem_level]);
-          f32 width_exclusive = avail_size.x * (exclusive_mem_size / mem_levels[mem_level]);
-          v2 size_inclusive = v2(width_inclusive, height);
-          v2 size_exclusive = v2(width_exclusive, height);
-  
-          v2 offset = v2(0,  height_level_old * height) + cursor_pos;
-          Rng2 rect_inclusive = Rng2(v2_add_x(offset, size_exclusive.x), v2_add_x(size_inclusive + offset, -size_exclusive.x));
-          Rng2 rect_exclusive = Rng2(offset, size_exclusive + offset);
-          ImDrawList* draw = ImGui::GetWindowDrawList();
-          // inclusive draw
-          draw->AddRectFilled(IM_RECT(rect_inclusive), IM_COL32(40, 70, 120, 255));
-          draw->AddRect(IM_RECT(rect_inclusive), IM_COL32(200, 200, 200, 255));
-          // exclusive draw
-          draw->AddRectFilled(IM_RECT(rect_exclusive), IM_COL32(70, 80, 50, 255));
-          draw->AddRect(IM_RECT(rect_exclusive), IM_COL32(200, 200, 200, 255));
-  
-          MemFormatSize pos = mem_format_size(info.pos);
-          MemFormatSize pos_exclusive = mem_format_size(exclusive_mem_size);
-          MemFormatSize cmt = mem_format_size(info.cmt);
-          MemFormatSize cap = mem_format_size(info.cap);
-  
-          String name_str = push_strf(scratch, "%s", info.name);
-          String ms_str = push_strf(scratch, "%.2f%s pos, %.2f%s cmt, %.2f%s cap", pos.size,pos.format, cmt.size,cmt.format, cap.size, cap.format);
-          v2 name_offset = v2(0, height_level_old * height) + cursor_pos;
-          v2 ms_offset = v2(avail_size.x * 0.5, height_level_old * height) + cursor_pos;
-  
-          draw->AddText(name_offset, ImGui::GetColorU32(ImGuiCol_Text), (char*)name_str.str);
-          draw->AddText(ms_offset, ImGui::GetColorU32(ImGuiCol_Text), (char*)ms_str.str);
-
-          if (contains_2f32(union_2f32(rect_inclusive, rect_exclusive), mouse_pos)) {
-            ImGui::BeginTooltip();
-            ImString inclusive = push_strf(scratch, "inclusive: %.2f%s", pos.size, pos.format);
-            ImGui::Text("%s", inclusive.str);
-            ImString exclusive = push_strf(scratch, "exclusive: %.2f%s", pos_exclusive.size, pos_exclusive.format);
-            ImGui::Text("%s", exclusive.str);
-            ImGui::EndTooltip();
+          if (info.first) {
+            height_offset += 20;
           }
-
-          ++height_level;
           ImGui::PopID();
         }
-
-
-
-
         ImGui::EndTabItem();
       }
       ImGui::EndTabBar();
@@ -1083,7 +1086,7 @@ void common_update() {
 shared_function void common_main(HotReloadData* data) {
   Scratch scratch;
 if (data->ctx == null) {
-    Arena arena = arena_init();
+    Arena arena = arena_init_named("common arena");
     data->ctx = push_struct_zero(arena, GlobalState);
     g_st = (GlobalState*)data->ctx;
     g_st->arena = arena;

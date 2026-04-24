@@ -65,6 +65,7 @@ void allocator_inherit(Allocator parent_, Allocator child_) {
   AllocatorInfo* child = *(AllocatorInfo**)(child_.ctx) = allocator_info_alloc();
   child->parent = parent;
   DLLPushBack(parent->first, parent->last, child);
+  ++parent->first_count;
 }
 
 AllocatorInfoList get_allocators_info() {
@@ -72,8 +73,8 @@ AllocatorInfoList get_allocators_info() {
 }
 
 void global_allocator_init() {
-  mem_st.arena = arena_init();
-  mem_st.seglist.init(mem_st.arena);
+  mem_st.arena = arena_init_named("global allocator's parent");
+  mem_st.seglist.init(mem_st.arena, "global allocator");
 }
 
 intern u8* global_alloc(u64 size, u64 align)                                     { return mem_alloc(mem_st.seglist, size, align); }
@@ -112,6 +113,8 @@ Arena arena_init_(String name) {
 
 void arena_deinit(Arena* arena) {
   os_release(arena->base, arena->cap);
+  DLLRemove(mem_st.list.first, mem_st.list.last, arena->info);
+  --mem_st.list.count;
 }
 
 void arena_clear(Arena* arena) { 
@@ -138,10 +141,11 @@ intern u8* arena_alloc(Arena* arena, u64 size, u64 align) {
   arena->pos = pos + size;
 #if MEM_TRACK
   AllocatorInfo* info = arena->info;
-  info->pos += size;
+  info->pos = arena->pos;
   info->exclusive_pos += size;
   info->cmt = arena->cmt;
   info->cap = arena->cap;
+  ++info->allocs;
 #endif
   return result;
 }
@@ -167,16 +171,15 @@ intern u8* arena_realloc_zero(Arena* arena, void* ptr, u64 old_size, u64 new_siz
 
 Temp temp_begin(Arena* arena) {
 #if MEM_TRACK
-  arena->info->temp_pos = arena->info->pos;
-  arena->info->temp_exclusive_pos = arena->info->exclusive_pos;
+  return Temp{arena, arena->pos, arena->info->exclusive_pos};
 #endif
   return Temp{arena, arena->pos};
 };
 void temp_end(Temp temp) {
   temp.arena->pos = temp.pos;
 #if MEM_TRACK
-  temp.arena->info->pos = temp.arena->info->temp_pos;
-  temp.arena->info->exclusive_pos = temp.arena->info->temp_exclusive_pos;
+  temp.arena->info->pos = temp.arena->pos;
+  temp.arena->info->exclusive_pos = temp.temp_exclusive_pos;
 #endif
 }
 
@@ -311,6 +314,8 @@ intern u8* seglist_alloc(AllocSegList* alloc, u64 size, u64 align) {
     info->pos += pow2_size;
     info->cap += pow2_size;
     info->parent->exclusive_pos -= pow2_size;
+    ++info->allocs;
+    ++info->current_allocs;
 #endif
     return result;
   }
@@ -331,6 +336,8 @@ intern u8* seglist_alloc(AllocSegList* alloc, u64 size, u64 align) {
 #if MEM_TRACK
   AllocatorInfo* info = alloc->info;
   info->pos += pow2_size;
+  ++info->allocs;
+  ++info->current_allocs;
 #endif
   return result;
 #else
@@ -374,8 +381,10 @@ intern void seglist_free(AllocSegList* alloc, void* ptr) {
 
 #if MEM_TRACK
   AllocatorInfo* info = alloc->info;
-  u64 pow2_size = (1 << (*pool_idx + 3));
+  u64 pow2_size = 8 << *pool_idx;;
   info->pos -= pow2_size;
+  ++info->frees;
+  --info->current_allocs;
 #endif
 #endif
 }

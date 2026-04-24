@@ -470,7 +470,7 @@ void scene_update() {
 
   ///////////////////////////////////
   // Random creating and moving stuff
-  Loop (i, 0) {
+  Loop (i, 1) {
     MeshId meshes[] = {
       // Mesh_MonkeyGlb,
       // Mesh_Triangle,
@@ -500,7 +500,7 @@ void game_init() {
   GameState& g = g_st->game;
   Scratch scratch;
   g.arena = arena_init_named("game arena");
-  g.persistent_arena = arena_init_named("persistent game arena");
+  g.persistent_arena = arena_init_named("game arena persistent");
   g.gpa.init(g.arena, "game gpa");
   g.timer = timer_init(1);
   g.entity_id_pool.init(g.persistent_arena, MaxEntities);
@@ -508,8 +508,8 @@ void game_init() {
   g.entities = push_array(g.persistent_arena, Entity, MaxEntities);
   g.static_entities = push_array(g.persistent_arena, StaticEntity, MaxStaticEntities);
 
-  g.gpa_arena0.init(g.arena, "gpu_arena0");
-  g.gpa_arena1.init(g.arena, "gpu_arena1");
+  g.gpa_arena0.init(g.arena, "game gpa arena0");
+  g.gpa_arena1.init(g.arena, "game gpa arena1");
 
   // g.gpa_gpa0.init(g.gpa, "gpu_gpu0");
   // g.gpa_gpa1.init(g.gpa, "gpu_gpu1");
@@ -539,9 +539,9 @@ void game_update() {
   }
   // push_array(g.arena, u32, 100);
   if (timer_tick(g.timer)) {
-    push_array(g.gpa, u32, 10000);
+    push_array(g.gpa, u32, 1000);
     // push_array(g.gpa_arena0, u32, 200);
-    // push_array(g.gpa_arena1, u32, 300);
+    push_array(g.gpa_arena1, u32, 500);
     // push_array(g.gpa_gpa0, u32, 100);
     // push_array(g.gpa_gpa1, u32, 150);
   }
