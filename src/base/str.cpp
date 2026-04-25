@@ -587,6 +587,7 @@ StringNode* str_list_pushf(Allocator arena, StringList* list, String fmt, ...) {
 // String utils
 
 void str_copy(String64& dest, String str) {
+  Assert(str.size <= 64);
   MemCopy(dest.str, str.str, str.size);
   dest.size = str.size;
 }

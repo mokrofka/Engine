@@ -10,7 +10,7 @@ b32  os_window_should_close();
 v2u  os_get_window_size();
 v2   os_get_mouse_pos();
 f32  os_get_scroll();
-f32  os_get_touchpad();
+f32  os_get_scroll_x();
 void os_get_gfx_api_handlers(void* out);
 void os_close_window();
 

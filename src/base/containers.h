@@ -90,6 +90,12 @@ struct Darray {
     return data[idx];
   }
   Slice<T> slice() { return {data, count}; }
+  void add() { 
+    if (count >= cap) {
+      grow(0);
+    }
+    ++count;
+  }
   void add(T b) { 
     if (count >= cap) {
       grow(0);
@@ -1086,3 +1092,35 @@ template<typename T, typename Compare> Slice<T> sort_list_insert(Allocator arena
   return sorted_arr.slice();
 }
 
+inline void insert_sort(i32* arr, i32 size) {
+  for (i32 i = 1; i < size; ++i) {
+    i32 key = arr[i];
+    i32 j = i - 1;
+    while (j >= 0 && arr[j] > key) {
+      arr[j + 1] = arr[j];
+      j--;
+    }
+    arr[j + 1] = key;
+  }
+}
+
+inline i32 partition(i32 *arr, i32 low, i32 high) {
+  i32 pivot = arr[high]; // choose last element as pivot
+  i32 i = low;           // place for next smaller element
+  for (i32 j = low; j < high; ++j) {
+    if (arr[j] < pivot) {
+      Swap(arr[i], arr[j]);
+      i++;
+    }
+  }
+  Swap(arr[i], arr[high]); // place pivot in correct position
+  return i;
+}
+
+inline void quick_sort(i32* arr, i32 low, i32 high) {
+  if (low < high) {
+    i32 p = partition(arr, low, high);
+    quick_sort(arr, low, p - 1);
+    quick_sort(arr, p + 1, high);
+  }
+}

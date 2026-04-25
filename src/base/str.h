@@ -34,12 +34,6 @@ struct StringList {
   u32 total_size;
 };
 
-struct String64 {
-  u8 str[64];
-  u32 size;
-  operator String();
-};
-
 u64 cstr_length(const void* c);
 
 ////////////////////////////////////////////////////////////////////////

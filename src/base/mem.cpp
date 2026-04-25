@@ -19,7 +19,7 @@ const u32 MEM_ALLOC_TAIL_GUARD     = 0xdeedbeef;
   #define MemGuardDealloc(d, c)
 #endif
 
-const u32 ARENA_DEFAULT_RESERVE_SIZE = MB(164);
+const u32 ARENA_DEFAULT_RESERVE_SIZE = MB(64);
 const u32 ARENA_DEFAULT_COMMIT_SIZE  = KB(4);
 const u32 ARENA_LIST_BLOCK_SIZE      = KB(64);
 
@@ -104,7 +104,7 @@ Arena arena_init_(String name) {
   DLLPushBack(mem_st.list.first, mem_st.list.last, info);
   mem_st.list.count++;
   info->type = AllocatorType_Arena;
-  info->name = name;
+  str_copy(info->name, name);
   info->res = reserve_size;
   result.info = info;
 #endif
@@ -278,9 +278,11 @@ struct SegListHeader {
 AllocSegList::AllocSegList(Allocator alloc_) { init(alloc_, {}); }
 void AllocSegList::init(Allocator alloc_, String name) {
   *this = {}; alloc = alloc_;
+#if MEM_TRACK
   allocator_inherit(alloc_, *this);
   info->type = AllocatorType_SegList;
-  info->name = name;
+  str_copy(info->name, name);
+#endif
 }
 
 AllocSegList::operator Allocator() { return {.type = AllocatorType_SegList, .ctx = this}; }
@@ -476,6 +478,7 @@ intern u8* seglist_realloc_zero(AllocSegList* alloc, void* ptr, u64 old_size, u6
 
 u8* mem_alloc(Allocator alloc, u64 size, u64 align) {
   switch (alloc.type) {
+    case AllocatorType_None: InvalidPath;
     case AllocatorType_Global:    return global_alloc(size, align);
     case AllocatorType_Arena:     return arena_alloc((Arena*)alloc.ctx, size, align);
     case AllocatorType_ArenaList: return arena_list_alloc((ArenaList*)alloc.ctx, size, align);
@@ -484,6 +487,7 @@ u8* mem_alloc(Allocator alloc, u64 size, u64 align) {
 }
 u8* mem_alloc_zero(Allocator alloc, u64 size, u64 align) {
   switch (alloc.type) {
+    case AllocatorType_None: InvalidPath;
     case AllocatorType_Global:    return global_alloc_zero(size, align);
     case AllocatorType_Arena:     return arena_alloc_zero((Arena*)alloc.ctx, size, align);
     case AllocatorType_ArenaList: return arena_list_alloc((ArenaList*)alloc.ctx, size, align);
@@ -492,6 +496,7 @@ u8* mem_alloc_zero(Allocator alloc, u64 size, u64 align) {
 }
 u8* mem_realloc(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 align) {
   switch (alloc.type) {
+    case AllocatorType_None: InvalidPath;
     case AllocatorType_Global:    return global_realloc(ptr, old_size, new_size, align);
     case AllocatorType_Arena:     return arena_realloc((Arena*)alloc.ctx, ptr, old_size, new_size, align);
     case AllocatorType_ArenaList: return arena_list_realloc((ArenaList*)alloc.ctx, ptr, old_size, new_size, align);
@@ -500,6 +505,7 @@ u8* mem_realloc(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 alig
 }
 u8* mem_realloc_zero(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 align) {
   switch (alloc.type) {
+    case AllocatorType_None: InvalidPath;
     case AllocatorType_Global:    return global_realloc_zero(ptr, old_size, new_size, align);
     case AllocatorType_Arena:     return arena_realloc_zero((Arena*)alloc.ctx, ptr, old_size, new_size, align);
     case AllocatorType_ArenaList: return arena_list_realloc_zero((ArenaList*)alloc.ctx, ptr, old_size, new_size, align);
@@ -508,6 +514,7 @@ u8* mem_realloc_zero(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64
 }
 void mem_free(Allocator alloc, void* ptr) {
   switch (alloc.type) {
+    case AllocatorType_None: InvalidPath;
     case AllocatorType_Global:    return global_free(ptr);
     case AllocatorType_Arena:     return;
     case AllocatorType_ArenaList: return;

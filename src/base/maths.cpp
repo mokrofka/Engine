@@ -170,6 +170,8 @@ f32 v2_distance(v2 a, v2 b)    { return v2_length(v2(a.x - b.x, a.y - b.y)); }
 f32 v2_dot(v2 a, v2 b)         { return a.x*b.x + a.y*b.y; }
 f32 v2_cross(v2 a, v2 b)       { return a.x*b.y - a.y*b.x; } // if > 0 (b is to the left of a), if < 0 (b is to the right of a), if == 0 (collinear)
 v2  v2_lerp(v2 a, f32 t, v2 b) { return v2(Lerp(a.x, t, b.x), Lerp(a.y, t, b.y));}
+v2  v2_hadamard(v2 a, v2 b)    { return v2(a.x*b.x, a.y*b.y); }
+v2  v2_hadamard_div(v2 a, v2 b){ return v2(a.x/b.x, a.y/b.y); }
 v2  v2_skew(v2 a)              { return v2(-a.y, a.x); }
 v2  v2_rand_range(v2 a, v2 b) {
   v2 vec = {

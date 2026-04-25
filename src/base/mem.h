@@ -6,6 +6,7 @@
 const u32 MEM_DEFAULT_ALIGNMENT = sizeof(void*);
 
 enum AllocatorType {
+  AllocatorType_None,
   AllocatorType_Global,
   AllocatorType_Arena,
   AllocatorType_ArenaList,
@@ -66,7 +67,7 @@ struct AllocatorInfo {
   u64 frees;
   u64 current_allocs;
   u64 allocs_per_frame;
-  String name;
+  String64 name;
 };
 
 struct AllocatorInfoList {
@@ -156,6 +157,8 @@ struct AllocSegList {
   void init(Allocator alloc_, String name = {});
   operator Allocator();
 };
+
+AllocSegList alloc_sig_list_init(Allocator alloc);
 
 ////////////////////////////////////////////////////////////////////////
 // tlsf TODO: implement

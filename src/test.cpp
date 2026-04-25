@@ -11,7 +11,7 @@ global i32 test_alignments[] = { 8, 16, 32, 64 };
 
 intern void test_global_alloc() {
   Array<u8*, TEST_SAMPLES> arr = {};
-  Allocator alloc = {};
+  Allocator alloc = {.type = AllocatorType_Global};
 
   Loop (i, TEST_SAMPLES) {
     u64 size = rand_range_u32(8, KB(1));
@@ -227,7 +227,7 @@ intern void test_handle_darray() {
     u32 a;
     u32 b;
   };
-  DarrayHandler<A> arr = {};
+  DarrayHandler<A> arr(scratch);
   Array<A, TEST_SAMPLES> values = {};
   Array<Handle<A>, TEST_SAMPLES> handlers = {};
 
@@ -371,18 +371,18 @@ intern void test_profile_print_time_elapsed(u64 total_tsc_elapsed, ProfileAnchor
 }
 
 intern void test_profiler_print() {
-  u64 cpu_freq = cpu_frequency();
-  u64 total_cpu_elapsed = g_st->profiler.prev_tsc_elapsed;
-  if (cpu_freq) {
-    print("\nTotal time: %0.4fms (CPU freq %lu)\n", 1000.0 * (f64)total_cpu_elapsed / (f64)cpu_freq, cpu_freq);
-  }
-  Slice<ProfileAnchor> anchors = profiler_get_anchors();
-  Loop (anchor_idx, anchors.count) {
-    ProfileAnchor anchor = anchors[anchor_idx];
-    if (anchor.tsc_elapsed_inclusive) {
-      test_profile_print_time_elapsed(total_cpu_elapsed, anchor);
-    }
-  }
+  // u64 cpu_freq = cpu_frequency();
+  // u64 total_cpu_elapsed = g_st->profiler.prev_tsc_elapsed;
+  // if (cpu_freq) {
+  //   print("\nTotal time: %0.4fms (CPU freq %lu)\n", 1000.0 * (f64)total_cpu_elapsed / (f64)cpu_freq, cpu_freq);
+  // }
+  // Slice<ProfileAnchor> anchors = profiler_get_current_frame_anchors();
+  // Loop (anchor_idx, anchors.count) {
+  //   ProfileAnchor anchor = anchors[anchor_idx];
+  //   if (anchor.tsc_elapsed_inclusive) {
+  //     test_profile_print_time_elapsed(total_cpu_elapsed, anchor);
+  //   }
+  // }
 }
 
 intern void profiler_test() {
@@ -603,6 +603,83 @@ void test_bandwidth() {
   // Loop (i, size) { Info("%i", buf1[i]); }
 
   // ring_read(ring, Slice(buf0, size));
+
+}
+
+struct Thing {
+  Thing* first;
+  Thing* last;
+  Thing* next;
+  Thing* prev;
+  Thing* parent;
+  i32 data;
+};
+
+void test_link_list() {
+  Scratch scratch;
+  Thing* thing = push_struct_zero(scratch, Thing);
+  Thing* thing1 = push_struct_zero(scratch, Thing);
+  Thing* thing2 = push_struct_zero(scratch, Thing);
+  Thing* thing3 = push_struct_zero(scratch, Thing);
+  Thing* thing4 = push_struct_zero(scratch, Thing);
+  Thing* thing5 = push_struct_zero(scratch, Thing);
+  Thing* thing6 = push_struct_zero(scratch, Thing);
+  Thing* thing7 = push_struct_zero(scratch, Thing);
+
+  thing->data = 0;
+  thing1->data = 1;
+  thing2->data = 2;
+  thing3->data = 3;
+  thing4->data = 4;
+  thing5->data = 5;
+  thing6->data = 6;
+  thing7->data = 7;
+
+  Thing* first = null;
+  Thing* last = null;
+
+  #if 0
+  SLLStackPush(head, thing1);
+  SLLStackPush(head, thing2);
+  SLLStackPush(head, thing3);
+
+  for EachNode(it, Thing, head) {
+    Info("%i", it->data);
+  }
+
+  SLLStackPop(head);
+  SLLStackPop(head);
+  for EachNode(it, Thing, head) {
+    Info("%i", it->data);
+  }
+  #endif
+
+  #if 0
+  SLLQueuePush(first, last, thing);
+  SLLQueuePush(first, last, thing1);
+  SLLQueuePush(first, last, thing2);
+  SLLQueuePush(first, last, thing3);
+
+  for EachNode (it, Thing, first) {
+    Info("%i", it->data);
+  }
+  #endif
+
+  DLLPushBack(first, last, thing);
+  DLLPushBack(first, last, thing1);
+  DLLPushBack(first, last, thing2);
+  DLLPushBack(first, last, thing3);
+
+  DLLPushFront(first, last, thing4);
+  DLLPushFront(first, last, thing5);
+  DLLPushFront(first, last, thing6);
+  DLLPushFront(first, last, thing7);
+
+  DLLRemove(first, last, thing5);
+
+  for EachNode (it, Thing, first) {
+    Info("%i", it->data);
+  }
 
 }
 

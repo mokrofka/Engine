@@ -323,6 +323,8 @@ NO_DEBUG f32 v2_distance(v2 a, v2 b);
 NO_DEBUG f32 v2_dot(v2 a, v2 b);
 NO_DEBUG f32 v2_cross(v2 a, v2 b);
 NO_DEBUG v2  v2_lerp(v2 a, f32 t, v2 b);
+NO_DEBUG v2  v2_hadamard(v2 a, v2 b);
+NO_DEBUG v2  v2_hadamard_div(v2 a, v2 b);
 NO_DEBUG v2  v2_skew(v2 a);
 NO_DEBUG v2 v2_rand_range(v2 a, v2 b);
 f32 v2_shortest_arc(v2 a, v2 b);
@@ -362,13 +364,14 @@ NO_DEBUG f32 v3_distance(v3 a, v3 b);
 NO_DEBUG f32 v3_dot(v3 a, v3 b);
 NO_DEBUG v3  v3_cross(v3 a, v3 b);
 NO_DEBUG v3  v3_lerp(v3 a, f32 t, v3 b);
+NO_DEBUG v3  v3_hadamard(v3 a, v3 b);
 NO_DEBUG v3  v3_hadamard_div(v3 a, v3 b);
 NO_DEBUG v3  v3_greater(v3 a, v3 b);
 NO_DEBUG v3  v3_less(v3 a, v3 b);
-NO_DEBUG v3 v3_pos_of_mat4(mat4 mat);
+NO_DEBUG v3  v3_pos_of_mat4(mat4 mat);
 // NO_DEBUG v3 v3_rot_of_mat4(mat4 mat);
 // NO_DEBUG v3 v3_scale_of_mat4(mat4 mat);
-NO_DEBUG v3 v3_rand_range(v3 a, v3 b);
+NO_DEBUG v3  v3_rand_range(v3 a, v3 b);
 
 ////////////////////////////////////////////////////////////////////////
 // Vector4

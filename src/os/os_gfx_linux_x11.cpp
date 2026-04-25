@@ -450,8 +450,8 @@ void os_pump_messages() {
           switch (bp->detail) {
             case XK_ScrollUp: ; event.scroll = 1; break;
             case XK_ScrollDown: event.scroll = -1; break;
-            case XK_ScrollLeft: g.input.touchpad_move_x = -1; break;
-            case XK_ScrollRight: g.input.touchpad_move_x = 1; break;
+            case XK_ScrollRight: g.input.touchpad_move_x = -1; break;
+            case XK_ScrollLeft: g.input.touchpad_move_x = 1; break;
           }
           g.input.mouse_scroll = event.scroll;
           event.type = OS_EventKind_Scroll;
@@ -584,7 +584,7 @@ b32 os_window_should_close() { return gfx_st.should_close; }
 v2u os_get_window_size() { return v2u(gfx_st.width, gfx_st.height); }
 v2 os_get_mouse_pos() { return v2(gfx_st.input.mouse_current.x, gfx_st.input.mouse_current.y); }
 f32 os_get_scroll() { return gfx_st.input.mouse_scroll; }
-f32  os_get_touchpad() { return gfx_st.input.touchpad_move_x; }
+f32  os_get_scroll_x() { return gfx_st.input.touchpad_move_x; }
 void os_close_window() { gfx_st.should_close = true; }
 
 void os_get_gfx_api_handlers(void* out) {

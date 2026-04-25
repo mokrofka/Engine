@@ -378,6 +378,11 @@ struct String {
   NO_DEBUG String(u8* str_);
 };
 
+struct String64 {
+  u8 str[64];
+  u32 size;
+  operator String();
+};
 
 // AllocatorInfo* data = ...;
 // struct StackNode {

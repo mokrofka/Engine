@@ -9,6 +9,7 @@
 struct ImString {
   u8* str;
   u64 size;
+  ImString() = default;
   ImString(const String& f) : str(f.str), size(f.size) {}
   operator char*() { return (char*)str; }
 };
@@ -212,7 +213,41 @@ Handle<GpuCubemap> cubemap_load(String name);
 void asset_load();
 
 ////////////////////////////////////////////////////////////////////////
+// some ui
+
+struct ScrollState {
+  v2 offset;
+  f32 scale;
+};
+
+struct ScrollRegion {
+  Rng2 rect;
+  v2 content_size;
+  ScrollState* state;
+};
+
+struct ImguiWindow {
+  v2 pos;
+  v2 size;
+  b32 fullscreen;
+  ImGuiWindowFlags flags;
+  ScrollState root_scroll_state;
+  ScrollState frames_scroll_state;
+  ScrollRegion scroll_region;
+};
+
+void imgui_window_toggle_fullscreen(ImguiWindow& window);
+void imgui_window_apply_state(ImguiWindow& window);
+void imgui_window_track_state(ImguiWindow& window);
+void ui_handle_scroll(ScrollState& s, v2 mouse);
+
+////////////////////////////////////////////////////////////////////////
 // Profiler
+
+enum ProfileType {
+  ProfileType_Work,
+  ProfileType_Sleep,
+};
 
 struct ProfileAnchor {
   u64 tsc_elapsed_exclusive; // without children
@@ -223,6 +258,7 @@ struct ProfileAnchor {
   u32 depth;
   u64 tsc_start;
   u64 tsc_end;
+  ProfileType type;
 };
 
 struct ProfileBlock {
@@ -230,53 +266,47 @@ struct ProfileBlock {
   u64 start_tsc;
   u32 parent_idx;
   u32 anchor_idx;
-  ProfileBlock(String label_, String func, String str_to_hash);
+  ProfileBlock(String label_, String func, ProfileType type = ProfileType_Work);
   ~ProfileBlock();
 };
 
-struct ProfilerState {
-  // struct FrameState {
-  //   ProfileAnchor anchors[KB(4)];
-  //   u32 anchors_count;
-  //   u64 tsc_start;
-  //   u64 tsc_end;
-  //   u32 profiler_parent;
-  // } frames[10];
-
-  ProfileAnchor anchors[KB(4)];
+struct ProfileFrame {
+  ProfileAnchor* anchors;
   u32 anchors_count;
   u64 tsc_start;
   u64 tsc_end;
+};
+
+enum ProfileTabActive {
+  ProfileTabActive_Root,
+  ProfileTabActive_Frames,
+  ProfileTabActive_Time,
+  ProfileTabActive_Memory,
+};
+
+struct ProfilerState {
+  AllocSegList gpa;
+  ProfileFrame frames[120];
+
   u32 profiler_parent;
-  // Map<String, u32> map;
   u32 hash_to_indices[KB(4)];
   u32 depth;
 
-  ProfileAnchor prev_anchors[4096];
-  u32 prev_anchors_count;
-  u64 prev_tsc_start;
-  u64 prev_tsc_end;
-  u64 prev_tsc_elapsed;
+  ProfileFrame current_frame;
+  u32 current_anchor_count;
+  u32 anchors_cap;
 
-  struct {
-    f32 scale_x;
-    f32 scale_y;
-    f32 offset_x;
-    f32 offset_y;
-    b32 fullscreen;
-    v2 pos;
-    v2 size;
-  } window;
-
+  ImguiWindow win;
+  u32 active_tab;
 };
 
 void profiler_begin();
 void profiler_end();
-Slice<ProfileAnchor> profiler_get_anchors();
-u64 profiler_get_tsc_elapsed();
+ProfileFrame& profiler_get_current_frame();
+ProfileFrame& profiler_get_prev_frame();
 
 #if PROFILE_BUILD
-  #define TimeBlock(Name) ProfileBlock Glue(__profiler_block, __LINE__)(Name, __func__, Name)
+  #define TimeBlock(Name, ...) ProfileBlock Glue(__profiler_block, __LINE__)(Name, __func__, ##__VA_ARGS__)
   #define TimeFunction TimeBlock(__func__)
 #else
   #define TimeBlock(Name)
@@ -305,7 +335,7 @@ struct WatchDirectory {
 };
 
 struct WatchState {
-  Allocator alloc;
+  Allocator arena;
   Array<WatchFile, 128> watches;
   Array<WatchDirectory, 128> directories;
 };
@@ -317,35 +347,35 @@ void watch_update();
 ////////////////////////////////////////////////////////////////////////
 // UI
 
-struct UI_Window {
-  v2 pos;
-  v2 size;
-};
+// struct UI_Window {
+//   v2 pos;
+//   v2 size;
+// };
 
-struct UI_Box {
-  v2 pos;
-  v2 size;
-  u64 hash;
-};
+// struct UI_Box {
+//   v2 pos;
+//   v2 size;
+//   u64 hash;
+// };
 
-struct UI_State {
-  u32 hot;
-  u32 last_hot;
-  u32 active;
-  u32 active_window;
-  v2 drag_offset;
-  UI_Window windows[10];
-  UI_Box boxes[10];
-  u32 boxes_count;
-  HashedStrMap<u32> hashes;
-};
+// struct UI_State {
+//   u32 hot;
+//   u32 last_hot;
+//   u32 active;
+//   u32 active_window;
+//   v2 drag_offset;
+//   UI_Window windows[10];
+//   UI_Box boxes[10];
+//   u32 boxes_count;
+//   HashedStrMap<u32> hashes;
+// };
 
-void ui_begin();
-void ui_end();
-void ui_push_box(String str);
-void ui_pop_box();
-b32 ui_begin_window(u32 id, v2 size);
-b32 ui_button(u32 id, v2 min, v2 max);
+// void ui_begin();
+// void ui_end();
+// void ui_push_box(String str);
+// void ui_pop_box();
+// b32 ui_begin_window(u32 id, v2 size);
+// b32 ui_button(u32 id, v2 min, v2 max);
 
 ////////////////////////////////////////////////////////////////////////
 // game
@@ -426,8 +456,10 @@ struct GameState {
 
 struct GlobalState {
   Arena arena;
+  AllocSegList gpa;
   f32 dt;
   f32 time;
+  u32 current_frame;
   b32 should_hotreload;
   Transform* transforms;
   Transform* static_transforms;
@@ -447,14 +479,12 @@ struct GlobalState {
 
   WatchState watch;
   ProfilerState profiler;
-  UI_State ui;
+  // UI_State ui;
   GameState game;
 
   void* vk_st;
 };
 
 extern GlobalState* g_st;
-
-void common_init();
 
 

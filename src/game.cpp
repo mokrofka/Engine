@@ -280,30 +280,6 @@ void camera_update() {
   view = mat4_look_at(cam.pos, cam.dir, v3_up());
 }
 
-Darray<Handle<Entity>> arr;
-
-intern void render_add() {
-  Scratch scratch;
-  Loop (i, 10) {
-    Handle<Entity> e = entity_create(Mesh_Cube, Material_Container);
-    arr.add(e);
-    f32 range = 10;
-    e.pos() = v3_rand_range(v3_scale(range), -v3_scale(range));
-  }
-  for (u32 i = arr.count - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
-    Swap(arr.data[i], arr.data[j]);
-  }
-}
-
-intern void render_remove() {
-  Scratch scratch;
-  for (Handle<Entity> e : arr) {
-    entity_remove(e);
-  }
-  arr.clear();
-}
-
 ////////////////////////////////////////////////////////////////////////
 // Init
 
@@ -429,12 +405,6 @@ void scene_deinit() {
 void scene_update() {
   Scratch scratch;
   GameState& g = g_st->game;
-  if (os_is_key_pressed(Key_1)) {
-    render_add();
-  }
-  if (os_is_key_pressed(Key_2)) {
-    render_remove();
-  }
   if (os_is_key_pressed(MouseKey_Left)) {
     // select_obj();
     // v3 dir = ray_from_camera();
@@ -470,7 +440,7 @@ void scene_update() {
 
   ///////////////////////////////////
   // Random creating and moving stuff
-  Loop (i, 1) {
+  Loop (i, 0) {
     MeshId meshes[] = {
       // Mesh_MonkeyGlb,
       // Mesh_Triangle,
@@ -507,12 +477,12 @@ void game_init() {
   g.static_entity_id_pool.init(g.persistent_arena, MaxStaticEntities);
   g.entities = push_array(g.persistent_arena, Entity, MaxEntities);
   g.static_entities = push_array(g.persistent_arena, StaticEntity, MaxStaticEntities);
+  g.moving_cubes.init(g.gpa);
 
   g.gpa_arena0.init(g.arena, "game gpa arena0");
   g.gpa_arena1.init(g.arena, "game gpa arena1");
-
-  // g.gpa_gpa0.init(g.gpa, "gpu_gpu0");
-  // g.gpa_gpa1.init(g.gpa, "gpu_gpu1");
+  g.gpa_gpa0.init(g.arena, "game gpa arena0");
+  g.gpa_gpa1.init(g.arena, "game gpa arena1");
 
   // Mesh cube_mesh = {.vertices = cube_vertices, .vert_count = ArrayCount(cube_vertices)};
   // mesh_set(Mesh_Cube, vk_mesh_load(cube_mesh));
@@ -529,112 +499,26 @@ void game_init() {
   scene_init();
 }
 
-void foo();
 void game_update() {
   // foo();
   TimeFunction;
   var& g = g_st->game;
-  if (os_is_key_pressed(Key_0)) {
-    arena_clear(&g.arena);
-  }
   // push_array(g.arena, u32, 100);
   if (timer_tick(g.timer)) {
-    push_array(g.gpa, u32, 1000);
+    // push_array(g.gpa, u32, 1000);
     // push_array(g.gpa_arena0, u32, 200);
-    push_array(g.gpa_arena1, u32, 500);
+    // push_array(g.gpa_arena1, u32, 500);
     // push_array(g.gpa_gpa0, u32, 100);
     // push_array(g.gpa_gpa1, u32, 150);
   }
-  // if (os_is_key_pressed(Key_X)) {
-  //   arena_clear(&g.arena);
-  // }
   Scratch scratch;
   camera_update();
   if (os_is_key_down(Key_T)) {
     scene_deinit();
     scene_init();
   }
-  if (os_is_key_pressed(Key_N)) {
-  }
   if (os_is_key_down(Key_Escape)) {
     os_close_window();
   }
   scene_update();
-}
-
-struct Thing {
-  Thing* first;
-  Thing* last;
-  Thing* next;
-  Thing* prev;
-  Thing* parent;
-  i32 data;
-};
-
-void foo() {
-  Scratch scratch;
-  Thing* thing = push_struct_zero(scratch, Thing);
-  Thing* thing1 = push_struct_zero(scratch, Thing);
-  Thing* thing2 = push_struct_zero(scratch, Thing);
-  Thing* thing3 = push_struct_zero(scratch, Thing);
-  Thing* thing4 = push_struct_zero(scratch, Thing);
-  Thing* thing5 = push_struct_zero(scratch, Thing);
-  Thing* thing6 = push_struct_zero(scratch, Thing);
-  Thing* thing7 = push_struct_zero(scratch, Thing);
-
-  thing->data = 0;
-  thing1->data = 1;
-  thing2->data = 2;
-  thing3->data = 3;
-  thing4->data = 4;
-  thing5->data = 5;
-  thing6->data = 6;
-  thing7->data = 7;
-
-  Thing* first = null;
-  Thing* last = null;
-
-  #if 0
-  SLLStackPush(head, thing1);
-  SLLStackPush(head, thing2);
-  SLLStackPush(head, thing3);
-
-  for EachNode(it, Thing, head) {
-    Info("%i", it->data);
-  }
-
-  SLLStackPop(head);
-  SLLStackPop(head);
-  for EachNode(it, Thing, head) {
-    Info("%i", it->data);
-  }
-  #endif
-
-  #if 0
-  SLLQueuePush(first, last, thing);
-  SLLQueuePush(first, last, thing1);
-  SLLQueuePush(first, last, thing2);
-  SLLQueuePush(first, last, thing3);
-
-  for EachNode (it, Thing, first) {
-    Info("%i", it->data);
-  }
-  #endif
-
-  DLLPushBack(first, last, thing);
-  DLLPushBack(first, last, thing1);
-  DLLPushBack(first, last, thing2);
-  DLLPushBack(first, last, thing3);
-
-  DLLPushFront(first, last, thing4);
-  DLLPushFront(first, last, thing5);
-  DLLPushFront(first, last, thing6);
-  DLLPushFront(first, last, thing7);
-
-  DLLRemove(first, last, thing5);
-
-  for EachNode (it, Thing, first) {
-    Info("%i", it->data);
-  }
-
 }
