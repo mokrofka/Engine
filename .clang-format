@@ -7,3 +7,4 @@ PointerAlignment: Left
 IndentPPDirectives: BeforeHash
 AlignAfterOpenBracket: BlockIndent
 AllowShortIfStatementsOnASingleLine: true
+IndentCaseLabels: true

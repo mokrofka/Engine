@@ -27,6 +27,7 @@ struct ImString {
 // make wayland backend work
 // linux crushes when I try sleep and mount?
 // fix static non indexed - doesn't render
+// console
 
 const v3 ColorRed   = v3(1,0,0);
 const v3 ColorGreen = v3(0,1,0);
@@ -213,7 +214,17 @@ Handle<GpuCubemap> cubemap_load(String name);
 void asset_load();
 
 ////////////////////////////////////////////////////////////////////////
-// some ui
+// Input
+
+struct InputState {
+  b8 consumed[Key_COUNT];
+};
+
+b32 key_pressed(Key key);
+void key_consume(Key key);
+
+////////////////////////////////////////////////////////////////////////
+// Some ui
 
 struct ScrollState {
   v2 offset;
@@ -230,6 +241,7 @@ struct ImguiWindow {
   v2 pos;
   v2 size;
   b32 fullscreen;
+  b32 open;
   ImGuiWindowFlags flags;
   ScrollState root_scroll_state;
   ScrollState frames_scroll_state;
@@ -293,8 +305,14 @@ struct ProfilerState {
   u32 depth;
 
   ProfileFrame current_frame;
-  u32 current_anchor_count;
+  u32 anchor_count;
   u32 anchors_cap;
+
+  f32 frame_avg_time;
+  f32 frame_min_time;
+  f32 frame_max_time;
+
+  b32 paused;
 
   ImguiWindow win;
   u32 active_tab;
@@ -304,6 +322,7 @@ void profiler_begin();
 void profiler_end();
 ProfileFrame& profiler_get_current_frame();
 ProfileFrame& profiler_get_prev_frame();
+f64 tsc_to_ms(u64 tsc);
 
 #if PROFILE_BUILD
   #define TimeBlock(Name, ...) ProfileBlock Glue(__profiler_block, __LINE__)(Name, __func__, ##__VA_ARGS__)
@@ -479,8 +498,10 @@ struct GlobalState {
 
   WatchState watch;
   ProfilerState profiler;
-  // UI_State ui;
   GameState game;
+  b32 imgui_demo_open;
+
+  InputState input;
 
   void* vk_st;
 };
