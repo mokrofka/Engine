@@ -6,6 +6,7 @@ i32 main(i32 count, char* args[]) {
   tctx_init();
   os_init(args[0]);
 
+  Scratch scratch;
   struct App {
     HotReloadData state;
     void (*update)(HotReloadData* data);
@@ -14,7 +15,6 @@ i32 main(i32 count, char* args[]) {
   } st = {};
 
 #if HOTRELOAD_BUILD
-  Scratch scratch;
   String current_dir = os_get_current_directory();
   st.lib_filepath = push_str_cat(scratch, current_dir, "/libgame.so");
   st.state.lib = st.lib_filepath;

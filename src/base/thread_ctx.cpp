@@ -2,13 +2,20 @@
 
 struct TCTX {
   Arena arenas[2];
+  u32 id;
 };
 
 global thread_local TCTX tctx;
+global u32 _next_thread_id;
+
+u32 tctx_get_id() {
+  return tctx.id;
+}
 
 void tctx_init() {
   tctx.arenas[0] = arena_init();
   tctx.arenas[1] = arena_init();
+  tctx.id = atomic_u32_inc_eval(&_next_thread_id) - 1;
 }
 
 intern Temp tctx_get_scratch() {

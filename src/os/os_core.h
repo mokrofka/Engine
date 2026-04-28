@@ -3,21 +3,6 @@
 #include "base/str.h"
 #include "base/mem.h"
 
-struct Thread {
-  u64 v;
-};
-
-typedef void ThreadEntryPointFunctionType(void* p);
-
-struct Task {
-  void (*func)(void* arg);
-  void* arg;
-};
-
-struct Mutex {
-  u64 v;
-};
-
 struct OS_Handle {
   u64 v;
 };
@@ -74,6 +59,15 @@ struct OS_Watch{
   OS_WatchFlags flags;
 };
 
+///////////////////////////////////
+// Threads
+typedef void ThreadEntryPointFn(void* p);
+struct Thread { u64 v; };
+struct Mutex { u64 v; };
+struct CondVar { u64 v; };
+struct Semaphore { u64 v; };
+struct Barrier { u64 v; };
+
 String os_get_current_filepath();
 String os_get_current_directory();
 String os_get_current_binary_name();
@@ -88,7 +82,7 @@ void os_sleep_ms(u64 ms);
 void os_console_write(String message, u32 color);
 String os_get_environment(String name);
 
-//////////////////////////////////////////////////////////////////////////
+///////////////////////////////////
 // Memory
 
 u8*  os_reserve(u64 size);
@@ -127,21 +121,44 @@ StringList os_watch_check(Allocator arena, OS_Watch watch);
 
 // Directory iteration
 OS_FileIter* os_file_iter_begin(Allocator arena, String path, OS_FileIterFlags flags);
-b32          os_file_iter_next(Allocator arena, OS_FileIter *iter, OS_FileInfo *info_out);
+b32          os_file_iter_next(Allocator arena, OS_FileIter* iter, OS_FileInfo* info_out);
 void         os_file_iter_end(OS_FileIter* iter);
 
-////////////////////////////////////////////////////////////////////////
+///////////////////////////////////
 // Processes
 
 OS_Handle os_process_launch(StringList list);
 i32       os_process_join(OS_Handle handle);
 
-////////////////////////////////////////////////////////////////////////
+///////////////////////////////////
 // Threads
-void thread_pool_init(u32 num_threads);
-Thread os_thread_launch(ThreadEntryPointFunctionType *func, void *ptr);
-b32 os_thread_join(Thread handle, u64 endt_us);
+
+Thread os_thread_launch(ThreadEntryPointFn* func, void *ptr);
+b32 os_thread_join(Thread handle);
 void os_thread_detach(Thread handle);
+
+///////////////////////////////////
+// Sync primitives
+
+Mutex os_mutex_alloc();
+void  os_mutex_release(Mutex mutex);
+void  os_mutex_take(Mutex mutex);
+void  os_mutex_drop(Mutex mutex);
+
+CondVar os_cond_var_alloc();
+void    os_cond_var_release(CondVar cv);
+void    os_cond_var_wait(CondVar cv, Mutex mutex);
+void    os_cond_var_signal(CondVar cv);
+void    os_cond_var_broadcast(CondVar cv);
+
+Semaphore os_semaphore_alloc(u32 count);
+void      os_semaphore_release(Semaphore semaphore);
+void      os_semaphore_take(Semaphore semaphore);
+void      os_semaphore_drop(Semaphore semaphore);
+
+Barrier   os_barrier_alloc(u32 count);
+void      os_barrier_release(Barrier barrier);
+void      os_barrier_wait(Barrier barrier);
 
 ////////////////////////////////////////////////////////////////////////
 // Lib

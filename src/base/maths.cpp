@@ -14,6 +14,7 @@ f32& mat3::operator[](u32 a) { return v[a]; }
 
 Rng1u32::Rng1u32(u32 min_, u32 max_) { min = min_; max = max_; }
 Rng1i32::Rng1i32(i32 min_, i32 max_) { min = min_; max = max_; }
+Rng1u64::Rng1u64(u64 min_, u64 max_) { min = min_; max = max_; }
 Rng1f32::Rng1f32(f32 min_, f32 max_) { min = min_; max = max_; }
 Rng2f32::Rng2f32(v2 min_, v2 max_) { min = min_; max = max_; }
 Rng3f32::Rng3f32(v3 min_, v3 max_) { min = min_; max = max_; }

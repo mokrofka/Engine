@@ -30,7 +30,7 @@ struct MemState {
   Arena arena;
   AllocSegList seglist;
 
-#if MEM_TRACK
+#if MEM_TRACK | 1
   AllocatorInfo* free;
   AllocatorInfoList list;
   AllocatorInfo infos[128];
@@ -113,8 +113,10 @@ Arena arena_init_(String name) {
 
 void arena_deinit(Arena* arena) {
   os_release(arena->base, arena->cap);
+#if MEM_TRACK
   DLLRemove(mem_st.list.first, mem_st.list.last, arena->info);
   --mem_st.list.count;
+#endif
 }
 
 void arena_clear(Arena* arena) { 

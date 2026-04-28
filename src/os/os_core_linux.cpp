@@ -17,6 +17,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <semaphore.h>
 
 struct OS_LNX_FileIter {
   DIR* dir;
@@ -24,14 +25,54 @@ struct OS_LNX_FileIter {
   String path;
 };
 
+enum OS_LNX_EntityType {
+  OS_LNX_EntityType_Thread,
+  OS_LNX_EntityType_Mutex,
+  OS_LNX_EntityType_Semaphore,
+  OS_LNX_EntityType_Barrier,
+};
+
+struct OS_LNX_Entity {
+  OS_LNX_Entity* next;
+  OS_LNX_EntityType type;
+  union {
+    struct {
+      pthread_t handle;
+      ThreadEntryPointFn* func;
+      void* ptr;
+    } thread;
+    pthread_mutex_t mutex;
+    pthread_cond_t cv;
+    sem_t semaphore;
+    pthread_barrier_t barrier;
+  };
+};
+
 struct OS_State {
-  Allocator arena;
+  Arena arena;
+  OS_LNX_Entity* entity_free;
   String binary_filepath;
   String binary_directory;
   String binary_name;
 };
 
 global OS_State os_st;
+
+OS_LNX_Entity* os_lnx_entity_alloc(OS_LNX_EntityType type) {
+  OS_LNX_Entity* entity = 0;
+  entity = os_st.entity_free;
+  if (entity) {
+    SLLStackPop(os_st.entity_free);
+  } else {
+    entity = push_struct(os_st.arena, OS_LNX_Entity);
+  }
+  entity->type = type;
+  return entity;
+}
+
+void os_lnx_entity_release(OS_LNX_Entity* entity) {
+  SLLStackPush(os_st.entity_free, entity);
+}
 
 String os_get_current_filepath()     { return os_st.binary_filepath; }
 String os_get_current_directory()    { return os_st.binary_directory; }
@@ -440,106 +481,123 @@ i32 os_process_join(OS_Handle handle) {
 ////////////////////////////////////////////////////////////////////////
 // Threads
 
-#define MAX_TASKS 1024
-
-struct TaskQueue {
-  Task tasks[MAX_TASKS];
-  u32 head;
-  u32 tail;
-  u32 count;
-  u32 remain_tasks;
-  pthread_mutex_t mutex;
-  pthread_cond_t cond;
-};
-
-struct ThreadPool {
-  pthread_t threads[16];
-  u32 num_threads;
-  TaskQueue queue;
-};
-
-global ThreadPool thread_pool;
-
-void task_queue_init() {
-  TaskQueue& q = thread_pool.queue;
-  pthread_mutex_init(&q.mutex, null);
-  pthread_cond_init(&q.cond, null);
-}
-
-void task_queue_push(Task t) {
-  TaskQueue& q = thread_pool.queue;
-  pthread_mutex_lock(&q.mutex);
-  while (q.count == MAX_TASKS) {
-    pthread_cond_wait(&q.cond, &q.mutex);
-  }
-  q.tasks[q.tail] = t;
-  q.tail = ModPow2(q.tail + 1, MAX_TASKS);
-  ++q.count;
-  ++q.remain_tasks;
-  pthread_cond_broadcast(&q.cond);
-  pthread_mutex_unlock(&q.mutex);
-}
-
-intern Task task_queue_pop() {
-  TaskQueue& q = thread_pool.queue;
-  pthread_mutex_lock(&q.mutex);
-  while (q.count == 0) {
-    pthread_cond_wait(&q.cond, &q.mutex);
-  }
-  Task t = q.tasks[q.head];
-  q.head = ModPow2(q.head + 1, MAX_TASKS);
-  --q.count;
-  pthread_cond_broadcast(&q.cond);
-  pthread_mutex_unlock(&q.mutex);
-  return t;
-}
-
-intern void* worker(void* arg) {
-  tctx_init();
-  while (true) {
-    Task t = task_queue_pop();
-    t.func(t.arg);
-    atomic_u32_dec_eval(&thread_pool.queue.remain_tasks);
-  }
+void* os_thread_entry(void* ctx) {
+  OS_LNX_Entity* entity = (OS_LNX_Entity*)ctx;
+  entity->thread.func(entity->thread.ptr);
   return null;
 }
 
-void thread_pool_init(u32 num_threads) {
-  thread_pool.num_threads = num_threads;
-  task_queue_init();
-  Loop (i, num_threads) {
-    pthread_create(&thread_pool.threads[i], null, worker, null);
-  }
+Thread os_thread_launch(ThreadEntryPointFn* func, void* ptr) {
+  OS_LNX_Entity* entity = os_lnx_entity_alloc(OS_LNX_EntityType_Thread);
+  entity->thread.func = func;
+  entity->thread.ptr = ptr;
+  pthread_create(&entity->thread.handle, null, os_thread_entry, entity);
+  Thread handle = {(u64)entity};
+  return handle;
 }
 
-u32 task_queue_count() {
-  return atomic_u32_eval(&thread_pool.queue.remain_tasks);
+b32 os_thread_join(Thread handle) {
+  int join_result = pthread_join(handle.v, 0);
+  b32 result = (join_result == 0);
+  return result;
 }
 
-Thread os_thread_launch(ThreadEntryPointFunctionType *func, void *ptr) {
-  {
-    // pthread_t 
-    // int pthread_result = pthread_create();
-  }
-  // Thread handle = {(u64)entity};
-  // return handle;
-  return {};
+void os_thread_detach(Thread handle) {
+  pthread_detach(handle.v);
 }
 
-// b32 os_thread_join(Thread handle, U64 endt_us) {
-//   if(MemoryIsZeroStruct(&handle)) { return 0; }
-//   OS_LNX_Entity *entity = (OS_LNX_Entity *)handle.u64[0];
-//   int join_result = pthread_join(entity->thread.handle, 0);
-//   B32 result = (join_result == 0);
-//   os_lnx_entity_release(entity);
-//   return result;
-// }
+///////////////////////////////////
+// Sync primitives
 
-// void os_thread_detach(Thread handle) {
-//   if(MemoryIsZeroStruct(&handle)) { return; }
-//   OS_LNX_Entity *entity = (OS_LNX_Entity *)handle.u64[0];
-//   os_lnx_entity_release(entity);
-// }
+Mutex os_mutex_alloc() {
+  OS_LNX_Entity* entity = os_lnx_entity_alloc(OS_LNX_EntityType_Mutex);
+  pthread_mutex_init(&entity->mutex, null);
+  Mutex handle = {(u64)entity};
+  return handle;
+}
+
+void os_mutex_release(Mutex mutex) {
+  OS_LNX_Entity* entity = (OS_LNX_Entity*)mutex.v;
+  pthread_mutex_destroy(&entity->mutex);
+  os_lnx_entity_release(entity);
+}
+
+void os_mutex_take(Mutex mutex) {
+  OS_LNX_Entity* entity = (OS_LNX_Entity*)mutex.v;
+  pthread_mutex_lock(&entity->mutex);
+}
+
+void os_mutex_drop(Mutex mutex) {
+  OS_LNX_Entity* entity = (OS_LNX_Entity*)mutex.v;
+  pthread_mutex_unlock(&entity->mutex);
+}
+
+CondVar os_cond_var_alloc() {
+  OS_LNX_Entity* entity = os_lnx_entity_alloc(OS_LNX_EntityType_Mutex);
+  pthread_cond_init(&entity->cv, null);
+  CondVar handle = {(u64)entity};
+  return handle;
+}
+
+void os_cond_var_release(CondVar cv) {
+  OS_LNX_Entity *entity = (OS_LNX_Entity*)cv.v;
+  pthread_cond_destroy(&entity->cv);
+}
+
+void os_cond_var_wait(CondVar cv, Mutex mutex) {
+  OS_LNX_Entity* cv_entity = (OS_LNX_Entity*)cv.v;
+  OS_LNX_Entity* mutex_entity = (OS_LNX_Entity*)mutex.v;
+  pthread_cond_wait(&cv_entity->cv, &mutex_entity->mutex);
+}
+
+void os_cond_var_signal(CondVar cv) {
+  OS_LNX_Entity* cv_entity = (OS_LNX_Entity*)cv.v;
+  pthread_cond_signal(&cv_entity->cv);
+}
+
+void os_cond_var_broadcast(CondVar cv) {
+  OS_LNX_Entity* cv_entity = (OS_LNX_Entity*)cv.v;
+  pthread_cond_broadcast(&cv_entity->cv);
+}
+
+Semaphore os_semaphore_alloc(u32 count) {
+  OS_LNX_Entity* s_entity = os_lnx_entity_alloc(OS_LNX_EntityType_Semaphore);
+  sem_init(&s_entity->semaphore, 0, count);
+  Semaphore handle = {(u64)s_entity};
+  return handle;
+}
+
+void os_semaphore_release(Semaphore semaphore) {
+  OS_LNX_Entity* entity = (OS_LNX_Entity*)semaphore.v;
+  sem_destroy(&entity->semaphore);
+}
+
+void os_semaphore_take(Semaphore semaphore) {
+  OS_LNX_Entity* entity = (OS_LNX_Entity*)semaphore.v;
+  sem_wait(&entity->semaphore);
+}
+
+void os_semaphore_drop(Semaphore semaphore) {
+  OS_LNX_Entity* s_entity = (OS_LNX_Entity*)semaphore.v;
+  sem_post(&s_entity->semaphore);
+}
+
+Barrier os_barrier_alloc(u64 count) {
+  OS_LNX_Entity* entity = os_lnx_entity_alloc(OS_LNX_EntityType_Barrier);
+  pthread_barrier_init(&entity->barrier, null, count);
+  Barrier handle = {(u64)entity};
+  return handle;
+}
+
+void os_barrier_release(Barrier barrier) {
+  OS_LNX_Entity* entity = (OS_LNX_Entity*)barrier.v;
+  pthread_barrier_destroy(&entity->barrier);
+}
+
+void os_barrier_wait(Barrier barrier) {
+  OS_LNX_Entity* entity = (OS_LNX_Entity*)barrier.v;
+  pthread_barrier_wait(&entity->barrier);
+}
 
 ////////////////////////////////////////////////////////////////////////
 // Lib

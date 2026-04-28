@@ -29,6 +29,8 @@ struct ImString {
 // fix static non indexed - doesn't render
 // console
 
+#define THREAD_COUNT 2
+
 const v3 ColorRed   = v3(1,0,0);
 const v3 ColorGreen = v3(0,1,0);
 const v3 ColorBlue  = v3(0,0,1);
@@ -38,6 +40,7 @@ const v3 ColorGrey  = v3(0.8,0.8,0.8);
 
 const u32 MaxEntities = KB(10);
 const u32 MaxStaticEntities = KB(10);
+
 
 struct Entity;
 struct StaticEntity;
@@ -214,6 +217,41 @@ Handle<GpuCubemap> cubemap_load(String name);
 void asset_load();
 
 ////////////////////////////////////////////////////////////////////////
+// Threads
+
+#define MAX_TASKS 1024
+
+struct Task {
+  ThreadEntryPointFn* func;
+  void* arg;
+};
+
+struct TaskQueue {
+  Task tasks[MAX_TASKS];
+  u32 head;
+  u32 tail;
+  u32 count;
+  u32 remaining_tasks;
+  Mutex mutex;
+  CondVar cond_not_empty;
+  CondVar cond_not_full;
+  CondVar finished;
+};
+
+struct ThreadPool {
+  Thread threads[16];
+  u32 num_threads;
+  TaskQueue queue;
+};
+
+void task_queue_init();
+void task_queue_push(Task t);
+Task task_queue_pop();
+void thread_worker(void* arg);
+void thread_pool_init(u32 num_threads);
+void thread_wait_for();
+
+////////////////////////////////////////////////////////////////////////
 // Input
 
 struct InputState {
@@ -221,7 +259,9 @@ struct InputState {
 };
 
 b32 key_pressed(Key key);
+b32 key_pressed_consume(Key key);
 void key_consume(Key key);
+void input_update();
 
 ////////////////////////////////////////////////////////////////////////
 // Some ui
@@ -254,11 +294,52 @@ void imgui_window_track_state(ImguiWindow& window);
 void ui_handle_scroll(ScrollState& s, v2 mouse);
 
 ////////////////////////////////////////////////////////////////////////
+// UI
+
+// struct UI_Window {
+//   v2 pos;
+//   v2 size;
+// };
+
+// struct UI_Box {
+//   v2 pos;
+//   v2 size;
+//   u64 hash;
+// };
+
+// struct UI_State {
+//   u32 hot;
+//   u32 last_hot;
+//   u32 active;
+//   u32 active_window;
+//   v2 drag_offset;
+//   UI_Window windows[10];
+//   UI_Box boxes[10];
+//   u32 boxes_count;
+//   HashedStrMap<u32> hashes;
+// };
+
+// void ui_begin();
+// void ui_end();
+// void ui_push_box(String str);
+// void ui_pop_box();
+// b32 ui_begin_window(u32 id, v2 size);
+// b32 ui_button(u32 id, v2 min, v2 max);
+
+////////////////////////////////////////////////////////////////////////
 // Profiler
+
+enum ProfileTabActive {
+  ProfileTabActive_Root,
+  ProfileTabActive_Frames,
+  ProfileTabActive_Time,
+  ProfileTabActive_Memory,
+};
 
 enum ProfileType {
   ProfileType_Work,
   ProfileType_Sleep,
+  ProfileType_Async,
 };
 
 struct ProfileAnchor {
@@ -282,31 +363,38 @@ struct ProfileBlock {
   ~ProfileBlock();
 };
 
-struct ProfileFrame {
-  ProfileAnchor* anchors;
-  u32 anchors_count;
+struct ProfileFrameTime {
   u64 tsc_start;
   u64 tsc_end;
 };
 
-enum ProfileTabActive {
-  ProfileTabActive_Root,
-  ProfileTabActive_Frames,
-  ProfileTabActive_Time,
-  ProfileTabActive_Memory,
+struct ProfileAnchors {
+  ProfileAnchor* data;
+  u32 count;
+};
+
+struct ProfileView {
+  ProfileFrameTime frame_time;
+  ProfileAnchors anchors;
+};
+
+struct ProfileThread {
+  ProfileAnchor* anchors;
+  ProfileAnchors recorded_anchors[120];
+  u32 parent_idx;
+  u32 hash_to_indices[KB(4)];
+  u32 depth;
+  u32 anchor_count;
+  u32 anchors_cap;
 };
 
 struct ProfilerState {
   AllocSegList gpa;
-  ProfileFrame frames[120];
+  ProfileFrameTime current_frame_time;
+  ProfileFrameTime frame_times[120];
+  ProfileThread prof_threads[THREAD_COUNT+1];
 
-  u32 profiler_parent;
-  u32 hash_to_indices[KB(4)];
-  u32 depth;
-
-  ProfileFrame current_frame;
-  u32 anchor_count;
-  u32 anchors_cap;
+  Mutex reallocation_mutex;
 
   f32 frame_avg_time;
   f32 frame_min_time;
@@ -318,10 +406,11 @@ struct ProfilerState {
   u32 active_tab;
 };
 
+void profiler_init();
 void profiler_begin();
 void profiler_end();
-ProfileFrame& profiler_get_current_frame();
-ProfileFrame& profiler_get_prev_frame();
+ProfileView profiler_get_prev_frame();
+ProfileThread& profiler_get_prof_thread();
 f64 tsc_to_ms(u64 tsc);
 
 #if PROFILE_BUILD
@@ -362,39 +451,6 @@ struct WatchState {
 void watch_add(String watch_name, WatchOp op);
 void watch_directory_add(String watch_name, WatchOp op, OS_WatchFlags flags = OS_WatchFlag_Modify);
 void watch_update();
-
-////////////////////////////////////////////////////////////////////////
-// UI
-
-// struct UI_Window {
-//   v2 pos;
-//   v2 size;
-// };
-
-// struct UI_Box {
-//   v2 pos;
-//   v2 size;
-//   u64 hash;
-// };
-
-// struct UI_State {
-//   u32 hot;
-//   u32 last_hot;
-//   u32 active;
-//   u32 active_window;
-//   v2 drag_offset;
-//   UI_Window windows[10];
-//   UI_Box boxes[10];
-//   u32 boxes_count;
-//   HashedStrMap<u32> hashes;
-// };
-
-// void ui_begin();
-// void ui_end();
-// void ui_push_box(String str);
-// void ui_pop_box();
-// b32 ui_begin_window(u32 id, v2 size);
-// b32 ui_button(u32 id, v2 min, v2 max);
 
 ////////////////////////////////////////////////////////////////////////
 // game
@@ -496,6 +552,7 @@ struct GlobalState {
   Map<String, Handle<GpuMesh>> str_to_mesh;
   Map<String, Handle<GpuMaterial>> str_to_material;
 
+  ThreadPool thread_pool;
   WatchState watch;
   ProfilerState profiler;
   GameState game;

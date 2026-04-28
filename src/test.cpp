@@ -393,218 +393,218 @@ intern void profiler_test() {
   test_profiler_die(10);
 }
 
-struct Transform1 {
-  v3 pos;
-  // v3 arr[2];
-};
+// struct Transform1 {
+//   v3 pos;
+//   // v3 arr[2];
+// };
 
-void task_queue_push(Task t);
-u32 task_queue_count();
+// void task_queue_push(Task t);
+// u32 task_queue_count();
 
-struct TransformTask {
-  Transform1* transforms;
-  u32* idx_arr;
-  u64 count;
-  v3* out_sum;
-  b32 use_random;
-};
+// struct TransformTask {
+//   Transform1* transforms;
+//   u32* idx_arr;
+//   u64 count;
+//   v3* out_sum;
+//   b32 use_random;
+// };
 
-void transform_task_func(void* arg) {
-  TransformTask* t = (TransformTask*)arg;
-  v3 sum = {0, 0, 0};
-  if (t->use_random) {
-    for (u64 i = 0; i < t->count; ++i) {
-      sum += t->transforms[t->idx_arr[i]].pos;
-    }
-  }
-  else {
-    for (u64 i = 0; i < t->count; ++i) {
-      sum += t->transforms[i].pos;
-    }
-  }
-  // store result (safe if each thread writes to its own slot)
-  *t->out_sum = sum;
-}
+// void transform_task_func(void* arg) {
+//   TransformTask* t = (TransformTask*)arg;
+//   v3 sum = {0, 0, 0};
+//   if (t->use_random) {
+//     for (u64 i = 0; i < t->count; ++i) {
+//       sum += t->transforms[t->idx_arr[i]].pos;
+//     }
+//   }
+//   else {
+//     for (u64 i = 0; i < t->count; ++i) {
+//       sum += t->transforms[i].pos;
+//     }
+//   }
+//   // store result (safe if each thread writes to its own slot)
+//   *t->out_sum = sum;
+// }
 
-void test_bandwidth() {
-  Scratch scratch;
-  thread_pool_init(4);
+// void test_bandwidth() {
+//   Scratch scratch;
+//   // task_queue_init(4);
 
-  u64 cpu_frequ = cpu_frequency();
-  Info("%.2f Ghz/s cpu frequency", (f64)cpu_frequ / Billion(1));
-  #define IterationNum (MB(10))
-  #define NUM_THREADS 4
-  #define IterationChunk (IterationNum / NUM_THREADS)
-  #define SIZE (IterationNum * sizeof(Transform1))
-  #define USEFUL_SIZE (IterationNum * sizeof(v3))
-  Info("%.2f mb Memory size", (f64)SIZE / MB(1));
+//   u64 cpu_frequ = cpu_frequency();
+//   Info("%.2f Ghz/s cpu frequency", (f64)cpu_frequ / Billion(1));
+//   #define IterationNum (MB(10))
+//   #define NUM_THREADS 4
+//   #define IterationChunk (IterationNum / NUM_THREADS)
+//   #define SIZE (IterationNum * sizeof(Transform1))
+//   #define USEFUL_SIZE (IterationNum * sizeof(v3))
+//   Info("%.2f mb Memory size", (f64)SIZE / MB(1));
 
-  u8* idx_buf = os_reserve(IterationNum*sizeof(u32));
-  os_commit(idx_buf, IterationNum*sizeof(u32));
-  u8* buf = os_reserve(SIZE);
-  os_commit(buf, SIZE);
+//   u8* idx_buf = os_reserve(IterationNum*sizeof(u32));
+//   os_commit(idx_buf, IterationNum*sizeof(u32));
+//   u8* buf = os_reserve(SIZE);
+//   os_commit(buf, SIZE);
 
-  u32* idx_arr = (u32*)idx_buf;
-  Loop(i, IterationNum) {
-    idx_arr[i] = i;
-  }
-  for (u32 i = IterationNum - 1; i > 0; --i) {
-    u32 j = rand_range_u32(0, i);
-    Swap(idx_arr[i], idx_arr[j]);
-  }
-  Transform1* transforms = (Transform1*)buf;
-  Loop (i, IterationNum) {
-    transforms[i].pos = v3_rand_range(v3_scale(-10), v3_scale(10));
-  }
+//   u32* idx_arr = (u32*)idx_buf;
+//   Loop(i, IterationNum) {
+//     idx_arr[i] = i;
+//   }
+//   for (u32 i = IterationNum - 1; i > 0; --i) {
+//     u32 j = rand_range_u32(0, i);
+//     Swap(idx_arr[i], idx_arr[j]);
+//   }
+//   Transform1* transforms = (Transform1*)buf;
+//   Loop (i, IterationNum) {
+//     transforms[i].pos = v3_rand_range(v3_scale(-10), v3_scale(10));
+//   }
 
-#if 0
-  Loop (i, 1) {
-    u64 now = cpu_timer_now();
-    v3 vec_res = {};
-    Loop (i, IterationNum) {
-      vec_res += transforms[i].pos;
-    }
-    u64 end = cpu_timer_now();
-    f64 seconds = f64(end-now) / cpu_frequ;
-    f64 bandwidth_gb = SIZE / seconds / GB(1);
-    f64 useful_bandwidth_gb = USEFUL_SIZE / seconds / GB(1);
-    Info("%.2f GB/s", bandwidth_gb);
-    Info("%.2f useful GB/s", useful_bandwidth_gb);
-    Info("%f took sec", seconds);
-    Info("%f %f %f\n\n", vec_res.x, vec_res.y, vec_res.z);
-  }
-  Info("------------- RANDOM ACCESS");
-  Loop (i, 1) {
-    u64 now = cpu_timer_now();
-    v3 vec_res = {};
-    Loop (i, IterationNum) {
-      vec_res += transforms[idx_arr[i]].pos;
-    }
-    u64 end = cpu_timer_now();
-    f64 seconds = f64(end-now) / cpu_frequ;
-    f64 bandwidth_gb = SIZE / seconds / GB(1);
-    f64 useful_bandwidth_gb = USEFUL_SIZE / seconds / GB(1);
-    Info("%.2f GB/s", bandwidth_gb);
-    Info("%.2f useful GB/s", useful_bandwidth_gb);
-    Info("%f took sec", seconds);
-    Info("%f %f %f\n\n", vec_res.x, vec_res.y, vec_res.z);
-  }
-#else
+// #if 0
+//   Loop (i, 1) {
+//     u64 now = cpu_timer_now();
+//     v3 vec_res = {};
+//     Loop (i, IterationNum) {
+//       vec_res += transforms[i].pos;
+//     }
+//     u64 end = cpu_timer_now();
+//     f64 seconds = f64(end-now) / cpu_frequ;
+//     f64 bandwidth_gb = SIZE / seconds / GB(1);
+//     f64 useful_bandwidth_gb = USEFUL_SIZE / seconds / GB(1);
+//     Info("%.2f GB/s", bandwidth_gb);
+//     Info("%.2f useful GB/s", useful_bandwidth_gb);
+//     Info("%f took sec", seconds);
+//     Info("%f %f %f\n\n", vec_res.x, vec_res.y, vec_res.z);
+//   }
+//   Info("------------- RANDOM ACCESS");
+//   Loop (i, 1) {
+//     u64 now = cpu_timer_now();
+//     v3 vec_res = {};
+//     Loop (i, IterationNum) {
+//       vec_res += transforms[idx_arr[i]].pos;
+//     }
+//     u64 end = cpu_timer_now();
+//     f64 seconds = f64(end-now) / cpu_frequ;
+//     f64 bandwidth_gb = SIZE / seconds / GB(1);
+//     f64 useful_bandwidth_gb = USEFUL_SIZE / seconds / GB(1);
+//     Info("%.2f GB/s", bandwidth_gb);
+//     Info("%.2f useful GB/s", useful_bandwidth_gb);
+//     Info("%f took sec", seconds);
+//     Info("%f %f %f\n\n", vec_res.x, vec_res.y, vec_res.z);
+//   }
+// #else
 
-  Loop (k, 2) {
-    Info("---------------- LINEAR ACCESS");
-    Loop (m, 2) {
-      u64 now = cpu_timer_now();
-      v3 thread_sums[NUM_THREADS] = {};
-      TransformTask trans_tasks[NUM_THREADS] = {};
-      Task tasks[NUM_THREADS] = {};
-      Loop (i, NUM_THREADS) {
-        trans_tasks[i] = {
-          .transforms = transforms + i*IterationChunk,
-          .idx_arr = idx_arr + i*IterationChunk,
-          .count = IterationChunk,
-          .out_sum = &thread_sums[i],
-          .use_random = false,
-        };
-        tasks[i] = {
-          .func = transform_task_func,
-          .arg = &trans_tasks[i],
-        };
-        task_queue_push(tasks[i]);
-      }
-      while (true) {
-        if (task_queue_count() == 0) {
-          break;
-        }
-        os_sleep_ms(5);
-      }
-      u64 end = cpu_timer_now();
-      f64 seconds = f64(end-now) / cpu_frequ;
-      f64 bandwidth_gb = SIZE / seconds / GB(1);
-      f64 useful_bandwidth_gb = USEFUL_SIZE / seconds / GB(1);
-      Info("%.2f GB/s", bandwidth_gb);
-      Info("%.2f useful GB/s", useful_bandwidth_gb);
-      Info("%f took sec", seconds);
-      v3 vec_res = {};
-      Loop (i, NUM_THREADS) {
-        vec_res += thread_sums[i];
-      }
-      Info("%f %f %f\n\n", vec_res.x, vec_res.y, vec_res.z);
-    }
+//   Loop (k, 2) {
+//     Info("---------------- LINEAR ACCESS");
+//     Loop (m, 2) {
+//       u64 now = cpu_timer_now();
+//       v3 thread_sums[NUM_THREADS] = {};
+//       TransformTask trans_tasks[NUM_THREADS] = {};
+//       Task tasks[NUM_THREADS] = {};
+//       Loop (i, NUM_THREADS) {
+//         trans_tasks[i] = {
+//           .transforms = transforms + i*IterationChunk,
+//           .idx_arr = idx_arr + i*IterationChunk,
+//           .count = IterationChunk,
+//           .out_sum = &thread_sums[i],
+//           .use_random = false,
+//         };
+//         // tasks[i] = {
+//         //   .func = transform_task_func,
+//         //   .arg = &trans_tasks[i],
+//         // };
+//         task_queue_push(tasks[i]);
+//       }
+//       while (true) {
+//         if (task_queue_count() == 0) {
+//           break;
+//         }
+//         os_sleep_ms(5);
+//       }
+//       u64 end = cpu_timer_now();
+//       f64 seconds = f64(end-now) / cpu_frequ;
+//       f64 bandwidth_gb = SIZE / seconds / GB(1);
+//       f64 useful_bandwidth_gb = USEFUL_SIZE / seconds / GB(1);
+//       Info("%.2f GB/s", bandwidth_gb);
+//       Info("%.2f useful GB/s", useful_bandwidth_gb);
+//       Info("%f took sec", seconds);
+//       v3 vec_res = {};
+//       Loop (i, NUM_THREADS) {
+//         vec_res += thread_sums[i];
+//       }
+//       Info("%f %f %f\n\n", vec_res.x, vec_res.y, vec_res.z);
+//     }
 
-    Info("---------------- RANDOM ACCESS");
-    Loop (m, 2) {
-      u64 now = cpu_timer_now();
-      v3 thread_sums[NUM_THREADS] = {};
-      TransformTask trans_tasks[NUM_THREADS] = {};
-      Task tasks[NUM_THREADS] = {};
-      Loop (i, NUM_THREADS) {
-        trans_tasks[i] = {
-          .transforms = transforms,
-          .idx_arr = idx_arr + i*IterationChunk,
-          .count = IterationChunk,
-          .out_sum = &thread_sums[i],
-          .use_random = true,
-        };
-        tasks[i] = {
-          .func = transform_task_func,
-          .arg = &trans_tasks[i],
-        };
-        task_queue_push(tasks[i]);
-      }
-      while (true) {
-        if (task_queue_count() == 0) {
-          break;
-        }
-      }
-      u64 end = cpu_timer_now();
-      f64 seconds = f64(end-now) / cpu_frequ;
-      f64 bandwidth_gb = SIZE / seconds / GB(1);
-      f64 useful_bandwidth_gb = USEFUL_SIZE / seconds / GB(1);
-      Info("%.2f GB/s", bandwidth_gb);
-      Info("%.2f useful GB/s", useful_bandwidth_gb);
-      Info("%f took sec", seconds);
-      v3 vec_res = {};
-      Loop (i, NUM_THREADS) {
-        vec_res += thread_sums[i];
-      }
-      Info("%f %f %f\n\n", vec_res.x, vec_res.y, vec_res.z);
-    }
-  }
+//     Info("---------------- RANDOM ACCESS");
+//     Loop (m, 2) {
+//       u64 now = cpu_timer_now();
+//       v3 thread_sums[NUM_THREADS] = {};
+//       TransformTask trans_tasks[NUM_THREADS] = {};
+//       Task tasks[NUM_THREADS] = {};
+//       Loop (i, NUM_THREADS) {
+//         trans_tasks[i] = {
+//           .transforms = transforms,
+//           .idx_arr = idx_arr + i*IterationChunk,
+//           .count = IterationChunk,
+//           .out_sum = &thread_sums[i],
+//           .use_random = true,
+//         };
+//         // tasks[i] = {
+//         //   .func = transform_task_func,
+//         //   .arg = &trans_tasks[i],
+//         // };
+//         task_queue_push(tasks[i]);
+//       }
+//       while (true) {
+//         if (task_queue_count() == 0) {
+//           break;
+//         }
+//       }
+//       u64 end = cpu_timer_now();
+//       f64 seconds = f64(end-now) / cpu_frequ;
+//       f64 bandwidth_gb = SIZE / seconds / GB(1);
+//       f64 useful_bandwidth_gb = USEFUL_SIZE / seconds / GB(1);
+//       Info("%.2f GB/s", bandwidth_gb);
+//       Info("%.2f useful GB/s", useful_bandwidth_gb);
+//       Info("%f took sec", seconds);
+//       v3 vec_res = {};
+//       Loop (i, NUM_THREADS) {
+//         vec_res += thread_sums[i];
+//       }
+//       Info("%f %f %f\n\n", vec_res.x, vec_res.y, vec_res.z);
+//     }
+//   }
 
 
-#endif
+// #endif
 
-  os_exit(0);
+//   os_exit(0);
   
-  // u8* 
+//   // u8* 
 
-  // i32 arr[] = {5, 2, 9, 1, 5, 6};
-  // i32 n = sizeof(arr)/sizeof(arr[0]);
-  // for (var i : arr) {
-  //   print("%i ", i);
-  // }
-  // quick_sort(arr, 0, n - 1);
-  // print("\n");
-  // for (var i : arr) {
-  //   print("%i ", i);
-  // }
+//   // i32 arr[] = {5, 2, 9, 1, 5, 6};
+//   // i32 n = sizeof(arr)/sizeof(arr[0]);
+//   // for (var i : arr) {
+//   //   print("%i ", i);
+//   // }
+//   // quick_sort(arr, 0, n - 1);
+//   // print("\n");
+//   // for (var i : arr) {
+//   //   print("%i ", i);
+//   // }
 
-  // RingBuffer ring = {
-  //   .base = push_buffer(scratch, KB(1)),
-  //   .size = KB(1),
-  // };
-  // u64 size = 128;
-  // u8* buf0 = push_buffer(scratch, size);
-  // Loop (i, size) { buf0[i] = 0; }
-  // u8* buf1 = push_buffer(scratch, size);
-  // ring_write(ring, buf0, size);
-  // ring_read(ring, buf1, size);
-  // Loop (i, size) { Info("%i", buf1[i]); }
+//   // RingBuffer ring = {
+//   //   .base = push_buffer(scratch, KB(1)),
+//   //   .size = KB(1),
+//   // };
+//   // u64 size = 128;
+//   // u8* buf0 = push_buffer(scratch, size);
+//   // Loop (i, size) { buf0[i] = 0; }
+//   // u8* buf1 = push_buffer(scratch, size);
+//   // ring_write(ring, buf0, size);
+//   // ring_read(ring, buf1, size);
+//   // Loop (i, size) { Info("%i", buf1[i]); }
 
-  // ring_read(ring, Slice(buf0, size));
+//   // ring_read(ring, Slice(buf0, size));
 
-}
+// }
 
 struct Thing {
   Thing* first;
