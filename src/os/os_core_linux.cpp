@@ -109,6 +109,13 @@ void os_sleep_ms(u64 ms) {
   nanosleep(&ts, null);
 }
 
+void os_sleep_us(u64 us) {
+  timespec ts;
+  ts.tv_sec = us / Million(1);
+  ts.tv_nsec = (us % Million(1)) * Thousand(1);
+  nanosleep(&ts, null);
+}
+
 void os_console_write(String message, u32 color) {
   String color_str;
   switch (color) {

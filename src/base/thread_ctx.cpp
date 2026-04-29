@@ -15,7 +15,7 @@ u32 tctx_get_id() {
 void tctx_init() {
   tctx.arenas[0] = arena_init();
   tctx.arenas[1] = arena_init();
-  tctx.id = atomic_u32_inc_eval(&_next_thread_id) - 1;
+  tctx.id = atomic_u32_inc(&_next_thread_id) - 1;
 }
 
 intern Temp tctx_get_scratch() {

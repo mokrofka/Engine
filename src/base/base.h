@@ -203,6 +203,7 @@ u32 prev_pow2(u32 n);
 #define ArrayCount(x)  (sizeof((x)) / sizeof((x)[0]))
 #define ArraySlice(arr) Slice(arr, ArrayCount(arr))
 #define ArrayRand(arr) arr[rand_range_u32(0, ArrayCount(arr)-1)]
+#define ArrayZero(arr) MemZeroArray((arr), ArrayCount((arr)))
 #define Assign(a,b)    (*((u8**)(&(a))) = (u8*)(b))
 #define _Stringify(S)  #S
 #define Stringify(S)   _Stringify(S)
@@ -240,9 +241,10 @@ void DebugTrap();
 ////////////////////////////////////////////////////////////////////////
 // Atomic Operations
 
-#define atomic_u32_inc_eval(x) (__atomic_fetch_add((u32*)(x), 1, __ATOMIC_SEQ_CST) + 1)
-#define atomic_u32_dec_eval(x) (__atomic_fetch_sub((u32*)(x), 1, __ATOMIC_SEQ_CST) - 1)
-#define atomic_u32_eval(x)     __atomic_load_n(x, __ATOMIC_SEQ_CST)
+#define atomic_u32_inc(x) (__atomic_fetch_add((u32*)(x), 1, __ATOMIC_SEQ_CST) + 1)
+#define atomic_u32_dec(x) (__atomic_fetch_sub((u32*)(x), 1, __ATOMIC_SEQ_CST) - 1)
+#define atomic_u32_load(x) __atomic_load_n(x, __ATOMIC_SEQ_CST)
+#define atomic_u32_xor(x) __atomic_fetch_xor((x), 1, __ATOMIC_SEQ_CST);
 
 ////////////////////////////////////////////////////////////////////////
 // Link list

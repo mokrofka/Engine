@@ -79,6 +79,7 @@ u64 os_timer_frequency();
 u64 os_timer_now();
 u64 os_now_ns();
 void os_sleep_ms(u64 ms);
+void os_sleep_us(u64 us);
 void os_console_write(String message, u32 color);
 String os_get_environment(String name);
 

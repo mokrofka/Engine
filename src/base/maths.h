@@ -302,8 +302,6 @@ NO_DEBUG v4 v2_to_v4(v2 a, f32 b, f32 c);
 NO_DEBUG v2 v2_of_v2i(v2i a);
 NO_DEBUG v2 v2_of_v2u(v2u a);
 NO_DEBUG v2i v2i_of_v2(v2 a);
-NO_DEBUG v2 v2_add_x(v2 a, f32 x);
-NO_DEBUG v2 v2_add_y(v2 a, f32 y);
 NO_DEBUG v2  operator+(v2 a, v2 b);
 NO_DEBUG v2  operator-(v2 a, v2 b);
 NO_DEBUG v2  operator*(v2 a, f32 scalar);

@@ -358,19 +358,19 @@ intern void test_profiler_die(i32 i) {
   }
 }
 
-intern void test_profile_print_time_elapsed(u64 total_tsc_elapsed, ProfileAnchor anchor) {
-  Scratch scratch;
-  String label_c = push_str_copy(scratch, anchor.label);
-  f64 percent = 100.0 * ((f64)anchor.tsc_elapsed_exclusive / (f64)total_tsc_elapsed);
-  print("  %s[%u64]: %u64 (%.2f%%)", label_c.str, anchor.hit_count, anchor.tsc_elapsed_exclusive, percent);
-  if (anchor.tsc_elapsed_inclusive != anchor.tsc_elapsed_exclusive) {
-    f64 percent_with_children = 100.0 * ((f64)anchor.tsc_elapsed_inclusive / (f64)total_tsc_elapsed);
-    print(", %.2f%% w/children", percent_with_children);
-  }
-  print(")\n");
-}
+// intern void test_profile_print_time_elapsed(u64 total_tsc_elapsed, ProfileAnchor anchor) {
+//   Scratch scratch;
+//   String label_c = push_str_copy(scratch, anchor.label);
+//   f64 percent = 100.0 * ((f64)anchor.tsc_elapsed_exclusive / (f64)total_tsc_elapsed);
+//   print("  %s[%u64]: %u64 (%.2f%%)", label_c.str, anchor.hit_count, anchor.tsc_elapsed_exclusive, percent);
+//   if (anchor.tsc_elapsed_inclusive != anchor.tsc_elapsed_exclusive) {
+//     f64 percent_with_children = 100.0 * ((f64)anchor.tsc_elapsed_inclusive / (f64)total_tsc_elapsed);
+//     print(", %.2f%% w/children", percent_with_children);
+//   }
+//   print(")\n");
+// }
 
-intern void test_profiler_print() {
+// intern void test_profiler_print() {
   // u64 cpu_freq = cpu_frequency();
   // u64 total_cpu_elapsed = g_st->profiler.prev_tsc_elapsed;
   // if (cpu_freq) {
@@ -383,7 +383,7 @@ intern void test_profiler_print() {
   //     test_profile_print_time_elapsed(total_cpu_elapsed, anchor);
   //   }
   // }
-}
+// }
 
 intern void profiler_test() {
   profiler_begin();

@@ -148,8 +148,6 @@ v4 v2_to_v4(v2 a, f32 b, f32 c)  { return v4(a.x, a.y, b, c); }
 v2 v2_of_v2i(v2i a)              { return v2(a.x, a.y); }
 v2 v2_of_v2u(v2u a)              { return v2(a.x, a.y); }
 v2i v2i_of_v2(v2 a)              { return v2i(a.x, a.y); }
-v2 v2_add_x(v2 a, f32 x)         { return v2(a.x + x, a.y); }
-v2 v2_add_y(v2 a, f32 y)         { return v2(a.x, a.y + y); }
 
 v2  operator+(v2 a, v2 b)          { return v2(a.x + b.x, a.y + b.y); }
 v2  operator-(v2 a, v2 b)          { return v2(a.x - b.x, a.y - b.y); }

@@ -144,9 +144,9 @@ Mesh grid_create(Allocator arena, u32 size, f32 step) {
 }
 
 ////////////////////////////////////////////////////////////////////////
-// Utils
+// @Entity
 
-Handle<Entity> entity_create(MeshId mesh_id, MaterialId material_id) {
+Handle<Entity> e_alloc(MeshId mesh_id, MaterialId material_id) {
   GameState& g = g_st->game;
   u32 e_id = g.entity_id_pool.alloc();
   Handle<Entity> e = {e_id};
@@ -156,7 +156,7 @@ Handle<Entity> entity_create(MeshId mesh_id, MaterialId material_id) {
   return e;
 }
 
-Handle<StaticEntity> entity_static_create(MeshId mesh_id, MaterialId material_id) {
+Handle<StaticEntity> e_static_alloc(MeshId mesh_id, MaterialId material_id) {
   GameState& g = g_st->game;
   u32 e_id = g.static_entity_id_pool.alloc();
   Handle<StaticEntity> e = {e_id};
@@ -166,11 +166,14 @@ Handle<StaticEntity> entity_static_create(MeshId mesh_id, MaterialId material_id
   return e;
 }
 
-void entity_remove(Handle<Entity> e) {
+void e_release(Handle<Entity> e) {
   GameState& g = g_st->game;
   g.entity_id_pool.free(e.handle);
   vk_remove_renderable(e);
 }
+
+////////////////////////////////////////////////////////////////////////
+// @Misc
 
 v3 ray_from_camera() {
   v2 mouse_pos = os_get_mouse_pos();
@@ -200,7 +203,7 @@ v3 ray_from_camera() {
 void select_obj() {
   GameState& g = g_st->game;
   v3 dir = ray_from_camera();
-  Handle<Entity> e = entity_create(Mesh_Cube, Material_Orange);
+  var e = e_alloc(Mesh_Cube, Material_Orange);
   // e.pos() = st->cam.pos + v3_norm(mat4_forward(st->cam.view));
   e.pos() = g.cam.pos;
   e.scale() = v3_scale(0.3);
@@ -298,38 +301,36 @@ void scene_init() {
     SinD(cam.yaw) * CosD(cam.pitch)
   };
   vk_get_view() = mat4_look_at(cam.pos, cam.dir, v3_up());
-  Handle<Entity> cube = entity_create(Mesh_Cube, Material_Orange);
+  var cube = e_alloc(Mesh_Cube, Material_Orange);
   g.rotating_cube = cube;
-  Handle<Entity> monkey = entity_create(Mesh_MonkeyGlb, Material_Container);
+  var monkey = e_alloc(Mesh_MonkeyGlb, Material_Container);
   monkey.aabb() = {v3_scale(-1.2), v3_scale(1.2)};
   g.monkey = monkey;
   {
-    Handle<Entity> triangle = entity_create(Mesh_Triangle, Material_Orange);
+    var triangle = e_alloc(Mesh_Triangle, Material_Orange);
     triangle.pos() = v3_scale(3);
   }
   {
-    Handle<Entity> grid = entity_create(Mesh_Grid, Material_Line);
+    var grid = e_alloc(Mesh_Grid, Material_Line);
     g.grid = grid;
     vk_set_entity_color(grid, v4_scale(0.6));
     grid.pos() = v3(0,0,-5);
   }
   {
-    g.axis_attached_to_cam = entity_create(Mesh_Axis, Material_Axis);
+    g.axis_attached_to_cam = e_alloc(Mesh_Axis, Material_Axis);
   }
   Loop (i, 3) {
-    Handle<Entity> cube = entity_create(Mesh_Cube, Material_Orange);
+    var cube = e_alloc(Mesh_Cube, Material_Orange);
     u32 range = 10;
     cube.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
   }
 #if 1
-  u64 start = os_now_ns();
   // Loop (i, MB(1)-KB(1)) {
   // Loop (i, KB(100)) {
   Loop (i, KB(1)) {
     // Handle<StaticEntity> e = entity_static_create(Mesh_Cube, Material_Orange);
     // u32 range = KB(1);
     // e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
-
     MeshId meshes[] = {
       // Mesh_MonkeyGlb,
       // Mesh_Triangle,
@@ -340,17 +341,14 @@ void scene_init() {
       // Material_Container,
       // Material_Screen,
     };
-    Handle<StaticEntity> e = entity_static_create(meshes[rand_range_u32(0, ArrayCount(meshes)-1)], materials[rand_range_u32(0, ArrayCount(materials)-1)]);
+    var e = e_static_alloc(meshes[rand_range_u32(0, ArrayCount(meshes)-1)], materials[rand_range_u32(0, ArrayCount(materials)-1)]);
     u32 range = KB(1);
     e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
-
   }
-  u64 end = os_now_ns();
-  Info("%f64 s", f64(end - start)/Billion(1));
 #endif
 
   {
-    g.sphere = entity_create(Mesh_Sphere, Material_Container);
+    g.sphere = e_alloc(Mesh_Sphere, Material_Container);
     g.sphere.pos() = v3(0,0,-10);
   }
   {
@@ -368,7 +366,7 @@ void scene_init() {
     // Loop (i, KB(400)) {
     // Loop (i, MB(1)-KB(1)) {
     Loop (i, 0) {
-      Handle<Entity> e = entity_create(Mesh_Cube, Material_Container);
+      var e = e_alloc(Mesh_Cube, Material_Container);
       u32 range = KB(1);
       e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
       g.moving_cubes.add(e);
@@ -386,7 +384,7 @@ void scene_init() {
       Material_Container,
       // Material_Screen,
     };
-    Handle<Entity> e = entity_create(meshes[rand_range_u32(0, ArrayCount(meshes)-1)], materials[rand_range_u32(0, ArrayCount(materials)-1)]);
+    var e = e_alloc(meshes[rand_range_u32(0, ArrayCount(meshes)-1)], materials[rand_range_u32(0, ArrayCount(materials)-1)]);
     u32 range = 100;
     e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
     g.moving_cubes.add(e);
@@ -414,15 +412,15 @@ void scene_update() {
   }
   // moving cube and monkey
   {
-    Handle<Entity> cube = g.rotating_cube;
-    Handle<Entity> monkey = g.monkey;
+    var cube = g.rotating_cube;
+    var monkey = g.monkey;
     monkey.pos().x += 0.1 * get_dt();
     cube.pos().x = monkey.pos().x + Sin(get_time()) * 4;
     cube.pos().z = monkey.pos().z + Cos(get_time()) * 4;
     cube.pos().y = monkey.pos().z + Cos(get_time()) * 4;
   }
   {
-    Handle<Entity> e = g.monkey;
+    var e = g.monkey;
     vk_draw_aabb(e.pos()+e.aabb().min, e.pos()+e.aabb().max, ColorWhite);
   }
   {
@@ -433,7 +431,7 @@ void scene_update() {
     f32 dist = 1.0f;
     f32 xoff = 0.3f;
     f32 yoff = 0.3f;
-    Handle<Entity> axis = g.axis_attached_to_cam;
+    var axis = g.axis_attached_to_cam;
     axis.pos() = g.cam.pos + forward*dist + right*xoff + up*yoff;
     axis.scale() = v3_scale(0.1);
   }
@@ -451,12 +449,12 @@ void scene_update() {
       // Material_Container,
       // Material_Screen,
     };
-    Handle<Entity> e = entity_create(meshes[rand_range_u32(0, ArrayCount(meshes)-1)], materials[rand_range_u32(0, ArrayCount(materials)-1)]);
+    var e = e_alloc(meshes[rand_range_u32(0, ArrayCount(meshes)-1)], materials[rand_range_u32(0, ArrayCount(materials)-1)]);
     u32 range = 100;
     e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
     g.moving_cubes.add(e);
   }
-  for (Handle<Entity> e : g.moving_cubes) {
+  for (var e : g.moving_cubes) {
     e.pos() += e.vel() * get_dt();
     v3 center = {0, 0, 0};
     v3 dir = e.pos() - center;

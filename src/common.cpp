@@ -6,6 +6,26 @@
 
 Extern GlobalState* g_st;
 
+Timer timer_init(f32 interval) {
+  Timer timer = {
+    .interval = interval,
+  };
+  return timer;
+}
+
+b32 timer_tick(Timer& t) {
+  t.passed += g_st->dt;
+  if (t.passed >= t.interval) {
+    t.passed = 0;
+    return true;
+  }
+  return false;
+}
+
+f64 tsc_to_ms(u64 tsc) {
+  return (f64)tsc/cpu_frequency()*1000;
+}
+
 f32 get_dt() { return g_st->dt; }
 f32 get_time() { return g_st->time; }
 
@@ -771,112 +791,181 @@ void ui_handle_scroll(ScrollState& s, v2 mouse) {
 // }
 
 ////////////////////////////////////////////////////////////////////////
-// Profiler
+// @Profiler
 
 void profiler_init() {
   ProfilerState& g = g_st->profiler;
-  g.gpa.init(g_st->arena, "profiler gpa");
   for EachElement (i, g.prof_threads) {
     ProfileThread& prof_thread = g.prof_threads[i];
-    for EachElement(j, g.frame_times) {
-      ProfileAnchors& anchors = prof_thread.recorded_anchors[j];
-      anchors.data = push_array_zero(g.gpa, ProfileAnchor, 8);
+    String str = push_strf(g_st->arena, "profiler thread %u arena", i);
+    prof_thread.arena = arena_init_named(str);
+    prof_thread.gpa.init(prof_thread.arena);
+    prof_thread.events[0].init(prof_thread.gpa);
+    prof_thread.events[1].init(prof_thread.gpa);
+    for EachElement(j, g.frames_times) {
+      prof_thread.recorded_anchors[j].init(prof_thread.gpa);
     }
-    prof_thread.anchors = push_array_zero(g.gpa, ProfileAnchor, 8);
-    prof_thread.anchors_cap = 8;
   }
-  g.reallocation_mutex = os_mutex_alloc();
   g.win.root_scroll_state.scale = 1;
   g.win.frames_scroll_state.scale = 1;
   g.win.open = true;
 }
 
-ProfileBlock::ProfileBlock(String label_, String func, ProfileType type) {
+ProfileBlock::ProfileBlock(String label_, String func_, ProfileType type) {
   ProfilerState& g = g_st->profiler;
-  u32 idx = ModPow2(hash(label_, hash(func)), KB(4));
   ProfileThread& prof_thread = profiler_get_prof_thread();
-  anchor_idx = prof_thread.hash_to_indices[idx];
-  ProfileAnchor* current_anchors = prof_thread.anchors;
-  if (anchor_idx == 0) {
-    anchor_idx = prof_thread.anchor_count;
-    prof_thread.hash_to_indices[idx] = anchor_idx;
-    if (prof_thread.anchor_count >= prof_thread.anchors_cap) {
-      os_mutex_take(g.reallocation_mutex);
-      for EachElement(i, g.frame_times) {
-        ProfileAnchors& rec_anchors = prof_thread.recorded_anchors[i];
-        rec_anchors.data = mem_realloc_array_zero(g.gpa, rec_anchors.data, rec_anchors.count, prof_thread.anchors_cap * 2);
-      }
-      current_anchors = mem_realloc_array_zero(g.gpa, current_anchors, prof_thread.anchor_count, prof_thread.anchors_cap * 2);
-      prof_thread.anchors_cap *= 2;
-      os_mutex_drop(g.reallocation_mutex);
-    }
-    ++prof_thread.anchor_count;
-  }
-  parent_idx = prof_thread.parent_idx;
-  ProfileAnchor* anchor = &current_anchors[anchor_idx];
-  anchor->label = label_;
-  old_tsc_elapsed_inclusive = anchor->tsc_elapsed_inclusive;
-  prof_thread.parent_idx = anchor_idx;
-  start_tsc = cpu_timer_now();
-
-  anchor->depth = prof_thread.depth++;
-  anchor->tsc_start = start_tsc;
-  anchor->type = type;
+  label = label_;
+  func = func_;
+  ProfileEvent event = {
+    .type = ProfileEventType_Push,
+    .prof_type = type,
+    .tsc_start = cpu_timer_now(),
+    .label = label_,
+    .func = func_,
+  };
+  prof_thread.events[g.current_buf].add(event);
 }
 
 ProfileBlock::~ProfileBlock() {
-  // ProfilerState& g = g_st->profiler;
+  ProfilerState& g = g_st->profiler;
   ProfileThread& prof_thread = profiler_get_prof_thread();
-  u64 elapsed = cpu_timer_now() - start_tsc;
-  prof_thread.parent_idx = parent_idx;
-  ProfileAnchor* parent = &prof_thread.anchors[parent_idx];
-  ProfileAnchor* anchor = &prof_thread.anchors[anchor_idx];
-  if (parent != anchor) {
-    parent->tsc_elapsed_exclusive -= elapsed;
-  }
-  anchor->tsc_elapsed_exclusive += elapsed;
-  anchor->tsc_elapsed_inclusive = old_tsc_elapsed_inclusive + elapsed;
-  ++anchor->hit_count;
-
-  --prof_thread.depth;
-  anchor->tsc_end = cpu_timer_now();
+  ProfileEvent event = {
+    .type = ProfileEventType_Pop,
+    .tsc_end = cpu_timer_now(),
+    .label = label,
+    .func = func,
+  };
+  prof_thread.events[g.current_buf].add(event);
 }
 
 void profiler_begin() {
   ProfilerState& g = g_st->profiler;
-  ProfileFrameTime& frame = g.current_frame_time;
-  frame.tsc_start = cpu_timer_now();
+  ProfileFrameTime& frame_time = g.current_frame_time;
   for EachElement(i, g.prof_threads) {
-    ProfileThread prof_thread = g.prof_threads[i];
-    MemZeroArray(prof_thread.anchors, prof_thread.anchor_count);
-    MemZeroArray(prof_thread.hash_to_indices, KB(4));
-    prof_thread.anchor_count = 0;
+    ProfileThread& prof_thread = g.prof_threads[i];
+    prof_thread.events[g.current_buf].clear();
   }
+  frame_time.tsc_start = cpu_timer_now();
 }
 
 void profiler_end() {
+  Scratch scratch;
   ProfilerState& g = g_st->profiler;
-  if (!g.paused) {
-    ProfileFrameTime& frame_time = g.current_frame_time;
-    ProfileFrameTime& write_frame_time = g.frame_times[g_st->current_frame % ArrayCount(g.frame_times)];
-    frame_time.tsc_end = cpu_timer_now();
-    write_frame_time.tsc_start = frame_time.tsc_start;
-    write_frame_time.tsc_end = frame_time.tsc_end;
-    for EachElement(i, g.prof_threads) {
-      ProfileThread& prof_thread = g.prof_threads[i];
-      ProfileAnchors& write_anchors = prof_thread.recorded_anchors[g_st->current_frame % ArrayCount(g.frame_times)];
-      MemCopyArray(write_anchors.data, prof_thread.anchors, prof_thread.anchor_count);
-      write_anchors.count = prof_thread.anchor_count;
+
+  ProfileFrameTime& frame_time = g.current_frame_time;
+  frame_time.tsc_end = cpu_timer_now();
+  ProfileFrameTime& write_frame_time = g.frames_times[g_st->current_frame % ArrayCount(g.frames_times)];
+  write_frame_time.tsc_start = frame_time.tsc_start;
+  write_frame_time.tsc_end = frame_time.tsc_end;
+
+  u32 read_buf = atomic_u32_xor(&g.current_buf);
+
+  for EachElement(j, g.prof_threads) {
+    ProfileThread& prof_thread = g.prof_threads[j];
+    Darray<ProfileAnchor> anchors(scratch);
+    u32 depth = 0;
+    Darray<u32> parent_stack(scratch);
+    u32 hash_to_indices[KB(8)] = {};
+
+    // Process events
+    ///////////////////////////////////
+    Loop (i, prof_thread.events[read_buf].count) {
+      ProfileEvent event = prof_thread.events[read_buf][i];
+      u32 idx = ModPow2(hash(event.label, hash(event.func)), ArrayCount(hash_to_indices));
+      u32 anchor_idx = hash_to_indices[idx];
+      ProfileAnchor* anchor = null;
+      switch (event.type) {
+        case ProfileEventType_Push: {
+          if (anchor_idx == 0) {
+            anchor_idx = anchors.count + 1;
+            hash_to_indices[idx] = anchor_idx;
+            anchors.add();
+            anchor = &anchors[anchor_idx-1];
+            *anchor = {
+              .type = event.prof_type,
+              .current = anchor_idx,
+              .label = event.label,
+              .func = event.func,
+              .tsc_start = event.tsc_start,
+            };
+          }
+          else {
+            anchor = &anchors[anchors[anchor_idx-1].current - 1];
+            if (depth <= anchors[anchor_idx-1].depth) {
+              anchor_idx = anchors.count + 1;
+              anchors.add();
+              anchor->current = anchor_idx;
+              anchor = &anchors[anchor->current-1];
+              *anchor = {
+                .type = event.prof_type,
+                .label = event.label,
+                .func = event.func,
+                .tsc_start = event.tsc_start,
+              };
+            }
+          }
+          parent_stack.add(anchor_idx);
+          anchor->depth = depth;
+          ++depth;
+        } break;
+        case ProfileEventType_Pop: {
+          // In some time back block time was longer than frame
+          if (prof_thread.is_long_time_block) {
+            prof_thread.is_long_time_block = false;
+            anchor_idx = anchors.count + 1;
+            hash_to_indices[idx] = anchor_idx;
+            anchors.add();
+            anchor = &anchors[anchor_idx-1];
+            ProfileAnchor old_anchor = prof_thread.long_block;
+            *anchor = old_anchor;
+            anchor->current = anchor_idx;
+            ++depth;
+          }
+          // Normal path
+          else {
+            parent_stack.pop();
+            anchor = &anchors[anchor_idx-1];
+            anchor = &anchors[anchor->current - 1];
+          }
+          anchor->tsc_end = event.tsc_end;
+          u64 elapsed = anchor->tsc_end - anchor->tsc_start;
+          if (parent_stack.count) {
+            u32 parent_idx = parent_stack[parent_stack.count-1];
+            ProfileAnchor& anchor_parent = anchors[parent_idx-1];
+            anchor_parent.tsc_elapsed_exclusive -= elapsed;
+          }
+          anchor->tsc_elapsed_inclusive += elapsed;
+          anchor->tsc_elapsed_exclusive += elapsed;
+          anchor->was_poped = true;
+          --depth;
+        } break;
+      }
+    }
+
+    // We save long block time to handle it in next frames
+    if (parent_stack.count) {
+      prof_thread.is_long_time_block = true;
+      prof_thread.long_block = anchors[anchors.count-1];
+    }
+
+    ///////////////////////////////////
+    // Record anchors
+    if (!g.paused) {
+      var& write_anchors = prof_thread.recorded_anchors[g_st->current_frame % ArrayCount(g.frames_times)];
+      write_anchors.reserve(anchors.count);
+      MemCopyArray(write_anchors.data, anchors.data, anchors.count);
+      write_anchors.count = anchors.count;
     }
   }
 }
 
-ProfileView profiler_get_prev_frame() {
+ProfileFrame profiler_get_prev_frame() {
   ProfilerState& g = g_st->profiler;
   ProfileThread& prof_thread = profiler_get_prof_thread();
-  ProfileView result = {};
-  result.frame_time = g.frame_times[(g_st->current_frame-1) % ArrayCount(g.frame_times)];
-  result.anchors = prof_thread.recorded_anchors[(g_st->current_frame-1) % ArrayCount(g.frame_times)];
+  ProfileFrame result = {
+    .frame_time = g.frames_times[(g_st->current_frame-1) % ArrayCount(g.frames_times)],
+    .anchors = prof_thread.recorded_anchors[(g_st->current_frame-1) % ArrayCount(g.frames_times)].slice(),
+  };
   return result;
 }
 
@@ -885,46 +974,31 @@ ProfileThread& profiler_get_prof_thread() {
   return g.prof_threads[tctx_get_id()];
 }
 
-f64 tsc_to_ms(u64 tsc) {
-  return (f64)tsc/cpu_frequency()*1000;
-}
-
-void profiler_draw_frame(ProfileView frame, f32 width, v2 cursor_pos, ScrollState scroll_state) {
+void profiler_draw_frame(Slice<ProfileAnchor> anchors, ProfileFrameTime frame_time, f32 width, v2 cursor_pos, ScrollState scroll_state) {
   Scratch scratch;
   v2 mouse = os_get_mouse_pos();
 
   u64 cpu_freq = cpu_frequency();
-  u64 tsc_start = frame.frame_time.tsc_start;
-  u64 tsc_end = frame.frame_time.tsc_end;
+  u64 tsc_start = frame_time.tsc_start;
+  u64 tsc_end = frame_time.tsc_end;
   u64 tsc_elapsed = tsc_end - tsc_start;
 
-  Slice anchors = Slice(frame.anchors.data, frame.anchors.count);
-
   ImDrawList* draw = ImGui::GetWindowDrawList();
-  // f32 line_height = 1000;
-  // f32 thick = 1;
-  // v2 p0 = v2_add_y(cursor_pos, -line_height/2);
-  // v2 p1 = v2_add_y(cursor_pos, line_height);
-  // v2 p2 = v2_add_x(cursor_pos, width);
-  // v2 p3 = v2_add_y(v2_add_x(cursor_pos, width), line_height);
-  // p0 = p0 * scroll_state.scale + scroll_state.offset;
-  // p1 = p1 * scroll_state.scale + scroll_state.offset;
-  // p2 = p2 * scroll_state.scale + scroll_state.offset;
-  // p3 = p3 * scroll_state.scale + scroll_state.offset;
-  // draw->AddLine(p0, p1, IM_COL32(200,200,200,255), thick);
-  // // draw->AddLine(p3, p2, IM_COL32(200,200,200,255), thick);
-  // if (is_current_frame) {
-  //   draw->AddRectFilled(p0, p3, IM_COL32(100,100,100,100));
-  // }
 
   Loop(i, anchors.count) {
-    f32 width_size = width;
     ImGui::PushID(i);
     ProfileAnchor anchor = anchors[i];
+
+    // Handle async anchors
+    if (!anchor.was_poped) {
+      ImGui::PopID();
+      return;
+    }
+
     f64 width_percent = (f64)anchor.tsc_elapsed_inclusive / tsc_elapsed;
     f64 width_percent_offset = inverse_lerp_f64(tsc_start, anchor.tsc_start, tsc_end);
     f64 width_percent_with_children = 0;
-    v2 size = v2(width_size, 30);
+    v2 size = v2(width, 30);
     if (anchor.tsc_elapsed_inclusive != anchor.tsc_elapsed_exclusive) {
       width_percent_with_children = ((f64)anchor.tsc_elapsed_inclusive / (f64)tsc_elapsed);
       size.x *= width_percent_with_children;
@@ -932,7 +1006,7 @@ void profiler_draw_frame(ProfileView frame, f32 width, v2 cursor_pos, ScrollStat
       size.x *= width_percent;
     }
     if (width_percent > 0.02 || width_percent_with_children > 0.02) {
-      f32 x_offset = width_size * width_percent_offset;
+      f32 x_offset = width * width_percent_offset;
       v2 min = v2(x_offset, anchor.depth * size.y) + cursor_pos;
       Rng2 world_rect = Rng2(min, min + size);
 
@@ -952,8 +1026,6 @@ void profiler_draw_frame(ProfileView frame, f32 width, v2 cursor_pos, ScrollStat
           color = IM_COL32(50, 70, 80, 255);
           str = String("sleep");
         } break;
-        case ProfileType_Async:
-          break;
       }
       draw->AddRectFilled(IM_RECT(rect), color);
       draw->AddRect(IM_RECT(rect), IM_COL32(200, 200, 200, 255));
@@ -961,8 +1033,9 @@ void profiler_draw_frame(ProfileView frame, f32 width, v2 cursor_pos, ScrollStat
         ImGui::BeginTooltip();
         ImGui::Text("Label: %s", anchor.label.str);
         ImGui::Text("Percent: %f%%", width_percent * 100);
-        ImGui::Text("Hits: %lu", anchor.hit_count);
+        // ImGui::Text("Hits: %lu", anchor.hit_count);
         ImGui::Text("Time: %fms", (f64)anchor.tsc_elapsed_inclusive / cpu_freq * 1000);
+        ImGui::Text("Time exclusive: %fms", (f64)anchor.tsc_elapsed_exclusive / cpu_freq * 1000);
         ImGui::Text("Type: %s", str.str);
         ImGui::EndTooltip();
       }
@@ -989,18 +1062,18 @@ void profiler_view() {
   Scratch scratch;
   ProfilerState& g = g_st->profiler;
 
-  ProfileView prev_frame = profiler_get_prev_frame();
-  Slice<ProfileAnchor> anchors = Slice(prev_frame.anchors.data, prev_frame.anchors.count);
+  ProfileFrame prev_frame = profiler_get_prev_frame();
+  var anchors = prev_frame.anchors;
   u64 cpu_freq = cpu_frequency();
   u64 tsc_start = prev_frame.frame_time.tsc_start;
   u64 tsc_end = prev_frame.frame_time.tsc_end;
   u64 tsc_elapsed = tsc_end - tsc_start;
 
   u64 tsc_elapsed_sum = 0;
-  u64 tsc_elapsed_max = g.frame_times[0].tsc_end - g.frame_times[0].tsc_start;
-  u64 tsc_elapsed_min = g.frame_times[0].tsc_end - g.frame_times[0].tsc_start;
-  for EachElement(i, g.frame_times) {
-    ProfileFrameTime frame = g.frame_times[i];
+  u64 tsc_elapsed_max = g.frames_times[0].tsc_end - g.frames_times[0].tsc_start;
+  u64 tsc_elapsed_min = g.frames_times[0].tsc_end - g.frames_times[0].tsc_start;
+  for EachElement(i, g.frames_times) {
+    ProfileFrameTime frame = g.frames_times[i];
     u64 elapsed = frame.tsc_end - frame.tsc_start;
     tsc_elapsed_sum += elapsed;
     if (tsc_elapsed_max < elapsed) tsc_elapsed_max = elapsed;
@@ -1043,18 +1116,20 @@ void profiler_view() {
           ImGui::Text("%.1ffps %.1fms CPU %.1fGhz", 1 / get_dt(), 1000 * (f64)tsc_elapsed / cpu_freq, (f64)cpu_freq / Billion(1));
           ImGui::Text("avg %.1fms, max %.1f, min %.1f", g.frame_avg_time, g.frame_max_time, g.frame_min_time);
           cursor_pos = ImGui::GetCursorScreenPos();
-          profiler_draw_frame(prev_frame, avail_size.x, cursor_pos, g.win.root_scroll_state);
+          if (prev_frame.frame_time.tsc_end > 0) {
+            profiler_draw_frame(prev_frame.anchors, prev_frame.frame_time, avail_size.x, cursor_pos, g.win.root_scroll_state);
+          }
           ImGui::EndTabItem();
         };
         if (ImGui::BeginTabItem("frames"), g.active_tab == ProfileTabActive_Frames) {
           f32 width_size = avail_size.x;
-          Loop (i, ArrayCount(g.frame_times)) {
-            ProfileFrameTime frame_time = g.frame_times[i];
+          Loop (i, ArrayCount(g.frames_times)) {
+            ProfileFrameTime frame_time = g.frames_times[i];
             f32 max_height = 40;
             f32 max_ms = 30;
             f32 frame_ms = tsc_to_ms(frame_time.tsc_end - frame_time.tsc_start);
             f32 height = max_height / (max_ms / frame_ms);
-            v2 size = v2(avail_size.x / ArrayCount(g.frame_times), height);
+            v2 size = v2(avail_size.x / ArrayCount(g.frames_times), height);
             v2 min = cursor_pos + v2(i*size.x, -height + max_height);
             Rng2 rect = Rng2(min, size + min);
             if (contains_2f32(rect, mouse_pos)) {
@@ -1072,10 +1147,10 @@ void profiler_view() {
             } else if (frame_ms > 20) {
               color = IM_COL32(255, 100, 50, 255);
             }
-            if (i == g_st->current_frame % ArrayCount(g.frame_times)) {
+            if (i == g_st->current_frame % ArrayCount(g.frames_times)) {
               color = IM_COL32(230,230,230,255);
             }
-            if (i == g_st->current_frame % ArrayCount(g.frame_times)) {
+            if (i == g_st->current_frame % ArrayCount(g.frames_times)) {
               draw->AddRectFilled(IM_RECT(rect), color);
               draw->AddRect(IM_RECT(rect), IM_COL32(10, 10, 10, 100));
             } else {
@@ -1093,20 +1168,20 @@ void profiler_view() {
           // Draw lines and current rect
           {
             f32 width_offset = 0;
-            Loop (i, ArrayCount(g.frame_times)) {
+            Loop (i, ArrayCount(g.frames_times)) {
               f32 line_height = 1000;
               f32 thick = 1;
-              v2 p0 = v2_add_y(cursor_pos, -line_height / 2) + v2(width_offset, 0);
-              v2 p1 = v2_add_y(cursor_pos, line_height) + v2(width_offset, 0);
-              v2 p2 = v2_add_x(cursor_pos, width_size) + v2(width_offset, 0);
-              v2 p3 = v2_add_y(v2_add_x(cursor_pos, width_size), line_height) + v2(width_offset, 0);
+              v2 p0 = cursor_pos + v2(0, -line_height / 2) + v2(width_offset, 0);
+              v2 p1 = cursor_pos + v2(0, line_height) + v2(width_offset, 0);
+              v2 p2 = cursor_pos + v2(width_size, 0) + v2(width_offset, 0);
+              v2 p3 = cursor_pos + v2(width_size, 0) + v2(0, line_height) + v2(width_offset, 0);
               p0 = p0 * scroll_state.scale + scroll_state.offset;
               p1 = p1 * scroll_state.scale + scroll_state.offset;
               p2 = p2 * scroll_state.scale + scroll_state.offset;
               p3 = p3 * scroll_state.scale + scroll_state.offset;
               draw->AddLine(p0, p1, IM_COL32(200, 200, 200, 255), thick);
               // draw->AddLine(p3, p2, IM_COL32(200,200,200,255), thick);
-              if (i == g_st->current_frame % ArrayCount(g.frame_times)) {
+              if (i == g_st->current_frame % ArrayCount(g.frames_times)) {
                 draw->AddRectFilled(p0, p3, IM_COL32(100, 100, 100, 100));
               }
               width_offset += width_size;
@@ -1117,12 +1192,9 @@ void profiler_view() {
           // Draw graph per thread
           for EachElement(i, g.prof_threads) {
             f32 width_offset = 0;
-            Loop (j, ArrayCount(g.frame_times)) {
-              ProfileView frame_view = {
-                .frame_time = g.frame_times[j],
-                .anchors = g.prof_threads[i].recorded_anchors[j],
-              };
-              profiler_draw_frame(frame_view, width_size, v2_add_x(cursor_pos, width_offset), g.win.frames_scroll_state);
+            ProfileThread prof_thread = g.prof_threads[i];
+            for EachElement(j, g.frames_times) {
+              profiler_draw_frame(prof_thread.recorded_anchors[j].slice(), g.frames_times[j], width_size, cursor_pos+v2(width_offset,0), g.win.frames_scroll_state);
               width_offset += width_size;
             }
             width_offset = 0;
@@ -1235,7 +1307,7 @@ void profiler_view() {
       
               v2 offset = v2(0,  height_level * height + height_offset) + cursor_pos;
               Rng2 rect_exclusive = Rng2(offset, size_exclusive + offset);
-              Rng2 rect_inclusive = push_right_2f32(rect_exclusive, v2_add_x(size_inclusive, -size_exclusive.x));
+              Rng2 rect_inclusive = push_right_2f32(rect_exclusive, size_inclusive + v2(-size_exclusive.x, 0));
 
               ImDrawList* draw = ImGui::GetWindowDrawList();
               // inclusive draw
@@ -1292,7 +1364,7 @@ void profiler_view() {
                 v2 child_size = v2(avail_size.x * child_info.pos / mem_levels[mem_level], height * 0.6);
                 v2 child_size_cap = v2(avail_size.x * child_info.cap / mem_levels[mem_level], height * 0.6);
                 Rng2 child_rect = Rng2(child_offset, child_offset + child_size);
-                Rng2 child_rect_cap = push_right_2f32(child_rect, v2_add_x(child_size_cap, -child_size.x));
+                Rng2 child_rect_cap = push_right_2f32(child_rect, child_size_cap + v2(-child_size.x, 0));
 
                 // pos
                 ImDrawList* draw = ImGui::GetWindowDrawList();
@@ -1309,7 +1381,7 @@ void profiler_view() {
                 v2 name_offset = child_offset;
                 v2 meta_offset = v2(name_offset);
                 draw->AddText(name_offset, ImGui::GetColorU32(ImGuiCol_Text), child_name_str);
-                draw->AddText(v2_add_x(meta_offset, 200), ImGui::GetColorU32(ImGuiCol_Text), child_meta_str);
+                draw->AddText(meta_offset + v2(200, 0), ImGui::GetColorU32(ImGuiCol_Text), child_meta_str);
               }
 
               first_childs_sorted = sort_list_insert(scratch, node->v->first, [](var a, var b) { return a->pos > b->pos; });
@@ -1423,7 +1495,6 @@ void common_init() {
   g.str_to_material.init(g.gpa);
 
   thread_pool_init(THREAD_COUNT);
-
   g.watch.arena = g.arena;
   watch_directory_add(g.shader_dir, WatchOp_RecompileShader);
   watch_directory_add(g.shader_compiled_dir, WatchOp_ShaderReload);
@@ -1436,6 +1507,17 @@ void common_init() {
   game_init();
 }
 
+void bar(f32 time) {
+  TimeFunction;
+  os_sleep_ms(time);
+}
+
+void foo(f32 time) {
+  TimeFunction;
+  os_sleep_ms(time);
+  bar(time);
+}
+
 void common_update() {
   input_update();
   profiler_view();
@@ -1443,16 +1525,26 @@ void common_update() {
   if (g_st->imgui_demo_open) {
     ImGui::ShowDemoWindow();
   }
-
+  // {
+  //   TimeBlock("block0");
+  //   os_sleep_ms(1);
+  // }
+  // {
+  //   TimeBlock("block1");
+  //   os_sleep_ms(1);
+  // }
+  // Loop (i, 2) {
+  //   foo(2);
+  // }
   Task task = {
     .func = [](void* ptr) {
-      os_sleep_ms(2);
+      os_sleep_ms(rand_u32()%20);
     }
   };
-  Loop (i, 4) {
+  Loop (i, 2) {
     task_queue_push(task);
   }
-  thread_wait_for();
+  // thread_wait_for();
 }
 
 shared_function void common_main(HotReloadData* data) {
@@ -1462,7 +1554,10 @@ if (data->ctx == null) {
     data->ctx = push_struct_zero(arena, GlobalState);
     g_st = (GlobalState*)data->ctx;
     g_st->arena = arena;
-    common_init();
+    {
+      TimeScope scope;
+      common_init();
+    }
 #if HOTRELOAD_BUILD
     watch_add(data->lib, WatchOp_NotifyHotreload);
 #endif
@@ -1520,20 +1615,4 @@ if (data->ctx == null) {
   os_exit(0);
 
   hotreload:
-}
-
-Timer timer_init(f32 interval) {
-  Timer timer = {
-    .interval = interval,
-  };
-  return timer;
-}
-
-b32 timer_tick(Timer& t) {
-  t.passed += g_st->dt;
-  if (t.passed >= t.interval) {
-    t.passed = 0;
-    return true;
-  }
-  return false;
 }

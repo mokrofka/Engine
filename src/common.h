@@ -25,9 +25,11 @@ struct ImString {
 // thread graph visualisation
 // profiler
 // make wayland backend work
-// linux crushes when I try sleep and mount?
 // fix static non indexed - doesn't render
 // console
+// thread safe allocator
+// async
+// profile launch time
 
 #define THREAD_COUNT 2
 
@@ -40,7 +42,6 @@ const v3 ColorGrey  = v3(0.8,0.8,0.8);
 
 const u32 MaxEntities = KB(10);
 const u32 MaxStaticEntities = KB(10);
-
 
 struct Entity;
 struct StaticEntity;
@@ -146,23 +147,24 @@ struct Timer {
 Timer timer_init(f32 interval);
 b32 timer_tick(Timer& t);
 
-void draw_squad(v2 min, v2 max, v3 color);
+f64 tsc_to_ms(u64 tsc);
 
-// Transform& entity_transform(Handle<Entity> handle);
-// Transform& static_entity_transform(Handle<StaticEntity> handle);
+struct TimeScope {
+  u64 tsc_start;
+  TimeScope() {
+    tsc_start = cpu_timer_now();
+  }
+  ~TimeScope() {
+    u64 elapsed = cpu_timer_now() - tsc_start;
+    Info("%fms", tsc_to_ms(elapsed));
+  }
+};
 
 f32 get_dt();
 f32 get_time();
 
-f32 get_was_hotreload();
-
-#if BUILD_DEBUG
-u32* entities_generations();
-u32* static_entities_generations();
-#endif
-
 ////////////////////////////////////////////////////////////////////////
-// Assets
+// @Assets
 
 #define MESH_LIST \
   X(Mesh_MonkeyGlb, monkey.glb) \
@@ -217,7 +219,7 @@ Handle<GpuCubemap> cubemap_load(String name);
 void asset_load();
 
 ////////////////////////////////////////////////////////////////////////
-// Threads
+// @Threads
 
 #define MAX_TASKS 1024
 
@@ -252,7 +254,7 @@ void thread_pool_init(u32 num_threads);
 void thread_wait_for();
 
 ////////////////////////////////////////////////////////////////////////
-// Input
+// @Input
 
 struct InputState {
   b8 consumed[Key_COUNT];
@@ -264,7 +266,7 @@ void key_consume(Key key);
 void input_update();
 
 ////////////////////////////////////////////////////////////////////////
-// Some ui
+// @UI
 
 struct ScrollState {
   v2 offset;
@@ -292,9 +294,6 @@ void imgui_window_toggle_fullscreen(ImguiWindow& window);
 void imgui_window_apply_state(ImguiWindow& window);
 void imgui_window_track_state(ImguiWindow& window);
 void ui_handle_scroll(ScrollState& s, v2 mouse);
-
-////////////////////////////////////////////////////////////////////////
-// UI
 
 // struct UI_Window {
 //   v2 pos;
@@ -327,38 +326,46 @@ void ui_handle_scroll(ScrollState& s, v2 mouse);
 // b32 ui_button(u32 id, v2 min, v2 max);
 
 ////////////////////////////////////////////////////////////////////////
-// Profiler
-
-enum ProfileTabActive {
-  ProfileTabActive_Root,
-  ProfileTabActive_Frames,
-  ProfileTabActive_Time,
-  ProfileTabActive_Memory,
-};
+// @Profiler
 
 enum ProfileType {
   ProfileType_Work,
   ProfileType_Sleep,
-  ProfileType_Async,
 };
 
 struct ProfileAnchor {
+  ProfileType type;
   u64 tsc_elapsed_exclusive; // without children
   u64 tsc_elapsed_inclusive; // with children
-  u64 hit_count;
+  // u64 hit_count;
   String label;
-  // for fraph
+  String func;
   u32 depth;
   u64 tsc_start;
   u64 tsc_end;
-  ProfileType type;
+  u32 current;
+  b32 was_poped;
+};
+
+enum ProfileEventType {
+  ProfileEventType_Push,
+  ProfileEventType_Pop,
+};
+
+struct ProfileEvent {
+  ProfileEventType type;
+  ProfileType prof_type;
+  union {
+    u64 tsc_start;
+    u64 tsc_end;
+  };
+  String label;
+  String func;
 };
 
 struct ProfileBlock {
-  u64 old_tsc_elapsed_inclusive;
-  u64 start_tsc;
-  u32 parent_idx;
-  u32 anchor_idx;
+  String label;
+  String func;
   ProfileBlock(String label_, String func, ProfileType type = ProfileType_Work);
   ~ProfileBlock();
 };
@@ -368,33 +375,33 @@ struct ProfileFrameTime {
   u64 tsc_end;
 };
 
-struct ProfileAnchors {
-  ProfileAnchor* data;
-  u32 count;
-};
-
-struct ProfileView {
+struct ProfileFrame {
   ProfileFrameTime frame_time;
-  ProfileAnchors anchors;
+  Slice<ProfileAnchor> anchors;
 };
 
 struct ProfileThread {
-  ProfileAnchor* anchors;
-  ProfileAnchors recorded_anchors[120];
-  u32 parent_idx;
-  u32 hash_to_indices[KB(4)];
-  u32 depth;
-  u32 anchor_count;
-  u32 anchors_cap;
+  Arena arena;
+  AllocSegList gpa;
+  Darray<ProfileEvent> events[2];
+  Darray<ProfileAnchor> recorded_anchors[120];
+  b32 is_long_time_block;
+  ProfileAnchor long_block;
+};
+
+enum ProfileTabActive {
+  ProfileTabActive_Root,
+  ProfileTabActive_Frames,
+  ProfileTabActive_Time,
+  ProfileTabActive_Memory,
 };
 
 struct ProfilerState {
-  AllocSegList gpa;
   ProfileFrameTime current_frame_time;
-  ProfileFrameTime frame_times[120];
+  ProfileFrameTime frames_times[120];
   ProfileThread prof_threads[THREAD_COUNT+1];
-
-  Mutex reallocation_mutex;
+  Arena threads_arenas[THREAD_COUNT+1];
+  u32 current_buf;
 
   f32 frame_avg_time;
   f32 frame_min_time;
@@ -403,15 +410,14 @@ struct ProfilerState {
   b32 paused;
 
   ImguiWindow win;
-  u32 active_tab;
+  ProfileTabActive active_tab;
 };
 
 void profiler_init();
 void profiler_begin();
 void profiler_end();
-ProfileView profiler_get_prev_frame();
+ProfileFrame profiler_get_prev_frame();
 ProfileThread& profiler_get_prof_thread();
-f64 tsc_to_ms(u64 tsc);
 
 #if PROFILE_BUILD
   #define TimeBlock(Name, ...) ProfileBlock Glue(__profiler_block, __LINE__)(Name, __func__, ##__VA_ARGS__)
@@ -422,7 +428,7 @@ f64 tsc_to_ms(u64 tsc);
 #endif
 
 ////////////////////////////////////////////////////////////////////////
-// Watch
+// @Watch
 
 enum WatchOp {
   WatchOp_NotifyHotreload = 1,
@@ -453,7 +459,7 @@ void watch_directory_add(String watch_name, WatchOp op, OS_WatchFlags flags = OS
 void watch_update();
 
 ////////////////////////////////////////////////////////////////////////
-// game
+// @Game
 
 struct Camera {
   v3 pos;
