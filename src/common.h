@@ -31,7 +31,7 @@ struct ImString {
 // async
 // profile launch time
 
-#define THREAD_COUNT 2
+#define THREAD_COUNT 16
 
 const v3 ColorRed   = v3(1,0,0);
 const v3 ColorGreen = v3(0,1,0);
@@ -355,10 +355,7 @@ enum ProfileEventType {
 struct ProfileEvent {
   ProfileEventType type;
   ProfileType prof_type;
-  union {
-    u64 tsc_start;
-    u64 tsc_end;
-  };
+  u64 tsc;
   String label;
   String func;
 };

@@ -146,6 +146,9 @@ struct Darray {
   T pop() {
     return data[--count];
   }
+  T& back() {
+    return data[count-1];
+  }
   b32 exists(T a, b32(*fn)(T a, T b) = equal) {
     for (T x : *this) {
       if (fn(x, a)) return true;

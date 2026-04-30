@@ -241,10 +241,18 @@ void DebugTrap();
 ////////////////////////////////////////////////////////////////////////
 // Atomic Operations
 
-#define atomic_u32_inc(x) (__atomic_fetch_add((u32*)(x), 1, __ATOMIC_SEQ_CST) + 1)
-#define atomic_u32_dec(x) (__atomic_fetch_sub((u32*)(x), 1, __ATOMIC_SEQ_CST) - 1)
-#define atomic_u32_load(x) __atomic_load_n(x, __ATOMIC_SEQ_CST)
-#define atomic_u32_xor(x) __atomic_fetch_xor((x), 1, __ATOMIC_SEQ_CST);
+#define atomic_u32_inc(x)                    __atomic_fetch_add((x), 1, __ATOMIC_SEQ_CST)
+#define atomic_u32_dec(x)                    __atomic_fetch_sub((x), 1, __ATOMIC_SEQ_CST)
+#define atomic_u32_add(x, v)                 __atomic_fetch_add((x), (v), __ATOMIC_SEQ_CST)
+#define atomic_u32_sub(x, v)                 __atomic_fetch_sub((x), (v), __ATOMIC_SEQ_CST)
+#define atomic_u32_load(x)                   __atomic_load_n((x), __ATOMIC_SEQ_CST)
+#define atomic_u32_store(x, v)               __atomic_store_n((x), (v), __ATOMIC_SEQ_CST)
+#define atomic_u32_or(x, v)                  __atomic_fetch_or((x), (v), __ATOMIC_SEQ_CST)
+#define atomic_u32_and(x, v)                 __atomic_fetch_and((x), (v), __ATOMIC_SEQ_CST)
+#define atomic_u32_xor(x, v)                 __atomic_fetch_xor((x), (v), __ATOMIC_SEQ_CST)
+#define atomic_u32_exchange(x, v)            __atomic_exchange_n((x), (v), __ATOMIC_SEQ_CST)
+#define atomic_u32_cmp_exchange(x, old, new) __atomic_compare_exchange_n((x), (old), (new), 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+#define atomic_u32_cond_exchange(x, v, c) ({ u32 _new = (c); __atomic_compare_exchange_n((x), (&_new), (v), 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); _new; })
 
 ////////////////////////////////////////////////////////////////////////
 // Link list

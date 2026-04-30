@@ -819,7 +819,7 @@ ProfileBlock::ProfileBlock(String label_, String func_, ProfileType type) {
   ProfileEvent event = {
     .type = ProfileEventType_Push,
     .prof_type = type,
-    .tsc_start = cpu_timer_now(),
+    .tsc = cpu_timer_now(),
     .label = label_,
     .func = func_,
   };
@@ -831,7 +831,7 @@ ProfileBlock::~ProfileBlock() {
   ProfileThread& prof_thread = profiler_get_prof_thread();
   ProfileEvent event = {
     .type = ProfileEventType_Pop,
-    .tsc_end = cpu_timer_now(),
+    .tsc = cpu_timer_now(),
     .label = label,
     .func = func,
   };
@@ -858,94 +858,63 @@ void profiler_end() {
   write_frame_time.tsc_start = frame_time.tsc_start;
   write_frame_time.tsc_end = frame_time.tsc_end;
 
-  u32 read_buf = atomic_u32_xor(&g.current_buf);
+  u32 read_buf = atomic_u32_xor(&g.current_buf, 1);
 
   for EachElement(j, g.prof_threads) {
     ProfileThread& prof_thread = g.prof_threads[j];
     Darray<ProfileAnchor> anchors(scratch);
     u32 depth = 0;
-    Darray<u32> parent_stack(scratch);
-    u32 hash_to_indices[KB(8)] = {};
+    Darray<u32> stack(scratch);
 
-    // Process events
     ///////////////////////////////////
+    // Process events
     Loop (i, prof_thread.events[read_buf].count) {
       ProfileEvent event = prof_thread.events[read_buf][i];
-      u32 idx = ModPow2(hash(event.label, hash(event.func)), ArrayCount(hash_to_indices));
-      u32 anchor_idx = hash_to_indices[idx];
-      ProfileAnchor* anchor = null;
       switch (event.type) {
         case ProfileEventType_Push: {
-          if (anchor_idx == 0) {
-            anchor_idx = anchors.count + 1;
-            hash_to_indices[idx] = anchor_idx;
-            anchors.add();
-            anchor = &anchors[anchor_idx-1];
-            *anchor = {
-              .type = event.prof_type,
-              .current = anchor_idx,
-              .label = event.label,
-              .func = event.func,
-              .tsc_start = event.tsc_start,
-            };
-          }
-          else {
-            anchor = &anchors[anchors[anchor_idx-1].current - 1];
-            if (depth <= anchors[anchor_idx-1].depth) {
-              anchor_idx = anchors.count + 1;
-              anchors.add();
-              anchor->current = anchor_idx;
-              anchor = &anchors[anchor->current-1];
-              *anchor = {
-                .type = event.prof_type,
-                .label = event.label,
-                .func = event.func,
-                .tsc_start = event.tsc_start,
-              };
-            }
-          }
-          parent_stack.add(anchor_idx);
-          anchor->depth = depth;
+          ProfileAnchor anchor = {
+            .type = event.prof_type,
+            .label = event.label,
+            .func = event.func,
+            .tsc_start = event.tsc,
+            .depth = depth,
+          };
+          anchors.add(anchor);
+          stack.add(anchors.count-1);
           ++depth;
         } break;
         case ProfileEventType_Pop: {
+          u32 anchor_idx = 0;
           // In some time back block time was longer than frame
           if (prof_thread.is_long_time_block) {
             prof_thread.is_long_time_block = false;
-            anchor_idx = anchors.count + 1;
-            hash_to_indices[idx] = anchor_idx;
-            anchors.add();
-            anchor = &anchors[anchor_idx-1];
             ProfileAnchor old_anchor = prof_thread.long_block;
-            *anchor = old_anchor;
-            anchor->current = anchor_idx;
+            anchors.add(old_anchor);
+            stack.add(anchors.count-1);
             ++depth;
           }
-          // Normal path
-          else {
-            parent_stack.pop();
-            anchor = &anchors[anchor_idx-1];
-            anchor = &anchors[anchor->current - 1];
-          }
-          anchor->tsc_end = event.tsc_end;
-          u64 elapsed = anchor->tsc_end - anchor->tsc_start;
-          if (parent_stack.count) {
-            u32 parent_idx = parent_stack[parent_stack.count-1];
-            ProfileAnchor& anchor_parent = anchors[parent_idx-1];
+
+          anchor_idx = stack.pop();
+          ProfileAnchor& anchor = anchors[anchor_idx];
+          anchor.tsc_end = event.tsc;
+          u64 elapsed = anchor.tsc_end - anchor.tsc_start;
+          if (stack.count) {
+            u32 parent_idx = stack.back();
+            ProfileAnchor& anchor_parent = anchors[parent_idx];
             anchor_parent.tsc_elapsed_exclusive -= elapsed;
           }
-          anchor->tsc_elapsed_inclusive += elapsed;
-          anchor->tsc_elapsed_exclusive += elapsed;
-          anchor->was_poped = true;
+          anchor.tsc_elapsed_inclusive += elapsed;
+          anchor.tsc_elapsed_exclusive += elapsed;
+          anchor.was_poped = true;
           --depth;
         } break;
       }
     }
 
     // We save long block time to handle it in next frames
-    if (parent_stack.count) {
+    if (stack.count) {
       prof_thread.is_long_time_block = true;
-      prof_thread.long_block = anchors[anchors.count-1];
+      prof_thread.long_block = anchors.back();
     }
 
     ///////////////////////////////////
@@ -1538,10 +1507,11 @@ void common_update() {
   // }
   Task task = {
     .func = [](void* ptr) {
-      os_sleep_ms(rand_u32()%20);
+      os_sleep_ms(rand_u32()%100);
+      // os_sleep_ms(32);
     }
   };
-  Loop (i, 2) {
+  Loop (i, 3) {
     task_queue_push(task);
   }
   // thread_wait_for();
