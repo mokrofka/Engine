@@ -386,7 +386,7 @@ intern void test_profiler_die(i32 i) {
 // }
 
 intern void profiler_test() {
-  profiler_begin();
+  // profiler_begin();
   test_profiler_bar();
   test_profiler_bar();
   test_profiler_der();
@@ -684,6 +684,7 @@ void test_link_list() {
 }
 
 void test() {
+  TimeFunction;
   test_global_alloc();
   test_arena_alloc();
   test_arena_list_alloc();

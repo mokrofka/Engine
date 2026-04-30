@@ -2813,6 +2813,7 @@ intern void vk_instance_create() {
 }
 
 void* vk_init() {
+  TimeFunction;
   Scratch scratch;
   Arena arena = arena_init_named("vk arena");
   vk = push_struct_zero(arena, VK_State);
@@ -3655,6 +3656,7 @@ PFN_vkVoidFunction imgui_load_fn(const char* function_name, void* user_data) {
 }
 
 void vk_imgui_init() {
+  TimeFunction;
   ImGui::CreateContext();
   ImGuiIO& io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;   

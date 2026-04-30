@@ -31,8 +31,6 @@ struct ImString {
 // async
 // profile launch time
 
-#define THREAD_COUNT 16
-
 const v3 ColorRed   = v3(1,0,0);
 const v3 ColorGreen = v3(0,1,0);
 const v3 ColorBlue  = v3(0,0,1);
@@ -219,41 +217,6 @@ Handle<GpuCubemap> cubemap_load(String name);
 void asset_load();
 
 ////////////////////////////////////////////////////////////////////////
-// @Threads
-
-#define MAX_TASKS 1024
-
-struct Task {
-  ThreadEntryPointFn* func;
-  void* arg;
-};
-
-struct TaskQueue {
-  Task tasks[MAX_TASKS];
-  u32 head;
-  u32 tail;
-  u32 count;
-  u32 remaining_tasks;
-  Mutex mutex;
-  CondVar cond_not_empty;
-  CondVar cond_not_full;
-  CondVar finished;
-};
-
-struct ThreadPool {
-  Thread threads[16];
-  u32 num_threads;
-  TaskQueue queue;
-};
-
-void task_queue_init();
-void task_queue_push(Task t);
-Task task_queue_pop();
-void thread_worker(void* arg);
-void thread_pool_init(u32 num_threads);
-void thread_wait_for();
-
-////////////////////////////////////////////////////////////////////////
 // @Input
 
 struct InputState {
@@ -324,105 +287,6 @@ void ui_handle_scroll(ScrollState& s, v2 mouse);
 // void ui_pop_box();
 // b32 ui_begin_window(u32 id, v2 size);
 // b32 ui_button(u32 id, v2 min, v2 max);
-
-////////////////////////////////////////////////////////////////////////
-// @Profiler
-
-enum ProfileType {
-  ProfileType_Work,
-  ProfileType_Sleep,
-};
-
-struct ProfileAnchor {
-  ProfileType type;
-  u64 tsc_elapsed_exclusive; // without children
-  u64 tsc_elapsed_inclusive; // with children
-  // u64 hit_count;
-  String label;
-  String func;
-  u32 depth;
-  u64 tsc_start;
-  u64 tsc_end;
-  u32 current;
-  b32 was_poped;
-};
-
-enum ProfileEventType {
-  ProfileEventType_Push,
-  ProfileEventType_Pop,
-};
-
-struct ProfileEvent {
-  ProfileEventType type;
-  ProfileType prof_type;
-  u64 tsc;
-  String label;
-  String func;
-};
-
-struct ProfileBlock {
-  String label;
-  String func;
-  ProfileBlock(String label_, String func, ProfileType type = ProfileType_Work);
-  ~ProfileBlock();
-};
-
-struct ProfileFrameTime {
-  u64 tsc_start;
-  u64 tsc_end;
-};
-
-struct ProfileFrame {
-  ProfileFrameTime frame_time;
-  Slice<ProfileAnchor> anchors;
-};
-
-struct ProfileThread {
-  Arena arena;
-  AllocSegList gpa;
-  Darray<ProfileEvent> events[2];
-  Darray<ProfileAnchor> recorded_anchors[120];
-  b32 is_long_time_block;
-  ProfileAnchor long_block;
-};
-
-enum ProfileTabActive {
-  ProfileTabActive_Root,
-  ProfileTabActive_Frames,
-  ProfileTabActive_Time,
-  ProfileTabActive_Memory,
-};
-
-struct ProfilerState {
-  ProfileFrameTime current_frame_time;
-  ProfileFrameTime frames_times[120];
-  ProfileThread prof_threads[THREAD_COUNT+1];
-  Arena threads_arenas[THREAD_COUNT+1];
-  u32 current_buf;
-
-  f32 frame_avg_time;
-  f32 frame_min_time;
-  f32 frame_max_time;
-
-  b32 paused;
-
-  ImguiWindow win;
-  ProfileTabActive active_tab;
-};
-
-void profiler_init();
-void profiler_begin();
-void profiler_end();
-ProfileFrame profiler_get_prev_frame();
-ProfileThread& profiler_get_prof_thread();
-
-#if PROFILE_BUILD
-  #define TimeBlock(Name, ...) ProfileBlock Glue(__profiler_block, __LINE__)(Name, __func__, ##__VA_ARGS__)
-  #define TimeFunction TimeBlock(__func__)
-#else
-  #define TimeBlock(Name)
-  #define TimeFunction
-#endif
 
 ////////////////////////////////////////////////////////////////////////
 // @Watch
@@ -557,7 +421,7 @@ struct GlobalState {
 
   ThreadPool thread_pool;
   WatchState watch;
-  ProfilerState profiler;
+  ImguiWindow profile_win;
   GameState game;
   b32 imgui_demo_open;
 

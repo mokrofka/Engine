@@ -518,85 +518,6 @@ void asset_load() {
 }
 
 ////////////////////////////////////////////////////////////////////////
-// Threads
-
-void task_queue_init() {
-  ThreadPool& g = g_st->thread_pool;
-  TaskQueue& queue = g.queue;
-  queue.mutex = os_mutex_alloc();
-  queue.cond_not_empty = os_cond_var_alloc();
-  queue.cond_not_full = os_cond_var_alloc();
-  queue.finished = os_cond_var_alloc();
-}
-
-void task_queue_push(Task t) {
-  ThreadPool& g = g_st->thread_pool;
-  TaskQueue& queue = g.queue;
-  os_mutex_take(queue.mutex);
-  while (queue.count == MAX_TASKS) {
-    os_cond_var_wait(queue.cond_not_full, queue.mutex);
-  }
-  queue.tasks[queue.tail] = t;
-  queue.tail = ModPow2(queue.tail + 1, MAX_TASKS);
-  ++queue.count;
-  ++queue.remaining_tasks;
-  os_cond_var_signal(queue.cond_not_empty);
-  os_mutex_drop(queue.mutex);
-}
-
-Task task_queue_pop() {
-  ThreadPool& g = g_st->thread_pool;
-  TaskQueue& queue = g.queue;
-  os_mutex_take(queue.mutex);
-  while (queue.count == 0) {
-    os_cond_var_wait(queue.cond_not_empty, queue.mutex);
-  }
-  if (queue.count == MAX_TASKS) {
-    os_cond_var_signal(queue.cond_not_full);
-  }
-  Task t = queue.tasks[queue.head];
-  queue.head = ModPow2(queue.head + 1, MAX_TASKS);
-  --queue.count;
-  os_mutex_drop(queue.mutex);
-  return t;
-}
-
-void thread_worker(void* arg) {
-  TaskQueue& queue = g_st->thread_pool.queue;
-  tctx_init();
-  while (true) {
-    Task t = task_queue_pop();
-    TimeBlock("doing job");
-    t.func(t.arg);
-    os_mutex_take(queue.mutex);
-    --queue.remaining_tasks;
-    if (queue.remaining_tasks == 0) {
-      os_cond_var_signal(queue.finished);
-    }
-    os_mutex_drop(queue.mutex);
-  }
-}
-
-void thread_pool_init(u32 num_threads) {
-  ThreadPool& g = g_st->thread_pool;
-  g.num_threads = num_threads;
-  task_queue_init();
-  Loop (i, num_threads) {
-    g.threads[i] = os_thread_launch(thread_worker, null);
-  }
-}
-
-void thread_wait_for() {
-  TimeBlock("wait for workers", ProfileType_Sleep);
-  TaskQueue& queue = g_st->thread_pool.queue;
-  os_mutex_take(queue.mutex);
-  if (queue.remaining_tasks > 0) {
-    os_cond_var_wait(queue.finished, queue.mutex);
-  }
-  os_mutex_drop(queue.mutex);
-}
-
-////////////////////////////////////////////////////////////////////////
 // Input
 
 b32 key_pressed(Key key) {
@@ -790,159 +711,6 @@ void ui_handle_scroll(ScrollState& s, v2 mouse) {
 //   return clicked;
 // }
 
-////////////////////////////////////////////////////////////////////////
-// @Profiler
-
-void profiler_init() {
-  ProfilerState& g = g_st->profiler;
-  for EachElement (i, g.prof_threads) {
-    ProfileThread& prof_thread = g.prof_threads[i];
-    String str = push_strf(g_st->arena, "profiler thread %u arena", i);
-    prof_thread.arena = arena_init_named(str);
-    prof_thread.gpa.init(prof_thread.arena);
-    prof_thread.events[0].init(prof_thread.gpa);
-    prof_thread.events[1].init(prof_thread.gpa);
-    for EachElement(j, g.frames_times) {
-      prof_thread.recorded_anchors[j].init(prof_thread.gpa);
-    }
-  }
-  g.win.root_scroll_state.scale = 1;
-  g.win.frames_scroll_state.scale = 1;
-  g.win.open = true;
-}
-
-ProfileBlock::ProfileBlock(String label_, String func_, ProfileType type) {
-  ProfilerState& g = g_st->profiler;
-  ProfileThread& prof_thread = profiler_get_prof_thread();
-  label = label_;
-  func = func_;
-  ProfileEvent event = {
-    .type = ProfileEventType_Push,
-    .prof_type = type,
-    .tsc = cpu_timer_now(),
-    .label = label_,
-    .func = func_,
-  };
-  prof_thread.events[g.current_buf].add(event);
-}
-
-ProfileBlock::~ProfileBlock() {
-  ProfilerState& g = g_st->profiler;
-  ProfileThread& prof_thread = profiler_get_prof_thread();
-  ProfileEvent event = {
-    .type = ProfileEventType_Pop,
-    .tsc = cpu_timer_now(),
-    .label = label,
-    .func = func,
-  };
-  prof_thread.events[g.current_buf].add(event);
-}
-
-void profiler_begin() {
-  ProfilerState& g = g_st->profiler;
-  ProfileFrameTime& frame_time = g.current_frame_time;
-  for EachElement(i, g.prof_threads) {
-    ProfileThread& prof_thread = g.prof_threads[i];
-    prof_thread.events[g.current_buf].clear();
-  }
-  frame_time.tsc_start = cpu_timer_now();
-}
-
-void profiler_end() {
-  Scratch scratch;
-  ProfilerState& g = g_st->profiler;
-
-  ProfileFrameTime& frame_time = g.current_frame_time;
-  frame_time.tsc_end = cpu_timer_now();
-  ProfileFrameTime& write_frame_time = g.frames_times[g_st->current_frame % ArrayCount(g.frames_times)];
-  write_frame_time.tsc_start = frame_time.tsc_start;
-  write_frame_time.tsc_end = frame_time.tsc_end;
-
-  u32 read_buf = atomic_u32_xor(&g.current_buf, 1);
-
-  for EachElement(j, g.prof_threads) {
-    ProfileThread& prof_thread = g.prof_threads[j];
-    Darray<ProfileAnchor> anchors(scratch);
-    u32 depth = 0;
-    Darray<u32> stack(scratch);
-
-    ///////////////////////////////////
-    // Process events
-    Loop (i, prof_thread.events[read_buf].count) {
-      ProfileEvent event = prof_thread.events[read_buf][i];
-      switch (event.type) {
-        case ProfileEventType_Push: {
-          ProfileAnchor anchor = {
-            .type = event.prof_type,
-            .label = event.label,
-            .func = event.func,
-            .tsc_start = event.tsc,
-            .depth = depth,
-          };
-          anchors.add(anchor);
-          stack.add(anchors.count-1);
-          ++depth;
-        } break;
-        case ProfileEventType_Pop: {
-          u32 anchor_idx = 0;
-          // In some time back block time was longer than frame
-          if (prof_thread.is_long_time_block) {
-            prof_thread.is_long_time_block = false;
-            ProfileAnchor old_anchor = prof_thread.long_block;
-            anchors.add(old_anchor);
-            stack.add(anchors.count-1);
-            ++depth;
-          }
-
-          anchor_idx = stack.pop();
-          ProfileAnchor& anchor = anchors[anchor_idx];
-          anchor.tsc_end = event.tsc;
-          u64 elapsed = anchor.tsc_end - anchor.tsc_start;
-          if (stack.count) {
-            u32 parent_idx = stack.back();
-            ProfileAnchor& anchor_parent = anchors[parent_idx];
-            anchor_parent.tsc_elapsed_exclusive -= elapsed;
-          }
-          anchor.tsc_elapsed_inclusive += elapsed;
-          anchor.tsc_elapsed_exclusive += elapsed;
-          anchor.was_poped = true;
-          --depth;
-        } break;
-      }
-    }
-
-    // We save long block time to handle it in next frames
-    if (stack.count) {
-      prof_thread.is_long_time_block = true;
-      prof_thread.long_block = anchors.back();
-    }
-
-    ///////////////////////////////////
-    // Record anchors
-    if (!g.paused) {
-      var& write_anchors = prof_thread.recorded_anchors[g_st->current_frame % ArrayCount(g.frames_times)];
-      write_anchors.reserve(anchors.count);
-      MemCopyArray(write_anchors.data, anchors.data, anchors.count);
-      write_anchors.count = anchors.count;
-    }
-  }
-}
-
-ProfileFrame profiler_get_prev_frame() {
-  ProfilerState& g = g_st->profiler;
-  ProfileThread& prof_thread = profiler_get_prof_thread();
-  ProfileFrame result = {
-    .frame_time = g.frames_times[(g_st->current_frame-1) % ArrayCount(g.frames_times)],
-    .anchors = prof_thread.recorded_anchors[(g_st->current_frame-1) % ArrayCount(g.frames_times)].slice(),
-  };
-  return result;
-}
-
-ProfileThread& profiler_get_prof_thread() {
-  ProfilerState& g = g_st->profiler;
-  return g.prof_threads[tctx_get_id()];
-}
-
 void profiler_draw_frame(Slice<ProfileAnchor> anchors, ProfileFrameTime frame_time, f32 width, v2 cursor_pos, ScrollState scroll_state) {
   Scratch scratch;
   v2 mouse = os_get_mouse_pos();
@@ -1029,15 +797,16 @@ void profiler_draw_frame(Slice<ProfileAnchor> anchors, ProfileFrameTime frame_ti
 
 void profiler_view() {
   Scratch scratch;
-  ProfilerState& g = g_st->profiler;
+  ProfilerState& g = profiler_get();
+  ImguiWindow& win = g_st->profile_win;
 
-  ProfileFrame prev_frame = profiler_get_prev_frame();
+  // Avg, min, max
+  ProfileFrame prev_frame = profiler_get_prev_frame(g_st->current_frame);
   var anchors = prev_frame.anchors;
   u64 cpu_freq = cpu_frequency();
   u64 tsc_start = prev_frame.frame_time.tsc_start;
   u64 tsc_end = prev_frame.frame_time.tsc_end;
   u64 tsc_elapsed = tsc_end - tsc_start;
-
   u64 tsc_elapsed_sum = 0;
   u64 tsc_elapsed_max = g.frames_times[0].tsc_end - g.frames_times[0].tsc_start;
   u64 tsc_elapsed_min = g.frames_times[0].tsc_end - g.frames_times[0].tsc_start;
@@ -1045,21 +814,20 @@ void profiler_view() {
     ProfileFrameTime frame = g.frames_times[i];
     u64 elapsed = frame.tsc_end - frame.tsc_start;
     tsc_elapsed_sum += elapsed;
-    if (tsc_elapsed_max < elapsed) tsc_elapsed_max = elapsed;
-    if (tsc_elapsed_min > elapsed) tsc_elapsed_min = elapsed;
+    tsc_elapsed_max = Max(tsc_elapsed_max, elapsed);
+    tsc_elapsed_min = Min(tsc_elapsed_min, elapsed);
   }
+  g.frame_avg_time = tsc_to_ms(tsc_elapsed_sum / 120);
+  g.frame_max_time = tsc_to_ms(tsc_elapsed_max);
+  g.frame_min_time = tsc_to_ms(tsc_elapsed_min);
 
-  g.frame_avg_time = (f64)(tsc_elapsed_sum / 120) / cpu_freq * 1000;
-  g.frame_max_time = (f64)tsc_elapsed_max/cpu_freq*1000;
-  g.frame_min_time = (f64)tsc_elapsed_min/cpu_freq*1000;
+  if (key_pressed(Key_F1)) win.open = !win.open;
 
-  if (key_pressed(Key_F1)) g.win.open = !g.win.open;
-
-  if (g.win.open) {
+  if (win.open) {
     if (key_pressed(Key_F2)) {
-      imgui_window_toggle_fullscreen(g.win);
+      imgui_window_toggle_fullscreen(win);
     }
-    imgui_window_apply_state(g.win);
+    imgui_window_apply_state(win);
 
     if (key_pressed(Key_1)) g.active_tab = ProfileTabActive_Root;
     if (key_pressed(Key_2)) g.active_tab = ProfileTabActive_Frames;
@@ -1067,9 +835,8 @@ void profiler_view() {
     if (key_pressed(Key_4)) g.active_tab = ProfileTabActive_Memory;
     if (key_pressed(Key_5)) g.paused = !g.paused;
 
-    if (ImGui::Begin("Profiler", null, g.win.flags)) {
-      imgui_window_track_state(g.win);
-
+    if (ImGui::Begin("Profiler", null, win.flags)) {
+      imgui_window_track_state(win);
       if (ImGui::BeginTabBar("MyTabBar")) {
         ImDrawList* draw = ImGui::GetWindowDrawList();
         v2 cursor_pos = ImGui::GetCursorScreenPos();
@@ -1078,19 +845,33 @@ void profiler_view() {
         v2 avail_size = ImGui::GetWindowSize();
         avail_size.x -= (cursor_pos - win_pos).x * 2;
 
+        ///////////////////////////////////
+        // Root
         if (ImGui::BeginTabItem("root"), g.active_tab == ProfileTabActive_Root) {
+          ScrollState& scroll_state = win.root_scroll_state;
           if (ImGui::IsWindowHovered()) {
-            ui_handle_scroll(g.win.root_scroll_state, mouse_pos);
+            ui_handle_scroll(scroll_state, mouse_pos);
           }
-          ImGui::Text("%.1ffps %.1fms CPU %.1fGhz", 1 / get_dt(), 1000 * (f64)tsc_elapsed / cpu_freq, (f64)cpu_freq / Billion(1));
+          ImGui::Text("%.1ffps %.1fms CPU %.1fGhz", 1 / get_dt(), tsc_to_ms(tsc_elapsed), (f64)cpu_freq / Billion(1));
           ImGui::Text("avg %.1fms, max %.1f, min %.1f", g.frame_avg_time, g.frame_max_time, g.frame_min_time);
-          cursor_pos = ImGui::GetCursorScreenPos();
-          if (prev_frame.frame_time.tsc_end > 0) {
-            profiler_draw_frame(prev_frame.anchors, prev_frame.frame_time, avail_size.x, cursor_pos, g.win.root_scroll_state);
+          f32 info_height = 40;
+          cursor_pos.y += info_height;
+          for EachElement(i, g.prof_threads) {
+            ProfileThread prof_thread = g.prof_threads[i];
+            var anchors = prof_thread.recorded_anchors[(g_st->current_frame-1) % ArrayCount(g.frames_times)].slice();
+            profiler_draw_frame(anchors, prev_frame.frame_time, avail_size.x, cursor_pos, scroll_state);
+            cursor_pos.y += 200;
           }
           ImGui::EndTabItem();
         };
+
+        ///////////////////////////////////
+        // Frames
         if (ImGui::BeginTabItem("frames"), g.active_tab == ProfileTabActive_Frames) {
+          ScrollState& scroll_state = win.frames_scroll_state;
+          if (ImGui::IsWindowHovered()) {
+            ui_handle_scroll(scroll_state, mouse_pos);
+          }
           f32 width_size = avail_size.x;
           Loop (i, ArrayCount(g.frames_times)) {
             ProfileFrameTime frame_time = g.frames_times[i];
@@ -1106,8 +887,8 @@ void profiler_view() {
               ImGui::Text("frame: %i", i);
               ImGui::EndTooltip();
               if (os_is_key_pressed(MouseKey_Left)) {
-                g.win.frames_scroll_state.offset.x = -width_size * i;
-                g.win.frames_scroll_state.scale = 1;
+                win.frames_scroll_state.offset.x = -width_size * i;
+                win.frames_scroll_state.scale = 1;
               }
             }
             ImU32 color = IM_COL32(50, 200, 50, 255);
@@ -1128,11 +909,6 @@ void profiler_view() {
             }
           }
           cursor_pos.y += 80;
-          ScrollState& scroll_state = g.win.frames_scroll_state;
-          if (ImGui::IsWindowHovered()) {
-            ui_handle_scroll(scroll_state, mouse_pos);
-          }
-
           ///////////////////////////////////
           // Draw lines and current rect
           {
@@ -1157,20 +933,41 @@ void profiler_view() {
             }
           }
 
+          // Draw thread names
+          f32 thread_height = 200;
+          f32 thread_height_offset = 0;
+          {
+            ImString str = push_strf(scratch, "Main thread");
+            v2 text_pos = (v2(0, -20) + cursor_pos) * scroll_state.scale + v2(0, scroll_state.offset.y);
+            draw->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), str);
+          }
+          {
+            Loop (i, THREAD_COUNT) {
+              thread_height_offset += thread_height;
+              ImString str = push_strf(scratch, "Worker %i", i);
+              v2 text_pos = (v2(0, thread_height_offset - 20) + cursor_pos) * scroll_state.scale + v2(0, + scroll_state.offset.y);
+              draw->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), str);
+            }
+            thread_height_offset = 0;
+          }
+
           ///////////////////////////////////
           // Draw graph per thread
           for EachElement(i, g.prof_threads) {
             f32 width_offset = 0;
             ProfileThread prof_thread = g.prof_threads[i];
             for EachElement(j, g.frames_times) {
-              profiler_draw_frame(prof_thread.recorded_anchors[j].slice(), g.frames_times[j], width_size, cursor_pos+v2(width_offset,0), g.win.frames_scroll_state);
+              profiler_draw_frame(prof_thread.recorded_anchors[j].slice(), g.frames_times[j], width_size, cursor_pos+v2(width_offset, thread_height_offset), scroll_state);
               width_offset += width_size;
             }
             width_offset = 0;
-            cursor_pos.y += 200;
+            thread_height_offset += thread_height;
           }
           ImGui::EndTabItem();
         }
+
+        ///////////////////////////////////
+        // Time
         if (ImGui::BeginTabItem("time"), g.active_tab == ProfileTabActive_Time) {
           var sorted_anchors = slice_clone(scratch, anchors);
           sort_insert(sorted_anchors, [](ProfileAnchor a, ProfileAnchor b) { return a.tsc_elapsed_exclusive > b.tsc_elapsed_exclusive; });
@@ -1203,6 +1000,9 @@ void profiler_view() {
           }
           ImGui::EndTabItem();
         }
+
+        ///////////////////////////////////
+        // Memory
         if (ImGui::BeginTabItem("memory"),  g.active_tab == ProfileTabActive_Memory) {
           f64 mem_usage = 0;
 
@@ -1446,34 +1246,44 @@ void watch_update() {
 
 void common_init() {
   GlobalState& g = *g_st;
-  global_allocator_init();
-  test();
-  os_gfx_init();
   estimate_cpu_frequency();
+  global_allocator_init();
+  os_gfx_init();
+  profiler_init(g.arena);
+  profiler_launch_begin();
+  {
+    TimeBlock("init");
+    test();
 
-  g.gpa.init(g.arena);
-  g.transforms = push_array(g.arena, Transform, MaxEntities);
-  g.static_transforms = push_array(g.arena, Transform, MaxStaticEntities);
-  g.asset_path = push_strf(g.arena, "%s/%s", os_get_current_directory(), String("../assets"));
-  g.shader_dir = push_str_cat(g.arena, g.asset_path, "/shaders");
-  g.shader_compiled_dir = push_str_cat(g.arena, g.shader_dir, "/compiled");
-  g.models_dir = push_str_cat(g.arena, g.asset_path, "/models");
-  g.textures_dir = push_str_cat(g.arena, g.asset_path, "/textures");
-  g.str_to_texture.init(g.gpa);
-  g.str_to_mesh.init(g.gpa);
-  g.str_to_material.init(g.gpa);
+    g.gpa.init(g.arena);
+    g.transforms = push_array(g.arena, Transform, MaxEntities);
+    g.static_transforms = push_array(g.arena, Transform, MaxStaticEntities);
+    g.asset_path = push_strf(g.arena, "%s/%s", os_get_current_directory(), String("../assets"));
+    g.shader_dir = push_str_cat(g.arena, g.asset_path, "/shaders");
+    g.shader_compiled_dir = push_str_cat(g.arena, g.shader_dir, "/compiled");
+    g.models_dir = push_str_cat(g.arena, g.asset_path, "/models");
+    g.textures_dir = push_str_cat(g.arena, g.asset_path, "/textures");
+    g.str_to_texture.init(g.gpa);
+    g.str_to_mesh.init(g.gpa);
+    g.str_to_material.init(g.gpa);
 
-  thread_pool_init(THREAD_COUNT);
-  g.watch.arena = g.arena;
-  watch_directory_add(g.shader_dir, WatchOp_RecompileShader);
-  watch_directory_add(g.shader_compiled_dir, WatchOp_ShaderReload);
+    g.watch.arena = g.arena;
+    watch_directory_add(g.shader_dir, WatchOp_RecompileShader);
+    watch_directory_add(g.shader_compiled_dir, WatchOp_ShaderReload);
 
-  profiler_init();
-  g.vk_st = vk_init();
+    g.profile_win.root_scroll_state.scale = 1;
+    g.profile_win.frames_scroll_state.scale = 1;
+    g.profile_win.open = true;
+
+    thread_pool_init(THREAD_COUNT);
+
+    g.vk_st = vk_init();
 #if DEAR_IMGUI
-  vk_imgui_init();
+    vk_imgui_init();
 #endif
-  game_init();
+    game_init();
+  }
+  profiler_launch_end();
 }
 
 void bar(f32 time) {
@@ -1507,11 +1317,13 @@ void common_update() {
   // }
   Task task = {
     .func = [](void* ptr) {
-      os_sleep_ms(rand_u32()%100);
+      TimeBlock("sleep job");
+      // os_sleep_ms(rand_u32()%100);
+      os_sleep_ms(rand_u32()%10);
       // os_sleep_ms(32);
     }
   };
-  Loop (i, 3) {
+  Loop (i, 2) {
     task_queue_push(task);
   }
   // thread_wait_for();
@@ -1542,40 +1354,37 @@ if (data->ctx == null) {
 
   u64 target_fps = Billion(1) / 60;
   u64 last_time = os_now_ns();
-  Timer timer = timer_init(1);
 
   while (!os_window_should_close()) {
     if (g_st->should_hotreload) {
       goto hotreload;
     }
 
-    profiler_begin();
-    {TimeBlock("frame");
-    os_pump_messages();
-    u64 start_time = os_now_ns();
-    g.dt = f64(start_time - last_time) / Billion(1);
-    g.time += g.dt;
-    last_time = start_time;
-    vk_begin_draw_frame();
-    // ui_begin();
-    common_update();
-    game_update();
-    // ui_end();
-    vk_end_draw_frame();
-    os_input_update();
-    watch_update();
+    profiler_begin(g.current_frame);
+    {
+      TimeBlock("frame");
+      os_pump_messages();
+      u64 start_time = os_now_ns();
+      g.dt = f64(start_time - last_time) / Billion(1);
+      g.time += g.dt;
+      last_time = start_time;
+      vk_begin_draw_frame();
+      // ui_begin();
+      common_update();
+      game_update();
+      // ui_end();
+      vk_end_draw_frame();
+      os_input_update();
+      watch_update();
 
-    u64 frame_duration = os_now_ns() - start_time;
-    if (frame_duration < target_fps) {
-      u64 sleep_time = target_fps - frame_duration;
-      TimeBlock("Sleep", ProfileType_Sleep);
-      os_sleep_ms(sleep_time / Million(1));
+      u64 frame_duration = os_now_ns() - start_time;
+      if (frame_duration < target_fps) {
+        u64 sleep_time = target_fps - frame_duration;
+        TimeBlock("main sleep", ProfileType_Sleep);
+        os_sleep_ms(sleep_time / Million(1));
+      }
     }
-    if (timer_tick(timer)) {
-      Info("Frame rate: %f, %f fps", g.dt, 1/g.dt);
-    }
-    }
-    profiler_end();
+    profiler_end(g.current_frame);
     ++g.current_frame;
   }
 
@@ -1585,4 +1394,5 @@ if (data->ctx == null) {
   os_exit(0);
 
   hotreload:
+  thread_wait_for();
 }

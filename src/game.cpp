@@ -465,6 +465,7 @@ void scene_update() {
 }
 
 void game_init() {
+  TimeFunction;
   GameState& g = g_st->game;
   Scratch scratch;
   g.arena = arena_init_named("game arena");
