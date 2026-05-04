@@ -2,17 +2,47 @@
 #include "common.h"
 #include "vulkan/vulkan_core.h"
 
-const u32 MaxMaterials = KB(1);
-const u32 MaxLights    = KB(1);
-const u32 MaxLines     = KB(1);
-const u32 MaxMeshes    = KB(1);
-const u32 MaxShaders   = KB(1);
-const u32 MaxTextures  = KB(1);
-const u32 MaxDrawCalls = KB(1);
+typedef u32 VK_BufferUsageFlags;
+enum {
+  VK_BufferUsageFlag_Vert = Bit(0),
+  VK_BufferUsageFlag_Index = Bit(1),
+  VK_BufferUsageFlag_Dst = Bit(2),
+  VK_BufferUsageFlag_Src = Bit(3),
+  VK_BufferUsageFlag_Storage = Bit(4),
+  VK_BufferUsageFlag_Indirect = VK_BufferUsageFlag_Storage | Bit(5),
+};
+
+enum VK_MemType {
+  VK_MemType_Gpu,
+  VK_MemType_Cpu,
+};
+
+#if BUILD_DEBUG
+  #define VK_CHECK(expr)                     \
+    {                                        \
+      if (expr != VK_SUCCESS) {              \
+        Error("%s", vk_result_string(expr)); \
+        InvalidPath;                         \
+      }                                      \
+    }
+#else
+  #define VK_CHECK(expr) expr
+#endif
+
+#define vkdevice vk->device.logical_device
+
+const u32 MaxMaterials  = KB(1);
+const u32 MaxLights     = KB(1);
+const u32 MaxLines      = KB(1);
+const u32 MaxMeshes     = KB(1);
+const u32 MaxShaders    = KB(1);
+const u32 MaxTextures   = KB(1);
+const u32 MaxDrawCalls  = KB(1);
 const u32 MaxDebugLines = KB(1);
 
-u64 hash(Vertex x) { return hash_memory(&x, sizeof(x)); }
-b32 equal(Vertex a, Vertex b) { return MemMatchStruct(&a, &b); }
+struct VK_KeyToShaderPipeline { String name; ShaderState state; };
+intern u64 hash(VK_KeyToShaderPipeline x) { return hash(x.name) + hash_memory(&x.state, sizeof(ShaderState)); }
+intern b32 equal(VK_KeyToShaderPipeline a, VK_KeyToShaderPipeline b) { return equal(a.name, b.name) & MemMatchStruct(&a.state, &b.state); }
 
 struct GpuMaterial {
   u32 pipeline_idx;
@@ -72,72 +102,17 @@ struct GlobalStateGPU {
   u32 entity_indices[MaxEntities+MaxStaticEntities];
 };
 
-///////////////////////////////////
-
-struct VK_KeyToShaderPipeline {
-  String name;
-  ShaderState state;
-};
-
-intern u64 hash(VK_KeyToShaderPipeline x) {
-  return hash(x.name) + hash_memory(&x.state, sizeof(ShaderState));
-}
-
-intern b32 equal(VK_KeyToShaderPipeline a, VK_KeyToShaderPipeline b) {
-  return equal(a.name, b.name) & MemMatchStruct(&a.state, &b.state);
-}
-
-enum VK_RenderpassType {
-  RenderpassType_World,
-  RenderpassType_UI,
-  RenderpassType_Screen,
-};
-
-struct VK_PushConstant {
-  u32 drawcall_offset;
-};
-
 template<typename T>
 struct VK_MeshBatch {
   Handle<GpuMesh> mesh_handle;
   Darray<Handle<T>> entities;
 };
 
-VK_MeshBatch<Entity> vk_mesh_batch_init(Allocator alloc) {
-  VK_MeshBatch<Entity> res = {
-    .entities{alloc},
-  };
-  return res;
-}
-
-VK_MeshBatch<StaticEntity> vk_mesh_batch_static_init(Allocator alloc) {
-  VK_MeshBatch<StaticEntity> res = {
-    .entities{alloc},
-  };
-  return res;
-}
-
 template<typename T>
 struct VK_ShaderBatch {
   Darray<VK_MeshBatch<T>> mesh_batches;
   Map<u32, u32> mesh_to_batch;
 };
-
-VK_ShaderBatch<Entity> vk_shader_batch_init(Allocator alloc) {
-  VK_ShaderBatch<Entity> res = {
-    .mesh_batches{alloc},
-    .mesh_to_batch{alloc},
-  };
-  return res;
-}
-
-VK_ShaderBatch<StaticEntity> vk_shader_batch_static_init(Allocator alloc) {
-  VK_ShaderBatch<StaticEntity> res = {
-    .mesh_batches{alloc},
-    .mesh_to_batch{alloc},
-  };
-  return res;
-}
 
 struct VK_RenderBatch {
   VK_ShaderBatch<Entity> batch;
@@ -150,15 +125,6 @@ struct VK_RenderBatch {
   VK_ShaderBatch<StaticEntity> static_batch_indexed;
 };
 
-VK_RenderBatch vk_render_batch_init(Allocator alloc) {
-  VK_RenderBatch res = {};
-  res.batch = vk_shader_batch_init(alloc);
-  res.batch_indexed = vk_shader_batch_init(alloc);
-  res.static_batch = vk_shader_batch_static_init(alloc);
-  res.static_batch_indexed = vk_shader_batch_static_init(alloc);
-  return res;
-}
-
 struct VK_RenderEntity {
   u32 entity_idx_in_array;
   u32 pipeline;
@@ -168,28 +134,27 @@ struct VK_RenderEntity {
 #endif
 };
 
-///////////////////////////////////
-// Vulkan
+enum VK_RenderpassType {
+  VK_RenderpassType_World,
+  VK_RenderpassType_UI,
+  VK_RenderpassType_Screen,
+};
 
-#if BUILD_DEBUG
-  #define VK_CHECK(expr)                     \
-    {                                        \
-      if (expr != VK_SUCCESS) {              \
-        Error("%s", vk_result_string(expr)); \
-        InvalidPath;                         \
-      }                                      \
-    }
-#else
-  #define VK_CHECK(expr) expr
-#endif
+struct VK_PushConstant {
+  u32 drawcall_offset;
+};
 
-#define vkdevice vk->device.logical_device
+struct VK_Memory {
+  VkDeviceMemory h;
+  u8* mapped_mem;
+  u64 pos;
+  u64 cap;
+};
 
 struct VK_Buffer {
-  VkBuffer handle;
-  VkDeviceMemory memory;
-  u8* mapped_memory;
-  u64 size;
+  VkBuffer h;
+  u8* mapped_mem;
+  u64 pos;
   u64 cap;
 };
 
@@ -210,23 +175,21 @@ struct VK_ImageInfo {
 };
 
 struct VK_Image {
-  VkImage handle;
+  VkImage h;
   VkImageView view;
   VK_ImageInfo info;
   VkDeviceMemory memory;
 };
 
 struct VK_Mesh {
-  u64 vert_count;
-  VkDeviceSize vert_offset;
-  GpuMemHandler vert_memory;
-  u64 index_count;
-  VkDeviceSize index_offset;
-  GpuMemHandler index_memory;
+  u32 vert_count;
+  u64 vert_offset;
+  u32 index_count;
+  u64 index_offset;
 };
 
 struct VK_Swapchain {
-  VkSwapchainKHR handle;
+  VkSwapchainKHR h;
   VkSurfaceFormatKHR image_format;  
   VkPresentModeKHR present_mode;
   VK_Image images[4];
@@ -264,6 +227,12 @@ struct VK_ShaderModule {
   VkPipelineShaderStageCreateInfo stages[2];
 };
 
+struct VK_ShaderModuleEntry {
+  VK_ShaderModule module;
+  Darray<u32> track_pipelines;
+  Darray<u32> track_shader_states;
+};
+
 struct VK_SyncObj {
   VkSemaphore* image_available_semaphores;
   VkSemaphore* render_complete_semaphores;
@@ -278,20 +247,6 @@ struct VK_DrawCallInfo {
   };
   u32 entities_offset_id;
 };
-
-struct VK_EntryModule {
-  VK_ShaderModule module;
-  Darray<u32> track_pipelines;
-  Darray<u32> track_shader_states;
-};
-
-VK_EntryModule vk_module_entry_init(Allocator alloc) {
-  VK_EntryModule res = {
-    .track_pipelines{alloc},
-    .track_shader_states{alloc},
-  };
-  return res;
-}
 
 struct VK_State {
   Arena arena;
@@ -316,6 +271,8 @@ struct VK_State {
   f32 scale;
   f32 old_scale;
   
+  VK_Memory gpu_mem;
+  VK_Memory cpu_mem;
   VK_Buffer vert_buffer;
   VK_Buffer index_buffer;
   VK_Buffer stage_buffer;
@@ -371,7 +328,7 @@ struct VK_State {
   Darray<u32> draw_vert_offsets;
 
   Darray<VkPipeline> pipelines;
-  Darray<VK_EntryModule> modules;
+  Darray<VK_ShaderModuleEntry> modules;
   Darray<VK_RenderBatch> batches;
   Darray<GpuMaterial> materials;
   
@@ -504,7 +461,42 @@ struct VK_State {
 };
 
 global VK_State* vk;
+
 void vk_hotreload(void* ctx) { vk = (VK_State*)ctx; }
+
+template<typename T>
+VK_MeshBatch<T> vk_mesh_batch_make(Allocator alloc) {
+  VK_MeshBatch<T> res = {
+    .entities{alloc},
+  };
+  return res;
+}
+
+template<typename T>
+VK_ShaderBatch<T> vk_shader_batch_make(Allocator alloc) {
+  VK_ShaderBatch<T> res = {
+    .mesh_batches{alloc},
+    .mesh_to_batch{alloc},
+  };
+  return res;
+}
+
+VK_RenderBatch vk_render_batch_make(Allocator alloc) {
+  VK_RenderBatch res = {};
+  res.batch = vk_shader_batch_make<Entity>(alloc);
+  res.batch_indexed = vk_shader_batch_make<Entity>(alloc);
+  res.static_batch = vk_shader_batch_make<StaticEntity>(alloc);
+  res.static_batch_indexed = vk_shader_batch_make<StaticEntity>(alloc);
+  return res;
+}
+
+VK_ShaderModuleEntry vk_shader_module_entry_make(Allocator alloc) {
+  VK_ShaderModuleEntry res = {
+    .track_pipelines{alloc},
+    .track_shader_states{alloc},
+  };
+  return res;
+}
 
 intern String vk_result_string(VkResult result) {
   switch (result) {
@@ -672,8 +664,7 @@ intern u32 vk_find_memory_idx(u32 type_filter, u32 property_flags) {
       break;
     }
   }
-  AssertMsg(idx != -1, "Unable to find suitable memory type");
-  // if (idx == -1) Assert(!"Unable to find sutable memory type");
+  Assert(idx != -1);
   return idx;
 }
 
@@ -744,80 +735,101 @@ intern void vk_cmd_end_free(VkCommandBuffer cmd) {
 ////////////////////////////////////////////////////////////////////////
 // @Buffer
 
-intern VK_Buffer vk_buffer_create(u64 size, u32 usage, u32 memory_property_flags) {
+intern VK_Memory vk_mem_alloc(VK_MemType type, u64 size) {
+  u32 mem_idx = 0;
+  b32 map = false;
+  switch (type) {
+    case VK_MemType_Gpu: {
+      mem_idx = 0; 
+    } break;
+    case VK_MemType_Cpu: {
+      mem_idx = 1; 
+      map = true;
+    } break;
+  }
+  VkMemoryAllocateInfo alloc_info = {
+    .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+    .allocationSize = size,
+    .memoryTypeIndex = mem_idx,
+  };
+  VK_Memory res = {.cap = size};
+  VK_CHECK(vk->AllocateMemory(vkdevice, &alloc_info, vk->allocator, &res.h));
+  if (map) {
+    VK_CHECK(vk->MapMemory(vkdevice, res.h, 0, size, 0, (void**)&res.mapped_mem));
+  }
+  return res;
+}
+
+intern VK_Buffer vk_buffer_make(u64 size, VK_BufferUsageFlags usage, VK_MemType mem_type) {
+  VkBufferUsageFlags buf_usage_flags = 0;
+  if (FlagHas(usage, VK_BufferUsageFlag_Vert)) buf_usage_flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+  if (FlagHas(usage, VK_BufferUsageFlag_Index)) buf_usage_flags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+  if (FlagHas(usage, VK_BufferUsageFlag_Dst)) buf_usage_flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+  if (FlagHas(usage, VK_BufferUsageFlag_Src)) buf_usage_flags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+  if (FlagHas(usage, VK_BufferUsageFlag_Storage)) buf_usage_flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+  if (FlagHas(usage, VK_BufferUsageFlag_Indirect)) buf_usage_flags |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+
   VkBufferCreateInfo buffer_create_info = {
     .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
     .size = size,
-    .usage = usage,
+    .usage = buf_usage_flags,
     .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
   };
-  VK_Buffer buffer = {
-    .cap = size,
-  };
-  VK_CHECK(vk->CreateBuffer(vkdevice, &buffer_create_info, vk->allocator, &buffer.handle));
-  VkMemoryRequirements requirements;
-  vk->GetBufferMemoryRequirements(vkdevice, buffer.handle, &requirements);
-  u32 memory_index = vk_find_memory_idx(requirements.memoryTypeBits, memory_property_flags);
-  VkMemoryAllocateInfo allocate_info = {
-    .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-    .allocationSize = requirements.size,
-    .memoryTypeIndex = memory_index,
-  };
-  VK_CHECK(vk->AllocateMemory(vkdevice, &allocate_info, vk->allocator, &buffer.memory));
-  VK_CHECK(vk->BindBufferMemory(vkdevice, buffer.handle, buffer.memory, 0));
-  return buffer;
+  VK_Buffer res = {.cap = size};
+  VK_CHECK(vk->CreateBuffer(vkdevice, &buffer_create_info, vk->allocator, &res.h));
+
+  // u32 mem_prop_flags = 0;
+  // if (mem_type == VK_MemType_Gpu) mem_prop_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  // if (mem_type == VK_MemType_Cpu) mem_prop_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+  // VkMemoryRequirements requirements;
+  // vk->GetBufferMemoryRequirements(vkdevice, res.h, &requirements);
+  // u32 mem_idx = vk_find_memory_idx(requirements.memoryTypeBits, mem_prop_flags);
+  // VkMemoryAllocateInfo alloc_info = {
+  //   .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+  //   .allocationSize = requirements.size,
+  //   .memoryTypeIndex = mem_idx,
+  // };
+  // UnusedVariable(alloc_info);
+
+  VK_Memory* mem = null;
+  u64 offset = 0;
+  switch (mem_type) {
+    case VK_MemType_Gpu: {
+      mem = &vk->gpu_mem;
+      offset = mem->pos;
+      vk->gpu_mem.pos += size;
+    } break;
+    case VK_MemType_Cpu: {
+      mem = &vk->cpu_mem;
+      offset = mem->pos;
+      vk->cpu_mem.pos += size;
+    } break;
+  }
+  VK_CHECK(vk->BindBufferMemory(vkdevice, res.h, mem->h, offset));
+  res.mapped_mem = Offset(mem->mapped_mem, offset);
+  return res;
 }
 
 intern void vk_buffer_destroy(VK_Buffer buffer) {
-  vk->FreeMemory(vkdevice, buffer.memory, vk->allocator);
-  vk->DestroyBuffer(vkdevice, buffer.handle, vk->allocator);
 }
 
 intern void vk_buffer_map_memory(VK_Buffer& buffer, u64 offset, u64 size) {
-  VK_CHECK(vk->MapMemory(vkdevice, buffer.memory, offset, size, 0, (void**)&buffer.mapped_memory));
 }
 
 intern void vk_buffer_unmap_memory(VK_Buffer buffer) {
-  vk->UnmapMemory(vkdevice, buffer.memory);
 }
 
-intern void vk_buffer_upload_to_gpu(VK_Buffer buffer, BufferRegion range, void* data) {
-  MemCopy(vk->stage_buffer.mapped_memory, data, range.size);
+intern void vk_buffer_upload(VK_Buffer buffer, BufferRegion range, void* data) {
+  MemCopy(vk->stage_buffer.mapped_mem, data, range.size);
   vk_cmd_begin(vk->upload_cmd);
   VkBufferCopy copy_region = {
     .srcOffset = 0,
     .dstOffset = range.offset,
     .size = range.size,
   };
-  vk->CmdCopyBuffer(vk->upload_cmd, vk->stage_buffer.handle, buffer.handle, 1, &copy_region);
+  vk->CmdCopyBuffer(vk->upload_cmd, vk->stage_buffer.h, buffer.h, 1, &copy_region);
   vk_cmd_end_submit(vk->upload_cmd);
 }
-
-// intern void vk_buffer_descriptor_update(VK_SubBuffer buf, u32 binding) {
-//   Range range = buf.range;
-//   VkDescriptorBufferInfo buffer_info = {
-//     .buffer = vk->storage_buffer.handle,
-//     .offset = range.offset,
-//     .range = range.size,
-//   };
-//   VkWriteDescriptorSet ubo_descriptor = {
-//     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-//     .dstSet = vk->descriptor_sets,
-//     .dstBinding = binding,
-//     .dstArrayElement = 0,
-//     .descriptorCount = 1,
-//     .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-//     .pBufferInfo = &buffer_info,
-//   };
-//   VkWriteDescriptorSet descriptors[] = {ubo_descriptor};
-//   vk->UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
-// }
-
-// intern void vk_buffer_alloc(VK_SubBuffer* buf, u32 binding, u64 size, u64 align) {
-//   GpuMemHandler handler = vk->gpu_alloc.alloc(size, align);
-//   buf->mem = handler;
-//   buf->range = {vk->gpu_alloc.get(handler), size};
-// }
 
 ////////////////////////////////////////////////////////////////////////
 // @Pipeline
@@ -1270,7 +1282,7 @@ intern VkPipeline vk_shader_pipeline_create_(VK_ShaderModule module, ShaderState
 
 void vk_shader_reload(String name) {
   u32* module_idx = vk->shader_to_module.get(name);
-  VK_EntryModule& entry = vk->modules[*module_idx];
+  VK_ShaderModuleEntry& entry = vk->modules[*module_idx];
   entry.module = vk_shader_module_create(name);
   Loop (i, entry.track_pipelines.count) {
     u32 pipeline_idx = entry.track_pipelines[i];
@@ -1425,7 +1437,7 @@ intern void vk_descriptor_init() {
     u64 materials_offset = offset_push_array(offset, MaterialGPU, MaxMaterials);
     // Global
     VkDescriptorBufferInfo global_state_buffer_info = {
-      .buffer = vk->storage_buffer.handle,
+      .buffer = vk->storage_buffer.h,
       .offset = 0,
       .range = sizeof(GlobalStateGPU),
     };
@@ -1440,7 +1452,7 @@ intern void vk_descriptor_init() {
     };
     // Entity
     VkDescriptorBufferInfo entity_buffer_info = {
-      .buffer = vk->storage_buffer.handle,
+      .buffer = vk->storage_buffer.h,
       .offset = entities_offset,
       .range = sizeof(EntityGPU) * (MaxEntities + MaxStaticEntities),
     };
@@ -1455,7 +1467,7 @@ intern void vk_descriptor_init() {
     };
     // Material
     VkDescriptorBufferInfo material_buffer_info = {
-      .buffer = vk->storage_buffer.handle,
+      .buffer = vk->storage_buffer.h,
       .offset = materials_offset,
       .range = sizeof(MaterialGPU) * MaxMaterials,
     };
@@ -1470,7 +1482,7 @@ intern void vk_descriptor_init() {
     };
     // Indirect draw
     VkDescriptorBufferInfo indirect_draw_buffer_info = {
-      .buffer = vk->indirect_draw_buffer.handle,
+      .buffer = vk->indirect_draw_buffer.h,
       .offset = 0,
       .range = VK_WHOLE_SIZE,
     };
@@ -1489,13 +1501,13 @@ intern void vk_descriptor_init() {
 
   // Set pointers to shader data
   {
-    void* offset = vk->storage_buffer.mapped_memory;
+    void* offset = vk->storage_buffer.mapped_mem;
     vk->gpu_global_shader_st = offset_mem_push_struct(offset, GlobalStateGPU);
     vk->gpu_entities_indexes = vk->gpu_global_shader_st->entity_indices;
     vk->gpu_entities = offset_mem_push_array(offset, EntityGPU, MaxEntities+MaxStaticEntities);
     vk->gpu_materials = offset_mem_push_array(offset, MaterialGPU, MaxMaterials);
 
-    vk->gpu_draw_call_infos = (VK_DrawCallInfo*)vk->indirect_draw_buffer.mapped_memory;
+    vk->gpu_draw_call_infos = (VK_DrawCallInfo*)vk->indirect_draw_buffer.mapped_mem;
   }
   
 }
@@ -1586,7 +1598,7 @@ intern VK_Image vk_image_create(VK_ImageInfo info) {
   VK_CHECK(vk->BindImageMemory(vkdevice, handle, memory, 0));
   VkImageView view = vk_image_view_create(handle, info);
   VK_Image result = {
-    .handle = handle,
+    .h = handle,
     .memory = memory,
     .view = view,
     .info = info,
@@ -1601,8 +1613,8 @@ intern void vk_image_destroy(VK_Image image) {
   if (image.memory) {
     vk->FreeMemory(vkdevice, image.memory, vk->allocator);
   }
-  if (image.handle) {
-    vk->DestroyImage(vkdevice, image.handle, vk->allocator);
+  if (image.h) {
+    vk->DestroyImage(vkdevice, image.h, vk->allocator);
   }
 }
 
@@ -1640,7 +1652,7 @@ intern void vk_image_layout_transition(VkCommandBuffer cmd, VK_Image image, VkIm
     .oldLayout = old_layout,
     .newLayout = new_layout,
     .srcQueueFamilyIndex = vk->device.graphics_queue_index,
-    .image = image.handle,
+    .image = image.h,
     .subresourceRange = {
       .aspectMask = aspect_mask,
       .baseMipLevel = 0,
@@ -1667,7 +1679,7 @@ intern void vk_image_upload_to_gpu(VkCommandBuffer cmd, VK_Image image) {
     },
     .imageExtent = { image.info.width, image.info.height, 1 },
   };
-  vk->CmdCopyBufferToImage(cmd, vk->stage_buffer.handle, image.handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+  vk->CmdCopyBufferToImage(cmd, vk->stage_buffer.h, image.h, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 }
 
 intern void vk_texture_init() {
@@ -1713,7 +1725,7 @@ intern void vk_texture_generate_mipmaps(VK_Image image) {
   VkImageMemoryBarrier barrier = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
     .srcQueueFamilyIndex = vk->device.graphics_queue_index,
-    .image = image.handle,
+    .image = image.h,
     .subresourceRange = {
       .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
       .levelCount = 1,
@@ -1747,7 +1759,7 @@ intern void vk_texture_generate_mipmaps(VK_Image image) {
         .layerCount = 1,
       },
     };
-    vk->CmdBlitImage(cmd, image.handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image.handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+    vk->CmdBlitImage(cmd, image.h, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image.h, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
 
     barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -1770,7 +1782,7 @@ intern void vk_texture_generate_mipmaps(VK_Image image) {
 
 Handle<GpuTexture> vk_texture_load(Texture texture) {
   u64 size = texture.width * texture.height * 4;
-  MemCopy(vk->stage_buffer.mapped_memory, texture.data, size);
+  MemCopy(vk->stage_buffer.mapped_mem, texture.data, size);
   VK_ImageInfo image_info = vk_image_info_default(texture.width, texture.height);
   image_info.miplevels_count = Floor(Log2(Max(image_info.width, image_info.height))) + 1;
   image_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -1879,16 +1891,16 @@ Handle<GpuMaterial> vk_material_load(Material material) {
     if (!module_idx) {
       VK_ShaderModule module = vk_shader_module_create(material.shader.name);
       module_idx = g.shader_to_module.add(material.shader.name, g.modules.count);
-      VK_EntryModule entry = vk_module_entry_init(g.gpa);
+      VK_ShaderModuleEntry entry = vk_shader_module_entry_make(g.gpa);
       entry.module = module;
       g.modules.add(entry);
     }
     VkPipeline pipeline = vk_shader_pipeline_create_(g.modules[*module_idx].module, material.shader.state);
     pipeline_idx = g.shader_to_pipeline.add(key, g.pipelines.count);
     g.pipelines.add(pipeline);
-    g.batches.add(vk_render_batch_init(g.gpa));
+    g.batches.add(vk_render_batch_make(g.gpa));
 
-    VK_EntryModule& entry = g.modules[*module_idx];
+    VK_ShaderModuleEntry& entry = g.modules[*module_idx];
     entry.track_pipelines.add(*pipeline_idx);
     entry.track_shader_states.add(g.materials.count);
   }
@@ -1915,7 +1927,7 @@ Handle<GpuCubemap> vk_cubemap_load(Texture* textures) {
   u32 height = textures->height;
   u64 size = width * height * 4;
   Loop (i, 6) {
-    MemCopy(Offset(vk->stage_buffer.mapped_memory, size * i), textures[i].data, size);
+    MemCopy(Offset(vk->stage_buffer.mapped_mem, size * i), textures[i].data, size);
   }
   VK_ImageInfo image_info = vk_image_info_default(width, height);
   image_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -2311,16 +2323,16 @@ intern void vk_swapchain_create(b32 reuse) {
     .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
     .presentMode = vk->swapchain.present_mode,
     .clipped = VK_TRUE,
-    .oldSwapchain = reuse ? vk->swapchain.handle : null,
+    .oldSwapchain = reuse ? vk->swapchain.h : null,
   };
-  VK_CHECK(vk->CreateSwapchainKHR(vkdevice, &swapchain_create_info, vk->allocator, &vk->swapchain.handle));
+  VK_CHECK(vk->CreateSwapchainKHR(vkdevice, &swapchain_create_info, vk->allocator, &vk->swapchain.h));
   u32 image_count = vk->images_in_flight;
 
   VkImage images[4];
-  VK_CHECK(vk->GetSwapchainImagesKHR(vkdevice, vk->swapchain.handle, &image_count, images));
+  VK_CHECK(vk->GetSwapchainImagesKHR(vkdevice, vk->swapchain.h, &image_count, images));
   Loop (i, image_count) {
     vk->swapchain.images[i] = {
-      .handle = images[i],
+      .h = images[i],
       .info = {
         .miplevels_count = 1,
         .array_layers_count = 1,
@@ -2328,7 +2340,7 @@ intern void vk_swapchain_create(b32 reuse) {
     };
     VkImageViewCreateInfo view_create_info = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-      .image = vk->swapchain.images[i].handle,
+      .image = vk->swapchain.images[i].h,
       .viewType = VK_IMAGE_VIEW_TYPE_2D,
       .format = vk->swapchain.image_format.format,
       .subresourceRange = {
@@ -2396,7 +2408,7 @@ intern void vk_swapchain_destroy(VK_Swapchain swapchain) {
   Loop (i, vk->images_in_flight) {
     vk->DestroyImageView(vkdevice, swapchain.images[i].view, vk->allocator);
   }
-  vk->DestroySwapchainKHR(vkdevice, swapchain.handle, vk->allocator);
+  vk->DestroySwapchainKHR(vkdevice, swapchain.h, vk->allocator);
 }
 
 intern void vk_swapchain_recreate() {
@@ -2409,7 +2421,7 @@ intern void vk_swapchain_recreate() {
 intern u32 vk_swapchain_acquire_next_image_index(VkSemaphore image_available_semaphore) {
   u32 image_index;
 #if GFX_X11 // NOTE: on x11 errors
-  VkResult res = vk->AcquireNextImageKHR(vkdevice, vk->swapchain.handle, U64_MAX, image_available_semaphore, null, &image_index);
+  VkResult res = vk->AcquireNextImageKHR(vkdevice, vk->swapchain.h, U64_MAX, image_available_semaphore, null, &image_index);
   if (res != VK_SUCCESS) {
     // Warn("%s", vk_result_string(res));
   }
@@ -2425,7 +2437,7 @@ intern void vk_swapchain_present(VkSemaphore render_complete_semaphore, u32 pres
     .waitSemaphoreCount = 1,
     .pWaitSemaphores = &render_complete_semaphore,
     .swapchainCount = 1,
-    .pSwapchains = &vk->swapchain.handle,
+    .pSwapchains = &vk->swapchain.h,
     .pImageIndices = &present_image_index,
   };
 #if GFX_X11 // NOTE: on x11 errors
@@ -2445,18 +2457,18 @@ intern void vk_swapchain_present(VkSemaphore render_complete_semaphore, u32 pres
 Handle<GpuMesh> vk_mesh_load(Mesh mesh) {
   VK_Buffer& vert_buff = vk->vert_buffer;
   u64 vert_size = mesh.vert_count*sizeof(Vertex);
-  u64 vert_offset = vert_buff.size;
-  vert_buff.size += vert_size;
+  u64 vert_offset = vert_buff.pos;
+  vert_buff.pos += vert_size;
   BufferRegion vert_range = { .offset = vert_offset, .size = vert_size };
-  vk_buffer_upload_to_gpu(vk->vert_buffer, vert_range, mesh.vertices);
+  vk_buffer_upload(vk->vert_buffer, vert_range, mesh.vertices);
 
   VK_Buffer& index_buff = vk->index_buffer;
   u64 index_size = mesh.index_count*sizeof(u32);
-  u64 index_offset = index_buff.size;
-  index_buff.size += index_size;
+  u64 index_offset = index_buff.pos;
+  index_buff.pos += index_size;
   BufferRegion index_range = { .offset = index_offset, .size = index_size };
   if (mesh.indices) {
-    vk_buffer_upload_to_gpu(vk->index_buffer, index_range, mesh.indices);
+    vk_buffer_upload(vk->index_buffer, index_range, mesh.indices);
   }
 
   VK_Mesh vk_mesh = {
@@ -2484,8 +2496,8 @@ void vk_draw() {
   vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->pipeline_layout, 0, 1, &vk->descriptor_sets, 0, null);
 
   VkDeviceSize size = 0;
-  vk->CmdBindVertexBuffers(cmd, 0, 1, &vk->vert_buffer.handle, &size);
-  vk->CmdBindIndexBuffer(cmd, vk->index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
+  vk->CmdBindVertexBuffers(cmd, 0, 1, &vk->vert_buffer.h, &size);
+  vk->CmdBindIndexBuffer(cmd, vk->index_buffer.h, 0, VK_INDEX_TYPE_UINT32);
   u32 draw_call_count = 0;
   u32 draw_call_mem_offset = 0;
   u32 entities_draw_count = 0;
@@ -2523,7 +2535,7 @@ void vk_draw() {
     if (per_shader_indexed_draw_count > 0) {
       VK_PushConstant push = {.drawcall_offset = draw_call_mem_offset / (u32)sizeof(VK_DrawCallInfo)};
       vk->CmdPushConstants(cmd, vk->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &push);
-      vk->CmdDrawIndexedIndirect(cmd, vk->indirect_draw_buffer.handle, draw_call_mem_offset, per_shader_indexed_draw_count, sizeof(VK_DrawCallInfo));
+      vk->CmdDrawIndexedIndirect(cmd, vk->indirect_draw_buffer.h, draw_call_mem_offset, per_shader_indexed_draw_count, sizeof(VK_DrawCallInfo));
     }
 
     // Entities per shader
@@ -2554,7 +2566,7 @@ void vk_draw() {
       u32 draw_call_indexed_mem_offset = draw_call_mem_offset + (u32)sizeof(VK_DrawCallInfo)*per_shader_indexed_draw_count;
       VK_PushConstant push = {.drawcall_offset = draw_call_indexed_mem_offset / (u32)sizeof(VK_DrawCallInfo)};
       vk->CmdPushConstants(cmd, vk->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &push);
-      vk->CmdDrawIndirect(cmd, vk->indirect_draw_buffer.handle, draw_call_indexed_mem_offset , per_shader_draw_count, sizeof(VK_DrawCallInfo));
+      vk->CmdDrawIndirect(cmd, vk->indirect_draw_buffer.h, draw_call_indexed_mem_offset , per_shader_draw_count, sizeof(VK_DrawCallInfo));
     }
     draw_call_mem_offset = draw_call_count * sizeof(VK_DrawCallInfo);
 
@@ -2627,19 +2639,19 @@ void vk_draw() {
     if (batch.static_entities_indexed_count) {
       VK_PushConstant push = {MaxDrawCalls};
       vk->CmdPushConstants(cmd, vk->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &push);
-      vk->CmdDrawIndexedIndirect(cmd, vk->indirect_draw_buffer.handle, vk->static_draw_indexed_offset, vk->static_indexed_draw_count, sizeof(VK_DrawCallInfo));
+      vk->CmdDrawIndexedIndirect(cmd, vk->indirect_draw_buffer.h, vk->static_draw_indexed_offset, vk->static_indexed_draw_count, sizeof(VK_DrawCallInfo));
     }
     if (batch.static_entities_count) {
       VK_PushConstant push = {MaxDrawCalls+vk->static_indexed_draw_count};
       vk->CmdPushConstants(cmd, vk->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &push);
-      vk->CmdDrawIndirect(cmd, vk->indirect_draw_buffer.handle, vk->static_draw_offset, vk->static_draw_count, sizeof(VK_DrawCallInfo));
+      vk->CmdDrawIndirect(cmd, vk->indirect_draw_buffer.h, vk->static_draw_offset, vk->static_draw_count, sizeof(VK_DrawCallInfo));
     }
   }
 
   // Debug drawing
   if (vk->draw_lines.count > 0) {
     vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->debug_line_shader);
-    vk->CmdBindVertexBuffers(cmd, 0, 1, &vk->vert_buffer.handle, (VkDeviceSize*)&vk->draw_lines_offset);
+    vk->CmdBindVertexBuffers(cmd, 0, 1, &vk->vert_buffer.h, (VkDeviceSize*)&vk->draw_lines_offset);
     vk->CmdDraw(cmd, vk->draw_lines.count*2, 1, 0, 0);
     vk->draw_lines.clear();
   }
@@ -2648,9 +2660,9 @@ void vk_draw() {
   vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->cubemap_shader);
   Handle<GpuMesh> h = mesh_get(Mesh_Cube);
   VK_Mesh mesh = vk->meshes[h.handle];
-  vk->CmdBindVertexBuffers(cmd, 0, 1, &vk->vert_buffer.handle, &mesh.vert_offset);
+  vk->CmdBindVertexBuffers(cmd, 0, 1, &vk->vert_buffer.h, &mesh.vert_offset);
   if (mesh.index_count) {
-    vk->CmdBindIndexBuffer(cmd, vk->index_buffer.handle, mesh.index_offset, VK_INDEX_TYPE_UINT32);
+    vk->CmdBindIndexBuffer(cmd, vk->index_buffer.h, mesh.index_offset, VK_INDEX_TYPE_UINT32);
     vk->CmdDrawIndexed(cmd, mesh.index_count, 1, 0, 0, 0);
   } else {
     vk->CmdDraw(cmd, mesh.vert_count, 1, 0, 0);
@@ -2659,7 +2671,7 @@ void vk_draw() {
   vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->ui_shader);
   if (vk->draw_squares.count > 0) {
     vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->ui_shader);
-    vk->CmdBindVertexBuffers(cmd, 0, 1, &vk->vert_buffer.handle, (VkDeviceSize*)&vk->draw_squares_offset);
+    vk->CmdBindVertexBuffers(cmd, 0, 1, &vk->vert_buffer.h, (VkDeviceSize*)&vk->draw_squares_offset);
     vk->CmdDraw(cmd, vk->draw_squares.count*6, 1, 0, 0);
     vk->draw_squares.clear();
   }
@@ -2794,9 +2806,7 @@ intern void vk_instance_create() {
           Warn(String(callback_data->pMessage));
         } break;
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: {
-          // Error(String(callback_data->pMessage))
-          // NOTE: For some reason Scratch arena is invalid here?
-          ErrorArena({}, "%s", String(callback_data->pMessage));
+          Error(String(callback_data->pMessage));
         } break;
       }
       return false;
@@ -2901,17 +2911,16 @@ void* vk_init() {
       VK_CHECK(vk->CreateFence(vkdevice, &fence_create_info, vk->allocator, &vk->sync.in_flight_fences[i]));
     }
   }
-  
+
   // Buffers
   {
-    vk->vert_buffer = vk_buffer_create(MB(1), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    vk->index_buffer = vk_buffer_create(MB(1), VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    vk->stage_buffer = vk_buffer_create(MB(10), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    vk_buffer_map_memory(vk->stage_buffer, 0, vk->stage_buffer.cap);
-    vk->storage_buffer = vk_buffer_create(MB(200), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    vk_buffer_map_memory(vk->storage_buffer, 0, vk->storage_buffer.cap);
-    vk->indirect_draw_buffer = vk_buffer_create(MB(100), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    vk_buffer_map_memory(vk->indirect_draw_buffer, 0, vk->indirect_draw_buffer.cap);
+    vk->gpu_mem = vk_mem_alloc(VK_MemType_Gpu, MB(10));
+    vk->cpu_mem = vk_mem_alloc(VK_MemType_Cpu, MB(100));
+    vk->vert_buffer = vk_buffer_make(MB(1), VK_BufferUsageFlag_Vert | VK_BufferUsageFlag_Dst, VK_MemType_Gpu);
+    vk->index_buffer = vk_buffer_make(MB(1), VK_BufferUsageFlag_Index | VK_BufferUsageFlag_Dst, VK_MemType_Gpu);
+    vk->stage_buffer = vk_buffer_make(MB(10), VK_BufferUsageFlag_Src, VK_MemType_Cpu);
+    vk->storage_buffer = vk_buffer_make(MB(50), VK_BufferUsageFlag_Storage, VK_MemType_Cpu);
+    vk->indirect_draw_buffer = vk_buffer_make(MB(10), VK_BufferUsageFlag_Indirect, VK_MemType_Cpu);
   }
 
   vk_descriptor_init();
@@ -2976,11 +2985,11 @@ void* vk_init() {
     vk_texture_resize_target();
   }
 
-  vk->draw_lines_offset = vk->vert_buffer.size;
-  vk->vert_buffer.size += sizeof(Vertex)*KB(1);
+  vk->draw_lines_offset = vk->vert_buffer.pos;
+  vk->vert_buffer.pos += sizeof(Vertex)*KB(1);
 
-  vk->draw_squares_offset = vk->vert_buffer.size;
-  vk->vert_buffer.size += sizeof(Vertex)*KB(1);
+  vk->draw_squares_offset = vk->vert_buffer.pos;
+  vk->vert_buffer.pos += sizeof(Vertex)*KB(1);
 
   Info("Vulkan renderer initialized");
   return vk;
@@ -2998,10 +3007,10 @@ void vk_shutdown() {
   }
 
   {
-    vk->DestroyBuffer(vkdevice, vk->vert_buffer.handle, vk->allocator);
-    vk->DestroyBuffer(vkdevice, vk->index_buffer.handle, vk->allocator);
-    vk->DestroyBuffer(vkdevice, vk->stage_buffer.handle, vk->allocator);
-    vk->DestroyBuffer(vkdevice, vk->storage_buffer.handle, vk->allocator);
+    vk->DestroyBuffer(vkdevice, vk->vert_buffer.h, vk->allocator);
+    vk->DestroyBuffer(vkdevice, vk->index_buffer.h, vk->allocator);
+    vk->DestroyBuffer(vkdevice, vk->stage_buffer.h, vk->allocator);
+    vk->DestroyBuffer(vkdevice, vk->storage_buffer.h, vk->allocator);
   }
   
   vk_swapchain_destroy(vk->swapchain);
@@ -3043,13 +3052,13 @@ void vk_begin_frame() {
   if (vk->draw_lines.count > 0) {
     u32 size = vk->draw_lines.count * sizeof(VK_State::DebugDrawLine);
     void* data = vk->draw_lines.data;
-    vk_buffer_upload_to_gpu(vk->vert_buffer, {vk->draw_lines_offset, size}, data);
+    vk_buffer_upload(vk->vert_buffer, {vk->draw_lines_offset, size}, data);
   }
 
   if (vk->draw_squares.count > 0) {
     u32 size = vk->draw_squares.count * sizeof(VK_State::DebugDrawSquare);
     void* data = vk->draw_squares.data;
-    vk_buffer_upload_to_gpu(vk->vert_buffer, {vk->draw_squares_offset, size}, data);
+    vk_buffer_upload(vk->vert_buffer, {vk->draw_squares_offset, size}, data);
   }
 
   VK_CHECK(vk->WaitForFences(vkdevice, 1, &vk->sync.in_flight_fences[vk->current_frame_idx], true, U64_MAX));
@@ -3161,7 +3170,7 @@ intern VkRenderingInfo vk_default_rendering_info(VkRenderingAttachmentInfo* colo
 void vk_begin_renderpass(VK_RenderpassType renderpass_id) {
   VkCommandBuffer cmd = vk_get_current_cmd();
   switch (renderpass_id) {
-    case RenderpassType_World: {
+    case VK_RenderpassType_World: {
       vk_image_layout_transition(cmd, vk->msaa_texture_target, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
       vk_image_layout_transition(cmd, vk->offscreen_depth_buffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
       vk_image_layout_transition(cmd, vk->texture_targets[vk->current_image_idx], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -3204,9 +3213,9 @@ void vk_begin_renderpass(VK_RenderpassType renderpass_id) {
       // VkRenderingInfo render_info = vk_default_rendering_info(&color_attachment, &depth_attachment);
       // vk->CmdBeginRendering(cmd, &render_info);
     } break;
-    case RenderpassType_UI: {
+    case VK_RenderpassType_UI: {
     } break;
-    case RenderpassType_Screen: {
+    case VK_RenderpassType_Screen: {
       vk_image_layout_transition(cmd, vk->swapchain.images[vk->current_image_idx], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
       VkRenderingAttachmentInfo color_attachment = vk_default_color_attachment_info(vk->swapchain.images[vk->current_image_idx].view);
       VkRenderingInfo render_info = vk_default_rendering_info(&color_attachment);
@@ -3219,16 +3228,16 @@ void vk_begin_renderpass(VK_RenderpassType renderpass_id) {
 void vk_end_renderpass(VK_RenderpassType renderpass) {
   VkCommandBuffer cmd = vk_get_current_cmd();
   switch (renderpass) {
-    case RenderpassType_World: {
+    case VK_RenderpassType_World: {
       vk->CmdEndRendering(cmd);
       vk_image_layout_transition(cmd, vk->texture_targets[vk->current_image_idx], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
       ///////////////////////////////////
       // vk_image_layout_transition(cmd, vk->swapchain.images[vk->current_image_idx], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
     } break;
-    case RenderpassType_UI: {
+    case VK_RenderpassType_UI: {
     } break;
-    case RenderpassType_Screen: {
+    case VK_RenderpassType_Screen: {
       vk->CmdEndRendering(cmd);
       vk_image_layout_transition(cmd, vk->swapchain.images[vk->current_image_idx], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
     } break;
@@ -3252,9 +3261,9 @@ void vk_end_draw_frame() {
   }
   // World
   {
-    vk_begin_renderpass(RenderpassType_World);
+    vk_begin_renderpass(VK_RenderpassType_World);
     vk_draw();
-    vk_end_renderpass(RenderpassType_World);
+    vk_end_renderpass(VK_RenderpassType_World);
   }
   // {
   //   vk_begin_renderpass(Renderpass_UI);
@@ -3282,10 +3291,10 @@ void vk_end_draw_frame() {
       },
     };
     vk->CmdSetScissor(cmd, 0, 1, &scissor);
-    vk_begin_renderpass(RenderpassType_Screen);
+    vk_begin_renderpass(VK_RenderpassType_Screen);
     vk_draw_screen();
     vk_imgui_end_frame();
-    vk_end_renderpass(RenderpassType_Screen);
+    vk_end_renderpass(VK_RenderpassType_Screen);
   }
   vk_end_frame();
 }
@@ -3309,7 +3318,7 @@ void vk_make_renderable(Handle<Entity> entity_handle, Handle<GpuMesh> mesh_handl
     u32* mesh_idx_in_array = shader_batch.mesh_to_batch.get(mesh_idx);
     if (!mesh_idx_in_array) {
       mesh_idx_in_array = shader_batch.mesh_to_batch.add(mesh_idx, shader_batch.mesh_batches.count);
-      VK_MeshBatch<Entity> mesh_batch = vk_mesh_batch_init(g.gpa);
+      VK_MeshBatch<Entity> mesh_batch = vk_mesh_batch_make<Entity>(g.gpa);
       mesh_batch.mesh_handle = mesh_handle;
       shader_batch.mesh_batches.add(mesh_batch);
     }
@@ -3324,7 +3333,7 @@ void vk_make_renderable(Handle<Entity> entity_handle, Handle<GpuMesh> mesh_handl
     u32* mesh_idx_in_array = shader_batch.mesh_to_batch.get(mesh_idx);
     if (!mesh_idx_in_array) {
       mesh_idx_in_array = shader_batch.mesh_to_batch.add(mesh_idx, shader_batch.mesh_batches.count);
-      VK_MeshBatch<Entity> mesh_batch = vk_mesh_batch_init(g.gpa);
+      VK_MeshBatch<Entity> mesh_batch = vk_mesh_batch_make<Entity>(g.gpa);
       mesh_batch.mesh_handle = mesh_handle;
       shader_batch.mesh_batches.add(mesh_batch);
     }
@@ -3353,7 +3362,7 @@ void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMes
     u32* mesh_idx_in_array = shader_batch.mesh_to_batch.get(mesh_idx);
     if (!mesh_idx_in_array) {
       mesh_idx_in_array = shader_batch.mesh_to_batch.add(mesh_idx, shader_batch.mesh_batches.count);
-      VK_MeshBatch<StaticEntity> mesh_batch = vk_mesh_batch_static_init(g.gpa);
+      VK_MeshBatch<StaticEntity> mesh_batch = vk_mesh_batch_make<StaticEntity>(g.gpa);
       mesh_batch.mesh_handle = mesh_handle;
       shader_batch.mesh_batches.add(mesh_batch);
     }
@@ -3369,7 +3378,7 @@ void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMes
     u32* mesh_idx_in_array = shader_batch.mesh_to_batch.get(mesh_idx);
     if (!mesh_idx_in_array) {
       mesh_idx_in_array = shader_batch.mesh_to_batch.add(mesh_idx, shader_batch.mesh_batches.count);
-      VK_MeshBatch<StaticEntity> mesh_batch = vk_mesh_batch_static_init(g.gpa);
+      VK_MeshBatch<StaticEntity> mesh_batch = vk_mesh_batch_make<StaticEntity>(g.gpa);
       mesh_batch.mesh_handle = mesh_handle;
       shader_batch.mesh_batches.add(mesh_batch);
     }
@@ -3422,7 +3431,7 @@ void vk_set_entity_color(Handle<Entity> entity_handle, v4 color) {
   vk->gpu_entities[entity_handle.idx()].color = color;
 }
 
-GlobalStateGPU* vk_get_shader_state() { return (GlobalStateGPU*)vk->storage_buffer.mapped_memory; }
+GlobalStateGPU* vk_get_shader_state() { return (GlobalStateGPU*)vk->storage_buffer.mapped_mem; }
 
 mat4& vk_get_view() { return vk->view; }
 mat4& vk_get_projection() { return vk->projection; };

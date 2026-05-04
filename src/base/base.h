@@ -174,19 +174,20 @@ b32 FlagIntersects(u64 x, u64 f);
 ////////////////////////////////////////////////////////////////////////
 // Common operations
 
-template <typename T> T Max(T a, T b)                { return a > b ? a : b; }
-template <typename T> T Min(T a, T b)                { return a < b ? a : b; }
-template <typename T> T Max3(T a, T b, T c)          { return Max(Max(a,b), c); }
-template <typename T> T Min3(T a, T b, T c)          { return Min(Min(a,b), c); }
-template <typename T> T ClampTop(T x, T a)           { return Min(x, a); };
-template <typename T> T ClampBot(T x, T a)           { return Max(x, a); };
-template <typename T> T Clamp(T a, T x, T b)         { return (x < a) ? a : (x > b) ? b : x; };
-template <typename T> T Reverse_clamp(T a, T x, T b) { return (x < a) ? b : (b < x) ? a : x; };
-template <typename T> T Wrap(T a, T x, T b)          { return (x < a) ? b : (b < x) ? a : x; };
-template <typename T> T Square(T x)                  { return x * x; };
-template <typename T> T Cube(T x)                    { return x * x * x; };
-template <typename T> T Sign(T x)                    { return (x < 0) ? -1 : (x > 0) ? 1 : 0; };
-template <typename T> T Abs(T x)                     { return (x < 0) ? -x : x; };
+#define Max(a, b)              ((a) > (b) ? (a) : (b))
+#define Min(a, b)              ((a) < (b) ? (a) : (b))
+#define Max3(a, b, c)          (Max(Max((a),(b)), (c)))
+#define Min3(a, b, c)          (Min(Min((a),(b)), (c)))
+#define ClampTop(x, a)         (Min((x), (a)))
+#define ClampBot(x, a)         (Max((x), (a)))
+#define Clamp(a, x, b)         (((x) < (a)) ? (a) : ((x) > (b)) ? (b) : (x))
+#define Clamp01(x)             Clamp(0, (x), 1)
+#define ReverseClamp(a, x, b)  (((x) < (a)) ? (b) : ((b) < (x)) ? (a) : (x))
+#define Wrap(a, x, b)          (((x) < (a)) ? (b) : ((b) < (x)) ? (a) : (x))
+#define Square(x)              ((x) * (x))
+#define Cube(x)                ((x) * (x) * (x))
+#define Sign(x)                (((x) < 0) ? -1 : ((x) > 0) ? 1 : 0)
+#define Abs(x)                 (((x) < 0) ? -(x) : (x))
 
 u64 ModPow2(u64 x, u64 b);
 u64 DivPow2(u64 x, u64 b);
@@ -202,7 +203,7 @@ u32 prev_pow2(u32 n);
 
 #define ArrayCount(x)  (sizeof((x)) / sizeof((x)[0]))
 #define ArraySlice(arr) Slice(arr, ArrayCount(arr))
-#define ArrayRand(arr) arr[rand_range_u32(0, ArrayCount(arr)-1)]
+#define ArrayRand(arr) arr[rand_rng_u32(0, ArrayCount(arr)-1)]
 #define ArrayZero(arr) MemZeroArray((arr), ArrayCount((arr)))
 #define Assign(a,b)    (*((u8**)(&(a))) = (u8*)(b))
 #define _Stringify(S)  #S

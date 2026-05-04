@@ -322,7 +322,7 @@ void scene_init() {
   Loop (i, 3) {
     var cube = e_alloc(Mesh_Cube, Material_Orange);
     u32 range = 10;
-    cube.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+    cube.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
   }
 #if 1
   // Loop (i, MB(1)-KB(1)) {
@@ -341,9 +341,9 @@ void scene_init() {
       // Material_Container,
       // Material_Screen,
     };
-    var e = e_static_alloc(meshes[rand_range_u32(0, ArrayCount(meshes)-1)], materials[rand_range_u32(0, ArrayCount(materials)-1)]);
+    var e = e_static_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
     u32 range = KB(1);
-    e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+    e.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
   }
 #endif
 
@@ -368,7 +368,7 @@ void scene_init() {
     Loop (i, 0) {
       var e = e_alloc(Mesh_Cube, Material_Container);
       u32 range = KB(1);
-      e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+      e.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
       g.moving_cubes.add(e);
     }
   }
@@ -384,9 +384,9 @@ void scene_init() {
       Material_Container,
       // Material_Screen,
     };
-    var e = e_alloc(meshes[rand_range_u32(0, ArrayCount(meshes)-1)], materials[rand_range_u32(0, ArrayCount(materials)-1)]);
+    var e = e_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
     u32 range = 100;
-    e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+    e.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
     g.moving_cubes.add(e);
   }
 }
@@ -449,9 +449,9 @@ void scene_update() {
       // Material_Container,
       // Material_Screen,
     };
-    var e = e_alloc(meshes[rand_range_u32(0, ArrayCount(meshes)-1)], materials[rand_range_u32(0, ArrayCount(materials)-1)]);
+    var e = e_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
     u32 range = 100;
-    e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+    e.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
     g.moving_cubes.add(e);
   }
   for (var e : g.moving_cubes) {

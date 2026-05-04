@@ -102,10 +102,12 @@ void profiler_end(u32 current_frame) {
           u32 anchor_idx = 0;
           // In some time back block time was longer than frame
           if (prof_thread.long_anchors.count) {
-            ProfileAnchor old_anchor = prof_thread.long_anchors.pop();
-            anchors.add(old_anchor);
-            stack.add(anchors.count-1);
-            ++depth;
+            Loop (i, prof_thread.long_anchors.count) {
+              ProfileAnchor old_anchor = prof_thread.long_anchors.pop();
+              anchors.add(old_anchor);
+              stack.add(anchors.count-1);
+              ++depth;
+            }
           }
 
           anchor_idx = stack.pop();

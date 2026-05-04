@@ -110,13 +110,13 @@ u32 xorshift32(u32* seed) {
 
 global thread_local u32 _seed = 0x95123512;
 u32 rand_u32()                        { return xorshift32(&_seed); }
-u32 rand_range_u32(u32 min, u32 max)  { return (rand_u32() % (max - min + 1)) + min; }
+u32 rand_rng_u32(u32 min, u32 max)  { return (rand_u32() % (max - min + 1)) + min; }
 i32 rand_i32()                        { return rand_u32(); }
-i32 rand_range_i32(i32 min, i32 max)  { return (i32)(rand_u32() % (u32)(max - min + 1)) + min; }
+i32 rand_rng_i32(i32 min, i32 max)  { return (i32)(rand_u32() % (u32)(max - min + 1)) + min; }
 f32 rand_f32_01()                     { return rand_u32() / (f32)U32_MAX; }
 f32 rand_f32_11()                     { return rand_f32_01()*2.0f - 1.0f; }
 f32 rand_f32()                        { return rand_f32_01()*2*U16_MAX - U16_MAX; }
-f32 rand_range_f32(f32 min, f32 max)  { return rand_f32_01()*(max - min) + min ; }
+f32 rand_rng_f32(f32 min, f32 max)  { return rand_f32_01()*(max - min) + min ; }
 b32 rand_b32()                        { return rand_u32() % 2; }
 void rand_seed()                      { _seed = cpu_timer_now(); }
 u32 rand_get_seed()                   { return _seed; }
@@ -125,9 +125,8 @@ u32 rand_get_seed()                   { return _seed; }
 // Misc
 
 f32 Lerp(f32 a, f32 t, f32 b)  { return (1 - t)*a + t*b; }
-f32 inverse_lerp(f32 a, f32 x, f32 b) { return (x - a) / (b - a); }
-f64 inverse_lerp_f64(f64 a, f64 x, f64 b) { return (x - a) / (b - a); }
-f32 map_range_f32(f32 v, f32 old_min, f32 old_max, f32 new_min, f32 new_max) {
+f32 normalize(f32 a, f32 x, f32 b) { return (x - a) / (b - a); }
+f32 remap_rng_f32(f32 v, f32 old_min, f32 old_max, f32 new_min, f32 new_max) {
   return new_min + (((v - old_min) * (new_max - new_min)) / (old_max - old_min));
 }
 
@@ -172,10 +171,10 @@ v2  v2_lerp(v2 a, f32 t, v2 b) { return v2(Lerp(a.x, t, b.x), Lerp(a.y, t, b.y))
 v2  v2_hadamard(v2 a, v2 b)    { return v2(a.x*b.x, a.y*b.y); }
 v2  v2_hadamard_div(v2 a, v2 b){ return v2(a.x/b.x, a.y/b.y); }
 v2  v2_skew(v2 a)              { return v2(-a.y, a.x); }
-v2  v2_rand_range(v2 a, v2 b) {
+v2  v2_rand_rng(v2 a, v2 b) {
   v2 vec = {
-    rand_range_f32(a.x, b.x),
-    rand_range_f32(a.y, b.y),
+    rand_rng_f32(a.x, b.x),
+    rand_rng_f32(a.y, b.y),
   };
   return vec;
 }
@@ -259,11 +258,11 @@ v3 v3_pos_of_mat4(mat4 mat) {
 //   return vec;
 // };
 
-v3 v3_rand_range(v3 a, v3 b) {
+v3 v3_rand_rng(v3 a, v3 b) {
   v3 vec = {
-    rand_range_f32(a.x, b.x),
-    rand_range_f32(a.y, b.y),
-    rand_range_f32(a.z, b.z),
+    rand_rng_f32(a.x, b.x),
+    rand_rng_f32(a.y, b.y),
+    rand_rng_f32(a.z, b.z),
   };
   return vec;
 }
@@ -288,7 +287,7 @@ v4  operator-(v4 a)                { return v4(-a.x, -a.y, -a.z, -a.w); }
 
 f32 v4_length_squared(v4 a)          { return Square(a.x) + Square(a.y) + Square(a.z) + Square(a.w); }
 f32 v4_length(v4 a)                  { return Sqrt(v4_length_squared(a)); }
-v4  v4_normalize(v4 a)               { return a * (1.0f / v4_length(a)); }
+v4  v4_norm(v4 a)               { return a * (1.0f / v4_length(a)); }
 v4  v4_hadamard(v4 a, v4 b)  { return v4(a.x*b.x, a.y*b.y, a.z*b.z, a.w*b.w); }
 
 ////////////////////////////////////////////////////////////////////////
@@ -665,14 +664,18 @@ Rng1u64 union_1u64(Rng1u64 a, Rng1u64 b)     { return Rng1u64{Min(a.min, b.min),
 Rng1u64 intersect_1u64(Rng1u64 a, Rng1u64 b) { return Rng1u64{Max(a.min, b.min), Min(a.max, b.max)}; }
 u64 clamp_1u64(Rng1u64 r, u64 v)             { return Clamp(r.min, v, r.max); }
 
-Rng1f32 shift_1f32(Rng1f32 r, f32 x)         { return Rng1f32{r.min + x, r.max + x}; }
-Rng1f32 pad_1f32(Rng1f32 r, f32 x)           { return Rng1f32{r.min - x, r.max + x}; }
-f32 center_1f32(Rng1f32 r)                   { return (r.min+r.max)/2; }
-b32 contains_1f32(Rng1f32 r, f32 x)          { return (r.min <= x && x < r.max); }
-f32 dim_1f32(Rng1f32 r)                      { return r.max - r.min; }
-Rng1f32 union_1f32(Rng1f32 a, Rng1f32 b)     { return Rng1f32{Min(a.min, b.min), Max(a.max, b.max)}; }
-Rng1f32 intersect_1f32(Rng1f32 a, Rng1f32 b) { return Rng1f32{Max(a.min, b.min), Min(a.max, b.max)}; }
-f32 clamp_1f32(Rng1f32 r, f32 v)             { return Clamp(r.min, v, r.max); }
+Rng1f32 shift_1f32(Rng1f32 r, f32 x)            { return Rng1f32{r.min + x, r.max + x}; }
+Rng1f32 pad_1f32(Rng1f32 r, f32 x)              { return Rng1f32{r.min - x, r.max + x}; }
+f32 center_1f32(Rng1f32 r)                      { return (r.min+r.max)/2; }
+b32 contains_1f32(Rng1f32 r, f32 x)             { return (r.min <= x && x < r.max); }
+f32 dim_1f32(Rng1f32 r)                         { return r.max - r.min; }
+Rng1f32 union_1f32(Rng1f32 a, Rng1f32 b)        { return Rng1f32{Min(a.min, b.min), Max(a.max, b.max)}; }
+Rng1f32 intersect_1f32(Rng1f32 a, Rng1f32 b)    { return Rng1f32{Max(a.min, b.min), Min(a.max, b.max)}; }
+f32 clamp_1f32(Rng1f32 r, f32 v)                { return Clamp(r.min, v, r.max); }
+
+f32 normalize_1f32(f32 x, Rng1f32 r)            { return (x - r.min) / (r.max - r.min); }
+f32 lerp_1f32(f32 t, Rng1f32 r)                 { return Lerp(r.min, t, r.max); } 
+f32 remap_1f32(f32 x, Rng1f32 from, Rng1f32 to) { return to.min + (((x - from.min) * (to.max - to.min)) / (from.max - from.min));}
 
 ///////////////////////////////////
 // Dim2
@@ -684,8 +687,19 @@ v2 dim_2f32(Rng2f32 r)                       { return v2(r.max.x - r.min.x, r.ma
 Rng2f32 union_2f32(Rng2f32 a, Rng2f32 b)     { return Rng2f32{v2(Min(a.min.x, b.min.x), Min(a.min.y, b.min.y)), v2(Max(a.max.x, b.max.x), Max(a.max.y, b.max.y))}; }
 Rng2f32 intersect_2f32(Rng2f32 a, Rng2f32 b) { return Rng2f32{v2(Max(a.min.x, b.min.x), Max(a.min.y, b.min.y)), v2(Min(a.max.x, b.max.x), Min(a.max.y, b.max.y))}; }
 v2 clamp_2f32(Rng2f32 r, v2 v)               { return v2(Clamp(r.min.x, v.x, r.max.x), Clamp(r.min.y, v.y, r.max.y)); }
-Rng2f32 center_size_2f32(Rng2f32 r, v2 x)    { v2 center = center_2f32(r); return Rng2f32(v2(center.x - x.x / 2, center.y - x.y / 2), v2(center.x + x.x / 2, center.y + x.y / 2)); }
-Rng2f32 push_right_2f32(Rng2f32 r, v2 x)     { return Rng2f32(v2(r.x1, r.y0), v2(r.x1 + x.x, r.y0 + x.y)); }
+
+Rng2f32 slice_x_2f32(Rng2f32 r, Rng1f32 x)      { return Rng2f32(v2(r.min.x + x.min, r.min.y), v2(r.min.x + x.max, r.max.y)); }
+Rng2f32 slice_y_2f32(Rng2f32 r, Rng1f32 y)      { return Rng2f32(v2(r.min.x, r.min.y + y.min), v2(r.min.x, r.max.y + y.max)); }
+Rng2f32 slice_x_2f32(Rng2f32 r, f32 t0, f32 t1) { f32 w = dim_2f32(r).x; return Rng2f32(v2(r.min.x + w*t0, r.min.y), v2(r.min.x + w * t1, r.max.y)); }
+Rng2f32 fill_x_2f32(Rng2f32 r, f32 t)           { f32 w = dim_2f32(r).x * t; return Rng2f32(r.min, v2(r.min.x + w, r.max.y)); }
+Rng2f32 fill_y_2f32(Rng2f32 r, f32 t)           { f32 h = dim_2f32(r).y * t; return Rng2f32(r.min, v2(r.min.x, r.max.y + h)); }
+Rng2f32 pos_size_2f32(v2 pos, v2 size)          { return Rng2f32(pos, pos + size); }
+Rng2f32 center_halfdim_2f32(v2 c, v2 halfdim)   { return Rng2f32(c - halfdim, c + halfdim); }
+Rng2f32 center_dim_2f32(v2 c, v2 dim)           { return center_halfdim_2f32(c, dim/2); }
+Rng2f32 align_center_2f32(Rng2f32 r, v2 s)      { v2 c = center_2f32(r); v2 half = s/2; return Rng2f32(c - half, c + half); }
+Rng2f32 align_center_x_2f32(Rng2f32 r, v2 s)    { f32 x = center_2f32(r).x; return Rng2f32(v2(x - s.x/2, r.min.y), v2(x + s.x/2, r.min.y + s.y)); }
+Rng2f32 align_center_y_2f32(Rng2f32 r, v2 s)    { f32 y = center_2f32(r).y; return Rng2f32(v2(r.min.x, y - s.y/2), v2(r.min.x + s.x, y + s.y/2)); }
+Rng2f32 scale_2f32(Rng2f32 r, f32 scale)        { return Rng2f32(r.min*scale, r.max*scale); }
 
 ///////////////////////////////////
 // Dim3
@@ -703,6 +717,19 @@ Rng3f32 intersect_3f32(Rng3f32 a, Rng3f32 b) {
                  v3(Min(a.max.x, b.max.x), Min(a.max.y, b.max.y), Min(a.max.z, b.max.z))};
 }
 v3 clamp_3f32(Rng3f32 r, v3 v) { return v3(Clamp(r.min.x, v.x, r.max.x), Clamp(r.min.y, v.y, r.max.y), Clamp(r.min.z, v.z, r.max.z)); }
+
+Rng2f32 layout_row(LayoutCursor& c, Rng1f32 x, f32 h) {
+  Rng2f32 r = {
+    v2(x.min, c.pos.y),
+    v2(x.max, c.pos.y + h)
+  };
+  c.pos.y += h;
+  return r;
+}
+
+void layout_next(LayoutCursor& c, f32 h) {
+  c.pos.y += h;
+}
 
 
 

@@ -14,7 +14,7 @@ intern void test_global_alloc() {
   Allocator alloc = {.type = AllocatorType_Global};
 
   Loop (i, TEST_SAMPLES) {
-    u64 size = rand_range_u32(8, KB(1));
+    u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
     arr.add(mem_alloc(alloc, size, align));
     MemZero(arr[i], size);
@@ -28,7 +28,7 @@ intern void test_global_alloc() {
 
   arr.clear();
   Loop (i, TEST_SAMPLES) {
-    u64 size = rand_range_u32(8, KB(1));
+    u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
     arr.add(mem_alloc(alloc, size, align));
     MemZero(arr[i], size);
@@ -45,11 +45,11 @@ intern void test_arena_alloc() {
   Array<u32, TEST_SAMPLES> sizes = {};
   Array<u32, TEST_SAMPLES> values = {};
   Loop (i, TEST_SAMPLES) {
-    u32 size = rand_range_u32(8, KB(1));
+    u32 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
     arr[i] = push_buffer(arena, size, align);
     sizes[i] = size;
-    values[i] = rand_range_u32(0, 255);
+    values[i] = rand_rng_u32(0, 255);
     MemSet(arr[i], values[i], size);
   }
   Loop (i, TEST_SAMPLES) {
@@ -71,11 +71,11 @@ intern void test_arena_list_alloc() {
   Array<u32, TEST_SAMPLES> values = {};
 
   Loop (i, TEST_SAMPLES) {
-    u32 size = rand_range_u32(8, KB(1));
+    u32 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
     arr[i] = push_buffer(arena, size, align);
     sizes[i] = size;
-    values[i] = rand_range_u32(0, 255);
+    values[i] = rand_rng_u32(0, 255);
     MemSet(arr[i], values[i], size);
   }
   Loop (i, TEST_SAMPLES) {
@@ -89,11 +89,11 @@ intern void test_arena_list_alloc() {
   arena.clear();
 
   Loop (i, TEST_SAMPLES) {
-    u32 size = rand_range_u32(8, KB(1));
+    u32 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
     arr[i] = push_buffer(arena, size, align);
     sizes[i] = size;
-    values[i] = rand_range_u32(0, 255);
+    values[i] = rand_rng_u32(0, 255);
     MemSet(arr[i], values[i], size);
   }
   Loop (i, TEST_SAMPLES) {
@@ -113,7 +113,7 @@ intern void test_seglist_alloc() {
   Array<u8*, TEST_SAMPLES> arr = {};
 
   Loop (i, TEST_SAMPLES) {
-    u64 size = rand_range_u32(8, KB(1));
+    u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
     arr.add(mem_alloc(alloc, size, align));
     MemZero(arr[i], size);
@@ -127,7 +127,7 @@ intern void test_seglist_alloc() {
 
   arr.clear();
   Loop (i, TEST_SAMPLES) {
-    u64 size = rand_range_u32(8, KB(1));
+    u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
     arr.add(mem_alloc(alloc, size, align));
     MemZero(arr[i], size);
@@ -148,7 +148,7 @@ intern void test_gpu_seglist_alloc() {
   Array<GpuMemHandler, TEST_SAMPLES> arr = {};
 
   Loop (i, TEST_SAMPLES) {
-    u64 size = rand_range_u32(8, KB(1));
+    u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
     arr.add(alloc.alloc(size, align));
   }
@@ -161,7 +161,7 @@ intern void test_gpu_seglist_alloc() {
 
   arr.clear();
   Loop (i, TEST_SAMPLES) {
-    u64 size = rand_range_u32(8, KB(1));
+    u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
     arr.add(alloc.alloc(size, align));
   }
@@ -187,8 +187,8 @@ intern void test_object_pool() {
   Array<Handle<A>, TEST_SAMPLES> handlers = {};
 
   Loop (i, TEST_SAMPLES) {
-    values[i].a = rand_range_u32(0, TEST_SAMPLES);
-    values[i].b = rand_range_u32(0, TEST_SAMPLES);
+    values[i].a = rand_rng_u32(0, TEST_SAMPLES);
+    values[i].b = rand_rng_u32(0, TEST_SAMPLES);
   };
   Loop (i, TEST_SAMPLES) {
     handlers[i] = pool.add(values[i]);
@@ -205,8 +205,8 @@ intern void test_object_pool() {
 
   indices.clear();
   Loop (i, TEST_SAMPLES) {
-    values[i].a = rand_range_u32(0, TEST_SAMPLES);
-    values[i].b = rand_range_u32(0, TEST_SAMPLES);
+    values[i].a = rand_rng_u32(0, TEST_SAMPLES);
+    values[i].b = rand_rng_u32(0, TEST_SAMPLES);
   };
   Loop (i, TEST_SAMPLES) {
     handlers[i] = pool.add(values[i]);
@@ -232,8 +232,8 @@ intern void test_handle_darray() {
   Array<Handle<A>, TEST_SAMPLES> handlers = {};
 
   Loop (i, TEST_SAMPLES) {
-    values[i].a = rand_range_u32(0, TEST_SAMPLES);
-    values[i].b = rand_range_u32(0, TEST_SAMPLES);
+    values[i].a = rand_rng_u32(0, TEST_SAMPLES);
+    values[i].b = rand_rng_u32(0, TEST_SAMPLES);
   };
   Loop (i, TEST_SAMPLES) {
     handlers[i] = arr.add(values[i]);
@@ -250,8 +250,8 @@ intern void test_handle_darray() {
 
   indices.clear();
   Loop (i, TEST_SAMPLES) {
-    values[i].a = rand_range_u32(0, TEST_SAMPLES);
-    values[i].b = rand_range_u32(0, TEST_SAMPLES);
+    values[i].a = rand_rng_u32(0, TEST_SAMPLES);
+    values[i].b = rand_rng_u32(0, TEST_SAMPLES);
   };
   Loop (i, TEST_SAMPLES) {
     handlers[i] = arr.add(values[i]);

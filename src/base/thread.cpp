@@ -33,7 +33,7 @@ Task task_queue_pop() {
   TaskQueue& queue = g.queue;
   os_mutex_take(queue.mutex);
   while (queue.count == 0) {
-    TimeBlock("sleep", ProfileType_Sleep);
+    // TimeBlock("sleep", ProfileType_Sleep);
     os_cond_var_wait(queue.cond_not_empty, queue.mutex);
   }
   if (queue.count == MAX_TASKS) {

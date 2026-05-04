@@ -21,7 +21,7 @@ struct ImString {
 // obj mouse selection
 // serelization/deserialization
 // UI rendering
-// memory visualisation
+// memory visualisation thread safe, and gpu memory
 // thread graph visualisation
 // profiler
 // make wayland backend work
@@ -250,6 +250,7 @@ struct ImguiWindow {
   ImGuiWindowFlags flags;
   ScrollState root_scroll_state;
   ScrollState frames_scroll_state;
+  ScrollState mem_scroll_state;
   ScrollRegion scroll_region;
 };
 

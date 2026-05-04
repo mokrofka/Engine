@@ -4,6 +4,5 @@
 #include "defines/fragdef.glsl"
 
 void main() {
-  i32 arr[10];
-  out_color = vec4(in_color, 0.6f);
+  out_color = vec4(in_color, 1.0);
 }

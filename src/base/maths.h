@@ -186,22 +186,6 @@ typedef Rng3f32 Rng3;
 ///////////////////////////////////
 // Misc
 
-// union Rect {
-//   struct {
-//     f32 x,y;
-//     f32 width,height;
-//   };
-//   struct {
-//     v2 min;
-//     v2 max;
-//   };
-//   Rect() = default;
-//   Rect(v2 min_, v2 max_) {
-//     min = min_;
-//     max = max_;
-//   }
-// };
-
 struct Transform {
   v3 pos;
   v3 rot;
@@ -260,19 +244,19 @@ u64 hash(String str, u64 seed = 0);
 u32 xorshift32(u32* seed);
 
 NO_DEBUG u32 rand_u32();
-NO_DEBUG u32 rand_range_u32(u32 min, u32 max);
+NO_DEBUG u32 rand_rng_u32(u32 min, u32 max);
 NO_DEBUG i32 rand_i32();
-NO_DEBUG i32 rand_range_i32(i32 min, i32 max);
+NO_DEBUG i32 rand_rng_i32(i32 min, i32 max);
 NO_DEBUG f32 rand_f32_01();
 NO_DEBUG f32 rand_f32_11();
 NO_DEBUG f32 rand_f32();
-NO_DEBUG f32 rand_range_f32(f32 min, f32 max);
+NO_DEBUG f32 rand_rng_f32(f32 min, f32 max);
 NO_DEBUG b32 rand_b32();
 NO_DEBUG void rand_seed();
 NO_DEBUG u32 rand_get_seed();
 template<typename T> void rand_shuffle(Slice<T> slice) {
   Loop (i, slice.count) {
-    u32 j = rand_range_u32(i, slice.count - 1);
+    u32 j = rand_rng_u32(i, slice.count - 1);
     Swap(slice[i], slice[j]);
   }
 }
@@ -281,9 +265,7 @@ template<typename T> void rand_shuffle(Slice<T> slice) {
 // Misc
 
 NO_DEBUG f32 Lerp(f32 a, f32 t, f32 b);
-f32 inverse_lerp(f32 a, f32 x, f32 b);
-f64 inverse_lerp_f64(f64 a, f64 x, f64 b);
-f32 map_range_f32(f32 v, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
+f32 normalize(f32 a, f32 x, f32 b);
 
 ////////////////////////////////////////////////////////////////////////
 // Vector2
@@ -324,7 +306,7 @@ NO_DEBUG v2  v2_lerp(v2 a, f32 t, v2 b);
 NO_DEBUG v2  v2_hadamard(v2 a, v2 b);
 NO_DEBUG v2  v2_hadamard_div(v2 a, v2 b);
 NO_DEBUG v2  v2_skew(v2 a);
-NO_DEBUG v2 v2_rand_range(v2 a, v2 b);
+NO_DEBUG v2  v2_rand_rng(v2 a, v2 b);
 f32 v2_shortest_arc(v2 a, v2 b);
 v2 v2_map_to_v2_11(v2 pos, v2 size);
 
@@ -369,7 +351,7 @@ NO_DEBUG v3  v3_less(v3 a, v3 b);
 NO_DEBUG v3  v3_pos_of_mat4(mat4 mat);
 // NO_DEBUG v3 v3_rot_of_mat4(mat4 mat);
 // NO_DEBUG v3 v3_scale_of_mat4(mat4 mat);
-NO_DEBUG v3  v3_rand_range(v3 a, v3 b);
+NO_DEBUG v3  v3_rand_rng(v3 a, v3 b);
 
 ////////////////////////////////////////////////////////////////////////
 // Vector4
@@ -389,7 +371,7 @@ NO_DEBUG v4  operator/=(v4& a, f32 scalar);
 NO_DEBUG v4  operator-(v4 a);
 NO_DEBUG f32 v4_length_squared(v4 a);
 NO_DEBUG f32 v4_length(v4 a);
-NO_DEBUG v4  v4_normalize(v4 a);
+NO_DEBUG v4  v4_norm(v4 a);
 NO_DEBUG v4  v4_hadamard(v4 a, v4 b);
 
 ////////////////////////////////////////////////////////////////////////
@@ -408,9 +390,9 @@ NO_DEBUG v3 operator*(mat3 mat, v3 vec);
 mat4 mat4_identity();
 mat4 mat4_translate(v3 pos);
 mat4 mat4_scale(v3 scale);
-mat4 mat4_rotate_x(f32 angle_radians);
-mat4 mat4_rotate_y(f32 angle_radians);
-mat4 mat4_rotate_z(f32 angle_radians);
+mat4 mat4_rotate_x(f32 rad);
+mat4 mat4_rotate_y(f32 rad);
+mat4 mat4_rotate_z(f32 rad);
 mat4 operator*(mat4 a, mat4 b);
 mat4& operator*=(mat4& a, mat4 b);
 v4 operator*(mat4 mat, v4 vec);
@@ -433,7 +415,7 @@ v3 mat4_left(mat4 matrix);
 // Range Ops
 
 ///////////////////////////////////
-// Dim 1
+// Dim1
 Rng1u32 shift_1u32(Rng1u32 r, u32 x);
 Rng1u32 pad_1u32(Rng1u32 r, u32 x);
 u32 center_1u32(Rng1u32 r);
@@ -470,8 +452,12 @@ Rng1f32 union_1f32(Rng1f32 a, Rng1f32 b);
 Rng1f32 intersect_1f32(Rng1f32 a, Rng1f32 b);
 f32 clamp_1f32(Rng1f32 r, f32 v);
 
+f32 normalize_1f32(f32 x, Rng1f32 r);
+f32 lerp_1f32(f32 t, Rng1f32 r);
+f32 remap_1f32(f32 x, Rng1f32 from, Rng1f32 to);
+
 ///////////////////////////////////
-// Dim 2
+// Dim2
 Rng2f32 shift_2f32(Rng2f32 r, v2 x);
 Rng2f32 pad_2f32(Rng2f32 r, f32 x);
 v2 center_2f32(Rng2f32 r);
@@ -480,8 +466,19 @@ v2 dim_2f32(Rng2f32 r);
 Rng2f32 union_2f32(Rng2f32 a, Rng2f32 b);
 Rng2f32 intersect_2f32(Rng2f32 a, Rng2f32 b);
 v2 clamp_2f32(Rng2f32 r, v2 v);
-Rng2f32 center_size_2f32(Rng2f32 r, v2 x);
-Rng2f32 push_right_2f32(Rng2f32 r, v2 x);
+
+Rng2f32 slice_x_2f32(Rng2f32 r, Rng1f32 x);
+Rng2f32 slice_y_2f32(Rng2f32 r, Rng1f32 y);
+Rng2f32 slice_x_2f32(Rng2f32 r, f32 t0, f32 t1);
+Rng2f32 fill_x_2f32(Rng2f32 r, f32 t);
+Rng2f32 fill_y_2f32(Rng2f32 r, f32 t);
+Rng2f32 pos_size_2f32(v2 pos, v2 size);
+Rng2f32 center_halfdim_2f32(v2 center, v2 halfdim);
+Rng2f32 center_dim_2f32(v2 center, v2 dim);
+Rng2f32 align_center_2f32(Rng2f32 r, v2 s);
+Rng2f32 align_center_x_2f32(Rng2f32 r, v2 s);
+Rng2f32 align_center_y_2f32(Rng2f32 r, v2 s);
+Rng2f32 scale_2f32(Rng2f32 r, f32 scale);
 
 ///////////////////////////////////
 // Dim3
@@ -493,4 +490,11 @@ v3 dim_3f32(Rng3f32 r);
 Rng3f32 union_3f32(Rng3f32 a, Rng3f32 b);
 Rng3f32 intersect_3f32(Rng3f32 a, Rng3f32 b);
 v3 clamp_3f32(Rng3f32 r, v3 v);
+
+struct LayoutCursor {
+  v2 pos;
+};
+
+Rng2f32 layout_row(LayoutCursor& c, Rng1f32 x, f32 h);
+void layout_next(LayoutCursor& c, f32 h);
 
