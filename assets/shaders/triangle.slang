@@ -30,3 +30,4 @@ VS_Entry VSOutput vs_main(VSInput in) {
 FS_Entry v4 fs_main(VSOutput in) {
   return v4(1.0, 0.0, 0.0, 1.0);
 }
+

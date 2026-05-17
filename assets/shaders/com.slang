@@ -69,8 +69,12 @@ struct SpotLight {
 };
 
 struct DrawCallInfo {
-  u32 pad[5];
-  u32 entity_id;
+  u32 indexCount;
+  u32 instanceCount;
+  u32 firstIndex;
+  i32 vertexOffset;
+  u32 firstInstance;
+  u32 entity_inst_offset;
 };
 
 struct State {

@@ -2,7 +2,7 @@
 
 VS_Entry VSOutput vs_main(VSInput in) {
   VSOutput o;
-  u32 entity_inst_offset = drawinfo[push.drawcall_offset + in.draw_id].entity_id;
+  u32 entity_inst_offset = drawinfo[push.drawcall_offset + in.draw_id].entity_inst_offset;
   u32 entity_id = g.entity_indices[entity_inst_offset + in.inst_id];
   Entity e = entities[entity_id];
 

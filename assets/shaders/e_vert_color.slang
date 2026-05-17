@@ -3,7 +3,7 @@
 VS_Entry VSOutput vs_main(VSInput in) {
   VSOutput o;
 
-  u32 entities_offset_id = drawinfo[push.drawcall_offset + in.draw_id].entity_id;
+  u32 entities_offset_id = drawinfo[push.drawcall_offset + in.draw_id].entity_inst_offset;
   u32 entity_id = g.entity_indices[entities_offset_id + in.inst_id];
   Entity e = entities[entity_id];
   o.pos = g.projection_view * e.model * v4(in.pos, 1.0);
