@@ -16,31 +16,31 @@ intern void test_global_alloc() {
   Loop (i, TEST_SAMPLES) {
     u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
-    arr.add(mem_alloc(alloc, size, align));
+    array_add(arr, mem_alloc(alloc, size, align));
     MemZero(arr[i], size);
   }
   Array<u32, TEST_SAMPLES> indices = {};
-  Loop(i, TEST_SAMPLES) indices.add(i);
-  rand_shuffle(indices.slice());
+  Loop(i, TEST_SAMPLES) array_add(indices, i);
+  rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
     mem_free(alloc, arr[indices[i]]);
   }
 
-  arr.clear();
+  array_clear(arr);
   Loop (i, TEST_SAMPLES) {
     u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
-    arr.add(mem_alloc(alloc, size, align));
+    array_add(arr, mem_alloc(alloc, size, align));
     MemZero(arr[i], size);
   }
-  rand_shuffle(indices.slice());
+  rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
     mem_free(alloc, arr[indices[i]]);
   }
 }
 
 intern void test_arena_alloc() {
-  Arena arena = arena_init();
+  Arena arena = arena_make();
   Array<u8*, TEST_SAMPLES> arr = {};
   Array<u32, TEST_SAMPLES> sizes = {};
   Array<u32, TEST_SAMPLES> values = {};
@@ -60,7 +60,7 @@ intern void test_arena_alloc() {
       Assert(buf[j] == value);
     }
   }
-  arena_deinit(&arena);
+  arena_free(&arena);
 }
 
 intern void test_arena_list_alloc() {
@@ -108,37 +108,37 @@ intern void test_arena_list_alloc() {
 }
 
 intern void test_seglist_alloc() {
-  Arena arena = arena_init();
+  Arena arena = arena_make();
   AllocSegList alloc(arena);
   Array<u8*, TEST_SAMPLES> arr = {};
 
   Loop (i, TEST_SAMPLES) {
     u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
-    arr.add(mem_alloc(alloc, size, align));
+    array_add(arr, mem_alloc(alloc, size, align));
     MemZero(arr[i], size);
   }
   Array<u32, TEST_SAMPLES> indices = {};
-  Loop(i, TEST_SAMPLES) indices.add(i);
-  rand_shuffle(indices.slice());
+  Loop(i, TEST_SAMPLES) array_add(indices, i);
+  rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
     mem_free(alloc, arr[indices[i]]);
   }
 
-  arr.clear();
+  array_clear(arr);
   Loop (i, TEST_SAMPLES) {
     u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
-    arr.add(mem_alloc(alloc, size, align));
+    array_add(arr, mem_alloc(alloc, size, align));
     MemZero(arr[i], size);
   }
-  indices.clear();
-  Loop(i, TEST_SAMPLES) indices.add(i);
-  rand_shuffle(indices.slice());
+  array_clear(indices);
+  Loop(i, TEST_SAMPLES) array_add(indices, i);
+  rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
     mem_free(alloc, arr[indices[i]]);
   }
-  arena_deinit(&arena);
+  arena_free(&arena);
 }
 
 intern void test_gpu_seglist_alloc() {
@@ -150,24 +150,24 @@ intern void test_gpu_seglist_alloc() {
   Loop (i, TEST_SAMPLES) {
     u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
-    arr.add(alloc.alloc(size, align));
+    array_add(arr, alloc.alloc(size, align));
   }
   Array<u32, TEST_SAMPLES> indices = {};
-  Loop(i, TEST_SAMPLES) indices.add(i);
-  rand_shuffle(indices.slice());
+  Loop(i, TEST_SAMPLES) array_add(indices, i);
+  rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
     alloc.free(arr[indices[i]]);
   }
 
-  arr.clear();
+  array_clear(arr);
   Loop (i, TEST_SAMPLES) {
     u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
-    arr.add(alloc.alloc(size, align));
+    array_add(arr, alloc.alloc(size, align));
   }
-  indices.clear();
-  Loop(i, TEST_SAMPLES) indices.add(i);
-  rand_shuffle(indices.slice());
+  array_clear(indices);
+  Loop(i, TEST_SAMPLES) array_add(indices, i);
+  rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
     alloc.free(arr[indices[i]]);
   }
@@ -197,13 +197,13 @@ intern void test_object_pool() {
     Assert(MemMatchStruct(&values[i], &pool.get(handlers[i])));
   }
   Array<u32, TEST_SAMPLES> indices = {};
-  Loop(i, TEST_SAMPLES) indices.add(i);
-  rand_shuffle(indices.slice());
+  Loop(i, TEST_SAMPLES) array_add(indices, i);
+  rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
     pool.remove(handlers[i]);
   }
 
-  indices.clear();
+  array_clear(indices);
   Loop (i, TEST_SAMPLES) {
     values[i].a = rand_rng_u32(0, TEST_SAMPLES);
     values[i].b = rand_rng_u32(0, TEST_SAMPLES);
@@ -214,8 +214,8 @@ intern void test_object_pool() {
   Loop (i, TEST_SAMPLES) {
     Assert(MemMatchStruct(&values[i], &pool.get(handlers[i])));
   }
-  Loop(i, TEST_SAMPLES) indices.add(i);
-  rand_shuffle(indices.slice());
+  Loop(i, TEST_SAMPLES) array_add(indices, i);
+  rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
     pool.remove(handlers[i]);
   }
@@ -242,13 +242,13 @@ intern void test_handle_darray() {
     Assert(MemMatchStruct(&values[i], &arr.get(handlers[i])));
   }
   Array<u32, TEST_SAMPLES> indices = {};
-  Loop (i, TEST_SAMPLES) indices.add(i);
-  rand_shuffle(indices.slice());
+  Loop (i, TEST_SAMPLES) array_add(indices, i);
+  rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
     arr.remove(handlers[indices[i]]);
   }
 
-  indices.clear();
+  array_clear(indices);
   Loop (i, TEST_SAMPLES) {
     values[i].a = rand_rng_u32(0, TEST_SAMPLES);
     values[i].b = rand_rng_u32(0, TEST_SAMPLES);
@@ -259,8 +259,8 @@ intern void test_handle_darray() {
   Loop (i, TEST_SAMPLES) {
     Assert(MemMatchStruct(&values[i], &arr.get(handlers[i])));
   }
-  Loop(i, TEST_SAMPLES) indices.add(i);
-  rand_shuffle(indices.slice());
+  Loop(i, TEST_SAMPLES) array_add(indices, i);
+  rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
     arr.remove(handlers[indices[i]]);
   }
@@ -274,16 +274,16 @@ intern void test_id_pool() {
     Array<u32, TEST_SAMPLES> arr = {};
     Loop (i, TEST_SAMPLES) {
       u32 id = id_pool.alloc();
-      arr.add(id);
+      array_add(arr, id);
     }
-    rand_shuffle(arr.slice());
+    rand_shuffle(slice(arr));
     Loop (i, arr.count) {
       id_pool.free(arr[i]);
     }
     Array<u32, TEST_SAMPLES> new_arr = {};
     Loop (i, arr.count) {
       u32 id = id_pool.alloc();
-      new_arr.add(id);
+      array_add(new_arr, id);
     }
     Loop (i, arr.count) {
       b32 exists = false;
@@ -306,16 +306,16 @@ intern void test_id_pool() {
     Array<u32, TEST_SAMPLES> arr = {};
     Loop (i, TEST_SAMPLES) {
       u32 id = static_id_pool.alloc();
-      arr.add(id);
+      array_add(arr, id);
     }
-    rand_shuffle(arr.slice());
+    rand_shuffle(slice(arr));
     Loop (i, arr.count) {
       static_id_pool.free(i);
     }
     Array<u32, TEST_SAMPLES> new_arr = {};
     Loop (i, arr.count) {
       u32 id = static_id_pool.alloc();
-      new_arr.add(id);
+      array_add(new_arr, id);
     }
     Loop (i, arr.count) {
       b32 exists = false;
@@ -337,21 +337,21 @@ intern void test_id_pool() {
 // Profiler
 
 intern void test_profiler_bar() {
-  TimeFunction;
+  ProfFunc;
   {
-  TimeBlock("block in bar");
+  ProfBlock("block in bar");
   os_sleep_ms(1);
   }
   os_sleep_ms(2);
 }
 
 intern void test_profiler_der() {
-  TimeFunction;
+  ProfFunc;
   os_sleep_ms(10);
 }
 
 intern void test_profiler_die(i32 i) {
-  TimeFunction;
+  ProfFunc;
   os_sleep_ms(1);
   if (--i) {
     test_profiler_die(i);
@@ -684,7 +684,7 @@ void test_link_list() {
 }
 
 void test() {
-  TimeFunction;
+  ProfFunc;
   test_global_alloc();
   test_arena_alloc();
   test_arena_list_alloc();

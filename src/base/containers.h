@@ -28,41 +28,42 @@ struct Array {
   u32 count;
   static constexpr i32 cap = N;
   T data[N];
-  T* begin() { return data; }
-  T* end()   { return data + count; }
   T& operator[](u32 idx) {
     Assert(idx < cap);
     return data[idx];
   }
-  Slice<T> slice() { return {data, count}; }
-  void add(T a) { 
-    Assert(count < cap);
-    data[count++] = a;
-  }
-  template<typename ... Args>
-  void add(Args... args) {
-    var list = {args...};
-    for (T x : list) {
-      add(x);
-    }
-  }
-  void swap_remove(u32 idx) {
-    Assert(idx < count);
-    data[idx] = data[--count];
-  }
-  void clear() {
-    count = 0;
-  }
-  T pop() {
-    return data[--count];
-  }
-  b32 exists(T a, b32(*fn)(T a, T b) = equal) {
-    for (T x : data) {
-      if (fn(x, a)) return true;
-    }
-    return false;
-  }
 };
+
+template<typename T, i32 N> Slice<T> slice(Array<T, N>& arr) {
+  return {arr.data, arr.count};
+}
+template<typename T, i32 N> void array_add(Array<T, N>& arr, T a) {
+  Assert(arr.count < arr.cap);
+  arr.data[arr.count++] = a;
+}
+template<typename T, i32 N, typename ... Args> void array_add(Array<T, N>& arr, Args... args) {
+  var list = {args...};
+  for (T x : list) {
+    array_add(arr, x);
+  }
+}
+template<typename T, i32 N> void array_swap_remove(Array<T, N>& arr, u32 idx) {
+  Assert(idx < arr.count);
+  arr.data[idx] = arr.data[--arr.count];
+}
+template<typename T, i32 N> void array_clear(Array<T, N>& arr) {
+  arr.count = 0;
+}
+template<typename T, i32 N> T array_pop(Array<T, N>& arr) {
+  return arr.data[--arr.count];
+}
+template<typename T, i32 N> b32 array_exists(Array<T, N>& arr, T a, b32(*fn)(T a, T b) = equal) {
+  Loop (i, arr.count) {
+    T x = arr[i];
+    if (fn(x, a)) return true;
+  }
+  return false;
+}
 
 ////////////////////////////////////////////////////////////////////////
 // Darray
@@ -73,108 +74,108 @@ struct Darray {
   u32 cap;
   Allocator alloc;
   T* data;
-  Darray() = default;
-  Darray(Allocator alloc_) { init(alloc_); }
-  void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
-  void init(Allocator alloc_, u32 count_, u32 cap_) { 
-    count = count_;
-    cap = cap_;
-    alloc = alloc_;
-    data = push_array(alloc, T, cap);
-  }
-  void deinit() { if (data) { mem_free(alloc, data); } }
-  T* begin() { return data; }
-  T* end()   { return data + count; }
   T& operator[](u32 idx) {
     Assert(idx < cap);
     return data[idx];
   }
-  Slice<T> slice() { return {data, count}; }
-  void add() { 
-    if (count >= cap) {
-      grow(0);
-    }
-    ++count;
-  }
-  void add(T b) { 
-    if (count >= cap) {
-      grow(0);
-    }
-    data[count++] = b;
-  }
-  template<typename ... Args> void add(Args... args) {
-    var list = { args... };
-    for (T x : list) {
-      add(x);
-    }
-  }
-  void add_elems(T* elems, u32 elem_count) {
-    if (count + elem_count >= cap) {
-      grow(elem_count);
-    }
-    MemCopyArray(data + count, elems, elem_count);
-    count += elem_count;
-  }
-  void grow(u32 elem_count) {
-    if (data) {
-      u32 old_cap = cap;
-      cap = Max(cap * DEFAULT_RESIZE_FACTOR, count + elem_count);
-      data = mem_realloc_array(alloc, data, old_cap, cap);
-    } else {
-      cap = Max(DEFAULT_CAPACITY, elem_count);
-      data = push_array(alloc, T, cap);
-    }
-  }
-  void reserve(u32 min_cap) { 
-    if (cap >= min_cap) return;
-    u32 old_cap = cap;
-    u32 new_cap = Max(old_cap*DEFAULT_RESIZE_FACTOR, min_cap);
-    if (data) {
-      data = mem_realloc_array(alloc, data, old_cap, new_cap);
-    } else {
-      data = push_array(alloc, T, new_cap);
-    }
-    cap = new_cap;
-  }
-  void swap_remove(u32 idx) {
-    Assert(idx < count);
-    data[idx] = data[--count];
-  }
-  void clear() { 
-    count = 0; 
-  }
-  T pop() {
-    return data[--count];
-  }
-  T& back() {
-    return data[count-1];
-  }
-  b32 exists(T a, b32(*fn)(T a, T b) = equal) {
-    for (T x : *this) {
-      if (fn(x, a)) return true;
-    }
-    return false;
-  }
-  b32 exists_at(T e, u32* index, b32(*fn)(T a, T b) = equal) { 
-    Loop (i, count) {
-      if (fn(data[i], e)) {
-        *index = i;
-        return true;
-      }
-    }
-    return false;
-  }
-  Darray<T> clone(Allocator alloc_) {
-    Darray<T> result = {
-      .count = count,
-      .cap = cap,
-      .alloc = alloc_,
-      .data = push_array(alloc_, T, cap),
-    };
-    MemCopyArray(result.data, data, count);
-    return result;
-  }
 };
+
+template<typename T> Slice<T> slice(Darray<T>& arr) {
+  return {arr.data, arr.count};
+}
+template<typename T> Darray<T> darray_make(Allocator alloc) {
+  Darray<T> res = {};
+  res.alloc = alloc;
+  return res;
+}
+template<typename T> void darray_free(Darray<T>& arr) {
+  if (arr.data) { mem_free(arr.alloc, arr.data); } 
+}
+template<typename T> void darray_grow(Darray<T>& arr, u32 elem_count) {
+  if (arr.data) {
+    u32 old_cap = arr.cap;
+    arr.cap = Max(arr.cap * DEFAULT_RESIZE_FACTOR, arr.count + elem_count);
+    arr.data = mem_realloc_array(arr.alloc, arr.data, old_cap, arr.cap);
+  } else {
+    arr.cap = Max(DEFAULT_CAPACITY, elem_count);
+    arr.data = push_array(arr.alloc, T, arr.cap);
+  }
+}
+template<typename T> void darray_reserve(Darray<T>& arr, u32 min_cap) {
+  if (arr.cap >= min_cap) return;
+  u32 old_cap = arr.cap;
+  u32 new_cap = Max(old_cap * DEFAULT_RESIZE_FACTOR, min_cap);
+  if (arr.data) {
+    arr.data = mem_realloc_array(arr.alloc, arr.data, old_cap, new_cap);
+  } else {
+    arr.data = push_array(arr.alloc, T, new_cap);
+  }
+  arr.cap = new_cap;
+}
+template<typename T> T darray_clone(Darray<T>& arr, Allocator alloc) {
+  Darray<T> result = {
+    .count = arr.count,
+    .cap = arr.cap,
+    .alloc = alloc,
+    .data = push_array(alloc, T, arr.cap),
+  };
+  MemCopyArray(result.data, arr.data, arr.count);
+  return result;
+}
+template<typename T> void darray_add(Darray<T>& arr) {
+  if (arr.count >= arr.cap) {
+    darray_grow(arr, 0);
+  }
+  ++arr.count;
+}
+template<typename T> void darray_add(Darray<T>& arr, T a) {
+  if (arr.count >= arr.cap) {
+    darray_grow(arr, 0);
+  }
+  arr.data[arr.count++] = a;
+}
+template<typename T, typename...Args> void darray_add(Darray<T>& arr, Args...args) {
+  var list = { args... };
+  for (T x : list) {
+    darray_add(arr, x);
+  }
+}
+template<typename T> void darray_add_elems(Darray<T>& arr, T* elems, u32 elem_count) {
+  if (arr.count + elem_count >= arr.cap) {
+    darray_grow(arr, elem_count);
+  }
+  MemCopyArray(arr.data + arr.count, elems, elem_count);
+  arr.count += elem_count;
+}
+template<typename T> void darray_swap_remove(Darray<T>& arr, u32 idx) {
+  Assert(idx < arr.count);
+  arr.data[idx] = arr.data[--arr.count];
+}
+template<typename T> void darray_clear(Darray<T>& arr) {
+  arr.count = 0; 
+}
+template<typename T> T darray_pop(Darray<T>& arr) {
+  return arr.data[--arr.count];
+}
+template<typename T> T darray_back(Darray<T>& arr) {
+  return arr.data[arr.count-1];
+}
+template<typename T> T darray_exists(Darray<T>& arr, T a, b32(*fn)(T a, T b) = equal) {
+  Loop (i, arr.count) {
+    T x = arr[i];
+    if (fn(x, a)) return true;
+  }
+  return false;
+}
+template<typename T> T darray_exists_at(Darray<T>& arr, T a, u32* out_idx, b32(*fn)(T a, T b) = equal) {
+  Loop (i, arr.count) {
+    if (fn(arr.data[i], a)) {
+      *out_idx = i;
+      return true;
+    }
+  }
+  return false;
+}
 
 ////////////////////////////////////////////////////////////////////////
 // HandlerArray
@@ -1087,12 +1088,12 @@ template<typename T, typename Compare> void sort_insert(Slice<T> slice, Compare 
 #define sort_insert_l(data, ...) sort_insert(data, [](var a, var b) __VA_ARGS__)
 
 template<typename T, typename Compare> Slice<T> sort_list_insert(Allocator arena, T first, Compare cmp) {
-  Darray<T> sorted_arr(arena);
+  var sorted_arr = darray_make<T>(arena);
   for (T it = first; it != 0; it = it->next) {
-    sorted_arr.add(it);
+    darray_add(sorted_arr, it);
   }
-  sort_insert(sorted_arr.slice(), cmp);
-  return sorted_arr.slice();
+  sort_insert(slice(sorted_arr), cmp);
+  return slice(sorted_arr);
 }
 
 inline void insert_sort(i32* arr, i32 size) {

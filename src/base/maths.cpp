@@ -10,8 +10,6 @@ v3::v3(f32 x_, f32 y_, f32 z_) { x = x_, y = y_, z = z_; }
 v3u::v3u(u32 x_, u32 y_, u32 z_) { x = x_, y = y_, z = z_; }
 v4::v4(f32 x_, f32 y_, f32 z_, f32 w_) { x = x_, y = y_, z = z_, w = w_; }
 
-f32& mat3::operator[](u32 a) { return v[a]; }
-
 Rng1u32::Rng1u32(u32 min_, u32 max_) { min = min_; max = max_; }
 Rng1i32::Rng1i32(i32 min_, i32 max_) { min = min_; max = max_; }
 Rng1u64::Rng1u64(u64 min_, u64 max_) { min = min_; max = max_; }
@@ -126,6 +124,7 @@ u32 rand_get_seed()                   { return _seed; }
 
 f32 Lerp(f32 a, f32 t, f32 b)  { return (1 - t)*a + t*b; }
 f32 normalize(f32 a, f32 x, f32 b) { return (x - a) / (b - a); }
+f64 normalize(f64 a, f64 x, f64 b) { return (x - a) / (b - a); }
 f32 remap_rng_f32(f32 v, f32 old_min, f32 old_max, f32 new_min, f32 new_max) {
   return new_min + (((v - old_min) * (new_max - new_min)) / (old_max - old_min));
 }
@@ -322,11 +321,11 @@ mat3 mat3_scale(v2 scale) {
 
 mat3 operator*(mat3 a, mat3 b) {
   mat3 c = {};
-  Loop (row, 3) {
-    Loop (col, 3) {
-      c[row*3 + col] = b[row*3 + 0] * a[0*3 + col] +
-                       b[row*3 + 1] * a[1*3 + col] +
-                       b[row*3 + 2] * a[2*3 + col];
+  Loop (j, 3) {
+    Loop (i, 3) {
+      c.v[j][i] = b.v[j][0] * a.v[0][i] +
+                  b.v[j][1] * a.v[1][i] +
+                  b.v[j][2] * a.v[2][i];
     }
   }
   return c;
@@ -335,9 +334,9 @@ mat3& operator*=(mat3& a, mat3 b) { return a = b * a; }
 
 v3 operator*(mat3 mat, v3 vec) {
   v3 result = {
-    mat.v[0]*vec.x + mat.v[1]*vec.y + mat.v[2]*vec.z,
-    mat.v[3]*vec.x + mat.v[4]*vec.y + mat.v[5]*vec.z,
-    mat.v[6]*vec.x + mat.v[7]*vec.y + mat.v[8]*vec.z,
+    mat.v[0][0]*vec.x + mat.v[0][1]*vec.y + mat.v[0][2]*vec.z,
+    mat.v[1][0]*vec.x + mat.v[1][1]*vec.y + mat.v[1][2]*vec.z,
+    mat.v[2][0]*vec.x + mat.v[2][1]*vec.y + mat.v[2][2]*vec.z,
   };
   return result;
 }
@@ -676,6 +675,7 @@ f32 clamp_1f32(Rng1f32 r, f32 v)                { return Clamp(r.min, v, r.max);
 f32 normalize_1f32(f32 x, Rng1f32 r)            { return (x - r.min) / (r.max - r.min); }
 f32 lerp_1f32(f32 t, Rng1f32 r)                 { return Lerp(r.min, t, r.max); } 
 f32 remap_1f32(f32 x, Rng1f32 from, Rng1f32 to) { return to.min + (((x - from.min) * (to.max - to.min)) / (from.max - from.min));}
+Rng1f32 slice_x_1f32(Rng1f32 r, f32 t0, f32 t1) { f32 w = dim_1f32(r); return Rng1f32(r.min + w*t0, r.min + w*t1); }
 
 ///////////////////////////////////
 // Dim2
@@ -690,7 +690,7 @@ v2 clamp_2f32(Rng2f32 r, v2 v)               { return v2(Clamp(r.min.x, v.x, r.m
 
 Rng2f32 slice_x_2f32(Rng2f32 r, Rng1f32 x)      { return Rng2f32(v2(r.min.x + x.min, r.min.y), v2(r.min.x + x.max, r.max.y)); }
 Rng2f32 slice_y_2f32(Rng2f32 r, Rng1f32 y)      { return Rng2f32(v2(r.min.x, r.min.y + y.min), v2(r.min.x, r.max.y + y.max)); }
-Rng2f32 slice_x_2f32(Rng2f32 r, f32 t0, f32 t1) { f32 w = dim_2f32(r).x; return Rng2f32(v2(r.min.x + w*t0, r.min.y), v2(r.min.x + w * t1, r.max.y)); }
+Rng2f32 slice_x_2f32(Rng2f32 r, f32 t0, f32 t1) { f32 w = dim_2f32(r).x; return Rng2f32(v2(r.min.x + w*t0, r.min.y), v2(r.min.x + w*t1, r.max.y)); }
 Rng2f32 fill_x_2f32(Rng2f32 r, f32 t)           { f32 w = dim_2f32(r).x * t; return Rng2f32(r.min, v2(r.min.x + w, r.max.y)); }
 Rng2f32 fill_y_2f32(Rng2f32 r, f32 t)           { f32 h = dim_2f32(r).y * t; return Rng2f32(r.min, v2(r.min.x, r.max.y + h)); }
 Rng2f32 pos_size_2f32(v2 pos, v2 size)          { return Rng2f32(pos, pos + size); }
@@ -718,7 +718,7 @@ Rng3f32 intersect_3f32(Rng3f32 a, Rng3f32 b) {
 }
 v3 clamp_3f32(Rng3f32 r, v3 v) { return v3(Clamp(r.min.x, v.x, r.max.x), Clamp(r.min.y, v.y, r.max.y), Clamp(r.min.z, v.z, r.max.z)); }
 
-Rng2f32 layout_row(LayoutCursor& c, Rng1f32 x, f32 h) {
+Rng2f32 layout_row(Rng2Cursor& c, Rng1f32 x, f32 h) {
   Rng2f32 r = {
     v2(x.min, c.pos.y),
     v2(x.max, c.pos.y + h)
@@ -727,7 +727,7 @@ Rng2f32 layout_row(LayoutCursor& c, Rng1f32 x, f32 h) {
   return r;
 }
 
-void layout_next(LayoutCursor& c, f32 h) {
+void layout_next(Rng2Cursor& c, f32 h) {
   c.pos.y += h;
 }
 

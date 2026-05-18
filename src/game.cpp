@@ -153,6 +153,7 @@ Handle<Entity> e_alloc(MeshId mesh_id, MaterialId material_id) {
   e.trans() = {};
   e.scale() = v3_one();
   vk_make_renderable(e, mesh_get(mesh_id), material_get(material_id));
+  ++g.entities_count;
   return e;
 }
 
@@ -163,6 +164,7 @@ Handle<StaticEntity> e_static_alloc(MeshId mesh_id, MaterialId material_id) {
   e.trans() = {};
   e.scale() = v3_one();
   vk_make_renderable_static(e, mesh_get(mesh_id), material_get(material_id));
+  ++g.static_entities_count;
   return e;
 }
 
@@ -170,6 +172,7 @@ void e_release(Handle<Entity> e) {
   GameState& g = g_st->game;
   g.entity_id_pool.free(e.handle);
   vk_remove_renderable(e);
+  --g.entities_count;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -210,6 +213,23 @@ void select_obj() {
   e.vel() = dir * 4;
 }
 
+void camera_init() {
+  GameState& g = g_st->game;
+  Camera& cam = g.cam;
+  cam = {
+    .pos = v3(0,0,5),
+    .yaw = -90,
+    .fov = 45,
+    .speed = 10,
+  };
+  cam.dir = {
+    CosD(cam.yaw) * CosD(cam.pitch),
+    SinD(cam.pitch),
+    SinD(cam.yaw) * CosD(cam.pitch)
+  };
+  vk_get_view() = mat4_look_at(cam.pos, cam.dir, v3_up());
+}
+
 void camera_update() {
   GameState& g = g_st->game;
   Camera& cam = g.cam;
@@ -237,7 +257,7 @@ void camera_update() {
 
   // Camera movement
   {
-    f32 speed = 10.0f;
+    f32 speed = cam.speed*1;
     v3 velocity = {};
     if (os_is_key_down(Key_W)) {
       v3 forward = mat4_forward(view);
@@ -289,18 +309,7 @@ void camera_update() {
 void scene_init() {
   Scratch scratch;
   GameState& g = g_st->game;
-  Camera& cam = g.cam;
-  cam = {
-    .pos = v3(0,0,5),
-    .yaw = -90,
-    .fov = 45,
-  };
-  cam.dir = {
-    CosD(cam.yaw) * CosD(cam.pitch),
-    SinD(cam.pitch),
-    SinD(cam.yaw) * CosD(cam.pitch)
-  };
-  vk_get_view() = mat4_look_at(cam.pos, cam.dir, v3_up());
+  camera_init();
   var cube = e_alloc(Mesh_Cube, Material_Orange);
   g.rotating_cube = cube;
   var monkey = e_alloc(Mesh_MonkeyGlb, Material_Container);
@@ -369,7 +378,7 @@ void scene_init() {
       var e = e_alloc(Mesh_Cube, Material_Container);
       u32 range = KB(1);
       e.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
-      g.moving_cubes.add(e);
+      darray_add(g.moving_cubes, e);
     }
   }
 
@@ -387,7 +396,7 @@ void scene_init() {
     var e = e_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
     u32 range = 100;
     e.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
-    g.moving_cubes.add(e);
+    darray_add(g.moving_cubes, e);
   }
 }
 
@@ -401,12 +410,12 @@ void scene_deinit() {
 // Update
 
 void scene_update() {
-  Scratch scratch;
+  // Scratch scratch;
   GameState& g = g_st->game;
   if (os_is_key_pressed(MouseKey_Left)) {
     // select_obj();
-    // v3 dir = ray_from_camera();
-    // debug_draw_line(st->cam.pos - v3(0,0.1,0), st->cam.pos + dir*100, ColorWhite);
+    v3 dir = ray_from_camera();
+    vk_draw_line_consistent(g.cam.pos - v3(0,0.1,0), g.cam.pos + dir*100, ColorWhite);
     // v3 max = st->cam.pos + v3_one();
     // v3 min = st->cam.pos - v3_one();
   }
@@ -421,7 +430,7 @@ void scene_update() {
   }
   {
     var e = g.monkey;
-    vk_draw_aabb(e.pos()+e.aabb().min, e.pos()+e.aabb().max, ColorWhite);
+    vk_draw_cuboid(shift_3f32(e.aabb(), e.pos()), ColorWhite);
   }
   {
     mat4& view = vk_get_view();
@@ -452,9 +461,10 @@ void scene_update() {
     var e = e_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
     u32 range = 100;
     e.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
-    g.moving_cubes.add(e);
+    darray_add(g.moving_cubes, e);
   }
-  for (var e : g.moving_cubes) {
+  Loop (i, g.moving_cubes.count) {
+    var e = g.moving_cubes[i];
     e.pos() += e.vel() * get_dt();
     v3 center = {0, 0, 0};
     v3 dir = e.pos() - center;
@@ -462,21 +472,36 @@ void scene_update() {
     e.vel() += tangent * 2.0f * get_dt();
     e.vel() += -dir * 0.5f * get_dt();
   }
+
+  vk_draw_rect(Rng2(v2(100,100), v2(200,200)), v3(1,1,1));
+  v4& pos = get_pos();
+  f32 speed = 1 * get_dt();
+  if (key_down(Key_A)) {
+    pos.x -= speed;
+  }
+  if (key_down(Key_D)) {
+    pos.x += speed;
+  }
+
+  mat4& mat = get_mat();
+  mat = mat4_translate(v3_of_v4(pos));
 }
 
 void game_init() {
-  TimeFunction;
+  ProfFunc;
+  v4& pos = get_pos();
+  pos = {};
   GameState& g = g_st->game;
   Scratch scratch;
-  g.arena = arena_init_named("game arena");
-  g.persistent_arena = arena_init_named("game arena persistent");
+  g.arena = arena_make_named("game arena");
+  g.persistent_arena = arena_make_named("game arena persistent");
   g.gpa.init(g.arena, "game gpa");
   g.timer = timer_init(1);
   g.entity_id_pool.init(g.persistent_arena, MaxEntities);
   g.static_entity_id_pool.init(g.persistent_arena, MaxStaticEntities);
   g.entities = push_array(g.persistent_arena, Entity, MaxEntities);
   g.static_entities = push_array(g.persistent_arena, StaticEntity, MaxStaticEntities);
-  g.moving_cubes.init(g.gpa);
+  g.moving_cubes = darray_make<Handle<Entity>>(g.gpa);
 
   g.gpa_arena0.init(g.arena, "game gpa arena0");
   g.gpa_arena1.init(g.arena, "game gpa arena1");
@@ -496,12 +521,36 @@ void game_init() {
   cubemap_load("night_cubemap");
   asset_load();
   scene_init();
+
+  // camera_init();
+  // g.cube0 = e_alloc(Mesh_Cube, Material_Container);
+  // g.cube0.pos() = v3(1,0,0);
+  // g.cube1 = e_alloc(Mesh_Cube, Material_Orange);
+  // g.cube1.pos() = v3(-1,0,0);
+  // g.monkey = e_alloc(Mesh_MonkeyGlb, Material_Container);
+  // g.monkey.pos() = v3(2,0,0);
+  // Loop (i, KB(10)) {
+  //   MeshId meshes[] = {
+  //     // Mesh_MonkeyGlb,
+  //     // Mesh_Triangle,
+  //     Mesh_Cube,
+  //   };
+  //   MaterialId materials[] = {
+  //     Material_Orange,
+  //     // Material_Container,
+  //     // Material_Screen,
+  //   };
+  //   var e = e_static_alloc(ArrayRand(meshes), ArrayRand(materials));
+  //   u32 range = KB(1);
+  //   e.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
+  // }
 }
 
 void game_update() {
   // foo();
-  TimeFunction;
+  ProfFunc;
   var& g = g_st->game;
+
   // push_array(g.arena, u32, 100);
   if (timer_tick(g.timer)) {
     // push_array(g.gpa, u32, 1000);
@@ -521,3 +570,5 @@ void game_update() {
   }
   scene_update();
 }
+
+

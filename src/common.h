@@ -23,13 +23,19 @@ struct ImString {
 // UI rendering
 // memory visualisation thread safe, and gpu memory
 // thread graph visualisation
-// profiler
+// sample profiler
 // make wayland backend work
 // fix static non indexed - doesn't render
 // console
 // thread safe allocator
 // async
-// profile launch time
+// introspection
+// upgrade vulkan
+// compiling all shaders in compiled dir and check timestamp to recompile on thread
+// slang shader language
+// metadesk tables?
+// shaders code
+// draw
 
 const v3 ColorRed   = v3(1,0,0);
 const v3 ColorGreen = v3(0,1,0);
@@ -217,6 +223,46 @@ Handle<GpuCubemap> cubemap_load(String name);
 void asset_load();
 
 ////////////////////////////////////////////////////////////////////////
+// Lexer
+
+enum TokenType {
+  TokenType_Unknown,
+
+  TokenType_OpenParen,
+  TokenType_CloseParen,
+  TokenType_Colon,
+  TokenType_Semicolon,
+  TokenType_Asterisk,
+  TokenType_OpenBracket,
+  TokenType_CloseBracket,
+  TokenType_OpenBrace,
+  TokenType_CloseBrace,
+  TokenType_Equals,
+  TokenType_Comma,
+  TokenType_Or,
+  TokenType_Pound,
+
+  TokenType_String,
+  TokenType_Identifier,
+  TokenType_Number,
+
+  TokenType_Spacing,
+  TokenType_EndOfLine,
+  TokenType_Comment,
+
+  TokenType_EndOfStream,
+};
+
+struct Token {
+  TokenType type;
+  String str;
+};
+
+struct Tokenizer {
+  String str;
+};
+
+////////////////////////////////////////////////////////////////////////
 // @Input
 
 struct InputState {
@@ -225,39 +271,46 @@ struct InputState {
 
 b32 key_pressed(Key key);
 b32 key_pressed_consume(Key key);
+b32 key_down(Key key);
+b32 key_down_consume(Key key);
 void key_consume(Key key);
 void input_update();
 
 ////////////////////////////////////////////////////////////////////////
 // @UI
 
-struct ScrollState {
-  v2 offset;
-  f32 scale;
+enum ScrollType {
+  ScrollType_Default,
+  ScrollType_PowClamp,
 };
 
-struct ScrollRegion {
-  Rng2 rect;
-  v2 content_size;
-  ScrollState* state;
+struct ScrollState {
+  v2 offset;
+  v2 scale;
+  f32 scale_level;
 };
 
 struct ImguiWindow {
   v2 pos;
   v2 size;
+  b32 toggle_fullscreen;
   b32 fullscreen;
   b32 open;
   ImGuiWindowFlags flags;
-  ScrollState root_scroll_state;
-  ScrollState frames_scroll_state;
-  ScrollState mem_scroll_state;
-  ScrollRegion scroll_region;
 };
 
+struct ProfWindow : ImguiWindow {
+  ScrollState root_scroll_state;
+  ScrollState frames_scroll_state;
+  ScrollState launch_time_scroll_state;
+  ScrollState mem_scroll_state;
+};
+
+ScrollState scroll_state_make(f32 scale);
+void ui_handle_scroll(ScrollState& s, ScrollType type = ScrollType_Default);
 void imgui_window_toggle_fullscreen(ImguiWindow& window);
 void imgui_window_apply_state(ImguiWindow& window);
 void imgui_window_track_state(ImguiWindow& window);
-void ui_handle_scroll(ScrollState& s, v2 mouse);
 
 // struct UI_Window {
 //   v2 pos;
@@ -329,6 +382,7 @@ struct Camera {
   f32 yaw;
   f32 pitch;
   f32 fov;
+  f32 speed;
 };
 
 struct Entity {
@@ -383,6 +437,8 @@ struct GameState {
   Camera cam;
   Timer timer;
 
+  u32 entities_count;
+  u32 static_entities_count;
   Entity* entities;
   StaticEntity* static_entities;
   StaticIdPool entity_id_pool;
@@ -395,6 +451,9 @@ struct GameState {
   Handle<Entity> monkey;
   Handle<Entity> rotating_cube;
   Handle<Entity> sphere;
+
+  Handle<Entity> cube0;
+  Handle<Entity> cube1;
 };  
 
 struct GlobalState {
@@ -422,13 +481,14 @@ struct GlobalState {
 
   ThreadPool thread_pool;
   WatchState watch;
-  ImguiWindow profile_win;
+  ProfWindow profile_win;
   GameState game;
+  ImguiWindow game_win;
   b32 imgui_demo_open;
 
   InputState input;
 
-  void* vk_st;
+  void* vk;
 };
 
 extern GlobalState* g_st;

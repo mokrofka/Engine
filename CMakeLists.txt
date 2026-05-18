@@ -29,7 +29,7 @@ project(Engine)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO "${binary_dir}")
 
 # Compiler
-  add_compile_options(-Wunused-variable -Wno-unused-const-variable -Wuninitialized -fno-exceptions -fno-rtti -Wno-c99-designator)
+  add_compile_options(-Wunused-variable -Wno-unused-const-variable -Wuninitialized -Wno-c99-designator -fno-exceptions -fno-rtti)
   message("Compiler: ${CMAKE_CXX_COMPILER_ID}")
 
 # Sanitizer
@@ -66,7 +66,6 @@ project(Engine)
   )
   set(game_source src/common.cpp src/vk.cpp)
   set(exe_source src/main.cpp)
-  set(cpp_modules src/module.ixx)
 
   if (dev_build) # reduce build time in release build
     add_compile_definitions(DEAR_IMGUI=1)
@@ -121,9 +120,8 @@ project(Engine)
     endif()
   endif()
 
-# add_executable(compiling_shaders 
-#   src/base/base_impl.cpp
-#   src/os/os_impl.cpp
-#   src/compiling_shaders.cpp
-# )
-# target_link_libraries(compiling_shaders -lxcb libxcb-keysyms.so)
+add_executable(compiling_shaders 
+  src/base/base_impl.cpp
+  src/compiling_shaders.cpp
+)
+target_link_libraries(compiling_shaders -lxcb libxcb-keysyms.so)

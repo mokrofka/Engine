@@ -1,5 +1,7 @@
 #include "stb_image.h"
+#include "stb_truetype.h"
 #include "game.cpp"
+
 #include "common.h"
 #include "json.cpp"
 #include "test.cpp"
@@ -53,10 +55,10 @@ v3& Handle<StaticEntity>::scale() { return trans().scale; }
 
 intern Mesh mesh_load_obj(Allocator arena, String name) {
   Scratch scratch(arena);
-  Darray<v3> positions(scratch);
-  Darray<v3> normals(scratch);
-  Darray<v2> uvs(scratch);
-  Darray<v3u> indexes(scratch);
+  var positions = darray_make<v3>(scratch);
+  var normals = darray_make<v3>(scratch);
+  var uvs = darray_make<v2>(scratch);
+  var indexes = darray_make<v3u>(scratch);
   Slice buf = os_file_path_read_all(scratch, name);
   Lexer lexer = lexer_init({buf.data, buf.count});
   String word;
@@ -68,7 +70,7 @@ intern Mesh mesh_load_obj(Allocator arena, String name) {
         e = f32_from_str(lexer_next_token(&lexer));
       }
       // Info("v %f, %f, %f", v.x, v.y, v.z);
-      positions.add(v);
+      darray_add(positions, v);
     }
     // norm
     else if (str_match(word, "vn")) {
@@ -77,7 +79,7 @@ intern Mesh mesh_load_obj(Allocator arena, String name) {
         e = f32_from_str(lexer_next_token(&lexer));
       }
       // Info("vn %f, %f, %f", v.x, v.y, v.z);
-      normals.add(v);
+      darray_add(normals, v);
     }
     // uv
     else if (str_match(word, "vt")) {
@@ -86,7 +88,7 @@ intern Mesh mesh_load_obj(Allocator arena, String name) {
         e = f32_from_str(lexer_next_token(&lexer));
       }
       // Info("vt %f, %f", v.x, v.y);
-      uvs.add(v);
+      darray_add(uvs, v);
     }
     // indexes
     else if (str_match(word, "f")) {
@@ -97,14 +99,15 @@ intern Mesh mesh_load_obj(Allocator arena, String name) {
         }
         v3u v = {raw.x, raw.z, raw.y};
         // Info("%i, %i, %i", v.x, v.y, v.z);
-        indexes.add(v);
+        darray_add(indexes, v);
       }
     }
   }
-  Darray<Vertex> vertices(arena);
-  Darray<u32> final_indices(arena);
+  var vertices = darray_make<Vertex>(arena);
+  var final_indices = darray_make<u32>(arena);
   Map<Vertex, u32> map(scratch);
-  for (v3u idx : indexes) {
+  Loop (i, indexes.count) {
+    v3u idx = indexes[i];
     Vertex vertex = {
       .pos = positions[idx.x],
       .norm = normals[idx.y],
@@ -112,11 +115,11 @@ intern Mesh mesh_load_obj(Allocator arena, String name) {
     };
     u32* found = map.get(vertex);
     if (found) {
-      final_indices.add(*found);
+      darray_add(final_indices, *found);
     } else {
       u32 new_index = vertices.count;
-      vertices.add(vertex);
-      final_indices.add(new_index);
+      darray_add(vertices, vertex);
+      darray_add(final_indices, new_index);
       map.add(vertex, new_index);
     }
   }
@@ -521,7 +524,21 @@ void asset_load() {
 }
 
 ////////////////////////////////////////////////////////////////////////
-// Input
+// Lexer
+
+Slice<Token> tokens_from_str(Allocator arena, String str) {
+  // u32 off = 0;
+//   u32 advance = 0;
+//   for (u32 advance = 0; off <= str.size; off += advance) {
+//     u8 byte      = (off+0 < str.size) ? str.str[off+0] : 0;
+//     u8 next_byte = (off+1 < str.size) ? str.str[off+1] : 0;
+//     b32 ender_found = false;
+//   }
+  return {};
+}
+
+////////////////////////////////////////////////////////////////////////
+// @Input
 
 b32 key_pressed(Key key) {
   if (os_is_key_pressed(key)) {
@@ -532,6 +549,21 @@ b32 key_pressed(Key key) {
 
 b32 key_pressed_consume(Key key) {
   if (key_pressed(key)) {
+    key_consume(key);
+    return true;
+  }
+  return false;
+}
+
+b32 key_down(Key key) {
+  if (os_is_key_down(key)) {
+    if (!g_st->input.consumed[key]) return true;
+  }
+  return false;
+}
+
+b32 key_down_consume(Key key) {
+  if (key_down(key)) {
     key_consume(key);
     return true;
   }
@@ -549,21 +581,86 @@ void input_update() {
 ////////////////////////////////////////////////////////////////////////
 // some ui
 
-void imgui_window_toggle_fullscreen(ImguiWindow& window) {
-  if (window.fullscreen) {
-    ImGui::SetNextWindowPos(window.pos);
-    ImGui::SetNextWindowSize(window.size);
-  }
-  window.fullscreen = !window.fullscreen;
+ScrollState scroll_state_make(f32 scale) {
+  ScrollState res = {
+    .scale_level = scale,
+    .scale = v2_scale(scale),
+  };
+  return res;
 }
 
-void imgui_window_apply_state(ImguiWindow& window) {
-  if (window.fullscreen) {
-    ImGui::SetNextWindowPos(ImVec2(0, 0));
-    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
-    window.flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
-  } else {
-    window.flags = NoFlags;
+void ui_handle_scroll(ScrollState& s, ScrollType type) {
+  f32 wheel = os_get_scroll();
+  if (wheel) {
+    if (os_is_key_down(Key_Ctrl)) {
+      v2 mouse = os_get_mouse_pos();
+      f32 sensity = 1.3;
+      f32 zoom = (wheel > 0) ? sensity : 1.0f/sensity;
+      switch (type) {
+        case ScrollType_Default: {
+          // we have: mouse == world * scale + offset;
+          v2 world = (mouse - s.offset) / s.scale_level;
+          s.scale_level *= zoom;
+          s.offset = mouse - world * s.scale_level;
+          s.scale = v2_scale(s.scale_level);
+        } break;
+        case ScrollType_PowClamp: {
+          v2 world = {
+            (mouse.x - s.offset.x) / s.scale.x,
+            (mouse.y - s.offset.y) / s.scale.y
+          };
+          s.scale_level *= zoom;
+          s.scale_level = ClampBot(s.scale_level, 0.02);
+          s.scale.y = Clamp(0.01, s.scale_level, 3);
+          f32 t = Pow(s.scale_level + 1, 2);
+          f32 ratio = t * 0.3;
+          s.scale.x = s.scale.y * ratio;
+
+          if (s.scale.y > 1) {
+            f32 inv = 1.0f / s.scale_level;
+            f32 target = inv / (1.0f + inv);
+            s.scale.y = Lerp(1.0f, 0.3f, target);
+          }
+
+          s.offset.x = mouse.x - world.x * s.scale.x;
+          s.offset.y = mouse.y - world.y * s.scale.y;
+
+        } break;
+      }
+    }
+    else {
+      s.offset.y += wheel * 100.0f;
+    }
+  }
+
+  f32 scroll_h = os_get_scroll_h();
+  if (scroll_h) {
+    f32 sensity = 100;
+    if (os_is_key_down(Key_Shift)) {
+      sensity *= 3;
+    }
+    s.offset.x += scroll_h * sensity;
+  }
+}
+
+void imgui_window_toggle_fullscreen(ImguiWindow& window) {
+  window.toggle_fullscreen = 1;
+}
+
+void imgui_window_apply_state(ImguiWindow& win) {
+  if (win.toggle_fullscreen) {
+    if (!win.fullscreen) {
+      win.fullscreen = true;
+      ImGui::SetNextWindowPos(ImVec2(0, 0));
+      ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+      win.flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
+    } else {
+      win.fullscreen = false;
+      ImGui::SetNextWindowPos(win.pos);
+      ImGui::SetNextWindowSize(win.size);
+      win.flags = NoFlags;
+    }
+    win.toggle_fullscreen = false;
   }
 }
 
@@ -571,34 +668,6 @@ void imgui_window_track_state(ImguiWindow& window) {
   if (!window.fullscreen) {
     window.pos = ImGui::GetWindowPos();
     window.size = ImGui::GetWindowSize();
-  }
-}
-
-void ui_zoom_at_mouse(ScrollState& s, f32 zoom_factor) {
-  v2 mouse = os_get_mouse_pos();
-  // we that: mouse == world * scale + offset;
-  // 1. get world position under mouse BEFORE zoom
-  v2 world = (mouse - s.offset) / s.scale;
-  // 2. apply zoom
-  s.scale *= zoom_factor;
-  // 3. move offset so that same world point stays under mouse
-  s.offset = mouse - world * s.scale;
-}
-
-void ui_handle_scroll(ScrollState& s, v2 mouse) {
-  f32 wheel = os_get_scroll();
-  if (wheel) {
-    if (os_is_key_down(Key_Ctrl)) {
-      f32 zoom = (wheel > 0) ? 1.1f : 0.9f;
-      ui_zoom_at_mouse(s, zoom);
-    } else {
-      s.offset.y += wheel * 100.0f;
-    }
-  }
-
-  f32 x_scroll = os_get_scroll_x();
-  if (x_scroll) {
-    s.offset.x += x_scroll * 100.0f;
   }
 }
 
@@ -714,97 +783,13 @@ void ui_handle_scroll(ScrollState& s, v2 mouse) {
 //   return clicked;
 // }
 
-void profiler_draw_frame(Slice<ProfileAnchor> anchors, ProfileFrameTime frame_time, f32 width, v2 cursor_pos, ScrollState scroll_state) {
-  Scratch scratch;
-  v2 mouse = os_get_mouse_pos();
-
-  u64 cpu_freq = cpu_frequency();
-  u64 tsc_start = frame_time.tsc_start;
-  u64 tsc_end = frame_time.tsc_end;
-  u64 tsc_elapsed = tsc_end - tsc_start;
-
-  ImDrawList* draw = ImGui::GetWindowDrawList();
-
-  Loop(i, anchors.count) {
-    ImGui::PushID(i);
-    ProfileAnchor anchor = anchors[i];
-
-    // Handle async anchors
-    if (!anchor.was_poped) {
-      ImGui::PopID();
-      return;
-    }
-
-    f64 width_percent = (f64)anchor.tsc_elapsed_inclusive / tsc_elapsed;
-    f64 width_percent_offset = normalize(tsc_start, anchor.tsc_start, tsc_end);
-    f64 width_percent_with_children = 0;
-    v2 size = v2(width, 30);
-    if (anchor.tsc_elapsed_inclusive != anchor.tsc_elapsed_exclusive) {
-      width_percent_with_children = ((f64)anchor.tsc_elapsed_inclusive / (f64)tsc_elapsed);
-      size.x *= width_percent_with_children;
-    } else {
-      size.x *= width_percent;
-    }
-    if (width_percent > 0.02 || width_percent_with_children > 0.02) {
-      f32 x_offset = width * width_percent_offset;
-      v2 min = v2(x_offset, anchor.depth * size.y) + cursor_pos;
-      Rng2 world_rect = Rng2(min, min + size);
-
-      v2 screen_min = world_rect.min * scroll_state.scale + scroll_state.offset;
-      v2 screen_max = world_rect.max * scroll_state.scale + scroll_state.offset;
-      Rng2 screen_rect = Rng2(screen_min, screen_max);
-      Rng2 rect = screen_rect;
-
-      ImU32 color = {};
-      ImString str = {};
-      switch (anchor.type) {
-        case ProfileType_Work: {
-          color = IM_COL32(50, 50, 50, 255);
-          str = String("work");
-        } break;
-        case ProfileType_Sleep: {
-          color = IM_COL32(50, 70, 80, 255);
-          str = String("sleep");
-        } break;
-      }
-      draw->AddRectFilled(IM_RECT(rect), color);
-      draw->AddRect(IM_RECT(rect), IM_COL32(200, 200, 200, 255));
-      if (contains_2f32(rect, mouse)) {
-        ImGui::BeginTooltip();
-        ImGui::Text("Label: %s", anchor.label.str);
-        ImGui::Text("Percent: %f%%", width_percent * 100);
-        // ImGui::Text("Hits: %lu", anchor.hit_count);
-        ImGui::Text("Time: %fms", (f64)anchor.tsc_elapsed_inclusive / cpu_freq * 1000);
-        ImGui::Text("Time exclusive: %fms", (f64)anchor.tsc_elapsed_exclusive / cpu_freq * 1000);
-        ImGui::Text("Type: %s", str.str);
-        ImGui::EndTooltip();
-      }
-      if (width_percent > 0.05 || width_percent_with_children > 0.05) {
-        ImString str = push_strf(scratch, "%s %.3f", anchor.label, (f64)anchor.tsc_elapsed_inclusive / cpu_freq * 1000);
-        v2 text_size = ImGui::CalcTextSize(str);
-        v2 text_pos = {};
-        if (text_size.x > size.x) {
-          text_pos.x = rect.min.x;
-          text_pos.y = rect.min.y + (size.y - text_size.y) * 0.5;
-        } else {
-          text_pos = align_center_2f32(rect, text_size).min;
-        }
-        draw->PushClipRect(rect.min, rect.max);
-        draw->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), str);
-        draw->PopClipRect();
-      }
-    }
-    ImGui::PopID();
-  }
-}
-
 void profiler_view() {
   Scratch scratch;
-  ProfilerState& g = profiler_get();
-  ImguiWindow& win = g_st->profile_win;
+  ProfState& g = prof_get();
+  ProfWindow& win = g_st->profile_win;
 
   // Avg, min, max
-  ProfileFrame prev_frame = profiler_get_prev_frame(g_st->current_frame);
+  ProfFrame prev_frame = prof_get_prev_frame(g_st->current_frame);
   var anchors = prev_frame.anchors;
   u64 cpu_freq = cpu_frequency();
   u64 tsc_start = prev_frame.frame_time.tsc_start;
@@ -814,7 +799,7 @@ void profiler_view() {
   u64 tsc_elapsed_max = g.frames_times[0].tsc_end - g.frames_times[0].tsc_start;
   u64 tsc_elapsed_min = g.frames_times[0].tsc_end - g.frames_times[0].tsc_start;
   for EachElement(i, g.frames_times) {
-    ProfileFrameTime frame = g.frames_times[i];
+    ProfFrameTime frame = g.frames_times[i];
     u64 elapsed = frame.tsc_end - frame.tsc_start;
     tsc_elapsed_sum += elapsed;
     tsc_elapsed_max = Max(tsc_elapsed_max, elapsed);
@@ -824,22 +809,28 @@ void profiler_view() {
   g.frame_max_time = tsc_to_ms(tsc_elapsed_max);
   g.frame_min_time = tsc_to_ms(tsc_elapsed_min);
 
-  if (key_pressed(Key_F1)) win.open = !win.open;
+  if (key_pressed(Key_H)) {
+    ImGui::SetNextWindowFocus(); 
+  }
 
   if (win.open) {
-    if (key_pressed(Key_F2)) {
-      imgui_window_toggle_fullscreen(win);
-    }
     imgui_window_apply_state(win);
-
-    if (key_pressed(Key_1)) g.active_tab = ProfileTabActive_Root;
-    if (key_pressed(Key_2)) g.active_tab = ProfileTabActive_Frames;
-    if (key_pressed(Key_3)) g.active_tab = ProfileTabActive_Time;
-    if (key_pressed(Key_4)) g.active_tab = ProfileTabActive_Memory;
-    if (key_pressed(Key_5)) g.paused = !g.paused;
 
     if (ImGui::Begin("Profiler", null, win.flags)) {
       imgui_window_track_state(win);
+      if (key_pressed(Key_1)) g.active_tab = ProfileTabActive_Root;
+      if (key_pressed(Key_2)) g.active_tab = ProfileTabActive_Frames;
+      if (key_pressed(Key_3)) g.active_tab = ProfileTabActive_Time;
+      if (key_pressed(Key_4)) g.active_tab = ProfileTabActive_LaunchTime;
+      if (key_pressed(Key_5)) g.active_tab = ProfileTabActive_Memory;
+      if (key_pressed(Key_P)) g.paused = !g.paused;
+      if (ImGui::IsWindowHovered()) {
+        if (key_pressed(Key_V)) {
+          imgui_window_toggle_fullscreen(win);
+        }
+      }
+
+      ImGui::SetWindowFontScale(0.8f);
       if (ImGui::BeginTabBar("MyTabBar")) {
         ImDrawList* draw = ImGui::GetWindowDrawList();
         v2 cursor_pos = ImGui::GetCursorScreenPos();
@@ -848,23 +839,207 @@ void profiler_view() {
         v2 avail_size = ImGui::GetWindowSize();
         avail_size.x -= (cursor_pos - win_pos).x * 2;
 
+        enum UI_ItemType {
+          UI_ItemType_Bar,
+          UI_ItemType_NextThread,
+        };
+        struct UI_Item {
+          UI_ItemType type;
+          Rng2 rect;
+          ProfAnchor anchor;
+        };
+
+        var draw_frame_graph = [&](Slice<Slice<ProfAnchor>> slices, ProfFrameTime time, f32 width_off, ScrollState scroll_state, b32 wrap = false) {
+          Scratch scratch;
+          var items = darray_make<UI_Item>(scratch);
+          Loop (i, slices.count) {
+            var anchors = slices[i];
+
+            ///////////////////////////////////
+            // Build rect layout
+            {
+              // ProfFrameTime time = g.frames_times[anchors_idx];
+              u64 tsc_start = time.tsc_start;
+              u64 tsc_end = time.tsc_end;
+              u64 tsc_elapsed = tsc_end - tsc_start;
+              Loop(i, anchors.count) {
+                ProfAnchor anchor = anchors[i];
+                u64 var_tsc_elapsed_incl = anchor.tsc_elapsed_incl;
+                u64 var_tsc_start = anchor.tsc_start;
+                
+                // Handle async anchors
+                if (wrap) {
+                  if (!anchor.was_poped) {
+                    var_tsc_elapsed_incl = tsc_end - anchor.tsc_start;
+                    anchor.tsc_elapsed_incl = var_tsc_elapsed_incl;
+                  }
+                  if (anchor.tsc_start < tsc_start) {
+                    var_tsc_start = tsc_start;
+                    anchor.tsc_start = var_tsc_start;
+                  }
+                }
+                else {
+                  if (!anchor.was_poped) {
+                    break;
+                  }
+                }
+
+                f64 width_t = (f64)var_tsc_elapsed_incl / tsc_elapsed;
+                f64 width_t_off = normalize((f64)tsc_start, var_tsc_start, tsc_end);
+                if (anchor.tsc_elapsed_incl != anchor.tsc_elapsed_excl) {
+                  width_t = (f64)anchor.tsc_elapsed_incl / tsc_elapsed;
+                }
+                f32 height = 30;
+                f32 height_off = anchor.depth * height;
+                f32 width = width_t * avail_size.x;
+                f32 width_off = width_t_off * avail_size.x;
+                Rng2 rect = pos_size_2f32(v2(width_off, height_off), v2(width, height));
+                UI_Item item = {
+                  .type = UI_ItemType_Bar,
+                  .rect = rect,
+                  .anchor = anchor,
+                };
+                darray_add(items, item);
+              }
+            }
+            darray_add(items, {.type = UI_ItemType_NextThread});
+          }
+
+          ///////////////////////////////////
+          // Anchors and thread offsets
+          f32 height_off = 0;
+          f32 thread_height_off = 200;
+          Loop (i, items.count) {
+            UI_Item& item = items[i];
+            switch (item.type) {
+              case UI_ItemType_Bar: {
+                item.rect = shift_2f32(item.rect, v2(width_off, height_off));
+              } break;
+              case UI_ItemType_NextThread: {
+                height_off += thread_height_off;
+              } break;
+            }
+          }
+
+          // Scroll
+          Loop (i, items.count) {
+            UI_Item& item = items[i];
+            item.rect = shift_2f32(item.rect, cursor_pos);
+            item.rect.min.x *= scroll_state.scale.x;
+            item.rect.min.y *= scroll_state.scale.y;
+            item.rect.max.x *= scroll_state.scale.x;
+            item.rect.max.y *= scroll_state.scale.y;
+            item.rect = shift_2f32(item.rect, scroll_state.offset);
+          }
+
+          ///////////////////////////////////
+          // Drawing
+          Loop (i, items.count) {
+            UI_Item item = items[i];
+            switch (item.type) {
+              default:{}break;
+              case UI_ItemType_Bar: {
+                ImU32 color = {};
+                ImString str = {};
+                ProfAnchor anchor = item.anchor;
+                Rng2 rect = item.rect;
+                switch (anchor.type) {
+                  case ProfType_Work: {
+                    color = IM_COL32(50, 50, 50, 255);
+                    str = String("work");
+                  } break;
+                  case ProfType_Sleep: {
+                    color = IM_COL32(50, 70, 80, 255);
+                    str = String("sleep");
+                  } break;
+                  case ProfType_Worker: {
+                    color = IM_COL32(50, 100, 80, 255);
+                    str = String("job");
+                  } break;
+                }
+                draw->AddRectFilled(IM_RECT(rect), color);
+                draw->AddRect(IM_RECT(rect), IM_COL32(200, 200, 200, 255));
+                if (contains_2f32(rect, mouse_pos)) {
+                  ImGui::BeginTooltip();
+                  ImGui::Text("Label: %s", anchor.label.str);
+                  ImGui::Text("Percent: %f%%", dim_2f32(rect).x / avail_size.x * 100);
+                  // ImGui::Text("Hits: %lu", anchor.hit_count);
+                  ImGui::Text("Time: %fms", tsc_to_ms(anchor.tsc_elapsed_incl));
+                  ImGui::Text("Time exclusive: %fms", tsc_to_ms(anchor.tsc_elapsed_excl));
+                  ImGui::Text("Type: %s", str.str);
+                  ImGui::EndTooltip();
+                }
+
+                // Text
+                {
+                  ImString str = push_strf(scratch, "%s %.3f", anchor.label, tsc_to_ms(anchor.tsc_elapsed_incl));
+                  v2 text_size = ImGui::CalcTextSize(str);
+                  if (dim_2f32(rect).x < 30.1 || scroll_state.scale.y < 0.3) {
+                    continue;
+                  }
+                  v2 text_pos = {};
+                  if (text_size.x > dim_2f32(rect).x) {
+                    text_pos.x = rect.min.x;
+                    text_pos.y = rect.min.y + (dim_2f32(rect).y - text_size.y) * 0.5;
+                  } else {
+                    text_pos = align_center_2f32(rect, text_size).min;
+                  }
+                  draw->PushClipRect(rect.min, rect.max);
+                  draw->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), str);
+                  draw->PopClipRect();
+                }
+              } break;
+            }
+          }
+        };
+
+        ImGui::Text("%.1ffps %.1fms CPU %.1fGhz, Recording: %s", 1000 / tsc_to_ms(tsc_elapsed), tsc_to_ms(tsc_elapsed), (f64)cpu_freq / Billion(1), g.paused ? "off" : "on");
+        ImGui::Text("avg %.1fms, max %.1f, min %.1f", g.frame_avg_time, g.frame_max_time, g.frame_min_time);
+        f32 info_height = 60;
+        cursor_pos.y += info_height;
+
+        ///////////////////////////////////
+        // Draw thread names
+        var draw_threads = [&](ScrollState scroll_state) {
+          f32 thread_height = 200;
+          f32 thread_height_offset = 0;
+          f32 text_off_above = -40;
+          {
+            ImString str = push_strf(scratch, "Main thread");
+            v2 text_pos = (v2(0, text_off_above) + cursor_pos);
+            text_pos.y *= scroll_state.scale.y;
+            text_pos.y += scroll_state.offset.y;
+            draw->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), str);
+          }
+          {
+            Loop (i, THREAD_COUNT) {
+              thread_height_offset += thread_height;
+              ImString str = push_strf(scratch, "Worker %i", i);
+              v2 text_pos = v2(0, thread_height_offset + text_off_above) + cursor_pos;
+              text_pos.y *= scroll_state.scale.y;
+              text_pos.y += scroll_state.offset.y;
+              draw->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), str);
+            }
+            thread_height_offset = 0;
+          }
+        };
+
         ///////////////////////////////////
         // Root
         if (ImGui::BeginTabItem("root"), g.active_tab == ProfileTabActive_Root) {
           ScrollState& scroll_state = win.root_scroll_state;
           if (ImGui::IsWindowHovered()) {
-            ui_handle_scroll(scroll_state, mouse_pos);
+            ui_handle_scroll(scroll_state, ScrollType_PowClamp);
           }
-          ImGui::Text("%.1ffps %.1fms CPU %.1fGhz", 1 / get_dt(), tsc_to_ms(tsc_elapsed), (f64)cpu_freq / Billion(1));
-          ImGui::Text("avg %.1fms, max %.1f, min %.1f", g.frame_avg_time, g.frame_max_time, g.frame_min_time);
-          f32 info_height = 40;
-          cursor_pos.y += info_height;
+          cursor_pos.y += 30;
+          draw_threads(scroll_state);
+          u32 idx = (g_st->current_frame-1) % ArrayCount(g.frames_times);
+          Slice<ProfAnchor> slices[ArrayCount(g.prof_threads)] = {};
           for EachElement(i, g.prof_threads) {
-            ProfileThread prof_thread = g.prof_threads[i];
-            var anchors = prof_thread.recorded_anchors[(g_st->current_frame-1) % ArrayCount(g.frames_times)].slice();
-            profiler_draw_frame(anchors, prev_frame.frame_time, avail_size.x, cursor_pos, scroll_state);
-            cursor_pos.y += 200;
+            slices[i] = slice(g.prof_threads[i].recorded_anchors[idx]);
           }
+          ProfFrameTime time = g.frames_times[idx];
+          draw_frame_graph(ArraySlice(slices), time, 0, scroll_state);
           ImGui::EndTabItem();
         };
 
@@ -873,25 +1048,28 @@ void profiler_view() {
         if (ImGui::BeginTabItem("frames"), g.active_tab == ProfileTabActive_Frames) {
           ScrollState& scroll_state = win.frames_scroll_state;
           if (ImGui::IsWindowHovered()) {
-            ui_handle_scroll(scroll_state, mouse_pos);
+            ui_handle_scroll(scroll_state, ScrollType_PowClamp);
           }
           f32 width_size = avail_size.x;
+
+          ///////////////////////////////////
+          // Little bars
           Loop (i, ArrayCount(g.frames_times)) {
-            ProfileFrameTime frame_time = g.frames_times[i];
+            ProfFrameTime frame_time = g.frames_times[i];
             f32 max_height = 40;
             f32 max_ms = 30;
-            f32 frame_ms = tsc_to_ms(frame_time.tsc_end - frame_time.tsc_start);
-            f32 height = max_height / (max_ms / frame_ms);
+            f64 frame_ms = tsc_to_ms(frame_time.tsc_end - frame_time.tsc_start);
+            f64 height = max_height / (max_ms / frame_ms);
             v2 size = v2(avail_size.x / ArrayCount(g.frames_times), height);
             v2 min = cursor_pos + v2(i*size.x, -height + max_height);
-            Rng2 rect = Rng2(min, size + min);
+            Rng2 rect = pos_size_2f32(min, size);
             if (contains_2f32(rect, mouse_pos)) {
               ImGui::BeginTooltip();
               ImGui::Text("frame: %i", i);
               ImGui::EndTooltip();
               if (os_is_key_pressed(MouseKey_Left)) {
                 win.frames_scroll_state.offset.x = -width_size * i;
-                win.frames_scroll_state.scale = 1;
+                win.frames_scroll_state.scale = v2_scale(1);
               }
             }
             ImU32 color = IM_COL32(50, 200, 50, 255);
@@ -912,6 +1090,7 @@ void profiler_view() {
             }
           }
           cursor_pos.y += 80;
+
           ///////////////////////////////////
           // Draw lines and current rect
           {
@@ -919,16 +1098,16 @@ void profiler_view() {
             Loop (i, ArrayCount(g.frames_times)) {
               f32 line_height = 1000;
               f32 thick = 1;
-              v2 p0 = cursor_pos + v2(0, -line_height / 2) + v2(width_offset, 0);
-              v2 p1 = cursor_pos + v2(0, line_height) + v2(width_offset, 0);
-              v2 p2 = cursor_pos + v2(width_size, 0) + v2(width_offset, 0);
-              v2 p3 = cursor_pos + v2(width_size, 0) + v2(0, line_height) + v2(width_offset, 0);
-              p0 = p0 * scroll_state.scale + scroll_state.offset;
-              p1 = p1 * scroll_state.scale + scroll_state.offset;
-              p2 = p2 * scroll_state.scale + scroll_state.offset;
-              p3 = p3 * scroll_state.scale + scroll_state.offset;
+              v2 base = cursor_pos + v2(width_offset, 0);
+              v2 p0 = base + v2(0, -line_height / 2);
+              v2 p1 = base + v2(0, line_height);
+              v2 p2 = base + v2(width_size, 0);
+              v2 p3 = base + v2(width_size, 0) + v2(0, line_height);
+              p0 = p0 * scroll_state.scale.x + scroll_state.offset;
+              p1 = p1 * scroll_state.scale.x + scroll_state.offset;
+              p2 = p2 * scroll_state.scale.x + scroll_state.offset;
+              p3 = p3 * scroll_state.scale.x + scroll_state.offset;
               draw->AddLine(p0, p1, IM_COL32(200, 200, 200, 255), thick);
-              // draw->AddLine(p3, p2, IM_COL32(200,200,200,255), thick);
               if (i == g_st->current_frame % ArrayCount(g.frames_times)) {
                 draw->AddRectFilled(p0, p3, IM_COL32(100, 100, 100, 100));
               }
@@ -936,35 +1115,17 @@ void profiler_view() {
             }
           }
 
-          // Draw thread names
-          f32 thread_height = 200;
-          f32 thread_height_offset = 0;
-          {
-            ImString str = push_strf(scratch, "Main thread");
-            v2 text_pos = (v2(0, -20) + cursor_pos) * scroll_state.scale + v2(0, scroll_state.offset.y);
-            draw->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), str);
-          }
-          {
-            Loop (i, THREAD_COUNT) {
-              thread_height_offset += thread_height;
-              ImString str = push_strf(scratch, "Worker %i", i);
-              v2 text_pos = (v2(0, thread_height_offset - 20) + cursor_pos) * scroll_state.scale + v2(0, + scroll_state.offset.y);
-              draw->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), str);
-            }
-            thread_height_offset = 0;
-          }
+          draw_threads(scroll_state);
 
           ///////////////////////////////////
           // Draw graph per thread
-          for EachElement(i, g.prof_threads) {
-            f32 width_offset = 0;
-            ProfileThread prof_thread = g.prof_threads[i];
-            for EachElement(j, g.frames_times) {
-              profiler_draw_frame(prof_thread.recorded_anchors[j].slice(), g.frames_times[j], width_size, cursor_pos+v2(width_offset, thread_height_offset), scroll_state);
-              width_offset += width_size;
+          for EachElement(j, g.frames_times) {
+            Slice<ProfAnchor> slices[ArrayCount(g.prof_threads)] = {};
+            for EachElement(i, g.prof_threads) {
+              slices[i] = slice(g.prof_threads[i].recorded_anchors[j]);
             }
-            width_offset = 0;
-            thread_height_offset += thread_height;
+            ProfFrameTime time = g.frames_times[j];
+            draw_frame_graph(ArraySlice(slices), time, j * width_size, scroll_state);
           }
           ImGui::EndTabItem();
         }
@@ -973,12 +1134,12 @@ void profiler_view() {
         // Time
         if (ImGui::BeginTabItem("time"), g.active_tab == ProfileTabActive_Time) {
           var sorted_anchors = slice_clone(scratch, anchors);
-          sort_insert(sorted_anchors, [](ProfileAnchor a, ProfileAnchor b) { return a.tsc_elapsed_exclusive > b.tsc_elapsed_exclusive; });
+          sort_insert(sorted_anchors, [](ProfAnchor a, ProfAnchor b) { return a.tsc_elapsed_excl > b.tsc_elapsed_excl; });
 
           Loop (i, anchors.count) {
             ImGui::PushID(i);
-            ProfileAnchor anchor = sorted_anchors[i];
-            f64 width_exclusive_percent = (f64)anchor.tsc_elapsed_exclusive / tsc_elapsed;
+            ProfAnchor anchor = sorted_anchors[i];
+            f64 width_exclusive_percent = (f64)anchor.tsc_elapsed_excl / tsc_elapsed;
             f32 width_exclusive = avail_size.x * 0.8;
             f32 height = 30;
             width_exclusive *= width_exclusive_percent;
@@ -992,7 +1153,7 @@ void profiler_view() {
             draw->AddRect(IM_RECT(rect), IM_COL32(200, 200, 200, 255));
 
             ImString name_str = push_strf(scratch, "%s", anchor.label);
-            ImString ms_str = push_strf(scratch, "%.3fms", (f64)anchor.tsc_elapsed_exclusive / cpu_freq * 1000);
+            ImString ms_str = push_strf(scratch, "%.3fms", (f64)anchor.tsc_elapsed_excl / cpu_freq * 1000);
             v2 name_offset = v2(0, height * i) + cursor_pos;
             v2 ms_offset = v2(avail_size.x * 0.82, height * i) + cursor_pos;
 
@@ -1004,12 +1165,29 @@ void profiler_view() {
           ImGui::EndTabItem();
         }
 
+        if (ImGui::BeginTabItem("launch"), g.active_tab == ProfileTabActive_LaunchTime) {
+          ScrollState& scroll_state = win.launch_time_scroll_state;
+          if (ImGui::IsWindowHovered()) {
+            ui_handle_scroll(scroll_state, ScrollType_PowClamp);
+          }
+
+          draw_threads(scroll_state);
+
+          Slice<ProfAnchor> slices[ArrayCount(g.prof_threads)] = {};
+          for EachElement(i, g.prof_threads) {
+            slices[i] = slice(g.prof_threads[i].launch_anchors);
+          }
+          ProfFrameTime time = g.launch_time;
+          draw_frame_graph(ArraySlice(slices), time, 0, scroll_state, true);
+          ImGui::EndTabItem();
+        }
+
         ///////////////////////////////////
         // Memory
         if (ImGui::BeginTabItem("memory"),  g.active_tab == ProfileTabActive_Memory) {
           ScrollState& scroll_state = win.mem_scroll_state;
           if (ImGui::IsWindowHovered()) {
-            ui_handle_scroll(scroll_state, mouse_pos);
+            ui_handle_scroll(scroll_state);
           }
           enum UI_ItemType {
             UI_ItemType_MemUsage,
@@ -1024,7 +1202,7 @@ void profiler_view() {
             AllocatorInfo* info;
             u32 mem_level;
           };
-          Darray<UI_Item> items(scratch);
+          var items = darray_make<UI_Item>(scratch);
           AllocatorInfoList infos = get_allocators_info();
           var infos_sorted = sort_list_insert(scratch, infos.first, [](var a, var b) { return a->pos > b->pos; });
           f64 mem_usage = 0;
@@ -1037,14 +1215,14 @@ void profiler_view() {
           // Layout
           {
             f32 row_h = 30;
-            LayoutCursor curs = {};
+            Rng2Cursor curs = {};
             // mem usage
             {
               UI_Item item = {
                 .type = UI_ItemType_MemUsage,
                 .rect = layout_row(curs, Rng1(0, avail_size.x), row_h),
               };
-              items.add(item);
+              darray_add(items, item);
             }
 
             b32 level_drawn[ArrayCount(mem_levels)] = {};
@@ -1066,7 +1244,7 @@ void profiler_view() {
                   .rect = layout_row(curs, Rng1(0, avail_size.x), row_h),
                   .mem_level = mem_level,
                 };
-                items.add(item);
+                darray_add(items, item);
               }
   
               // Arena
@@ -1077,7 +1255,7 @@ void profiler_view() {
                   .info = &info,
                   .mem_level = mem_level,
                 };
-                items.add(item);
+                darray_add(items, item);
               }
   
               // Children
@@ -1086,13 +1264,13 @@ void profiler_view() {
                 AllocatorInfo* node;
                 u32 depth;
               };
-              Darray<StackEntry> stack(scratch);
+              var stack = darray_make<StackEntry>(scratch);
               Slice sorted_children = sort_list_insert(scratch, info.first, [](var a, var b) { return a->pos > b->pos; });
               ReverseLoop (i, sorted_children.count) {
-                stack.add({sorted_children[i], 1});
+                darray_add(stack, {sorted_children[i], 1});
               }
               while (stack.count) {
-                StackEntry entry = stack.pop();
+                StackEntry entry = darray_pop(stack);
                 var child = entry.node;
                 UI_Item item = {
                   .type = UI_ItemType_Child,
@@ -1104,13 +1282,13 @@ void profiler_view() {
                   v2(depth * 10, curs.pos.y),
                   v2(avail_size.x, curs.pos.y + row_h * 0.6)
                 );
-                items.add(item);
+                darray_add(items, item);
                 layout_next(curs, row_h * 0.6);
                 if (child->first) {
                   ++depth;
                   Slice sorted_children = sort_list_insert(scratch, child->first, [](var a, var b) { return a->pos > b->pos; });
                   ReverseLoop (i, sorted_children.count) {
-                    stack.add({sorted_children[i], entry.depth + 1});
+                    darray_add(stack, {sorted_children[i], entry.depth + 1});
                   }
                 }
               }
@@ -1120,11 +1298,11 @@ void profiler_view() {
           Loop (i, items.count) {
             UI_Item& item = items[i];
             item.rect = shift_2f32(item.rect, cursor_pos);
-            item.rect = Rng2(item.rect.min*scroll_state.scale, item.rect.max*scroll_state.scale);
+            item.rect = scale_2f32(item.rect, scroll_state.scale.x);
             item.rect = shift_2f32(item.rect, scroll_state.offset);
           }
 
-          Rng2 rounding_edge = shift_2f32(scale_2f32(pos_size_2f32(cursor_pos, avail_size), scroll_state.scale), scroll_state.offset);
+          Rng2 rounding_edge = shift_2f32(scale_2f32(pos_size_2f32(cursor_pos, avail_size), scroll_state.scale.x), scroll_state.offset);
           rounding_edge = pad_2f32(rounding_edge, 10);
           draw->AddRect(IM_RECT(rounding_edge), IM_COL32(200, 200, 200, 255));
 
@@ -1221,6 +1399,29 @@ void profiler_view() {
   }
 }
 
+void game_view() {
+  GameState& g = g_st->game;
+  ImguiWindow& win = g_st->game_win;
+  Camera& cam = g.cam;
+  if (win.open) {
+    imgui_window_apply_state(win);
+    ImGui::Begin("Game");
+
+    if (ImGui::IsWindowHovered()) {
+      if (key_pressed(Key_V)) {
+        imgui_window_toggle_fullscreen(win);
+      }
+    }
+
+    v3 pos = cam.pos;
+    ImGui::Text("entities: %u, static entities: %u", g.entities_count, g.static_entities_count);
+    ImGui::Text("Camera: x: %.2f y: %.2f z: %.2f", pos.x, pos.y, pos.z);
+    // ImGui::SliderFloat("", &cam.speed, 0, 10000);
+    ImGui::DragFloat("speed", &cam.speed, 1);
+    ImGui::End();
+  }
+}
+
 ////////////////////////////////////////////////////////////////////////
 // Watch
 
@@ -1232,7 +1433,7 @@ void watch_add(String watch_name, WatchOp op) {
     .modified = props.modified,
     .op = op,
   };
-  g.watches.add(file_watch);
+  array_add(g.watches, file_watch);
 }
 
 void watch_directory_add(String watch_name, WatchOp op, OS_WatchFlags flags) {
@@ -1245,13 +1446,14 @@ void watch_directory_add(String watch_name, WatchOp op, OS_WatchFlags flags) {
     .watch = watch,
     .op = op,
   };
-  g.directories.add(dir_watch);
+  array_add(g.directories, dir_watch);
 }
 
 void watch_update() {
   WatchState& g = g_st->watch;
   Scratch scratch;
-  for (WatchFile& x : g.watches) {
+  Loop (i, g.watches.count) {
+    WatchFile& x = g.watches[i];
     FileProperties props = os_file_path_properties(x.path);
     if (props.modified > x.modified) {
       switch (x.op) {
@@ -1263,7 +1465,8 @@ void watch_update() {
       x.modified = props.modified;
     }
   }
-  for (WatchDirectory x : g.directories) {
+  Loop (i, g.directories.count) {
+  WatchDirectory x = g.directories[i];
     StringList list = os_watch_check(scratch, x.watch);
     for EachNode(it, StringNode, list.first) {
       String name = it->string;
@@ -1297,10 +1500,11 @@ void common_init() {
   estimate_cpu_frequency();
   global_allocator_init();
   os_gfx_init();
-  profiler_init(g.arena);
-  profiler_launch_begin();
+  prof_init(g.arena);
+  prof_launch_begin();
   {
-    TimeBlock("init");
+    ProfBlock("init");
+    thread_pool_init(THREAD_COUNT);
     test();
 
     g.gpa.init(g.arena);
@@ -1319,46 +1523,43 @@ void common_init() {
     watch_directory_add(g.shader_dir, WatchOp_RecompileShader);
     watch_directory_add(g.shader_compiled_dir, WatchOp_ShaderReload);
 
-    g.profile_win.root_scroll_state.scale = 1;
-    g.profile_win.frames_scroll_state.scale = 1;
-    g.profile_win.mem_scroll_state.scale = 1;
-    g.profile_win.open = true;
+    var& win = g.profile_win;
+    win.root_scroll_state = scroll_state_make(1);
+    win.frames_scroll_state = scroll_state_make(1);
+    win.launch_time_scroll_state = scroll_state_make(1);
+    win.mem_scroll_state = scroll_state_make(1);
+    win.open = false;
 
-    thread_pool_init(THREAD_COUNT);
-
-    g.vk_st = vk_init();
+    g.vk = vk_init();
 #if DEAR_IMGUI
     vk_imgui_init();
 #endif
     game_init();
+    
   }
-  profiler_launch_end();
-}
-
-void bar(f32 time) {
-  TimeFunction;
-  os_sleep_ms(time);
-}
-
-void foo(f32 time) {
-  TimeFunction;
-  os_sleep_ms(time);
-  bar(time);
+  prof_launch_end();
 }
 
 void common_update() {
+  GlobalState& g = *g_st;
   input_update();
   profiler_view();
-  if (key_pressed(Key_F3)) g_st->imgui_demo_open = !g_st->imgui_demo_open;
+  game_view();
+  
+  if (key_pressed(Key_F1)) g.profile_win.open = !g.profile_win.open;
+  if (key_pressed(Key_F2)) g.imgui_demo_open = !g.imgui_demo_open;
+  if (key_pressed(Key_F3)) g.game_win.open = !g.game_win.open;
+
   if (g_st->imgui_demo_open) {
     ImGui::ShowDemoWindow();
   }
+
   // {
-  //   TimeBlock("block0");
+  //   ProfBlock("block0");
   //   os_sleep_ms(1);
   // }
   // {
-  //   TimeBlock("block1");
+  //   ProfBlock("block1");
   //   os_sleep_ms(1);
   // }
   // Loop (i, 2) {
@@ -1366,17 +1567,24 @@ void common_update() {
   // }
   Task task = {
     .func = [](void* ptr) {
-      TimeBlock("sleep job");
-      // TimeBlock("sleep job");
-      // TimeBlock("sleep job");
-      os_sleep_ms(4);
-      // os_sleep_ms(rand_u32()%100);
-      os_sleep_ms(rand_u32()%10);
+      // ProfBlock("job1");
+      // ProfBlock("sleep job");
+      // ProfBlock("sleep job");
+      {
+        // ProfBlock("job2");
+        // os_sleep_ms(rand_u32()%10);
+      }
+      // os_sleep_ms(4);
+      os_sleep_ms(rand_u32()%2);
+      // os_sleep_ms(rand_u32()%10);
       // os_sleep_ms(32);
     }
   };
-  Loop (i, 2) {
-    task_queue_push(task);
+  {
+    ProfBlock("push jobs");
+    Loop (i, 16) {
+      task_queue_push(task);
+    }
   }
   // thread_wait_for();
 }
@@ -1384,7 +1592,7 @@ void common_update() {
 shared_function void common_main(HotReloadData* data) {
   Scratch scratch;
 if (data->ctx == null) {
-    Arena arena = arena_init_named("common arena");
+    Arena arena = arena_make_named("common arena");
     data->ctx = push_struct_zero(arena, GlobalState);
     g_st = (GlobalState*)data->ctx;
     g_st->arena = arena;
@@ -1398,7 +1606,7 @@ if (data->ctx == null) {
   }
   if (!g_st) {
     g_st = (GlobalState*)data->ctx;
-    vk_hotreload(g_st->vk_st);
+    vk_set_state(g_st->vk);
     g_st->should_hotreload = false;
   }
 
@@ -1412,9 +1620,9 @@ if (data->ctx == null) {
       goto hotreload;
     }
 
-    profiler_begin(g.current_frame);
+    prof_begin(g.current_frame);
     {
-      TimeBlock("frame");
+      ProfBlock("frame");
       os_pump_messages();
       u64 start_time = os_now_ns();
       g.dt = f64(start_time - last_time) / Billion(1);
@@ -1432,11 +1640,11 @@ if (data->ctx == null) {
       u64 frame_duration = os_now_ns() - start_time;
       if (frame_duration < target_fps) {
         u64 sleep_time = target_fps - frame_duration;
-        TimeBlock("main sleep", ProfileType_Sleep);
+        ProfBlock("main sleep", ProfType_Sleep);
         os_sleep_ms(sleep_time / Million(1));
       }
     }
-    profiler_end(g.current_frame);
+    prof_end(g.current_frame);
     ++g.current_frame;
   }
 
@@ -1448,3 +1656,211 @@ if (data->ctx == null) {
   hotreload:
   thread_wait_for();
 }
+// void vk_draw() {
+//   ProfFunc;
+
+//   VkCommandBuffer cmd = vk_get_current_cmd();
+//   vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->pipeline_layout, 0, 1, &vk->descriptor_sets, 0, null);
+//   VkDeviceSize size = 0;
+//   vk->CmdBindVertexBuffers(cmd, 0, 1, &vk->vert_buffer.h, &size);
+//   vk->CmdBindIndexBuffer(cmd, vk->index_buffer.h, 0, VK_INDEX_TYPE_UINT32);
+
+//   VK_State& g = *vk;
+//   GlobalStateGPU& shader_st = *vk->gpu_global_shader_st;
+//   shader_st.projection_view = vk->projection * vk->view;
+//   shader_st.projection = vk->projection;
+//   shader_st.view = vk->view;
+  
+//   u32 draw_call_count = 0;
+//   u32 draw_call_mem_offset = 0;
+//   u32 entities_draw_count = 0;
+//   u32 entity_inst_offset = 0;
+
+//   Loop (i, g.pipelines.count) {
+//     vk_bind_pipeline(cmd, g.pipelines[i]);
+//     VK_RenderBatch& batch = vk->batches[i];
+
+//     var fill_buffer = []() {
+      
+//     };
+
+//     // Indexed Entities per shader
+//     u32 per_shader_indexed_draw_count = 0;
+//     for (VK_MeshBatch mesh_batch : batch.batch_indexed.mesh_batches) {
+//       if (mesh_batch.entities.count == 0) continue;
+//       for (Handle<Entity> entity_handle : mesh_batch.entities) {
+//         u32 entity_idx = entity_handle.idx();
+//         vk->gpu_entities[entity_idx].model = mat4_transform(entity_handle.trans());
+//         vk->gpu_entities_indices[entities_draw_count++] = entity_idx;
+//       }
+//       u32 mesh_idx = mesh_batch.mesh_handle.handle;
+//       VK_Mesh mesh = vk->meshes[mesh_idx];
+//       VK_DrawCallInfo info = {
+//         .index_draw_command = {
+//           .indexCount = (u32)mesh.index_count,
+//           .instanceCount = mesh_batch.entities.count,
+//           .firstIndex = (u32)(mesh.index_offset/sizeof(u32)),
+//           .vertexOffset = (i32)(mesh.vert_offset/sizeof(Vertex)),
+//           .firstInstance = 0,
+//         },
+//         .entity_inst_offset = entity_inst_offset,
+//       };
+//       vk->gpu_draw_call_infos[draw_call_count++] = info;
+//       entity_inst_offset += mesh_batch.entities.count;
+//       ++per_shader_indexed_draw_count;
+//     }
+//     if (per_shader_indexed_draw_count > 0) {
+//       VK_PushConstant push = {.drawcall_offset = draw_call_mem_offset / (u32)sizeof(VK_DrawCallInfo)};
+//       vk->CmdPushConstants(cmd, vk->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &push);
+//       vk->CmdDrawIndexedIndirect(cmd, vk->indirect_draw_buffer.h, draw_call_mem_offset, per_shader_indexed_draw_count, sizeof(VK_DrawCallInfo));
+//     }
+
+//     // Entities per shader
+//     u32 per_shader_draw_count = 0;
+//     for (VK_MeshBatch mesh_batch : batch.batch.mesh_batches) {
+//       if (mesh_batch.entities.count == 0) continue;
+//       for (Handle<Entity> entity_handle : mesh_batch.entities) {
+//         u32 entity_idx = entity_handle.idx();
+//         vk->gpu_entities[entity_idx].model = mat4_transform(entity_handle.trans());
+//         vk->gpu_entities_indices[entities_draw_count++] = entity_idx;
+//       }
+//       u32 mesh_idx = mesh_batch.mesh_handle.handle;
+//       VK_Mesh mesh = vk->meshes[mesh_idx];
+//       VK_DrawCallInfo info = {
+//         .draw_command = {
+//           .vertexCount = (u32)mesh.vert_count,
+//           .instanceCount = mesh_batch.entities.count,
+//           .firstVertex = (u32)(mesh.vert_offset/sizeof(Vertex)),
+//           .firstInstance = 0,
+//         },
+//         .entity_inst_offset = entity_inst_offset,
+//       };
+//       vk->gpu_draw_call_infos[draw_call_count++] = info;
+//       entity_inst_offset += mesh_batch.entities.count;
+//       ++per_shader_draw_count;
+//     }
+//     if (per_shader_draw_count > 0) {
+//       u32 draw_call_indexed_mem_offset = draw_call_mem_offset + (u32)sizeof(VK_DrawCallInfo)*per_shader_indexed_draw_count;
+//       VK_PushConstant push = {.drawcall_offset = draw_call_indexed_mem_offset / (u32)sizeof(VK_DrawCallInfo)};
+//       vk->CmdPushConstants(cmd, vk->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &push);
+//       vk->CmdDrawIndirect(cmd, vk->indirect_draw_buffer.h, draw_call_indexed_mem_offset , per_shader_draw_count, sizeof(VK_DrawCallInfo));
+//     }
+//     draw_call_mem_offset = draw_call_count * sizeof(VK_DrawCallInfo);
+
+//     /////////////////////////////////
+//     // Rebuilding static buffer
+//     #define MaxDrawCalls (MaxDrawCalls/2)
+//     if ((batch.static_entities_count_old != batch.static_entities_count) || (batch.static_entities_indexed_count_old != batch.static_entities_indexed_count)) {
+//       batch.static_entities_indexed_count_old = batch.static_entities_indexed_count;
+//       batch.static_entities_count_old = batch.static_entities_count;
+
+//       u32 static_draw_call_count = 0;
+//       u32 static_entities_draw_count = 0;
+//       u32 static_entities_draw_id_offset = 0;
+
+//       // Indexed Entities per shader
+//       u32 per_shader_static_indexed_draw_count = 0;
+//       for (VK_MeshBatch mesh_batch : batch.static_batch_indexed.mesh_batches) {
+//         if (mesh_batch.entities.count == 0) continue;
+//         for (Handle<StaticEntity> entity_handle : mesh_batch.entities) {
+//           u32 entity_idx = entity_handle.idx();
+//           vk->gpu_entities[MaxEntities+entity_idx].model = mat4_transform(entity_handle.trans());
+//           vk->gpu_entities_indices[MaxEntities+static_entities_draw_count++] = MaxEntities+entity_idx;
+//         }
+//         u32 mesh_idx = mesh_batch.mesh_handle.handle;
+//         VK_Mesh mesh = vk->meshes[mesh_idx];
+//         VK_DrawCallInfo info = {
+//           .index_draw_command = {
+//             .indexCount = (u32)mesh.index_count,
+//             .instanceCount = mesh_batch.entities.count,
+//             .firstIndex = (u32)(mesh.index_offset/sizeof(u32)),
+//             .vertexOffset = (i32)(mesh.vert_offset/sizeof(Vertex)),
+//             .firstInstance = 0,
+//           },
+//           .entity_inst_offset = MaxEntities+static_entities_draw_id_offset,
+//         };
+//         vk->gpu_draw_call_infos[MaxDrawCalls+static_draw_call_count++] = info;
+//         static_entities_draw_id_offset += mesh_batch.entities.count;
+//         ++per_shader_static_indexed_draw_count;
+//       }
+//       vk->static_draw_indexed_offset = MaxDrawCalls*sizeof(VK_DrawCallInfo);
+//       vk->static_draw_offset = vk->static_draw_indexed_offset + per_shader_static_indexed_draw_count*sizeof(VK_DrawCallInfo);
+
+//       // Entities per shader
+//       u32 per_shader_static_draw_count = 0;
+//       for (VK_MeshBatch mesh_batch : batch.static_batch.mesh_batches) {
+//         if (mesh_batch.entities.count == 0) continue;
+//         for (Handle<StaticEntity> entity_handle : mesh_batch.entities) {
+//           u32 entity_idx = entity_handle.idx();
+//           vk->gpu_entities[MaxEntities+entity_idx].model = mat4_transform(entity_handle.trans());
+//           vk->gpu_entities_indices[MaxEntities+static_draw_call_count++] = MaxEntities+entity_idx;
+//         }
+//         u32 mesh_idx = mesh_batch.mesh_handle.handle;
+//         VK_Mesh mesh = vk->meshes[mesh_idx];
+//         VK_DrawCallInfo info = {
+//           .draw_command = {
+//             .vertexCount = (u32)mesh.vert_count,
+//             .instanceCount = mesh_batch.entities.count,
+//             .firstVertex = (u32)(mesh.vert_offset/sizeof(Vertex)),
+//             .firstInstance = 0,
+//           },
+//           .entity_inst_offset = MaxEntities+static_entities_draw_id_offset,
+//         };
+//         vk->gpu_draw_call_infos[MaxDrawCalls+static_draw_call_count++] = info;
+//         static_entities_draw_id_offset += mesh_batch.entities.count;
+//         ++per_shader_static_draw_count;
+//       }
+
+//       vk->static_indexed_draw_count = per_shader_static_indexed_draw_count;
+//       vk->static_draw_count = per_shader_static_draw_count;
+//     }
+//     if (batch.static_entities_indexed_count) {
+//       VK_PushConstant push = {MaxDrawCalls};
+//       vk->CmdPushConstants(cmd, vk->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &push);
+//       vk->CmdDrawIndexedIndirect(cmd, vk->indirect_draw_buffer.h, vk->static_draw_indexed_offset, vk->static_indexed_draw_count, sizeof(VK_DrawCallInfo));
+//     }
+//     if (batch.static_entities_count) {
+//       VK_PushConstant push = {MaxDrawCalls+vk->static_indexed_draw_count};
+//       vk->CmdPushConstants(cmd, vk->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &push);
+//       vk->CmdDrawIndirect(cmd, vk->indirect_draw_buffer.h, vk->static_draw_offset, vk->static_draw_count, sizeof(VK_DrawCallInfo));
+//     }
+//     #undef MaxDrawCalls
+//   }
+
+//   // Debug drawing
+//   if (vk->draw_lines.count > 0) {
+//     g.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.debug_line_shader);
+//     g.CmdBindVertexBuffers(cmd, 0, 1, &g.vert_buffer.h, (VkDeviceSize*)&g.draw_lines_offset);
+//     g.CmdDraw(cmd, g.draw_lines.count*2, 1, 0, 0);
+//     g.draw_lines.clear();
+//   }
+//   if (g.draw_lines_consistent.count > 0) {
+//     g.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.debug_line_shader);
+//     g.CmdBindVertexBuffers(cmd, 0, 1, &g.vert_buffer.h, (VkDeviceSize*)&g.draw_lines_consistent_offset);
+//     g.CmdDraw(cmd, g.draw_lines_consistent.count*2, 1, 0, 0);
+//   }
+
+//   // Cube map
+//   vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->cubemap_shader);
+//   Handle<GpuMesh> h = mesh_get(Mesh_Cube);
+//   VK_Mesh mesh = vk->meshes[h.handle];
+//   vk->CmdBindVertexBuffers(cmd, 0, 1, &vk->vert_buffer.h, &mesh.vert_offset);
+//   if (mesh.index_count) {
+//     vk->CmdBindIndexBuffer(cmd, vk->index_buffer.h, mesh.index_offset, VK_INDEX_TYPE_UINT32);
+//     vk->CmdDrawIndexed(cmd, mesh.index_count, 1, 0, 0, 0);
+//   } else {
+//     vk->CmdDraw(cmd, mesh.vert_count, 1, 0, 0);
+//   }
+
+//   vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->ui_shader);
+//   if (vk->draw_rects.count > 0) {
+//     vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->ui_shader);
+//     vk->CmdBindVertexBuffers(cmd, 0, 1, &vk->vert_buffer.h, (VkDeviceSize*)&vk->draw_rects_offset);
+//     vk->CmdDraw(cmd, vk->draw_rects.count*6, 1, 0, 0);
+//     vk->draw_rects.clear();
+//   }
+
+//   g.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.triangle);
+//   g.CmdDraw(cmd, 3, 1, 0, 0);
+
+// }

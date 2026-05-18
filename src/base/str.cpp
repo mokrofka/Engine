@@ -462,6 +462,30 @@ b32 str_matchi(String str0, String str1) {
   return true;
 }
 
+u64 str_find_needle(String string, u64 start_pos, String needle) {
+  u8 first_char = needle.str[0];
+  u8 last_char = needle.str[needle.size-1];
+  u8* p = string.str + start_pos;
+  u64 stop_offset = Max(string.size + 1, needle.size) - needle.size;
+  u8* stop_p = string.str + stop_offset;
+  if (needle.size > 0) {
+    for (;p < stop_p; ++p) {
+      if (*p == first_char) {
+        if (p[needle.size-1] == last_char) {
+          if (str_match(str_range(p, p+needle.size), needle)) {
+            break;
+          }
+        }
+      }
+    }
+  }
+  u64 res = string.size;
+  if (p < stop_p) {
+    res = (u64)(p - string.str);
+  }
+  return res;
+}
+
 b32 str_ends_with(String string, String end) {
   String postfix = str_postfix(string, end.size);
   b32 is_match = str_match(end, postfix);

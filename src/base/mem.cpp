@@ -30,7 +30,7 @@ struct MemState {
   Arena arena;
   AllocSegList seglist;
 
-#if MEM_TRACK | 1
+#if MEM_TRACK
   AllocatorInfo* free;
   AllocatorInfoList list;
   AllocatorInfo infos[128];
@@ -73,7 +73,7 @@ AllocatorInfoList get_allocators_info() {
 }
 
 void global_allocator_init() {
-  mem_st.arena = arena_init_named("global allocator's parent");
+  mem_st.arena = arena_make_named("global allocator's parent");
   mem_st.seglist.init(mem_st.arena, "global allocator");
 }
 
@@ -88,11 +88,11 @@ intern void global_free(void* ptr)                                              
 
 Arena::operator Allocator() { return {.type = AllocatorType_Arena, .ctx = this}; }
 
-Arena arena_init_named(String name) {
-  return arena_init_(name);
+Arena arena_make_named(String name) {
+  return arena_make_(name);
 }
 
-Arena arena_init_(String name) {
+Arena arena_make_(String name) {
   u64 reserve_size = ARENA_DEFAULT_RESERVE_SIZE;
   u8* base = os_reserve(reserve_size);
   Arena result = {
@@ -111,7 +111,7 @@ Arena arena_init_(String name) {
   return result;
 }
 
-void arena_deinit(Arena* arena) {
+void arena_free(Arena* arena) {
   os_release(arena->base, arena->cap);
 #if MEM_TRACK
   DLLRemove(mem_st.list.first, mem_st.list.last, arena->info);
@@ -288,6 +288,16 @@ void AllocSegList::init(Allocator alloc_, String name) {
 }
 
 AllocSegList::operator Allocator() { return {.type = AllocatorType_SegList, .ctx = this}; }
+
+AllocSegList alloc_seg_list_make(Allocator alloc, String name) {
+  AllocSegList res = {}; res.alloc = alloc;
+#if MEM_TRACK
+  allocator_inherit(alloc, res);
+  res.info->type = AllocatorType_SegList;
+  str_copy(res.info->name, name);
+#endif
+  return res;
+}
 
 // NOTE: memory: header + pad -> u8* memory -> u32 tail_guard
 intern u8* seglist_alloc(AllocSegList* alloc, u64 size, u64 align) {
@@ -613,13 +623,13 @@ u8* mem_realloc_soa(Allocator alloc, u32 old_count, u32 new_count, Slice<SoA_Fie
 }
 
 
-void* offset_pusher_mem_push(void*& offset, u64 size, u64 align) {
+void* offset_mem_push(void*& offset, u64 size, u64 align) {
   void* result = (void*)AlignUp((u64)offset, align);
   offset = Offset(result, size);
   return result;
 }
 
-u64 offset_pusher_push(u64& offset, u64 size, u64 align) {
+u64 offset_push(u64& offset, u64 size, u64 align) {
   u64 result = AlignUp(offset, align);
   offset = result + size;
   return result;

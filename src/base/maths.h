@@ -95,8 +95,7 @@ union v4 {
 };
 
 union mat3 {
-  f32 v[9];
-  f32& operator[](u32 a);
+  f32 v[3][3];
 };
 
 union mat4 {
@@ -266,6 +265,7 @@ template<typename T> void rand_shuffle(Slice<T> slice) {
 
 NO_DEBUG f32 Lerp(f32 a, f32 t, f32 b);
 f32 normalize(f32 a, f32 x, f32 b);
+f64 normalize(f64 a, f64 x, f64 b);
 
 ////////////////////////////////////////////////////////////////////////
 // Vector2
@@ -455,6 +455,7 @@ f32 clamp_1f32(Rng1f32 r, f32 v);
 f32 normalize_1f32(f32 x, Rng1f32 r);
 f32 lerp_1f32(f32 t, Rng1f32 r);
 f32 remap_1f32(f32 x, Rng1f32 from, Rng1f32 to);
+Rng1f32 slice_x_1f32(Rng1f32 r, f32 t0, f32 t1);
 
 ///////////////////////////////////
 // Dim2
@@ -491,10 +492,10 @@ Rng3f32 union_3f32(Rng3f32 a, Rng3f32 b);
 Rng3f32 intersect_3f32(Rng3f32 a, Rng3f32 b);
 v3 clamp_3f32(Rng3f32 r, v3 v);
 
-struct LayoutCursor {
+struct Rng2Cursor {
   v2 pos;
 };
 
-Rng2f32 layout_row(LayoutCursor& c, Rng1f32 x, f32 h);
-void layout_next(LayoutCursor& c, f32 h);
+Rng2f32 layout_row(Rng2Cursor& c, Rng1f32 x, f32 h);
+void layout_next(Rng2Cursor& c, f32 h);
 

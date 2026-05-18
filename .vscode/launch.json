@@ -2,11 +2,18 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug",
+      "name": "Run game",
       "type": "lldb-dap",
       "request": "launch",
       "program": "${workspaceFolder}/bin/exe",
-      // "program": "${workspaceFolder}/bin/compiling_shaders",
+      "cwd": "${workspaceFolder}",
+      "console": "internalConsole",
+    },
+    {
+      "name": "Comiple shaders",
+      "type": "lldb-dap",
+      "request": "launch",
+      "program": "${workspaceFolder}/bin/compiling_shaders",
       "args": ["../assets/shaders", "../assets/shaders/compiled"],
       "cwd": "${workspaceFolder}",
       "console": "internalConsole",

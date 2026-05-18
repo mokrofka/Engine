@@ -108,12 +108,12 @@ const u64 U64_MAX = 0xFFFFFFFFFFFFFFFF;
 const u64 INVALID_ID = U32_MAX;
 const u64 PAGE_SIZE = 4096;
 
-template<typename T> void Swap(T& a, T& b) {
-  T temp = a;
+void Swap(var& a, var& b) {
+  var temp = a;
   a = b;
   b = temp;
 }
-template<typename T> b32 equal(T a, T b) { return a == b; }
+b32 equal(var a, var b) { return a == b; }
 
 NO_DEBUG constexpr u64 KB(u64 x) { return x << 10; }
 NO_DEBUG constexpr u64 MB(u64 x) { return x << 20; }
@@ -136,12 +136,12 @@ void MemZero(void *d, u64 size);
 void MemCopy(void* d, void* s, u64 size);
 b32  MemMatch(void* a, void* b, u64 size);
 
-template<typename T> void MemZeroStruct(T* x)              { MemZero(x, sizeof(*x)); };
-template<typename T> void MemZeroArray(T* x, u64 c)        { MemZero(x, sizeof(*x) * c); };
-template<typename T> void MemCopyStruct(T* d, T* s)        { MemCopy(d, s, sizeof(*d)); }
-template<typename T> void MemCopyArray(T* d, T* s, u64 c)  { MemCopy(d, s, sizeof(*d) * c); }
-template<typename T> b32  MemMatchStruct(T* a, T* b)       { return MemMatch(a, b, sizeof(*a)); }
-template<typename T> b32  MemMatchArray(T* a, T* b, u64 c) { return MemMatch(a, b, sizeof(*a) * c); }
+void MemZeroStruct(var* x)                { MemZero(x, sizeof(*x)); };
+void MemZeroArray(var* x, u64 c)          { MemZero(x, sizeof(*x) * c); };
+void MemCopyStruct(var* d, var* s)        { MemCopy(d, s, sizeof(*d)); }
+void MemCopyArray(var* d, var* s, u64 c)  { MemCopy(d, s, sizeof(*d) * c); }
+b32  MemMatchStruct(var* a, var* b)       { return MemMatch(a, b, sizeof(*a)); }
+b32  MemMatchArray(var* a, var* b, u64 c) { return MemMatch(a, b, sizeof(*a) * c); }
 
 u64 AlignUp(u64 x, u64 a);
 u64 AlignDown(u64 x, u64 a);
@@ -162,7 +162,7 @@ u32 ctz(u64 val);
 u32 count_bits_set(u64 val);
 u32 most_significant_bit(u64 size);
 
-constexpr u64 Bit(u32 x) { return 1 << x; }
+#define Bit(x) (1 << (x))
 u64 BitHas(u64 x, u64 pos);
 u64 FlagSet(u64 x, u64 f);
 u64 FlagClear(u64 x, u64 f);
@@ -201,10 +201,11 @@ u32 prev_pow2(u32 n);
 ////////////////////////////////////////////////////////////////////////
 // Shenanigans
 
-#define ArrayCount(x)  (sizeof((x)) / sizeof((x)[0]))
+#define ArrayCount(x)   (sizeof((x)) / sizeof((x)[0]))
 #define ArraySlice(arr) Slice(arr, ArrayCount(arr))
-#define ArrayRand(arr) arr[rand_rng_u32(0, ArrayCount(arr)-1)]
-#define ArrayZero(arr) MemZeroArray((arr), ArrayCount((arr)))
+#define ArrayRand(arr)  arr[rand_rng_u32(0, ArrayCount(arr)-1)]
+#define ArrayZero(arr)  MemZeroArray((arr), ArrayCount((arr)))
+#define ArrayCopy(d, s) MemCopyArray((d), (s), ArrayCount((d)))
 #define Assign(a,b)    (*((u8**)(&(a))) = (u8*)(b))
 #define _Stringify(S)  #S
 #define Stringify(S)   _Stringify(S)
@@ -242,18 +243,18 @@ void DebugTrap();
 ////////////////////////////////////////////////////////////////////////
 // Atomic Operations
 
-#define atomic_u32_inc(x)                    __atomic_fetch_add((x), 1, __ATOMIC_SEQ_CST)
-#define atomic_u32_dec(x)                    __atomic_fetch_sub((x), 1, __ATOMIC_SEQ_CST)
-#define atomic_u32_add(x, v)                 __atomic_fetch_add((x), (v), __ATOMIC_SEQ_CST)
-#define atomic_u32_sub(x, v)                 __atomic_fetch_sub((x), (v), __ATOMIC_SEQ_CST)
-#define atomic_u32_load(x)                   __atomic_load_n((x), __ATOMIC_SEQ_CST)
-#define atomic_u32_store(x, v)               __atomic_store_n((x), (v), __ATOMIC_SEQ_CST)
-#define atomic_u32_or(x, v)                  __atomic_fetch_or((x), (v), __ATOMIC_SEQ_CST)
-#define atomic_u32_and(x, v)                 __atomic_fetch_and((x), (v), __ATOMIC_SEQ_CST)
-#define atomic_u32_xor(x, v)                 __atomic_fetch_xor((x), (v), __ATOMIC_SEQ_CST)
-#define atomic_u32_exchange(x, v)            __atomic_exchange_n((x), (v), __ATOMIC_SEQ_CST)
-#define atomic_u32_cmp_exchange(x, old, new) __atomic_compare_exchange_n((x), (old), (new), 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
-#define atomic_u32_cond_exchange(x, v, c) ({ u32 _new = (c); __atomic_compare_exchange_n((x), (&_new), (v), 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); _new; })
+#define atomic_inc(x)                    __atomic_fetch_add((x), 1, __ATOMIC_SEQ_CST)
+#define atomic_dec(x)                    __atomic_fetch_sub((x), 1, __ATOMIC_SEQ_CST)
+#define atomic_add(x, v)                 __atomic_fetch_add((x), (v), __ATOMIC_SEQ_CST)
+#define atomic_sub(x, v)                 __atomic_fetch_sub((x), (v), __ATOMIC_SEQ_CST)
+#define atomic_load(x)                   __atomic_load_n((x), __ATOMIC_SEQ_CST)
+#define atomic_store(x, v)               __atomic_store_n((x), (v), __ATOMIC_SEQ_CST)
+#define atomic_or(x, v)                  __atomic_fetch_or((x), (v), __ATOMIC_SEQ_CST)
+#define atomic_and(x, v)                 __atomic_fetch_and((x), (v), __ATOMIC_SEQ_CST)
+#define atomic_xor(x, v)                 __atomic_fetch_xor((x), (v), __ATOMIC_SEQ_CST)
+#define atomic_exchange(x, v)            __atomic_exchange_n((x), (v), __ATOMIC_SEQ_CST)
+#define atomic_cmp_exchange(x, old, new) __atomic_compare_exchange_n((x), (old), (new), 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+#define atomic_cond_exchange(x, v, c) ({ u32 _new = (c); __atomic_compare_exchange_n((x), (&_new), (v), 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); _new; })
 
 ////////////////////////////////////////////////////////////////////////
 // Link list
@@ -367,7 +368,7 @@ struct Slice {
   T* begin() { return data; }
   T* end()   { return data + count; }
   Slice() = default;
-  Slice(T* data_, u64 count_) {
+  NO_DEBUG Slice(T* data_, u64 count_) {
     data = data_;
     count = count_;
   }
@@ -415,5 +416,6 @@ struct String64 {
 //     SLLStackPush(stack, s);
 //   }
 // }
+
 
 

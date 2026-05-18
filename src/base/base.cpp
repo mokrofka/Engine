@@ -129,4 +129,3 @@ void ring_read(RingBuffer& ring, void *dst, u64 dst_size) {
   }
   ring.read_pos += dst_size;
 }
-

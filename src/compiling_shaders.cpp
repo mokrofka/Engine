@@ -1,6 +1,6 @@
 #include "lib.h"
-#undef Info
-#define Info(...)
+// #undef Info
+// #define Info(...)
 
 i32 main(i32 args_count, char* args[]) {
   os_init(args[0]);
@@ -8,13 +8,13 @@ i32 main(i32 args_count, char* args[]) {
   u64 start = os_now_ns();
 
   Scratch scratch;
-  String curr_dir = os_get_current_directory();
-  Info("current directory: %s", curr_dir);
-  String shader_dir = push_strf(scratch, "%s/%s", curr_dir, String(args[1]));
+  String cur_dir = os_get_current_directory();
+  Info("current directory: %s", cur_dir);
+  String shader_dir = push_strf(scratch, "%s/%s", cur_dir, String(args[1]));
   Info("shader directory: %s", shader_dir);
-  String compiled_shader_dir = push_strf(scratch, "%s/%s", curr_dir, String(args[2]));
+  String compiled_shader_dir = push_strf(scratch, "%s/%s", cur_dir, String(args[2]));
   Info("compiled directory: %s", compiled_shader_dir);
-  String file_path = push_strf(scratch, "%s/%s", curr_dir, "compiling_shaders_data");
+  String time_stamps_file_path = push_strf(scratch, "%s/%s", cur_dir, "saved_time_stamps_for_shad");
 
   if (!os_directory_path_exist(shader_dir)) {
     os_directory_create_p(shader_dir);
@@ -23,65 +23,88 @@ i32 main(i32 args_count, char* args[]) {
     os_directory_create_p(compiled_shader_dir);
   }
 
-  String global_glsl_path = push_strf(scratch, "%s/%s", shader_dir, String("defines/global.glsl"));
-  FileProperties global_props = os_file_path_properties(global_glsl_path);
-  OS_Handle file = os_file_open(file_path, OS_AccessFlag_Read|OS_AccessFlag_Write);
-  FileProperties file_props = os_file_properties(file);
+  String com_slang_file_path = push_strf(scratch, "%s/%s", shader_dir, String("com.slang"));
+  String lib_slang_file_path = push_strf(scratch, "%s/%s", shader_dir, String("lib.slang"));
+  DenseTime com_slang_modified = os_file_path_properties(com_slang_file_path).modified;
+  DenseTime lib_slang_modified = os_file_path_properties(lib_slang_file_path).modified;
+  FileProperties time_stamps_props = os_file_path_properties(time_stamps_file_path);
+
+  struct {
+    DenseTime com_slang_modified;
+    DenseTime lib_slang_modified;
+  } stamps;
   b32 is_change = false;
-  if (file_props.size != sizeof(DenseTime)) {
+  if (!time_stamps_props.size) {
     is_change = true;
-  }
-  else {
-    Buffer buf = os_file_path_read_all(scratch, file_path);
-    DenseTime* modified = (DenseTime*)buf.data;
-    if (global_props.modified != *modified) {
+    OS_Handle file = os_file_open(time_stamps_file_path, OS_AccessFlag_Write);
+    stamps = {
+      com_slang_modified,
+      lib_slang_modified,
+    };
+    os_file_write(file, sizeof(stamps), &stamps);
+  } else {
+    OS_Handle file = os_file_open(time_stamps_file_path, OS_AccessFlag_Read | OS_AccessFlag_Write);
+    os_file_read(file, sizeof(stamps), &stamps);
+    if (stamps.com_slang_modified != com_slang_modified || stamps.lib_slang_modified != lib_slang_modified) {
       is_change = true;
+      stamps = {
+        com_slang_modified,
+        lib_slang_modified,
+      };
+      os_file_write(file, sizeof(stamps), &stamps);
     }
   }
-  if (is_change) {
-    os_file_write(file, sizeof(DenseTime), &global_props.modified);
-  }
 
-  struct CompiledFile {
+  struct Shader {
+    String shader_path;
+    String compiled_shader_path;
+    b32 vert;
+    b32 frag;
+    b32 comp;
     OS_Handle pid;
-    String shader_full_path;
-    String compiled_shader_full_path;
   };
-  Darray<CompiledFile> compiled_shaders(scratch);
+  var compiled_shaders = darray_make<Shader>(scratch);
   {
     OS_FileIter* it = os_file_iter_begin(scratch, shader_dir, OS_FileIterFlag_SkipFolders);
-    Info("files:");
     for (OS_FileInfo info = {}; os_file_iter_next(scratch, it, &info);) {
-      Info("%s", info.name);
-      String shader_full_path = push_strf(scratch, "%s/%s", shader_dir, info.name);
-      String compiled_shader_full_path = push_strf(scratch, "%s/%s.spv", compiled_shader_dir, info.name);
-      if (!os_file_path_equal_mtime(shader_full_path, compiled_shader_full_path) || is_change) {
-        StringList list = {};
-        str_list_pushf(scratch, &list, "glslangValidator");
-        str_list_pushf(scratch, &list, "-V");
-        str_list_pushf(scratch, &list, "%s", shader_full_path);
-        str_list_pushf(scratch, &list, "-o");
-        str_list_pushf(scratch, &list, "%s", compiled_shader_full_path);
-        OS_Handle pid = os_process_launch(list);
-        compiled_shaders.add({pid, shader_full_path, compiled_shader_full_path});
+      String shader_path = push_strf(scratch, "%s/%s", shader_dir, info.name);
+      String shader_name = str_chop_last_dot(info.name);
+      String compiled_shader_path = push_strf(scratch, "%s/%s.spv", compiled_shader_dir, shader_name);
+      if ((!os_file_path_equal_mtime(shader_path, compiled_shader_path) || is_change) && (!str_match(info.name, "com.slang") && !str_match(info.name, "lib.slang"))) {
+        Shader f = {
+          .shader_path = shader_path,
+          .compiled_shader_path = compiled_shader_path,
+        };
+        darray_add(compiled_shaders, f);
       }
     }
     os_file_iter_end(it);
   }
 
-  Darray<CompiledFile> tmp(scratch);
-  for (i32 i = 0; i < compiled_shaders.count; ++i) {
-    Info(compiled_shaders[i].shader_full_path);
-    i32 result = os_process_join(compiled_shaders[i].pid);
-    if (result == 0) {
-      tmp.add(compiled_shaders[i]);
-    }
+  Loop (i, compiled_shaders.count) {
+    Shader& x = compiled_shaders[i];
+    Info("%s", x.shader_path);
+    StringList list = {};
+    str_list_pushf(scratch, &list, "slangc");
+    str_list_pushf(scratch, &list, x.shader_path);
+    str_list_pushf(scratch, &list, "-target");
+    str_list_pushf(scratch, &list, "spirv");
+    str_list_pushf(scratch, &list, "-o");
+    str_list_pushf(scratch, &list, x.compiled_shader_path);
+    x.pid = os_process_launch(list);
   }
-  for (CompiledFile& x : tmp) {
-    os_file_path_copy_mtime(x.shader_full_path, x.compiled_shader_full_path);
+
+  Loop (i, compiled_shaders.count) {
+    Shader& x = compiled_shaders[i];
+    os_process_join(x.pid);
+  }
+  Loop (i, compiled_shaders.count) {
+    Shader& x = compiled_shaders[i];
+    os_file_path_copy_mtime(x.shader_path, x.compiled_shader_path);
   }
 
   u64 end = os_now_ns();
   Info("took seconds: %f", f64(end - start) / Billion(1));
   os_exit(0);
 }
+

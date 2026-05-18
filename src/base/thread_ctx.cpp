@@ -3,6 +3,7 @@
 struct TCTX {
   Arena arenas[2];
   u32 id;
+  b32 role;
 };
 
 global thread_local TCTX tctx;
@@ -13,13 +14,14 @@ u32 tctx_get_id() {
 }
 
 void tctx_init() {
-  tctx.arenas[0] = arena_init();
-  tctx.arenas[1] = arena_init();
-  tctx.id = atomic_u32_inc(&_next_thread_id);
+  tctx.arenas[0] = arena_make();
+  tctx.arenas[1] = arena_make();
+  tctx.id = atomic_inc(&_next_thread_id);
 }
 
 intern Temp tctx_get_scratch() {
-  return temp_begin(&tctx.arenas[0]);
+  Arena* arena = &tctx.arenas[0];
+  return temp_begin(arena);
 }
 
 intern Temp tctx_get_scratch_conflict(Allocator conflict) {

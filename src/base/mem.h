@@ -97,10 +97,10 @@ struct Arena {
   operator Allocator();
 };
 
-#define arena_init(...) arena_init_(__func__)
-Arena arena_init_named(String name);
-Arena arena_init_(String name);
-void  arena_deinit(Arena* arena);
+#define arena_make(...) arena_make_(__func__)
+Arena arena_make_named(String name);
+Arena arena_make_(String name);
+void  arena_free(Arena* arena);
 void  arena_clear(Arena* arena);
 
 struct Temp {
@@ -158,7 +158,7 @@ struct AllocSegList {
   operator Allocator();
 };
 
-AllocSegList alloc_sig_list_init(Allocator alloc);
+AllocSegList alloc_seg_list_make(Allocator alloc, String name = {});
 
 ////////////////////////////////////////////////////////////////////////
 // tlsf TODO: implement
@@ -213,12 +213,12 @@ struct SoA_Field {
 u8* mem_alloc_soa(Allocator alloc, u32 count, Slice<SoA_Field> fields);
 u8* mem_realloc_soa(Allocator alloc, u32 old_count, u32 new_count, Slice<SoA_Field> fields);
 
-void* offset_pusher_mem_push(void*& offset, u64 size, u64 align);
-u64 offset_pusher_push(u64& offset, u64 size, u64 align);
-#define offset_mem_push_struct(a, T)  (T*)offset_pusher_mem_push(a, sizeof(T), alignof(T))
-#define offset_mem_push_array(a, T, c)(T*)offset_pusher_mem_push(a, sizeof(T)*(c), alignof(T))
-#define offset_push_struct(a, T)          offset_pusher_push(a, sizeof(T), alignof(T))
-#define offset_push_array(a, T, c)        offset_pusher_push(a, sizeof(T)*(c), alignof(T))
+void* offset_mem_push(void*& offset, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
+u64 offset_push(u64& offset, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
+#define offset_mem_push_struct(a, T)  (T*)offset_mem_push(a, sizeof(T), alignof(T))
+#define offset_mem_push_array(a, T, c)(T*)offset_mem_push(a, sizeof(T)*(c), alignof(T))
+#define offset_push_struct(a, T)          offset_push(a, sizeof(T), alignof(T))
+#define offset_push_array(a, T, c)        offset_push(a, sizeof(T)*(c), alignof(T))
 
 struct MemFormatSize {
   String format;

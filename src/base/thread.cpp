@@ -14,6 +14,7 @@ void task_queue_init() {
 }
 
 void task_queue_push(Task t) {
+  // ProfFunc;
   ThreadPool& g = thread_pool;
   TaskQueue& queue = g.queue;
   os_mutex_take(queue.mutex);
@@ -29,11 +30,14 @@ void task_queue_push(Task t) {
 }
 
 Task task_queue_pop() {
+  // ProfFunc;
   ThreadPool& g = thread_pool;
   TaskQueue& queue = g.queue;
-  os_mutex_take(queue.mutex);
+  {
+    os_mutex_take(queue.mutex);
+  }
   while (queue.count == 0) {
-    // TimeBlock("sleep", ProfileType_Sleep);
+    ProfBlock("sleep", ProfType_Sleep);
     os_cond_var_wait(queue.cond_not_empty, queue.mutex);
   }
   if (queue.count == MAX_TASKS) {
@@ -51,7 +55,7 @@ void thread_worker(void* arg) {
   tctx_init();
   while (true) {
     Task t = task_queue_pop();
-    TimeBlock("doing job");
+    ProfBlock("working", ProfType_Worker);
     t.func(t.arg);
     os_mutex_take(queue.mutex);
     --queue.remaining_tasks;
@@ -63,7 +67,7 @@ void thread_worker(void* arg) {
 }
 
 void thread_pool_init(u32 num_threads) {
-  TimeFunction;
+  ProfFunc;
   ThreadPool& g = thread_pool;
   g.num_threads = num_threads;
   task_queue_init();
@@ -73,7 +77,7 @@ void thread_pool_init(u32 num_threads) {
 }
 
 void thread_wait_for() {
-  // TimeBlock("wait for workers", ProfileType_Sleep);
+  // ProfBlock("wait for workers", ProfileType_Sleep);
   TaskQueue& queue = thread_pool.queue;
   os_mutex_take(queue.mutex);
   if (queue.remaining_tasks > 0) {

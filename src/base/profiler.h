@@ -3,75 +3,78 @@
 #include "containers.h"
 #include "thread_ctx.h"
 
-enum ProfileType {
-  ProfileType_Work,
-  ProfileType_Sleep,
+enum ProfType {
+  ProfType_Work,
+  ProfType_Sleep,
+  ProfType_Worker,
 };
 
-struct ProfileAnchor {
-  ProfileType type;
-  u64 tsc_elapsed_exclusive; // without children
-  u64 tsc_elapsed_inclusive; // with children
+struct ProfAnchor {
+  ProfType type;
+  u64 tsc_elapsed_excl; // without children
+  u64 tsc_elapsed_incl; // with children
   // u64 hit_count;
   String label;
   String func;
   u32 depth;
   u64 tsc_start;
   u64 tsc_end;
-  u32 current;
   b32 was_poped;
 };
 
-enum ProfileEventType {
-  ProfileEventType_Push,
-  ProfileEventType_Pop,
+enum ProfEventType {
+  ProfEventType_Push,
+  ProfEventType_Pop,
 };
 
-struct ProfileEvent {
-  ProfileEventType type;
-  ProfileType prof_type;
+struct ProfEvent {
+  ProfEventType type;
+  ProfType prof_type;
   u64 tsc;
   String label;
   String func;
 };
 
-struct ProfileBlock {
+struct _ProfBlock {
   String label;
   String func;
-  ProfileBlock(String label_, String func, ProfileType type = ProfileType_Work);
-  ~ProfileBlock();
+  ProfType type;
+  _ProfBlock(String label_, String func_, ProfType type_ = ProfType_Work);
+  ~_ProfBlock();
 };
 
-struct ProfileFrameTime {
+struct ProfFrameTime {
   u64 tsc_start;
   u64 tsc_end;
 };
 
-struct ProfileFrame {
-  ProfileFrameTime frame_time;
-  Slice<ProfileAnchor> anchors;
+struct ProfFrame {
+  ProfFrameTime frame_time;
+  Slice<ProfAnchor> anchors;
 };
 
-struct ProfileThread {
+struct ProfThread {
   Arena arena;
   AllocSegList gpa;
-  Darray<ProfileEvent> events[2];
-  Darray<ProfileAnchor> recorded_anchors[120];
-  Darray<ProfileAnchor> launch_anchors;
-  Darray<ProfileAnchor> long_anchors;
+  Darray<ProfEvent> events[2];
+  Darray<ProfAnchor> recorded_anchors[120];
+  Darray<ProfAnchor> launch_anchors;
+  Darray<ProfAnchor> long_anchors;
 };
 
-enum ProfileTabActive {
+enum ProfTabActive {
   ProfileTabActive_Root,
   ProfileTabActive_Frames,
   ProfileTabActive_Time,
+  ProfileTabActive_LaunchTime,
   ProfileTabActive_Memory,
 };
 
-struct ProfilerState {
-  ProfileFrameTime current_frame_time;
-  ProfileFrameTime frames_times[120];
-  ProfileThread prof_threads[THREAD_COUNT+1];
+struct ProfState {
+  ProfFrameTime current_frame_time;
+  ProfFrameTime frames_times[120];
+  ProfFrameTime launch_time;
+  ProfThread prof_threads[THREAD_COUNT+1];
   u32 current_buf;
 
   f32 frame_avg_time;
@@ -80,22 +83,22 @@ struct ProfilerState {
 
   b32 paused;
 
-  ProfileTabActive active_tab;
+  ProfTabActive active_tab;
 };
 
-void profiler_init(Allocator arena);
-ProfilerState& profiler_get();
-void profiler_begin(u32 current_frame);
-void profiler_end(u32 current_frame);
-ProfileFrame profiler_get_prev_frame(u32 current_frame);
-ProfileThread& profiler_get_prof_thread();
-void profiler_launch_begin();
-void profiler_launch_end();
+void prof_init(Allocator arena);
+ProfState& prof_get();
+void prof_begin(u32 current_frame);
+void prof_end(u32 current_frame);
+ProfFrame prof_get_prev_frame(u32 current_frame);
+ProfThread& prof_get_prof_thread();
+void prof_launch_begin();
+void prof_launch_end();
 
 #if PROFILE_BUILD
-  #define TimeBlock(Name, ...) ProfileBlock Glue(__profiler_block, __LINE__)(Name, __func__, ##__VA_ARGS__)
-  #define TimeFunction TimeBlock(__func__)
+  #define ProfBlock(Name, ...) _ProfBlock Glue(__profiler_block, __LINE__)(Name, __func__, ##__VA_ARGS__)
+  #define ProfFunc ProfBlock(__func__)
 #else
-  #define TimeBlock(Name)
-  #define TimeFunction
+  #define ProfBlock(Name)
+  #define ProfFunc
 #endif

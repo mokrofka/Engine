@@ -28,6 +28,8 @@ struct X11State {
   Clipboard clipboard;
   u32 width = 1;
   u32 height = 1;
+  u32 screen_width;
+  u32 screen_height;
   b8 should_close;
   struct KeyboardState {
     b8 keys[256];
@@ -42,7 +44,7 @@ struct X11State {
     MouseState mouse_current;
     MouseState mouse_previous;
     f32 mouse_scroll;
-    f32 touchpad_move_x;
+    f32 scroll_h;
   } input;
   Darray<OS_InputEvent> input_events;
   Darray<xcb_generic_event_t*> xcb_events;
@@ -269,15 +271,17 @@ xcb_atom_t intern_(String name) {
 
 void os_gfx_init() {
   X11State& g = gfx_st;
-  g.arena = arena_init_named("gfx arena");
+  g.arena = arena_make_named("gfx arena");
   g.gpa.init(g.arena);
-  g.input_events.init(g.gpa);
+  g.input_events = darray_make<OS_InputEvent>(g.gpa);
 
   i32 screen_number;
   g.connection = xcb_connect(null, &screen_number);
   xcb_connection_has_error(g.connection);
   const xcb_setup_t* setup = xcb_get_setup(g.connection);
   xcb_screen_iterator_t iter = xcb_setup_roots_iterator(setup);
+  g.screen_width = iter.data->width_in_pixels;
+  g.screen_height = iter.data->height_in_pixels;
   Loop (i, screen_number) {
     xcb_screen_next(&iter);
   }
@@ -297,6 +301,7 @@ void os_gfx_init() {
   xcb_create_window(g.connection, XCB_COPY_FROM_PARENT, g.window, g.screen->root,
     100, 100, 800, 600,
     1, XCB_WINDOW_CLASS_INPUT_OUTPUT, g.screen->root_visual, mask, values);
+
   const char* title = "XCB Window Example";
   xcb_change_property(g.connection, XCB_PROP_MODE_REPLACE, g.window, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, cstr_length(title), title);
 
@@ -320,9 +325,9 @@ void os_gfx_shutdown() { xcb_disconnect(gfx_st.connection); }
 
 void os_pump_messages() {
   X11State& g = gfx_st;
-  g.input_events.clear();
+  darray_clear(g.input_events);
   g.input.mouse_scroll = 0;
-  g.input.touchpad_move_x = 0;
+  g.input.scroll_h = 0;
 
   xcb_generic_event_t* event;
   u32 i = 0;
@@ -364,15 +369,15 @@ void os_pump_messages() {
             .type = OS_EventKind_Modifier,
             .modifier = g.modifiers,
           };
-          g.input_events.add(event);
+          darray_add(g.input_events, event);
         }
         OS_InputEvent event = {
           .type = OS_EventKind_Key,
-          .is_pressed = true,
           .key = key,
+          .is_pressed = true,
           .modifier = g.modifiers,
         };
-        g.input_events.add(event);
+        darray_add(g.input_events, event);
       } break;
       case XCB_KEY_RELEASE: {
         xcb_key_press_event_t* kp = (xcb_key_press_event_t*)event;
@@ -403,7 +408,7 @@ void os_pump_messages() {
             .type = OS_EventKind_Modifier,
             .modifier = g.modifiers,
           };
-          g.input_events.add(event);
+          darray_add(g.input_events, event);
         }
         OS_InputEvent event = {
           .type = OS_EventKind_Key,
@@ -411,7 +416,7 @@ void os_pump_messages() {
           .is_pressed = false,
           .modifier = g.modifiers,
         };
-        g.input_events.add(event);
+        darray_add(g.input_events, event);
       } break;
       case XCB_CONFIGURE_NOTIFY: {
         xcb_configure_notify_event_t* cfg = (xcb_configure_notify_event_t*)event;
@@ -431,10 +436,10 @@ void os_pump_messages() {
         #define XK_MouseLeft 1
         #define XK_MouseMiddle 2
         #define XK_MouseRight 3
-        #define XK_ScrollUp 4
-        #define XK_ScrollDown 5
-        #define XK_ScrollLeft 6
-        #define XK_ScrollRight 7
+        #define XK_WheelUp 4
+        #define XK_WheelDown 5
+        #define XK_WheelRight 6
+        #define XK_WheelLeft 7
         xcb_button_press_event_t* bp = (xcb_button_press_event_t*)event;
         OS_InputEvent event = {};
         if (bp->detail >= XK_MouseLeft && bp->detail <= XK_MouseRight) {
@@ -448,15 +453,15 @@ void os_pump_messages() {
         }
         else {
           switch (bp->detail) {
-            case XK_ScrollUp: ; event.scroll = 1; break;
-            case XK_ScrollDown: event.scroll = -1; break;
-            case XK_ScrollRight: g.input.touchpad_move_x = -1; break;
-            case XK_ScrollLeft: g.input.touchpad_move_x = 1; break;
+            case XK_WheelUp: ; event.scroll = 1; break;
+            case XK_WheelDown: event.scroll = -1; break;
+            case XK_WheelRight: g.input.scroll_h = 1; break;
+            case XK_WheelLeft: g.input.scroll_h = -1; break;
           }
           g.input.mouse_scroll = event.scroll;
           event.type = OS_EventKind_Scroll;
         }
-        g.input_events.add(event);
+        darray_add(g.input_events, event);
       } break;
       case XCB_BUTTON_RELEASE: {
         xcb_button_press_event_t* bp = (xcb_button_press_event_t*)event;
@@ -470,7 +475,7 @@ void os_pump_messages() {
           event.type = OS_EventKind_MouseButton;
           event.is_pressed = false;
         }
-        g.input_events.add(event);
+        darray_add(g.input_events, event);
       } break;
       case XCB_MOTION_NOTIFY: {
         xcb_motion_notify_event_t* motion = (xcb_motion_notify_event_t*)event;
@@ -479,7 +484,7 @@ void os_pump_messages() {
         OS_InputEvent event = {.type = OS_EventKind_MouseMove};
         event.x = g.input.mouse_current.x;
         event.y = g.input.mouse_current.y;
-        g.input_events.add(event);
+        darray_add(g.input_events, event);
       } break;
       case XCB_SELECTION_REQUEST: {
         xcb_selection_request_event_t* req = (xcb_selection_request_event_t*)event;
@@ -508,7 +513,7 @@ void os_pump_messages() {
       } break;
     }
   }
-  g.xcb_events.clear();
+  darray_clear(g.xcb_events);
 }
 
 void os_clipboard_write(String str) {
@@ -574,7 +579,7 @@ String os_clipboard_read() {
     }
     else {
       add_event:
-      g.xcb_events.add(event);
+      darray_add(g.xcb_events, event);
     }
   }
   return g.clipboard.str_to_read;
@@ -584,8 +589,8 @@ b32 os_window_should_close() { return gfx_st.should_close; }
 v2u os_get_window_size() { return v2u(gfx_st.width, gfx_st.height); }
 v2 os_get_mouse_pos() { return v2(gfx_st.input.mouse_current.x, gfx_st.input.mouse_current.y); }
 f32 os_get_scroll() { return gfx_st.input.mouse_scroll; }
-f32  os_get_scroll_x() { return gfx_st.input.touchpad_move_x; }
-void os_close_window() { gfx_st.should_close = true; }
+f32 os_get_scroll_h() { return gfx_st.input.scroll_h; }
+v2u os_get_screen_size() { return v2u(gfx_st.screen_width, gfx_st.screen_height); }
 
 void os_get_gfx_api_handlers(void* out) {
   struct Surface {
@@ -594,6 +599,8 @@ void os_get_gfx_api_handlers(void* out) {
   };
   *(Surface*)out = { gfx_st.connection, gfx_st.window };
 }
+
+void os_close_window() { gfx_st.should_close = true; }
 
 Slice<OS_InputEvent> os_get_events() { return {gfx_st.input_events.data, gfx_st.input_events.count}; }
 

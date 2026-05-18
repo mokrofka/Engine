@@ -71,6 +71,7 @@ String lower_from_str(Allocator arena, String string);
 
 b32 str_match(String str0, String str1);
 b32 str_matchi(String str0, String str1);
+u64 str_find_needle(String string, u64 start_pos, String needle);
 b32 str_ends_with(String string, String end);
 b32 equal(String a, String b);
 
