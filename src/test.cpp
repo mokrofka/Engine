@@ -310,7 +310,7 @@ intern void test_id_pool() {
     }
     rand_shuffle(slice(arr));
     Loop (i, arr.count) {
-      static_id_pool.free(i);
+      static_id_pool.free(arr[i]);
     }
     Array<u32, TEST_SAMPLES> new_arr = {};
     Loop (i, arr.count) {

@@ -140,12 +140,12 @@ template<typename T, typename...Args> void darray_add(Darray<T>& arr, Args...arg
     darray_add(arr, x);
   }
 }
-template<typename T> void darray_add_elems(Darray<T>& arr, T* elems, u32 elem_count) {
-  if (arr.count + elem_count >= arr.cap) {
-    darray_grow(arr, elem_count);
+template<typename T> void darray_add_elems(Darray<T>& arr, Slice<T> elems) {
+  if (arr.count + elems.count >= arr.cap) {
+    darray_grow(arr, elems.count);
   }
-  MemCopyArray(arr.data + arr.count, elems, elem_count);
-  arr.count += elem_count;
+  MemCopyArray(arr.data + arr.count, elems.data, elems.count);
+  arr.count += elems.count;
 }
 template<typename T> void darray_swap_remove(Darray<T>& arr, u32 idx) {
   Assert(idx < arr.count);

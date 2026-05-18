@@ -6,7 +6,7 @@ mat4& get_mat();
 
 mat4& vk_get_view();
 mat4& vk_get_projection();
-void vk_set_state(void* vk);
+void vk_set_state(void* ctx);
 
 Handle<GpuTexture> vk_texture_load(Texture texture);
 Handle<GpuMaterial> vk_material_load(Material material);

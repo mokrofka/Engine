@@ -150,6 +150,7 @@ void StaticIdPool::init(Allocator alloc, u32 cap_) {
   ids = push_array(alloc, u32, cap);
 #if BUILD_DEBUG
   generations = push_array_zero(alloc, u32, cap);
+  generations[0] = 1;
 #endif
   Loop (i, cap) {
     ids[i] = i;

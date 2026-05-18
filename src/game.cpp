@@ -529,6 +529,12 @@ void game_init() {
   // g.cube1.pos() = v3(-1,0,0);
   // g.monkey = e_alloc(Mesh_MonkeyGlb, Material_Container);
   // g.monkey.pos() = v3(2,0,0);
+
+  // var grid = e_alloc(Mesh_Grid, Material_Line);
+  // g.grid = grid;
+  // vk_set_entity_color(grid, v4_scale(0.6));
+  // grid.pos() = v3(0,0,-5);
+
   // Loop (i, KB(10)) {
   //   MeshId meshes[] = {
   //     // Mesh_MonkeyGlb,
