@@ -1,21 +1,6 @@
 #pragma once
 #include "lib.h"
 
-#define IM_VEC2_CLASS_EXTRA                               \
-        constexpr ImVec2(const v2& f) : x(f.x), y(f.y) {} \
-        operator v2() const { return v2(x,y); }
-#include "imgui/imgui.h"
-
-struct ImString {
-  u8* str;
-  u64 size;
-  ImString() = default;
-  ImString(const String& f) : str(f.str), size(f.size) {}
-  operator char*() { return (char*)str; }
-};
-
-#define IM_RECT(rect) rect.min, rect.max
-
 // TODO:
 // dummy assets/null 
 // obj mouse selection
@@ -32,10 +17,27 @@ struct ImString {
 // introspection
 // upgrade vulkan
 // compiling all shaders in compiled dir and check timestamp to recompile on thread
-// slang shader language
 // metadesk tables?
 // shaders code
-// draw
+// Remove Handle<>
+
+////////////////////////////////////////////////////////////////////////
+// @Common
+
+#define IM_VEC2_CLASS_EXTRA                               \
+        constexpr ImVec2(const v2& f) : x(f.x), y(f.y) {} \
+        operator v2() const { return v2(x,y); }
+#include "imgui/imgui.h"
+
+struct ImString {
+  u8* str;
+  u64 size;
+  ImString() = default;
+  ImString(const String& f) : str(f.str), size(f.size) {}
+  operator char*() { return (char*)str; }
+};
+
+#define IM_RECT(rect) rect.min, rect.max
 
 const v3 ColorRed   = v3(1,0,0);
 const v3 ColorGreen = v3(0,1,0);
@@ -75,13 +77,6 @@ struct SpotLight {
   f32 intensity;
   f32 inner_cutoff;
   f32 outer_cutoff;
-};
-
-struct MaterialProps {
-  v3 ambient;
-  v3 diffuse;
-  v3 specular;
-  f32 shininess;
 };
 
 struct Texture {
@@ -132,6 +127,13 @@ struct Shader {
   ShaderState state;
 };
 
+struct MaterialProps {
+  v3 ambient;
+  v3 diffuse;
+  v3 specular;
+  f32 shininess;
+};
+
 struct Material {
   Shader shader;
   MaterialProps props;
@@ -148,8 +150,9 @@ struct Timer {
   f32 interval;
 };
 
-Timer timer_init(f32 interval);
-b32 timer_tick(Timer& t);
+Timer timer_make(f32 interval);
+void timer_tick(Timer& t);
+b32 timer_passed(Timer& t);
 
 f64 tsc_to_ms(u64 tsc);
 
@@ -166,6 +169,11 @@ struct TimeScope {
 
 f32 get_dt();
 f32 get_time();
+
+Mesh load_obj(Allocator arena, String name);
+Mesh load_gltf(Allocator arena, String name);
+Mesh load_glb(Allocator arena, String name);
+Texture load_image(String filepath);
 
 ////////////////////////////////////////////////////////////////////////
 // @Assets
@@ -220,10 +228,10 @@ Handle<GpuMaterial> material_get(MaterialId id);
 Handle<GpuMesh> mesh_load(String name);
 Handle<GpuShader> shader_load(Shader shader);
 Handle<GpuCubemap> cubemap_load(String name);
-void asset_load();
+void assets_load();
 
 ////////////////////////////////////////////////////////////////////////
-// Lexer
+// @Lexer
 
 enum TokenType {
   TokenType_Unknown,
@@ -261,6 +269,43 @@ struct Token {
 struct Tokenizer {
   String str;
 };
+
+////////////////////////////////////////////////////////////////////////
+// @Json
+
+enum JsonType {
+  JsonType_Error,
+  JsonType_Bool,
+  JsonType_Number,
+  JsonType_String,
+  JsonType_Array,
+  JsonType_Object,
+  JsonType_Null,
+  JsonType_End,
+};
+
+struct JsonValue {
+  JsonType type;
+  String str;
+  i32 depth;
+  b32 match(String name) { return str_match(str, name); };
+};
+
+struct JsonReader {
+  u8* cur;
+  u8* end;
+  i32 depth;
+  String error;
+  JsonValue base_obj;
+};
+
+JsonReader json_reader_init(String buffer);
+b32 json_iter_object(JsonReader* r, JsonValue obj, JsonValue *key, JsonValue *val);
+b32 json_iter_array(JsonReader* r, JsonValue arr, JsonValue* val);
+
+#define JSON_OBJ(r, o) for (JsonValue k, v; json_iter_object(&r, o, &k, &v);)
+#define JSON_OBJ_(r, o) for (JsonValue key, val; json_iter_object(&r, o, &key, &val);)
+#define JSON_ARR(r, val) for (JsonValue obj; json_iter_array(&r, val, &obj);)
 
 ////////////////////////////////////////////////////////////////////////
 // @Input
@@ -455,6 +500,9 @@ struct GameState {
   Handle<Entity> cube0;
   Handle<Entity> cube1;
 };  
+
+void game_init();
+void game_update();
 
 struct GlobalState {
   Arena arena;

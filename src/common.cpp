@@ -1,27 +1,99 @@
+#include "common.h"
+#include "vk.h"
+#include "test.cpp"
+
 #include "stb_image.h"
 #include "stb_truetype.h"
-#include "game.cpp"
 
-#include "common.h"
-#include "json.cpp"
-#include "test.cpp"
+////////////////////////////////////////////////////////////////////////
+// @Common
+
+Vertex cube_vertices[] = {
+  // Front face (0, 0, 1)
+  {.pos = v3(-1.00, -1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0.0f, 0.0f)},
+  {.pos = v3( 1.00, -1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1.0f, 0.0f)},
+  {.pos = v3( 1.00,  1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3( 1.00,  1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3(-1.00,  1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0.0f, 1.0f)},
+  {.pos = v3(-1.00, -1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0.0f, 0.0f)},
+
+  // Back face (0, 0, -1)
+  {.pos = v3( 1.00, -1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0.0f, 0.0f)},
+  {.pos = v3(-1.00, -1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1.0f, 0.0f)},
+  {.pos = v3(-1.00,  1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3(-1.00,  1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3( 1.00,  1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0.0f, 1.0f)},
+  {.pos = v3( 1.00, -1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0.0f, 0.0f)},
+
+  // Left face (-1, 0, 0)
+  {.pos = v3(-1.00, -1.00, -1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+  {.pos = v3(-1.00, -1.00,  1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
+  {.pos = v3(-1.00,  1.00,  1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3(-1.00,  1.00,  1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3(-1.00,  1.00, -1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
+  {.pos = v3(-1.00, -1.00, -1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+
+  // Right face (1, 0, 0)
+  {.pos = v3(1.00, -1.00,  1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+  {.pos = v3(1.00, -1.00, -1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
+  {.pos = v3(1.00,  1.00, -1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3(1.00,  1.00, -1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3(1.00,  1.00,  1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
+  {.pos = v3(1.00, -1.00,  1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+
+  // Bottom face (0, -1, 0)
+  {.pos = v3(-1.00, -1.00, -1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
+  {.pos = v3( 1.00, -1.00, -1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3( 1.00, -1.00,  1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
+  {.pos = v3( 1.00, -1.00,  1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
+  {.pos = v3(-1.00, -1.00,  1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+  {.pos = v3(-1.00, -1.00, -1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
+
+  // Top face (0, 1, 0)
+  {.pos = v3(-1.00,  1.00,  1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+  {.pos = v3( 1.00,  1.00,  1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
+  {.pos = v3( 1.00,  1.00, -1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3( 1.00,  1.00, -1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3(-1.00,  1.00, -1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
+  {.pos = v3(-1.00,  1.00,  1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+};
+
+Vertex triangle_vertices[] = {
+  {.pos = v3( 0.0,   0.5, 0), .uv = v2(0.5, 1), .color = v3(1,0,0)},
+  {.pos = v3(-0.5,  -0.5, 0), .uv = v2(0.0, 0), .color = v3(0,1,0)},
+  {.pos = v3( 0.5,  -0.5, 0), .uv = v2(1.0, 0), .color = v3(0,0,1)},
+};
+
+Vertex axis_vertices[] = {
+  {.pos = v3_zero(), .color = v3(1,0,0)},
+  {.pos = v3(1,0,0), .color = v3(1,0,0)},
+  {.pos = v3_zero(), .color = v3(0,1,0)},
+  {.pos = v3(0,1,0), .color = v3(0,1,0)},
+  {.pos = v3_zero(), .color = v3(0,0,1)},
+  {.pos = v3(0,0,1), .color = v3(0,0,1)},
+};
 
 u64 hash(Vertex x) { return hash_memory(&x, sizeof(x)); }
 b32 equal(Vertex a, Vertex b) { return MemMatchStruct(&a, &b); }
 
 Extern GlobalState* g_st;
 
-Timer timer_init(f32 interval) {
+Timer timer_make(f32 interval) {
   Timer timer = {
     .interval = interval,
   };
   return timer;
 }
 
-b32 timer_tick(Timer& t) {
+void timer_tick(Timer& t) {
   t.passed += g_st->dt;
   if (t.passed >= t.interval) {
     t.passed = 0;
+  }
+}
+
+b32 timer_passed(Timer& t) {
+  if (t.passed >= t.interval) {
     return true;
   }
   return false;
@@ -53,7 +125,7 @@ v3& Handle<StaticEntity>::pos() { return trans().pos; }
 v3& Handle<StaticEntity>::rot() { return trans().rot; }
 v3& Handle<StaticEntity>::scale() { return trans().scale; }
 
-intern Mesh mesh_load_obj(Allocator arena, String name) {
+Mesh load_obj(Allocator arena, String name) {
   Scratch scratch(arena);
   var positions = darray_make<v3>(scratch);
   var normals = darray_make<v3>(scratch);
@@ -105,7 +177,7 @@ intern Mesh mesh_load_obj(Allocator arena, String name) {
   }
   var vertices = darray_make<Vertex>(arena);
   var final_indices = darray_make<u32>(arena);
-  Map<Vertex, u32> map(scratch);
+  var map = map_make<Vertex, u32>(scratch);
   Loop (i, indexes.count) {
     v3u idx = indexes[i];
     Vertex vertex = {
@@ -113,14 +185,14 @@ intern Mesh mesh_load_obj(Allocator arena, String name) {
       .norm = normals[idx.y],
       .uv = uvs[idx.z],
     };
-    u32* found = map.get(vertex);
+    u32* found = map_get(map, vertex);
     if (found) {
       darray_add(final_indices, *found);
     } else {
       u32 new_index = vertices.count;
       darray_add(vertices, vertex);
       darray_add(final_indices, new_index);
-      map.add(vertex, new_index);
+      map_set(map, vertex, new_index);
     }
   }
   Mesh mesh = {
@@ -132,7 +204,7 @@ intern Mesh mesh_load_obj(Allocator arena, String name) {
   return mesh;
 }
 
-intern Mesh mesh_load_gltf(Allocator arena, String name) {
+Mesh load_gltf(Allocator arena, String name) {
   Scratch scratch(arena);
   Slice buf = os_file_path_read_all(scratch, name);
   JsonReader r = json_reader_init({buf.data, buf.count});
@@ -251,7 +323,7 @@ intern Mesh mesh_load_gltf(Allocator arena, String name) {
   return mesh;
 }
 
-intern Mesh mesh_load_glb(Allocator arena, String name) {
+Mesh load_glb(Allocator arena, String name) {
   Scratch scratch(arena);
   Slice buf = os_file_path_read_all(scratch, name);
   struct FileHeader {
@@ -378,7 +450,7 @@ intern Mesh mesh_load_glb(Allocator arena, String name) {
   return mesh;
 }
 
-intern Texture texture_image_load(String filepath) {
+Texture load_image(String filepath) {
   Scratch scratch;
   Texture texture = {};
   u32 required_channel_count = 4;
@@ -391,7 +463,7 @@ intern Texture texture_image_load(String filepath) {
 }
 
 ////////////////////////////////////////////////////////////////////////
-// Assets
+// @Assets
 
 // TODO: allocate in hotreload build?
 global String meshes_strs[Mesh_Load_COUNT] = {
@@ -438,11 +510,11 @@ Handle<GpuMesh> mesh_load(String name) {
   String format = str_skip_last_dot(name);
   Mesh mesh = {};
   if (str_match(format, "glb")) {
-    mesh = mesh_load_glb(scratch, filepath);
+    mesh = load_glb(scratch, filepath);
   } else if (str_match(format, "gltf")) {
-    mesh = mesh_load_gltf(scratch, filepath);
+    mesh = load_gltf(scratch, filepath);
   } else if (str_match(format, "obj")) {
-    mesh = mesh_load_obj(scratch, filepath);
+    mesh = load_obj(scratch, filepath);
   } else {
     InvalidPath;
   }
@@ -454,7 +526,7 @@ Handle<GpuTexture> texture_load(String name) {
   GlobalState& g = *g_st;
   Scratch scratch;
   String filepath = push_strf(scratch, "%s/%s", g.textures_dir, name);
-  Texture texture = texture_image_load(filepath);
+  Texture texture = load_image(filepath);
   Handle<GpuTexture> handle = vk_texture_load(texture);
   return handle;
 }
@@ -471,23 +543,23 @@ Handle<GpuCubemap> cubemap_load(String name) {
   for EachElement(i, textures) {
     String texture_name = push_strf(scratch, "%s/%s%s", name, sides[i], String(".png"));
     String filepath = push_strf(scratch, "%s/%s", g.textures_dir, texture_name);
-    textures[i] = texture_image_load(filepath);
+    textures[i] = load_image(filepath);
   }
   vk_cubemap_load(textures);
   return {};
 }
 
-void asset_load() {
+void assets_load() {
   GlobalState& g = *g_st;
 #define X(enum_name, name) \
   g.meshes_handlers[enum_name] = mesh_load(meshes_strs[enum_name]); \
-  g.str_to_mesh.add(Stringify(name), g.meshes_handlers[enum_name]);
+  map_set(g.str_to_mesh, String(Stringify(name)), g.meshes_handlers[enum_name]);
   MESH_LIST
 #undef X
 
 #define X(enum_name, name) \
   g.textures_handlers[enum_name] = texture_load(textures_strs[enum_name]); \
-  g.str_to_texture.add(Stringify(name), g.textures_handlers[enum_name]);
+  map_set(g.str_to_texture, String(Stringify(name)), g.textures_handlers[enum_name]);
   TEXTURE_LIST
 #undef X
 
@@ -514,7 +586,7 @@ void asset_load() {
     TakeMaterial mat = { \
       __VA_ARGS__ \
     }; \
-    Handle<GpuTexture>* texture_hanle = g.str_to_texture.get(mat.texture); \
+    Handle<GpuTexture>* texture_hanle = map_get(g.str_to_texture, mat.texture); \
     if (texture_hanle) \
       mat.texture_handle = *texture_hanle; \
     g.materials_handlers[enum_name] = vk_material_load(mat); \
@@ -524,7 +596,7 @@ void asset_load() {
 }
 
 ////////////////////////////////////////////////////////////////////////
-// Lexer
+// @Lexer
 
 Slice<Token> tokens_from_str(Allocator arena, String str) {
   // u32 off = 0;
@@ -535,6 +607,100 @@ Slice<Token> tokens_from_str(Allocator arena, String str) {
 //     b32 ender_found = false;
 //   }
   return {};
+}
+
+////////////////////////////////////////////////////////////////////////
+// @Json
+
+// https://github.com/rxi/sj.h.git
+JsonValue json_read(JsonReader* r) {
+  JsonValue res = {};
+  top:
+  if (r->error.str) { return { .type = JsonType_Error, .str = str_range(r->cur, r->end)}; }
+  u8* start = r->cur;
+  switch (*r->cur) {
+    case ' ': case '\n': case '\r': case '\t':
+    case ':': case ',': {
+      ++r->cur;
+      goto top;
+    }
+    case '-': case '0': case '1': case '2': case '3': case '4':
+    case '5': case '6': case '7': case '8': case '9': {
+      res.type = JsonType_Number;
+      while (r->cur != r->end && char_is_number_cont(*r->cur)) { ++r->cur; }
+    } break;
+    case '"': {
+      res.type = JsonType_String;
+      start = ++r->cur;
+      while (true) {
+        if (r->cur == r->end) { r->error = "unclosed string"; goto top; }
+        if (*r->cur == '"')   { break; }
+        if (*r->cur == '\\')  { r->cur++; }
+        if (r->cur != r->end) { r->cur++; }
+      }
+      res.str = str_range(start, r->cur++);
+      return res;
+    }
+    case '{': case '[': {
+      res.type = (*r->cur == '{') ? JsonType_Object : JsonType_Array;
+      res.depth = ++r->depth;
+      r->cur++;
+    } break;
+    case '}': case ']': {
+      res.type = JsonType_End;
+      if (--r->depth < 0) {
+        r->error = (*r->cur == '}') ? "stray '}'" : "stray ']'";
+        goto top;
+      }
+      r->cur++;
+    } break;
+    case 'n': case 't': case 'f': {
+      res.type = (*r->cur == 'n') ? JsonType_Null : JsonType_Bool;
+      if (str_match(String(r->cur, 4),  "null")) { r->cur += 4; break; }
+      if (str_match(String(r->cur, 4),  "true")) { r->cur += 4; break; }
+      if (str_match(String(r->cur, 5), "false")) { r->cur += 5; break; }
+    } // fallthrough
+    default: {
+      r->error = "unknown token";
+      goto top;
+    }
+  }
+  res.str = str_range(start, r->cur);
+  return res;
+}
+
+JsonReader json_reader_init(String buffer) {
+  JsonReader r = {
+    .cur = buffer.str,
+    .end = buffer.str + buffer.size,
+  };
+  r.base_obj = json_read(&r);
+  return r;
+}
+
+intern void json_discard_until(JsonReader* r, i32 depth) {
+  JsonValue val;
+  val.type = JsonType_Null;
+  while (r->depth != depth && val.type != JsonType_Error) {
+    val = json_read(r);
+  }
+}
+
+b32 json_iter_object(JsonReader* r, JsonValue obj, JsonValue *key, JsonValue *val) {
+  json_discard_until(r, obj.depth);
+  *key = json_read(r);
+  if (key->type == JsonType_Error || key->type == JsonType_End) { return false; }
+  *val = json_read(r);
+  if (val->type == JsonType_End)   { r->error = "unexpected object end"; return false; }
+  if (val->type == JsonType_Error) { return false; }
+  return true;
+}
+
+b32 json_iter_array(JsonReader* r, JsonValue arr, JsonValue* val) {
+  json_discard_until(r, arr.depth);
+  *val = json_read(r);
+  if (val->type == JsonType_Error || val->type == JsonType_End) { return false; }
+  return true;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -575,11 +741,11 @@ void key_consume(Key key) {
 }
 
 void input_update() {
-  MemZeroArray(g_st->input.consumed, ArrayCount(g_st->input.consumed));
+  ArrayZero(g_st->input.consumed);
 }
 
 ////////////////////////////////////////////////////////////////////////
-// some ui
+// @UI
 
 ScrollState scroll_state_make(f32 scale) {
   ScrollState res = {
@@ -670,9 +836,6 @@ void imgui_window_track_state(ImguiWindow& window) {
     window.size = ImGui::GetWindowSize();
   }
 }
-
-////////////////////////////////////////////////////////////////////////
-// UI
 
 // void ui_begin() {
 //   UI_State& g = g_st->ui;
@@ -1423,7 +1586,7 @@ void game_view() {
 }
 
 ////////////////////////////////////////////////////////////////////////
-// Watch
+// @Watch
 
 void watch_add(String watch_name, WatchOp op) {
   WatchState& g = g_st->watch;
@@ -1475,18 +1638,19 @@ void watch_update() {
           GlobalState& g = *g_st;
           Scratch scratch;
           String shader_filepath = push_strf(scratch, "%s/%s", g.shader_dir, name);
-          String shader_compiled_filepath = push_strf(scratch, "%s/%s%s", g.shader_compiled_dir, name, String(".spv"));
+          String shader_compiled_filepath = push_strf(scratch, "%s/%s%s", g.shader_compiled_dir, str_chop_last_dot(name), String(".spv"));
           StringList list = {};
-          str_list_push(scratch, &list, "glslangValidator");
-          str_list_push(scratch, &list, "-V");
+          str_list_push(scratch, &list, "slangc");
           str_list_push(scratch, &list, shader_filepath);
+          str_list_push(scratch, &list, "-target");
+          str_list_push(scratch, &list, "spirv");
+          str_list_push(scratch, &list, "-g");
           str_list_push(scratch, &list, "-o");
           str_list_push(scratch, &list, shader_compiled_filepath);
           os_process_launch(list);
         } break;
         case WatchOp_ShaderReload: {
-          String shader_name_with_format = str_chop_last_dot(name);
-          String shader_name = str_chop_last_dot(shader_name_with_format);
+          String shader_name = str_chop_last_dot(name);
           vk_shader_reload(shader_name);
         } break;
         InvalidDefaultCase break;
@@ -1495,13 +1659,66 @@ void watch_update() {
   }
 }
 
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+
+#define BASE 256
+
+static void counting_sort_pass(uint32_t* arr, uint32_t* out, int n, int shift) {
+  int count[BASE] = {0};
+
+  // Count occurrences of each byte value
+  for (int i = 0; i < n; i++) {
+    int byte = (arr[i] >> shift) & 0xFF;
+    count[byte]++;
+  }
+
+  // Prefix sum (positions)
+  for (int i = 1; i < BASE; i++) {
+    count[i] += count[i - 1];
+  }
+
+  // Build output (stable)
+  for (int i = n - 1; i >= 0; i--) {
+    int byte = (arr[i] >> shift) & 0xFF;
+    out[--count[byte]] = arr[i];
+  }
+}
+
+void radix_sort(uint32_t* arr, int n) {
+  u32* tmp = (u32*)malloc(n * sizeof(uint32_t));
+  if (!tmp) return;
+
+  // 4 passes for 32-bit integers (8 bits each)
+  for (int shift = 0; shift < 32; shift += 8) {
+    counting_sort_pass(arr, tmp, n, shift);
+
+    // swap buffers
+    uint32_t* swap = arr;
+    arr = tmp;
+    tmp = swap;
+  }
+
+  // If final result ended in tmp, copy back
+  // (depends on even/odd number of passes)
+  memcpy(tmp, arr, n * sizeof(uint32_t));
+  // free(arr);
+  arr = tmp;
+}
+
 void common_init() {
+  Scratch scratch;
+
   GlobalState& g = *g_st;
   estimate_cpu_frequency();
   global_allocator_init();
   os_gfx_init();
   prof_init(g.arena);
   prof_launch_begin();
+
   {
     ProfBlock("init");
     thread_pool_init(THREAD_COUNT);
@@ -1515,9 +1732,9 @@ void common_init() {
     g.shader_compiled_dir = push_str_cat(g.arena, g.shader_dir, "/compiled");
     g.models_dir = push_str_cat(g.arena, g.asset_path, "/models");
     g.textures_dir = push_str_cat(g.arena, g.asset_path, "/textures");
-    g.str_to_texture.init(g.gpa);
-    g.str_to_mesh.init(g.gpa);
-    g.str_to_material.init(g.gpa);
+    g.str_to_texture = map_make<String, Handle<GpuTexture>>(g.gpa);
+    g.str_to_mesh = map_make<String, Handle<GpuMesh>>(g.gpa);
+    g.str_to_material = map_make<String, Handle<GpuMaterial>>(g.gpa);
 
     g.watch.arena = g.arena;
     watch_directory_add(g.shader_dir, WatchOp_RecompileShader);
@@ -1583,7 +1800,7 @@ void common_update() {
   {
     ProfBlock("push jobs");
     Loop (i, 16) {
-      task_queue_push(task);
+      thread_task_push(task);
     }
   }
   // thread_wait_for();
@@ -1656,211 +1873,508 @@ if (data->ctx == null) {
   hotreload:
   thread_wait_for();
 }
-// void vk_draw() {
-//   ProfFunc;
 
-//   VkCommandBuffer cmd = vk_get_current_cmd();
-//   vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->pipeline_layout, 0, 1, &vk->descriptor_sets, 0, null);
-//   VkDeviceSize size = 0;
-//   vk->CmdBindVertexBuffers(cmd, 0, 1, &vk->vert_buffer.h, &size);
-//   vk->CmdBindIndexBuffer(cmd, vk->index_buffer.h, 0, VK_INDEX_TYPE_UINT32);
+////////////////////////////////////////////////////////////////////////
+// @Game
 
-//   VK_State& g = *vk;
-//   GlobalStateGPU& shader_st = *vk->gpu_global_shader_st;
-//   shader_st.projection_view = vk->projection * vk->view;
-//   shader_st.projection = vk->projection;
-//   shader_st.view = vk->view;
+Mesh sphere_generate(Allocator arena) {
+  u32 lat_steps = 10;
+  u32 lon_steps = 10;
+  u32 vert_count = lat_steps*lon_steps;
+  u32 index_count = (lat_steps - 1) * lon_steps * 6;
+  Vertex* vertices = push_array(arena, Vertex, vert_count);
+  u32* indices = push_array(arena, u32, index_count);
+  f32 lat_step_angle = PI / lat_steps;
+  f32 lon_step_angle = 2*PI / lon_steps;
+  for (u32 i = 0; i < lat_steps; ++i) {
+    f32 lat_angle = -PI/2 + i*lat_step_angle;
+    for (u32 j = 0; j < lon_steps; ++j) {
+      f32 lon_angle = j * lon_step_angle;
+      Vertex vert = {
+        .pos.x = Cos(lat_angle) * Cos(lon_angle),
+        .pos.y = Sin(lat_angle),
+        .pos.z = Cos(lat_angle) * Sin(lon_angle),
+        .uv.x = (f32)j / (lon_steps - 1),  // 0 → 1 across longitude
+        .uv.y = (f32)i / (lat_steps - 1),  // 0 → 1 from bottom to top
+      };
+      vertices[i*lon_steps + j] = vert;
+    }
+  }
+  var idx = [&](u32 i, u32 j) {
+    return i * lon_steps + j;
+  };
+  u32 k = 0;
+  for (u32 i = 0; i < lat_steps - 1; ++i) {
+    for (u32 j = 0; j < lon_steps; ++j) {
+      u32 next_j = (j + 1) % lon_steps; // wrap around
+      u32 v0 = idx(i, j);
+      u32 v1 = idx(i, next_j);
+      u32 v2 = idx(i + 1, j);
+      u32 v3 = idx(i + 1, next_j);
+      indices[k++] = v0;
+      indices[k++] = v2;
+      indices[k++] = v1;
+      indices[k++] = v1;
+      indices[k++] = v2;
+      indices[k++] = v3;
+    }
+  }
+  u32 north_pole_index = vert_count - 1; // last vertex
+  for (u32 j = 0; j < lon_steps; ++j) {
+    u32 next_j = (j + 1) % lon_steps;
+    indices[k++] = idx(lat_steps - 2, j); // last row before pole
+    indices[k++] = north_pole_index;      // pole
+    indices[k++] = idx(lat_steps - 2, next_j);
+  }
+  Mesh mesh = {
+    .vert_count = lat_steps * lon_steps,
+    .vertices = vertices,
+    .index_count = index_count,
+    .indices = indices,
+  };
+  return mesh;
+}
+
+Mesh grid_generate(Allocator arena, u32 size, f32 step) {
+  Vertex* vertices = push_array(arena, Vertex, size*4);
+  v3 pos_offset = v3(-(i32)size/2, 0, -(i32)size/2);
+  for (i32 i = 0; i < size; ++i) {
+    vertices[i*2].pos = pos_offset + v3(0, 0, i*step);
+    vertices[i*2+1].pos = pos_offset + v3(size*step, 0, i*step);
+  }
+  Vertex* vertical_vertices = vertices + size*2;
+  for (i32 i = 0; i < size; ++i) {
+    vertical_vertices[i*2].pos = pos_offset + v3(i*step, 0, 0);
+    vertical_vertices[i*2+1].pos = pos_offset + v3(i*step, 0, size*step);
+  }
+  Mesh mesh = {
+    .vertices = vertices,
+    .vert_count = size*4,
+  };
+  return mesh;
+}
+
+v3 ray_from_camera() {
+  v2 mouse_pos = os_get_mouse_pos();
+  v2u win_size = os_get_window_size();
+  v2 norm_coords = v2(2 * (mouse_pos.x/win_size.x) - 1, 2 * -(mouse_pos.y/win_size.y) + 1);
+  v4 clip_coords = v4(norm_coords.x, norm_coords.y, -1, 1);
+  v4 eye_coord = mat4_inverse(vk_get_projection()) * clip_coords;
+  eye_coord = v4(eye_coord.x, eye_coord.y, -1, 0);
+  v3 world_coord = v3_of_v4(vk_get_view() * eye_coord);
+  world_coord = v3_norm(world_coord);
+  return world_coord;
+}
+
+// b32 ray_intersect_AABB(Ray ray, AABB aabb) {
+//   v3 tMin = v3_hadamard_div(aabb.min - ray.origin, ray.dir);
+//   v3 tMax = v3_hadamard_div(aabb.max - ray.origin, ray.dir);
+//   v3 t1 = v3_less(tMin, tMax);
+//   v3 t2 = v3_greater(tMin, tMax);
+//   f32 tNear = Max3(t1.x, t1.y, t1.z);
+//   f32 tFar = Min3(t2.x, t2.y, t2.z);
+//   if (tNear > tFar) {
+//     return false;
+//   }
+//   return true;
+// };
+
+Handle<Entity> e_alloc(MeshId mesh_id, MaterialId material_id) {
+  GameState& g = g_st->game;
+  u32 e_id = static_id_pool_alloc(g.entity_id_pool);
+  Handle<Entity> e = {e_id};
+  e.trans() = {};
+  e.scale() = v3_one();
+  vk_make_renderable(e, mesh_get(mesh_id), material_get(material_id));
+  ++g.entities_count;
+  return e;
+}
+
+Handle<StaticEntity> e_static_alloc(MeshId mesh_id, MaterialId material_id) {
+  GameState& g = g_st->game;
+  u32 e_id = static_id_pool_alloc(g.static_entity_id_pool);
+  Handle<StaticEntity> e = {e_id};
+  e.trans() = {};
+  e.scale() = v3_one();
+  vk_make_renderable_static(e, mesh_get(mesh_id), material_get(material_id));
+  ++g.static_entities_count;
+  return e;
+}
+
+void e_release(Handle<Entity> e) {
+  GameState& g = g_st->game;
+  static_id_pool_free(g.entity_id_pool, e.handle);
+  vk_remove_renderable(e);
+  --g.entities_count;
+}
+
+void select_obj() {
+  GameState& g = g_st->game;
+  v3 dir = ray_from_camera();
+  var e = e_alloc(Mesh_Cube, Material_Orange);
+  // e.pos() = st->cam.pos + v3_norm(mat4_forward(st->cam.view));
+  e.pos() = g.cam.pos;
+  e.scale() = v3_scale(0.3);
+  e.vel() = dir * 4;
+}
+
+void camera_init() {
+  GameState& g = g_st->game;
+  Camera& cam = g.cam;
+  cam = {
+    .pos = v3(0,0,5),
+    .yaw = -90,
+    .fov = 45,
+    .speed = 10,
+  };
+  cam.dir = {
+    CosD(cam.yaw) * CosD(cam.pitch),
+    SinD(cam.pitch),
+    SinD(cam.yaw) * CosD(cam.pitch)
+  };
+  vk_get_view() = mat4_look_at(cam.pos, cam.dir, v3_up());
+}
+
+void camera_update() {
+  GameState& g = g_st->game;
+  Camera& cam = g.cam;
+  v2 win_size = v2_of_v2u(os_get_window_size());
+  mat4& projection = vk_get_projection();
+  mat4& view = vk_get_view();
+  projection = mat4_perspective(degtorad(cam.fov), win_size.x / win_size.y, 0.1f, 10000.0f);
+
+  // Camera rotation
+  {
+    f32 rotation_speed = 180.0f * get_dt();
+    if (os_is_key_down(Key_A)) {
+      cam.yaw += -rotation_speed;
+    }
+    if (os_is_key_down(Key_D)) {
+      cam.yaw += rotation_speed;
+    }
+    if (os_is_key_down(Key_R)) {
+      cam.pitch += rotation_speed;
+    }
+    if (os_is_key_down(Key_F)) {
+      cam.pitch += -rotation_speed;
+    }
+  }
+
+  // Camera movement
+  {
+    f32 speed = cam.speed*1;
+    v3 velocity = {};
+    if (os_is_key_down(Key_W)) {
+      v3 forward = mat4_forward(view);
+      velocity += forward;
+    }
+    if (os_is_key_down(Key_S)) {
+      v3 backward = mat4_backward(view);
+      velocity += backward;
+    }
+    if (os_is_key_down(Key_Q)) {
+      v3 left = mat4_left(view);
+      velocity += left;
+    }
+    if (os_is_key_down(Key_E)) {
+      v3 right = mat4_right(view);
+      velocity += right;
+    }
+    if (os_is_key_down(Key_Space)) {
+      velocity.y += 1.0f;
+    }
+    if (os_is_key_down(Key_X)) {
+      velocity.y -= 1.0f;
+    }
+    if (os_is_key_down(Key_Shift)) {
+      speed *= 20;
+    }
+    if (os_is_key_down(Key_LAlt)) {
+      speed *= 0.1;
+    }
+    if (velocity != v3_zero()) {
+      velocity = v3_norm(velocity);
+      cam.pos += velocity * speed * get_dt();
+    }
+  }
   
-//   u32 draw_call_count = 0;
-//   u32 draw_call_mem_offset = 0;
-//   u32 entities_draw_count = 0;
-//   u32 entity_inst_offset = 0;
+  // Camera update
+  cam.pitch = Clamp(-89.0f, cam.pitch, 89.0f);
+  cam.dir = {
+    CosD(cam.yaw) * CosD(cam.pitch),
+    SinD(cam.pitch),
+    SinD(cam.yaw) * CosD(cam.pitch)
+  };
+  view = mat4_look_at(cam.pos, cam.dir, v3_up());
+}
 
-//   Loop (i, g.pipelines.count) {
-//     vk_bind_pipeline(cmd, g.pipelines[i]);
-//     VK_RenderBatch& batch = vk->batches[i];
+void scene_init() {
+  Scratch scratch;
+  GameState& g = g_st->game;
+  camera_init();
+  var cube = e_alloc(Mesh_Cube, Material_Orange);
+  g.rotating_cube = cube;
+  var monkey = e_alloc(Mesh_MonkeyGlb, Material_Container);
+  monkey.aabb() = {v3_scale(-1.2), v3_scale(1.2)};
+  g.monkey = monkey;
+  {
+    var triangle = e_alloc(Mesh_Triangle, Material_Orange);
+    triangle.pos() = v3_scale(3);
+  }
+  {
+    var grid = e_alloc(Mesh_Grid, Material_Line);
+    g.grid = grid;
+    vk_set_entity_color(grid, v4_scale(0.6));
+    grid.pos() = v3(0,0,-5);
+  }
+  {
+    g.axis_attached_to_cam = e_alloc(Mesh_Axis, Material_Axis);
+  }
+  Loop (i, 3) {
+    var cube = e_alloc(Mesh_Cube, Material_Orange);
+    u32 range = 10;
+    cube.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
+  }
+#if 1
+  // Loop (i, MB(1)-KB(1)) {
+  // Loop (i, KB(100)) {
+  Loop (i, KB(1)) {
+    // Handle<StaticEntity> e = entity_static_create(Mesh_Cube, Material_Orange);
+    // u32 range = KB(1);
+    // e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+    MeshId meshes[] = {
+      // Mesh_MonkeyGlb,
+      // Mesh_Triangle,
+      Mesh_Cube,
+    };
+    MaterialId materials[] = {
+      Material_Orange,
+      // Material_Container,
+      // Material_Screen,
+    };
+    var e = e_static_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
+    u32 range = KB(1);
+    e.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
+  }
+#endif
 
-//     var fill_buffer = []() {
-      
-//     };
+  {
+    g.sphere = e_alloc(Mesh_Sphere, Material_Container);
+    g.sphere.pos() = v3(0,0,-10);
+  }
+  {
+    // Handle<Entity> e = entity_create(Mesh_Castle, Shader_E_Texture, Material_Castle);
+    // e.pos().z = -100;
+  }
+  {
+    // Loop (i, KB(1)) {
+    //   Handle<Entity> e = entity_create(Mesh_Cube, Material_Screen);
+    //   u32 range = 100;
+    //   e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
+    // }
+  }
+  {
+    // Loop (i, KB(400)) {
+    // Loop (i, MB(1)-KB(1)) {
+    Loop (i, 0) {
+      var e = e_alloc(Mesh_Cube, Material_Container);
+      u32 range = KB(1);
+      e.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
+      darray_add(g.moving_cubes, e);
+    }
+  }
 
-//     // Indexed Entities per shader
-//     u32 per_shader_indexed_draw_count = 0;
-//     for (VK_MeshBatch mesh_batch : batch.batch_indexed.mesh_batches) {
-//       if (mesh_batch.entities.count == 0) continue;
-//       for (Handle<Entity> entity_handle : mesh_batch.entities) {
-//         u32 entity_idx = entity_handle.idx();
-//         vk->gpu_entities[entity_idx].model = mat4_transform(entity_handle.trans());
-//         vk->gpu_entities_indices[entities_draw_count++] = entity_idx;
-//       }
-//       u32 mesh_idx = mesh_batch.mesh_handle.handle;
-//       VK_Mesh mesh = vk->meshes[mesh_idx];
-//       VK_DrawCallInfo info = {
-//         .index_draw_command = {
-//           .indexCount = (u32)mesh.index_count,
-//           .instanceCount = mesh_batch.entities.count,
-//           .firstIndex = (u32)(mesh.index_offset/sizeof(u32)),
-//           .vertexOffset = (i32)(mesh.vert_offset/sizeof(Vertex)),
-//           .firstInstance = 0,
-//         },
-//         .entity_inst_offset = entity_inst_offset,
-//       };
-//       vk->gpu_draw_call_infos[draw_call_count++] = info;
-//       entity_inst_offset += mesh_batch.entities.count;
-//       ++per_shader_indexed_draw_count;
-//     }
-//     if (per_shader_indexed_draw_count > 0) {
-//       VK_PushConstant push = {.drawcall_offset = draw_call_mem_offset / (u32)sizeof(VK_DrawCallInfo)};
-//       vk->CmdPushConstants(cmd, vk->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &push);
-//       vk->CmdDrawIndexedIndirect(cmd, vk->indirect_draw_buffer.h, draw_call_mem_offset, per_shader_indexed_draw_count, sizeof(VK_DrawCallInfo));
-//     }
+  Loop (i, 0) {
+    MeshId meshes[] = {
+      Mesh_MonkeyGlb,
+      Mesh_Triangle,
+      Mesh_Cube,
+    };
+    MaterialId materials[] = {
+      // Material_Orange,
+      Material_Container,
+      // Material_Screen,
+    };
+    var e = e_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
+    u32 range = 100;
+    e.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
+    darray_add(g.moving_cubes, e);
+  }
+}
 
-//     // Entities per shader
-//     u32 per_shader_draw_count = 0;
-//     for (VK_MeshBatch mesh_batch : batch.batch.mesh_batches) {
-//       if (mesh_batch.entities.count == 0) continue;
-//       for (Handle<Entity> entity_handle : mesh_batch.entities) {
-//         u32 entity_idx = entity_handle.idx();
-//         vk->gpu_entities[entity_idx].model = mat4_transform(entity_handle.trans());
-//         vk->gpu_entities_indices[entities_draw_count++] = entity_idx;
-//       }
-//       u32 mesh_idx = mesh_batch.mesh_handle.handle;
-//       VK_Mesh mesh = vk->meshes[mesh_idx];
-//       VK_DrawCallInfo info = {
-//         .draw_command = {
-//           .vertexCount = (u32)mesh.vert_count,
-//           .instanceCount = mesh_batch.entities.count,
-//           .firstVertex = (u32)(mesh.vert_offset/sizeof(Vertex)),
-//           .firstInstance = 0,
-//         },
-//         .entity_inst_offset = entity_inst_offset,
-//       };
-//       vk->gpu_draw_call_infos[draw_call_count++] = info;
-//       entity_inst_offset += mesh_batch.entities.count;
-//       ++per_shader_draw_count;
-//     }
-//     if (per_shader_draw_count > 0) {
-//       u32 draw_call_indexed_mem_offset = draw_call_mem_offset + (u32)sizeof(VK_DrawCallInfo)*per_shader_indexed_draw_count;
-//       VK_PushConstant push = {.drawcall_offset = draw_call_indexed_mem_offset / (u32)sizeof(VK_DrawCallInfo)};
-//       vk->CmdPushConstants(cmd, vk->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &push);
-//       vk->CmdDrawIndirect(cmd, vk->indirect_draw_buffer.h, draw_call_indexed_mem_offset , per_shader_draw_count, sizeof(VK_DrawCallInfo));
-//     }
-//     draw_call_mem_offset = draw_call_count * sizeof(VK_DrawCallInfo);
+void scene_deinit() {
+  // st->entity_pool = {};
+  // st->entity_pool.clear();
+  // arena_clear(&st->arena);
+}
 
-//     /////////////////////////////////
-//     // Rebuilding static buffer
-//     #define MaxDrawCalls (MaxDrawCalls/2)
-//     if ((batch.static_entities_count_old != batch.static_entities_count) || (batch.static_entities_indexed_count_old != batch.static_entities_indexed_count)) {
-//       batch.static_entities_indexed_count_old = batch.static_entities_indexed_count;
-//       batch.static_entities_count_old = batch.static_entities_count;
+void scene_update() {
+  // Scratch scratch;
+  GameState& g = g_st->game;
+  if (os_is_key_pressed(MouseKey_Left)) {
+    // select_obj();
+    v3 dir = ray_from_camera();
+    vk_draw_line_consistent(g.cam.pos - v3(0,0.1,0), g.cam.pos + dir*100, ColorWhite);
+    // v3 max = st->cam.pos + v3_one();
+    // v3 min = st->cam.pos - v3_one();
+  }
+  // moving cube and monkey
+  {
+    var cube = g.rotating_cube;
+    var monkey = g.monkey;
+    monkey.pos().x += 0.1 * get_dt();
+    cube.pos().x = monkey.pos().x + Sin(get_time()) * 4;
+    cube.pos().z = monkey.pos().z + Cos(get_time()) * 4;
+    cube.pos().y = monkey.pos().z + Cos(get_time()) * 4;
+  }
+  {
+    var e = g.monkey;
+    vk_draw_cuboid(shift_3f32(e.aabb(), e.pos()), ColorWhite);
+  }
+  {
+    mat4& view = vk_get_view();
+    v3 forward = mat4_forward(view);
+    v3 right   = mat4_right(view);
+    v3 up      = mat4_up(view);
+    f32 dist = 1.0f;
+    f32 xoff = 0.3f;
+    f32 yoff = 0.3f;
+    var axis = g.axis_attached_to_cam;
+    axis.pos() = g.cam.pos + forward*dist + right*xoff + up*yoff;
+    axis.scale() = v3_scale(0.1);
+  }
 
-//       u32 static_draw_call_count = 0;
-//       u32 static_entities_draw_count = 0;
-//       u32 static_entities_draw_id_offset = 0;
+  ///////////////////////////////////
+  // Random creating and moving stuff
+  Loop (i, 0) {
+    MeshId meshes[] = {
+      // Mesh_MonkeyGlb,
+      // Mesh_Triangle,
+      Mesh_Cube,
+    };
+    MaterialId materials[] = {
+      Material_Orange,
+      // Material_Container,
+      // Material_Screen,
+    };
+    var e = e_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
+    u32 range = 100;
+    e.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
+    darray_add(g.moving_cubes, e);
+  }
+  Loop (i, g.moving_cubes.count) {
+    var e = g.moving_cubes[i];
+    e.pos() += e.vel() * get_dt();
+    v3 center = {0, 0, 0};
+    v3 dir = e.pos() - center;
+    v3 tangent = v3_norm(v3{-dir.z, 0, dir.x});
+    e.vel() += tangent * 2.0f * get_dt();
+    e.vel() += -dir * 0.5f * get_dt();
+  }
 
-//       // Indexed Entities per shader
-//       u32 per_shader_static_indexed_draw_count = 0;
-//       for (VK_MeshBatch mesh_batch : batch.static_batch_indexed.mesh_batches) {
-//         if (mesh_batch.entities.count == 0) continue;
-//         for (Handle<StaticEntity> entity_handle : mesh_batch.entities) {
-//           u32 entity_idx = entity_handle.idx();
-//           vk->gpu_entities[MaxEntities+entity_idx].model = mat4_transform(entity_handle.trans());
-//           vk->gpu_entities_indices[MaxEntities+static_entities_draw_count++] = MaxEntities+entity_idx;
-//         }
-//         u32 mesh_idx = mesh_batch.mesh_handle.handle;
-//         VK_Mesh mesh = vk->meshes[mesh_idx];
-//         VK_DrawCallInfo info = {
-//           .index_draw_command = {
-//             .indexCount = (u32)mesh.index_count,
-//             .instanceCount = mesh_batch.entities.count,
-//             .firstIndex = (u32)(mesh.index_offset/sizeof(u32)),
-//             .vertexOffset = (i32)(mesh.vert_offset/sizeof(Vertex)),
-//             .firstInstance = 0,
-//           },
-//           .entity_inst_offset = MaxEntities+static_entities_draw_id_offset,
-//         };
-//         vk->gpu_draw_call_infos[MaxDrawCalls+static_draw_call_count++] = info;
-//         static_entities_draw_id_offset += mesh_batch.entities.count;
-//         ++per_shader_static_indexed_draw_count;
-//       }
-//       vk->static_draw_indexed_offset = MaxDrawCalls*sizeof(VK_DrawCallInfo);
-//       vk->static_draw_offset = vk->static_draw_indexed_offset + per_shader_static_indexed_draw_count*sizeof(VK_DrawCallInfo);
+  vk_draw_rect(Rng2(v2(100,100), v2(200,200)), v3(1,1,1));
+  v4& pos = get_pos();
+  f32 speed = 1 * get_dt();
+  if (key_down(Key_A)) {
+    pos.x -= speed;
+  }
+  if (key_down(Key_D)) {
+    pos.x += speed;
+  }
 
-//       // Entities per shader
-//       u32 per_shader_static_draw_count = 0;
-//       for (VK_MeshBatch mesh_batch : batch.static_batch.mesh_batches) {
-//         if (mesh_batch.entities.count == 0) continue;
-//         for (Handle<StaticEntity> entity_handle : mesh_batch.entities) {
-//           u32 entity_idx = entity_handle.idx();
-//           vk->gpu_entities[MaxEntities+entity_idx].model = mat4_transform(entity_handle.trans());
-//           vk->gpu_entities_indices[MaxEntities+static_draw_call_count++] = MaxEntities+entity_idx;
-//         }
-//         u32 mesh_idx = mesh_batch.mesh_handle.handle;
-//         VK_Mesh mesh = vk->meshes[mesh_idx];
-//         VK_DrawCallInfo info = {
-//           .draw_command = {
-//             .vertexCount = (u32)mesh.vert_count,
-//             .instanceCount = mesh_batch.entities.count,
-//             .firstVertex = (u32)(mesh.vert_offset/sizeof(Vertex)),
-//             .firstInstance = 0,
-//           },
-//           .entity_inst_offset = MaxEntities+static_entities_draw_id_offset,
-//         };
-//         vk->gpu_draw_call_infos[MaxDrawCalls+static_draw_call_count++] = info;
-//         static_entities_draw_id_offset += mesh_batch.entities.count;
-//         ++per_shader_static_draw_count;
-//       }
+  mat4& mat = get_mat();
+  mat = mat4_translate(v3_of_v4(pos));
+}
 
-//       vk->static_indexed_draw_count = per_shader_static_indexed_draw_count;
-//       vk->static_draw_count = per_shader_static_draw_count;
-//     }
-//     if (batch.static_entities_indexed_count) {
-//       VK_PushConstant push = {MaxDrawCalls};
-//       vk->CmdPushConstants(cmd, vk->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &push);
-//       vk->CmdDrawIndexedIndirect(cmd, vk->indirect_draw_buffer.h, vk->static_draw_indexed_offset, vk->static_indexed_draw_count, sizeof(VK_DrawCallInfo));
-//     }
-//     if (batch.static_entities_count) {
-//       VK_PushConstant push = {MaxDrawCalls+vk->static_indexed_draw_count};
-//       vk->CmdPushConstants(cmd, vk->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &push);
-//       vk->CmdDrawIndirect(cmd, vk->indirect_draw_buffer.h, vk->static_draw_offset, vk->static_draw_count, sizeof(VK_DrawCallInfo));
-//     }
-//     #undef MaxDrawCalls
-//   }
+void game_init() {
+  ProfFunc;
+  v4& pos = get_pos();
+  pos = {};
+  GameState& g = g_st->game;
+  Scratch scratch;
+  g.arena = arena_make_named("game arena");
+  g.persistent_arena = arena_make_named("game arena persistent");
+  g.gpa.init(g.arena, "game gpa");
+  g.timer = timer_make(1);
+  g.entity_id_pool = static_id_pool_make(g.persistent_arena, MaxEntities);
+  g.static_entity_id_pool = static_id_pool_make(g.persistent_arena, MaxStaticEntities);
+  g.entities = push_array(g.persistent_arena, Entity, MaxEntities);
+  g.static_entities = push_array(g.persistent_arena, StaticEntity, MaxStaticEntities);
+  g.moving_cubes = darray_make<Handle<Entity>>(g.gpa);
 
-//   // Debug drawing
-//   if (vk->draw_lines.count > 0) {
-//     g.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.debug_line_shader);
-//     g.CmdBindVertexBuffers(cmd, 0, 1, &g.vert_buffer.h, (VkDeviceSize*)&g.draw_lines_offset);
-//     g.CmdDraw(cmd, g.draw_lines.count*2, 1, 0, 0);
-//     g.draw_lines.clear();
-//   }
-//   if (g.draw_lines_consistent.count > 0) {
-//     g.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.debug_line_shader);
-//     g.CmdBindVertexBuffers(cmd, 0, 1, &g.vert_buffer.h, (VkDeviceSize*)&g.draw_lines_consistent_offset);
-//     g.CmdDraw(cmd, g.draw_lines_consistent.count*2, 1, 0, 0);
-//   }
+  g.gpa_arena0.init(g.arena, "game gpa arena0");
+  g.gpa_arena1.init(g.arena, "game gpa arena1");
+  g.gpa_gpa0.init(g.arena, "game gpa arena0");
+  g.gpa_gpa1.init(g.arena, "game gpa arena1");
 
-//   // Cube map
-//   vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->cubemap_shader);
-//   Handle<GpuMesh> h = mesh_get(Mesh_Cube);
-//   VK_Mesh mesh = vk->meshes[h.handle];
-//   vk->CmdBindVertexBuffers(cmd, 0, 1, &vk->vert_buffer.h, &mesh.vert_offset);
-//   if (mesh.index_count) {
-//     vk->CmdBindIndexBuffer(cmd, vk->index_buffer.h, mesh.index_offset, VK_INDEX_TYPE_UINT32);
-//     vk->CmdDrawIndexed(cmd, mesh.index_count, 1, 0, 0, 0);
-//   } else {
-//     vk->CmdDraw(cmd, mesh.vert_count, 1, 0, 0);
-//   }
+  // Mesh cube_mesh = {.vertices = cube_vertices, .vert_count = ArrayCount(cube_vertices)};
+  // mesh_set(Mesh_Cube, vk_mesh_load(cube_mesh));
+  Mesh triangle_mesh =  {.vertices = triangle_vertices, .vert_count = ArrayCount(triangle_vertices)};
+  mesh_set(Mesh_Triangle, vk_mesh_load(triangle_mesh));
+  Mesh grid_mesh = grid_generate(scratch, 100, 1);
+  mesh_set(Mesh_Grid, vk_mesh_load(grid_mesh));
+  Mesh axis_mesh = {.vertices = axis_vertices, .vert_count = ArrayCount(axis_vertices)};
+  mesh_set(Mesh_Axis, vk_mesh_load(axis_mesh));
+  Mesh sphere = sphere_generate(scratch);
+  mesh_set(Mesh_Sphere, vk_mesh_load(sphere));
+  cubemap_load("night_cubemap");
+  assets_load();
+  scene_init();
 
-//   vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->ui_shader);
-//   if (vk->draw_rects.count > 0) {
-//     vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->ui_shader);
-//     vk->CmdBindVertexBuffers(cmd, 0, 1, &vk->vert_buffer.h, (VkDeviceSize*)&vk->draw_rects_offset);
-//     vk->CmdDraw(cmd, vk->draw_rects.count*6, 1, 0, 0);
-//     vk->draw_rects.clear();
-//   }
+  // camera_init();
+  // g.cube0 = e_alloc(Mesh_Cube, Material_Container);
+  // g.cube0.pos() = v3(1,0,0);
+  // g.cube1 = e_alloc(Mesh_Cube, Material_Orange);
+  // g.cube1.pos() = v3(-1,0,0);
+  // g.monkey = e_alloc(Mesh_MonkeyGlb, Material_Container);
+  // g.monkey.pos() = v3(2,0,0);
 
-//   g.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.triangle);
-//   g.CmdDraw(cmd, 3, 1, 0, 0);
+  // var grid = e_alloc(Mesh_Grid, Material_Line);
+  // g.grid = grid;
+  // vk_set_entity_color(grid, v4_scale(0.6));
+  // grid.pos() = v3(0,0,-5);
 
-// }
+  // Loop (i, KB(10)) {
+  //   MeshId meshes[] = {
+  //     // Mesh_MonkeyGlb,
+  //     // Mesh_Triangle,
+  //     Mesh_Cube,
+  //   };
+  //   MaterialId materials[] = {
+  //     Material_Orange,
+  //     // Material_Container,
+  //     // Material_Screen,
+  //   };
+  //   var e = e_static_alloc(ArrayRand(meshes), ArrayRand(materials));
+  //   u32 range = KB(1);
+  //   e.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
+  // }
+}
+
+void game_update() {
+  // foo();
+  ProfFunc;
+  var& g = g_st->game;
+  timer_tick(g.timer);
+
+  // push_array(g.arena, u32, 100);
+  if (timer_passed(g.timer)) {
+    // push_array(g.gpa, u32, 1000);
+    // push_array(g.gpa_arena0, u32, 200);
+    // push_array(g.gpa_arena1, u32, 500);
+    // push_array(g.gpa_gpa0, u32, 100);
+    // push_array(g.gpa_gpa1, u32, 150);
+  }
+  
+  Scratch scratch;
+  camera_update();
+  if (os_is_key_down(Key_T)) {
+    scene_deinit();
+    scene_init();
+  }
+  if (os_is_key_down(Key_Escape)) {
+    os_close_window();
+  }
+  scene_update();
+}
+

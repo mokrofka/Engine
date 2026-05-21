@@ -50,16 +50,14 @@ const u32 MaxDebugLines = KB(1);
 
 struct VK_KeyToShaderPipeline { String name; ShaderState state; };
 intern u64 hash(VK_KeyToShaderPipeline x) { return hash(x.name) + hash_memory(&x.state, sizeof(ShaderState)); }
-intern b32 equal(VK_KeyToShaderPipeline a, VK_KeyToShaderPipeline b) { return equal(a.name, b.name) & MemMatchStruct(&a.state, &b.state); }
+intern b32 equal(VK_KeyToShaderPipeline a, VK_KeyToShaderPipeline b) { return equal(a.name, b.name) && MemMatchStruct(&a.state, &b.state); }
 
 struct DebugDrawLine { Vertex vert[2]; };
 struct DebugDrawRect { Vertex vert[6]; };
 
 struct GpuMaterial {
   u32 pipeline_idx;
-  ShaderState shader_state;
-  MaterialProps props;
-  Handle<GpuTexture> texture;
+  u32 texture;
 };
 
 enum VK_RenderpassType {
@@ -82,7 +80,7 @@ struct MaterialGPU {
   alignas(16) v3 diffuse;
   alignas(16) v3 specular;
   f32 shininess;
-  Handle<GpuTexture> texture;
+  u32 texture;
 };
 
 struct PointLightGPU {
@@ -120,6 +118,11 @@ struct GlobalStateGPU {
   u32 entity_indices[MaxEntities+MaxStaticEntities];
 };
 
+struct VK_Pipeline {
+  VkPipeline h;
+  u32 batch_idx;
+};
+
 template<typename T>
 struct VK_MeshBatch {
   Handle<GpuMesh> mesh_handle;
@@ -135,10 +138,6 @@ struct VK_ShaderBatch {
 struct VK_RenderBatch {
   VK_ShaderBatch<Entity> batch;
   VK_ShaderBatch<Entity> batch_indexed;
-  u32 static_entities_count;
-  u32 static_entities_indexed_count;
-  u32 static_entities_count_old;
-  u32 static_entities_indexed_count_old;
   VK_ShaderBatch<StaticEntity> static_batch;
   VK_ShaderBatch<StaticEntity> static_batch_indexed;
 };
@@ -291,7 +290,9 @@ struct VK_State {
   u32 height;
   f32 scale;
   f32 old_scale;
-  
+  mat4 view;
+  mat4 projection;
+
   VK_Memory gpu_mem;
   VK_Memory cpu_mem;
   VK_Buffer vert_buffer;
@@ -313,24 +314,27 @@ struct VK_State {
   VK_Image offscreen_depth_buffer;
   VK_Image* texture_targets;
 
-  Darray<VkPipeline> pipelines;
-  Darray<IndirectDrawCall> static_draw_calls;
+  Darray<VK_Pipeline> pipelines;
   Darray<u32> entity_pipelines;
-  VkPipeline screen_shader;
-  VkPipeline cubemap_shader;
-  VkPipeline debug_line_shader;
-  VkPipeline ui_shader;
-  VkPipeline triangle;
+  u32 screen_pipeline;
+  u32 cubemap_pipeline;
+  u32 debug_line_pipeline;
+  u32 ui_pipeline;
+  u32 triangle_pipeline;
   Darray<VK_ShaderModuleEntry> modules;
   Map<VK_KeyToShaderPipeline, u32> shader_to_pipeline;
   Map<String, u32> shader_to_module;
+  Darray<GpuMaterial> materials;
+  Darray<ShaderState> shader_states;
+  Darray<VK_RenderBatch> batches;
 
   Array<VK_RenderEntity, MaxEntities+MaxStaticEntities> entities;
   Array<VK_Mesh, MaxMeshes> meshes;
   Array<VK_Image, MaxTextures> textures;
 
-  mat4 view;
-  mat4 projection;
+  Darray<IndirectDrawCall> static_draw_calls;
+  u32 static_entities_count;
+  u32 static_entities_count_old;
 
   u64 draw_lines_offset;
   u64 draw_lines_consistent_offset;
@@ -338,16 +342,6 @@ struct VK_State {
   Darray<DebugDrawLine> draw_lines;
   Darray<DebugDrawLine> draw_lines_consistent;
   Darray<DebugDrawRect> draw_rects;
-
-  Darray<GpuMaterial> materials;
-  Darray<VK_RenderBatch> batches;
-  u32 static_draw_indexed_offset;
-  u32 static_draw_offset;
-  u32 static_indexed_draw_count;
-  u32 static_draw_count;
-
-  u32 static_entities_count;
-  u32 static_entities_count_old;
 
   GlobalStateGPU* gpu_global_shader_st;
   EntityGPU* gpu_entities;
@@ -498,7 +492,7 @@ template<typename T>
 VK_ShaderBatch<T> vk_shader_batch_make(Allocator alloc) {
   VK_ShaderBatch<T> res = {
     .mesh_batches = darray_make<VK_MeshBatch<T>>(alloc),
-    .mesh_to_batch{alloc},
+    .mesh_to_batch = map_make<u32, u32>(alloc),
   };
   return res;
 }
@@ -1072,15 +1066,42 @@ intern VkPipeline vk_shader_pipeline_create(Shader shader) {
 }
 
 void vk_shader_reload(String name) {
-  u32* module_idx = vk->shader_to_module.get(name);
+  VK_State& g = *vk;
+  Info("reload %s shader", name);
+  u32* module_idx = map_get(g.shader_to_module, name);
   VK_ShaderModuleEntry& entry = vk->modules[*module_idx];
   entry.module = vk_shader_module_create(name);
   Loop (i, entry.track_pipelines.count) {
     u32 pipeline_idx = entry.track_pipelines[i];
-    u32 material_idx = entry.track_shader_states[i];
-    ShaderState state = vk->materials[material_idx].shader_state;
-    vk->pipelines[pipeline_idx] = vk_shader_pipeline_create(entry.module, state);
+    u32 shader_state_idx = entry.track_shader_states[i];
+    ShaderState state = g.shader_states[shader_state_idx];
+    g.pipelines[pipeline_idx].h = vk_shader_pipeline_create(entry.module, state);
   }
+}
+
+u32 vk_shader_pipeline_alloc(String name, ShaderState state) {
+  VK_State& g = *vk;
+  VK_KeyToShaderPipeline key = {name, state};
+  u32* module_idx = map_get(g.shader_to_module, name);
+  if (!module_idx) {
+    VK_ShaderModule module = vk_shader_module_create(name);
+    module_idx = map_set(g.shader_to_module, name, g.modules.count);
+    VK_ShaderModuleEntry entry = vk_shader_module_entry_make(g.gpa);
+    entry.module = module;
+    darray_add(g.modules, entry);
+  }
+  VkPipeline pipeline = vk_shader_pipeline_create(g.modules[*module_idx].module, state);
+  u32* pipeline_idx = map_set(g.shader_to_pipeline, key, g.pipelines.count);
+  darray_add(g.pipelines, {.h = pipeline});
+  VK_ShaderModuleEntry& entry = g.modules[*module_idx];
+  darray_add(entry.track_pipelines, *pipeline_idx);
+  darray_add(entry.track_shader_states, g.shader_states.count);
+  darray_add(g.shader_states, state);
+  return *pipeline_idx;
+}
+
+u32 vk_shader_pipeline_alloc(Shader shader) {
+  return vk_shader_pipeline_alloc(shader.name, shader.state);
 }
 
 void vk_compile_and_load_shaders() {
@@ -1130,14 +1151,10 @@ void vk_compile_and_load_shaders() {
   }
 
   struct File {
-    FileProperties props;
     String file_path;
     String compiled_file_path;
     String shader_name;
     String text;
-    b32 vert;
-    b32 frag;
-    b32 comp;
     OS_Handle pid;
   };
   var files = darray_make<File>(scratch);
@@ -1158,7 +1175,6 @@ void vk_compile_and_load_shaders() {
       FileProperties compiled_props = os_file_path_properties(compiled_file_path);
       if (info.props.modified != compiled_props.modified || recompile) {
         File f = {
-          .props = info.props,
           .file_path = file_path,
           .compiled_file_path = compiled_file_path,
           .shader_name = shader_name,
@@ -1193,7 +1209,7 @@ void vk_compile_and_load_shaders() {
   Loop (i, files.count) {
     File& f = files[i];
     VK_ShaderModule modulo = vk_shader_module_create(f.shader_name);
-    g.shader_to_module.add(f.shader_name, g.modules.count);
+    map_set(g.shader_to_module, f.shader_name, g.modules.count);
     VK_ShaderModuleEntry entry = vk_shader_module_entry_make(g.gpa);
     entry.module = modulo;
     darray_add(g.modules, entry);
@@ -1519,41 +1535,28 @@ intern void vk_texture_resize_target() {
 Handle<GpuMaterial> vk_material_load(Material material) {
   VK_State& g = *vk;
   VK_KeyToShaderPipeline key = {material.shader.name, material.shader.state};
-  u32* pipeline_idx = g.shader_to_pipeline.get(key);
+  u32* pipeline_idx = map_get(g.shader_to_pipeline, key);
+  u32 a;
   if (!pipeline_idx) {
-    u32* module_idx = g.shader_to_module.get(material.shader.name);
-    if (!module_idx) {
-      VK_ShaderModule module = vk_shader_module_create(material.shader.name);
-      module_idx = g.shader_to_module.add(material.shader.name, g.modules.count);
-      VK_ShaderModuleEntry entry = vk_shader_module_entry_make(g.gpa);
-      entry.module = module;
-      darray_add(g.modules, entry);
-    }
-    VkPipeline pipeline = vk_shader_pipeline_create(g.modules[*module_idx].module, material.shader.state);
-    pipeline_idx = g.shader_to_pipeline.add(key, g.pipelines.count);
-    darray_add(g.pipelines, pipeline);
+    pipeline_idx = &a;
+    u32 idx = vk_shader_pipeline_alloc(material.shader.name, material.shader.state);
+    a = idx;
+    darray_add(g.entity_pipelines, idx);
+    g.pipelines[idx].batch_idx = g.batches.count;
     darray_add(g.batches, vk_render_batch_make(g.gpa));
     darray_add(g.static_draw_calls, {});
     darray_add(g.static_draw_calls, {});
-
-    VK_ShaderModuleEntry& entry = g.modules[*module_idx];
-    darray_add(entry.track_pipelines, *pipeline_idx);
-    darray_add(entry.track_shader_states, g.materials.count);
-
-    darray_add(g.entity_pipelines, *pipeline_idx);
   }
   g.gpu_materials[g.materials.count] = {
     .ambient = material.props.ambient,
     .diffuse = material.props.diffuse,
     .specular = material.props.specular,
     .shininess = material.props.shininess, 
-    .texture = material.texture_handle, 
+    .texture = material.texture_handle.handle, 
   };
   GpuMaterial mat = {
     .pipeline_idx = *pipeline_idx,
-    .shader_state = material.shader.state,
-    .texture = material.texture_handle,
-    .props = material.props,
+    .texture = material.texture_handle.handle,
   };
   Handle<GpuMaterial> result = {g.materials.count};
   darray_add(g.materials, mat);
@@ -1755,9 +1758,10 @@ void vk_draw() {
     .gpu_draw_call_infos = vk->gpu_draw_call_infos,
   };
 
-  Loop (i, g.pipelines.count) {
-    vk_bind_pipeline(cmd, g.pipelines[i]);
-    VK_RenderBatch& batch = vk->batches[i];
+  Loop (i, g.entity_pipelines.count) {
+    VK_Pipeline pipeline = g.pipelines[g.entity_pipelines[i]];
+    vk_bind_pipeline(cmd, pipeline.h);
+    VK_RenderBatch& batch = g.batches[pipeline.batch_idx];
     var fill_buffer = [&](var shader_batch, b32 is_indexed, b32 is_static) {
       u32 entity_offset = 0;
       u32 draw_call_offset = 0;
@@ -1868,19 +1872,19 @@ void vk_draw() {
 
   // Debug drawing
   if (vk->draw_lines.count > 0) {
-    g.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.debug_line_shader);
+    g.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipelines[g.debug_line_pipeline].h);
     g.CmdBindVertexBuffers(cmd, 0, 1, &g.vert_buffer.h, (VkDeviceSize*)&g.draw_lines_offset);
     g.CmdDraw(cmd, g.draw_lines.count*2, 1, 0, 0);
     darray_clear(g.draw_lines);
   }
   if (g.draw_lines_consistent.count > 0) {
-    g.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.debug_line_shader);
+    g.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipelines[g.debug_line_pipeline].h);
     g.CmdBindVertexBuffers(cmd, 0, 1, &g.vert_buffer.h, (VkDeviceSize*)&g.draw_lines_consistent_offset);
     g.CmdDraw(cmd, g.draw_lines_consistent.count*2, 1, 0, 0);
   }
 
   // Cube map
-  vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->cubemap_shader);
+  vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipelines[g.cubemap_pipeline].h);
   Handle<GpuMesh> h = mesh_get(Mesh_Cube);
   VK_Mesh mesh = vk->meshes[h.handle];
   vk->CmdBindVertexBuffers(cmd, 0, 1, &vk->vert_buffer.h, &mesh.vert_offset);
@@ -1892,25 +1896,26 @@ void vk_draw() {
   }
 
   // Rect drawing
-  vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->ui_shader);
+  vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipelines[g.ui_pipeline].h);
   if (vk->draw_rects.count > 0) {
-    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->ui_shader);
+    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipelines[g.ui_pipeline].h);
     vk->CmdBindVertexBuffers(cmd, 0, 1, &vk->vert_buffer.h, (VkDeviceSize*)&vk->draw_rects_offset);
     vk->CmdDraw(cmd, vk->draw_rects.count*6, 1, 0, 0);
     darray_clear(vk->draw_rects);
   }
 
   // Hello world
-  g.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.triangle);
+  g.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipelines[g.triangle_pipeline].h);
   g.CmdDraw(cmd, 3, 1, 0, 0);
 }
 
 void vk_draw_screen() {
+  VK_State& g = *vk;
   VkCommandBuffer cmd = vk_get_current_cmd();
-  VK_PushConstant push = {vk->current_image_idx};
-  vk->CmdPushConstants(cmd, vk->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &push);
-  vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk->screen_shader);
-  vk->CmdDraw(cmd, 3, 1, 0, 0);
+  VK_PushConstant push = {g.current_image_idx};
+  g.CmdPushConstants(cmd, g.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &push);
+  g.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipelines[g.screen_pipeline].h);
+  g.CmdDraw(cmd, 3, 1, 0, 0);
 }
 
 void vk_loader_load_core() {
@@ -2236,7 +2241,6 @@ intern void vk_device_init() {
   }
 }
 
-
 void* vk_init() {
   ProfFunc;
   Scratch scratch;
@@ -2244,19 +2248,20 @@ void* vk_init() {
   vk = push_struct_zero(arena, VK_State);
   VK_State& g = *vk;
   g.arena = arena;
-  g.gpa = alloc_seg_list_make(g.arena, "vk gpa");
+  g.gpa = alloc_seglist_make(g.arena, "vk gpa");
   g.scale = 1;
   g.draw_lines = darray_make<DebugDrawLine>(g.gpa);
   g.draw_lines_consistent = darray_make<DebugDrawLine>(g.gpa);
   g.draw_rects = darray_make<DebugDrawRect>(g.gpa);
-  g.pipelines = darray_make<VkPipeline>(g.gpa);
+  g.pipelines = darray_make<VK_Pipeline>(g.gpa);
   g.static_draw_calls = darray_make<IndirectDrawCall>(g.gpa);
   g.entity_pipelines = darray_make<u32>(g.gpa);
   g.modules = darray_make<VK_ShaderModuleEntry>(g.gpa);
   g.batches = darray_make<VK_RenderBatch>(g.gpa);
   g.materials = darray_make<GpuMaterial>(g.gpa);
-  g.shader_to_pipeline.init(g.gpa);
-  g.shader_to_module.init(g.gpa);
+  g.shader_states = darray_make<ShaderState>(g.gpa);
+  g.shader_to_pipeline = map_make<VK_KeyToShaderPipeline, u32>(g.gpa);
+  g.shader_to_module = map_make<String, u32>(g.gpa);
   
 #if VulkanUseAllocator
   vk->_allocator = vk_allocator_create();
@@ -2273,18 +2278,18 @@ void* vk_init() {
   ///////////////////////////////////
   // Buffers
   {
-    vk->gpu_mem = vk_mem_alloc(VK_MemType_Gpu, MB(200));
-    vk->cpu_mem = vk_mem_alloc(VK_MemType_Cpu, MB(100));
-    vk->vert_buffer = vk_buffer_alloc(MB(1), VK_BufferUsageFlag_Vert | VK_BufferUsageFlag_Dst, VK_MemType_Gpu);
-    vk->index_buffer = vk_buffer_alloc(MB(1), VK_BufferUsageFlag_Index | VK_BufferUsageFlag_Dst, VK_MemType_Gpu);
-    vk->stage_buffer = vk_buffer_alloc(MB(10), VK_BufferUsageFlag_Src, VK_MemType_Cpu);
-    vk->storage_buffer = vk_buffer_alloc(MB(50), VK_BufferUsageFlag_Storage, VK_MemType_Cpu);
-    vk->indirect_draw_buffer = vk_buffer_alloc(MB(10), VK_BufferUsageFlag_Indirect, VK_MemType_Cpu);
+    g.gpu_mem = vk_mem_alloc(VK_MemType_Gpu, MB(200));
+    g.cpu_mem = vk_mem_alloc(VK_MemType_Cpu, MB(100));
+    g.vert_buffer = vk_buffer_alloc(MB(1), VK_BufferUsageFlag_Vert | VK_BufferUsageFlag_Dst, VK_MemType_Gpu);
+    g.index_buffer = vk_buffer_alloc(MB(1), VK_BufferUsageFlag_Index | VK_BufferUsageFlag_Dst, VK_MemType_Gpu);
+    g.stage_buffer = vk_buffer_alloc(MB(10), VK_BufferUsageFlag_Src, VK_MemType_Cpu);
+    g.storage_buffer = vk_buffer_alloc(MB(50), VK_BufferUsageFlag_Storage, VK_MemType_Cpu);
+    g.indirect_draw_buffer = vk_buffer_alloc(MB(10), VK_BufferUsageFlag_Indirect, VK_MemType_Cpu);
   }
 
-  g.draw_lines_offset = offset_push(g.vert_buffer.pos, sizeof(Vertex)*KB(1), alignof(Vertex));
-  g.draw_lines_consistent_offset = offset_push(g.vert_buffer.pos, sizeof(Vertex)*KB(1), alignof(Vertex));
-  g.draw_rects_offset = offset_push(g.vert_buffer.pos, sizeof(Vertex)*KB(1), alignof(Vertex));
+  g.draw_lines_offset = offset_push_array(g.vert_buffer.pos, Vertex, KB(1));
+  g.draw_lines_consistent_offset = offset_push_array(g.vert_buffer.pos, Vertex, KB(1));
+  g.draw_rects_offset = offset_push_array(g.vert_buffer.pos, Vertex, KB(1));
 
   ///////////////////////////////////
   // Device stuff
@@ -2459,20 +2464,11 @@ void* vk_init() {
     {
       var writes = darray_make<VkWriteDescriptorSet>(scratch);
       var buffer_infos = darray_make<VkDescriptorBufferInfo>(scratch);
-      u64 offset = 0;
-      #define write_descriptor(binding, T, count, ...) (T*)write_descriptor_((binding), sizeof(T) * (count), alignof(T), ##__VA_ARGS__)
-      var write_descriptor_ = [&](Bindings binding, u64 size, u64 align, b32 indirect = false) {
-        VK_Buffer* buf = null;
-        u64 off = 0;
-        if (indirect) {
-          buf = &g.indirect_draw_buffer;
-          off = offset_push(g.indirect_draw_buffer.pos, size, align);
-        } else {
-          buf = &g.storage_buffer;
-          off = offset_push(offset, size, align);
-        }
+      #define write_descriptor(buf, binding, T, count) (T*)write_descriptor_((buf), (binding), sizeof(T) * (count), alignof(T))
+      var write_descriptor_ = [&](VK_Buffer& buf, Bindings binding, u64 size, u64 align) {
+        u64 off = offset_push(buf.pos, size, align);
         VkDescriptorBufferInfo buffer_info = {
-          .buffer = buf->h,
+          .buffer = buf.h,
           .offset = off,
           .range = size,
         };
@@ -2486,13 +2482,14 @@ void* vk_init() {
           .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         };
         darray_add(writes, write);
-        u8* res = Offset(buf->base, off);
+        u8* res = Offset(buf.base, off);
         return res;
       };
-      g.gpu_global_shader_st = write_descriptor(Bindings::State, GlobalStateGPU, 1);
-      g.gpu_entities = write_descriptor(Bindings::Entities, EntityGPU, MaxEntities+MaxStaticEntities);
-      g.gpu_materials = write_descriptor(Bindings::Materials, MaterialGPU, MaxMaterials);
-      g.gpu_draw_call_infos = write_descriptor(Bindings::Drawinfo, VK_DrawCallInfo, MaxDrawCalls, true);
+
+      g.gpu_global_shader_st = write_descriptor(g.storage_buffer, Bindings::State, GlobalStateGPU, 1);
+      g.gpu_entities = write_descriptor(g.storage_buffer, Bindings::Entities, EntityGPU, MaxEntities+MaxStaticEntities);
+      g.gpu_materials = write_descriptor(g.storage_buffer, Bindings::Materials, MaterialGPU, MaxMaterials);
+      g.gpu_draw_call_infos = write_descriptor(g.indirect_draw_buffer, Bindings::Drawinfo, VK_DrawCallInfo, MaxDrawCalls);
       g.gpu_entities_indices = g.gpu_global_shader_st->entity_indices;
       Loop (i, writes.count) {
         writes[i].pBufferInfo = &buffer_infos[i];
@@ -2613,7 +2610,7 @@ void* vk_init() {
         .use_depth = true,
       },
     };
-    vk->debug_line_shader = vk_shader_pipeline_create(shader);
+    g.debug_line_pipeline = vk_shader_pipeline_alloc(shader);
   }
   {
     Shader shader = {
@@ -2623,7 +2620,7 @@ void* vk_init() {
         .samples = 1,
       },
     };
-    vk->screen_shader = vk_shader_pipeline_create(shader);
+    g.screen_pipeline = vk_shader_pipeline_alloc(shader);
   }
   {
     Shader shader = {
@@ -2635,7 +2632,7 @@ void* vk_init() {
         .use_depth = true,
       },
     };
-    vk->cubemap_shader = vk_shader_pipeline_create(shader);
+    g.cubemap_pipeline = vk_shader_pipeline_alloc(shader);
   }
   {
     Shader shader = {
@@ -2647,7 +2644,7 @@ void* vk_init() {
         .use_depth = false,
       },
     };
-    vk->ui_shader = vk_shader_pipeline_create(shader);
+    g.ui_pipeline = vk_shader_pipeline_alloc(shader);
   }
   {
     Shader shader = {
@@ -2657,7 +2654,7 @@ void* vk_init() {
         .topology = ShaderTopology_Triangle,
       },
     };
-    g.triangle = vk_shader_pipeline_create(shader);
+    g.triangle_pipeline = vk_shader_pipeline_alloc(shader);
   }
   
   Info("Vulkan renderer initialized");
@@ -3042,16 +3039,16 @@ void vk_make_renderable(Handle<Entity> entity_handle, Handle<GpuMesh> mesh_handl
   Assert(!vk->entities[entity_idx].is_init);
   DebugDo(vk->entities[entity_idx].is_init = true);
   u32 material_idx = material_handle.idx();
-  u32 pipeline_idx = vk->materials[material_idx].pipeline_idx;
+  u32 pipeline_idx = g.materials[material_idx].pipeline_idx;
   u32 mesh_idx = mesh_handle.idx();
   vk->entities[entity_idx].pipeline = pipeline_idx;
   VK_Mesh mesh = vk->meshes[mesh_idx];
   // Indexed
   if (mesh.index_count) {
-    VK_ShaderBatch<Entity>& shader_batch = vk->batches[pipeline_idx].batch_indexed;
-    u32* mesh_idx_in_array = shader_batch.mesh_to_batch.get(mesh_idx);
+    VK_ShaderBatch<Entity>& shader_batch = g.batches[g.pipelines[pipeline_idx].batch_idx].batch_indexed;
+    u32* mesh_idx_in_array = map_get(shader_batch.mesh_to_batch, mesh_idx);
     if (!mesh_idx_in_array) {
-      mesh_idx_in_array = shader_batch.mesh_to_batch.add(mesh_idx, shader_batch.mesh_batches.count);
+      mesh_idx_in_array = map_set(shader_batch.mesh_to_batch, mesh_idx, shader_batch.mesh_batches.count);
       VK_MeshBatch<Entity> mesh_batch = vk_mesh_batch_make<Entity>(g.gpa);
       mesh_batch.mesh_handle = mesh_handle;
       darray_add(shader_batch.mesh_batches, mesh_batch);
@@ -3063,10 +3060,10 @@ void vk_make_renderable(Handle<Entity> entity_handle, Handle<GpuMesh> mesh_handl
   }
   // Not Indexed
   else {
-    VK_ShaderBatch<Entity>& shader_batch = vk->batches[pipeline_idx].batch;
-    u32* mesh_idx_in_array = shader_batch.mesh_to_batch.get(mesh_idx);
+    VK_ShaderBatch<Entity>& shader_batch = g.batches[g.pipelines[pipeline_idx].batch_idx].batch;
+    u32* mesh_idx_in_array = map_get(shader_batch.mesh_to_batch, mesh_idx);
     if (!mesh_idx_in_array) {
-      mesh_idx_in_array = shader_batch.mesh_to_batch.add(mesh_idx, shader_batch.mesh_batches.count);
+      mesh_idx_in_array = map_set(shader_batch.mesh_to_batch, mesh_idx, shader_batch.mesh_batches.count);
       VK_MeshBatch<Entity> mesh_batch = vk_mesh_batch_make<Entity>(g.gpa);
       mesh_batch.mesh_handle = mesh_handle;
       darray_add(shader_batch.mesh_batches, mesh_batch);
@@ -3077,7 +3074,7 @@ void vk_make_renderable(Handle<Entity> entity_handle, Handle<GpuMesh> mesh_handl
     vk->entities[entity_idx].entity_idx_in_array = entity_idx_in_array;
   }
   vk->entities[entity_idx].mesh = mesh_handle;
-  vk->gpu_entities[entity_idx].material = material_handle.idx();
+  vk->gpu_entities[entity_idx].material = material_idx;
 }
 
 void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuMaterial> material_handle) {
@@ -3092,11 +3089,10 @@ void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMes
   VK_Mesh mesh = vk->meshes[mesh_idx];
   // Indexed
   if (mesh.index_count) {
-    ++vk->batches[pipeline_idx].static_entities_indexed_count;
-    VK_ShaderBatch<StaticEntity>& shader_batch = vk->batches[pipeline_idx].static_batch_indexed;
-    u32* mesh_idx_in_array = shader_batch.mesh_to_batch.get(mesh_idx);
+    VK_ShaderBatch<StaticEntity>& shader_batch = g.batches[g.pipelines[pipeline_idx].batch_idx].static_batch_indexed;
+    u32* mesh_idx_in_array = map_get(shader_batch.mesh_to_batch, mesh_idx);
     if (!mesh_idx_in_array) {
-      mesh_idx_in_array = shader_batch.mesh_to_batch.add(mesh_idx, shader_batch.mesh_batches.count);
+      mesh_idx_in_array = map_set(shader_batch.mesh_to_batch, mesh_idx, shader_batch.mesh_batches.count);
       VK_MeshBatch<StaticEntity> mesh_batch = vk_mesh_batch_make<StaticEntity>(g.gpa);
       mesh_batch.mesh_handle = mesh_handle;
       darray_add(shader_batch.mesh_batches, mesh_batch);
@@ -3108,11 +3104,10 @@ void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMes
   }
   // Not Indexed
   else {
-    ++vk->batches[pipeline_idx].static_entities_count;
-    VK_ShaderBatch<StaticEntity>& shader_batch = vk->batches[pipeline_idx].static_batch;
-    u32* mesh_idx_in_array = shader_batch.mesh_to_batch.get(mesh_idx);
+    VK_ShaderBatch<StaticEntity>& shader_batch = g.batches[g.pipelines[pipeline_idx].batch_idx].static_batch;
+    u32* mesh_idx_in_array = map_get(shader_batch.mesh_to_batch, mesh_idx);
     if (!mesh_idx_in_array) {
-      mesh_idx_in_array = shader_batch.mesh_to_batch.add(mesh_idx, shader_batch.mesh_batches.count);
+      mesh_idx_in_array = map_set(shader_batch.mesh_to_batch, mesh_idx, shader_batch.mesh_batches.count);
       VK_MeshBatch<StaticEntity> mesh_batch = vk_mesh_batch_make<StaticEntity>(g.gpa);
       mesh_batch.mesh_handle = mesh_handle;
       darray_add(shader_batch.mesh_batches, mesh_batch);
@@ -3123,7 +3118,7 @@ void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMes
     UnusedVariable(entity_idx_in_array); // TODO: remove static entity
   }
   // vk->entities[entity_idx].shader_handle = vk->shaders[shader_idx].entities.add(entity_handle);
-  vk->gpu_entities[entity_idx].material = material_handle.idx();
+  vk->gpu_entities[entity_idx].material = material_idx;
 }
 
 void vk_remove_renderable(Handle<Entity> entity_handle) {
@@ -3135,7 +3130,7 @@ void vk_remove_renderable(Handle<Entity> entity_handle) {
   VK_Mesh mesh = vk->meshes[mesh_idx];
   if (mesh.index_count) {
     VK_ShaderBatch<Entity>& shader_batch = vk->batches[pipeline_idx].batch_indexed;
-    u32* mesh_batch_idx = shader_batch.mesh_to_batch.get(mesh_idx);
+    u32* mesh_batch_idx = map_get(shader_batch.mesh_to_batch, mesh_idx);
     VK_MeshBatch<Entity>& mesh_batch = shader_batch.mesh_batches[*mesh_batch_idx];
 
     u32 idx = vk->entities[entity_idx].entity_idx_in_array;
@@ -3148,7 +3143,7 @@ void vk_remove_renderable(Handle<Entity> entity_handle) {
     vk->entities[swapped_idx].entity_idx_in_array = idx;
   } else {
     VK_ShaderBatch<Entity>& shader_batch = vk->batches[pipeline_idx].batch;
-    u32* mesh_batch_idx = shader_batch.mesh_to_batch.get(mesh_idx);
+    u32* mesh_batch_idx = map_get(shader_batch.mesh_to_batch, mesh_idx);
     VK_MeshBatch<Entity>& mesh_batch = shader_batch.mesh_batches[*mesh_batch_idx];
 
     u32 idx = vk->entities[entity_idx].entity_idx_in_array;

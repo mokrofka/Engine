@@ -188,21 +188,26 @@ void temp_end(Temp temp) {
 ////////////////////////////////////////////////////////////////////////
 // ArenaList
 
-ArenaList::ArenaList(Allocator alloc_) { *this = {}; alloc = alloc_; }
-void ArenaList::init(Allocator alloc_) { *this = {}; alloc = alloc_; }
 ArenaList::operator Allocator() { return {.type = AllocatorType_ArenaList, .ctx = this}; }
 
-void ArenaList::clear() {
-  for (ArenaBlock* b = first;; b = b->next) {
+ArenaList alloc_arena_list_make(Allocator alloc) {
+  ArenaList res = {
+    .alloc = alloc,
+  };
+  return res;
+}
+
+void alloc_arena_list_clear(ArenaList& arena) {
+  for (ArenaBlock* b = arena.first;; b = b->next) {
     u8* base = Offset(b, sizeof(ArenaBlock));
     MemGuardDealloc(base, b->pos);
     AsanPoisonMemRegion(base, ARENA_LIST_BLOCK_SIZE);
     b->pos = 0;
-    if (b == current)
+    if (b == arena.current)
       break;
   }
-  current = first;
-};
+  arena.current = arena.first;
+}
 
 intern ArenaBlock* arena_list_new_block(ArenaList* arena) {
   ArenaBlock* b = (ArenaBlock*)mem_alloc(arena->alloc, sizeof(ArenaBlock) + ARENA_LIST_BLOCK_SIZE);
@@ -289,7 +294,7 @@ void AllocSegList::init(Allocator alloc_, String name) {
 
 AllocSegList::operator Allocator() { return {.type = AllocatorType_SegList, .ctx = this}; }
 
-AllocSegList alloc_seg_list_make(Allocator alloc, String name) {
+AllocSegList alloc_seglist_make(Allocator alloc, String name) {
   AllocSegList res = {}; res.alloc = alloc;
 #if MEM_TRACK
   allocator_inherit(alloc, res);
@@ -537,47 +542,48 @@ void mem_free(Allocator alloc, void* ptr) {
 ////////////////////////////////////////////////////////////////////////
 // General GPU allocator (segregated pow2)
 
-void GpuAllocSegList::init(Allocator alloc_) {
-  allocator = alloc_;
-  range_cap = 8;
-  data = push_array(allocator, RangeList, range_cap);
+GpuAllocSegList gpu_alloc_seglist_make(Allocator alloc) {
+  GpuAllocSegList res = {
+    .alloc = alloc,
+  };
+  res.range_cap = 8,
+  res.data = push_array(alloc, GpuBlockList, res.range_cap);
+  return res;
 }
-
-GpuMemHandler GpuAllocSegList::alloc(u64 size, u64 align) {
+GpuMemId gpu_alloc_seglist_alloc(GpuAllocSegList& a, u64 size, u64 align) {
   Assert(size > 0);
   u64 alloc_size = align + size;
   u64 pow2_size = next_pow2(alloc_size);
   u64 pool_idx = ctz(pow2_size) - ctz(8);
-  u32& p = heads[pool_idx];
+  u32& p = a.heads[pool_idx];
   if (p == 0) {
-    u64 cur_pos = AlignUp(pos, align);
-    pos = cur_pos + pow2_size;
-    RangeList range = {0, true, cur_pos, alloc_size};
-    u32 result = range_count;
-    if (range_count >= range_cap) {
-      range_cap *= 2;
-      mem_realloc_array<RangeList>(allocator, data, range_count, range_cap) ;
+    u64 cur_pos = AlignUp(a.pos, align);
+    a.pos = cur_pos + pow2_size;
+    GpuBlockList range = {0, true, cur_pos, alloc_size};
+    u32 result = a.range_count;
+    if (a.range_count >= a.range_cap) {
+      a.range_cap *= 2;
+      mem_realloc_array(a.alloc, a.data, a.range_count, a.range_cap) ;
     }
-    data[range_count++] = range;
+    a.data[a.range_count++] = range;
     return result;
   }
   u32 result = p;
-  p = data[p].next;
+  p = a.data[p].next;
   return result;
 }
-
-void GpuAllocSegList::free(u32 idx) {
-  RangeList& range = data[idx];
+void gpu_alloc_seglist_free(GpuAllocSegList& a, GpuMemId h) {
+  GpuBlockList& range = a.data[h];
   Assert(range.is_allocated == true);
   u64 pow2_size = next_pow2(range.range.size);
   u64 pool_idx = ctz(pow2_size) - ctz(8);
-  u32& p = heads[pool_idx];
+  u32& p = a.heads[pool_idx];
   range.next = p;
-  p = idx;
+  p = h;
 }
 
-u64 GpuAllocSegList::get(u32 idx) {
-  return data[idx].range.offset;
+u64 gpu_alloc_seglist_get(GpuAllocSegList& a, GpuMemId h) {
+  return a.data[h].range.offset;
 }
 
 ////////////////////////////////////////////////////////////////////////

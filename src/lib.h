@@ -9,11 +9,6 @@
 #include "base/thread.h"
 #include "base/profiler.h"
 
-#include "os/os_core.h"
-#include "os/os_gfx.h"
-
-struct HotReloadData {
-  void* ctx;
-  String lib;
-};
+#include "base/os/os_core.h"
+#include "base/os/os_gfx.h"
 

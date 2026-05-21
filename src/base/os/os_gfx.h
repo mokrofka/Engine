@@ -1,5 +1,5 @@
 #pragma once
-#include "os/os_core.h"
+#include "os_core.h"
 #include "base/maths.h"
 
 void os_gfx_init();

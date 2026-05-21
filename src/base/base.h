@@ -356,7 +356,7 @@ struct RingBuffer {
 void ring_write(RingBuffer& ring, void *src, u64 src_size);
 void ring_read(RingBuffer& ring, void *dst, u64 read_size);
 #define ring_write_struct(ring, ptr) ring_write((ring), (ptr), sizeof(*(ptr)))
-#define ring_read_struct(ring, ptr) ring_read((ring) (ptr), sizeof(*(ptr)))
+#define ring_read_struct(ring, ptr) ring_read((ring), (ptr), sizeof(*(ptr)))
 
 template<typename T>
 struct Slice {
@@ -416,6 +416,11 @@ struct String64 {
 //     SLLStackPush(stack, s);
 //   }
 // }
+
+struct HotReloadData {
+  void* ctx;
+  String lib;
+};
 
 
 

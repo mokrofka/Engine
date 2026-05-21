@@ -86,7 +86,7 @@ intern void test_arena_list_alloc() {
       Assert(buf[j] == value);
     }
   }
-  arena.clear();
+  alloc_arena_list_clear(arena);
 
   Loop (i, TEST_SAMPLES) {
     u32 size = rand_rng_u32(8, KB(1));
@@ -104,7 +104,7 @@ intern void test_arena_list_alloc() {
       Assert(buf[j] == value);
     }
   }
-  arena.clear();
+  alloc_arena_list_clear(arena);
 }
 
 intern void test_seglist_alloc() {
@@ -144,32 +144,32 @@ intern void test_seglist_alloc() {
 intern void test_gpu_seglist_alloc() {
   Scratch scratch;
   GpuAllocSegList alloc = {.cap = MB(1)};
-  alloc.init(scratch);
-  Array<GpuMemHandler, TEST_SAMPLES> arr = {};
+  alloc = gpu_alloc_seglist_make(scratch);
+  Array<GpuMemId, TEST_SAMPLES> arr = {};
 
   Loop (i, TEST_SAMPLES) {
     u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
-    array_add(arr, alloc.alloc(size, align));
+    array_add(arr, gpu_alloc_seglist_alloc(alloc, size, align));
   }
   Array<u32, TEST_SAMPLES> indices = {};
   Loop(i, TEST_SAMPLES) array_add(indices, i);
   rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
-    alloc.free(arr[indices[i]]);
+    gpu_alloc_seglist_free(alloc, arr[indices[i]]);
   }
 
   array_clear(arr);
   Loop (i, TEST_SAMPLES) {
     u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
-    array_add(arr, alloc.alloc(size, align));
+    array_add(arr, gpu_alloc_seglist_alloc(alloc, size, align));
   }
   array_clear(indices);
   Loop(i, TEST_SAMPLES) array_add(indices, i);
   rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
-    alloc.free(arr[indices[i]]);
+    gpu_alloc_seglist_free(alloc, arr[indices[i]]);
   }
 }
 
@@ -182,25 +182,25 @@ intern void test_object_pool() {
     u32 a;
     u32 b;
   };
-  ObjectPool<A> pool(scratch);
+  var pool = object_pool_make<A>(scratch);
   Array<A, TEST_SAMPLES> values = {};
-  Array<Handle<A>, TEST_SAMPLES> handlers = {};
+  Array<u32, TEST_SAMPLES> handlers = {};
 
   Loop (i, TEST_SAMPLES) {
     values[i].a = rand_rng_u32(0, TEST_SAMPLES);
     values[i].b = rand_rng_u32(0, TEST_SAMPLES);
   };
   Loop (i, TEST_SAMPLES) {
-    handlers[i] = pool.add(values[i]);
+    handlers[i] = object_pool_alloc(pool, values[i]);
   }
   Loop (i, TEST_SAMPLES) {
-    Assert(MemMatchStruct(&values[i], &pool.get(handlers[i])));
+    Assert(MemMatchStruct(&values[i], &object_pool_get(pool, handlers[i])));
   }
   Array<u32, TEST_SAMPLES> indices = {};
   Loop(i, TEST_SAMPLES) array_add(indices, i);
   rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
-    pool.remove(handlers[i]);
+    object_pool_free(pool, handlers[i]);
   }
 
   array_clear(indices);
@@ -209,15 +209,15 @@ intern void test_object_pool() {
     values[i].b = rand_rng_u32(0, TEST_SAMPLES);
   };
   Loop (i, TEST_SAMPLES) {
-    handlers[i] = pool.add(values[i]);
+    handlers[i] = object_pool_alloc(pool, values[i]);
   }
   Loop (i, TEST_SAMPLES) {
-    Assert(MemMatchStruct(&values[i], &pool.get(handlers[i])));
+    Assert(MemMatchStruct(&values[i], &object_pool_get(pool, handlers[i])));
   }
   Loop(i, TEST_SAMPLES) array_add(indices, i);
   rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
-    pool.remove(handlers[i]);
+    object_pool_free(pool, handlers[i]);
   }
 }
 
@@ -227,25 +227,25 @@ intern void test_handle_darray() {
     u32 a;
     u32 b;
   };
-  DarrayHandler<A> arr(scratch);
+  var arr = darray_handler_make<A>(scratch);
   Array<A, TEST_SAMPLES> values = {};
-  Array<Handle<A>, TEST_SAMPLES> handlers = {};
+  Array<u32, TEST_SAMPLES> handlers = {};
 
   Loop (i, TEST_SAMPLES) {
     values[i].a = rand_rng_u32(0, TEST_SAMPLES);
     values[i].b = rand_rng_u32(0, TEST_SAMPLES);
   };
   Loop (i, TEST_SAMPLES) {
-    handlers[i] = arr.add(values[i]);
+    handlers[i] = darray_handler_add(arr, values[i]);
   }
   Loop (i, TEST_SAMPLES) {
-    Assert(MemMatchStruct(&values[i], &arr.get(handlers[i])));
+    Assert(MemMatchStruct(&values[i], &darray_handler_get(arr, handlers[i])));
   }
   Array<u32, TEST_SAMPLES> indices = {};
   Loop (i, TEST_SAMPLES) array_add(indices, i);
   rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
-    arr.remove(handlers[indices[i]]);
+    darray_handler_remove(arr, handlers[indices[i]]);
   }
 
   array_clear(indices);
@@ -254,35 +254,34 @@ intern void test_handle_darray() {
     values[i].b = rand_rng_u32(0, TEST_SAMPLES);
   };
   Loop (i, TEST_SAMPLES) {
-    handlers[i] = arr.add(values[i]);
+    handlers[i] = darray_handler_add(arr, values[i]);
   }
   Loop (i, TEST_SAMPLES) {
-    Assert(MemMatchStruct(&values[i], &arr.get(handlers[i])));
+    Assert(MemMatchStruct(&values[i], &darray_handler_get(arr, handlers[i])));
   }
   Loop(i, TEST_SAMPLES) array_add(indices, i);
   rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
-    arr.remove(handlers[indices[i]]);
+    darray_handler_remove(arr, handlers[indices[i]]);
   }
 }
 
 intern void test_id_pool() {
   Scratch scratch;
   {
-    IdPool id_pool;
-    id_pool.init(scratch);
+    IdPool id_pool = id_pool_make(scratch);
     Array<u32, TEST_SAMPLES> arr = {};
     Loop (i, TEST_SAMPLES) {
-      u32 id = id_pool.alloc();
+      u32 id = id_pool_alloc(id_pool);
       array_add(arr, id);
     }
     rand_shuffle(slice(arr));
     Loop (i, arr.count) {
-      id_pool.free(arr[i]);
+      id_pool_free(id_pool, arr[i]);
     }
     Array<u32, TEST_SAMPLES> new_arr = {};
     Loop (i, arr.count) {
-      u32 id = id_pool.alloc();
+      u32 id = id_pool_alloc(id_pool);
       array_add(new_arr, id);
     }
     Loop (i, arr.count) {
@@ -296,25 +295,25 @@ intern void test_id_pool() {
       Assert(exists);
     }
     Loop (i, arr.count) {
-      id_pool.free(new_arr[i]);
+      id_pool_free(id_pool, new_arr[i]);
     }
   }
 
   {
     StaticIdPool static_id_pool;
-    static_id_pool.init(scratch, TEST_SAMPLES);
+    static_id_pool = static_id_pool_make(scratch, TEST_SAMPLES);
     Array<u32, TEST_SAMPLES> arr = {};
     Loop (i, TEST_SAMPLES) {
-      u32 id = static_id_pool.alloc();
+      u32 id = static_id_pool_alloc(static_id_pool);
       array_add(arr, id);
     }
     rand_shuffle(slice(arr));
     Loop (i, arr.count) {
-      static_id_pool.free(arr[i]);
+      static_id_pool_free(static_id_pool, arr[i]);
     }
     Array<u32, TEST_SAMPLES> new_arr = {};
     Loop (i, arr.count) {
-      u32 id = static_id_pool.alloc();
+      u32 id = static_id_pool_alloc(static_id_pool);
       array_add(new_arr, id);
     }
     Loop (i, arr.count) {
@@ -328,7 +327,7 @@ intern void test_id_pool() {
       Assert(exists);
     }
     Loop (i, arr.count) {
-      static_id_pool.free(new_arr[i]);
+      static_id_pool_free(static_id_pool, new_arr[i]);
     }
   }
 }
@@ -681,6 +680,73 @@ void test_link_list() {
     Info("%i", it->data);
   }
 
+}
+
+////////////////////////////////////////////////////////////////////////
+// sort
+
+void test_sort() {
+  Scratch scratch;
+  {
+    Info("insert");
+    i32 arr[] = {0, -4, -3, 7, 3};
+    sort_insert(ArraySlice(arr), [](var a, var b) { return a < b; });
+    for EachElement(i, arr) {
+      print("%i ", arr[i]);
+    }
+    print("\n");
+  }
+  {
+    Info("quick");
+    i32 arr[] = {0, -4, -3, 7, 3};
+    sort_quick(ArraySlice(arr), [](var a, var b) { return a < b;});
+    for EachElement(i, arr) {
+      print("%i ", arr[i]);
+    }
+    print("\n");
+  }
+  {
+    Scratch scratch;
+    Info("merge");
+    i32 arr[] = {0, -4, -3, 7, 3};
+    sort_merge(scratch, ArraySlice(arr), [](var a, var b) { return a < b;});
+    for EachElement(i, arr) {
+      print("%i ", arr[i]);
+    }
+    print("\n");
+  }
+  u32 counts[] = {128, 512, KB(1), KB(10), KB(100), MB(1)};
+  Slice<u32> arrs[ArrayCount(counts)];
+  for EachElement(i, counts) {
+    arrs[i] = push_slice(scratch, u32, counts[i]);
+    Loop (j, counts[i]) {
+      arrs[i][j] = rand_i32();
+    }
+  }
+  print("\n/////////////////\n");
+  Info("\nQuick test:");
+  Loop (i, 2) {
+    for EachElement(i, counts) {
+      Info("Count %i", counts[i]);
+      rand_shuffle(arrs[i]);
+      {
+        TimeScope t;
+        sort_quick(arrs[i], [](var a, var b) {return a < b;});
+      }
+    }
+  }
+  Info("\nmerge test:");
+  Loop (i, 2) {
+    for EachElement(i, counts) {
+      Scratch scratch;
+      Info("Count %i", counts[i]);
+      rand_shuffle(arrs[i]);
+      {
+        TimeScope t;
+        sort_merge(scratch, arrs[i], [](var a, var b) {return a < b;});
+      }
+    }
+  }
 }
 
 void test() {

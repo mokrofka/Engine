@@ -19,6 +19,7 @@ template<typename T> struct Handle {
 
 inline u32 id_idx(u32 id) { return id & INDEX_MASK; }
 inline u32 id_generation(u32 id) { return id >> INDEX_BITS; }
+inline u32 id_make(u32 generation, u32 idx) { return (generation << INDEX_BITS) | idx; }
 
 ////////////////////////////////////////////////////////////////////////
 // Array
@@ -84,8 +85,9 @@ template<typename T> Slice<T> slice(Darray<T>& arr) {
   return {arr.data, arr.count};
 }
 template<typename T> Darray<T> darray_make(Allocator alloc) {
-  Darray<T> res = {};
-  res.alloc = alloc;
+  Darray<T> res = {
+    .alloc = alloc,
+  };
   return res;
 }
 template<typename T> void darray_free(Darray<T>& arr) {
@@ -160,14 +162,14 @@ template<typename T> T darray_pop(Darray<T>& arr) {
 template<typename T> T darray_back(Darray<T>& arr) {
   return arr.data[arr.count-1];
 }
-template<typename T> T darray_exists(Darray<T>& arr, T a, b32(*fn)(T a, T b) = equal) {
+template<typename T> b32 darray_exists(Darray<T>& arr, T a, b32(*fn)(T a, T b) = equal) {
   Loop (i, arr.count) {
     T x = arr[i];
     if (fn(x, a)) return true;
   }
   return false;
 }
-template<typename T> T darray_exists_at(Darray<T>& arr, T a, u32* out_idx, b32(*fn)(T a, T b) = equal) {
+template<typename T> b32 darray_exists_at(Darray<T>& arr, T a, u32* out_idx, b32(*fn)(T a, T b) = equal) {
   Loop (i, arr.count) {
     if (fn(arr.data[i], a)) {
       *out_idx = i;
@@ -178,7 +180,7 @@ template<typename T> T darray_exists_at(Darray<T>& arr, T a, u32* out_idx, b32(*
 }
 
 ////////////////////////////////////////////////////////////////////////
-// HandlerArray
+// ArrayHandler
 
 template<typename T, i32 N>
 struct ArrayHandler {
@@ -190,64 +192,65 @@ struct ArrayHandler {
 #if BUILD_DEBUG
   u32 generations[N];
 #endif
-  T* begin() { return data; }
-  T* end()   { return data + count; }
-  T& get(Handle<T> handle) {
-    Assert(handle.idx() < cap);
-#if BUILD_DEBUG
-    u32 idx = handle.idx();
-    u32 generation = handle.generation();
-    Assert(generations[idx] == generation);
-    u32 index = sparse[idx];
-    return data[index];
-#else
-    u32 index = sparse[handle];
-    return data[index];
-#endif
-  }
-  Handle<T> add(T e) {
-#if BUILD_DEBUG
-    u32 idx = count++;
-    sparse[idx] = idx;
-    dense[idx] = idx;
-    data[idx] = e;
-    Handle<T> handle = (generations[idx] << INDEX_BITS) | idx;
-    return handle;
-#else
-    u32 idx = count++;
-    sparse[idx] = idx;
-    dense[idx] = idx;
-    data[idx] = e;
-    Handle<T> handle = {idx};
-    return handle;
-#endif
-  }
-  void remove(Handle<T> handle) {
-#if BUILD_DEBUG
-    u32 idx = handle.idx();
-    u32 generation = handle.generation();
-    Assert(generations[idx] == generation);
-    ++generation;
-    generations[idx] = generation;
-
-    u32 idx_removed = sparse[handle];
-    u32 idx_last = count - 1;
-    data[idx_removed] = data[idx_last];
-    u32 last_entity = dense[idx_last];
-    sparse[last_entity] = idx_removed;
-    dense[idx_removed] = last_entity;
-    --count;
-#else
-    u32 idx_removed = sparse[handle];
-    u32 idx_last = count - 1;
-    data[idx_removed] = data[idx_last];
-    u32 last_entity = dense[idx_last];
-    sparse[last_entity] = idx_removed;
-    dense[idx_removed] = last_entity;
-    --count;
-#endif
-  }
 };
+
+template<typename T, i32 N> T& array_handler_get(ArrayHandler<T, N>& arr, u32 h) {
+#if BUILD_DEBUG
+    u32 idx = id_idx(h);
+    Assert(idx < arr.count);
+    Assert(arr.generations[idx]++ == id_generation(h));
+    u32 index = arr.sparse[idx];
+    return arr.data[index];
+#else
+    Assert(h < arr.count);
+    u32 idx = arr.sparse[h];
+    return arr.data[idx];
+#endif
+}
+template<typename T, i32 N> u32 array_handler_add(ArrayHandler<T, N>& arr, T a) {
+#if BUILD_DEBUG
+  u32 idx = arr.count++;
+  arr.sparse[idx] = idx;
+  arr.dense[idx] = idx;
+  arr.data[idx] = a;
+  u32 h = id_make(arr.generations[idx], idx);
+  return h;
+#else
+  u32 idx = arr.count++;
+  arr.sparse[idx] = idx;
+  arr.dense[idx] = idx;
+  arr.data[idx] = a;
+  u32 h = idx;
+  return h;
+#endif
+}
+template<typename T, i32 N> void array_handler_remove(ArrayHandler<T, N>& arr, u32 h) {
+#if BUILD_DEBUG
+    u32 idx = id_idx(h);
+    Assert(idx < arr.count);
+    Assert(arr.generations[idx]++ == id_generation(h));
+    u32 idx_removed = arr.sparse[idx];
+    u32 idx_last = arr.count - 1;
+    arr.data[idx_removed] = arr.data[idx_last];
+    u32 last_entity = arr.dense[idx_last];
+    arr.sparse[last_entity] = idx_removed;
+    arr.dense[idx_removed] = last_entity;
+    --arr.count;
+#else
+    u32 idx = h;
+    Assert(idx < arr.count);
+    u32 idx_removed = arr.sparse[idx];
+    u32 idx_last = arr.count - 1;
+    arr.data[idx_removed] = arr.data[idx_last];
+    u32 last_entity = arr.dense[idx_last];
+    arr.sparse[last_entity] = idx_removed;
+    arr.dense[idx_removed] = last_entity;
+    --arr.count;
+#endif
+}
+template<typename T, i32 N> void array_handler_clear(ArrayHandler<T, N>& arr) {
+  arr.count = 0;
+}
 
 template <typename T>
 struct DarrayHandler {
@@ -260,123 +263,119 @@ struct DarrayHandler {
 #if BUILD_DEBUG
   u32* generations;
 #endif
-  DarrayHandler() = default;
-  DarrayHandler(Allocator alloc_) { init(alloc_); }
-  void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
-  void deinit() { if (sparse) { mem_free(alloc, sparse); } }
-  T* begin() { return data; }
-  T* end()   { return data + count; }
-  T& get(Handle<T> handle) {
-    Assert(handle.idx() < cap);
-#if BUILD_DEBUG
-    Assert(handle.generation() == generations[handle.idx()]);
-    u32 index = sparse[handle.idx()];
-    return data[index];
-#else
-    DebugDo(Assert(sparse[handle.handle] != INVALID_ID));
-    u32 index = sparse[handle.handle];
-    return data[index];
-#endif
-  }
-  Handle<T> add(T e) {
-#if BUILD_DEBUG
-    if (count >= cap) {
-      grow();
-    }
-    u32 idx = count++;
-    sparse[idx] = idx;
-    dense[idx] = idx;
-    data[idx] = e;
-    Handle<T> handle = {(generations[idx] << INDEX_BITS) | idx};
-    return handle;
-#else
-    if (count >= cap) {
-      grow();
-    }
-    u32 idx = count++;
-    sparse[idx] = idx;
-    dense[idx] = idx;
-    data[idx] = e;
-    Handle<T> handle = {idx};
-    return handle;
-#endif
-  }
-  void remove(Handle<T> handle) {
-#if BUILD_DEBUG
-    u32 idx = handle.handle & INDEX_MASK;
-    u32 generation = handle.handle >> INDEX_BITS;
-    Assert(generations[idx] == generation);
-    ++generation;
-    generations[idx] = generation;
-
-    u32 idx_removed = sparse[idx];
-    u32 idx_last = count - 1;
-    data[idx_removed] = data[idx_last];
-    u32 last_entity = dense[idx_last];
-    sparse[last_entity] = idx_removed;
-    dense[idx_removed] = last_entity;
-    --count;
-#else
-    u32 idx_removed = sparse[handle.idx()];
-    u32 idx_last = count - 1;
-    data[idx_removed] = data[idx_last];
-    u32 last_entity = dense[idx_last];
-    sparse[last_entity] = idx_removed;
-    dense[idx_removed] = last_entity;
-    --count;
-#endif
-  }
-  void grow() {
-#if BUILD_DEBUG
-    if (data) {
-      u32 cap_old = cap;
-      cap *= DEFAULT_RESIZE_FACTOR;
-      SoA_Field fields[] = {
-        SoA_push_field(&sparse, u32),
-        SoA_push_field(&dense, u32),
-        SoA_push_field(&data, T),
-        SoA_push_field(&generations, u32),
-      };
-      mem_realloc_soa(alloc, cap_old, cap, ArraySlice(fields));
-      MemZeroArray(generations+cap_old, cap-cap_old);
-    }
-    else {
-      cap = DEFAULT_CAPACITY;
-      SoA_Field fields[] = {
-        SoA_push_field(&sparse, u32),
-        SoA_push_field(&dense, u32),
-        SoA_push_field(&data, T),
-        SoA_push_field(&generations, u32),
-      };
-      mem_alloc_soa(alloc, cap, ArraySlice(fields));
-      MemZeroArray(generations, cap);
-    }
-#else
-    if (data) {
-      u32 cap_old = cap;
-      cap *= DEFAULT_RESIZE_FACTOR;
-      SoA_Field fields[] = {
-        SoA_push_field(&sparse, u32),
-        SoA_push_field(&dense, u32),
-        SoA_push_field(&data, T),
-      };
-      mem_realloc_soa(alloc, cap_old, cap, ArraySlice(fields));
-    }
-    else {
-      cap = DEFAULT_CAPACITY;
-      SoA_Field fields[] = {
-        SoA_push_field(&sparse, u32),
-        SoA_push_field(&dense, u32),
-        SoA_push_field(&data, T),
-      };
-      mem_alloc_soa(alloc, cap, ArraySlice(fields));
-    }
-    #endif
-  }
-  void clear() {
-    count = 0;
-  }
 };
+
+template<typename T> DarrayHandler<T> darray_handler_make(Allocator alloc) {
+  DarrayHandler<T> res = {
+    .alloc = alloc,
+  };
+  return res;
+}
+template<typename T> T& darray_handler_get(DarrayHandler<T>& arr, u32 h) {
+#if BUILD_DEBUG
+  u32 idx = id_idx(h);
+  Assert(idx < arr.cap);
+  Assert(arr.generations[idx] == id_generation(h));
+  u32 index = arr.sparse[idx];
+  return arr.data[index];
+#else
+  Assert(h < arr.count);
+  u32 idx = arr.sparse[h];
+  return arr.data[idx];
+#endif
+}
+template<typename T> void darray_handler_grow(DarrayHandler<T>& arr) {
+#if BUILD_DEBUG
+  if (arr.data) {
+    u32 cap_old = arr.cap;
+    arr.cap *= DEFAULT_RESIZE_FACTOR;
+    SoA_Field fields[] = {
+      SoA_push_field(&arr.sparse, u32),
+      SoA_push_field(&arr.dense, u32),
+      SoA_push_field(&arr.data, T),
+      SoA_push_field(&arr.generations, u32),
+    };
+    mem_realloc_soa(arr.alloc, cap_old, arr.cap, ArraySlice(fields));
+    MemZeroArray(arr.generations+cap_old, arr.cap-cap_old);
+  } else {
+    arr.cap = DEFAULT_CAPACITY;
+    SoA_Field fields[] = {
+      SoA_push_field(&arr.sparse, u32),
+      SoA_push_field(&arr.dense, u32),
+      SoA_push_field(&arr.data, T),
+      SoA_push_field(&arr.generations, u32),
+    };
+    mem_alloc_soa(arr.alloc, arr.cap, ArraySlice(fields));
+    MemZeroArray(arr.generations, arr.cap);
+  }
+#else
+  if (arr.data) {
+    u32 cap_old = arr.cap;
+    arr.cap *= DEFAULT_RESIZE_FACTOR;
+    SoA_Field fields[] = {
+      SoA_push_field(&arr.sparse, u32),
+      SoA_push_field(&arr.dense, u32),
+      SoA_push_field(&arr.data, T),
+    };
+    mem_realloc_soa(arr.alloc, cap_old, arr.cap, ArraySlice(fields));
+  } else {
+    arr.cap = DEFAULT_CAPACITY;
+    SoA_Field fields[] = {
+      SoA_push_field(&arr.sparse, u32),
+      SoA_push_field(&arr.dense, u32),
+      SoA_push_field(&arr.data, T),
+    };
+    mem_alloc_soa(arr.alloc, arr.cap, ArraySlice(fields));
+  }
+#endif
+}
+template<typename T> u32 darray_handler_add(DarrayHandler<T>& arr, T a) {
+#if BUILD_DEBUG
+  if (arr.count >= arr.cap) {
+    darray_handler_grow(arr);
+  }
+  u32 idx = arr.count++;
+  arr.sparse[idx] = idx;
+  arr.dense[idx] = idx;
+  arr.data[idx] = a;
+  u32 h = id_make(arr.generations[idx], idx);
+  return h;
+#else
+  if (arr.count >= arr.cap) {
+    darray_handler_grow(arr);
+  }
+  u32 idx = arr.count++;
+  arr.sparse[idx] = idx;
+  arr.dense[idx] = idx;
+  arr.data[idx] = a;
+  return idx;
+#endif
+}
+template<typename T> void darray_handler_remove(DarrayHandler<T>& arr, u32 h) {
+#if BUILD_DEBUG
+  u32 idx = id_idx(h);
+  Assert(arr.generations[idx]++ == id_generation(h));
+  u32 idx_removed = arr.sparse[idx];
+  u32 idx_last = arr.count - 1;
+  arr.data[idx_removed] = arr.data[idx_last];
+  u32 last_entity = arr.dense[idx_last];
+  arr.sparse[last_entity] = idx_removed;
+  arr.dense[idx_removed] = last_entity;
+  --arr.count;
+#else
+  u32 idx = h;
+  u32 idx_removed = arr.sparse[idx];
+  u32 idx_last = arr.count - 1;
+  arr.data[idx_removed] = arr.data[idx_last];
+  u32 last_entity = arr.dense[idx_last];
+  arr.sparse[last_entity] = idx_removed;
+  arr.dense[idx_removed] = last_entity;
+  --arr.count;
+#endif
+}
+template<typename T> void darray_handler_clear(DarrayHandler<T>& arr) {
+  arr.count = 0;
+}
 
 ////////////////////////////////////////////////////////////////////////
 // Pool
@@ -391,443 +390,238 @@ struct ObjectPool {
 #if BUILD_DEBUG
   u32* generations;
 #endif
-  ObjectPool() = default;
-  ObjectPool(Allocator alloc_) { *this = {}; alloc = alloc_; }
-  void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
-  void deinit() { if (data) mem_free(alloc, data); }
-  T& get(Handle<T> handle) {
-#if BUILD_DEBUG
-    u32 idx = handle.idx();
-    Assert(idx < cap);
-    Assert(generations[idx] == handle.generation());
-    return data[idx];
-#else
-    return data[handle.handle];
-#endif
-  }
-  Handle<T> add() {
-#if BUILD_DEBUG
-    u32 head_idx = head & INDEX_MASK;
-    if (head_idx >= cap) {
-      grow();
-    }
-    u32 result = head;
-    u32 idx = result & INDEX_MASK;
-    Assert((idx & INDEX_BITS) < cap);
-    head = *(u32*)&data[idx];
-    Handle<T> handle = {result};
-    return handle;
-#else
-    if (head >= cap) {
-      grow();
-    }
-    u32 result = head;
-    head = *(u32*)&data[head];
-    Handle<T> handle = {result};
-    return handle;
-  #endif
-  }
-  Handle<T> add(T e) {
-    Handle<T> handle = add();
-    get(handle) = e;
-    return handle;
-  }
-  void remove(Handle<T> handle) {
-#if BUILD_DEBUG
-    u32 idx = handle.handle & INDEX_MASK;
-    u32 generation = handle.handle >> INDEX_BITS;
-    Assert(generations[idx] == generation);
-    ++generation;
-    generations[idx] = generation;
-    handle.handle = (generation << INDEX_BITS) | idx;
-    *(u32*)&data[idx] = head;
-    head = handle.handle;
-#else
-    u32 idx = handle.idx();
-    *(u32*)&data[idx] = head;
-    head = handle.handle;
-#endif
-  }
-  void grow() {
-#if BUILD_DEBUG
-    if (data) {
-      u32 cap_old = cap;
-      cap *= DEFAULT_RESIZE_FACTOR;
-      SoA_Field fields[] = {
-        SoA_push_field(&generations, u32),
-        SoA_push_field(&data, T),
-      };
-      mem_realloc_soa(alloc, cap_old, cap, ArraySlice(fields));
-      head = cap_old;
-      for (i32 i = cap_old; i < cap-1; ++i) {
-        *(u32*)&data[i] = i+1;
-      }
-      *(u32*)&data[cap-1] = U32_MAX;
-      MemZeroArray(generations+cap_old, cap-cap_old);
-    } else {
-      cap = DEFAULT_CAPACITY;
-      SoA_Field fields[] = {
-        SoA_push_field(&generations, u32),
-        SoA_push_field(&data, T),
-      };
-      mem_alloc_soa(alloc, cap, ArraySlice(fields));
-      Loop (i, cap-1) {
-        *(u32*)&data[i] = i+1;
-      }
-      *(u32*)&data[cap-1] = U32_MAX;
-      MemZeroArray(generations, cap);
-    }
-#else
-    if (data) {
-      u32 cap_old = cap;
-      cap *= DEFAULT_RESIZE_FACTOR;
-      data = mem_realloc_array(alloc, data, cap_old, cap);
-      head = cap_old;
-      for (i32 i = cap_old; i < cap-1; ++i) {
-        *(u32*)&data[i] = i+1;
-      }
-      *(u32*)&data[cap-1] = U32_MAX;
-    } else {
-      cap = DEFAULT_CAPACITY;
-      data = mem_alloc_array<T>(alloc, cap);
-      Loop (i, cap-1) {
-        *(u32*)&data[i] = i+1;
-      }
-      *(u32*)&data[cap-1] = U32_MAX;
-    }
-#endif
-  }
-  void clear() {
-#if BUILD_DEBUG
-    head = 0;
-    Loop (i, cap-1) {
-      *(u32*)&data[i] = i+1;
-    }
-    *(u32*)&data[cap-1] = U32_MAX;
-    MemZeroArray(generations, cap);
-#else
-    head = 0;
-    Loop (i, cap-1) {
-      *(u32*)&data[i] = i+1;
-    }
-    *(u32*)&data[cap-1] = U32_MAX;
-#endif
-  }
 };
 
-// template<typename T, i32 cap>
-// struct StaticObjectPool {
-//   u32 head;
-//   T* data;
-// #if BUILD_DEBUG
-//   u32* generations;
-// #endif
-//   void init(Allocator arena, u32* generations_) {
-// #if BUILD_DEBUG
-//   data = push_array(arena, T, cap);
-//   generations = generations_;
-//   clear();
-// #else
-//   data = push_array(arena, T, cap);
-//   clear();
-// #endif
-//   }
-//   T& get(Handle<T> handle) {
-// #if BUILD_DEBUG
-//     u32 idx = handle.handle & INDEX_MASK;
-//     u32 generation = handle.handle >> INDEX_BITS;
-//     Assert(idx < cap);
-//     Assert(generations[idx] == generation);
-//     return data[idx];
-// #else
-//     return data[handle.handle];
-// #endif
-//   }
-//   Handle<T> add() {
-// #if BUILD_DEBUG
-//     u32 result = head;
-//     u32 idx = result & INDEX_MASK;
-//     Assert((idx & INDEX_BITS) < cap);
-//     head = *(u32*)&data[idx];
-//     Handle<T> handle = {result};
-//     return handle;
-// #else
-//     u32 result = head;
-//     head = *(u32*)&data[head];
-//     Handle<T> handle = {result};
-//     return handle;
-//   #endif
-//   }
-//   Handle<T> add(T e) {
-//     Handle<T> handle = add();
-//     get(handle) = e;
-//     return handle;
-//   }
-//   void remove(Handle<T> handle) {
-// #if BUILD_DEBUG
-//     u32 idx = handle.handle & INDEX_MASK;
-//     u32 generation = handle.handle >> INDEX_BITS;
-//     Assert(generations[idx] == generation);
-//     ++generation;
-//     generations[idx] = generation;
-//     handle.handle = (generation << INDEX_BITS) | idx;
-//     *(u32*)&data[idx] = head;
-//     head = handle.handle;
-// #else
-//     u32 idx = handle.handle;
-//     *(u32*)&data[idx] = head;
-//     head = handle.handle;
-// #endif
-//   }
-//   void clear() {
-// #if BUILD_DEBUG
-//     head = 0;
-//     Loop (i, cap) {
-//       *(u32*)&data[i] = i+1;
-//     }
-//     MemZeroArray(generations, cap);
-// #else
-//     head = 0;
-//     Loop (i, cap-1) {
-//       *(u32*)&data[i] = i+1;
-//     }
-// #endif
-//   }
-// };
-
-template<typename T, i32 N>
-struct StaticNObjectPool {
-  static constexpr i32 cap = N;
-  u32 head;
-  T data[N];
+template<typename T> ObjectPool<T> object_pool_make(Allocator alloc) {
+  ObjectPool<T> res = {
+    .alloc = alloc,
+  };
+  return res;
+}
+template<typename T> T& object_pool_get(ObjectPool<T>& p, u32 h) {
 #if BUILD_DEBUG
-  u32 generations[];
-#endif
-  void init() {
-#if BUILD_DEBUG
-  clear();
+  u32 idx = id_idx(h);
+  Assert(p.generations[idx] == id_generation(h));
+  return p.data[idx];
 #else
-  clear();
+  return p.data[h];
 #endif
-  }
-  T& get(Handle<T> handle) {
+}
+template<typename T> void object_pool_grow(ObjectPool<T>& p) {
 #if BUILD_DEBUG
-    u32 idx = handle.handle & INDEX_MASK;
-    u32 generation = handle.handle >> INDEX_BITS;
-    Assert(idx < cap);
-    Assert(generations[idx] == generation);
-    return data[idx];
-#else
-    return data[handle.handle];
-#endif
-  }
-  Handle<T> add() {
-#if BUILD_DEBUG
-    u32 result = head;
-    u32 idx = result & INDEX_MASK;
-    Assert((idx & INDEX_BITS) < cap);
-    head = *(u32*)&data[idx];
-    Handle<T> handle = {result};
-    return handle;
-#else
-    u32 result = head;
-    head = *(u32*)&data[head];
-    Handle<T> handle = {result};
-    return handle;
-  #endif
-  }
-  Handle<T> add(T e) {
-    Handle<T> handle = add();
-    get(handle) = e;
-    return handle;
-  }
-  void remove(Handle<T> handle) {
-#if BUILD_DEBUG
-    u32 idx = handle.handle & INDEX_MASK;
-    u32 generation = handle.handle >> INDEX_BITS;
-    Assert(generations[idx] == generation);
-    ++generation;
-    generations[idx] = generation;
-    handle.handle = (generation << INDEX_BITS) | idx;
-    *(u32*)&data[idx] = head;
-    head = handle.handle;
-#else
-    u32 idx = handle.handle;
-    *(u32*)&data[idx] = head;
-    head = handle.handle;
-#endif
-  }
-  void clear() {
-#if BUILD_DEBUG
-    head = 0;
-    Loop (i, cap) {
-      *(u32*)&data[i] = i+1;
+  if (p.data) {
+    u32 cap_old = p.cap;
+    p.cap *= DEFAULT_RESIZE_FACTOR;
+    SoA_Field fields[] = {
+      SoA_push_field(&p.generations, u32),
+      SoA_push_field(&p.data, T),
+    };
+    mem_realloc_soa(p.alloc, cap_old, p.cap, ArraySlice(fields));
+    p.head = cap_old;
+    for (i32 i = cap_old; i < p.cap - 1; ++i) {
+      *(u32*)&p.data[i] = i + 1;
     }
-    MemZeroArray(generations, cap);
-#else
-    head = 0;
-    Loop (i, cap-1) {
-      *(u32*)&data[i] = i+1;
+    *(u32*)&p.data[p.cap - 1] = U32_MAX;
+    MemZeroArray(p.generations + cap_old, p.cap - cap_old);
+  } else {
+    p.cap = DEFAULT_CAPACITY;
+    SoA_Field fields[] = {
+      SoA_push_field(&p.generations, u32),
+      SoA_push_field(&p.data, T),
+    };
+    mem_alloc_soa(p.alloc, p.cap, ArraySlice(fields));
+    Loop(i, p.cap - 1) {
+      *(u32*)&p.data[i] = i + 1;
     }
-#endif
+    *(u32*)&p.data[p.cap - 1] = U32_MAX;
+    MemZeroArray(p.generations, p.cap);
   }
-};
-
-////////////////////////////////////////////////////////////////////////
-// Ring buffer
-
-// template<typename T, i32 N>
-// struct ObjectRingBuffer {
-//   static constexpr i32 size = N;
-//   u64 write_pos;
-//   u64 read_pos;
-//   T data[size];
-//   void write(T src) {
-//     Assert(src_size <= (ring.size - (ring.write_pos - ring.read_pos)));
-//     u64 offset = ModPow2(ring.write_pos, ring.size);
-//     u64 first = Min(ring.size - offset, src_size);
-//     u64 second = src_size - first;
-//     MemCopy(ring.base + offset, src, first);
-//     if (second) {
-//       MemCopy(ring.base, Offset(src, first), second);
-//     }
-//     ring.write_pos += src_size;
-//   }
-//   void read(void *dst, u64 dst_size) {
-//     Assert(dst_size <= (ring.write_pos - ring.read_pos));
-//     u64 offset = ModPow2(ring.read_pos, ring.size);
-//     u64 first = Min(ring.size - offset, dst_size);
-//     u64 second = dst_size - first;
-//     MemCopy(dst, ring.base+offset, first);
-//     if (second) {
-//       MemCopy(Offset(dst, first), ring.base, second);
-//     }
-//     ring.read_pos += dst_size;
-//   }
-// };
+#else
+  if (p.data) {
+    u32 cap_old = p.cap;
+    p.cap *= DEFAULT_RESIZE_FACTOR;
+    p.data = mem_realloc_array(p.alloc, p.data, cap_old, p.cap);
+    p.head = cap_old;
+    for (i32 i = cap_old; i < p.cap - 1; ++i) {
+      *(u32*)&p.data[i] = i + 1;
+    }
+    *(u32*)&p.data[p.cap - 1] = U32_MAX;
+  } else {
+    p.cap = DEFAULT_CAPACITY;
+    p.data = push_array(p.alloc, T, p.cap);
+    Loop(i, p.cap - 1) {
+      *(u32*)&p.data[i] = i + 1;
+    }
+    *(u32*)&p.data[p.cap - 1] = U32_MAX;
+  }
+#endif
+}
+template<typename T> u32 object_pool_alloc(ObjectPool<T>& p) {
+  u32 head_idx = id_idx(p.head);
+  if (head_idx >= p.cap) {
+    object_pool_grow(p);
+  }
+  u32 result = p.head;
+  u32 idx = id_idx(result);
+  p.head = *(u32*)&p.data[idx];
+  return result;
+}
+template<typename T> u32 object_pool_alloc(ObjectPool<T>& p, T a) {
+  u32 h = object_pool_alloc(p);
+  object_pool_get(p, h) = a;
+  return h;
+}
+template<typename T> void object_pool_free(ObjectPool<T>& p, u32 h) {
+#if BUILD_DEBUG
+  u32 idx = id_idx(h);
+  Assert(p.generations[idx]++ == id_generation(h));
+  *(u32*)&p.data[idx] = p.head;
+  p.head = id_make(p.generations[idx], idx);
+#else
+  u32 idx = h;
+  *(u32*)&p.data[idx] = p.head;
+  p.head = h;
+#endif
+}
+template<typename T> u32 object_pool_clear(ObjectPool<T>& p) {
+#if BUILD_DEBUG
+  p.head = 0;
+  Loop (i, p.cap - 1) {
+    *(u32*)&p.data[i] = i + 1;
+  }
+  *(u32*)&p.data[p.cap - 1] = U32_MAX;
+  MemZeroArray(p.generations, p.cap);
+#else
+  p.head = 0;
+  Loop (i, p.cap - 1) {
+    *(u32*)&p.data[i] = i + 1;
+  }
+  *(u32*)&p.data[p.cap - 1] = U32_MAX;
+#endif
+}
 
 ////////////////////////////////////////////////////////////////////////
 // SparseSet
 
-template <typename T>
-struct SparseSet {
-  u32 count;
-  u32 cap;
-  u32 sparse_count;
-  Allocator alloc;
-  u32* sparse;
-  u32* dense;
-  T* data;
-  SparseSet() = default;
-  SparseSet(Allocator alloc_) { *this = {}; alloc = alloc_; }
-  void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
-  void deinit() { if (data) { mem_free(alloc, sparse); mem_free(alloc, dense); }; }
-  T* begin() { return data; }
-  T* end()   { return data + count; }
-  T& get(u32 handle) {
-    Assert(handle < cap);
-    DebugDo(Assert(sparse[handle] != INVALID_ID));
-    u32 idx = sparse[handle];
-    return data[idx];
-  }
-  void add(u32 handle) {
-    if (count >= cap) {
-      grow();
-    }
-    if (handle >= sparse_count) {
-      grow_max_index(handle);
-    }
-    sparse[handle] = count;
-    dense[count] = handle;
-    ++count;
-  }
-  void add(u32 handle, T element) {
-    if (count >= cap) {
-      grow();
-    }
-    if (handle >= sparse_count) {
-      grow_max_index(handle);
-    }
-    sparse[handle] = count;
-    dense[count] = handle;
-    data[count] = element;
-    ++count;
-  }
-  void remove(u32 handle) {
-    DebugDo(Assert(sparse[handle] != INVALID_ID));
-    u32 idx_removed = sparse[handle];
-    u32 idx_last = count - 1;
-    data[idx_removed] = data[idx_last];
-    u32 last_entity = dense[idx_last];
-    sparse[last_entity] = idx_removed;
-    dense[idx_removed] = last_entity;
-    --count;
-    DebugDo(sparse[handle] = INVALID_ID);
-  }
-  void grow() {
-    if (data) {
-      u32 cap_old = cap;
-      cap *= DEFAULT_RESIZE_FACTOR;
-      SoA_Field fields[] = {
-        SoA_push_field(&dense, u32),
-        SoA_push_field(&data, T),
-      };
-      mem_realloc_soa(alloc, cap_old, cap, ArraySlice(fields));
-    }
-    else {
-      cap = DEFAULT_CAPACITY;
-      SoA_Field fields[] = {
-        SoA_push_field(&dense, u32),
-        SoA_push_field(&data, T),
-      };
-      mem_alloc_soa(alloc, cap, ArraySlice(fields));
-      sparse = push_array(alloc, u32, cap);
-    }
-  }
-  void grow_max_index(u32 handle) {
-    u32 modifier = CeilIntDiv(handle+1, sparse_count); // +1 since hanlde is idx in array
-    u32 old_count = sparse_count;
-    sparse_count *= modifier;
-    sparse = mem_realloc_array(alloc, sparse, old_count, sparse_count);
-  }
-};
+// template <typename T>
+// struct SparseSet {
+//   u32 count;
+//   u32 cap;
+//   u32 sparse_count;
+//   Allocator alloc;
+//   u32* sparse;
+//   u32* dense;
+//   T* data;
+//   SparseSet() = default;
+//   SparseSet(Allocator alloc_) { *this = {}; alloc = alloc_; }
+//   void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
+//   void deinit() { if (data) { mem_free(alloc, sparse); mem_free(alloc, dense); }; }
+//   T* begin() { return data; }
+//   T* end()   { return data + count; }
+//   T& get(u32 handle) {
+//     Assert(handle < cap);
+//     DebugDo(Assert(sparse[handle] != INVALID_ID));
+//     u32 idx = sparse[handle];
+//     return data[idx];
+//   }
+//   void add(u32 handle) {
+//     if (count >= cap) {
+//       grow();
+//     }
+//     if (handle >= sparse_count) {
+//       grow_max_index(handle);
+//     }
+//     sparse[handle] = count;
+//     dense[count] = handle;
+//     ++count;
+//   }
+//   void add(u32 handle, T element) {
+//     if (count >= cap) {
+//       grow();
+//     }
+//     if (handle >= sparse_count) {
+//       grow_max_index(handle);
+//     }
+//     sparse[handle] = count;
+//     dense[count] = handle;
+//     data[count] = element;
+//     ++count;
+//   }
+//   void remove(u32 handle) {
+//     DebugDo(Assert(sparse[handle] != INVALID_ID));
+//     u32 idx_removed = sparse[handle];
+//     u32 idx_last = count - 1;
+//     data[idx_removed] = data[idx_last];
+//     u32 last_entity = dense[idx_last];
+//     sparse[last_entity] = idx_removed;
+//     dense[idx_removed] = last_entity;
+//     --count;
+//     DebugDo(sparse[handle] = INVALID_ID);
+//   }
+//   void grow() {
+//     if (data) {
+//       u32 cap_old = cap;
+//       cap *= DEFAULT_RESIZE_FACTOR;
+//       SoA_Field fields[] = {
+//         SoA_push_field(&dense, u32),
+//         SoA_push_field(&data, T),
+//       };
+//       mem_realloc_soa(alloc, cap_old, cap, ArraySlice(fields));
+//     }
+//     else {
+//       cap = DEFAULT_CAPACITY;
+//       SoA_Field fields[] = {
+//         SoA_push_field(&dense, u32),
+//         SoA_push_field(&data, T),
+//       };
+//       mem_alloc_soa(alloc, cap, ArraySlice(fields));
+//       sparse = push_array(alloc, u32, cap);
+//     }
+//   }
+//   void grow_max_index(u32 handle) {
+//     u32 modifier = CeilIntDiv(handle+1, sparse_count); // +1 since hanlde is idx in array
+//     u32 old_count = sparse_count;
+//     sparse_count *= modifier;
+//     sparse = mem_realloc_array(alloc, sparse, old_count, sparse_count);
+//   }
+// };
 
-// it returns stable indexes and iterate through them
-struct SparseSetIndex {
-  u32 count;
-  u32 cap;
-  u32 sparse_count;
-  Allocator alloc;
-  u32* sparse;
-  u32* dense;
-  SparseSetIndex() = default;
-  SparseSetIndex(Allocator alloc_);
-  void init(Allocator alloc_);
-  void deinit();
-  u32* begin();
-  u32* end();
-  void add(u32 id);
-  void remove(u32 id);
-  void grow();
-  void grow_max_index(u32 id);
-};
+// // it returns stable indexes and iterate through them
+// struct SparseSetIndex {
+//   u32 count;
+//   u32 cap;
+//   u32 sparse_count;
+//   Allocator alloc;
+//   u32* sparse;
+//   u32* dense;
+//   SparseSetIndex() = default;
+//   SparseSetIndex(Allocator alloc_);
+//   void init(Allocator alloc_);
+//   void deinit();
+//   u32* begin();
+//   u32* end();
+//   void add(u32 id);
+//   void remove(u32 id);
+//   void grow();
+//   void grow_max_index(u32 id);
+// };
 
-struct DarrayIndexHandler {
-  u32 count;
-  u32 cap;
-  Allocator alloc;
-  u32* sparse;
-  u32* dense;
-  u32* begin();
-  u32* end();
-  DarrayIndexHandler() = default;
-  DarrayIndexHandler(Allocator alloc_);
-  void init(Allocator alloc_);
-  void deinit();
-  u32 add();
-  void remove(u32 id);
-  void grow();
-};
+// struct DarrayIndexHandler {
+//   u32 count;
+//   u32 cap;
+//   Allocator alloc;
+//   u32* sparse;
+//   u32* dense;
+//   u32* begin();
+//   u32* end();
+//   DarrayIndexHandler() = default;
+//   DarrayIndexHandler(Allocator alloc_);
+//   void init(Allocator alloc_);
+//   void deinit();
+//   u32 add();
+//   void remove(u32 id);
+//   void grow();
+// };
 
 ////////////////////////////////////////////////////////////////////////
 // IdPool
@@ -836,17 +630,16 @@ struct IdPool {
   u32 count;
   u32 cap;
   u32* ids;
-  Allocator allocator;
+  Allocator alloc;
 #if BUILD_DEBUG
   u32* generations;
 #endif
-  IdPool() = default;
-  IdPool(Allocator alloc);
-  void init(Allocator alloc);
-  void clear();
-  u32 alloc();
-  void free(u32 id);
 };
+
+IdPool id_pool_make(Allocator alloc);
+u32 id_pool_alloc(IdPool& p);
+void id_pool_free(IdPool& p, u32 h);
+void id_pool_clear(IdPool& p);
 
 struct StaticIdPool {
   u32 count;
@@ -855,11 +648,12 @@ struct StaticIdPool {
 #if BUILD_DEBUG
   u32* generations;
 #endif
-  void init(Allocator alloc, u32 cap_);
-  void clear();
-  u32 alloc();
-  void free(u32 id);
 };
+
+StaticIdPool static_id_pool_make(Allocator alloc, u32 cap);
+u32 static_id_pool_alloc(StaticIdPool& p);
+void static_id_pool_free(StaticIdPool& p, u32 h);
+void static_id_pool_clear(StaticIdPool& p);
 
 ////////////////////////////////////////////////////////////////////////
 // Hashmap
@@ -879,202 +673,290 @@ struct Map {
   T* data;
   Key* keys;
   MapSlot* is_occupied;
-  Map() = default;
-  Map(Allocator alloc_) { init(alloc_); }
-  void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
-  T* add(Key key, T val) {
-    if (count >= cap*LF) { grow(); }
-    u64 hash_idx = hash(key);
-    u64 idx = ModPow2(hash_idx, cap);
-    while (is_occupied[idx] == MapSlot_Occupied) {
-      Assert(!equal(keys[idx], key));
-      idx = ModPow2(idx + 1, cap);
-    }
-    keys[idx] = key;
-    data[idx] = val;
-    is_occupied[idx] = MapSlot_Occupied;
-    ++count;
-    return &data[idx];
-  }
-  T* get(Key key) {
-    if (count >= cap*LF) { grow(); }
-    u64 hash_idx = hash(key);
-    u64 idx = ModPow2(hash_idx, cap);
-    Loop (i, cap) {
-      if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx], key))) {
-        return &data[idx];
-      } 
-      else if (is_occupied[idx] == MapSlot_Empty) {
-        break;
-      }
-      idx = ModPow2(idx + 1, cap);
-    }
-    return null;
-  }
-  T* get_or_add(Key key, T val) {
-    if (count >= cap*LF) { grow(); }
-    u64 hash_idx = hash(key);
-    u64 idx = ModPow2(hash_idx, cap);
-    Loop (i, cap) {
-      if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx], key))) {
-        return &data[idx];
-      } 
-      else if (is_occupied[idx] == MapSlot_Empty) {
-        break;
-      }
-      idx = ModPow2(idx + 1, cap);
-    }
-    keys[idx] = key;
-    data[idx] = val;
-    is_occupied[idx] = MapSlot_Occupied;
-    ++count;
-    return &data[idx];
-  }
-  T* get_or_add_was(Key key, T val, b32* out_was_added) {
-    if (count >= cap*LF) { grow(); }
-    u64 hash_idx = hash(key);
-    u64 idx = ModPow2(hash_idx, cap);
-    Loop (i, cap) {
-      if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx], key))) {
-        return &data[idx];
-      } 
-      else if (is_occupied[idx] == MapSlot_Empty) {
-        break;
-      }
-      idx = ModPow2(idx + 1, cap);
-    }
-    keys[idx] = key;
-    data[idx] = val;
-    is_occupied[idx] = MapSlot_Occupied;
-    ++count;
-    *out_was_added = true;
-    return &data[idx];
-  }
-  T* exists_or_add(Key key, T val, b32* exists) {
-    if (count >= cap*LF) { grow(); }
-    u64 hash_idx = hash(key);
-    u64 idx = ModPow2(hash_idx, cap);
-    Loop (i, cap) {
-      if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx], key))) {
-        *exists = true;
-        return &data[idx];
-      } 
-      else if (is_occupied[idx] == MapSlot_Empty) {
-        break;
-      }
-      idx = ModPow2(idx + 1, cap);
-    }
-    keys[idx] = key;
-    data[idx] = val;
-    is_occupied[idx] = MapSlot_Occupied;
-    ++count;
-    return &data[idx];
-  }
-  void remove(Key key) {
-    u64 hash_idx = hash(key);
-    u64 idx = ModPow2(hash_idx, cap);
-    while (is_occupied[idx] != MapSlot_Empty) {
-      if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx] == key))) {
-        is_occupied[idx] = MapSlot_Deleted;
-        --count;
-        return;
-      }
-      idx = ModPow2(idx + 1, cap);
-    }
-  }
-  void clear() {
-    MemZeroArray(data, cap);
-    MemZeroArray(keys, cap);
-    MemZeroArray(is_occupied, cap);
-  }
-  void grow() {
-    if (data) {
-      T* old_data = data;
-      Key* old_keys = keys;
-      MapSlot* old_is_occupied = is_occupied;
-      u32 old_cap = cap;
-      cap *= DEFAULT_RESIZE_FACTOR;
-      SoA_Field fields[] = {
-        SoA_push_field(&data, T),
-        SoA_push_field(&keys, Key),
-        SoA_push_field(&is_occupied, MapSlot),
-      };
-      mem_alloc_soa(alloc, cap, ArraySlice(fields));
-      Loop (i, old_cap) {
-        if (old_is_occupied[i] == MapSlot_Occupied) {
-          add(old_keys[i], old_data[i]);
-        }
-      }
-      mem_free(alloc, old_data);
-    }
-    else {
-      cap = DEFAULT_CAPACITY;
-      SoA_Field fields[] = {
-        SoA_push_field(&data, T),
-        SoA_push_field(&keys, Key),
-        SoA_push_field(&is_occupied, MapSlot),
-      };
-      mem_alloc_soa(alloc, cap, ArraySlice(fields));
-    }
-  }
+  // Map() = default;
+  // Map(Allocator alloc_) { init(alloc_); }
+  // void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
+  // T* set(Key key, T val) {
+  //   if (count >= cap*LF) { grow(); }
+  //   u64 hash_idx = hash(key);
+  //   u64 idx = ModPow2(hash_idx, cap);
+  //   while (is_occupied[idx] == MapSlot_Occupied) {
+  //     if (equal(keys[idx], key)) break;
+  //     idx = ModPow2(idx + 1, cap);
+  //   }
+  //   keys[idx] = key;
+  //   data[idx] = val;
+  //   is_occupied[idx] = MapSlot_Occupied;
+  //   ++count;
+  //   return &data[idx];
+  // }
+  // T* get(Key key) {
+  //   if (count >= cap*LF) { grow(); }
+  //   u64 hash_idx = hash(key);
+  //   u64 idx = ModPow2(hash_idx, cap);
+  //   Loop (i, cap) {
+  //     if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx], key))) {
+  //       return &data[idx];
+  //     } 
+  //     else if (is_occupied[idx] == MapSlot_Empty) {
+  //       break;
+  //     }
+  //     idx = ModPow2(idx + 1, cap);
+  //   }
+  //   return null;
+  // }
+  // T* get_or_add(Key key, T val) {
+  //   if (count >= cap*LF) { grow(); }
+  //   u64 hash_idx = hash(key);
+  //   u64 idx = ModPow2(hash_idx, cap);
+  //   Loop (i, cap) {
+  //     if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx], key))) {
+  //       return &data[idx];
+  //     } 
+  //     else if (is_occupied[idx] == MapSlot_Empty) {
+  //       break;
+  //     }
+  //     idx = ModPow2(idx + 1, cap);
+  //   }
+  //   keys[idx] = key;
+  //   data[idx] = val;
+  //   is_occupied[idx] = MapSlot_Occupied;
+  //   ++count;
+  //   return &data[idx];
+  // }
+  // T* get_or_add_was(Key key, T val, b32* out_was_added) {
+  //   if (count >= cap*LF) { grow(); }
+  //   u64 hash_idx = hash(key);
+  //   u64 idx = ModPow2(hash_idx, cap);
+  //   Loop (i, cap) {
+  //     if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx], key))) {
+  //       return &data[idx];
+  //     } 
+  //     else if (is_occupied[idx] == MapSlot_Empty) {
+  //       break;
+  //     }
+  //     idx = ModPow2(idx + 1, cap);
+  //   }
+  //   keys[idx] = key;
+  //   data[idx] = val;
+  //   is_occupied[idx] = MapSlot_Occupied;
+  //   ++count;
+  //   *out_was_added = true;
+  //   return &data[idx];
+  // }
+  // T* exists_or_add(Key key, T val, b32* exists) {
+  //   if (count >= cap*LF) { grow(); }
+  //   u64 hash_idx = hash(key);
+  //   u64 idx = ModPow2(hash_idx, cap);
+  //   Loop (i, cap) {
+  //     if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx], key))) {
+  //       *exists = true;
+  //       return &data[idx];
+  //     } 
+  //     else if (is_occupied[idx] == MapSlot_Empty) {
+  //       break;
+  //     }
+  //     idx = ModPow2(idx + 1, cap);
+  //   }
+  //   keys[idx] = key;
+  //   data[idx] = val;
+  //   is_occupied[idx] = MapSlot_Occupied;
+  //   ++count;
+  //   return &data[idx];
+  // }
+  // void remove(Key key) {
+  //   u64 hash_idx = hash(key);
+  //   u64 idx = ModPow2(hash_idx, cap);
+  //   while (is_occupied[idx] != MapSlot_Empty) {
+  //     if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx] == key))) {
+  //       is_occupied[idx] = MapSlot_Deleted;
+  //       --count;
+  //       return;
+  //     }
+  //     idx = ModPow2(idx + 1, cap);
+  //   }
+  // }
+  // void clear() {
+  //   count = 0;
+  //   MemZeroArray(data, cap);
+  //   MemZeroArray(keys, cap);
+  //   MemZeroArray(is_occupied, cap);
+  // }
+  // void grow() {
+  //   if (data) {
+  //     T* old_data = data;
+  //     Key* old_keys = keys;
+  //     MapSlot* old_is_occupied = is_occupied;
+  //     u32 old_cap = cap;
+  //     cap *= DEFAULT_RESIZE_FACTOR;
+  //     SoA_Field fields[] = {
+  //       SoA_push_field(&data, T),
+  //       SoA_push_field(&keys, Key),
+  //       SoA_push_field(&is_occupied, MapSlot),
+  //     };
+  //     mem_alloc_soa(alloc, cap, ArraySlice(fields));
+  //     Loop (i, old_cap) {
+  //       if (old_is_occupied[i] == MapSlot_Occupied) {
+  //         set(old_keys[i], old_data[i]);
+  //       }
+  //     }
+  //     mem_free(alloc, old_data);
+  //   }
+  //   else {
+  //     cap = DEFAULT_CAPACITY;
+  //     SoA_Field fields[] = {
+  //       SoA_push_field(&data, T),
+  //       SoA_push_field(&keys, Key),
+  //       SoA_push_field(&is_occupied, MapSlot),
+  //     };
+  //     mem_alloc_soa(alloc, cap, ArraySlice(fields));
+  //   }
+  // }
 };
 
-template<typename T>
-struct HashedStrMap {
-  u32 cap;
-  T* data;
-#if BUILD_DEBUG
-  String* strs;
-  MapSlot* is_occupied;
-#endif
-  void init(Allocator alloc, u32 size) {
-#if BUILD_DEBUG
-    cap = size;
-    data = push_array(alloc, T, size);
-    strs = push_array(alloc, String, size);
-    is_occupied = push_array(alloc, MapSlot, size);
-#else
-    cap = size;
-    data = push_array(alloc, T, size);
-#endif
+template<typename Key, typename T> Map<Key, T> map_make(Allocator alloc) {
+  Map<Key, T> res = {
+    .alloc = alloc,
+  };
+  return res;
+}
+template<typename Key, typename T> void map_grow(Map<Key, T>& m) {
+  if (m.data) {
+    T* old_data = m.data;
+    Key* old_keys = m.keys;
+    MapSlot* old_is_occupied = m.is_occupied;
+    u32 old_cap = m.cap;
+    m.cap *= DEFAULT_RESIZE_FACTOR;
+    SoA_Field fields[] = {
+      SoA_push_field(&m.data, T),
+      SoA_push_field(&m.keys, Key),
+      SoA_push_field(&m.is_occupied, MapSlot),
+    };
+    mem_alloc_soa(m.alloc, m.cap, ArraySlice(fields));
+    Loop (i, old_cap) {
+      if (old_is_occupied[i] == MapSlot_Occupied) {
+        map_set(m, old_keys[i], old_data[i]);
+      }
+    }
+    mem_free(m.alloc, old_data);
   }
-  void add(u64 key, T val, String str = {}) {
-#if BUILD_DEBUG
-    u64 idx = ModPow2(key, cap);
-    Assert(is_occupied[idx] != MapSlot_Occupied);
-    strs[idx] = str;
-    data[idx] = val;
-    is_occupied[idx] = MapSlot_Occupied;
-#else
-    u64 index = ModPow2(key, cap);
-    data[index] = val;
-#endif
+  else {
+    m.cap = DEFAULT_CAPACITY;
+    SoA_Field fields[] = {
+      SoA_push_field(&m.data, T),
+      SoA_push_field(&m.keys, Key),
+      SoA_push_field(&m.is_occupied, MapSlot),
+    };
+    mem_alloc_soa(m.alloc, m.cap, ArraySlice(fields));
   }
-  T* get(u64 key) {
-#if BUILD_DEBUG
-    u64 idx = ModPow2(key, cap);
-    Assert(is_occupied[idx] == MapSlot_Occupied);
-    return &data[idx];
-#else
-    u64 idx = ModPow2(key, cap);
-    return &data[idx];
-#endif
+}
+template<typename Key, typename T> T* map_set(Map<Key, T>& m, Key key, T val) {
+  if (m.count >= m.cap*m.LF) { map_grow(m); }
+  u64 hash_idx = hash(key);
+  u64 idx = ModPow2(hash_idx, m.cap);
+  while (m.is_occupied[idx] == MapSlot_Occupied) {
+    if (equal(m.keys[idx], key)) break;
+    idx = ModPow2(idx + 1, m.cap);
   }
-  String get_str(u64 key) {
-#if BUILD_DEBUG
-    u64 idx = ModPow2(key, cap);
-    Assert(is_occupied[idx] == MapSlot_Occupied);
-    return strs[idx];
-#else
-    return {};
-#endif
+  m.keys[idx] = key;
+  m.data[idx] = val;
+  m.is_occupied[idx] = MapSlot_Occupied;
+  ++m.count;
+  return &m.data[idx];
+}
+template<typename Key, typename T> T* map_get(Map<Key, T>& m, Key key) {
+  if (!m.data) return null;
+  u64 hash_idx = hash(key);
+  u64 idx = ModPow2(hash_idx, m.cap);
+  Loop (i, m.cap) {
+    if ((m.is_occupied[idx] == MapSlot_Occupied) && (equal(m.keys[idx], key))) {
+      return &m.data[idx];
+    } 
+    else if (m.is_occupied[idx] == MapSlot_Empty) {
+      break;
+    }
+    idx = ModPow2(idx + 1, m.cap);
   }
-};
+  return null;
+}
+template<typename Key, typename T> T* map_remove(Map<Key, T>& m, Key key) {
+  u64 hash_idx = hash(key);
+  u64 idx = ModPow2(hash_idx, m.cap);
+  while (m.is_occupied[idx] != MapSlot_Empty) {
+    if ((m.is_occupied[idx] == MapSlot_Occupied) && (equal(m.keys[idx] == key))) {
+      m.is_occupied[idx] = MapSlot_Deleted;
+      --m.count;
+      return;
+    }
+    idx = ModPow2(idx + 1, m.cap);
+  }
+}
+template<typename Key, typename T> T* map_clear(Map<Key, T>& m, Key key) {
+  m.count = 0;
+  MemZeroArray(m.data, m.cap);
+  MemZeroArray(m.keys, m.cap);
+  MemZeroArray(m.is_occupied, m.cap);
+}
+
+// template<typename T>
+// struct HashedStrMap {
+//   u32 cap;
+//   T* data;
+// #if BUILD_DEBUG
+//   String* strs;
+//   MapSlot* is_occupied;
+// #endif
+//   void init(Allocator alloc, u32 size) {
+// #if BUILD_DEBUG
+//     cap = size;
+//     data = push_array(alloc, T, size);
+//     strs = push_array(alloc, String, size);
+//     is_occupied = push_array(alloc, MapSlot, size);
+// #else
+//     cap = size;
+//     data = push_array(alloc, T, size);
+// #endif
+//   }
+//   void add(u64 key, T val, String str = {}) {
+// #if BUILD_DEBUG
+//     u64 idx = ModPow2(key, cap);
+//     Assert(is_occupied[idx] != MapSlot_Occupied);
+//     strs[idx] = str;
+//     data[idx] = val;
+//     is_occupied[idx] = MapSlot_Occupied;
+// #else
+//     u64 index = ModPow2(key, cap);
+//     data[index] = val;
+// #endif
+//   }
+//   T* get(u64 key) {
+// #if BUILD_DEBUG
+//     u64 idx = ModPow2(key, cap);
+//     Assert(is_occupied[idx] == MapSlot_Occupied);
+//     return &data[idx];
+// #else
+//     u64 idx = ModPow2(key, cap);
+//     return &data[idx];
+// #endif
+//   }
+//   String get_str(u64 key) {
+// #if BUILD_DEBUG
+//     u64 idx = ModPow2(key, cap);
+//     Assert(is_occupied[idx] == MapSlot_Occupied);
+//     return strs[idx];
+// #else
+//     return {};
+// #endif
+//   }
+// };
 
 ////////////////////////////////////////////////////////////////////////
 // Sort
 
-template<typename T, typename Compare> void sort_insert(Slice<T> slice, Compare cmp) {
+///////////////////////////////////
+// Insert
+
+template<typename T, typename Cmp> void sort_insert(Slice<T> slice, Cmp cmp) {
   for (i32 i = 1; i < slice.count; ++i) {
     T key = slice[i];
     i32 j = i - 1;
@@ -1085,46 +967,70 @@ template<typename T, typename Compare> void sort_insert(Slice<T> slice, Compare 
     slice[j + 1] = key;
   }
 }
-#define sort_insert_l(data, ...) sort_insert(data, [](var a, var b) __VA_ARGS__)
+// #define sort_insert_l(data, ...) sort_insert(data, [](var a, var b) __VA_ARGS__)
 
-template<typename T, typename Compare> Slice<T> sort_list_insert(Allocator arena, T first, Compare cmp) {
+///////////////////////////////////
+// Quick
+
+template<typename T, typename Cmp> i32 lomuto_partition(T* arr, i32 low, i32 high, Cmp cmp) {
+  T pivot = arr[high];
+  i32 i = low;
+  for (i32 j = low; j < high; ++j) {
+    if (cmp(arr[j], pivot)) {
+      Swap(arr[i], arr[j]);
+      i++;
+    }
+  }
+  Swap(arr[i], arr[high]);
+  return i;
+}
+template<typename T, typename Cmp> void _quick_sort(Slice<T> arr, i32 low, i32 high, Cmp cmp) {
+  if (low < high) {
+    i32 p = lomuto_partition(arr.data, low, high, cmp);
+    _quick_sort(arr, low, p - 1, cmp);
+    _quick_sort(arr, p + 1, high, cmp);
+  }
+}
+template<typename T, typename Cmp> void sort_quick(Slice<T> arr, Cmp cmp) { _quick_sort(arr, 0, arr.count-1, cmp); }
+
+///////////////////////////////////
+// Merge
+
+template<typename T, typename Cmp> void _merge(T* arr, T* tmp, u32 left, u32 mid, u32 right, Cmp cmp) {
+  u32 i = left;
+  u32 j = mid + 1;
+  u32 k = left;
+  while (i <= mid && j <= right) {
+    if (arr[i] <= arr[j]) {
+      tmp[k++] = arr[i++];
+    } else {
+      tmp[k++] = arr[j++];
+    }
+  }
+  while (i <= mid) {
+    tmp[k++] = arr[i++];
+  }
+  while (j <= right) {
+    tmp[k++] = arr[j++];
+  }
+  for (u32 x = left; x <= right; ++x) {
+    arr[x] = tmp[x];
+  }
+}
+template<typename T, typename Cmp> void _merge_sort(T* arr, T* tmp, u32 left, u32 right, Cmp cmp) {
+  if (left >= right) return;
+  u32 mid = left + (right - left) / 2;
+  _merge_sort(arr, tmp, left, mid, cmp);
+  _merge_sort(arr, tmp, mid + 1, right, cmp);
+  _merge(arr, tmp, left, mid, right, cmp);
+}
+template<typename T, typename Cmp> void sort_merge(Allocator alloc, Slice<T> arr, Cmp cmp) { Slice tmp = push_slice(alloc, T, arr.count); _merge_sort(arr.data, tmp.data, 0, arr.count-1, cmp); }
+
+template<typename T, typename Cmp> Slice<T> sort_list_insert(Allocator arena, T first, Cmp cmp) {
   var sorted_arr = darray_make<T>(arena);
   for (T it = first; it != 0; it = it->next) {
     darray_add(sorted_arr, it);
   }
   sort_insert(slice(sorted_arr), cmp);
   return slice(sorted_arr);
-}
-
-inline void insert_sort(i32* arr, i32 size) {
-  for (i32 i = 1; i < size; ++i) {
-    i32 key = arr[i];
-    i32 j = i - 1;
-    while (j >= 0 && arr[j] > key) {
-      arr[j + 1] = arr[j];
-      j--;
-    }
-    arr[j + 1] = key;
-  }
-}
-
-inline i32 partition(i32 *arr, i32 low, i32 high) {
-  i32 pivot = arr[high]; // choose last element as pivot
-  i32 i = low;           // place for next smaller element
-  for (i32 j = low; j < high; ++j) {
-    if (arr[j] < pivot) {
-      Swap(arr[i], arr[j]);
-      i++;
-    }
-  }
-  Swap(arr[i], arr[high]); // place pivot in correct position
-  return i;
-}
-
-inline void quick_sort(i32* arr, i32 low, i32 high) {
-  if (low < high) {
-    i32 p = partition(arr, low, high);
-    quick_sort(arr, low, p - 1);
-    quick_sort(arr, p + 1, high);
-  }
 }

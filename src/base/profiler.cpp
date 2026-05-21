@@ -8,7 +8,7 @@ void prof_init(Allocator arena) {
     ProfThread& prof_thread = g.prof_threads[i];
     String str = push_strf(arena, "profiler_st thread %u arena", i);
     prof_thread.arena = arena_make_named(str);
-    prof_thread.gpa = alloc_seg_list_make(prof_thread.arena);
+    prof_thread.gpa = alloc_seglist_make(prof_thread.arena);
     prof_thread.events[0] = darray_make<ProfEvent>(prof_thread.gpa);
     prof_thread.events[1] = darray_make<ProfEvent>(prof_thread.gpa);
     prof_thread.long_anchors = darray_make<ProfAnchor>(prof_thread.gpa);

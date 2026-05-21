@@ -136,12 +136,11 @@ struct ArenaList {
   Allocator alloc;
   ArenaBlock* current;
   ArenaBlock* first;
-  ArenaList() = default;
-  ArenaList(Allocator alloc_);
-  void init(Allocator alloc_);
-  void clear();
   operator Allocator();
 };
+
+ArenaList alloc_arena_list_make(Allocator alloc);
+void alloc_arena_list_clear(ArenaList& arena);
 
 ////////////////////////////////////////////////////////////////////////
 // Segregated pow2 list
@@ -158,7 +157,7 @@ struct AllocSegList {
   operator Allocator();
 };
 
-AllocSegList alloc_seg_list_make(Allocator alloc, String name = {});
+AllocSegList alloc_seglist_make(Allocator alloc, String name = {});
 
 ////////////////////////////////////////////////////////////////////////
 // tlsf TODO: implement
@@ -177,31 +176,33 @@ AllocSegList alloc_seg_list_make(Allocator alloc, String name = {});
 // atlas TODO: implement
 
 ////////////////////////////////////////////////////////////////////////
-// General GPU allocator (segregated pow2)
+// GPU segregated pow2 list
 
-typedef u32 GpuMemHandler;
+typedef u32 GpuMemId;
+
+struct GpuBlockList {
+  u32 next;
+  b32 is_allocated;
+  BufferRegion range;
+};
 
 struct GpuAllocSegList {
   u64 pos;
   u64 cap;
-  Allocator allocator;
-  struct RangeList {
-    u32 next;
-    b32 is_allocated;
-    BufferRegion range;
-  };
-  RangeList* data;
+  Allocator alloc;
+  GpuBlockList* data;
   u32 range_count;
   u32 range_cap;
   u32 heads[32];
-  void init(Allocator alloc_);
-  GpuMemHandler alloc(u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
-  void free(u32 idx);
-  u64 get(u32 idx);
 };
 
+GpuAllocSegList gpu_alloc_seglist_make(Allocator alloc);
+GpuMemId gpu_alloc_seglist_alloc(GpuAllocSegList& a, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
+void gpu_alloc_seglist_free(GpuAllocSegList& a, GpuMemId h);
+u64 gpu_alloc_seglist_get(GpuAllocSegList& a, GpuMemId h);
+
 ////////////////////////////////////////////////////////////////////////
-// Utils
+// Misc
 
 struct SoA_Field {
   void** dst_ptr;

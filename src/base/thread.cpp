@@ -4,16 +4,7 @@
 
 global ThreadPool thread_pool;
 
-void task_queue_init() {
-  ThreadPool& g = thread_pool;
-  TaskQueue& queue = g.queue;
-  queue.mutex = os_mutex_alloc();
-  queue.cond_not_empty = os_cond_var_alloc();
-  queue.cond_not_full = os_cond_var_alloc();
-  queue.finished = os_cond_var_alloc();
-}
-
-void task_queue_push(Task t) {
+void thread_task_push(Task t) {
   // ProfFunc;
   ThreadPool& g = thread_pool;
   TaskQueue& queue = g.queue;
@@ -21,15 +12,16 @@ void task_queue_push(Task t) {
   while (queue.count == MAX_TASKS) {
     os_cond_var_wait(queue.cond_not_full, queue.mutex);
   }
-  queue.tasks[queue.tail] = t;
-  queue.tail = ModPow2(queue.tail + 1, MAX_TASKS);
+  ring_write_struct(queue.ring, &t);
+  // queue.tasks[queue.tail] = t;
+  // queue.tail = ModPow2(queue.tail + 1, MAX_TASKS);
   ++queue.count;
   ++queue.remaining_tasks;
   os_cond_var_signal(queue.cond_not_empty);
   os_mutex_drop(queue.mutex);
 }
 
-Task task_queue_pop() {
+intern Task thread_task_pop() {
   // ProfFunc;
   ThreadPool& g = thread_pool;
   TaskQueue& queue = g.queue;
@@ -43,18 +35,21 @@ Task task_queue_pop() {
   if (queue.count == MAX_TASKS) {
     os_cond_var_signal(queue.cond_not_full);
   }
-  Task t = queue.tasks[queue.head];
-  queue.head = ModPow2(queue.head + 1, MAX_TASKS);
+  // Task t = queue.tasks[queue.head];
+  // queue.head = ModPow2(queue.head + 1, MAX_TASKS);
+
+  Task t = {};
+  ring_read_struct(queue.ring, &t);
   --queue.count;
   os_mutex_drop(queue.mutex);
   return t;
 }
 
-void thread_worker(void* arg) {
+intern void thread_worker(void* arg) {
   TaskQueue& queue = thread_pool.queue;
   tctx_init();
   while (true) {
-    Task t = task_queue_pop();
+    Task t = thread_task_pop();
     ProfBlock("working", ProfType_Worker);
     t.func(t.arg);
     os_mutex_take(queue.mutex);
@@ -69,8 +64,16 @@ void thread_worker(void* arg) {
 void thread_pool_init(u32 num_threads) {
   ProfFunc;
   ThreadPool& g = thread_pool;
+  g.arena = arena_make();
   g.num_threads = num_threads;
-  task_queue_init();
+  TaskQueue& q = g.queue;
+  q.tasks = push_array(g.arena, Task, MAX_TASKS);
+  q.ring.base = (u8*)q.tasks;
+  q.ring.size = MAX_TASKS * sizeof(Task);
+  q.mutex = os_mutex_alloc();
+  q.cond_not_empty = os_cond_var_alloc();
+  q.cond_not_full = os_cond_var_alloc();
+  q.finished = os_cond_var_alloc();
   Loop (i, num_threads) {
     g.threads[i] = os_thread_launch(thread_worker, null);
   }

@@ -9,9 +9,8 @@ struct Task {
 };
 
 struct TaskQueue {
-  Task tasks[MAX_TASKS];
-  u32 head;
-  u32 tail;
+  Task* tasks;
+  RingBuffer ring;
   u32 count;
   u32 remaining_tasks;
   Mutex mutex;
@@ -21,14 +20,12 @@ struct TaskQueue {
 };
 
 struct ThreadPool {
+  Arena arena;
   Thread threads[16];
   u32 num_threads;
   TaskQueue queue;
 };
 
-void task_queue_init();
-void task_queue_push(Task t);
-Task task_queue_pop();
-void thread_worker(void* arg);
+void thread_task_push(Task t);
 void thread_pool_init(u32 num_threads);
 void thread_wait_for();

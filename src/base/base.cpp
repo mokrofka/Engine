@@ -81,7 +81,7 @@ global u64 _cpu_frequency;
 u64 cpu_timer_now() { return __rdtsc(); }
 u64 cpu_frequency() { return _cpu_frequency; }
 
-#include "../os/os_core.h"
+#include "os/os_core.h"
 void estimate_cpu_frequency() {
   u64 os_freq = os_timer_frequency();
   u64 cpu_start = cpu_timer_now();
