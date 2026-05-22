@@ -19,7 +19,6 @@
 // compiling all shaders in compiled dir and check timestamp to recompile on thread
 // metadesk tables?
 // shaders code
-// Remove Handle<>
 
 ////////////////////////////////////////////////////////////////////////
 // @Common
@@ -48,14 +47,14 @@ const v3 ColorGrey  = v3(0.8,0.8,0.8);
 
 const u32 MaxEntities = KB(10);
 const u32 MaxStaticEntities = KB(10);
+// const u32 MaxEntities = KB(200);
+// const u32 MaxStaticEntities = MB(1);
 
-struct Entity;
-struct StaticEntity;
-struct GpuTexture;
-struct GpuMesh;
-struct GpuShader;
-struct GpuMaterial;
-struct GpuCubemap;
+struct GpuTextureH { u32 v; };
+struct GpuMaterialId { u32 v; };
+struct GpuMeshId { u32 v; };
+struct GpuShaderId { u32 v; };
+struct GpuCubemapId { u32 v; };
 
 struct PointLight {
   v3 color;
@@ -138,11 +137,7 @@ struct Material {
   Shader shader;
   MaterialProps props;
   String texture;
-  Handle<GpuTexture> texture_handle;
-  // Handle<GpuTexture> texture;
-  // Handle<GpuTexture> texture1;
-  // Handle<GpuTexture> texture2;
-  // Handle<GpuTexture> texture3;
+  GpuTextureH texture_h;
 };
 
 struct Timer {
@@ -213,7 +208,7 @@ enum TextureId {
   X(Material_Container, .name = "e_texture", .texture = "container.jpg") \
   X(Material_Axis, .name = "e_vert_color", .state.topology = ShaderTopology_Line) \
   X(Material_Line, .name = "e_color", .state.topology = ShaderTopology_Line) \
-  X(Material_Screen, .name = "e_texture", .texture_handle.handle = null, .texture = "") \
+  X(Material_Screen, .name = "e_texture", .texture_handle.v = null, .texture = "") \
 
 enum MaterialId {
 #define X(enum_name, ...) enum_name,
@@ -222,12 +217,12 @@ enum MaterialId {
   Material_COUNT,
 };
 
-Handle<GpuMesh> mesh_get(MeshId id);
-void mesh_set(MeshId id, Handle<GpuMesh> mesh_handle);
-Handle<GpuMaterial> material_get(MaterialId id);
-Handle<GpuMesh> mesh_load(String name);
-Handle<GpuShader> shader_load(Shader shader);
-Handle<GpuCubemap> cubemap_load(String name);
+GpuMeshId mesh_get(MeshId id);
+void mesh_set(MeshId id, GpuMeshId mesh_handle);
+GpuMaterialId material_get(MaterialId id);
+GpuMeshId mesh_load(String name);
+GpuShaderId shader_load(Shader shader);
+GpuCubemapId cubemap_load(String name);
 void assets_load();
 
 ////////////////////////////////////////////////////////////////////////
@@ -435,9 +430,8 @@ struct Entity {
   Rng3 aabb;
 };
 
-template<>
-struct Handle<Entity> {
-  u32 handle;
+struct EntityId {
+  u32 v;
   Transform& trans();
   v3& pos();
   v3& rot();
@@ -445,30 +439,17 @@ struct Handle<Entity> {
   Entity& get();
   Rng3& aabb();
   v3& vel();
-#if BUILD_DEBUG
-  u32 idx() { return handle & INDEX_MASK; }
-  u32 generation() { return handle >> INDEX_BITS; }
-#else
-  u32 idx() { return handle; }
-#endif
 };
 
 struct StaticEntity {
 };
 
-template<>
-struct Handle<StaticEntity> {
-  u32 handle;
+struct StaticEntityId {
+  u32 v;
   Transform& trans();
   v3& pos();
   v3& rot();
   v3& scale();
-#if BUILD_DEBUG
-  u32 idx() { return handle & INDEX_MASK; }
-  u32 generation() { return handle >> INDEX_BITS; }
-#else
-  u32 idx() { return handle; }
-#endif
 };
 
 struct GameState {
@@ -489,16 +470,17 @@ struct GameState {
   StaticIdPool entity_id_pool;
   StaticIdPool static_entity_id_pool;
 
-  Darray<Handle<Entity>> moving_cubes;
+  Darray<EntityId> moving_cubes;
 
-  Handle<Entity> axis_attached_to_cam;
-  Handle<Entity> grid;
-  Handle<Entity> monkey;
-  Handle<Entity> rotating_cube;
-  Handle<Entity> sphere;
+  EntityId axis_attached_to_cam;
+  EntityId grid;
+  EntityId monkey;
+  EntityId rotating_cube;
+  EntityId sphere;
 
-  Handle<Entity> cube0;
-  Handle<Entity> cube1;
+  EntityId cube0;
+  EntityId cube1;
+  EntityId target;
 };  
 
 void game_init();
@@ -514,18 +496,18 @@ struct GlobalState {
   Transform* transforms;
   Transform* static_transforms;
 
-  Handle<GpuMesh> meshes_handlers[Mesh_COUNT];
-  Handle<GpuTexture> textures_handlers[Texture_COUNT];
-  Handle<GpuMaterial> materials_handlers[Material_COUNT];
+  GpuMeshId meshes_handlers[Mesh_COUNT];
+  GpuTextureH textures_handlers[Texture_COUNT];
+  GpuMaterialId materials_handlers[Material_COUNT];
 
   String asset_path;
   String shader_dir;
   String shader_compiled_dir;
   String models_dir;
   String textures_dir;
-  Map<String, Handle<GpuTexture>> str_to_texture;
-  Map<String, Handle<GpuMesh>> str_to_mesh;
-  Map<String, Handle<GpuMaterial>> str_to_material;
+  Map<String, GpuTextureH> str_to_texture;
+  Map<String, GpuMeshId> str_to_mesh;
+  Map<String, GpuMaterialId> str_to_material;
 
   ThreadPool thread_pool;
   WatchState watch;

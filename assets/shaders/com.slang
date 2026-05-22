@@ -29,6 +29,8 @@ mat4 operator*(mat4 a, mat4 b) { return mul(a, b); }
 
 global const u32 MaxEntities = KB(10);
 global const u32 MaxStaticEntities = KB(10);
+// global const u32 MaxEntities = KB(200);
+// global const u32 MaxStaticEntities = MB(1);
 global const u32 MaxMaterials = KB(1);
 global const u32 MaxLights = KB(1);
 

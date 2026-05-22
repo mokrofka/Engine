@@ -1,6 +1,6 @@
 #include "lib.h"
-// #undef Info
-// #define Info(...)
+#undef Info
+#define Info(...)
 
 i32 main(i32 args_count, char* args[]) {
   os_init(args[0]);
@@ -83,7 +83,7 @@ i32 main(i32 args_count, char* args[]) {
 
   Loop (i, compiled_shaders.count) {
     Shader& x = compiled_shaders[i];
-    Info("%s", x.shader_path);
+    Debug("%s", x.shader_path);
     StringList list = {};
     str_list_pushf(scratch, &list, "slangc");
     str_list_pushf(scratch, &list, x.shader_path);

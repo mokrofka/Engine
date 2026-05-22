@@ -123,29 +123,27 @@ struct VK_Pipeline {
   u32 batch_idx;
 };
 
-template<typename T>
 struct VK_MeshBatch {
-  Handle<GpuMesh> mesh_handle;
-  Darray<Handle<T>> entities;
+  GpuMeshId mesh_id;
+  Darray<u32> entities;
 };
 
-template<typename T>
 struct VK_ShaderBatch {
-  Darray<VK_MeshBatch<T>> mesh_batches;
+  Darray<VK_MeshBatch> mesh_batches;
   Map<u32, u32> mesh_to_batch;
 };
 
 struct VK_RenderBatch {
-  VK_ShaderBatch<Entity> batch;
-  VK_ShaderBatch<Entity> batch_indexed;
-  VK_ShaderBatch<StaticEntity> static_batch;
-  VK_ShaderBatch<StaticEntity> static_batch_indexed;
+  VK_ShaderBatch batch;
+  VK_ShaderBatch batch_indexed;
+  VK_ShaderBatch static_batch;
+  VK_ShaderBatch static_batch_indexed;
 };
 
 struct VK_RenderEntity {
   u32 entity_idx_in_array;
   u32 pipeline;
-  Handle<GpuMesh> mesh;
+  GpuMeshId mesh_id;
 #if BUILD_DEBUG
   b32 is_init;
 #endif
@@ -480,18 +478,16 @@ v4& get_pos() { return vk->gpu_global_shader_st->ambient_color; }
 mat4& get_mat() { return vk->gpu_global_shader_st->mat; }
 v4& get_matrix() { return vk->gpu_global_shader_st->ambient_color; }
 
-template<typename T>
-VK_MeshBatch<T> vk_mesh_batch_make(Allocator alloc) {
-  VK_MeshBatch<T> res = {
-    .entities = darray_make<Handle<T>>(alloc),
+VK_MeshBatch vk_mesh_batch_make(Allocator alloc) {
+  VK_MeshBatch res = {
+    .entities = darray_make<u32>(alloc),
   };
   return res;
 }
 
-template<typename T>
-VK_ShaderBatch<T> vk_shader_batch_make(Allocator alloc) {
-  VK_ShaderBatch<T> res = {
-    .mesh_batches = darray_make<VK_MeshBatch<T>>(alloc),
+VK_ShaderBatch vk_shader_batch_make(Allocator alloc) {
+  VK_ShaderBatch res = {
+    .mesh_batches = darray_make<VK_MeshBatch>(alloc),
     .mesh_to_batch = map_make<u32, u32>(alloc),
   };
   return res;
@@ -499,10 +495,10 @@ VK_ShaderBatch<T> vk_shader_batch_make(Allocator alloc) {
 
 VK_RenderBatch vk_render_batch_make(Allocator alloc) {
   VK_RenderBatch res = {
-    .batch = vk_shader_batch_make<Entity>(alloc),
-    .batch_indexed = vk_shader_batch_make<Entity>(alloc),
-    .static_batch = vk_shader_batch_make<StaticEntity>(alloc),
-    .static_batch_indexed = vk_shader_batch_make<StaticEntity>(alloc),
+    .batch = vk_shader_batch_make(alloc),
+    .batch_indexed = vk_shader_batch_make(alloc),
+    .static_batch = vk_shader_batch_make(alloc),
+    .static_batch_indexed = vk_shader_batch_make(alloc),
   };
   return res;
 }
@@ -1104,12 +1100,16 @@ u32 vk_shader_pipeline_alloc(Shader shader) {
   return vk_shader_pipeline_alloc(shader.name, shader.state);
 }
 
-void vk_compile_and_load_shaders() {
+void foo() {
+  
+}
+
+void vk_shader_compile_and_load_modules() {
   Scratch scratch;
   String cur_dir = os_get_current_directory();
   String shader_dir = g_st->shader_dir;
   String compiled_shader_dir = g_st->shader_compiled_dir;
-  String saved_time_stamps = push_strf(scratch, "%s/%s", cur_dir, "saved_time_stamps_for_shaders");
+  String saved_time_stamps = push_strf(scratch, "%s/%s", cur_dir, String("saved_time_stamps_for_shad"));
 
   if (!os_directory_path_exist(shader_dir)) {
     os_directory_create_p(shader_dir);
@@ -1163,9 +1163,7 @@ void vk_compile_and_load_shaders() {
   // Which files recompile
   {
     OS_FileIter* it = os_file_iter_begin(scratch, shader_dir, OS_FileIterFlag_SkipFolders);
-    Info("files:");
     for (OS_FileInfo info = {}; os_file_iter_next(scratch, it, &info);) {
-      Info("%s", info.name);
       String file_path = push_strf(scratch, "%s/%s", shader_dir, info.name);
       String shader_name = str_chop_last_dot(info.name);
       String compiled_file_path = push_strf(scratch, "%s/%s.spv", compiled_shader_dir, shader_name);
@@ -1214,7 +1212,6 @@ void vk_compile_and_load_shaders() {
     entry.module = modulo;
     darray_add(g.modules, entry);
   }
-
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -1444,7 +1441,7 @@ intern void vk_texture_generate_mipmaps(VK_Image image) {
   vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, null, 0, null, 1, &barrier);
 }
 
-Handle<GpuTexture> vk_texture_load(Texture texture) {
+GpuTextureH vk_texture_load(Texture texture) {
   u64 size = texture.width * texture.height * 4;
   MemCopy(vk->stage_buffer.base, texture.data, size);
   VK_ImageInfo image_info = vk_image_info_default(texture.width, texture.height);
@@ -1477,7 +1474,7 @@ Handle<GpuTexture> vk_texture_load(Texture texture) {
   vk->UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
   u32 id = vk->textures.count;
   array_add(vk->textures, image);
-  Handle<GpuTexture> handle = {id};
+  GpuTextureH handle = {id};
   return handle;
 }
 
@@ -1532,7 +1529,7 @@ intern void vk_texture_resize_target() {
   vk->offscreen_depth_buffer = vk_image_create(depth_info);
 }
 
-Handle<GpuMaterial> vk_material_load(Material material) {
+GpuMaterialId vk_material_load(Material material) {
   VK_State& g = *vk;
   VK_KeyToShaderPipeline key = {material.shader.name, material.shader.state};
   u32* pipeline_idx = map_get(g.shader_to_pipeline, key);
@@ -1552,18 +1549,18 @@ Handle<GpuMaterial> vk_material_load(Material material) {
     .diffuse = material.props.diffuse,
     .specular = material.props.specular,
     .shininess = material.props.shininess, 
-    .texture = material.texture_handle.handle, 
+    .texture = material.texture_h.v, 
   };
   GpuMaterial mat = {
     .pipeline_idx = *pipeline_idx,
-    .texture = material.texture_handle.handle,
+    .texture = material.texture_h.v,
   };
-  Handle<GpuMaterial> result = {g.materials.count};
+  GpuMaterialId result = {g.materials.count};
   darray_add(g.materials, mat);
   return result;
 }
 
-Handle<GpuCubemap> vk_cubemap_load(Texture* textures) {
+GpuCubemapId vk_cubemap_load(Texture* textures) {
   u32 width = textures->width;
   u32 height = textures->height;
   u64 size = width * height * 4;
@@ -1690,7 +1687,7 @@ intern void vk_swapchain_destroy(VK_Swapchain swapchain) {
 ////////////////////////////////////////////////////////////////////////
 // @Mesh
 
-Handle<GpuMesh> vk_mesh_load(Mesh mesh) {
+GpuMeshId vk_mesh_load(Mesh mesh) {
   VK_Buffer& vert_buff = vk->vert_buffer;
   u64 vert_size = mesh.vert_count*sizeof(Vertex);
   u64 vert_offset = vert_buff.pos;
@@ -1715,7 +1712,7 @@ Handle<GpuMesh> vk_mesh_load(Mesh mesh) {
   };
   u32 id = vk->meshes.count;
   array_add(vk->meshes, vk_mesh);
-  Handle<GpuMesh> handle = {id};
+  GpuMeshId handle = {id};
   return handle;
 }
 
@@ -1762,7 +1759,7 @@ void vk_draw() {
     VK_Pipeline pipeline = g.pipelines[g.entity_pipelines[i]];
     vk_bind_pipeline(cmd, pipeline.h);
     VK_RenderBatch& batch = g.batches[pipeline.batch_idx];
-    var fill_buffer = [&](var shader_batch, b32 is_indexed, b32 is_static) {
+    var fill_buffer = [&](VK_ShaderBatch shader_batch, b32 is_indexed, b32 is_static) {
       u32 entity_offset = 0;
       u32 draw_call_offset = 0;
       u32* entities_count = &ctx.entities_count;
@@ -1779,11 +1776,12 @@ void vk_draw() {
         if (mesh_batch.entities.count == 0) continue;
         Loop (i, mesh_batch.entities.count) {
           var e = mesh_batch.entities[i];
-          u32 entity_idx = entity_offset + e.idx();
-          ctx.gpu_entities[entity_idx].model = mat4_transform(e.trans());
+          u32 entity_idx = entity_offset + id_idx(e);
+          Transform trans = is_static ? ((StaticEntityId)e).trans() : ((EntityId)e).trans();
+          ctx.gpu_entities[entity_idx].model = mat4_transform(trans);
           ctx.gpu_entities_indices[entity_offset + (*entities_count)++] = entity_idx;
         }
-        u32 mesh_idx = mesh_batch.mesh_handle.idx();
+        u32 mesh_idx = id_idx(mesh_batch.mesh_id.v);
         VK_Mesh mesh = g.meshes[mesh_idx];
         VK_DrawCallInfo info = {};
         if (is_indexed) {
@@ -1885,8 +1883,8 @@ void vk_draw() {
 
   // Cube map
   vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipelines[g.cubemap_pipeline].h);
-  Handle<GpuMesh> h = mesh_get(Mesh_Cube);
-  VK_Mesh mesh = vk->meshes[h.handle];
+  GpuMeshId h = mesh_get(Mesh_Cube);
+  VK_Mesh mesh = vk->meshes[h.v];
   vk->CmdBindVertexBuffers(cmd, 0, 1, &vk->vert_buffer.h, &mesh.vert_offset);
   if (mesh.index_count) {
     vk->CmdBindIndexBuffer(cmd, vk->index_buffer.h, mesh.index_offset, VK_INDEX_TYPE_UINT32);
@@ -2262,7 +2260,7 @@ void* vk_init() {
   g.shader_states = darray_make<ShaderState>(g.gpa);
   g.shader_to_pipeline = map_make<VK_KeyToShaderPipeline, u32>(g.gpa);
   g.shader_to_module = map_make<String, u32>(g.gpa);
-  
+
 #if VulkanUseAllocator
   vk->_allocator = vk_allocator_create();
   vk->allocator = &vk->_allocator;
@@ -2275,15 +2273,17 @@ void* vk_init() {
   vk_device_init();
   vk_loader_load_device();
 
+  vk_shader_compile_and_load_modules();
+  
   ///////////////////////////////////
   // Buffers
   {
     g.gpu_mem = vk_mem_alloc(VK_MemType_Gpu, MB(200));
-    g.cpu_mem = vk_mem_alloc(VK_MemType_Cpu, MB(100));
+    g.cpu_mem = vk_mem_alloc(VK_MemType_Cpu, MB(300));
     g.vert_buffer = vk_buffer_alloc(MB(1), VK_BufferUsageFlag_Vert | VK_BufferUsageFlag_Dst, VK_MemType_Gpu);
     g.index_buffer = vk_buffer_alloc(MB(1), VK_BufferUsageFlag_Index | VK_BufferUsageFlag_Dst, VK_MemType_Gpu);
     g.stage_buffer = vk_buffer_alloc(MB(10), VK_BufferUsageFlag_Src, VK_MemType_Cpu);
-    g.storage_buffer = vk_buffer_alloc(MB(50), VK_BufferUsageFlag_Storage, VK_MemType_Cpu);
+    g.storage_buffer = vk_buffer_alloc(MB(200), VK_BufferUsageFlag_Storage, VK_MemType_Cpu);
     g.indirect_draw_buffer = vk_buffer_alloc(MB(10), VK_BufferUsageFlag_Indirect, VK_MemType_Cpu);
   }
 
@@ -2717,20 +2717,26 @@ void vk_begin_frame() {
   //     ++i;
   //   }
   // }
-  if (g.draw_lines.count > 0) {
-    u32 size = g.draw_lines.count * sizeof(DebugDrawLine);
-    void* data = g.draw_lines.data;
-    vk_buffer_upload(g.vert_buffer, {g.draw_lines_offset, size}, data);
-  }
-  if (g.draw_lines_consistent.count > 0) {
-    u32 size = g.draw_lines_consistent.count * sizeof(DebugDrawLine);
-    void* data = g.draw_lines_consistent.data;
-    vk_buffer_upload(g.vert_buffer, {g.draw_lines_consistent_offset, size}, data);
-  }
-  if (g.draw_rects.count > 0) {
-    u32 size = g.draw_rects.count * sizeof(DebugDrawRect);
-    void* data = g.draw_rects.data;
-    vk_buffer_upload(g.vert_buffer, {g.draw_rects_offset, size}, data);
+  {
+    ProfBlock("block");
+    if (g.draw_lines.count > 0) {
+      ProfBlock("1");
+      u32 size = g.draw_lines.count * sizeof(DebugDrawLine);
+      void* data = g.draw_lines.data;
+      vk_buffer_upload(g.vert_buffer, {g.draw_lines_offset, size}, data);
+    }
+    if (g.draw_lines_consistent.count > 0) {
+      ProfBlock("2");
+      u32 size = g.draw_lines_consistent.count * sizeof(DebugDrawLine);
+      void* data = g.draw_lines_consistent.data;
+      vk_buffer_upload(g.vert_buffer, {g.draw_lines_consistent_offset, size}, data);
+    }
+    if (g.draw_rects.count > 0) {
+      ProfBlock("3");
+      u32 size = g.draw_rects.count * sizeof(DebugDrawRect);
+      void* data = g.draw_rects.data;
+      vk_buffer_upload(g.vert_buffer, {g.draw_rects_offset, size}, data);
+    }
   }
 
   {
@@ -3033,87 +3039,87 @@ void vk_end_draw_frame() {
 ////////////////////////////////////////////////////////////////////////
 // Entity
 
-void vk_make_renderable(Handle<Entity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuMaterial> material_handle) {
+void vk_make_renderable(EntityId entity, GpuMeshId mesh_handle, GpuMaterialId material_handle) {
   VK_State& g = *vk;
-  u32 entity_idx = entity_handle.idx();
+  u32 entity_idx = id_idx(entity.v);
   Assert(!vk->entities[entity_idx].is_init);
   DebugDo(vk->entities[entity_idx].is_init = true);
-  u32 material_idx = material_handle.idx();
+  u32 material_idx = id_idx(material_handle.v);
   u32 pipeline_idx = g.materials[material_idx].pipeline_idx;
-  u32 mesh_idx = mesh_handle.idx();
+  u32 mesh_idx = id_idx(mesh_handle.v);
   vk->entities[entity_idx].pipeline = pipeline_idx;
   VK_Mesh mesh = vk->meshes[mesh_idx];
   // Indexed
   if (mesh.index_count) {
-    VK_ShaderBatch<Entity>& shader_batch = g.batches[g.pipelines[pipeline_idx].batch_idx].batch_indexed;
+    VK_ShaderBatch& shader_batch = g.batches[g.pipelines[pipeline_idx].batch_idx].batch_indexed;
     u32* mesh_idx_in_array = map_get(shader_batch.mesh_to_batch, mesh_idx);
     if (!mesh_idx_in_array) {
       mesh_idx_in_array = map_set(shader_batch.mesh_to_batch, mesh_idx, shader_batch.mesh_batches.count);
-      VK_MeshBatch<Entity> mesh_batch = vk_mesh_batch_make<Entity>(g.gpa);
-      mesh_batch.mesh_handle = mesh_handle;
+      VK_MeshBatch mesh_batch = vk_mesh_batch_make(g.gpa);
+      mesh_batch.mesh_id = mesh_handle;
       darray_add(shader_batch.mesh_batches, mesh_batch);
     }
-    VK_MeshBatch<Entity>& mesh_batch = shader_batch.mesh_batches[*mesh_idx_in_array];
+    VK_MeshBatch& mesh_batch = shader_batch.mesh_batches[*mesh_idx_in_array];
     u32 entity_idx_in_array = mesh_batch.entities.count;
-    darray_add(mesh_batch.entities, entity_handle);
+    darray_add(mesh_batch.entities, entity.v);
     vk->entities[entity_idx].entity_idx_in_array = entity_idx_in_array;
   }
   // Not Indexed
   else {
-    VK_ShaderBatch<Entity>& shader_batch = g.batches[g.pipelines[pipeline_idx].batch_idx].batch;
+    VK_ShaderBatch& shader_batch = g.batches[g.pipelines[pipeline_idx].batch_idx].batch;
     u32* mesh_idx_in_array = map_get(shader_batch.mesh_to_batch, mesh_idx);
     if (!mesh_idx_in_array) {
       mesh_idx_in_array = map_set(shader_batch.mesh_to_batch, mesh_idx, shader_batch.mesh_batches.count);
-      VK_MeshBatch<Entity> mesh_batch = vk_mesh_batch_make<Entity>(g.gpa);
-      mesh_batch.mesh_handle = mesh_handle;
+      VK_MeshBatch mesh_batch = vk_mesh_batch_make(g.gpa);
+      mesh_batch.mesh_id = mesh_handle;
       darray_add(shader_batch.mesh_batches, mesh_batch);
     }
-    VK_MeshBatch<Entity>& mesh_batch = shader_batch.mesh_batches[*mesh_idx_in_array];
+    VK_MeshBatch& mesh_batch = shader_batch.mesh_batches[*mesh_idx_in_array];
     u32 entity_idx_in_array = mesh_batch.entities.count;
-    darray_add(mesh_batch.entities, entity_handle);
+    darray_add(mesh_batch.entities, entity.v);
     vk->entities[entity_idx].entity_idx_in_array = entity_idx_in_array;
   }
-  vk->entities[entity_idx].mesh = mesh_handle;
+  vk->entities[entity_idx].mesh_id = mesh_handle;
   vk->gpu_entities[entity_idx].material = material_idx;
 }
 
-void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMesh> mesh_handle, Handle<GpuMaterial> material_handle) {
+void vk_make_renderable_static(StaticEntityId entity, GpuMeshId mesh_handle, GpuMaterialId material_handle) {
   VK_State& g = *vk;
   ++g.static_entities_count;
-  u32 entity_idx = entity_handle.idx() + MaxEntities;
+  u32 entity_idx = id_idx(entity.v) + MaxEntities;
   Assert(!vk->entities[entity_idx].is_init);
   DebugDo(vk->entities[entity_idx].is_init = true);
-  u32 material_idx = material_handle.idx();
+  u32 material_idx = id_idx(material_handle.v);
   u32 pipeline_idx = vk->materials[material_idx].pipeline_idx;
-  u32 mesh_idx = mesh_handle.handle;
+  u32 mesh_idx = mesh_handle.v;
   VK_Mesh mesh = vk->meshes[mesh_idx];
   // Indexed
   if (mesh.index_count) {
-    VK_ShaderBatch<StaticEntity>& shader_batch = g.batches[g.pipelines[pipeline_idx].batch_idx].static_batch_indexed;
+    VK_ShaderBatch& shader_batch = g.batches[g.pipelines[pipeline_idx].batch_idx].static_batch_indexed;
     u32* mesh_idx_in_array = map_get(shader_batch.mesh_to_batch, mesh_idx);
     if (!mesh_idx_in_array) {
       mesh_idx_in_array = map_set(shader_batch.mesh_to_batch, mesh_idx, shader_batch.mesh_batches.count);
-      VK_MeshBatch<StaticEntity> mesh_batch = vk_mesh_batch_make<StaticEntity>(g.gpa);
-      mesh_batch.mesh_handle = mesh_handle;
+      VK_MeshBatch mesh_batch = vk_mesh_batch_make(g.gpa);
+      mesh_batch.mesh_id = mesh_handle;
       darray_add(shader_batch.mesh_batches, mesh_batch);
     }
-    VK_MeshBatch<StaticEntity>& mesh_batch = shader_batch.mesh_batches[*mesh_idx_in_array];
-    darray_add(mesh_batch.entities, entity_handle);
+    VK_MeshBatch& mesh_batch = shader_batch.mesh_batches[*mesh_idx_in_array];
+    darray_add(mesh_batch.entities, entity.v);
     u32 entity_idx_in_array = mesh_batch.entities.count;
     UnusedVariable(entity_idx_in_array); // TODO: remove static entity
   }
   // Not Indexed
   else {
-    VK_ShaderBatch<StaticEntity>& shader_batch = g.batches[g.pipelines[pipeline_idx].batch_idx].static_batch;
+    VK_ShaderBatch& shader_batch = g.batches[g.pipelines[pipeline_idx].batch_idx].static_batch;
     u32* mesh_idx_in_array = map_get(shader_batch.mesh_to_batch, mesh_idx);
     if (!mesh_idx_in_array) {
       mesh_idx_in_array = map_set(shader_batch.mesh_to_batch, mesh_idx, shader_batch.mesh_batches.count);
-      VK_MeshBatch<StaticEntity> mesh_batch = vk_mesh_batch_make<StaticEntity>(g.gpa);
-      mesh_batch.mesh_handle = mesh_handle;
+      VK_MeshBatch mesh_batch = vk_mesh_batch_make(g.gpa);
+      mesh_batch.mesh_id = mesh_handle;
       darray_add(shader_batch.mesh_batches, mesh_batch);
     }
-    VK_MeshBatch<StaticEntity>& mesh_batch = shader_batch.mesh_batches[*mesh_idx_in_array];
-    darray_add(mesh_batch.entities, entity_handle);
+    VK_MeshBatch& mesh_batch = shader_batch.mesh_batches[*mesh_idx_in_array];
+    darray_add(mesh_batch.entities, entity.v);
     u32 entity_idx_in_array = mesh_batch.entities.count;
     UnusedVariable(entity_idx_in_array); // TODO: remove static entity
   }
@@ -3121,44 +3127,45 @@ void vk_make_renderable_static(Handle<StaticEntity> entity_handle, Handle<GpuMes
   vk->gpu_entities[entity_idx].material = material_idx;
 }
 
-void vk_remove_renderable(Handle<Entity> entity_handle) {
-  u32 entity_idx = entity_handle.idx();
-  Assert(vk->entities[entity_idx].is_init == true);
-  DebugDo(vk->entities[entity_idx].is_init = false);
-  u32 pipeline_idx = vk->entities[entity_idx].pipeline;
-  u32 mesh_idx = vk->entities[entity_idx].mesh.handle;
-  VK_Mesh mesh = vk->meshes[mesh_idx];
+void vk_remove_renderable(EntityId entity_handle) {
+  VK_State& g = *vk;
+  u32 entity_idx = id_idx(entity_handle.v);
+  Assert(g.entities[entity_idx].is_init == true);
+  DebugDo(g.entities[entity_idx].is_init = false);
+  u32 pipeline_idx = g.entities[entity_idx].pipeline;
+  u32 mesh_idx = g.entities[entity_idx].mesh_id.v;
+  VK_Mesh mesh = g.meshes[mesh_idx];
   if (mesh.index_count) {
-    VK_ShaderBatch<Entity>& shader_batch = vk->batches[pipeline_idx].batch_indexed;
+    VK_ShaderBatch& shader_batch = g.batches[pipeline_idx].batch_indexed;
     u32* mesh_batch_idx = map_get(shader_batch.mesh_to_batch, mesh_idx);
-    VK_MeshBatch<Entity>& mesh_batch = shader_batch.mesh_batches[*mesh_batch_idx];
+    VK_MeshBatch& mesh_batch = shader_batch.mesh_batches[*mesh_batch_idx];
 
-    u32 idx = vk->entities[entity_idx].entity_idx_in_array;
+    u32 idx = g.entities[entity_idx].entity_idx_in_array;
     u32 last_idx = mesh_batch.entities.count-1;
-    Handle<Entity> swapped = mesh_batch.entities[last_idx];
-    u32 swapped_idx = swapped.idx();
+    EntityId swapped = {mesh_batch.entities[last_idx]};
+    u32 swapped_idx = id_idx(swapped.v);
 
-    mesh_batch.entities[idx] = swapped;
+    mesh_batch.entities[idx] = swapped.v;
     darray_pop(mesh_batch.entities);
-    vk->entities[swapped_idx].entity_idx_in_array = idx;
+    g.entities[swapped_idx].entity_idx_in_array = idx;
   } else {
-    VK_ShaderBatch<Entity>& shader_batch = vk->batches[pipeline_idx].batch;
+    VK_ShaderBatch& shader_batch = g.batches[pipeline_idx].batch;
     u32* mesh_batch_idx = map_get(shader_batch.mesh_to_batch, mesh_idx);
-    VK_MeshBatch<Entity>& mesh_batch = shader_batch.mesh_batches[*mesh_batch_idx];
+    VK_MeshBatch& mesh_batch = shader_batch.mesh_batches[*mesh_batch_idx];
 
-    u32 idx = vk->entities[entity_idx].entity_idx_in_array;
+    u32 idx = g.entities[entity_idx].entity_idx_in_array;
     u32 last_idx = mesh_batch.entities.count-1;
-    Handle<Entity> swapped = mesh_batch.entities[last_idx];
-    u32 swapped_idx = swapped.idx();
+    EntityId swapped = {mesh_batch.entities[last_idx]};
+    u32 swapped_idx = id_idx(swapped.v);
 
-    mesh_batch.entities[idx] = swapped;
+    mesh_batch.entities[idx] = swapped.v;
     darray_pop(mesh_batch.entities);
-    vk->entities[swapped_idx].entity_idx_in_array = idx;
+    g.entities[swapped_idx].entity_idx_in_array = idx;
   }
 }
 
-void vk_set_entity_color(Handle<Entity> entity_handle, v4 color) {
-  vk->gpu_entities[entity_handle.idx()].color = color;
+void vk_set_entity_color(EntityId entity_handle, v4 color) {
+  vk->gpu_entities[id_idx(entity_handle.v)].color = color;
 }
 
 void vk_draw_line(v3 a, v3 b, v3 color) {
@@ -3353,7 +3360,8 @@ void imgui_impl_new_frame() {
   v2u win_size = os_get_window_size();
   io.DisplaySize = ImVec2(win_size.x, win_size.y);
   Slice<OS_InputEvent> events = os_get_events();
-  for (OS_InputEvent event : events) {
+  Loop (i, events.count) {
+    OS_InputEvent event = events[i];
     switch (event.type) {
       case OS_EventKind_Key: {
         ImGuiKey key = imgui_keycode_translate(event.key);

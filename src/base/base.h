@@ -202,7 +202,7 @@ u32 prev_pow2(u32 n);
 // Shenanigans
 
 #define ArrayCount(x)   (sizeof((x)) / sizeof((x)[0]))
-#define ArraySlice(arr) Slice(arr, ArrayCount(arr))
+#define ArraySlice(arr) slice(arr, ArrayCount(arr))
 #define ArrayRand(arr)  arr[rand_rng_u32(0, ArrayCount(arr)-1)]
 #define ArrayZero(arr)  MemZeroArray((arr), ArrayCount((arr)))
 #define ArrayCopy(d, s) MemCopyArray((d), (s), ArrayCount((d)))
@@ -330,6 +330,9 @@ struct Result {
   b32 err;
 };
 
+#define ResultErr(...) {.err = true, __VA_ARGS__};
+#define ResultOk(val) {.v = (val)};
+
 u64 cpu_timer_now();
 u64 cpu_frequency();
 void estimate_cpu_frequency();
@@ -353,6 +356,7 @@ struct RingBuffer {
   u64 read_pos;
 };
 
+RingBuffer ring_make(void* base, u64 size);
 void ring_write(RingBuffer& ring, void *src, u64 src_size);
 void ring_read(RingBuffer& ring, void *dst, u64 read_size);
 #define ring_write_struct(ring, ptr) ring_write((ring), (ptr), sizeof(*(ptr)))
@@ -365,22 +369,22 @@ struct Slice {
     u64 count;
     u64 size;
   };
-  T* begin() { return data; }
-  T* end()   { return data + count; }
-  Slice() = default;
-  NO_DEBUG Slice(T* data_, u64 count_) {
-    data = data_;
-    count = count_;
-  }
-  T& operator[](u32 idx) {
+  T& operator[](u64 idx) {
     Assert(idx < count);
     return data[idx];
   }
-  Slice slice(u32 li, u32 hi) {
-    Assert(0 <= li && li <= hi && hi <= count);
-    return Slice(data + li, hi - li);
-  }
 };
+template<typename T> Slice<T> slice(T* data, u64 count) {
+  Slice<T> res = {
+    .data = data,
+    .count = count,
+  };
+  return res;
+}
+template<typename T> Slice<T> slice(Slice<T> arr, u64 li, u64 hi) {
+  Assert(0 <= li && li <= hi && hi <= arr.count);
+  return Slice(arr.data + li, hi - li);
+}
 
 struct String {
   u8* str;
@@ -396,26 +400,6 @@ struct String64 {
   u32 size;
   operator String();
 };
-
-// AllocatorInfo* data = ...;
-// struct StackNode {
-//   AllocatorInfo* v;
-//   StackNode* next;
-// };
-// StackNode* stack = null;
-// StackNode* node = push_struct_zero(scratch, StackNode);
-// node->v = data;
-// SLLStackPush(stack, node);
-// while (stack) {
-//   StackNode* node = stack;
-//   SLLStackPop(stack);
-//   do stuff
-//   for EachNode(it, AllocatorInfo, node->v->first) {
-//     StackNode* s = push_struct_zero(scratch, StackNode);
-//     s->v = it;
-//     SLLStackPush(stack, s);
-//   }
-// }
 
 struct HotReloadData {
   void* ctx;

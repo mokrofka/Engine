@@ -106,6 +106,14 @@ void estimate_cpu_frequency() {
 ////////////////////////////////////////////////////////////////////////
 // Types
 
+RingBuffer ring_make(void* base, u64 size) {
+  RingBuffer res = {
+    .base = (u8*)base,
+    .size = size,
+  };
+  return res;
+}
+
 void ring_write(RingBuffer& ring, void *src, u64 src_size) {
   Assert(src_size <= (ring.size - (ring.write_pos - ring.read_pos)));
   u64 offset = ModPow2(ring.write_pos, ring.size);

@@ -154,7 +154,7 @@ u32 id_pool_alloc(IdPool& p) {
 }
 void id_pool_free(IdPool& p, u32 h) {
   u32 idx = id_idx(h);
-  Assert(p.generations[idx]++ == id_generation(h));
+  Assert(generation_bits(p.generations[idx]++) == id_generation(h));
   p.ids[--p.count] = idx;
 }
 void id_pool_clear(IdPool& p) {
@@ -191,7 +191,7 @@ u32 static_id_pool_alloc(StaticIdPool& p) {
 
 void static_id_pool_free(StaticIdPool& p, u32 h) {
   u32 idx = id_idx(h);
-  Assert(p.generations[idx]++ == id_generation(h));
+  Assert(generation_bits(p.generations[idx]++) == id_generation(h));
   p.ids[--p.count] = idx;
 }
 

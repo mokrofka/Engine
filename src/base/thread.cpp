@@ -4,60 +4,83 @@
 
 global ThreadPool thread_pool;
 
-void thread_task_push(Task t) {
-  // ProfFunc;
+TaskId thread_task_push(Task t, b32 async) {
   ThreadPool& g = thread_pool;
-  TaskQueue& queue = g.queue;
-  os_mutex_take(queue.mutex);
-  while (queue.count == MAX_TASKS) {
-    os_cond_var_wait(queue.cond_not_full, queue.mutex);
+  TaskQueue& q = thread_pool.queue;
+  os_mutex_take(q.mutex);
+  while (q.count == MAX_TASKS) {
+    os_cond_var_wait(q.cond_not_full, q.mutex);
   }
-  ring_write_struct(queue.ring, &t);
-  // queue.tasks[queue.tail] = t;
-  // queue.tail = ModPow2(queue.tail + 1, MAX_TASKS);
-  ++queue.count;
-  ++queue.remaining_tasks;
-  os_cond_var_signal(queue.cond_not_empty);
-  os_mutex_drop(queue.mutex);
+  os_cond_var_signal(q.cond_not_empty);
+  t.async = async;
+  if (!t.async) {
+    t.counter_id = object_pool_alloc(g.counters, (u32)1);
+  }
+  ring_write_struct(q.ring, &t);
+  ++q.count;
+  ++q.remaining_tasks;
+  os_mutex_drop(q.mutex);
+  TaskId res = {t.counter_id};
+  return res;
 }
 
 intern Task thread_task_pop() {
-  // ProfFunc;
-  ThreadPool& g = thread_pool;
-  TaskQueue& queue = g.queue;
-  {
-    os_mutex_take(queue.mutex);
-  }
-  while (queue.count == 0) {
+  TaskQueue& q = thread_pool.queue;
+  os_mutex_take(q.mutex);
+  while (q.count == 0) {
     ProfBlock("sleep", ProfType_Sleep);
-    os_cond_var_wait(queue.cond_not_empty, queue.mutex);
+    os_cond_var_wait(q.cond_not_empty, q.mutex);
   }
-  if (queue.count == MAX_TASKS) {
-    os_cond_var_signal(queue.cond_not_full);
+  if (q.count == MAX_TASKS) {
+    os_cond_var_signal(q.cond_not_full);
   }
-  // Task t = queue.tasks[queue.head];
-  // queue.head = ModPow2(queue.head + 1, MAX_TASKS);
-
   Task t = {};
-  ring_read_struct(queue.ring, &t);
-  --queue.count;
-  os_mutex_drop(queue.mutex);
+  ring_read_struct(q.ring, &t);
+  --q.count;
+  os_mutex_drop(q.mutex);
   return t;
 }
 
-intern void thread_worker(void* arg) {
-  TaskQueue& queue = thread_pool.queue;
+intern Result<Task> thread_task_try_pop() {
+  TaskQueue& q = thread_pool.queue;
+  os_mutex_take(q.mutex);
+  b32 good = false;
+  if (q.count) {
+    good = true;
+    if (q.count == MAX_TASKS) {
+      os_cond_var_signal(q.cond_not_full);
+    }
+    --q.count;
+  }
+  Task t = {};
+  if (good) {
+    ring_read_struct(q.ring, &t);
+  }
+  os_mutex_drop(q.mutex);
+  if (good) {
+    return ResultOk(t);
+  } else {
+    return ResultErr();
+  }
+}
+
+intern void thread_worker(void* ctx) {
+  ThreadPool& g = thread_pool;
+  TaskQueue& q = thread_pool.queue;
   tctx_init();
   while (true) {
     Task t = thread_task_pop();
     ProfBlock("working", ProfType_Worker);
-    t.func(t.arg);
-    os_mutex_take(queue.mutex);
-    --queue.remaining_tasks;
-    if (queue.remaining_tasks == 0) {
-      os_cond_var_signal(queue.finished);
+    t.func(t.ctx);
+    if (!t.async) {
+      atomic_sub(&object_pool_get(g.counters, t.counter_id), 1);
     }
-    os_mutex_drop(queue.mutex);
+    os_mutex_take(q.mutex);
+    --q.remaining_tasks;
+    if (q.remaining_tasks == 0) {
+      os_cond_var_signal(q.finished);
+    }
+    os_mutex_drop(q.mutex);
   }
 }
 
@@ -66,10 +89,10 @@ void thread_pool_init(u32 num_threads) {
   ThreadPool& g = thread_pool;
   g.arena = arena_make();
   g.num_threads = num_threads;
+  g.counters = object_pool_make<u32>(g.arena);
   TaskQueue& q = g.queue;
   q.tasks = push_array(g.arena, Task, MAX_TASKS);
-  q.ring.base = (u8*)q.tasks;
-  q.ring.size = MAX_TASKS * sizeof(Task);
+  q.ring = ring_make(q.tasks, MAX_TASKS * sizeof(Task));
   q.mutex = os_mutex_alloc();
   q.cond_not_empty = os_cond_var_alloc();
   q.cond_not_full = os_cond_var_alloc();
@@ -79,8 +102,31 @@ void thread_pool_init(u32 num_threads) {
   }
 }
 
+void thread_wait_task(TaskId task_id) {
+  ThreadPool& g = thread_pool;
+  TaskQueue& q = thread_pool.queue;
+  while (atomic_load(&object_pool_get(g.counters, task_id.counter_id)) > 0) {
+    Result res = thread_task_try_pop();
+    if (res.err) {
+      os_sleep_ms(1);
+      continue;
+    }
+    Task t = res.v;
+    t.func(t.ctx);
+    if (!t.async) {
+      atomic_sub(&object_pool_get(g.counters, t.counter_id), 1);
+    }
+    os_mutex_take(q.mutex);
+    --q.remaining_tasks;
+    if (q.remaining_tasks == 0) {
+      os_cond_var_signal(q.finished);
+    }
+    os_mutex_drop(q.mutex);
+  }
+  object_pool_free(g.counters, task_id.counter_id);
+}
+
 void thread_wait_for() {
-  // ProfBlock("wait for workers", ProfileType_Sleep);
   TaskQueue& queue = thread_pool.queue;
   os_mutex_take(queue.mutex);
   if (queue.remaining_tasks > 0) {

@@ -106,24 +106,24 @@ f64 tsc_to_ms(u64 tsc) {
 f32 get_dt() { return g_st->dt; }
 f32 get_time() { return g_st->time; }
 
-Transform& Handle<Entity>::trans() { 
-  Assert(id_generation(handle) == g_st->game.entity_id_pool.generations[id_idx(handle)]);
-  return g_st->transforms[id_idx(handle)];
+Transform& EntityId::trans() { 
+  Assert(id_generation(v) == g_st->game.entity_id_pool.generations[id_idx(v)]);
+  return g_st->transforms[id_idx(v)];
 }
-v3& Handle<Entity>::pos() { return trans().pos; }
-v3& Handle<Entity>::rot() { return trans().rot; }
-v3& Handle<Entity>::scale() { return trans().scale; }
-Entity& Handle<Entity>::get() { return g_st->game.entities[handle & INDEX_MASK]; }
-Rng3& Handle<Entity>::aabb() { return get().aabb; }
-v3& Handle<Entity>::vel() { return get().vel; }
+v3& EntityId::pos() { return trans().pos; }
+v3& EntityId::rot() { return trans().rot; }
+v3& EntityId::scale() { return trans().scale; }
+Entity& EntityId::get() { return g_st->game.entities[v & INDEX_MASK]; }
+Rng3& EntityId::aabb() { return get().aabb; }
+v3& EntityId::vel() { return get().vel; }
 
-Transform& Handle<StaticEntity>::trans() {
-  Assert(id_generation(handle) == g_st->game.static_entity_id_pool.generations[id_idx(handle)]);
-  return g_st->static_transforms[id_idx(handle)];
+Transform& StaticEntityId::trans() {
+  Assert(id_generation(v) == g_st->game.static_entity_id_pool.generations[id_idx(v)]);
+  return g_st->static_transforms[id_idx(v)];
 }
-v3& Handle<StaticEntity>::pos() { return trans().pos; }
-v3& Handle<StaticEntity>::rot() { return trans().rot; }
-v3& Handle<StaticEntity>::scale() { return trans().scale; }
+v3& StaticEntityId::pos() { return trans().pos; }
+v3& StaticEntityId::rot() { return trans().rot; }
+v3& StaticEntityId::scale() { return trans().scale; }
 
 Mesh load_obj(Allocator arena, String name) {
   Scratch scratch(arena);
@@ -478,9 +478,9 @@ global String textures_strs[Texture_COUNT] = {
 #undef X
 };
 
-Handle<GpuMesh> mesh_get(MeshId id) { return g_st->meshes_handlers[id]; }
-void mesh_set(MeshId id, Handle<GpuMesh> mesh_handle) { g_st->meshes_handlers[id] = mesh_handle; }
-Handle<GpuMaterial> material_get(MaterialId id) { return g_st->materials_handlers[id]; }
+GpuMeshId mesh_get(MeshId id) { return g_st->meshes_handlers[id]; }
+void mesh_set(MeshId id, GpuMeshId mesh_handle) { g_st->meshes_handlers[id] = mesh_handle; }
+GpuMaterialId material_get(MaterialId id) { return g_st->materials_handlers[id]; }
 
 constexpr ShaderState shader_default_info() {
   ShaderState info = {
@@ -503,7 +503,7 @@ constexpr MaterialProps material_default_props() {
   return props;
 }
 
-Handle<GpuMesh> mesh_load(String name) {
+GpuMeshId mesh_load(String name) {
   GlobalState& g = *g_st;
   Scratch scratch;
   String filepath = push_strf(scratch, "%s/%s", g.models_dir, name);
@@ -518,20 +518,20 @@ Handle<GpuMesh> mesh_load(String name) {
   } else {
     InvalidPath;
   }
-  Handle<GpuMesh> handle = vk_mesh_load(mesh);
+  GpuMeshId handle = vk_mesh_load(mesh);
   return handle;
 }
 
-Handle<GpuTexture> texture_load(String name) {
+GpuTextureH texture_load(String name) {
   GlobalState& g = *g_st;
   Scratch scratch;
   String filepath = push_strf(scratch, "%s/%s", g.textures_dir, name);
   Texture texture = load_image(filepath);
-  Handle<GpuTexture> handle = vk_texture_load(texture);
+  GpuTextureH handle = vk_texture_load(texture);
   return handle;
 }
 
-Handle<GpuCubemap> cubemap_load(String name) {
+GpuCubemapId cubemap_load(String name) {
   GlobalState& g = *g_st;
   Scratch scratch;
   Texture textures[6];
@@ -568,7 +568,7 @@ void assets_load() {
     ShaderState state = shader_default_info();
     MaterialProps props = material_default_props();
     String texture = "container.jpg";
-    Handle<GpuTexture> texture_handle;
+    GpuTextureH texture_handle;
     operator Material() {
       return {
         .shader = {
@@ -577,7 +577,7 @@ void assets_load() {
         },
         .props = props,
         .texture = texture,
-        .texture_handle = texture_handle,
+        .texture_h = texture_handle,
       };
     }
   };
@@ -586,7 +586,7 @@ void assets_load() {
     TakeMaterial mat = { \
       __VA_ARGS__ \
     }; \
-    Handle<GpuTexture>* texture_hanle = map_get(g.str_to_texture, mat.texture); \
+    GpuTextureH* texture_hanle = map_get(g.str_to_texture, mat.texture); \
     if (texture_hanle) \
       mat.texture_handle = *texture_hanle; \
     g.materials_handlers[enum_name] = vk_material_load(mat); \
@@ -1369,7 +1369,8 @@ void profiler_view() {
           AllocatorInfoList infos = get_allocators_info();
           var infos_sorted = sort_list_insert(scratch, infos.first, [](var a, var b) { return a->pos > b->pos; });
           f64 mem_usage = 0;
-          for (var x : infos_sorted) {
+          Loop (i, infos_sorted.count) {
+            AllocatorInfo* x = infos_sorted[i];
             mem_usage += x->cmt;
           }
           f32 mem_levels[] = {KB(1), KB(10), KB(100), MB(1), MB(10), MB(100), GB(1)};
@@ -1629,7 +1630,7 @@ void watch_update() {
     }
   }
   Loop (i, g.directories.count) {
-  WatchDirectory x = g.directories[i];
+    WatchDirectory x = g.directories[i];
     StringList list = os_watch_check(scratch, x.watch);
     for EachNode(it, StringNode, list.first) {
       String name = it->string;
@@ -1650,63 +1651,18 @@ void watch_update() {
           os_process_launch(list);
         } break;
         case WatchOp_ShaderReload: {
+          GlobalState& g = *g_st;
           String shader_name = str_chop_last_dot(name);
+          String shader_name_slang = push_strf(scratch, "%s.slang", shader_name);
+          String shader_filepath = push_strf(scratch, "%s/%s", g.shader_dir, shader_name_slang);
+          String shader_compiled_filepath = push_strf(scratch, "%s/%s", g.shader_compiled_dir, name);
+          os_file_path_copy_mtime(shader_filepath, shader_compiled_filepath);
           vk_shader_reload(shader_name);
         } break;
         InvalidDefaultCase break;
       }
     }
   }
-}
-
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-
-#define BASE 256
-
-static void counting_sort_pass(uint32_t* arr, uint32_t* out, int n, int shift) {
-  int count[BASE] = {0};
-
-  // Count occurrences of each byte value
-  for (int i = 0; i < n; i++) {
-    int byte = (arr[i] >> shift) & 0xFF;
-    count[byte]++;
-  }
-
-  // Prefix sum (positions)
-  for (int i = 1; i < BASE; i++) {
-    count[i] += count[i - 1];
-  }
-
-  // Build output (stable)
-  for (int i = n - 1; i >= 0; i--) {
-    int byte = (arr[i] >> shift) & 0xFF;
-    out[--count[byte]] = arr[i];
-  }
-}
-
-void radix_sort(uint32_t* arr, int n) {
-  u32* tmp = (u32*)malloc(n * sizeof(uint32_t));
-  if (!tmp) return;
-
-  // 4 passes for 32-bit integers (8 bits each)
-  for (int shift = 0; shift < 32; shift += 8) {
-    counting_sort_pass(arr, tmp, n, shift);
-
-    // swap buffers
-    uint32_t* swap = arr;
-    arr = tmp;
-    tmp = swap;
-  }
-
-  // If final result ended in tmp, copy back
-  // (depends on even/odd number of passes)
-  memcpy(tmp, arr, n * sizeof(uint32_t));
-  // free(arr);
-  arr = tmp;
 }
 
 void common_init() {
@@ -1732,9 +1688,9 @@ void common_init() {
     g.shader_compiled_dir = push_str_cat(g.arena, g.shader_dir, "/compiled");
     g.models_dir = push_str_cat(g.arena, g.asset_path, "/models");
     g.textures_dir = push_str_cat(g.arena, g.asset_path, "/textures");
-    g.str_to_texture = map_make<String, Handle<GpuTexture>>(g.gpa);
-    g.str_to_mesh = map_make<String, Handle<GpuMesh>>(g.gpa);
-    g.str_to_material = map_make<String, Handle<GpuMaterial>>(g.gpa);
+    g.str_to_texture = map_make<String, GpuTextureH>(g.gpa);
+    g.str_to_mesh = map_make<String, GpuMeshId>(g.gpa);
+    g.str_to_material = map_make<String, GpuMaterialId>(g.gpa);
 
     g.watch.arena = g.arena;
     watch_directory_add(g.shader_dir, WatchOp_RecompileShader);
@@ -1799,9 +1755,17 @@ void common_update() {
   };
   {
     ProfBlock("push jobs");
-    Loop (i, 16) {
-      thread_task_push(task);
+    Loop (i, 0) {
+      thread_task_push(task, true);
     }
+    TaskId id0 = thread_task_push({.func = [](void* ctx) { os_sleep_ms(1); }});
+    TaskId id1 = thread_task_push({.func = [](void* ctx) { os_sleep_ms(1); }});
+    TaskId id2 = thread_task_push({.func = [](void* ctx) { os_sleep_ms(1); }});
+    TaskId id3 = thread_task_push({.func = [](void* ctx) { os_sleep_ms(1); }});
+    thread_wait_task(id0);
+    thread_wait_task(id1);
+    thread_wait_task(id2);
+    thread_wait_task(id3);
   }
   // thread_wait_for();
 }
@@ -1814,8 +1778,9 @@ if (data->ctx == null) {
     g_st = (GlobalState*)data->ctx;
     g_st->arena = arena;
     {
-      TimeScope scope;
+      u64 start = cpu_timer_now();
       common_init();
+      Info("init time: %fms", tsc_to_ms(cpu_timer_now() - start));
     }
 #if HOTRELOAD_BUILD
     watch_add(data->lib, WatchOp_NotifyHotreload);
@@ -1979,10 +1944,10 @@ v3 ray_from_camera() {
 //   return true;
 // };
 
-Handle<Entity> e_alloc(MeshId mesh_id, MaterialId material_id) {
+EntityId e_alloc(MeshId mesh_id, MaterialId material_id) {
   GameState& g = g_st->game;
   u32 e_id = static_id_pool_alloc(g.entity_id_pool);
-  Handle<Entity> e = {e_id};
+  EntityId e = {e_id};
   e.trans() = {};
   e.scale() = v3_one();
   vk_make_renderable(e, mesh_get(mesh_id), material_get(material_id));
@@ -1990,10 +1955,10 @@ Handle<Entity> e_alloc(MeshId mesh_id, MaterialId material_id) {
   return e;
 }
 
-Handle<StaticEntity> e_static_alloc(MeshId mesh_id, MaterialId material_id) {
+StaticEntityId e_static_alloc(MeshId mesh_id, MaterialId material_id) {
   GameState& g = g_st->game;
   u32 e_id = static_id_pool_alloc(g.static_entity_id_pool);
-  Handle<StaticEntity> e = {e_id};
+  StaticEntityId e = {e_id};
   e.trans() = {};
   e.scale() = v3_one();
   vk_make_renderable_static(e, mesh_get(mesh_id), material_get(material_id));
@@ -2001,9 +1966,9 @@ Handle<StaticEntity> e_static_alloc(MeshId mesh_id, MaterialId material_id) {
   return e;
 }
 
-void e_release(Handle<Entity> e) {
+void e_release(EntityId e) {
   GameState& g = g_st->game;
-  static_id_pool_free(g.entity_id_pool, e.handle);
+  static_id_pool_free(g.entity_id_pool, e.v);
   vk_remove_renderable(e);
   --g.entities_count;
 }
@@ -2155,6 +2120,8 @@ void scene_init() {
     var e = e_static_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
     u32 range = KB(1);
     e.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
+    // v3 dir = v3_rand_rng(v3_scale(-1), v3_scale(1));
+    // e.pos() = v3_norm(dir) * range;
   }
 #endif
 
@@ -2199,6 +2166,12 @@ void scene_init() {
     u32 range = 100;
     e.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
     darray_add(g.moving_cubes, e);
+  }
+
+  {
+    var e = e_alloc(Mesh_Cube, Material_Orange);
+    e.pos() = {};
+    g.target = e;
   }
 }
 
@@ -2271,6 +2244,11 @@ void scene_update() {
     e.vel() += tangent * 2.0f * get_dt();
     e.vel() += -dir * 0.5f * get_dt();
   }
+  {
+    var e = g.target;
+    // e.pos().x -= 1 * get_dt();
+    e.pos() = v3_norm(v3(-e.pos().z, 0, e.pos().x));
+  }
 
   vk_draw_rect(Rng2(v2(100,100), v2(200,200)), v3(1,1,1));
   v4& pos = get_pos();
@@ -2300,7 +2278,7 @@ void game_init() {
   g.static_entity_id_pool = static_id_pool_make(g.persistent_arena, MaxStaticEntities);
   g.entities = push_array(g.persistent_arena, Entity, MaxEntities);
   g.static_entities = push_array(g.persistent_arena, StaticEntity, MaxStaticEntities);
-  g.moving_cubes = darray_make<Handle<Entity>>(g.gpa);
+  g.moving_cubes = darray_make<EntityId>(g.gpa);
 
   g.gpa_arena0.init(g.arena, "game gpa arena0");
   g.gpa_arena1.init(g.arena, "game gpa arena1");

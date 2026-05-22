@@ -45,7 +45,7 @@ template<typename T> Slice<T> slice_clone(Allocator alloc, Slice<T> slice) {
   MemCopyArray(data, slice.data, slice.count);
   return {data, slice.count};
 }
-#define push_slice(a, T, c) Slice(push_array(a, T, c), c)
+#define push_slice(a, T, c) slice(push_array(a, T, c), c)
 
 ////////////////////////////////////////////////////////////////////////
 // Mem track

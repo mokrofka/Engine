@@ -18,6 +18,7 @@ FS_Entry v4 fs_main(VSOutput in) {
   Material material = materials[e.material];
   v4 color = textures[material.texture].Sample(samplers[0], in.uv);
   // color = v4(0,0,0,0);
+
   return color;
 }
 

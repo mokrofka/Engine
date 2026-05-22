@@ -7,19 +7,20 @@
 const u32 INDEX_BITS = 22;
 const u32 INDEX_MASK = (1u << INDEX_BITS) - 1;
 
-template<typename T> struct Handle {
-  u32 handle;
-#if BUILD_DEBUG
-  u32 idx() { return handle & INDEX_MASK; }
-  u32 generation() { return handle >> INDEX_BITS; }
-#else
-  u32 idx() { return handle; }
-#endif
-};
+// template<typename T> struct Handle {
+//   u32 handle;
+// #if BUILD_DEBUG
+//   u32 idx() { return handle & INDEX_MASK; }
+//   u32 generation() { return handle >> INDEX_BITS; }
+// #else
+//   u32 idx() { return handle; }
+// #endif
+// };
 
 inline u32 id_idx(u32 id) { return id & INDEX_MASK; }
 inline u32 id_generation(u32 id) { return id >> INDEX_BITS; }
 inline u32 id_make(u32 generation, u32 idx) { return (generation << INDEX_BITS) | idx; }
+inline u32 generation_bits(u32 gen) { return gen & Bit(32 - INDEX_BITS) - 1; }
 
 ////////////////////////////////////////////////////////////////////////
 // Array
@@ -198,7 +199,7 @@ template<typename T, i32 N> T& array_handler_get(ArrayHandler<T, N>& arr, u32 h)
 #if BUILD_DEBUG
     u32 idx = id_idx(h);
     Assert(idx < arr.count);
-    Assert(arr.generations[idx]++ == id_generation(h));
+    Assert(generation_bits(arr.generations[idx]++) == id_generation(h));
     u32 index = arr.sparse[idx];
     return arr.data[index];
 #else
@@ -228,7 +229,7 @@ template<typename T, i32 N> void array_handler_remove(ArrayHandler<T, N>& arr, u
 #if BUILD_DEBUG
     u32 idx = id_idx(h);
     Assert(idx < arr.count);
-    Assert(arr.generations[idx]++ == id_generation(h));
+    Assert(generation_bits(arr.generations[idx]++) == id_generation(h));
     u32 idx_removed = arr.sparse[idx];
     u32 idx_last = arr.count - 1;
     arr.data[idx_removed] = arr.data[idx_last];
@@ -275,7 +276,7 @@ template<typename T> T& darray_handler_get(DarrayHandler<T>& arr, u32 h) {
 #if BUILD_DEBUG
   u32 idx = id_idx(h);
   Assert(idx < arr.cap);
-  Assert(arr.generations[idx] == id_generation(h));
+  Assert(generation_bits(arr.generations[idx]) == id_generation(h));
   u32 index = arr.sparse[idx];
   return arr.data[index];
 #else
@@ -354,7 +355,7 @@ template<typename T> u32 darray_handler_add(DarrayHandler<T>& arr, T a) {
 template<typename T> void darray_handler_remove(DarrayHandler<T>& arr, u32 h) {
 #if BUILD_DEBUG
   u32 idx = id_idx(h);
-  Assert(arr.generations[idx]++ == id_generation(h));
+  Assert(generation_bits(arr.generations[idx]++) == id_generation(h));
   u32 idx_removed = arr.sparse[idx];
   u32 idx_last = arr.count - 1;
   arr.data[idx_removed] = arr.data[idx_last];
@@ -401,7 +402,7 @@ template<typename T> ObjectPool<T> object_pool_make(Allocator alloc) {
 template<typename T> T& object_pool_get(ObjectPool<T>& p, u32 h) {
 #if BUILD_DEBUG
   u32 idx = id_idx(h);
-  Assert(p.generations[idx] == id_generation(h));
+  Assert(generation_bits(p.generations[idx]) == id_generation(h));
   return p.data[idx];
 #else
   return p.data[h];
@@ -474,7 +475,7 @@ template<typename T> u32 object_pool_alloc(ObjectPool<T>& p, T a) {
 template<typename T> void object_pool_free(ObjectPool<T>& p, u32 h) {
 #if BUILD_DEBUG
   u32 idx = id_idx(h);
-  Assert(p.generations[idx]++ == id_generation(h));
+  Assert(generation_bits(p.generations[idx]++) == id_generation(h));
   *(u32*)&p.data[idx] = p.head;
   p.head = id_make(p.generations[idx], idx);
 #else

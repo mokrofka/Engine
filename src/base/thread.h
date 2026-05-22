@@ -1,11 +1,16 @@
 #pragma once
 #include "os/os_core.h"
+#include "containers.h"
 
 #define MAX_TASKS 1024
 
+struct TaskId { u32 counter_id; };
+
 struct Task {
   ThreadEntryPointFn* func;
-  void* arg;
+  void* ctx;
+  u32 counter_id;
+  b32 async;
 };
 
 struct TaskQueue {
@@ -24,8 +29,11 @@ struct ThreadPool {
   Thread threads[16];
   u32 num_threads;
   TaskQueue queue;
+  ObjectPool<u32> counters;
 };
 
-void thread_task_push(Task t);
+TaskId thread_task_push(Task t, b32 async = false);
 void thread_pool_init(u32 num_threads);
+void thread_wait_task(TaskId task_id);
 void thread_wait_for();
+
