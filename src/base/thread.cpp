@@ -103,6 +103,7 @@ void thread_pool_init(u32 num_threads) {
 }
 
 void thread_wait_task(TaskId task_id) {
+  ProfFunc;
   ThreadPool& g = thread_pool;
   TaskQueue& q = thread_pool.queue;
   while (atomic_load(&object_pool_get(g.counters, task_id.counter_id)) > 0) {
@@ -111,6 +112,7 @@ void thread_wait_task(TaskId task_id) {
       os_sleep_ms(1);
       continue;
     }
+    ProfBlock("Working", ProfType_Worker);
     Task t = res.v;
     t.func(t.ctx);
     if (!t.async) {

@@ -1100,12 +1100,8 @@ u32 vk_shader_pipeline_alloc(Shader shader) {
   return vk_shader_pipeline_alloc(shader.name, shader.state);
 }
 
-void foo() {
-  
-}
-
-void vk_shader_compile_and_load_modules() {
-  Scratch scratch;
+Slice<String> vk_shader_compile(Allocator arena) {
+  Scratch scratch(arena);
   String cur_dir = os_get_current_directory();
   String shader_dir = g_st->shader_dir;
   String compiled_shader_dir = g_st->shader_compiled_dir;
@@ -1183,6 +1179,7 @@ void vk_shader_compile_and_load_modules() {
     os_file_iter_end(it);
   }
 
+  var file_names = darray_make<String>(arena);
   Loop (i, files.count) {
     File& f = files[i];
     StringList list = {};
@@ -1193,21 +1190,29 @@ void vk_shader_compile_and_load_modules() {
     str_list_push(scratch, &list, "-g");
     str_list_push(scratch, &list, "-o");
     str_list_push(scratch, &list, f.compiled_file_path);
-    files[i].pid = os_process_launch(list);
+    darray_add(g_st->shader_module_compilation_pids, os_process_launch(list));
     Debug("%s", f.file_path);
+    darray_add(file_names, f.shader_name);
   }
+  return slice(file_names);
+}
 
-  Loop (i, files.count) {
-    File& f = files[i];
-    os_process_join(f.pid);
-    os_file_path_copy_mtime(f.file_path, f.compiled_file_path);
+void vk_shader_compile_join(Slice<String> names) {
+  Scratch scratch;
+  Loop (i, names.count) {
+    os_process_join(g_st->shader_module_compilation_pids[i]);
+    String shader_file_path = push_strf(scratch, "%s/%s.slang", g_st->shader_dir, names[i]);
+    String compiled_file_path = push_strf(scratch, "%s/%s.spv", g_st->shader_compiled_dir, names[i]);
+    os_file_path_copy_mtime(shader_file_path, compiled_file_path);
   }
+}
 
+void vk_shader_load_modules(Slice<String> file_names) {
   VK_State& g = *vk;
-  Loop (i, files.count) {
-    File& f = files[i];
-    VK_ShaderModule modulo = vk_shader_module_create(f.shader_name);
-    map_set(g.shader_to_module, f.shader_name, g.modules.count);
+  Loop (i, file_names.count) {
+    String name = file_names[i];
+    VK_ShaderModule modulo = vk_shader_module_create(name);
+    map_set(g.shader_to_module, name, g.modules.count);
     VK_ShaderModuleEntry entry = vk_shader_module_entry_make(g.gpa);
     entry.module = modulo;
     darray_add(g.modules, entry);
@@ -2266,15 +2271,16 @@ void* vk_init() {
   vk->allocator = &vk->_allocator;
 #endif
 
-  vk_loader_load_core();
-  vk_instance_init();
-  vk_loader_load_instance();
-  vk_surface_create();
-  vk_device_init();
-  vk_loader_load_device();
+  {
+    ProfBlock("vulkan loader");
+    vk_loader_load_core();
+    vk_instance_init();
+    vk_loader_load_instance();
+    vk_surface_create();
+    vk_device_init();
+    vk_loader_load_device();
+  }
 
-  vk_shader_compile_and_load_modules();
-  
   ///////////////////////////////////
   // Buffers
   {
@@ -2485,7 +2491,6 @@ void* vk_init() {
         u8* res = Offset(buf.base, off);
         return res;
       };
-
       g.gpu_global_shader_st = write_descriptor(g.storage_buffer, Bindings::State, GlobalStateGPU, 1);
       g.gpu_entities = write_descriptor(g.storage_buffer, Bindings::Entities, EntityGPU, MaxEntities+MaxStaticEntities);
       g.gpu_materials = write_descriptor(g.storage_buffer, Bindings::Materials, MaterialGPU, MaxMaterials);
@@ -2597,6 +2602,11 @@ void* vk_init() {
     depth_info.format = vk->device.depth_format;
     depth_info.samples = VK_SAMPLE_COUNT_4_BIT;
     vk->offscreen_depth_buffer = vk_image_create(depth_info);
+  }
+
+  {
+    ProfBlock("Waiting for compiling shaders");
+    vk_shader_compile_join(g_st->shader_module_compiled_names);
   }
 
   ///////////////////////////////////

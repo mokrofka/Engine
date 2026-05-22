@@ -1691,10 +1691,11 @@ void common_init() {
     g.str_to_texture = map_make<String, GpuTextureH>(g.gpa);
     g.str_to_mesh = map_make<String, GpuMeshId>(g.gpa);
     g.str_to_material = map_make<String, GpuMaterialId>(g.gpa);
-
     g.watch.arena = g.arena;
     watch_directory_add(g.shader_dir, WatchOp_RecompileShader);
     watch_directory_add(g.shader_compiled_dir, WatchOp_ShaderReload);
+    g.shader_module_compilation_pids = darray_make<OS_Handle>(g.gpa);
+    g.shader_module_compiled_names = vk_shader_compile(scratch);
 
     var& win = g.profile_win;
     win.root_scroll_state = scroll_state_make(1);
@@ -1727,47 +1728,20 @@ void common_update() {
     ImGui::ShowDemoWindow();
   }
 
-  // {
-  //   ProfBlock("block0");
-  //   os_sleep_ms(1);
-  // }
-  // {
-  //   ProfBlock("block1");
-  //   os_sleep_ms(1);
-  // }
-  // Loop (i, 2) {
-  //   foo(2);
-  // }
-  Task task = {
-    .func = [](void* ptr) {
-      // ProfBlock("job1");
-      // ProfBlock("sleep job");
-      // ProfBlock("sleep job");
-      {
-        // ProfBlock("job2");
-        // os_sleep_ms(rand_u32()%10);
-      }
-      // os_sleep_ms(4);
-      os_sleep_ms(rand_u32()%2);
-      // os_sleep_ms(rand_u32()%10);
-      // os_sleep_ms(32);
-    }
-  };
   {
     ProfBlock("push jobs");
-    Loop (i, 0) {
-      thread_task_push(task, true);
+    Loop (i, 2) {
+      thread_task_push({.func = [](void* ctx) {os_sleep_ms(rand_u32()%2);}}, true);
     }
-    TaskId id0 = thread_task_push({.func = [](void* ctx) { os_sleep_ms(1); }});
-    TaskId id1 = thread_task_push({.func = [](void* ctx) { os_sleep_ms(1); }});
-    TaskId id2 = thread_task_push({.func = [](void* ctx) { os_sleep_ms(1); }});
-    TaskId id3 = thread_task_push({.func = [](void* ctx) { os_sleep_ms(1); }});
+    TaskId id0 = thread_task_push({.func = [](void* ctx) { os_sleep_ms(2); }});
+    TaskId id1 = thread_task_push({.func = [](void* ctx) { os_sleep_ms(2); }});
+    TaskId id2 = thread_task_push({.func = [](void* ctx) { os_sleep_ms(2); }});
+    TaskId id3 = thread_task_push({.func = [](void* ctx) { os_sleep_ms(2); }});
     thread_wait_task(id0);
     thread_wait_task(id1);
     thread_wait_task(id2);
     thread_wait_task(id3);
   }
-  // thread_wait_for();
 }
 
 shared_function void common_main(HotReloadData* data) {

@@ -36,3 +36,4 @@ void vk_imgui_init();
 void vk_imgui_begin_frame();
 void vk_imgui_end_frame();
 
+Slice<String> vk_shader_compile(Allocator arena);

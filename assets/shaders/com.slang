@@ -131,3 +131,4 @@ VkBind(Bindings.DirLights) StructuredBuffer<DirLight> dir_lights;
 VkBind(Bindings.SpotLights) StructuredBuffer<SpotLight> spot_lights;
 
 v2 in_uv(v2 uv) { return v2(uv.x, -uv.y); }
+

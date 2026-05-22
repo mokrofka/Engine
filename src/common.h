@@ -517,6 +517,8 @@ struct GlobalState {
   b32 imgui_demo_open;
 
   InputState input;
+  Darray<OS_Handle> shader_module_compilation_pids;
+  Slice<String> shader_module_compiled_names;
 
   void* vk;
 };
