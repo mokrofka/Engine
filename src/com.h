@@ -14,11 +14,11 @@
 // console
 // thread safe allocator
 // async
+// glb loader
 // introspection
 // upgrade vulkan
-// compiling all shaders in compiled dir and check timestamp to recompile on thread
 // metadesk tables?
-// shaders code
+// font rendering
 
 ////////////////////////////////////////////////////////////////////////
 // @Common
@@ -229,7 +229,7 @@ void assets_load();
 // @Lexer
 
 enum TokenType {
-  TokenType_Unknown,
+  TokenType_Null,
 
   TokenType_OpenParen,
   TokenType_CloseParen,
@@ -301,6 +301,9 @@ b32 json_iter_array(JsonReader* r, JsonValue arr, JsonValue* val);
 #define JSON_OBJ(r, o) for (JsonValue k, v; json_iter_object(&r, o, &k, &v);)
 #define JSON_OBJ_(r, o) for (JsonValue key, val; json_iter_object(&r, o, &key, &val);)
 #define JSON_ARR(r, val) for (JsonValue obj; json_iter_array(&r, val, &obj);)
+
+////////////////////////////////////////////////////////////////////////
+// @Serialization
 
 ////////////////////////////////////////////////////////////////////////
 // @Input
@@ -485,6 +488,9 @@ struct GameState {
 
 void game_init();
 void game_update();
+
+////////////////////////////////////////////////////////////////////////
+// @State
 
 struct GlobalState {
   Arena arena;

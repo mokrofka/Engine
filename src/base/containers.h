@@ -7,16 +7,6 @@
 const u32 INDEX_BITS = 22;
 const u32 INDEX_MASK = (1u << INDEX_BITS) - 1;
 
-// template<typename T> struct Handle {
-//   u32 handle;
-// #if BUILD_DEBUG
-//   u32 idx() { return handle & INDEX_MASK; }
-//   u32 generation() { return handle >> INDEX_BITS; }
-// #else
-//   u32 idx() { return handle; }
-// #endif
-// };
-
 inline u32 id_idx(u32 id) { return id & INDEX_MASK; }
 inline u32 id_generation(u32 id) { return id >> INDEX_BITS; }
 inline u32 id_make(u32 generation, u32 idx) { return (generation << INDEX_BITS) | idx; }
@@ -1026,6 +1016,22 @@ template<typename T, typename Cmp> void _merge_sort(T* arr, T* tmp, u32 left, u3
   _merge(arr, tmp, left, mid, right, cmp);
 }
 template<typename T, typename Cmp> void sort_merge(Allocator alloc, Slice<T> arr, Cmp cmp) { Slice tmp = push_slice(alloc, T, arr.count); _merge_sort(arr.data, tmp.data, 0, arr.count-1, cmp); }
+
+///////////////////////////////////
+// Radix
+
+u32 sort_i32_key_to_u32(i32 x);
+u32 sort_f32_key_to_u32(f32 sort_key);
+
+struct SortEntry {
+  u32 sort_key;
+  u32 idx;
+};
+
+void sort_radix(Allocator alloc, Slice<SortEntry> arr);
+
+////////////////////////////////////////////////////////////////////////
+// List sort
 
 template<typename T, typename Cmp> Slice<T> sort_list_insert(Allocator arena, T first, Cmp cmp) {
   var sorted_arr = darray_make<T>(arena);

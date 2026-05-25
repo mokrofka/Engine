@@ -1,2 +1,7 @@
 Diagnostics:
     UnusedIncludes: None
+
+CompileFlags:
+  Add:
+    - -include com.h
+    - -DIMPL=1

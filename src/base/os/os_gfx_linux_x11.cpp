@@ -6,15 +6,13 @@
 #include <xcb/xcb.h>
 #include <xcb/xcb_keysyms.h>
 
-#include <stdlib.h>
-
 struct Clipboard {
   xcb_atom_t atom;
   xcb_atom_t targets_atom;
   xcb_atom_t property_atom;
   xcb_atom_t utf8_atom;
-  DString str_to_write;
-  DString str_to_read;
+  Dstring str_to_write;
+  Dstring str_to_read;
 };
 
 struct X11State {
@@ -309,6 +307,8 @@ void os_gfx_init() {
   xcb_intern_atom_reply_t* protocols_reply = xcb_intern_atom_reply(g.connection, protocols_cookie, null);
   xcb_intern_atom_cookie_t delete_cookie = xcb_intern_atom(g.connection, 0, 16, "WM_DELETE_WINDOW");
   xcb_intern_atom_reply_t* delete_reply = xcb_intern_atom_reply(g.connection, delete_cookie, null);
+  g.clipboard.str_to_write = dstr_make(g.arena);
+  g.clipboard.str_to_read = dstr_make(g.arena);
   g.clipboard.atom = intern_("CLIPBOARD");
   g.clipboard.targets_atom = intern_("TARGETS");
   g.clipboard.utf8_atom = intern_("UTF8_STRING");
@@ -518,8 +518,8 @@ void os_pump_messages() {
 
 void os_clipboard_write(String str) {
   X11State& g = gfx_st;
-  g.clipboard.str_to_write.clear();
-  g.clipboard.str_to_write.add(str);
+  dstr_clear(g.clipboard.str_to_write);
+  dstr_add(g.clipboard.str_to_write, str);
   xcb_set_selection_owner(g.connection, g.window, g.clipboard.atom, XCB_CURRENT_TIME);
   xcb_flush(g.connection);
 }
@@ -534,7 +534,7 @@ String os_clipboard_read() {
     event = xcb_wait_for_event(g.connection);
     u8 type = event->response_type & ~0x80;
     if (type == XCB_SELECTION_REQUEST) {
-      xcb_window_t owner = xcb_get_selection_owner_reply(g.connection, xcb_get_selection_owner(g.connection, g.clipboard.atom), NULL)->owner;
+      xcb_window_t owner = xcb_get_selection_owner_reply(g.connection, xcb_get_selection_owner(g.connection, g.clipboard.atom), null)->owner;
       if (g.window != owner) {
         goto add_event;
       }
@@ -572,8 +572,8 @@ String os_clipboard_read() {
       if (reply) {
         u8* data = (u8*)xcb_get_property_value(reply);
         u32 len = xcb_get_property_value_length(reply);
-        g.clipboard.str_to_read.clear();
-        g.clipboard.str_to_read.add(String(data, len));
+        dstr_clear(g.clipboard.str_to_read);
+        dstr_add(g.clipboard.str_to_read, String(data, len));
       }
       break;
     }

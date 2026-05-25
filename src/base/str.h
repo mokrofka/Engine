@@ -6,16 +6,17 @@
 ////////////////////////////////////////////////////////////////////////
 // Base
 
-struct DString {
+struct Dstring {
   u8* str;
   u32 size;
   u32 cap;
   Allocator alloc;
-  void init(Allocator alloc_);
-  void add(String str);
-  void clear();
   operator String();
 };
+
+Dstring dstr_make(Allocator alloc);
+void dstr_add(Dstring& arr, String str);
+void dstr_clear(Dstring& arr);
 
 struct StringArray {
   String* v;

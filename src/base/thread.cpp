@@ -44,24 +44,17 @@ intern Task thread_task_pop() {
 intern Result<Task> thread_task_try_pop() {
   TaskQueue& q = thread_pool.queue;
   os_mutex_take(q.mutex);
-  b32 good = false;
-  if (q.count) {
-    good = true;
-    if (q.count == MAX_TASKS) {
-      os_cond_var_signal(q.cond_not_full);
-    }
-    --q.count;
-  }
-  Task t = {};
-  if (good) {
-    ring_read_struct(q.ring, &t);
-  }
-  os_mutex_drop(q.mutex);
-  if (good) {
-    return ResultOk(t);
-  } else {
+  defer(os_mutex_drop(q.mutex));
+  if (q.count == 0) {
     return ResultErr();
   }
+  if (q.count == MAX_TASKS) {
+    os_cond_var_signal(q.cond_not_full);
+  }
+  Task t;
+  ring_read_struct(q.ring, &t);
+  --q.count;
+  return ResultOk(t);
 }
 
 intern void thread_worker(void* ctx) {

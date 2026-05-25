@@ -84,6 +84,7 @@ struct ProfState {
   b32 paused;
 
   ProfTabActive active_tab;
+  ProfTabActive future_active_tab;
 };
 
 void prof_init(Allocator arena);

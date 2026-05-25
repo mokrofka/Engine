@@ -365,28 +365,32 @@ String::String(u8* str_){
   size = cstr_length(str_) ;
 }
 
-void DString::init(Allocator alloc_) { *this = {}; alloc = alloc_;}
-
-void DString::add(String x) {
-  if (x.size + size > cap) {
-    if (str) {
-      u32 modifier = CeilIntDiv(x.size+size, cap);
-      u32 old_cap = cap;
-      cap *= modifier;
-      str = mem_realloc_array(alloc, str, old_cap, cap);
+Dstring dstr_make(Allocator alloc) {
+  Dstring res = {
+    .alloc = alloc,
+  };
+  return res;
+}
+void dstr_add(Dstring& arr, String str) {
+  if (str.size + arr.size > arr.cap) {
+    if (arr.str) {
+      u32 modifier = CeilIntDiv(str.size+arr.size, arr.cap);
+      u32 old_cap = arr.cap;
+      arr.cap *= modifier;
+      arr.str = mem_realloc_array(arr.alloc, arr.str, old_cap, arr.cap);
     } else {
-      cap = Max(x.size, (u64)DEFAULT_CAPACITY);
-      str = mem_alloc(alloc, cap);
+      arr.cap = Max(str.size, (u64)DEFAULT_CAPACITY);
+      arr.str = mem_alloc(arr.alloc, arr.cap);
     }
   }
-  MemCopy(str+size, x.str, x.size);
-  size += x.size;
+  MemCopy(arr.str+arr.size, str.str, str.size);
+  arr.size += str.size;
+}
+void dstr_clear(Dstring&arr) {
+  arr.size = 0;
 }
 
-void DString::clear() { size = 0; }
-
-DString::operator String() { return {str, size}; }
-
+Dstring::operator String() { return {str, size}; }
 String64::operator String() { return {str, size}; }
 
 ////////////////////////////////////////////////////////////////////////
@@ -625,38 +629,6 @@ String str_next_word(String line, u32& start) {
     start++;
   return {line.str + token_start, start - token_start};
 }
-
-// String str_read_line(Range* range) {
-//   while (range->offset < range->size) {
-//     u8* line_start = (u8*)range->offset;
-//     u8* start = (u8*)range->offset;
-//     u8* end = (u8*)range->size;
-// #if OS_WINDOWS
-//     while (start < end && *start != '\r') {
-//       ++start;
-//     }
-//     u32 len = start - line_start;
-//     // move to next line and handle \r\n
-//     range->offset += len + 2;
-// #else
-//     while (start < end && *start != '\n') {
-//       ++start;
-//     }
-//     u32 len = start - line_start;
-//     // move to next line and handle \n
-//     range->offset += len + 1;
-// #endif
-//     // If line is not empty, return it
-//     if (len > 0) {
-//       String result = {line_start, len};
-//       return result;
-//     }
-//     // If line was empty, loop to read the next one
-//   }
-//   // If nothing left
-//   String result = {0, 0};
-//   return result;
-// }
 
 String str_trim(String string) {
   String result;

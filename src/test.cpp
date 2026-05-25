@@ -1,4 +1,4 @@
-#include "common.h"
+#include "com.h"
 
 ////////////////////////////////////////////////////////////////////////
 // Test
@@ -685,6 +685,10 @@ void test_link_list() {
 ////////////////////////////////////////////////////////////////////////
 // sort
 
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
 void test_sort() {
   Scratch scratch;
   {
@@ -715,7 +719,22 @@ void test_sort() {
     }
     print("\n");
   }
-  u32 counts[] = {128, 512, KB(1), KB(10), KB(100), MB(1)};
+  {
+    Scratch scratch;
+    Info("radix");
+    i32 arr[] = {0, -4, -3, 7, 3};
+    Slice<SortEntry> entries = push_slice(scratch, SortEntry, ArrayCount(arr));
+    for EachElement(i, arr) {
+      entries[i] = {sort_i32_key_to_u32(arr[i]), (u32)i};
+    }
+    sort_radix(scratch, entries);
+    for EachElement(i, arr) {
+      print("%i ", arr[entries[i].idx]);
+    }
+    print("\n");
+  }
+
+  u32 counts[] = {32, 64, 128, 512, KB(1), KB(10), KB(100), MB(1)};
   Slice<u32> arrs[ArrayCount(counts)];
   for EachElement(i, counts) {
     arrs[i] = push_slice(scratch, u32, counts[i]);
@@ -747,10 +766,29 @@ void test_sort() {
       }
     }
   }
+  Info("\nradix test:");
+  Loop (i, 2) {
+    for EachElement(i, counts) {
+      Scratch scratch;
+      Info("Count %i", counts[i]);
+      rand_shuffle(arrs[i]);
+      Slice<SortEntry> entries = push_slice(scratch, SortEntry, counts[i]);
+      Loop (j, counts[i]) {
+        entries[j] = {arrs[i][j], (u32)j};
+      }
+      {
+        TimeScope t;
+        Scratch scratch;
+        sort_radix(scratch, entries);
+      }
+    }
+  }
 }
 
 void test() {
   ProfFunc;
+  test_sort();
+  os_exit(0);
   test_global_alloc();
   test_arena_alloc();
   test_arena_list_alloc();

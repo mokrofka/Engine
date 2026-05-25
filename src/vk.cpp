@@ -1,5 +1,4 @@
 #include "vk.h"
-#include "common.h"
 #include "vulkan/vulkan_core.h"
 
 #include "vk_bindings.h"
