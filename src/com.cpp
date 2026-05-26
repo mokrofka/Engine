@@ -107,24 +107,15 @@ f64 tsc_to_ms(u64 tsc) {
 f32 get_dt() { return g_st->dt; }
 f32 get_time() { return g_st->time; }
 
-Transform& EntityId::trans() { 
-  Assert(id_generation(v) == g_st->game.entity_id_pool.generations[id_idx(v)]);
-  return g_st->transforms[id_idx(v)];
+Entity& get_entity(EntityId id) {
+  Assert(id_generation(id.v) == g_st->game.entity_id_pool.generations[id_idx(id.v)])
+  return g_st->game.entities[id_idx(id.v)];
 }
-v3& EntityId::pos() { return trans().pos; }
-v3& EntityId::rot() { return trans().rot; }
-v3& EntityId::scale() { return trans().scale; }
-Entity& EntityId::get() { return g_st->game.entities[v & INDEX_MASK]; }
-Rng3& EntityId::aabb() { return get().aabb; }
-v3& EntityId::vel() { return get().vel; }
 
-Transform& StaticEntityId::trans() {
-  Assert(id_generation(v) == g_st->game.static_entity_id_pool.generations[id_idx(v)]);
-  return g_st->static_transforms[id_idx(v)];
+StaticEntity& get_static_entity(StaticEntityId id) {
+  Assert(id_generation(id.v) == g_st->game.static_entity_id_pool.generations[id_idx(id.v)]);
+  return g_st->game.static_entities[id_idx(id.v)];
 }
-v3& StaticEntityId::pos() { return trans().pos; }
-v3& StaticEntityId::rot() { return trans().rot; }
-v3& StaticEntityId::scale() { return trans().scale; }
 
 Mesh load_obj(Allocator arena, String name) {
   Scratch scratch(arena);
@@ -689,6 +680,9 @@ b32 json_iter_array(JsonReader* r, JsonValue arr, JsonValue* val) {
   if (val->type == JsonType_Error || val->type == JsonType_End) { return false; }
   return true;
 }
+
+////////////////////////////////////////////////////////////////////////
+// @Serialization
 
 ////////////////////////////////////////////////////////////////////////
 // @Input
@@ -1595,10 +1589,10 @@ void profiler_view() {
 String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr) {
   Scratch scratch(arena);
   var string = dstr_make(arena);
-  for EachElement(j, members_of_Entity) {
-    MemberDefinition member = members_of_Entity[j];
+  Loop (i, members.count) {
+    MemberDefinition member = members[i];
     u8* member_ptr = Offset(ptr, member.offset);
-    switch (members_of_Entity->type) {
+    switch (members[i].type) {
       default:{} break;
       case MetaType_u32: {
         dstr_add(string, push_strf(scratch, "%s %u\n", member.name, *(u32*)member_ptr));
@@ -1610,7 +1604,7 @@ String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr) 
         dstr_add(string, push_strf(scratch, "%s %u\n", member.name, *(b32*)member_ptr));
       } break;
       case MetaType_f32: {
-        dstr_add(string, push_strf(scratch, "%s %u\n", member.name, *(f32*)member_ptr));
+        dstr_add(string, push_strf(scratch, "%s %f\n", member.name, *(f32*)member_ptr));
       } break;
       case MetaType_v2: {
         v2 v = *((v2*)member_ptr);
@@ -1623,6 +1617,65 @@ String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr) 
     }
   }
   return string;
+}
+
+void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Slice<Token> tokens) {
+  Tokenizer t = {tokens};
+  while (!tok_match(t, TokenType_CloseBrace)) {
+    MemberDefinition member = {};
+    Token tok = tok_next(t);
+    if (tok.type == TokenType_Identifier) {
+      Loop (i, members.count) {
+        if (str_match(members[i].name, tok.str)) {
+          member = members[i];
+          break;
+        }
+      }
+    }
+    var parse_i32 = [](Tokenizer& t) {
+      b32 negative = false;
+      Token tok = tok_next(t);
+      if (tok.type == TokenType_Minus) {
+        negative = true;
+        tok = tok_next(t);
+      }
+      i32 v = i32_from_str(tok.str);
+      return negative ? -v : v;
+    };
+    var parse_f32 = [](Tokenizer& t) {
+      b32 negative = false;
+      Token tok = tok_next(t);
+      if (tok.type == TokenType_Minus) {
+        negative = true;
+        tok = tok_next(t);
+      }
+      f32 v = f32_from_str(tok.str);
+      return negative ? -v : v;
+    };
+    switch (member.type) {
+      default:{} break;
+      case MetaType_u32: {
+        Token tok = tok_next(t);
+        *(u32*)Offset(ptr, member.offset) = u32_from_str(tok.str);
+      } break;
+      case MetaType_i32: {
+        *(i32*)Offset(ptr, member.offset) = parse_i32(t);
+      } break;
+      case MetaType_b32: {
+        Token tok = tok_next(t);
+        *(u32*)Offset(ptr, member.offset) = u32_from_str(tok.str);
+      } break;
+      case MetaType_f32: {
+        *(f32*)Offset(ptr, member.offset) = parse_f32(t);
+      } break;
+      case MetaType_v2: {
+        *(v2*)Offset(ptr, member.offset) = v2(parse_f32(t), parse_f32(t));
+      } break;
+      case MetaType_v3: {
+        *(v3*)Offset(ptr, member.offset) = v3(parse_f32(t), parse_f32(t), parse_f32(t));
+      } break;
+    }
+  }
 }
 
 void game_view() {
@@ -1644,9 +1697,29 @@ void game_view() {
     ImGui::Text("entities: %u, static entities: %u", g.entities_count, g.static_entities_count);
     ImGui::Text("Camera: x: %.2f y: %.2f z: %.2f", pos.x, pos.y, pos.z);
     ImGui::DragFloat("speed", &cam.speed, 1);
-    Entity data = g.monkey.get();
-    ImString str = push_str_copy(scratch, dumb_struct(scratch, ArraySlice(members_of_Entity), &data));
+    Camera data = g.cam;
+    ImString str = push_str_copy(scratch, dumb_struct(scratch, ArraySlice(members_of_Camera), &data));
     ImGui::Text("%s", str.str);
+
+    if (ImGui::Button("save state")) {
+      String str = dumb_struct(scratch, ArraySlice(members_of_Camera), &g.cam);
+      OS_Handle file = os_file_open(push_strf(scratch, "%s/saved", os_get_current_directory(), String("saved")), OS_AccessFlag_Write | OS_AccessFlag_Trunc);
+      String str1 = push_str_cat(scratch, "Camera {\n", str);
+      String str2 = push_str_cat(scratch, str1, "}");
+      os_file_write(file, str2.size, str2.str);
+      os_file_close(file);
+    }
+    if (ImGui::Button("load state")) {
+      OS_Handle file = os_file_open(push_strf(scratch, "%s/saved", os_get_current_directory(), String("saved")), OS_AccessFlag_Read);
+      u32 size = os_file_size(file);
+      u8* data = push_buffer(scratch, size);
+      os_file_read(file, size, data);
+      os_file_close(file);
+      Slice tokens = tokens_from_str(scratch, String(data, size));
+      dumb_struct_load(ArraySlice(members_of_Camera), &g.cam, tokens);
+      Info("%s", String(data, size));
+    }
+
     ImGui::End();
   }
 }
@@ -1749,8 +1822,6 @@ void com_init() {
     test();
 
     g.gpa = alloc_seglist_make(g.arena);
-    g.transforms = push_array(g.arena, Transform, MaxEntities);
-    g.static_transforms = push_array(g.arena, Transform, MaxStaticEntities);
     g.asset_path = push_strf(g.arena, "%s/%s", os_get_current_directory(), String("../assets"));
     g.shader_dir = push_str_cat(g.arena, g.asset_path, "/shaders");
     g.shader_compiled_dir = push_str_cat(g.arena, g.shader_dir, "/compiled");
@@ -1988,24 +2059,22 @@ v3 ray_from_camera() {
 
 EntityId e_alloc(MeshId mesh_id, MaterialId material_id) {
   GameState& g = g_st->game;
-  u32 e_id = static_id_pool_alloc(g.entity_id_pool);
-  EntityId e = {e_id};
-  e.trans() = {};
-  e.scale() = v3_one();
-  vk_make_renderable(e, mesh_get(mesh_id), material_get(material_id));
+  EntityId e_id = {static_id_pool_alloc(g.entity_id_pool)};
+  Entity& e = get_entity(e_id);
+  e.scale = v3_one();
+  vk_make_renderable(e_id, mesh_get(mesh_id), material_get(material_id));
   ++g.entities_count;
-  return e;
+  return e_id;
 }
 
 StaticEntityId e_static_alloc(MeshId mesh_id, MaterialId material_id) {
   GameState& g = g_st->game;
-  u32 e_id = static_id_pool_alloc(g.static_entity_id_pool);
-  StaticEntityId e = {e_id};
-  e.trans() = {};
-  e.scale() = v3_one();
-  vk_make_renderable_static(e, mesh_get(mesh_id), material_get(material_id));
+  StaticEntityId e_id = {static_id_pool_alloc(g.static_entity_id_pool)};
+  StaticEntity& e = get_static_entity(e_id);
+  e.scale = v3_one();
+  vk_make_renderable_static(e_id, mesh_get(mesh_id), material_get(material_id));
   ++g.static_entities_count;
-  return e;
+  return e_id;
 }
 
 void e_release(EntityId e) {
@@ -2018,11 +2087,12 @@ void e_release(EntityId e) {
 void select_obj() {
   GameState& g = g_st->game;
   v3 dir = ray_from_camera();
-  var e = e_alloc(Mesh_Cube, Material_Orange);
+  EntityId e_id = e_alloc(Mesh_Cube, Material_Orange);
+  Entity& e = get_entity(e_id);
   // e.pos() = st->cam.pos + v3_norm(mat4_forward(st->cam.view));
-  e.pos() = g.cam.pos;
-  e.scale() = v3_scale(0.3);
-  e.vel() = dir * 4;
+  e.pos = g.cam.pos;
+  e.scale = v3_scale(0.3);
+  e.vel = dir * 4;
 }
 
 void camera_init() {
@@ -2119,28 +2189,32 @@ void scene_init() {
   Scratch scratch;
   GameState& g = g_st->game;
   camera_init();
-  var cube = e_alloc(Mesh_Cube, Material_Orange);
-  g.rotating_cube = cube;
-  var monkey = e_alloc(Mesh_MonkeyGlb, Material_Container);
-  monkey.aabb() = {v3_scale(-1.2), v3_scale(1.2)};
-  g.monkey = monkey;
+  EntityId cube = e_alloc(Mesh_Cube, Material_Orange);
+  g.rotating_cube_id = cube;
+  EntityId monkey_id = e_alloc(Mesh_MonkeyGlb, Material_Container);
+  Entity& monkey = get_entity(monkey_id);
+  monkey.aabb = {v3_scale(-1.2), v3_scale(1.2)};
+  g.monkey_id = monkey_id;
   {
-    var triangle = e_alloc(Mesh_Triangle, Material_Orange);
-    triangle.pos() = v3_scale(3);
+    EntityId triangle_id = e_alloc(Mesh_Triangle, Material_Orange);
+    Entity& triangle = get_entity(triangle_id);
+    triangle.pos = v3_scale(3);
   }
   {
-    var grid = e_alloc(Mesh_Grid, Material_Line);
-    g.grid = grid;
-    vk_set_entity_color(grid, v4_scale(0.6));
-    grid.pos() = v3(0,0,-5);
+    EntityId grid_id = e_alloc(Mesh_Grid, Material_Line);
+    g.grid_id = grid_id;
+    vk_set_entity_color(grid_id, v4_scale(0.6));
+    Entity& grid = get_entity(grid_id);
+    grid.pos = v3(0,0,-5);
   }
   {
-    g.axis_attached_to_cam = e_alloc(Mesh_Axis, Material_Axis);
+    g.axis_attached_to_cam_id = e_alloc(Mesh_Axis, Material_Axis);
   }
   Loop (i, 3) {
-    var cube = e_alloc(Mesh_Cube, Material_Orange);
+    EntityId cube_id = e_alloc(Mesh_Cube, Material_Orange);
     u32 range = 10;
-    cube.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
+    Entity& cube = get_entity(cube_id);
+    cube.pos = v3_rand_rng(-v3_scale(range), v3_scale(range));
   }
 #if 1
   // Loop (i, MB(1)-KB(1)) {
@@ -2159,17 +2233,19 @@ void scene_init() {
       // Material_Container,
       // Material_Screen,
     };
-    var e = e_static_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
+    StaticEntityId e_id = e_static_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
     u32 range = KB(1);
-    e.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
+    StaticEntity& e = get_static_entity(e_id);
+    e.pos = v3_rand_rng(-v3_scale(range), v3_scale(range));
     // v3 dir = v3_rand_rng(v3_scale(-1), v3_scale(1));
     // e.pos() = v3_norm(dir) * range;
   }
 #endif
 
   {
-    g.sphere = e_alloc(Mesh_Sphere, Material_Container);
-    g.sphere.pos() = v3(0,0,-10);
+    g.sphere_id = e_alloc(Mesh_Sphere, Material_Container);
+    Entity& sphere = get_entity(g.sphere_id);
+    sphere.pos = v3(0,0,-10);
   }
   {
     // Handle<Entity> e = entity_create(Mesh_Castle, Shader_E_Texture, Material_Castle);
@@ -2186,10 +2262,11 @@ void scene_init() {
     // Loop (i, KB(400)) {
     // Loop (i, MB(1)-KB(1)) {
     Loop (i, 0) {
-      var e = e_alloc(Mesh_Cube, Material_Container);
+      EntityId e_id = e_alloc(Mesh_Cube, Material_Container);
       u32 range = KB(1);
-      e.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
-      darray_add(g.moving_cubes, e);
+      Entity& e = get_entity(e_id);
+      e.pos = v3_rand_rng(-v3_scale(range), v3_scale(range));
+      darray_add(g.moving_cubes, e_id);
     }
   }
 
@@ -2204,16 +2281,18 @@ void scene_init() {
       Material_Container,
       // Material_Screen,
     };
-    var e = e_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
+    EntityId e_id = e_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
     u32 range = 100;
-    e.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
-    darray_add(g.moving_cubes, e);
+    Entity& e = get_entity(e_id);
+    e.pos = v3_rand_rng(-v3_scale(range), v3_scale(range));
+    darray_add(g.moving_cubes, e_id);
   }
 
   {
-    var e = e_alloc(Mesh_Cube, Material_Orange);
-    e.pos() = {};
-    g.target = e;
+    EntityId e_id = e_alloc(Mesh_Cube, Material_Orange);
+    Entity& e = get_entity(e_id);
+    e.pos = {};
+    g.target_id = e_id;
   }
 }
 
@@ -2235,16 +2314,18 @@ void scene_update() {
   }
   // moving cube and monkey
   {
-    var cube = g.rotating_cube;
-    var monkey = g.monkey;
-    monkey.pos().x += 0.1 * get_dt();
-    cube.pos().x = monkey.pos().x + Sin(get_time()) * 4;
-    cube.pos().z = monkey.pos().z + Cos(get_time()) * 4;
-    cube.pos().y = monkey.pos().z + Cos(get_time()) * 4;
+    EntityId cube_id = g.rotating_cube_id;
+    EntityId monkey_id = g.monkey_id;
+    Entity& cube = get_entity(cube_id);
+    Entity& monkey = get_entity(monkey_id);
+    monkey.pos.x += 0.1 * get_dt();
+    cube.pos.x = monkey.pos.x + Sin(get_time()) * 4;
+    cube.pos.z = monkey.pos.z + Cos(get_time()) * 4;
+    cube.pos.y = monkey.pos.z + Cos(get_time()) * 4;
   }
   {
-    var e = g.monkey;
-    vk_draw_cuboid(shift_3f32(e.aabb(), e.pos()), ColorWhite);
+    Entity& e = get_entity(g.monkey_id);
+    vk_draw_cuboid(shift_3f32(e.aabb, e.pos), ColorWhite);
   }
   {
     mat4& view = vk_get_view();
@@ -2254,9 +2335,9 @@ void scene_update() {
     f32 dist = 1.0f;
     f32 xoff = 0.3f;
     f32 yoff = 0.3f;
-    var axis = g.axis_attached_to_cam;
-    axis.pos() = g.cam.pos + forward*dist + right*xoff + up*yoff;
-    axis.scale() = v3_scale(0.1);
+    Entity& axis = get_entity(g.axis_attached_to_cam_id);
+    axis.pos = g.cam.pos + forward*dist + right*xoff + up*yoff;
+    axis.scale = v3_scale(0.1);
   }
 
   ///////////////////////////////////
@@ -2272,24 +2353,25 @@ void scene_update() {
       // Material_Container,
       // Material_Screen,
     };
-    var e = e_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
+    EntityId e_id = e_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
+    Entity& e = get_entity(e_id);
     u32 range = 100;
-    e.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
-    darray_add(g.moving_cubes, e);
+    e.pos = v3_rand_rng(-v3_scale(range), v3_scale(range));
+    darray_add(g.moving_cubes, e_id);
   }
   Loop (i, g.moving_cubes.count) {
-    var e = g.moving_cubes[i];
-    e.pos() += e.vel() * get_dt();
+    Entity& e = get_entity(g.moving_cubes[i]);
+    e.pos += e.vel * get_dt();
     v3 center = {0, 0, 0};
-    v3 dir = e.pos() - center;
+    v3 dir = e.pos - center;
     v3 tangent = v3_norm(v3{-dir.z, 0, dir.x});
-    e.vel() += tangent * 2.0f * get_dt();
-    e.vel() += -dir * 0.5f * get_dt();
+    e.vel += tangent * 2.0f * get_dt();
+    e.vel += -dir * 0.5f * get_dt();
   }
   {
-    var e = g.target;
+    Entity& e = get_entity(g.target_id);
     // e.pos().x -= 1 * get_dt();
-    e.pos() = v3_norm(v3(-e.pos().z, 0, e.pos().x));
+    e.pos = v3_norm(v3(-e.pos.z, 0, e.pos.x));
   }
 
   vk_draw_rect(Rng2(v2(100,100), v2(200,200)), v3(1,1,1));
@@ -2316,16 +2398,12 @@ void game_init() {
   g.persistent_arena = arena_make_named("game arena persistent");
   g.gpa = alloc_seglist_make(g.arena, "game gpa");
   g.timer = timer_make(1);
+
   g.entity_id_pool = static_id_pool_make(g.persistent_arena, MaxEntities);
   g.static_entity_id_pool = static_id_pool_make(g.persistent_arena, MaxStaticEntities);
   g.entities = push_array(g.persistent_arena, Entity, MaxEntities);
   g.static_entities = push_array(g.persistent_arena, StaticEntity, MaxStaticEntities);
   g.moving_cubes = darray_make<EntityId>(g.gpa);
-
-  g.gpa_arena0 = alloc_seglist_make(g.arena, "game gpa arena0");
-  g.gpa_arena1 = alloc_seglist_make(g.arena, "game gpa arena1");
-  g.gpa_gpa0 = alloc_seglist_make(g.arena, "game gpa arena0");
-  g.gpa_gpa1 = alloc_seglist_make(g.arena, "game gpa arena1");
 
   // Mesh cube_mesh = {.vertices = cube_vertices, .vert_count = ArrayCount(cube_vertices)};
   // mesh_set(Mesh_Cube, vk_mesh_load(cube_mesh));

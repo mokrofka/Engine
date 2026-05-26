@@ -6,11 +6,3 @@ MemberDefinition members_of_Camera[] = {
   {MetaType_f32, "fov", OffsetOf(Camera,fov)},
   {MetaType_f32, "speed", OffsetOf(Camera,speed)},
 };
-MemberDefinition members_of_Entity[] = {
-  {MetaType_v3, "vel", OffsetOf(Entity,vel)},
-  {MetaType_Rng3, "aabb", OffsetOf(Entity,aabb)},
-  {MetaType_u32, "a", OffsetOf(Entity,a)},
-  {MetaType_u32, "b", OffsetOf(Entity,b)},
-  {MetaType_Rng2, "rect", OffsetOf(Entity,rect)},
-  {MetaType_u32, "pa", OffsetOf(Entity,pa)},
-};

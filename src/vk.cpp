@@ -1779,9 +1779,16 @@ void vk_draw() {
         VK_MeshBatch mesh_batch = shader_batch.mesh_batches[i];
         if (mesh_batch.entities.count == 0) continue;
         Loop (i, mesh_batch.entities.count) {
-          var e = mesh_batch.entities[i];
-          u32 entity_idx = entity_offset + id_idx(e);
-          Transform trans = is_static ? ((StaticEntityId)e).trans() : ((EntityId)e).trans();
+          u32 e_id = mesh_batch.entities[i];
+          u32 entity_idx = entity_offset + id_idx(e_id);
+          Transform trans = {};
+          if (is_static) {
+            StaticEntity& e = get_static_entity(StaticEntityId{e_id});
+            trans = Transform{e.pos, e.rot, e.scale};
+          } else {
+            Entity& e = get_entity(EntityId{e_id});
+            trans = Transform{e.pos, e.rot, e.scale};
+          }
           ctx.gpu_entities[entity_idx].model = mat4_transform(trans);
           ctx.gpu_entities_indices[entity_offset + (*entities_count)++] = entity_idx;
         }

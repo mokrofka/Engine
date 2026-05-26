@@ -29,6 +29,7 @@ Slice<Token> tokens_from_str(Allocator arena, String string) {
       case ',': token_type = TokenType_Comma; advance = 1; break;
       case '|': token_type = TokenType_Or; advance = 1; break;
       case '#': token_type = TokenType_Pound; advance = 1; break;
+      case '-': token_type = TokenType_Minus; advance = 1; break;
       case '"': token_type = TokenType_String; advance = 1; {
         while (!is_end() && str[off + advance] != '"') {
           if (cur_byte() == '\\' && !is_next_end()) {
@@ -108,4 +109,48 @@ Slice<Token> tokens_from_str(Allocator arena, String string) {
     darray_add(tokens, token);
   }
   return slice(tokens);
+}
+
+b32 tok_is_trivia(TokenType type) { return type == TokenType_Spacing || type == TokenType_NewLine || type == TokenType_Comment; }
+void tok_skip_trivia(Tokenizer& t) {
+  while (t.i < t.tokens.count && tok_is_trivia(t.tokens[t.i].type)) {
+    ++t.i;
+  }
+}
+b32 tok_eof(Tokenizer& t) {
+  tok_skip_trivia(t);
+  return t.i >= t.tokens.count;
+}
+Token tok_peek(Tokenizer& t) {
+  if (tok_eof(t))
+    Error("unexpected eof");
+  return t.tokens[t.i];
+}
+Token tok_next(Tokenizer& t) {
+  Token tok = tok_peek(t);
+  ++t.i;
+  return tok;
+}
+b32 tok_match(Tokenizer& t, TokenType type) {
+  if (!tok_eof(t) && t.tokens[t.i].type == type) {
+    ++t.i;
+    return true;
+  }
+  return false;
+}
+Token tok_require(Tokenizer& t, TokenType type) {
+  Token tok = tok_next(t);
+  if (tok.type != type) {
+    Error("expected token type %i, got %i", type, tok.type);
+    return {};
+  }
+  return tok;
+}
+Token tok_require_ident(Tokenizer& t, String expected) {
+  Token tok = tok_require(t, TokenType_Identifier);
+  if (!str_match(tok.str, expected)) {
+    Error("expected '%s', got '%s'", expected, tok.str);
+    return {};
+  }
+  return tok;
 }

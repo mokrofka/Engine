@@ -58,6 +58,8 @@ struct GpuMaterialId { u32 v; };
 struct GpuMeshId { u32 v; };
 struct GpuShaderId { u32 v; };
 struct GpuCubemapId { u32 v; };
+struct EntityId { u32 v; };
+struct StaticEntityId { u32 v; };
 
 struct PointLight {
   v3 color;
@@ -268,7 +270,12 @@ b32 json_iter_array(JsonReader* r, JsonValue arr, JsonValue* val);
 ////////////////////////////////////////////////////////////////////////
 // @Serialization
 
+struct Serealizer {
+  u8* base;
+  u32 offset;
+};
 
+void serialize_data(Serealizer ser, Slice<MemberDefinition> members, void* ptr);
 
 ////////////////////////////////////////////////////////////////////////
 // @Input
@@ -393,66 +400,47 @@ Introspect struct Camera {
   f32 speed;
 };
 
-Introspect struct Entity {
-  v3 vel;
+struct Entity {
+  v3 pos;
+  v3 rot;
+  v3 scale;
   Rng3 aabb;
-  u32 a;
-  u32 b;
-  Rng2 rect;
-  u32 pa;
+  v3 vel;
 };
 
-struct EntityId {
-  u32 v;
-  Transform& trans();
-  v3& pos();
-  v3& rot();
-  v3& scale();
-  Entity& get();
-  Rng3& aabb();
-  v3& vel();
-};
+Entity& get_entity(EntityId id);
 
 struct StaticEntity {
+  v3 pos;
+  v3 rot;
+  v3 scale;
 };
 
-struct StaticEntityId {
-  u32 v;
-  Transform& trans();
-  v3& pos();
-  v3& rot();
-  v3& scale();
-};
+StaticEntity& get_static_entity(StaticEntityId id);
 
 struct GameState {
   Arena arena;
   Arena persistent_arena;
   AllocSegList gpa;
-  AllocSegList gpa_arena0;
-  AllocSegList gpa_arena1;
-  AllocSegList gpa_gpa0;
-  AllocSegList gpa_gpa1;
   Camera cam;
   Timer timer;
 
-  u32 entities_count;
-  u32 static_entities_count;
   Entity* entities;
   StaticEntity* static_entities;
+  u32 entities_count;
+  u32 static_entities_count;
   StaticIdPool entity_id_pool;
   StaticIdPool static_entity_id_pool;
 
   Darray<EntityId> moving_cubes;
-
-  EntityId axis_attached_to_cam;
-  EntityId grid;
-  EntityId monkey;
-  EntityId rotating_cube;
-  EntityId sphere;
-
-  EntityId cube0;
-  EntityId cube1;
-  EntityId target;
+  EntityId axis_attached_to_cam_id;
+  EntityId grid_id;
+  EntityId monkey_id;
+  EntityId rotating_cube_id;
+  EntityId sphere_id;
+  EntityId cube0_id;
+  EntityId cube1_id;
+  EntityId target_id;
 };  
 
 void game_init();
@@ -468,8 +456,6 @@ struct GlobalState {
   f32 time;
   u32 current_frame;
   b32 should_hotreload;
-  Transform* transforms;
-  Transform* static_transforms;
 
   GpuMeshId meshes_handlers[Mesh_COUNT];
   GpuTextureH textures_handlers[Texture_COUNT];

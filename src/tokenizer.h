@@ -17,6 +17,7 @@ enum TokenType {
   TokenType_Comma,
   TokenType_Or,
   TokenType_Pound,
+  TokenType_Minus,
 
   TokenType_String,
   TokenType_Identifier,
@@ -35,3 +36,17 @@ struct Token {
 };
 
 Slice<Token> tokens_from_str(Allocator arena, String string);
+
+struct Tokenizer {
+  Slice<Token> tokens;
+  u32 i;
+};
+
+b32 tok_is_trivia(TokenType type);
+void tok_skip_trivia(Tokenizer& t);
+b32 tok_eof(Tokenizer& t);
+Token tok_peek(Tokenizer& t);
+Token tok_next(Tokenizer& t);
+b32 tok_match(Tokenizer& t, TokenType type);
+Token tok_require(Tokenizer& t, TokenType type);
+Token tok_require_ident(Tokenizer& t, String expected);
