@@ -176,6 +176,9 @@ OS_Handle os_file_open(String path, OS_AccessFlags flags) {
   else if(flags & OS_AccessFlag_Read) {
     lnx_flags = O_RDONLY;
   }
+  if (flags & OS_AccessFlag_Trunc) {
+    lnx_flags |= O_TRUNC;
+  }
   if(flags & OS_AccessFlag_Append) {
     lnx_flags |= O_APPEND;
   }

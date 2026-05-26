@@ -41,10 +41,11 @@ typedef u32 OS_AccessFlags;
 enum {
   OS_AccessFlag_Read       = Bit(0),
   OS_AccessFlag_Write      = Bit(1),
-  OS_AccessFlag_Execute    = Bit(2),
-  OS_AccessFlag_Append     = Bit(3),
-  OS_AccessFlag_ShareRead  = Bit(4),
-  OS_AccessFlag_ShareWrite = Bit(5),
+  OS_AccessFlag_Trunc      = Bit(2),
+  OS_AccessFlag_Execute    = Bit(3),
+  OS_AccessFlag_Append     = Bit(4),
+  OS_AccessFlag_ShareRead  = Bit(5),
+  OS_AccessFlag_ShareWrite = Bit(6),
 };
 
 typedef u32 OS_WatchFlags;

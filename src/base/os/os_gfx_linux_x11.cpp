@@ -270,7 +270,7 @@ xcb_atom_t intern_(String name) {
 void os_gfx_init() {
   X11State& g = gfx_st;
   g.arena = arena_make_named("gfx arena");
-  g.gpa.init(g.arena);
+  g.gpa = alloc_seglist_make(g.arena);
   g.input_events = darray_make<OS_InputEvent>(g.gpa);
 
   i32 screen_number;

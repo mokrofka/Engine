@@ -396,7 +396,8 @@ String64::operator String() { return {str, size}; }
 ////////////////////////////////////////////////////////////////////////
 // Character Classification & Conversion Functions
 
-b32 char_is_space(u8 c) { return c == ' ' || c == '\n' || c == '\t'; }
+b32 char_is_space(u8 c) { return c == ' ' || c == '\t'; }
+b32 char_is_newline(u8 c) { return c == '\r' || c == '\n'; }
 b32 char_is_upper(u8 c) { return 'A' <= c && c <= 'Z'; }
 b32 char_is_lower(u8 c) { return 'a' <= c && c <= 'z'; }
 b32 char_is_alpha(u8 c) { return char_is_upper(c) || char_is_lower(c); }
@@ -716,6 +717,10 @@ f64 f64_from_str(String str) {
     x = -x;
   return x;
 }
+
+u32 u32_from_str(String str) { return u64_from_str(str); };
+i32 i32_from_str(String str) { return i64_from_str(str); };
+f32 f32_from_str(String str) { return f64_from_str(str); };
 
 ////////////////////////////////////////////////////////////////////////
 // String Path Helpers

@@ -151,9 +151,6 @@ struct AllocSegList {
 #endif
   Allocator alloc;
   u8* pools[32];
-  AllocSegList() = default;
-  AllocSegList(Allocator alloc_);
-  void init(Allocator alloc_, String name = {});
   operator Allocator();
 };
 

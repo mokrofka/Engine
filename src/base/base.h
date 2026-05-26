@@ -341,6 +341,8 @@ const u32 DEFAULT_CAPACITY = 8;
 const u32 DEFAULT_RESIZE_FACTOR = 2;
 const u32 THREAD_COUNT = 2;
 
+#define Introspect
+
 ////////////////////////////////////////////////////////////////////////
 // Types
 

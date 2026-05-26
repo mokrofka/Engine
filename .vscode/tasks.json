@@ -10,6 +10,15 @@
         "kind": "build",
         "isDefault": true
       }
+    },
+    {
+      "label": "Preprocessor",
+      "type": "process",
+      "command": "${workspaceFolder}/bin/preprocessor",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
     }
   ]
 }

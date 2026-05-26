@@ -1,6 +1,7 @@
 #include "com.h"
 #include "vk.h"
 #include "test.cpp"
+#include "generated.h"
 
 #include "stb_image.h"
 #include "stb_truetype.h"
@@ -593,55 +594,6 @@ void assets_load() {
   }
   MATERIAL_LIST
 #undef X
-}
-
-////////////////////////////////////////////////////////////////////////
-// @Lexer
-
-Slice<Token> tokens_from_str(Allocator arena, String str) {
-  var tokens = darray_make<Token>(arena);
-  u32 off = 0;
-  TokenType active_token = TokenType_Null;
-  for (u32 advance = 0; off <= str.size; off += advance) {
-    u8 byte      = (off+0 < str.size) ? str.str[off+0] : 0;
-    u8 next_byte = (off+1 < str.size) ? str.str[off+1] : 0;
-    b32 ender_found = false;
-    switch (active_token) {
-      case TokenType_Null: {
-        if ((byte == '\r' && next_byte == '\n') || byte == '\n') {
-          // active_token = TokenType_;
-          advance = 0;
-        }
-      } break;
-      case TokenType_OpenParen:
-      case TokenType_CloseParen:
-      case TokenType_Colon:
-      case TokenType_Semicolon:
-      case TokenType_Asterisk:
-      case TokenType_OpenBracket:
-      case TokenType_CloseBracket:
-      case TokenType_OpenBrace:
-      case TokenType_CloseBrace:
-      case TokenType_Equals:
-      case TokenType_Comma:
-      case TokenType_Or:
-      case TokenType_Pound:
-      case TokenType_String:
-      case TokenType_Identifier:
-      case TokenType_Number:
-      case TokenType_Spacing:
-      case TokenType_EndOfLine:
-      case TokenType_Comment:
-      case TokenType_EndOfStream:
-        break;
-    }
-    if (ender_found) {
-      Token token = {active_token, String(str.str+off, advance)};
-      darray_add(tokens, token);
-      active_token = TokenType_Null;
-    }
-  }
-  return slice(tokens);
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -1640,7 +1592,41 @@ void profiler_view() {
   g.active_tab = g.future_active_tab;
 }
 
+String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr) {
+  Scratch scratch(arena);
+  var string = dstr_make(arena);
+  for EachElement(j, members_of_Entity) {
+    MemberDefinition member = members_of_Entity[j];
+    u8* member_ptr = Offset(ptr, member.offset);
+    switch (members_of_Entity->type) {
+      default:{} break;
+      case MetaType_u32: {
+        dstr_add(string, push_strf(scratch, "%s %u\n", member.name, *(u32*)member_ptr));
+      } break;
+      case MetaType_i32: {
+        dstr_add(string, push_strf(scratch, "%s %u\n", member.name, *(i32*)member_ptr));
+      } break;
+      case MetaType_b32: {
+        dstr_add(string, push_strf(scratch, "%s %u\n", member.name, *(b32*)member_ptr));
+      } break;
+      case MetaType_f32: {
+        dstr_add(string, push_strf(scratch, "%s %u\n", member.name, *(f32*)member_ptr));
+      } break;
+      case MetaType_v2: {
+        v2 v = *((v2*)member_ptr);
+        dstr_add(string, push_strf(scratch, "%s %f %f\n", member.name, v.x, v.y));
+      } break;
+      case MetaType_v3: {
+        v3 v = *((v3*)member_ptr);
+        dstr_add(string, push_strf(scratch, "%s %f %f %f\n", member.name, v.x, v.y, v.z));
+      } break;
+    }
+  }
+  return string;
+}
+
 void game_view() {
+  Scratch scratch;
   GameState& g = g_st->game;
   ImguiWindow& win = g_st->game_win;
   Camera& cam = g.cam;
@@ -1657,8 +1643,10 @@ void game_view() {
     v3 pos = cam.pos;
     ImGui::Text("entities: %u, static entities: %u", g.entities_count, g.static_entities_count);
     ImGui::Text("Camera: x: %.2f y: %.2f z: %.2f", pos.x, pos.y, pos.z);
-    // ImGui::SliderFloat("", &cam.speed, 0, 10000);
     ImGui::DragFloat("speed", &cam.speed, 1);
+    Entity data = g.monkey.get();
+    ImString str = push_str_copy(scratch, dumb_struct(scratch, ArraySlice(members_of_Entity), &data));
+    ImGui::Text("%s", str.str);
     ImGui::End();
   }
 }
@@ -1745,7 +1733,7 @@ void watch_update() {
 ////////////////////////////////////////////////////////////////////////
 // @State
 
-void common_init() {
+void com_init() {
   Scratch scratch;
 
   GlobalState& g = *g_st;
@@ -1760,7 +1748,7 @@ void common_init() {
     thread_pool_init(THREAD_COUNT);
     test();
 
-    g.gpa.init(g.arena);
+    g.gpa = alloc_seglist_make(g.arena);
     g.transforms = push_array(g.arena, Transform, MaxEntities);
     g.static_transforms = push_array(g.arena, Transform, MaxStaticEntities);
     g.asset_path = push_strf(g.arena, "%s/%s", os_get_current_directory(), String("../assets"));
@@ -1794,7 +1782,7 @@ void common_init() {
   prof_launch_end();
 }
 
-void common_update() {
+void com_update() {
   GlobalState& g = *g_st;
   input_update();
   profiler_view();
@@ -1833,7 +1821,7 @@ if (data->ctx == null) {
     g_st->arena = arena;
     {
       u64 start = cpu_timer_now();
-      common_init();
+      com_init();
       Info("init time: %fms", tsc_to_ms(cpu_timer_now() - start));
     }
 #if HOTRELOAD_BUILD
@@ -1866,7 +1854,7 @@ if (data->ctx == null) {
       last_time = start_time;
       vk_begin_draw_frame();
       // ui_begin();
-      common_update();
+      com_update();
       game_update();
       // ui_end();
       vk_end_draw_frame();
@@ -2326,7 +2314,7 @@ void game_init() {
   Scratch scratch;
   g.arena = arena_make_named("game arena");
   g.persistent_arena = arena_make_named("game arena persistent");
-  g.gpa.init(g.arena, "game gpa");
+  g.gpa = alloc_seglist_make(g.arena, "game gpa");
   g.timer = timer_make(1);
   g.entity_id_pool = static_id_pool_make(g.persistent_arena, MaxEntities);
   g.static_entity_id_pool = static_id_pool_make(g.persistent_arena, MaxStaticEntities);
@@ -2334,10 +2322,10 @@ void game_init() {
   g.static_entities = push_array(g.persistent_arena, StaticEntity, MaxStaticEntities);
   g.moving_cubes = darray_make<EntityId>(g.gpa);
 
-  g.gpa_arena0.init(g.arena, "game gpa arena0");
-  g.gpa_arena1.init(g.arena, "game gpa arena1");
-  g.gpa_gpa0.init(g.arena, "game gpa arena0");
-  g.gpa_gpa1.init(g.arena, "game gpa arena1");
+  g.gpa_arena0 = alloc_seglist_make(g.arena, "game gpa arena0");
+  g.gpa_arena1 = alloc_seglist_make(g.arena, "game gpa arena1");
+  g.gpa_gpa0 = alloc_seglist_make(g.arena, "game gpa arena0");
+  g.gpa_gpa1 = alloc_seglist_make(g.arena, "game gpa arena1");
 
   // Mesh cube_mesh = {.vertices = cube_vertices, .vert_count = ArrayCount(cube_vertices)};
   // mesh_set(Mesh_Cube, vk_mesh_load(cube_mesh));

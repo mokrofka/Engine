@@ -1,10 +1,11 @@
 #pragma once
 #include "lib.h"
+#include "tokenizer.h"
+#include "meta.h"
 
 // TODO:
 // dummy assets/null 
 // obj mouse selection
-// serelization/deserialization
 // UI rendering
 // memory visualisation thread safe, and gpu memory
 // thread graph visualisation
@@ -17,8 +18,10 @@
 // glb loader
 // introspection
 // upgrade vulkan
-// metadesk tables?
 // font rendering
+// serelization/deserialization
+// metadesk tables?
+// reading json 
 
 ////////////////////////////////////////////////////////////////////////
 // @Common
@@ -226,46 +229,6 @@ GpuCubemapId cubemap_load(String name);
 void assets_load();
 
 ////////////////////////////////////////////////////////////////////////
-// @Lexer
-
-enum TokenType {
-  TokenType_Null,
-
-  TokenType_OpenParen,
-  TokenType_CloseParen,
-  TokenType_Colon,
-  TokenType_Semicolon,
-  TokenType_Asterisk,
-  TokenType_OpenBracket,
-  TokenType_CloseBracket,
-  TokenType_OpenBrace,
-  TokenType_CloseBrace,
-  TokenType_Equals,
-  TokenType_Comma,
-  TokenType_Or,
-  TokenType_Pound,
-
-  TokenType_String,
-  TokenType_Identifier,
-  TokenType_Number,
-
-  TokenType_Spacing,
-  TokenType_EndOfLine,
-  TokenType_Comment,
-
-  TokenType_EndOfStream,
-};
-
-struct Token {
-  TokenType type;
-  String str;
-};
-
-struct Tokenizer {
-  String str;
-};
-
-////////////////////////////////////////////////////////////////////////
 // @Json
 
 enum JsonType {
@@ -304,6 +267,8 @@ b32 json_iter_array(JsonReader* r, JsonValue arr, JsonValue* val);
 
 ////////////////////////////////////////////////////////////////////////
 // @Serialization
+
+
 
 ////////////////////////////////////////////////////////////////////////
 // @Input
@@ -419,7 +384,7 @@ void watch_update();
 ////////////////////////////////////////////////////////////////////////
 // @Game
 
-struct Camera {
+Introspect struct Camera {
   v3 pos;
   v3 dir;
   f32 yaw;
@@ -428,9 +393,13 @@ struct Camera {
   f32 speed;
 };
 
-struct Entity {
+Introspect struct Entity {
   v3 vel;
   Rng3 aabb;
+  u32 a;
+  u32 b;
+  Rng2 rect;
+  u32 pa;
 };
 
 struct EntityId {

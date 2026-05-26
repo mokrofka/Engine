@@ -109,7 +109,7 @@ intern void test_arena_list_alloc() {
 
 intern void test_seglist_alloc() {
   Arena arena = arena_make();
-  AllocSegList alloc(arena);
+  AllocSegList alloc = alloc_seglist_make(arena);
   Array<u8*, TEST_SAMPLES> arr = {};
 
   Loop (i, TEST_SAMPLES) {
@@ -787,8 +787,8 @@ void test_sort() {
 
 void test() {
   ProfFunc;
-  test_sort();
-  os_exit(0);
+  // test_sort();
+  // os_exit(0);
   test_global_alloc();
   test_arena_alloc();
   test_arena_list_alloc();

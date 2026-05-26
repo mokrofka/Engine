@@ -200,7 +200,7 @@ void static_id_pool_clear(StaticIdPool& p) {
 }
 
 ///////////////////////////////////
-// Merge
+// Radix
 
 u32 sort_i32_key_to_u32(i32 x) {
   return x ^ 0x80000000;

@@ -74,7 +74,7 @@ AllocatorInfoList get_allocators_info() {
 
 void global_allocator_init() {
   mem_st.arena = arena_make_named("global allocator's parent");
-  mem_st.seglist.init(mem_st.arena, "global allocator");
+  mem_st.seglist = alloc_seglist_make(mem_st.arena, "global allocator");
 }
 
 intern u8* global_alloc(u64 size, u64 align)                                     { return mem_alloc(mem_st.seglist, size, align); }
@@ -281,16 +281,6 @@ struct SegListHeader {
 #endif
   u32 pad;
 };
-
-AllocSegList::AllocSegList(Allocator alloc_) { init(alloc_, {}); }
-void AllocSegList::init(Allocator alloc_, String name) {
-  *this = {}; alloc = alloc_;
-#if MEM_TRACK
-  allocator_inherit(alloc_, *this);
-  info->type = AllocatorType_SegList;
-  str_copy(info->name, name);
-#endif
-}
 
 AllocSegList::operator Allocator() { return {.type = AllocatorType_SegList, .ctx = this}; }
 

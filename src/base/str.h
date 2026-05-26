@@ -41,6 +41,7 @@ u64 cstr_length(const void* c);
 // Character Classification & Conversion Functions
 
 b32 char_is_space(u8 c);
+b32 char_is_newline(u8 c);
 b32 char_is_upper(u8 c);
 b32 char_is_lower(u8 c);
 b32 char_is_alpha(u8 c);
@@ -135,9 +136,9 @@ i32 str_index_of(String str, u8 c);
 u64 u64_from_str(String str);
 i64 i64_from_str(String str);
 f64 f64_from_str(String str);
-INLINE u32 u32_from_str(String str) { return u64_from_str(str); };
-INLINE i32 i32_from_str(String str) { return i64_from_str(str); };
-INLINE f32 f32_from_str(String str) { return f64_from_str(str); };
+u32 u32_from_str(String str);
+i32 i32_from_str(String str);
+f32 f32_from_str(String str);
 
 ////////////////////////////////////////////////////////////////////////
 // String Path Helpers

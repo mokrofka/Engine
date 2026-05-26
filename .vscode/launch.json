@@ -6,7 +6,7 @@
       "type": "lldb-dap",
       "request": "launch",
       "program": "${workspaceFolder}/bin/exe",
-      "cwd": "${workspaceFolder}",
+      "cwd": "${workspaceFolder}/bin",
       "console": "internalConsole",
     },
     {
@@ -15,7 +15,15 @@
       "request": "launch",
       "program": "${workspaceFolder}/bin/compiling_shaders",
       "args": ["../assets/shaders", "../assets/shaders/compiled"],
-      "cwd": "${workspaceFolder}",
+      "cwd": "${workspaceFolder}/bin",
+      "console": "internalConsole",
+    },
+    {
+      "name": "Preprocessor",
+      "type": "lldb-dap",
+      "request": "launch",
+      "program": "${workspaceFolder}/bin/preprocessor",
+      "cwd": "${workspaceFolder}/bin",
       "console": "internalConsole",
     }
   ]

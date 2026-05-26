@@ -64,8 +64,9 @@ project(Engine)
     src/base/base_impl.cpp
     vendor/vendor_impl.cpp
   )
-  set(game_source src/com.cpp src/vk.cpp)
+  set(game_source src/com.cpp src/vk.cpp src/tokenizer.cpp)
   set(exe_source src/main.cpp)
+  set(X11_libs -lxcb libxcb-keysyms.so)
 
   if (dev_build) # reduce build time in release build
     add_compile_definitions(DEAR_IMGUI=1)
@@ -88,7 +89,7 @@ project(Engine)
     add_library(lib SHARED ${lib_source})
     if (UNIX)
       if (X11_use)
-        target_link_libraries(lib -lxcb libxcb-keysyms.so )
+        target_link_libraries(lib ${X11_libs})
       endif()
         target_link_libraries(lib wayland-client.so)
     endif()
@@ -111,7 +112,7 @@ project(Engine)
     )
     if (UNIX)
       if (X11_use)
-        target_link_libraries(exe -lxcb libxcb-keysyms.so)
+        target_link_libraries(exe ${X11_libs})
       else()
         target_link_libraries(exe wayland-client.so)
       endif()
@@ -124,4 +125,10 @@ add_executable(compiling_shaders
   src/base/base_impl.cpp
   src/compiling_shaders.cpp
 )
-target_link_libraries(compiling_shaders -lxcb libxcb-keysyms.so)
+target_link_libraries(compiling_shaders ${X11_libs})
+add_executable(preprocessor 
+  src/base/base_impl.cpp
+  src/tokenizer.cpp
+  src/preprocessor.cpp
+)
+target_link_libraries(preprocessor ${X11_libs})
