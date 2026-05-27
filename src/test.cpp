@@ -221,6 +221,64 @@ intern void test_object_pool() {
   }
 }
 
+intern void test_object_pool_linklist() {
+  Scratch scratch;
+  struct A {
+    u32 a;
+    u32 b;
+  };
+  var pool = object_pool_linklist_make<A>(scratch);
+  Array<A, TEST_SAMPLES> values = {};
+  Array<u32, TEST_SAMPLES> handlers = {};
+
+  Loop (i, TEST_SAMPLES) {
+    values[i].a = rand_rng_u32(0, TEST_SAMPLES);
+    values[i].b = rand_rng_u32(0, TEST_SAMPLES);
+  };
+  Loop (i, TEST_SAMPLES) {
+    handlers[i] = object_pool_linklist_alloc(pool, values[i]);
+  }
+  Loop (i, TEST_SAMPLES) {
+    Assert(MemMatchStruct(&values[i], &object_pool_linklist_get(pool, handlers[i])));
+  }
+  Array<u32, TEST_SAMPLES> indices = {};
+  Loop(i, TEST_SAMPLES) array_add(indices, i);
+  rand_shuffle(slice(indices));
+
+  u32 i = 0;
+  for (u32 node = pool.first; node != U32_MAX; node = pool.data[id_idx(node)].next) {
+    var elem = pool.data[id_idx(node)].data;
+    Assert(elem.a == values[i].a && elem.a == values[i].a);
+    ++i;
+  }
+  Loop (i, TEST_SAMPLES) {
+    object_pool_linklist_free(pool, handlers[i]);
+  }
+
+  array_clear(indices);
+  Loop (i, TEST_SAMPLES) {
+    values[i].a = rand_rng_u32(0, TEST_SAMPLES);
+    values[i].b = rand_rng_u32(0, TEST_SAMPLES);
+  };
+  Loop (i, TEST_SAMPLES) {
+    handlers[i] = object_pool_linklist_alloc(pool, values[i]);
+  }
+  Loop (i, TEST_SAMPLES) {
+    Assert(MemMatchStruct(&values[i], &object_pool_linklist_get(pool, handlers[i])));
+  }
+  Loop(i, TEST_SAMPLES) array_add(indices, i);
+  rand_shuffle(slice(indices));
+  i = 0;
+  for (u32 node = pool.first; node != U32_MAX; node = pool.data[id_idx(node)].next) {
+    var elem = pool.data[id_idx(node)].data;
+    Assert(elem.a == values[i].a && elem.a == values[i].a);
+    ++i;
+  }
+  Loop (i, TEST_SAMPLES) {
+    object_pool_linklist_free(pool, handlers[i]);
+  }
+}
+
 intern void test_handle_darray() {
   Scratch scratch;
   struct A {
@@ -795,6 +853,7 @@ void test() {
   test_seglist_alloc();
   test_gpu_seglist_alloc();
   test_object_pool();
+  test_object_pool_linklist();
   test_handle_darray();
   test_id_pool();
 }

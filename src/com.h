@@ -19,9 +19,9 @@
 // introspection
 // upgrade vulkan
 // font rendering
-// serelization/deserialization
-// metadesk tables?
 // reading json 
+// metadesk tables?
+// serelization/deserialization
 
 ////////////////////////////////////////////////////////////////////////
 // @Common
@@ -53,13 +53,14 @@ const u32 MaxStaticEntities = KB(10);
 // const u32 MaxEntities = KB(200);
 // const u32 MaxStaticEntities = MB(1);
 
-struct GpuTextureH { u32 v; };
+struct GpuTextureId { u32 v; };
 struct GpuMaterialId { u32 v; };
 struct GpuMeshId { u32 v; };
 struct GpuShaderId { u32 v; };
 struct GpuCubemapId { u32 v; };
 struct EntityId { u32 v; };
 struct StaticEntityId { u32 v; };
+struct RenderId { u32 v; };
 
 struct PointLight {
   v3 color;
@@ -97,6 +98,8 @@ struct Vertex {
 };
 u64 hash(Vertex vert);
 b32 equal(Vertex a, Vertex b);
+struct DebugDrawLine { Vertex vert[2]; };
+struct DebugDrawRect { Vertex vert[6]; };
 
 struct Mesh {
   Vertex* vertices;
@@ -126,7 +129,7 @@ struct ShaderState {
   b8 use_depth = true;
 };
 
-struct Shader {
+struct ShaderDesc {
   String name;
   ShaderState state;
 };
@@ -138,11 +141,10 @@ struct MaterialProps {
   f32 shininess;
 };
 
-struct Material {
-  Shader shader;
+struct MaterialDesc {
+  ShaderDesc shader;
   MaterialProps props;
   String texture;
-  GpuTextureH texture_h;
 };
 
 struct Timer {
@@ -226,7 +228,7 @@ GpuMeshId mesh_get(MeshId id);
 void mesh_set(MeshId id, GpuMeshId mesh_handle);
 GpuMaterialId material_get(MaterialId id);
 GpuMeshId mesh_load(String name);
-GpuShaderId shader_load(Shader shader);
+GpuShaderId shader_load(ShaderDesc shader);
 GpuCubemapId cubemap_load(String name);
 void assets_load();
 
@@ -400,27 +402,32 @@ Introspect struct Camera {
   f32 speed;
 };
 
-struct Entity {
+Introspect struct Entity {
   v3 pos;
   v3 rot;
   v3 scale;
   Rng3 aabb;
   v3 vel;
+  GpuMeshId mesh_id;
+  GpuMaterialId material_id;
+  RenderId render_id;
 };
 
 Entity& get_entity(EntityId id);
 
-struct StaticEntity {
+Introspect struct StaticEntity {
   v3 pos;
   v3 rot;
   v3 scale;
+  GpuMeshId mesh_id;
+  GpuMaterialId material_id;
+  RenderId render_id;
 };
 
 StaticEntity& get_static_entity(StaticEntityId id);
 
 struct GameState {
   Arena arena;
-  Arena persistent_arena;
   AllocSegList gpa;
   Camera cam;
   Timer timer;
@@ -433,6 +440,7 @@ struct GameState {
   StaticIdPool static_entity_id_pool;
 
   Darray<EntityId> moving_cubes;
+  Darray<StaticEntityId> static_cubes;
   EntityId axis_attached_to_cam_id;
   EntityId grid_id;
   EntityId monkey_id;
@@ -445,6 +453,9 @@ struct GameState {
 
 void game_init();
 void game_update();
+void game_view();
+
+#include "vk.h"
 
 ////////////////////////////////////////////////////////////////////////
 // @State
@@ -456,19 +467,26 @@ struct GlobalState {
   f32 time;
   u32 current_frame;
   b32 should_hotreload;
+  mat4 view;
+  mat4 projection;
 
-  GpuMeshId meshes_handlers[Mesh_COUNT];
-  GpuTextureH textures_handlers[Texture_COUNT];
-  GpuMaterialId materials_handlers[Material_COUNT];
+  GpuMeshId meshes_ids[Mesh_COUNT];
+  GpuTextureId textures_ids[Texture_COUNT];
+  GpuMaterialId materials_ids[Material_COUNT];
+
+  // Array<MaterialDesc, MaxMaterials> materials_desc;
 
   String asset_path;
   String shader_dir;
   String shader_compiled_dir;
   String models_dir;
   String textures_dir;
-  Map<String, GpuTextureH> str_to_texture;
-  Map<String, GpuMeshId> str_to_mesh;
-  Map<String, GpuMaterialId> str_to_material;
+  Map<String, GpuTextureId> str_to_texture_id;
+  Map<String, GpuMeshId> str_to_mesh_id;
+  Map<String, GpuMaterialId> str_to_material_id;
+  Array<String, MaxTextures> texture_id_to_str;
+  Array<String, MaxMeshes> mesh_id_to_str;
+  Array<String, MaxMaterials> material_id_to_str;
 
   ThreadPool thread_pool;
   WatchState watch;
@@ -476,14 +494,14 @@ struct GlobalState {
   GameState game;
   ImguiWindow game_win;
   b32 imgui_demo_open;
-
   InputState input;
+
   Darray<OS_Handle> shader_module_compilation_pids;
   Slice<String> shader_module_compiled_names;
 
-  void* vk;
+  VK_State vk;
 };
 
-extern GlobalState* g_st;
+extern GlobalState* st;
 
 

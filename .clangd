@@ -4,4 +4,4 @@ Diagnostics:
 CompileFlags:
   Add:
     - -include com.h
-    - -DIMPL=1
+    - -Wno-gnu-alignof-expression

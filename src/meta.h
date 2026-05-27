@@ -9,6 +9,9 @@ enum MetaType {
   MetaType_v3,
   MetaType_Rng2,
   MetaType_Rng3,
+  MetaType_MeshId,
+  MetaType_MaterialId,
+  MetaType_RenderId,
 };
 
 struct MemberDefinition {

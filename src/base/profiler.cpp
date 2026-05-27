@@ -1,4 +1,5 @@
 #include "profiler.h"
+#include "tokenizer.cpp"
 
 global ProfState profiler_st;
 

@@ -108,13 +108,13 @@ u32 xorshift32(u32* seed) {
 
 global thread_local u32 _seed = 0x95123512;
 u32 rand_u32()                        { return xorshift32(&_seed); }
-u32 rand_rng_u32(u32 min, u32 max)  { return (rand_u32() % (max - min + 1)) + min; }
+u32 rand_rng_u32(u32 min, u32 max)    { return (rand_u32() % (max - min + 1)) + min; }
 i32 rand_i32()                        { return rand_u32(); }
-i32 rand_rng_i32(i32 min, i32 max)  { return (i32)(rand_u32() % (u32)(max - min + 1)) + min; }
+i32 rand_rng_i32(i32 min, i32 max)    { return (i32)(rand_u32() % (u32)(max - min + 1)) + min; }
 f32 rand_f32_01()                     { return rand_u32() / (f32)U32_MAX; }
 f32 rand_f32_11()                     { return rand_f32_01()*2.0f - 1.0f; }
 f32 rand_f32()                        { return rand_f32_01()*2*U16_MAX - U16_MAX; }
-f32 rand_rng_f32(f32 min, f32 max)  { return rand_f32_01()*(max - min) + min ; }
+f32 rand_rng_f32(f32 min, f32 max)    { return rand_f32_01()*(max - min) + min ; }
 b32 rand_b32()                        { return rand_u32() % 2; }
 void rand_seed()                      { _seed = cpu_timer_now(); }
 u32 rand_get_seed()                   { return _seed; }

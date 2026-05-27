@@ -29,7 +29,7 @@ project(Engine)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO "${binary_dir}")
 
 # Compiler
-  add_compile_options(-Wunused-variable -Wno-unused-const-variable -Wuninitialized -Wno-c99-designator -fno-exceptions -fno-rtti)
+  add_compile_options(-Wno-gnu-alignof-expression -Wunused-variable -Wno-unused-const-variable -Wuninitialized -Wno-c99-designator -fno-exceptions -fno-rtti)
   message("Compiler: ${CMAKE_CXX_COMPILER_ID}")
 
 # Sanitizer
@@ -64,7 +64,8 @@ project(Engine)
     src/base/base_impl.cpp
     vendor/vendor_impl.cpp
   )
-  set(game_source src/com.cpp src/vk.cpp src/tokenizer.cpp)
+  set(game_source src/com.cpp)
+  # set(game_source src/com.cpp src/tokenizer.cpp)
   set(exe_source src/main.cpp)
   set(X11_libs -lxcb libxcb-keysyms.so)
 
@@ -128,7 +129,6 @@ add_executable(compiling_shaders
 target_link_libraries(compiling_shaders ${X11_libs})
 add_executable(preprocessor 
   src/base/base_impl.cpp
-  src/tokenizer.cpp
   src/preprocessor.cpp
 )
 target_link_libraries(preprocessor ${X11_libs})

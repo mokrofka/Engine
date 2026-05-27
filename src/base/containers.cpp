@@ -241,7 +241,6 @@ void sort_radix(Allocator alloc, Slice<SortEntry> arr) {
       u32 byte = (v >> shift) & 0xFF;
       dst[counts[byte]++] = src[i];
     }
-
     Swap(src, dst);
   }
 }

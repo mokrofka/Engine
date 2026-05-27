@@ -1,7 +1,9 @@
 #include "com.h"
-#include "vk.h"
-#include "test.cpp"
 #include "generated.h"
+
+#include "vk.cpp"
+#include "test.cpp"
+#include "tokenizer.cpp"
 
 #include "stb_image.h"
 #include "stb_truetype.h"
@@ -77,7 +79,7 @@ Vertex axis_vertices[] = {
 u64 hash(Vertex x) { return hash_memory(&x, sizeof(x)); }
 b32 equal(Vertex a, Vertex b) { return MemMatchStruct(&a, &b); }
 
-Extern GlobalState* g_st;
+Extern GlobalState* st;
 
 Timer timer_make(f32 interval) {
   Timer timer = {
@@ -87,7 +89,7 @@ Timer timer_make(f32 interval) {
 }
 
 void timer_tick(Timer& t) {
-  t.passed += g_st->dt;
+  t.passed += st->dt;
   if (t.passed >= t.interval) {
     t.passed = 0;
   }
@@ -104,17 +106,17 @@ f64 tsc_to_ms(u64 tsc) {
   return (f64)tsc/cpu_frequency()*1000;
 }
 
-f32 get_dt() { return g_st->dt; }
-f32 get_time() { return g_st->time; }
+f32 get_dt() { return st->dt; }
+f32 get_time() { return st->time; }
 
 Entity& get_entity(EntityId id) {
-  Assert(id_generation(id.v) == g_st->game.entity_id_pool.generations[id_idx(id.v)])
-  return g_st->game.entities[id_idx(id.v)];
+  Assert(id_generation(id.v) == st->game.entity_id_pool.generations[id_idx(id.v)])
+  return st->game.entities[id_idx(id.v)];
 }
 
 StaticEntity& get_static_entity(StaticEntityId id) {
-  Assert(id_generation(id.v) == g_st->game.static_entity_id_pool.generations[id_idx(id.v)]);
-  return g_st->game.static_entities[id_idx(id.v)];
+  Assert(id_generation(id.v) == st->game.static_entity_id_pool.generations[id_idx(id.v)]);
+  return st->game.static_entities[id_idx(id.v)];
 }
 
 Mesh load_obj(Allocator arena, String name) {
@@ -177,14 +179,14 @@ Mesh load_obj(Allocator arena, String name) {
       .norm = normals[idx.y],
       .uv = uvs[idx.z],
     };
-    u32* found = map_get(map, vertex);
-    if (found) {
-      darray_add(final_indices, *found);
-    } else {
+    Result res = map_get(map, vertex);
+    if (res.err) {
       u32 new_index = vertices.count;
       darray_add(vertices, vertex);
       darray_add(final_indices, new_index);
       map_set(map, vertex, new_index);
+    } else {
+      darray_add(final_indices, res.v);
     }
   }
   Mesh mesh = {
@@ -470,9 +472,9 @@ global String textures_strs[Texture_COUNT] = {
 #undef X
 };
 
-GpuMeshId mesh_get(MeshId id) { return g_st->meshes_handlers[id]; }
-void mesh_set(MeshId id, GpuMeshId mesh_handle) { g_st->meshes_handlers[id] = mesh_handle; }
-GpuMaterialId material_get(MaterialId id) { return g_st->materials_handlers[id]; }
+GpuMeshId mesh_get(MeshId id) { return st->meshes_ids[id]; }
+void mesh_set(MeshId id, GpuMeshId mesh_handle) { st->meshes_ids[id] = mesh_handle; }
+GpuMaterialId material_get(MaterialId id) { return st->materials_ids[id]; }
 
 constexpr ShaderState shader_default_info() {
   ShaderState info = {
@@ -496,7 +498,7 @@ constexpr MaterialProps material_default_props() {
 }
 
 GpuMeshId mesh_load(String name) {
-  GlobalState& g = *g_st;
+  GlobalState& g = *st;
   Scratch scratch;
   String filepath = push_strf(scratch, "%s/%s", g.models_dir, name);
   String format = str_skip_last_dot(name);
@@ -514,17 +516,17 @@ GpuMeshId mesh_load(String name) {
   return handle;
 }
 
-GpuTextureH texture_load(String name) {
-  GlobalState& g = *g_st;
+GpuTextureId texture_load(String name) {
+  GlobalState& g = *st;
   Scratch scratch;
   String filepath = push_strf(scratch, "%s/%s", g.textures_dir, name);
   Texture texture = load_image(filepath);
-  GpuTextureH handle = vk_texture_load(texture);
+  GpuTextureId handle = vk_texture_load(texture);
   return handle;
 }
 
 GpuCubemapId cubemap_load(String name) {
-  GlobalState& g = *g_st;
+  GlobalState& g = *st;
   Scratch scratch;
   Texture textures[6];
   String sides[] = {
@@ -542,16 +544,16 @@ GpuCubemapId cubemap_load(String name) {
 }
 
 void assets_load() {
-  GlobalState& g = *g_st;
+  GlobalState& g = *st;
 #define X(enum_name, name) \
-  g.meshes_handlers[enum_name] = mesh_load(meshes_strs[enum_name]); \
-  map_set(g.str_to_mesh, String(Stringify(name)), g.meshes_handlers[enum_name]);
+  g.meshes_ids[enum_name] = mesh_load(meshes_strs[enum_name]); \
+  map_set(g.str_to_mesh_id, String(Stringify(name)), g.meshes_ids[enum_name]);
   MESH_LIST
 #undef X
 
 #define X(enum_name, name) \
-  g.textures_handlers[enum_name] = texture_load(textures_strs[enum_name]); \
-  map_set(g.str_to_texture, String(Stringify(name)), g.textures_handlers[enum_name]);
+  g.textures_ids[enum_name] = texture_load(textures_strs[enum_name]); \
+  map_set(g.str_to_texture_id, String(Stringify(name)), g.textures_ids[enum_name]);
   TEXTURE_LIST
 #undef X
 
@@ -560,8 +562,8 @@ void assets_load() {
     ShaderState state = shader_default_info();
     MaterialProps props = material_default_props();
     String texture = "container.jpg";
-    GpuTextureH texture_handle;
-    operator Material() {
+    GpuTextureId texture_handle;
+    operator MaterialDesc() {
       return {
         .shader = {
           .name = name,
@@ -569,7 +571,7 @@ void assets_load() {
         },
         .props = props,
         .texture = texture,
-        .texture_h = texture_handle,
+        // .texture_id = texture_handle,
       };
     }
   };
@@ -578,10 +580,7 @@ void assets_load() {
     TakeMaterial mat = { \
       __VA_ARGS__ \
     }; \
-    GpuTextureH* texture_hanle = map_get(g.str_to_texture, mat.texture); \
-    if (texture_hanle) \
-      mat.texture_handle = *texture_hanle; \
-    g.materials_handlers[enum_name] = vk_material_load(mat); \
+    g.materials_ids[enum_name] = vk_material_load(mat); \
   }
   MATERIAL_LIST
 #undef X
@@ -689,7 +688,7 @@ b32 json_iter_array(JsonReader* r, JsonValue arr, JsonValue* val) {
 
 b32 key_pressed(Key key) {
   if (os_is_key_pressed(key)) {
-    if (!g_st->input.consumed[key]) return true;
+    if (!st->input.consumed[key]) return true;
   }
   return false;
 }
@@ -704,7 +703,7 @@ b32 key_pressed_consume(Key key) {
 
 b32 key_down(Key key) {
   if (os_is_key_down(key)) {
-    if (!g_st->input.consumed[key]) return true;
+    if (!st->input.consumed[key]) return true;
   }
   return false;
 }
@@ -718,11 +717,11 @@ b32 key_down_consume(Key key) {
 }
 
 void key_consume(Key key) {
-  g_st->input.consumed[key] = true;
+  st->input.consumed[key] = true;
 }
 
 void input_update() {
-  ArrayZero(g_st->input.consumed);
+  ArrayZero(st->input.consumed);
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -930,10 +929,10 @@ void imgui_window_track_state(ImguiWindow& window) {
 void profiler_view() {
   Scratch scratch;
   ProfState& g = prof_get();
-  ProfWindow& win = g_st->profile_win;
+  ProfWindow& win = st->profile_win;
 
   // Avg, min, max
-  ProfFrame prev_frame = prof_get_prev_frame(g_st->current_frame);
+  ProfFrame prev_frame = prof_get_prev_frame(st->current_frame);
   var anchors = prev_frame.anchors;
   u64 cpu_freq = cpu_frequency();
   u64 tsc_start = prev_frame.frame_time.tsc_start;
@@ -1228,7 +1227,7 @@ void profiler_view() {
             }
             cursor_pos.y += 30;
             draw_threads(scroll_state);
-            u32 idx = (g_st->current_frame-1) % ArrayCount(g.frames_times);
+            u32 idx = (st->current_frame-1) % ArrayCount(g.frames_times);
             Slice<ProfAnchor> slices[ArrayCount(g.prof_threads)] = {};
             for EachElement(i, g.prof_threads) {
               slices[i] = slice(g.prof_threads[i].recorded_anchors[idx]);
@@ -1270,10 +1269,10 @@ void profiler_view() {
               } else if (frame_ms > 20) {
                 color = IM_COL32(255, 100, 50, 255);
               }
-              if (i == g_st->current_frame % ArrayCount(g.frames_times)) {
+              if (i == st->current_frame % ArrayCount(g.frames_times)) {
                 color = IM_COL32(230,230,230,255);
               }
-              if (i == g_st->current_frame % ArrayCount(g.frames_times)) {
+              if (i == st->current_frame % ArrayCount(g.frames_times)) {
                 draw->AddRectFilled(IM_RECT(rect), color);
                 draw->AddRect(IM_RECT(rect), IM_COL32(10, 10, 10, 100));
               } else {
@@ -1300,7 +1299,7 @@ void profiler_view() {
                 p2 = p2 * scroll_state.scale.x + scroll_state.offset;
                 p3 = p3 * scroll_state.scale.x + scroll_state.offset;
                 draw->AddLine(p0, p1, IM_COL32(200, 200, 200, 255), thick);
-                if (i == g_st->current_frame % ArrayCount(g.frames_times)) {
+                if (i == st->current_frame % ArrayCount(g.frames_times)) {
                   draw->AddRectFilled(p0, p3, IM_COL32(100, 100, 100, 100));
                 }
                 width_offset += width_size;
@@ -1678,57 +1677,11 @@ void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Slice<Token> t
   }
 }
 
-void game_view() {
-  Scratch scratch;
-  GameState& g = g_st->game;
-  ImguiWindow& win = g_st->game_win;
-  Camera& cam = g.cam;
-  if (win.open) {
-    imgui_window_apply_state(win);
-    ImGui::Begin("Game");
-
-    if (ImGui::IsWindowHovered()) {
-      if (key_pressed(Key_V)) {
-        imgui_window_toggle_fullscreen(win);
-      }
-    }
-
-    v3 pos = cam.pos;
-    ImGui::Text("entities: %u, static entities: %u", g.entities_count, g.static_entities_count);
-    ImGui::Text("Camera: x: %.2f y: %.2f z: %.2f", pos.x, pos.y, pos.z);
-    ImGui::DragFloat("speed", &cam.speed, 1);
-    Camera data = g.cam;
-    ImString str = push_str_copy(scratch, dumb_struct(scratch, ArraySlice(members_of_Camera), &data));
-    ImGui::Text("%s", str.str);
-
-    if (ImGui::Button("save state")) {
-      String str = dumb_struct(scratch, ArraySlice(members_of_Camera), &g.cam);
-      OS_Handle file = os_file_open(push_strf(scratch, "%s/saved", os_get_current_directory(), String("saved")), OS_AccessFlag_Write | OS_AccessFlag_Trunc);
-      String str1 = push_str_cat(scratch, "Camera {\n", str);
-      String str2 = push_str_cat(scratch, str1, "}");
-      os_file_write(file, str2.size, str2.str);
-      os_file_close(file);
-    }
-    if (ImGui::Button("load state")) {
-      OS_Handle file = os_file_open(push_strf(scratch, "%s/saved", os_get_current_directory(), String("saved")), OS_AccessFlag_Read);
-      u32 size = os_file_size(file);
-      u8* data = push_buffer(scratch, size);
-      os_file_read(file, size, data);
-      os_file_close(file);
-      Slice tokens = tokens_from_str(scratch, String(data, size));
-      dumb_struct_load(ArraySlice(members_of_Camera), &g.cam, tokens);
-      Info("%s", String(data, size));
-    }
-
-    ImGui::End();
-  }
-}
-
 ////////////////////////////////////////////////////////////////////////
 // @Watch
 
 void watch_add(String watch_name, WatchOp op) {
-  WatchState& g = g_st->watch;
+  WatchState& g = st->watch;
   FileProperties props = os_file_path_properties(watch_name);
   WatchFile file_watch = {
     .path = watch_name,
@@ -1739,7 +1692,7 @@ void watch_add(String watch_name, WatchOp op) {
 }
 
 void watch_directory_add(String watch_name, WatchOp op, OS_WatchFlags flags) {
-  WatchState& g = g_st->watch;
+  WatchState& g = st->watch;
   String dir_path = push_strf(g.arena, "%s", watch_name);
   OS_Watch watch = os_watch_open(flags);
   os_watch_attach(watch, dir_path);
@@ -1752,7 +1705,7 @@ void watch_directory_add(String watch_name, WatchOp op, OS_WatchFlags flags) {
 }
 
 void watch_update() {
-  WatchState& g = g_st->watch;
+  WatchState& g = st->watch;
   Scratch scratch;
   Loop (i, g.watches.count) {
     WatchFile& x = g.watches[i];
@@ -1760,7 +1713,7 @@ void watch_update() {
     if (props.modified > x.modified) {
       switch (x.op) {
         case WatchOp_NotifyHotreload: {
-          g_st->should_hotreload = true;
+          st->should_hotreload = true;
         } break;
         InvalidDefaultCase break;
       }
@@ -1774,7 +1727,7 @@ void watch_update() {
       String name = it->string;
       switch (x.op) {
         case WatchOp_RecompileShader: {
-          GlobalState& g = *g_st;
+          GlobalState& g = *st;
           Scratch scratch;
           String shader_filepath = push_strf(scratch, "%s/%s", g.shader_dir, name);
           String shader_compiled_filepath = push_strf(scratch, "%s/%s%s", g.shader_compiled_dir, str_chop_last_dot(name), String(".spv"));
@@ -1789,7 +1742,7 @@ void watch_update() {
           os_process_launch(list);
         } break;
         case WatchOp_ShaderReload: {
-          GlobalState& g = *g_st;
+          GlobalState& g = *st;
           String shader_name = str_chop_last_dot(name);
           String shader_name_slang = push_strf(scratch, "%s.slang", shader_name);
           String shader_filepath = push_strf(scratch, "%s/%s", g.shader_dir, shader_name_slang);
@@ -1809,7 +1762,7 @@ void watch_update() {
 void com_init() {
   Scratch scratch;
 
-  GlobalState& g = *g_st;
+  GlobalState& g = *st;
   estimate_cpu_frequency();
   global_allocator_init();
   os_gfx_init();
@@ -1827,23 +1780,23 @@ void com_init() {
     g.shader_compiled_dir = push_str_cat(g.arena, g.shader_dir, "/compiled");
     g.models_dir = push_str_cat(g.arena, g.asset_path, "/models");
     g.textures_dir = push_str_cat(g.arena, g.asset_path, "/textures");
-    g.str_to_texture = map_make<String, GpuTextureH>(g.gpa);
-    g.str_to_mesh = map_make<String, GpuMeshId>(g.gpa);
-    g.str_to_material = map_make<String, GpuMaterialId>(g.gpa);
+    g.str_to_texture_id = map_make<String, GpuTextureId>(g.gpa);
+    g.str_to_mesh_id = map_make<String, GpuMeshId>(g.gpa);
+    g.str_to_material_id = map_make<String, GpuMaterialId>(g.gpa);
     g.watch.arena = g.arena;
     watch_directory_add(g.shader_dir, WatchOp_RecompileShader);
     watch_directory_add(g.shader_compiled_dir, WatchOp_ShaderReload);
     g.shader_module_compilation_pids = darray_make<OS_Handle>(g.gpa);
     g.shader_module_compiled_names = vk_shader_compile(scratch);
 
-    var& win = g.profile_win;
+    ProfWindow& win = g.profile_win;
     win.root_scroll_state = scroll_state_make(1);
     win.frames_scroll_state = scroll_state_make(1);
     win.launch_time_scroll_state = scroll_state_make(1);
     win.mem_scroll_state = scroll_state_make(1);
     win.open = false;
 
-    g.vk = vk_init();
+    vk_init();
 #if DEAR_IMGUI
     vk_imgui_init();
 #endif
@@ -1854,7 +1807,7 @@ void com_init() {
 }
 
 void com_update() {
-  GlobalState& g = *g_st;
+  GlobalState& g = *st;
   input_update();
   profiler_view();
   game_view();
@@ -1863,7 +1816,7 @@ void com_update() {
   if (key_pressed(Key_F2)) g.imgui_demo_open = !g.imgui_demo_open;
   if (key_pressed(Key_F3)) g.game_win.open = !g.game_win.open;
 
-  if (g_st->imgui_demo_open) {
+  if (st->imgui_demo_open) {
     ImGui::ShowDemoWindow();
   }
 
@@ -1888,8 +1841,8 @@ shared_function void common_main(HotReloadData* data) {
 if (data->ctx == null) {
     Arena arena = arena_make_named("common arena");
     data->ctx = push_struct_zero(arena, GlobalState);
-    g_st = (GlobalState*)data->ctx;
-    g_st->arena = arena;
+    st = (GlobalState*)data->ctx;
+    st->arena = arena;
     {
       u64 start = cpu_timer_now();
       com_init();
@@ -1899,19 +1852,18 @@ if (data->ctx == null) {
     watch_add(data->lib, WatchOp_NotifyHotreload);
 #endif
   }
-  if (!g_st) {
-    g_st = (GlobalState*)data->ctx;
-    vk_set_state(g_st->vk);
-    g_st->should_hotreload = false;
+  if (!st) {
+    st = (GlobalState*)data->ctx;
+    st->should_hotreload = false;
   }
 
-  GlobalState& g = *g_st;
+  GlobalState& g = *st;
 
   u64 target_fps = Billion(1) / 60;
   u64 last_time = os_now_ns();
 
   while (!os_window_should_close()) {
-    if (g_st->should_hotreload) {
+    if (st->should_hotreload) {
       goto hotreload;
     }
 
@@ -2037,9 +1989,9 @@ v3 ray_from_camera() {
   v2u win_size = os_get_window_size();
   v2 norm_coords = v2(2 * (mouse_pos.x/win_size.x) - 1, 2 * -(mouse_pos.y/win_size.y) + 1);
   v4 clip_coords = v4(norm_coords.x, norm_coords.y, -1, 1);
-  v4 eye_coord = mat4_inverse(vk_get_projection()) * clip_coords;
+  v4 eye_coord = mat4_inverse(st->projection) * clip_coords;
   eye_coord = v4(eye_coord.x, eye_coord.y, -1, 0);
-  v3 world_coord = v3_of_v4(vk_get_view() * eye_coord);
+  v3 world_coord = v3_of_v4(st->view * eye_coord);
   world_coord = v3_norm(world_coord);
   return world_coord;
 }
@@ -2058,34 +2010,45 @@ v3 ray_from_camera() {
 // };
 
 EntityId e_alloc(MeshId mesh_id, MaterialId material_id) {
-  GameState& g = g_st->game;
+  GameState& g = st->game;
   EntityId e_id = {static_id_pool_alloc(g.entity_id_pool)};
   Entity& e = get_entity(e_id);
   e.scale = v3_one();
+  e.mesh_id = mesh_get(mesh_id);
+  e.material_id = material_get(material_id);
   vk_make_renderable(e_id, mesh_get(mesh_id), material_get(material_id));
   ++g.entities_count;
   return e_id;
 }
 
 StaticEntityId e_static_alloc(MeshId mesh_id, MaterialId material_id) {
-  GameState& g = g_st->game;
+  GameState& g = st->game;
   StaticEntityId e_id = {static_id_pool_alloc(g.static_entity_id_pool)};
   StaticEntity& e = get_static_entity(e_id);
   e.scale = v3_one();
+  e.mesh_id = mesh_get(mesh_id);
+  e.material_id = material_get(material_id);
   vk_make_renderable_static(e_id, mesh_get(mesh_id), material_get(material_id));
   ++g.static_entities_count;
   return e_id;
 }
 
-void e_release(EntityId e) {
-  GameState& g = g_st->game;
-  static_id_pool_free(g.entity_id_pool, e.v);
+void e_free(EntityId e) {
+  GameState& g = st->game;
   vk_remove_renderable(e);
+  static_id_pool_free(g.entity_id_pool, e.v);
   --g.entities_count;
 }
 
+void e_static_free(StaticEntityId e) {
+  GameState& g = st->game;
+  vk_remove_static_renderable(e);
+  static_id_pool_free(g.static_entity_id_pool, e.v);
+  --g.static_entities_count;
+}
+
 void select_obj() {
-  GameState& g = g_st->game;
+  GameState& g = st->game;
   v3 dir = ray_from_camera();
   EntityId e_id = e_alloc(Mesh_Cube, Material_Orange);
   Entity& e = get_entity(e_id);
@@ -2096,7 +2059,7 @@ void select_obj() {
 }
 
 void camera_init() {
-  GameState& g = g_st->game;
+  GameState& g = st->game;
   Camera& cam = g.cam;
   cam = {
     .pos = v3(0,0,5),
@@ -2109,15 +2072,15 @@ void camera_init() {
     SinD(cam.pitch),
     SinD(cam.yaw) * CosD(cam.pitch)
   };
-  vk_get_view() = mat4_look_at(cam.pos, cam.dir, v3_up());
+  st->view = mat4_look_at(cam.pos, cam.dir, v3_up());
 }
 
 void camera_update() {
-  GameState& g = g_st->game;
+  GameState& g = st->game;
   Camera& cam = g.cam;
   v2 win_size = v2_of_v2u(os_get_window_size());
-  mat4& projection = vk_get_projection();
-  mat4& view = vk_get_view();
+  mat4& projection = st->projection;
+  mat4& view = st->view;
   projection = mat4_perspective(degtorad(cam.fov), win_size.x / win_size.y, 0.1f, 10000.0f);
 
   // Camera rotation
@@ -2187,7 +2150,7 @@ void camera_update() {
 
 void scene_init() {
   Scratch scratch;
-  GameState& g = g_st->game;
+  GameState& g = st->game;
   camera_init();
   EntityId cube = e_alloc(Mesh_Cube, Material_Orange);
   g.rotating_cube_id = cube;
@@ -2234,6 +2197,7 @@ void scene_init() {
       // Material_Screen,
     };
     StaticEntityId e_id = e_static_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
+    darray_add(g.static_cubes, e_id);
     u32 range = KB(1);
     StaticEntity& e = get_static_entity(e_id);
     e.pos = v3_rand_rng(-v3_scale(range), v3_scale(range));
@@ -2303,8 +2267,8 @@ void scene_deinit() {
 }
 
 void scene_update() {
-  // Scratch scratch;
-  GameState& g = g_st->game;
+  Scratch scratch;
+  GameState& g = st->game;
   if (key_pressed(MouseKey_Left)) {
     // select_obj();
     v3 dir = ray_from_camera();
@@ -2328,7 +2292,7 @@ void scene_update() {
     vk_draw_cuboid(shift_3f32(e.aabb, e.pos), ColorWhite);
   }
   {
-    mat4& view = vk_get_view();
+    mat4& view = st->view;
     v3 forward = mat4_forward(view);
     v3 right   = mat4_right(view);
     v3 up      = mat4_up(view);
@@ -2342,7 +2306,7 @@ void scene_update() {
 
   ///////////////////////////////////
   // Random creating and moving stuff
-  Loop (i, 0) {
+  Loop (i, 1) {
     MeshId meshes[] = {
       // Mesh_MonkeyGlb,
       // Mesh_Triangle,
@@ -2374,7 +2338,7 @@ void scene_update() {
     e.pos = v3_norm(v3(-e.pos.z, 0, e.pos.x));
   }
 
-  vk_draw_rect(Rng2(v2(100,100), v2(200,200)), v3(1,1,1));
+  // vk_draw_rect(Rng2(v2(100,100), v2(200,200)), v3(1,1,1));
   v4& pos = get_pos();
   f32 speed = 1 * get_dt();
   if (key_down(Key_A)) {
@@ -2388,22 +2352,80 @@ void scene_update() {
   mat = mat4_translate(v3_of_v4(pos));
 }
 
+void game_view() {
+  Scratch scratch;
+  GameState& g = st->game;
+  ImguiWindow& win = st->game_win;
+  Camera& cam = g.cam;
+  if (win.open) {
+    imgui_window_apply_state(win);
+    ImGui::Begin("Game");
+
+    if (ImGui::IsWindowHovered()) {
+      if (key_pressed(Key_V)) {
+        imgui_window_toggle_fullscreen(win);
+      }
+    }
+
+    v3 pos = cam.pos;
+    ImGui::Text("entities: %u, static entities: %u", g.entities_count, g.static_entities_count);
+    ImGui::Text("Camera: x: %.2f y: %.2f z: %.2f", pos.x, pos.y, pos.z);
+    ImGui::DragFloat("speed", &cam.speed, 1);
+    Camera data = g.cam;
+    ImString str = push_str_copy(scratch, dumb_struct(scratch, ArraySlice(members_of_Camera), &data));
+    ImGui::Text("%s", str.str);
+
+    if (ImGui::Button("save state")) {
+      String str = dumb_struct(scratch, ArraySlice(members_of_Camera), &g.cam);
+      OS_Handle file = os_file_open(push_strf(scratch, "%s/saved", os_get_current_directory(), String("saved")), OS_AccessFlag_Write | OS_AccessFlag_Trunc);
+      String str1 = push_str_cat(scratch, "Camera {\n", str);
+      String str2 = push_str_cat(scratch, str1, "}");
+      os_file_write(file, str2.size, str2.str);
+      os_file_close(file);
+    }
+    if (ImGui::Button("load state")) {
+      OS_Handle file = os_file_open(push_strf(scratch, "%s/saved", os_get_current_directory(), String("saved")), OS_AccessFlag_Read);
+      u32 size = os_file_size(file);
+      u8* data = push_buffer(scratch, size);
+      os_file_read(file, size, data);
+      os_file_close(file);
+      Slice tokens = tokens_from_str(scratch, String(data, size));
+      dumb_struct_load(ArraySlice(members_of_Camera), &g.cam, tokens);
+      // Info("%s", String(data, size));
+    }
+    if (ImGui::Button("clear moving cubes")) {
+      Loop (i, g.moving_cubes.count) {
+        EntityId e =  g.moving_cubes[i];
+        e_free(e);
+      }
+      darray_clear(g.moving_cubes);
+      Loop (i, g.static_cubes.count) {
+        StaticEntityId e = g.static_cubes[i];
+        e_static_free(e);
+      }
+      darray_clear(g.static_cubes);
+    }
+
+    ImGui::End();
+  }
+}
+
 void game_init() {
   ProfFunc;
   v4& pos = get_pos();
   pos = {};
-  GameState& g = g_st->game;
+  GameState& g = st->game;
   Scratch scratch;
   g.arena = arena_make_named("game arena");
-  g.persistent_arena = arena_make_named("game arena persistent");
   g.gpa = alloc_seglist_make(g.arena, "game gpa");
   g.timer = timer_make(1);
 
-  g.entity_id_pool = static_id_pool_make(g.persistent_arena, MaxEntities);
-  g.static_entity_id_pool = static_id_pool_make(g.persistent_arena, MaxStaticEntities);
-  g.entities = push_array(g.persistent_arena, Entity, MaxEntities);
-  g.static_entities = push_array(g.persistent_arena, StaticEntity, MaxStaticEntities);
+  g.entity_id_pool = static_id_pool_make(g.arena, MaxEntities);
+  g.static_entity_id_pool = static_id_pool_make(g.arena, MaxStaticEntities);
+  g.entities = push_array(g.arena, Entity, MaxEntities);
+  g.static_entities = push_array(g.arena, StaticEntity, MaxStaticEntities);
   g.moving_cubes = darray_make<EntityId>(g.gpa);
+  g.static_cubes = darray_make<StaticEntityId>(g.gpa);
 
   // Mesh cube_mesh = {.vertices = cube_vertices, .vert_count = ArrayCount(cube_vertices)};
   // mesh_set(Mesh_Cube, vk_mesh_load(cube_mesh));
@@ -2452,7 +2474,7 @@ void game_init() {
 void game_update() {
   // foo();
   ProfFunc;
-  var& g = g_st->game;
+  GameState& g = st->game;
   timer_tick(g.timer);
 
   // push_array(g.arena, u32, 100);

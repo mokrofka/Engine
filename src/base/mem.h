@@ -206,7 +206,7 @@ struct SoA_Field {
   u32 elem_size;
   u32 align;
 };
-#define SoA_push_field(ptr,T) {(void**)(ptr), sizeof(T), alignof(T)}
+#define SoA_push_field(ptr, T) {(void**)(ptr), sizeof(T), alignof(T)}
 
 u8* mem_alloc_soa(Allocator alloc, u32 count, Slice<SoA_Field> fields);
 u8* mem_realloc_soa(Allocator alloc, u32 old_count, u32 new_count, Slice<SoA_Field> fields);

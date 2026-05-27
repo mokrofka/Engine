@@ -377,7 +377,10 @@ struct ObjectPool {
   u32 head;
   u32 cap;
   Allocator alloc;
-  T* data;
+  union {
+    T v;
+    u32 next_free;
+  }*data;
 #if BUILD_DEBUG
   u32* generations;
 #endif
@@ -393,7 +396,7 @@ template<typename T> T& object_pool_get(ObjectPool<T>& p, u32 h) {
 #if BUILD_DEBUG
   u32 idx = id_idx(h);
   Assert(generation_bits(p.generations[idx]) == id_generation(h));
-  return p.data[idx];
+  return p.data[idx].v;
 #else
   return p.data[h];
 #endif
@@ -410,7 +413,7 @@ template<typename T> void object_pool_grow(ObjectPool<T>& p) {
     mem_realloc_soa(p.alloc, cap_old, p.cap, ArraySlice(fields));
     p.head = cap_old;
     for (i32 i = cap_old; i < p.cap - 1; ++i) {
-      *(u32*)&p.data[i] = i + 1;
+      p.data[i].next_free = i + 1;
     }
     *(u32*)&p.data[p.cap - 1] = U32_MAX;
     MemZeroArray(p.generations + cap_old, p.cap - cap_old);
@@ -422,9 +425,9 @@ template<typename T> void object_pool_grow(ObjectPool<T>& p) {
     };
     mem_alloc_soa(p.alloc, p.cap, ArraySlice(fields));
     Loop(i, p.cap - 1) {
-      *(u32*)&p.data[i] = i + 1;
+      p.data[i].next_free = i + 1;
     }
-    *(u32*)&p.data[p.cap - 1] = U32_MAX;
+    p.data[p.cap - 1].next_free = U32_MAX;
     MemZeroArray(p.generations, p.cap);
   }
 #else
@@ -434,16 +437,16 @@ template<typename T> void object_pool_grow(ObjectPool<T>& p) {
     p.data = mem_realloc_array(p.alloc, p.data, cap_old, p.cap);
     p.head = cap_old;
     for (i32 i = cap_old; i < p.cap - 1; ++i) {
-      *(u32*)&p.data[i] = i + 1;
+      p.data[i].next_free = i + 1;
     }
     *(u32*)&p.data[p.cap - 1] = U32_MAX;
   } else {
     p.cap = DEFAULT_CAPACITY;
     p.data = push_array(p.alloc, T, p.cap);
     Loop(i, p.cap - 1) {
-      *(u32*)&p.data[i] = i + 1;
+      p.data[i].next_free = i + 1;
     }
-    *(u32*)&p.data[p.cap - 1] = U32_MAX;
+    p.data[p.cap - 1].next_free = U32_MAX;
   }
 #endif
 }
@@ -454,7 +457,7 @@ template<typename T> u32 object_pool_alloc(ObjectPool<T>& p) {
   }
   u32 result = p.head;
   u32 idx = id_idx(result);
-  p.head = *(u32*)&p.data[idx];
+  p.head = p.data[idx].next_free;
   return result;
 }
 template<typename T> u32 object_pool_alloc(ObjectPool<T>& p, T a) {
@@ -466,11 +469,11 @@ template<typename T> void object_pool_free(ObjectPool<T>& p, u32 h) {
 #if BUILD_DEBUG
   u32 idx = id_idx(h);
   Assert(generation_bits(p.generations[idx]++) == id_generation(h));
-  *(u32*)&p.data[idx] = p.head;
+  p.data[idx].next_free = p.head;
   p.head = id_make(p.generations[idx], idx);
 #else
   u32 idx = h;
-  *(u32*)&p.data[idx] = p.head;
+  p.data[idx].next_free = p.head;
   p.head = h;
 #endif
 }
@@ -478,16 +481,169 @@ template<typename T> u32 object_pool_clear(ObjectPool<T>& p) {
 #if BUILD_DEBUG
   p.head = 0;
   Loop (i, p.cap - 1) {
-    *(u32*)&p.data[i] = i + 1;
+    p.data[i].next_Free = i + 1;
   }
-  *(u32*)&p.data[p.cap - 1] = U32_MAX;
+  p.data[p.cap - 1].next_free = U32_MAX;
   MemZeroArray(p.generations, p.cap);
 #else
   p.head = 0;
   Loop (i, p.cap - 1) {
-    *(u32*)&p.data[i] = i + 1;
+    p.data[i].next_free = i + 1;
   }
-  *(u32*)&p.data[p.cap - 1] = U32_MAX;
+  p.data[p.cap - 1].next_free = U32_MAX;
+#endif
+}
+
+template<typename T>
+struct ObjectPoolLinklist {
+  static_assert(sizeof(T) >= 4);
+  u32 head;
+  u32 cap;
+  Allocator alloc;
+  u32 first;
+  u32 last;
+  struct {
+    union {
+      T data;
+      u32 next_free;
+    };
+    u32 next;
+    u32 prev;
+  }*data;
+#if BUILD_DEBUG
+  u32* generations;
+#endif
+};
+
+template<typename T> ObjectPoolLinklist<T> object_pool_linklist_make(Allocator alloc) {
+  ObjectPoolLinklist<T> res = {
+    .alloc = alloc,
+  };
+  return res;
+}
+template<typename T> T& object_pool_linklist_get(ObjectPoolLinklist<T>& p, u32 h) {
+#if BUILD_DEBUG
+  u32 idx = id_idx(h);
+  Assert(generation_bits(p.generations[idx]) == id_generation(h));
+  return p.data[idx].data;
+#else
+  return p.data[h];
+#endif
+}
+template<typename T> void object_pool_linklist_grow(ObjectPoolLinklist<T>& p) {
+#if BUILD_DEBUG
+  if (p.data) {
+    u32 cap_old = p.cap;
+    p.cap *= DEFAULT_RESIZE_FACTOR;
+    SoA_Field fields[] = {
+      SoA_push_field(&p.generations, u32),
+      SoA_push_field(&p.data, *p.data),
+    };
+    mem_realloc_soa(p.alloc, cap_old, p.cap, ArraySlice(fields));
+    p.head = cap_old;
+    for (i32 i = cap_old; i < p.cap - 1; ++i) {
+      p.data[i].next_free = i + 1;
+    }
+    p.data[p.cap - 1].next_free = U32_MAX;
+    MemZeroArray(p.generations + cap_old, p.cap - cap_old);
+  } else {
+    p.cap = DEFAULT_CAPACITY;
+    SoA_Field fields[] = {
+      SoA_push_field(&p.generations, u32),
+      SoA_push_field(&p.data, *p.data),
+    };
+    mem_alloc_soa(p.alloc, p.cap, ArraySlice(fields));
+    Loop(i, p.cap - 1) {
+      p.data[i].next_free = i + 1;
+    }
+    p.data[p.cap - 1].next_free = U32_MAX;
+    MemZeroArray(p.generations, p.cap);
+    p.first = U32_MAX;
+    p.last = U32_MAX;
+  }
+#else
+  if (p.data) {
+    u32 cap_old = p.cap;
+    p.cap *= DEFAULT_RESIZE_FACTOR;
+    p.data = mem_realloc_array(p.alloc, p.data, cap_old, p.cap);
+    p.head = cap_old;
+    for (i32 i = cap_old; i < p.cap - 1; ++i) {
+      p.data[i].next_free = i + 1;
+    }
+    p.data[p.cap - 1].next_free = U32_MAX;
+  } else {
+    p.cap = DEFAULT_CAPACITY;
+    p.data = push_array(p.alloc, T, p.cap);
+    Loop(i, p.cap - 1) {
+      p.data[i].next_free = i + 1;
+    }
+    p.data[p.cap - 1].next_free = U32_MAX;
+  }
+#endif
+}
+template<typename T> u32 object_pool_linklist_alloc(ObjectPoolLinklist<T>& p) {
+  u32 head_idx = id_idx(p.head);
+  if (head_idx >= p.cap) {
+    object_pool_linklist_grow(p);
+  }
+  u32 result = p.head;
+  u32 idx = id_idx(result);
+  p.head = p.data[idx].next_free;
+
+  // add to link list
+  var& n = p.data[idx];
+  n.prev = p.last;
+  n.next = U32_MAX;
+  if (p.last != U32_MAX) {
+    p.data[id_idx(p.last)].next = result;
+  } else {
+    p.first = result;
+  }
+  p.last = result;
+
+  return result;
+}
+template<typename T> u32 object_pool_linklist_alloc(ObjectPoolLinklist<T>& p, T a) {
+  u32 h = object_pool_linklist_alloc(p);
+  object_pool_linklist_get(p, h) = a;
+  return h;
+}
+template<typename T> void object_pool_linklist_free(ObjectPoolLinklist<T>& p, u32 h) {
+#if BUILD_DEBUG
+  u32 idx = id_idx(h);
+  Assert(generation_bits(p.generations[idx]++) == id_generation(h));
+  p.data[idx].next_free = p.head;
+  p.head = id_make(p.generations[idx], idx);
+
+  // remove from link list
+  var& n = p.data[idx];
+  if(n.prev != U32_MAX) {
+    p.data[id_idx(n.prev)].next = n.next;
+  } else {
+    p.first = n.next;
+  }
+  if(n.next != U32_MAX) {
+    p.data[id_idx(n.next)].prev = n.prev;
+  } else {
+    p.last = n.prev;
+  }
+
+#else
+  u32 idx = h;
+  p.data[idx].next_free = p.head;
+  p.head = h;
+
+  // remove from link list
+  if(p.prev != U32_MAX) {
+    p.data[p.prev].next = p.next;
+  } else {
+    p.first = p.next;
+  }
+  if(p.next != U32_MAX) {
+    p.data[p.next].prev = p.prev;
+  } else {
+    p.last = p.prev;
+  }
 #endif
 }
 
@@ -664,145 +820,6 @@ struct Map {
   T* data;
   Key* keys;
   MapSlot* is_occupied;
-  // Map() = default;
-  // Map(Allocator alloc_) { init(alloc_); }
-  // void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
-  // T* set(Key key, T val) {
-  //   if (count >= cap*LF) { grow(); }
-  //   u64 hash_idx = hash(key);
-  //   u64 idx = ModPow2(hash_idx, cap);
-  //   while (is_occupied[idx] == MapSlot_Occupied) {
-  //     if (equal(keys[idx], key)) break;
-  //     idx = ModPow2(idx + 1, cap);
-  //   }
-  //   keys[idx] = key;
-  //   data[idx] = val;
-  //   is_occupied[idx] = MapSlot_Occupied;
-  //   ++count;
-  //   return &data[idx];
-  // }
-  // T* get(Key key) {
-  //   if (count >= cap*LF) { grow(); }
-  //   u64 hash_idx = hash(key);
-  //   u64 idx = ModPow2(hash_idx, cap);
-  //   Loop (i, cap) {
-  //     if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx], key))) {
-  //       return &data[idx];
-  //     } 
-  //     else if (is_occupied[idx] == MapSlot_Empty) {
-  //       break;
-  //     }
-  //     idx = ModPow2(idx + 1, cap);
-  //   }
-  //   return null;
-  // }
-  // T* get_or_add(Key key, T val) {
-  //   if (count >= cap*LF) { grow(); }
-  //   u64 hash_idx = hash(key);
-  //   u64 idx = ModPow2(hash_idx, cap);
-  //   Loop (i, cap) {
-  //     if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx], key))) {
-  //       return &data[idx];
-  //     } 
-  //     else if (is_occupied[idx] == MapSlot_Empty) {
-  //       break;
-  //     }
-  //     idx = ModPow2(idx + 1, cap);
-  //   }
-  //   keys[idx] = key;
-  //   data[idx] = val;
-  //   is_occupied[idx] = MapSlot_Occupied;
-  //   ++count;
-  //   return &data[idx];
-  // }
-  // T* get_or_add_was(Key key, T val, b32* out_was_added) {
-  //   if (count >= cap*LF) { grow(); }
-  //   u64 hash_idx = hash(key);
-  //   u64 idx = ModPow2(hash_idx, cap);
-  //   Loop (i, cap) {
-  //     if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx], key))) {
-  //       return &data[idx];
-  //     } 
-  //     else if (is_occupied[idx] == MapSlot_Empty) {
-  //       break;
-  //     }
-  //     idx = ModPow2(idx + 1, cap);
-  //   }
-  //   keys[idx] = key;
-  //   data[idx] = val;
-  //   is_occupied[idx] = MapSlot_Occupied;
-  //   ++count;
-  //   *out_was_added = true;
-  //   return &data[idx];
-  // }
-  // T* exists_or_add(Key key, T val, b32* exists) {
-  //   if (count >= cap*LF) { grow(); }
-  //   u64 hash_idx = hash(key);
-  //   u64 idx = ModPow2(hash_idx, cap);
-  //   Loop (i, cap) {
-  //     if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx], key))) {
-  //       *exists = true;
-  //       return &data[idx];
-  //     } 
-  //     else if (is_occupied[idx] == MapSlot_Empty) {
-  //       break;
-  //     }
-  //     idx = ModPow2(idx + 1, cap);
-  //   }
-  //   keys[idx] = key;
-  //   data[idx] = val;
-  //   is_occupied[idx] = MapSlot_Occupied;
-  //   ++count;
-  //   return &data[idx];
-  // }
-  // void remove(Key key) {
-  //   u64 hash_idx = hash(key);
-  //   u64 idx = ModPow2(hash_idx, cap);
-  //   while (is_occupied[idx] != MapSlot_Empty) {
-  //     if ((is_occupied[idx] == MapSlot_Occupied) && (equal(keys[idx] == key))) {
-  //       is_occupied[idx] = MapSlot_Deleted;
-  //       --count;
-  //       return;
-  //     }
-  //     idx = ModPow2(idx + 1, cap);
-  //   }
-  // }
-  // void clear() {
-  //   count = 0;
-  //   MemZeroArray(data, cap);
-  //   MemZeroArray(keys, cap);
-  //   MemZeroArray(is_occupied, cap);
-  // }
-  // void grow() {
-  //   if (data) {
-  //     T* old_data = data;
-  //     Key* old_keys = keys;
-  //     MapSlot* old_is_occupied = is_occupied;
-  //     u32 old_cap = cap;
-  //     cap *= DEFAULT_RESIZE_FACTOR;
-  //     SoA_Field fields[] = {
-  //       SoA_push_field(&data, T),
-  //       SoA_push_field(&keys, Key),
-  //       SoA_push_field(&is_occupied, MapSlot),
-  //     };
-  //     mem_alloc_soa(alloc, cap, ArraySlice(fields));
-  //     Loop (i, old_cap) {
-  //       if (old_is_occupied[i] == MapSlot_Occupied) {
-  //         set(old_keys[i], old_data[i]);
-  //       }
-  //     }
-  //     mem_free(alloc, old_data);
-  //   }
-  //   else {
-  //     cap = DEFAULT_CAPACITY;
-  //     SoA_Field fields[] = {
-  //       SoA_push_field(&data, T),
-  //       SoA_push_field(&keys, Key),
-  //       SoA_push_field(&is_occupied, MapSlot),
-  //     };
-  //     mem_alloc_soa(alloc, cap, ArraySlice(fields));
-  //   }
-  // }
 };
 
 template<typename Key, typename T> Map<Key, T> map_make(Allocator alloc) {
@@ -855,20 +872,20 @@ template<typename Key, typename T> T* map_set(Map<Key, T>& m, Key key, T val) {
   ++m.count;
   return &m.data[idx];
 }
-template<typename Key, typename T> T* map_get(Map<Key, T>& m, Key key) {
-  if (!m.data) return null;
+template<typename Key, typename T> Result<T> map_get(Map<Key, T>& m, Key key) {
+  if (!m.data) return ResultErr();
   u64 hash_idx = hash(key);
   u64 idx = ModPow2(hash_idx, m.cap);
   Loop (i, m.cap) {
     if ((m.is_occupied[idx] == MapSlot_Occupied) && (equal(m.keys[idx], key))) {
-      return &m.data[idx];
+      return ResultOk(m.data[idx]);
     } 
     else if (m.is_occupied[idx] == MapSlot_Empty) {
       break;
     }
     idx = ModPow2(idx + 1, m.cap);
   }
-  return null;
+  return ResultErr();
 }
 template<typename Key, typename T> T* map_remove(Map<Key, T>& m, Key key) {
   u64 hash_idx = hash(key);
