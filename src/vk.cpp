@@ -2641,7 +2641,7 @@ void vk_unregister_entity(u32 entity_id, b32 is_static) {
     mesh_idx = id_idx(entity.mesh_id.v);
   }
   VK_Mesh mesh = g.meshes[mesh_idx];
-  VK_BatchType type = (mesh.index_count != 0) | (Bit(is_static));
+  VK_BatchType type = (mesh.index_count == 0) | (is_static << 1);
   VK_MeshesBatches& shader_batch = g.batches[g.pipelines[pipeline_idx].batch_idx].batches[type];
 
   Result mesh_batch_idx = map_get(shader_batch.mesh_to_batch, mesh_idx);

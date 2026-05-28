@@ -12,6 +12,8 @@ enum MetaType {
   MetaType_GpuMeshId,
   MetaType_GpuMaterialId,
   MetaType_RenderId,
+  MetaType_String,
+  MetaType_EntityFlags
 };
 
 struct MemberDefinition {

@@ -460,9 +460,12 @@ Texture load_image(String filepath) {
 // @Assets
 
 // TODO: allocate in hotreload build?
-global String meshes_strs[Mesh_Load_COUNT] = {
+global String meshes_strs[Mesh_COUNT] = {
 #define X(enum_name, name) [enum_name] = Stringify(name),
   MESH_LIST
+#undef X
+#define X(enum_name) [enum_name] = Stringify(enum_name),
+  MESH_0_LIST
 #undef X
 };
 
@@ -473,7 +476,12 @@ global String textures_strs[Texture_COUNT] = {
 };
 
 GpuMeshId mesh_get(MeshId id) { return st->meshes_ids[id]; }
-void mesh_set(MeshId id, GpuMeshId mesh_handle) { st->meshes_ids[id] = mesh_handle; }
+void mesh_set(MeshId id, GpuMeshId mesh_handle) { 
+  st->meshes_ids[id] = mesh_handle;
+  String str = push_str_copy(st->arena, meshes_strs[id]);
+  st->mesh_id_to_str[mesh_handle.v] = str;
+  map_set(st->str_to_mesh_id, str, mesh_handle);
+}
 GpuMaterialId material_get(MaterialId id) { return st->materials_ids[id]; }
 
 constexpr ShaderState shader_default_info() {
@@ -582,8 +590,9 @@ void assets_load() {
       __VA_ARGS__ \
     }; \
     g.materials_ids[enum_name] = vk_material_load(mat); \
-    map_set(g.str_to_material_id, String(Stringify(enum_name)), g.materials_ids[enum_name]); \
-    g.material_id_to_str[g.materials_ids[enum_name].v] = Stringify(enum_name); \
+    String str = push_str_copy(g.arena, String(Stringify(enum_name))); \
+    map_set(g.str_to_material_id, str, g.materials_ids[enum_name]); \
+    g.material_id_to_str[g.materials_ids[enum_name].v] = str; \
   }
   MATERIAL_LIST
 #undef X
@@ -1588,7 +1597,7 @@ void profiler_view() {
   g.active_tab = g.future_active_tab;
 }
 
-String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr) {
+String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, EntityFlags flags = {}) {
   Scratch scratch(arena);
   var string = dstr_make(arena);
   Loop (i, members.count) {
@@ -1622,11 +1631,21 @@ String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr) 
       } break;
       case MetaType_GpuMeshId: {
         GpuMeshId v = *((GpuMeshId*)member_ptr);
-        dstr_add(string, push_strf(scratch, "mesh_name \"%s\"\n", st->mesh_id_to_str[v.v]));
+        dstr_add(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->mesh_id_to_str[v.v]));
       } break;
       case MetaType_GpuMaterialId: {
         GpuMaterialId v = *((GpuMaterialId*)member_ptr);
-        dstr_add(string, push_strf(scratch, "material_name \"%s\"\n", st->material_id_to_str[v.v]));
+        dstr_add(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->material_id_to_str[v.v]));
+      } break;
+      case MetaType_String: {
+        if (FlagHas(flags, EntityFlag_Referenced)) {
+          String v = *((String*)member_ptr);
+          dstr_add(string, push_strf(scratch, "%s \"%s\"\n", member.name, v));
+        }
+      } break;
+      case MetaType_EntityFlags: {
+        EntityFlags v = *((EntityFlags*)member_ptr);
+        dstr_add(string, push_strf(scratch, "%s %u\n", member.name, v));
       } break;
     }
   }
@@ -1637,10 +1656,10 @@ void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser
   Parser& p = *parser;
   while (!tok_match(p, TokenType_CloseBrace)) {
     MemberDefinition member = {};
-    Token tok = tok_advance(p);
-    if (tok.type == TokenType_Identifier) {
+    Token ident_token = tok_advance(p);
+    if (ident_token.type == TokenType_Identifier) {
       Loop (i, members.count) {
-        if (str_match(members[i].name, tok.str)) {
+        if (str_match(members[i].name, ident_token.str)) {
           member = members[i];
           break;
         }
@@ -1672,10 +1691,30 @@ void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser
         *(Rng3*)Offset(ptr, member.offset) = Rng3(v3(parse_f32(p), parse_f32(p), parse_f32(p)), v3(parse_f32(p), parse_f32(p), parse_f32(p)));
       } break;
       case MetaType_GpuMeshId: {
-        *(GpuMeshId*)Offset(ptr, member.offset) = map_get(st->str_to_mesh_id, tok.str).v;
+        Token tok = tok_require(p, TokenType_String);
+        String str = str_chop(str_skip(tok.str, 1), 1);
+        Result mesh = map_get(st->str_to_mesh_id, str);
+        if (mesh.err) {
+          InvalidPath;
+        }
+        *(GpuMeshId*)Offset(ptr, member.offset) = mesh.v;
       } break;
       case MetaType_GpuMaterialId: {
-        *(GpuMaterialId*)Offset(ptr, member.offset) = map_get(st->str_to_material_id, tok.str).v;
+        Token tok = tok_require(p, TokenType_String);
+        String str = str_chop(str_skip(tok.str, 1), 1);
+        Result material = map_get(st->str_to_material_id, str);
+        if (material.err) {
+          InvalidPath;
+        }
+        *(GpuMaterialId*)Offset(ptr, member.offset) = material.v;
+      } break;
+      case MetaType_String: {
+        Token tok = tok_require(p, TokenType_String);
+        String str = str_chop(str_skip(tok.str, 1), 1);
+        *(String*)Offset(ptr, member.offset) = push_str_copy(st->arena, str);
+      } break;
+      case MetaType_EntityFlags: {
+        *(EntityFlags*)Offset(ptr, member.offset) = (EntityFlags)parse_u32(p);
       } break;
     }
   }
@@ -2013,47 +2052,66 @@ v3 ray_from_camera() {
 //   return true;
 // };
 
-EntityId e_alloc(MeshId mesh_id, MaterialId material_id) {
+EntityId e_alloc_bare() {
   GameState& g = st->game;
   EntityId e_id = {static_id_pool_alloc(g.entity_id_pool)};
-  object_pool_linklist_alloc(g.all_dynamic_entities, e_id);
   Entity& e = get_entity(e_id);
-  e = {
-    .scale = v3_one(),
-    .mesh_id = mesh_get(mesh_id),
-    .material_id = material_get(material_id),
-  };
-  vk_make_renderable(e_id, mesh_get(mesh_id), material_get(material_id));
+  e = {};
   ++g.entities_count;
+  g.id_track_entities[id_idx(e_id.v)] = object_pool_linklist_alloc(g.all_dynamic_entities, e_id);
   return e_id;
 }
+EntityId e_alloc(GpuMeshId mesh_id, GpuMaterialId material_id, EntityThing thing = {}) {
+  GameState& g = st->game;
+  EntityId e_id = {static_id_pool_alloc(g.entity_id_pool)};
+  Entity& e = get_entity(e_id);
+  e = {
+    .name = thing.name,
+    .flags = thing.flags,
+    .scale = v3_one(),
+    .mesh_id = mesh_id,
+    .material_id = material_id,
+  };
+  vk_make_renderable(e_id, mesh_id, material_id);
+  ++g.entities_count;
+  g.id_track_entities[id_idx(e_id.v)] = object_pool_linklist_alloc(g.all_dynamic_entities, e_id);
+  return e_id;
+}
+EntityId e_alloc(MeshId mesh_id, MaterialId material_id, EntityThing thing = {}) {
+  return e_alloc(mesh_get(mesh_id), material_get(material_id), thing);
+}
 
-StaticEntityId e_static_alloc(MeshId mesh_id, MaterialId material_id) {
+StaticEntityId e_static_alloc(GpuMeshId mesh_id, GpuMaterialId material_id) {
   GameState& g = st->game;
   StaticEntityId e_id = {static_id_pool_alloc(g.static_entity_id_pool)};
-  object_pool_linklist_alloc(g.all_static_entities, e_id);
   StaticEntity& e = get_static_entity(e_id);
   e = {
     .scale = v3_one(),
-    .mesh_id = mesh_get(mesh_id),
-    .material_id = material_get(material_id),
+    .mesh_id = mesh_id,
+    .material_id = material_id,
   };
-  vk_make_renderable_static(e_id, mesh_get(mesh_id), material_get(material_id));
+  vk_make_renderable_static(e_id, mesh_id, material_id);
   ++g.static_entities_count;
+  g.id_track_static_entities[id_idx(e_id.v)] = object_pool_linklist_alloc(g.all_static_entities, e_id);
   return e_id;
 }
+StaticEntityId e_static_alloc(MeshId mesh_id, MaterialId material_id) {
+  return e_static_alloc(mesh_get(mesh_id), material_get(material_id));
+}
 
-void e_free(EntityId e) {
+void e_free(EntityId e_id) {
   GameState& g = st->game;
-  vk_remove_renderable(e);
-  static_id_pool_free(g.entity_id_pool, e.v);
+  object_pool_linklist_free(g.all_dynamic_entities, g.id_track_entities[id_idx(e_id.v)]);
+  vk_remove_renderable(e_id);
+  static_id_pool_free(g.entity_id_pool, e_id.v);
   --g.entities_count;
 }
 
-void e_static_free(StaticEntityId e) {
+void e_static_free(StaticEntityId e_id) {
   GameState& g = st->game;
-  vk_remove_static_renderable(e);
-  static_id_pool_free(g.static_entity_id_pool, e.v);
+  object_pool_linklist_free(g.all_static_entities, g.id_track_static_entities[id_idx(e_id.v)]);
+  vk_remove_static_renderable(e_id);
+  static_id_pool_free(g.static_entity_id_pool, e_id.v);
   --g.static_entities_count;
 }
 
@@ -2162,12 +2220,10 @@ void scene_init() {
   Scratch scratch;
   GameState& g = st->game;
   camera_init();
-  EntityId cube = e_alloc(Mesh_Cube, Material_Orange);
-  g.rotating_cube_id = cube;
-  EntityId monkey_id = e_alloc(Mesh_MonkeyGlb, Material_Container);
-  Entity& monkey = get_entity(monkey_id);
+  g.rotating_cube_id = e_alloc(Mesh_Cube, Material_Orange, {"rotating_cube", EntityFlag_Referenced});
+  g.monkey_id = e_alloc(Mesh_MonkeyGlb, Material_Container, {"monkey", EntityFlag_Referenced});
+  Entity& monkey = get_entity(g.monkey_id);
   monkey.aabb = {v3_scale(-1.2), v3_scale(1.2)};
-  g.monkey_id = monkey_id;
   {
     EntityId triangle_id = e_alloc(Mesh_Triangle, Material_Orange);
     Entity& triangle = get_entity(triangle_id);
@@ -2175,13 +2231,12 @@ void scene_init() {
   }
   {
     EntityId grid_id = e_alloc(Mesh_Grid, Material_Line);
-    g.grid_id = grid_id;
     vk_set_entity_color(grid_id, v4_scale(0.6));
     Entity& grid = get_entity(grid_id);
     grid.pos = v3(0,0,-5);
   }
   {
-    g.axis_attached_to_cam_id = e_alloc(Mesh_Axis, Material_Axis);
+    g.axis_attached_to_cam_id = e_alloc(Mesh_Axis, Material_Axis, {"axis_attached_to_cam", EntityFlag_Referenced});
   }
   Loop (i, 3) {
     EntityId cube_id = e_alloc(Mesh_Cube, Material_Orange);
@@ -2217,8 +2272,8 @@ void scene_init() {
 #endif
 
   {
-    g.sphere_id = e_alloc(Mesh_Sphere, Material_Container);
-    Entity& sphere = get_entity(g.sphere_id);
+    EntityId sphere_id = e_alloc(Mesh_Sphere, Material_Container);
+    Entity& sphere = get_entity(sphere_id);
     sphere.pos = v3(0,0,-10);
   }
   {
@@ -2260,13 +2315,6 @@ void scene_init() {
     Entity& e = get_entity(e_id);
     e.pos = v3_rand_rng(-v3_scale(range), v3_scale(range));
     darray_add(g.moving_cubes, e_id);
-  }
-
-  {
-    EntityId e_id = e_alloc(Mesh_Cube, Material_Orange);
-    Entity& e = get_entity(e_id);
-    e.pos = {};
-    g.target_id = e_id;
   }
 }
 
@@ -2343,11 +2391,6 @@ void scene_update() {
     e.vel += tangent * 2.0f * get_dt();
     e.vel += -dir * 0.5f * get_dt();
   }
-  {
-    Entity& e = get_entity(g.target_id);
-    // e.pos().x -= 1 * get_dt();
-    e.pos = v3_norm(v3(-e.pos.z, 0, e.pos.x));
-  }
 
   // vk_draw_rect(Rng2(v2(100,100), v2(200,200)), v3(1,1,1));
   v4& pos = get_pos();
@@ -2372,17 +2415,23 @@ void game_save_state() {
   dstr_add(data, dumb_struct(scratch, ArraySlice(members_of_Camera), &g.cam));
   dstr_add(data, "}\n");
 
-  // Entity& e = get_entity(g.monkey_id);
-  // dstr_add(data, "Entity {\n");
-  // dstr_add(data, dumb_struct(scratch, ArraySlice(members_of_Entity), &e));
-  // dstr_add(data, "}\n");
-
-  var& p = g.all_dynamic_entities;
-  for (u32 node = p.first; node != U32_MAX; node = p.data[id_idx(node)].next) {
-    Entity& e = get_entity(p.data[id_idx(node)].data);
-    dstr_add(data, "Entity {\n");
-    dstr_add(data, dumb_struct(scratch, ArraySlice(members_of_Entity), &e));
-    dstr_add(data, "}\n");
+  {
+    var& p = g.all_dynamic_entities;
+    for (u32 node = p.first; node != U32_MAX; node = p.data[id_idx(node)].next) {
+      Entity& e = get_entity(p.data[id_idx(node)].data);
+      dstr_add(data, "Entity {\n");
+      dstr_add(data, dumb_struct(scratch, ArraySlice(members_of_Entity), &e, e.flags));
+      dstr_add(data, "}\n");
+    }
+  }
+  {
+    var& p = g.all_static_entities;
+    for (u32 node = p.first; node != U32_MAX; node = p.data[id_idx(node)].next) {
+      StaticEntity& e = get_static_entity(p.data[id_idx(node)].data);
+      dstr_add(data, "StaticEntity {\n");
+      dstr_add(data, dumb_struct(scratch, ArraySlice(members_of_StaticEntity), &e));
+      dstr_add(data, "}\n");
+    }
   }
 
   OS_Handle file = os_file_open(push_strf(scratch, "%s/saved", os_get_current_directory(), String("saved")), OS_AccessFlag_Write | OS_AccessFlag_Trunc);
@@ -2396,6 +2445,22 @@ void game_load_state() {
   Slice data = os_file_path_read_all(scratch, push_strf(scratch, "%s/saved", os_get_current_directory(), String("saved")));
   Slice tokens = tokens_from_str(scratch, String(data.data, data.size));
   Parser p = parser_make(tokens);
+
+  {
+    var& p = g.all_dynamic_entities;
+    for (u32 node = p.first; node != U32_MAX; node = p.data[id_idx(node)].next) {
+      EntityId e_id = p.data[id_idx(node)].data;
+      e_free(e_id);
+    }
+  }
+  {
+    var& p = g.all_static_entities;
+    for (u32 node = p.first; node != U32_MAX; node = p.data[id_idx(node)].next) {
+      StaticEntityId e_id = p.data[id_idx(node)].data;
+      e_static_free(e_id);
+    }
+  }
+
   while (!tok_is_end(p)) {
     Token tok = tok_advance(p);
     switch (tok.type) {
@@ -2404,11 +2469,25 @@ void game_load_state() {
         if (str_match(tok.str, "Camera")) {
           dumb_struct_load(ArraySlice(members_of_Camera), &g.cam, &p);
         } else if (str_match(tok.str, "Entity")) {
-          var& pool = g.all_dynamic_entities;
-          for (u32 node = pool.first; node != U32_MAX; node = pool.data[id_idx(node)].next) {
-            Entity& e = get_entity(pool.data[id_idx(node)].data);
-            dumb_struct_load(ArraySlice(members_of_Entity), &e, &p);
+          EntityId e_id = e_alloc_bare();
+          Entity& e = get_entity(e_id);
+          dumb_struct_load(ArraySlice(members_of_Entity), &e, &p);
+          vk_make_renderable(e_id, e.mesh_id, e.material_id);
+          if (FlagHas(e.flags, EntityFlag_Referenced)) {
+            if (str_match("monkey", e.name)) {
+              g.monkey_id = e_id;
+            } else if (str_match("axis_attached_to_cam", e.name)) {
+              g.axis_attached_to_cam_id = e_id;
+            } else if (str_match("rotating_cube", e.name)) {
+              g.rotating_cube_id = e_id;
+            }
           }
+        } else if (str_match(tok.str, "StaticEntity")) {
+          StaticEntity entity = {};
+          dumb_struct_load(ArraySlice(members_of_StaticEntity), &entity, &p);
+          StaticEntityId e_id = e_static_alloc(entity.mesh_id, entity.material_id);
+          StaticEntity&e = get_static_entity(e_id);
+          e = entity;
         }
       }
     }
@@ -2450,11 +2529,6 @@ void game_view() {
         e_free(e);
       }
       darray_clear(g.moving_cubes);
-      Loop (i, g.static_cubes.count) {
-        StaticEntityId e = g.static_cubes[i];
-        e_static_free(e);
-      }
-      darray_clear(g.static_cubes);
     }
 
     ImGui::End();
@@ -2479,6 +2553,7 @@ void game_init() {
   g.static_entities = push_array(g.arena, StaticEntity, MaxStaticEntities);
   g.moving_cubes = darray_make<EntityId>(g.gpa);
   g.static_cubes = darray_make<StaticEntityId>(g.gpa);
+  g.find_entity = map_make<String, EntityId>(g.gpa);
 
   // Mesh cube_mesh = {.vertices = cube_vertices, .vert_count = ArrayCount(cube_vertices)};
   // mesh_set(Mesh_Cube, vk_mesh_load(cube_mesh));
@@ -2528,6 +2603,11 @@ void game_update() {
   ProfFunc;
   GameState& g = st->game;
   timer_tick(g.timer);
+  {
+    Entity& e = get_entity(g.monkey_id);
+    e.pos.x += get_dt() * 1;
+    e.pos.y += get_dt() * 0.5;
+  }
 
   // push_array(g.arena, u32, 100);
   if (timer_passed(g.timer)) {

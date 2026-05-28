@@ -187,16 +187,24 @@ Texture load_image(String filepath);
   X(Mesh_Cube, cube.glb) \
   // X(Mesh_Castle, castle.obj) \
 
+#define MESH_0_LIST \
+  X(Mesh_Triangle) \
+  X(Mesh_Grid) \
+  X(Mesh_Axis) \
+  X(Mesh_Sphere)
+
 enum MeshId {
 #define X(enum_name, name) enum_name,
   MESH_LIST
 #undef X
-  Mesh_Load_COUNT,
+#define X(enum_name) enum_name,
+  MESH_0_LIST
+#undef X
   
-  Mesh_Triangle,
-  Mesh_Grid,
-  Mesh_Axis,
-  Mesh_Sphere,
+  // Mesh_Triangle,
+  // Mesh_Grid,
+  // Mesh_Axis,
+  // Mesh_Sphere,
   Mesh_COUNT,
 };
 
@@ -404,7 +412,19 @@ Introspect struct Camera {
   f32 speed;
 };
 
+enum EntityFlags {
+  EntityFlag_Referenced = 1,
+  EntityFlag_NotRender,
+};
+
+struct EntityThing {
+  String name;
+  EntityFlags flags;
+};
+
 Introspect struct Entity {
+  String name;
+  EntityFlags flags;
   v3 pos;
   v3 rot;
   v3 scale;
@@ -435,7 +455,9 @@ struct GameState {
   Timer timer;
 
   Entity* entities;
+  u32 id_track_entities[MaxEntities];
   StaticEntity* static_entities;
+  u32 id_track_static_entities[MaxStaticEntities];
   u32 entities_count;
   u32 static_entities_count;
   StaticIdPool entity_id_pool;
@@ -446,13 +468,9 @@ struct GameState {
   ObjectPoolLinklist<EntityId> all_dynamic_entities;
   ObjectPoolLinklist<StaticEntityId> all_static_entities;
   EntityId axis_attached_to_cam_id;
-  EntityId grid_id;
   EntityId monkey_id;
   EntityId rotating_cube_id;
-  EntityId sphere_id;
-  EntityId cube0_id;
-  EntityId cube1_id;
-  EntityId target_id;
+  Map<String, EntityId> find_entity;
 };
 
 void game_init();
