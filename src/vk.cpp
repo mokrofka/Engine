@@ -1308,7 +1308,9 @@ void vk_draw() {
     VK_Pipeline pipeline = g.pipelines[g.entity_pipelines[i]];
     vk_bind_pipeline(cmd, pipeline.h);
     VK_PipelineBatch& batch = g.batches[pipeline.batch_idx];
-    var fill_buffer = [&](VK_MeshesBatches shader_batch, b32 is_indexed, b32 is_static) {
+    var fill_buffer = [&](VK_BatchType type) {
+      VK_MeshesBatches shader_batch = batch.batches[type];
+      b32 is_static = type & (Bit(1));
       u32 entity_offset = 0;
       u32 draw_call_offset = 0;
       u32* entities_count = &ctx.entities_count;
@@ -1340,7 +1342,7 @@ void vk_draw() {
         u32 mesh_idx = id_idx(mesh_batch.mesh_id.v);
         VK_Mesh mesh = g.meshes[mesh_idx];
         VK_DrawCallInfo info = {};
-        if (is_indexed) {
+        if (mesh.index_count) {
           info = {
             .index_draw_command = {
               .indexCount = (u32)mesh.index_count,
@@ -1372,56 +1374,30 @@ void vk_draw() {
       return drawcall;
     };
 
-    // indexed
-    {
-      VK_IndirectDrawCall draw = fill_buffer(batch.batches[VK_BatchType_Indexed], true, false);
+    var make_draw = [&](VK_IndirectDrawCall draw, b32 indexed) {
       if (draw.draw_call_count) {
         VK_PushConstant push = {.drawcall_offset = draw.draw_call_offset};
         g.CmdPushConstants(cmd, g.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &push);
         u64 draw_call_mem_offset = push.drawcall_offset*sizeof(VK_DrawCallInfo);
-        g.CmdDrawIndexedIndirect(cmd, g.indirect_draw_buffer.h, draw_call_mem_offset, draw.draw_call_count, sizeof(VK_DrawCallInfo));
+        if (indexed) {
+          g.CmdDrawIndexedIndirect(cmd, g.indirect_draw_buffer.h, draw_call_mem_offset, draw.draw_call_count, sizeof(VK_DrawCallInfo));
+        } else {
+          g.CmdDrawIndirect(cmd, g.indirect_draw_buffer.h, draw_call_mem_offset, draw.draw_call_count, sizeof(VK_DrawCallInfo));
+        }
       }
-    }
+    };
 
-    // not indexed
-    {
-      VK_IndirectDrawCall draw = fill_buffer(batch.batches[VK_BatchType_Unindexed], false, false);
-      if (draw.draw_call_count) {
-        VK_PushConstant push = {.drawcall_offset = draw.draw_call_offset};
-        g.CmdPushConstants(cmd, g.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &push);
-        u64 draw_call_mem_offset = push.drawcall_offset*sizeof(VK_DrawCallInfo);
-        g.CmdDrawIndirect(cmd, g.indirect_draw_buffer.h, draw_call_mem_offset, draw.draw_call_count, sizeof(VK_DrawCallInfo));
-      }
-    }
+    make_draw(fill_buffer(VK_BatchType_Indexed), true);
+    make_draw(fill_buffer(VK_BatchType_Unindexed), false);
 
     ///////////////////////////////////
     // Static entities
     if (rebuild_static_buffer) {
-      g.static_draw_calls[i*2] = fill_buffer(batch.batches[VK_BatchType_StaticIndexed], true, true);
-      g.static_draw_calls[i*2 + 1] = fill_buffer(batch.batches[VK_BatchType_StaticUnindexed], false, true);
+      g.static_draw_calls[i*2] = fill_buffer(VK_BatchType_StaticIndexed);
+      g.static_draw_calls[i*2 + 1] = fill_buffer(VK_BatchType_StaticUnindexed);
     }
-
-    // indexed
-    {
-      VK_IndirectDrawCall draw = g.static_draw_calls[i*2];
-      if (draw.draw_call_count) {
-        VK_PushConstant push = {.drawcall_offset = draw.draw_call_offset};
-        g.CmdPushConstants(cmd, g.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &push);
-        u64 draw_call_mem_offset = push.drawcall_offset*sizeof(VK_DrawCallInfo);
-        g.CmdDrawIndexedIndirect(cmd, g.indirect_draw_buffer.h, draw_call_mem_offset, draw.draw_call_count, sizeof(VK_DrawCallInfo));
-      }
-    }
-
-    // not indexed
-    {
-      VK_IndirectDrawCall draw = g.static_draw_calls[i*2 + 1];
-      if (draw.draw_call_count) {
-        VK_PushConstant push = {.drawcall_offset = draw.draw_call_offset};
-        g.CmdPushConstants(cmd, g.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &push);
-        u64 draw_call_mem_offset = push.drawcall_offset*sizeof(VK_DrawCallInfo);
-        g.CmdDrawIndirect(cmd, g.indirect_draw_buffer.h, draw_call_mem_offset, draw.draw_call_count, sizeof(VK_DrawCallInfo));
-      }
-    }
+    make_draw(g.static_draw_calls[i*2], true);
+    make_draw(g.static_draw_calls[i*2+1], false);
   }
 
   // Debug drawing
@@ -2619,7 +2595,7 @@ void vk_register_entity(u32 entity_id, GpuMeshId mesh_id, GpuMaterialId material
   u32 pipeline_idx = g.materials[material_idx].pipeline_idx;
   u32 mesh_idx = id_idx(mesh_id.v);
   VK_Mesh mesh = g.meshes[mesh_idx];
-  VK_BatchType type = (mesh.index_count != 0) | (Bit(is_static));
+  VK_BatchType type = (mesh.index_count == 0) | (is_static << 1);
   VK_MeshesBatches& shader_batch = g.batches[g.pipelines[pipeline_idx].batch_idx].batches[type];
   Result mesh_idx_in_array = map_get(shader_batch.mesh_to_batch, mesh_idx);
   if (mesh_idx_in_array.err) {

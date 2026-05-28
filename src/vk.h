@@ -127,12 +127,12 @@ struct VK_MeshesBatches {
   Map<u32, u32> mesh_to_batch;
 };
 
-typedef u32 VK_BatchType ;
+typedef u32 VK_BatchType;
 enum {
-  VK_BatchType_Unindexed,
   VK_BatchType_Indexed,
-  VK_BatchType_StaticUnindexed,
+  VK_BatchType_Unindexed,
   VK_BatchType_StaticIndexed,
+  VK_BatchType_StaticUnindexed,
 };
 
 struct VK_PipelineBatch {

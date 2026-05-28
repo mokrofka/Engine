@@ -20,6 +20,8 @@
 // upgrade vulkan
 // font rendering
 // reading json 
+// editor
+// full metaprogramming
 // metadesk tables?
 // serelization/deserialization
 
@@ -441,6 +443,8 @@ struct GameState {
 
   Darray<EntityId> moving_cubes;
   Darray<StaticEntityId> static_cubes;
+  ObjectPoolLinklist<EntityId> all_dynamic_entities;
+  ObjectPoolLinklist<StaticEntityId> all_static_entities;
   EntityId axis_attached_to_cam_id;
   EntityId grid_id;
   EntityId monkey_id;
@@ -449,7 +453,7 @@ struct GameState {
   EntityId cube0_id;
   EntityId cube1_id;
   EntityId target_id;
-};  
+};
 
 void game_init();
 void game_update();

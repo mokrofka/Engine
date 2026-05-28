@@ -547,7 +547,8 @@ void assets_load() {
   GlobalState& g = *st;
 #define X(enum_name, name) \
   g.meshes_ids[enum_name] = mesh_load(meshes_strs[enum_name]); \
-  map_set(g.str_to_mesh_id, String(Stringify(name)), g.meshes_ids[enum_name]);
+  map_set(g.str_to_mesh_id, String(Stringify(name)), g.meshes_ids[enum_name]); \
+  g.mesh_id_to_str[g.meshes_ids[enum_name].v] = Stringify(name);
   MESH_LIST
 #undef X
 
@@ -581,6 +582,8 @@ void assets_load() {
       __VA_ARGS__ \
     }; \
     g.materials_ids[enum_name] = vk_material_load(mat); \
+    map_set(g.str_to_material_id, String(Stringify(enum_name)), g.materials_ids[enum_name]); \
+    g.material_id_to_str[g.materials_ids[enum_name].v] = Stringify(enum_name); \
   }
   MATERIAL_LIST
 #undef X
@@ -1613,16 +1616,28 @@ String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr) 
         v3 v = *((v3*)member_ptr);
         dstr_add(string, push_strf(scratch, "%s %f %f %f\n", member.name, v.x, v.y, v.z));
       } break;
+      case MetaType_Rng3: {
+        Rng3 v = *((Rng3*)member_ptr);
+        dstr_add(string, push_strf(scratch, "%s %f %f %f %f %f %f\n", member.name, v.min.x,v.min.y,v.min.z, v.max.x,v.max.y,v.max.z));
+      } break;
+      case MetaType_GpuMeshId: {
+        GpuMeshId v = *((GpuMeshId*)member_ptr);
+        dstr_add(string, push_strf(scratch, "mesh_name \"%s\"\n", st->mesh_id_to_str[v.v]));
+      } break;
+      case MetaType_GpuMaterialId: {
+        GpuMaterialId v = *((GpuMaterialId*)member_ptr);
+        dstr_add(string, push_strf(scratch, "material_name \"%s\"\n", st->material_id_to_str[v.v]));
+      } break;
     }
   }
   return string;
 }
 
-void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Slice<Token> tokens) {
-  Tokenizer t = {tokens};
-  while (!tok_match(t, TokenType_CloseBrace)) {
+void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser) {
+  Parser& p = *parser;
+  while (!tok_match(p, TokenType_CloseBrace)) {
     MemberDefinition member = {};
-    Token tok = tok_next(t);
+    Token tok = tok_advance(p);
     if (tok.type == TokenType_Identifier) {
       Loop (i, members.count) {
         if (str_match(members[i].name, tok.str)) {
@@ -1631,47 +1646,36 @@ void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Slice<Token> t
         }
       }
     }
-    var parse_i32 = [](Tokenizer& t) {
-      b32 negative = false;
-      Token tok = tok_next(t);
-      if (tok.type == TokenType_Minus) {
-        negative = true;
-        tok = tok_next(t);
-      }
-      i32 v = i32_from_str(tok.str);
-      return negative ? -v : v;
-    };
-    var parse_f32 = [](Tokenizer& t) {
-      b32 negative = false;
-      Token tok = tok_next(t);
-      if (tok.type == TokenType_Minus) {
-        negative = true;
-        tok = tok_next(t);
-      }
-      f32 v = f32_from_str(tok.str);
-      return negative ? -v : v;
-    };
     switch (member.type) {
       default:{} break;
       case MetaType_u32: {
-        Token tok = tok_next(t);
+        Token tok = tok_advance(p);
         *(u32*)Offset(ptr, member.offset) = u32_from_str(tok.str);
       } break;
       case MetaType_i32: {
-        *(i32*)Offset(ptr, member.offset) = parse_i32(t);
+        *(i32*)Offset(ptr, member.offset) = parse_i32(p);
       } break;
       case MetaType_b32: {
-        Token tok = tok_next(t);
+        Token tok = tok_advance(p);
         *(u32*)Offset(ptr, member.offset) = u32_from_str(tok.str);
       } break;
       case MetaType_f32: {
-        *(f32*)Offset(ptr, member.offset) = parse_f32(t);
+        *(f32*)Offset(ptr, member.offset) = parse_f32(p);
       } break;
       case MetaType_v2: {
-        *(v2*)Offset(ptr, member.offset) = v2(parse_f32(t), parse_f32(t));
+        *(v2*)Offset(ptr, member.offset) = v2(parse_f32(p), parse_f32(p));
       } break;
       case MetaType_v3: {
-        *(v3*)Offset(ptr, member.offset) = v3(parse_f32(t), parse_f32(t), parse_f32(t));
+        *(v3*)Offset(ptr, member.offset) = v3(parse_f32(p), parse_f32(p), parse_f32(p));
+      } break;
+      case MetaType_Rng3: {
+        *(Rng3*)Offset(ptr, member.offset) = Rng3(v3(parse_f32(p), parse_f32(p), parse_f32(p)), v3(parse_f32(p), parse_f32(p), parse_f32(p)));
+      } break;
+      case MetaType_GpuMeshId: {
+        *(GpuMeshId*)Offset(ptr, member.offset) = map_get(st->str_to_mesh_id, tok.str).v;
+      } break;
+      case MetaType_GpuMaterialId: {
+        *(GpuMaterialId*)Offset(ptr, member.offset) = map_get(st->str_to_material_id, tok.str).v;
       } break;
     }
   }
@@ -2012,10 +2016,13 @@ v3 ray_from_camera() {
 EntityId e_alloc(MeshId mesh_id, MaterialId material_id) {
   GameState& g = st->game;
   EntityId e_id = {static_id_pool_alloc(g.entity_id_pool)};
+  object_pool_linklist_alloc(g.all_dynamic_entities, e_id);
   Entity& e = get_entity(e_id);
-  e.scale = v3_one();
-  e.mesh_id = mesh_get(mesh_id);
-  e.material_id = material_get(material_id);
+  e = {
+    .scale = v3_one(),
+    .mesh_id = mesh_get(mesh_id),
+    .material_id = material_get(material_id),
+  };
   vk_make_renderable(e_id, mesh_get(mesh_id), material_get(material_id));
   ++g.entities_count;
   return e_id;
@@ -2024,10 +2031,13 @@ EntityId e_alloc(MeshId mesh_id, MaterialId material_id) {
 StaticEntityId e_static_alloc(MeshId mesh_id, MaterialId material_id) {
   GameState& g = st->game;
   StaticEntityId e_id = {static_id_pool_alloc(g.static_entity_id_pool)};
+  object_pool_linklist_alloc(g.all_static_entities, e_id);
   StaticEntity& e = get_static_entity(e_id);
-  e.scale = v3_one();
-  e.mesh_id = mesh_get(mesh_id);
-  e.material_id = material_get(material_id);
+  e = {
+    .scale = v3_one(),
+    .mesh_id = mesh_get(mesh_id),
+    .material_id = material_get(material_id),
+  };
   vk_make_renderable_static(e_id, mesh_get(mesh_id), material_get(material_id));
   ++g.static_entities_count;
   return e_id;
@@ -2302,11 +2312,12 @@ void scene_update() {
     Entity& axis = get_entity(g.axis_attached_to_cam_id);
     axis.pos = g.cam.pos + forward*dist + right*xoff + up*yoff;
     axis.scale = v3_scale(0.1);
+    // axis.scale = v3_scale(1.1);
   }
 
   ///////////////////////////////////
   // Random creating and moving stuff
-  Loop (i, 1) {
+  Loop (i, 0) {
     MeshId meshes[] = {
       // Mesh_MonkeyGlb,
       // Mesh_Triangle,
@@ -2352,6 +2363,58 @@ void scene_update() {
   mat = mat4_translate(v3_of_v4(pos));
 }
 
+void game_save_state() {
+  Scratch scratch;
+  GameState& g = st->game;
+
+  Dstring data = dstr_make(scratch);
+  dstr_add(data, "Camera {\n");
+  dstr_add(data, dumb_struct(scratch, ArraySlice(members_of_Camera), &g.cam));
+  dstr_add(data, "}\n");
+
+  // Entity& e = get_entity(g.monkey_id);
+  // dstr_add(data, "Entity {\n");
+  // dstr_add(data, dumb_struct(scratch, ArraySlice(members_of_Entity), &e));
+  // dstr_add(data, "}\n");
+
+  var& p = g.all_dynamic_entities;
+  for (u32 node = p.first; node != U32_MAX; node = p.data[id_idx(node)].next) {
+    Entity& e = get_entity(p.data[id_idx(node)].data);
+    dstr_add(data, "Entity {\n");
+    dstr_add(data, dumb_struct(scratch, ArraySlice(members_of_Entity), &e));
+    dstr_add(data, "}\n");
+  }
+
+  OS_Handle file = os_file_open(push_strf(scratch, "%s/saved", os_get_current_directory(), String("saved")), OS_AccessFlag_Write | OS_AccessFlag_Trunc);
+  os_file_write(file, data.size, data.str);
+  os_file_close(file);
+}
+
+void game_load_state() {
+  GameState& g = st->game;
+  Scratch scratch;
+  Slice data = os_file_path_read_all(scratch, push_strf(scratch, "%s/saved", os_get_current_directory(), String("saved")));
+  Slice tokens = tokens_from_str(scratch, String(data.data, data.size));
+  Parser p = parser_make(tokens);
+  while (!tok_is_end(p)) {
+    Token tok = tok_advance(p);
+    switch (tok.type) {
+      default:{} break;
+      case TokenType_Identifier: {
+        if (str_match(tok.str, "Camera")) {
+          dumb_struct_load(ArraySlice(members_of_Camera), &g.cam, &p);
+        } else if (str_match(tok.str, "Entity")) {
+          var& pool = g.all_dynamic_entities;
+          for (u32 node = pool.first; node != U32_MAX; node = pool.data[id_idx(node)].next) {
+            Entity& e = get_entity(pool.data[id_idx(node)].data);
+            dumb_struct_load(ArraySlice(members_of_Entity), &e, &p);
+          }
+        }
+      }
+    }
+  }
+}
+
 void game_view() {
   Scratch scratch;
   GameState& g = st->game;
@@ -2376,22 +2439,10 @@ void game_view() {
     ImGui::Text("%s", str.str);
 
     if (ImGui::Button("save state")) {
-      String str = dumb_struct(scratch, ArraySlice(members_of_Camera), &g.cam);
-      OS_Handle file = os_file_open(push_strf(scratch, "%s/saved", os_get_current_directory(), String("saved")), OS_AccessFlag_Write | OS_AccessFlag_Trunc);
-      String str1 = push_str_cat(scratch, "Camera {\n", str);
-      String str2 = push_str_cat(scratch, str1, "}");
-      os_file_write(file, str2.size, str2.str);
-      os_file_close(file);
+      game_save_state();
     }
     if (ImGui::Button("load state")) {
-      OS_Handle file = os_file_open(push_strf(scratch, "%s/saved", os_get_current_directory(), String("saved")), OS_AccessFlag_Read);
-      u32 size = os_file_size(file);
-      u8* data = push_buffer(scratch, size);
-      os_file_read(file, size, data);
-      os_file_close(file);
-      Slice tokens = tokens_from_str(scratch, String(data, size));
-      dumb_struct_load(ArraySlice(members_of_Camera), &g.cam, tokens);
-      // Info("%s", String(data, size));
+      game_load_state();
     }
     if (ImGui::Button("clear moving cubes")) {
       Loop (i, g.moving_cubes.count) {
@@ -2422,6 +2473,8 @@ void game_init() {
 
   g.entity_id_pool = static_id_pool_make(g.arena, MaxEntities);
   g.static_entity_id_pool = static_id_pool_make(g.arena, MaxStaticEntities);
+  g.all_dynamic_entities = object_pool_linklist_make<EntityId>(g.gpa);
+  g.all_static_entities = object_pool_linklist_make<StaticEntityId>(g.gpa);
   g.entities = push_array(g.arena, Entity, MaxEntities);
   g.static_entities = push_array(g.arena, StaticEntity, MaxStaticEntities);
   g.moving_cubes = darray_make<EntityId>(g.gpa);
@@ -2472,7 +2525,6 @@ void game_init() {
 }
 
 void game_update() {
-  // foo();
   ProfFunc;
   GameState& g = st->game;
   timer_tick(g.timer);

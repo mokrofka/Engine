@@ -515,6 +515,8 @@ struct ObjectPoolLinklist {
 #endif
 };
 
+// for (u32 node = pool.first; node != U32_MAX; node = pool.data[id_idx(node)].next) {
+
 template<typename T> ObjectPoolLinklist<T> object_pool_linklist_make(Allocator alloc) {
   ObjectPoolLinklist<T> res = {
     .alloc = alloc,

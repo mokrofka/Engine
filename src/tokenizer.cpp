@@ -1,5 +1,11 @@
 #include "tokenizer.h"
 
+global String tokens_str_names[] = {
+#define X(name) Stringify(name),
+  TOKEN_TYPE_LIST
+#undef X
+};
+
 Slice<Token> tokens_from_str(Allocator arena, String string) {
   var tokens = darray_make<Token>(arena);
   u32 off = 0;
@@ -111,46 +117,102 @@ Slice<Token> tokens_from_str(Allocator arena, String string) {
   return slice(tokens);
 }
 
+Parser parser_make(Slice<Token> tokens) {
+  Parser res = {
+    .tokens = tokens,
+  };
+  return res;
+}
+
 b32 tok_is_trivia(TokenType type) { return type == TokenType_Spacing || type == TokenType_NewLine || type == TokenType_Comment; }
-void tok_skip_trivia(Tokenizer& t) {
+void tok_skip_trivia(Parser& t) {
   while (t.i < t.tokens.count && tok_is_trivia(t.tokens[t.i].type)) {
     ++t.i;
   }
 }
-b32 tok_eof(Tokenizer& t) {
+b32 tok_is_end(Parser& t) {
   tok_skip_trivia(t);
   return t.i >= t.tokens.count;
 }
-Token tok_peek(Tokenizer& t) {
-  if (tok_eof(t))
-    Error("unexpected eof");
+Token tok_peek(Parser& t) {
+  if (tok_is_end(t)) Error("unexpected end");
   return t.tokens[t.i];
 }
-Token tok_next(Tokenizer& t) {
+Token tok_prev(Parser& t) {
+  return t.tokens[t.i-1];
+}
+Token tok_advance(Parser& t) {
   Token tok = tok_peek(t);
   ++t.i;
   return tok;
 }
-b32 tok_match(Tokenizer& t, TokenType type) {
-  if (!tok_eof(t) && t.tokens[t.i].type == type) {
-    ++t.i;
+b32 tok_check(Parser& t, TokenType type) {
+  if (tok_is_end(t)) return false;
+  return tok_peek(t).type == type;
+}
+b32 tok_match(Parser& t, TokenType type) {
+  if (tok_check(t, type)) {
+    tok_advance(t);
     return true;
   }
   return false;
 }
-Token tok_require(Tokenizer& t, TokenType type) {
-  Token tok = tok_next(t);
-  if (tok.type != type) {
-    Error("expected token type %i, got %i", type, tok.type);
-    return {};
+Token tok_require(Parser& t, TokenType type) {
+  if (!tok_check(t, type)) {
+    Token tok = tok_peek(t);
+    Error("expected token type %s, got %s, line: %u, column: %u, token: '%s'", tokens_str_names[type], tok.str, tok.line, tok.column, tok.str);
   }
-  return tok;
+  return tok_advance(t);
 }
-Token tok_require_ident(Tokenizer& t, String expected) {
-  Token tok = tok_require(t, TokenType_Identifier);
-  if (!str_match(tok.str, expected)) {
-    Error("expected '%s', got '%s'", expected, tok.str);
-    return {};
+b32 tok_ident_check(Parser& t, String name) {
+  if (!tok_check(t, TokenType_Identifier)) {
+    return false;
   }
-  return tok;
+  return str_match(tok_peek(t).str, name);
+}
+b32 tok_ident_match(Parser& t, String name) {
+  if (tok_ident_check(t, name)) {
+    tok_advance(t);
+    return true;
+  }
+  return false;
+}
+Token tok_ident_require(Parser& t, String name) {
+  if (!tok_ident_check(t, name)) {
+    Token tok = tok_peek(t);
+    Error("expected '%s', got '%s'", name, tok.str);
+  }
+  return tok_advance(t);
+}
+
+f32 parse_f32(Parser& t) {
+  b32 negative = false;
+  if (tok_match(t, TokenType_Minus)) {
+    negative = true;
+  }
+  Token tok = tok_require(t, TokenType_Number);
+  f32 v = f32_from_str(tok.str);
+  return negative ? -v : v;
+}
+f32 parse_u32(Parser& t) {
+  b32 negative = false;
+  if (tok_match(t, TokenType_Minus)) {
+    negative = true;
+  }
+  Token tok = tok_require(t, TokenType_Number);
+  i32 v = u32_from_str(tok.str);
+  return negative ? -v : v;
+}
+f32 parse_i32(Parser& t) {
+  b32 negative = false;
+  if (tok_match(t, TokenType_Minus)) {
+    negative = true;
+  }
+  Token tok = tok_require(t, TokenType_Number);
+  i32 v = i32_from_str(tok.str);
+  return negative ? -v : v;
+}
+
+v3 parse_v3(Parser& t) {
+  return v3( parse_f32(t), parse_f32(t), parse_f32(t));
 }

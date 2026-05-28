@@ -9,8 +9,8 @@ enum MetaType {
   MetaType_v3,
   MetaType_Rng2,
   MetaType_Rng3,
-  MetaType_MeshId,
-  MetaType_MaterialId,
+  MetaType_GpuMeshId,
+  MetaType_GpuMaterialId,
   MetaType_RenderId,
 };
 
