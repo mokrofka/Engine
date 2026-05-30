@@ -6,6 +6,9 @@
 ////////////////////////////////////////////////////////////////////////
 // Base
 
+String str_make(u8* str, u64 size);
+String str_make(Slice<u8> str);
+
 struct Dstring {
   u8* str;
   u32 size;
@@ -80,29 +83,10 @@ b32 equal(String a, String b);
 ////////////////////////////////////////////////////////////////////////
 // String Slicing
 
-// hello_world
-// range {1, 4}
-// result: ello
-String str_substr(String str, Rng1u32 range);
-
-// hello_world
-// size 3
-// result: hel
+String str_substr(String str, Rng1u range);
 String str_prefix(String str, u64 size);
-
-// hello_world
-// size 6
-// result: world
 String str_skip(String str, u64 amt);
-
-// hello_world
-// size 4
-// result: orld
 String str_postfix(String str, u64 size);
-
-// hello_world
-// size 3
-// result: hello_wo
 String str_chop(String str, u64 amt);
 
 ////////////////////////////////////////////////////////////////////////

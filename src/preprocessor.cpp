@@ -7,10 +7,9 @@ i32 main(i32 count, char* args[]) {
   Scratch scratch;
   OS_Handle file = os_file_open(push_strf(scratch, "%s/../src/generated.h", os_get_current_directory()), OS_AccessFlag_Write | OS_AccessFlag_Trunc);
   Slice buf = os_file_path_read_all(scratch, push_strf(scratch, "%s/../src/com.h", os_get_current_directory()));
-  Slice tokens = tokens_from_str(scratch, String(buf.data, buf.size));
+  Slice tokens = tokens_from_str(scratch, str_make(buf));
   Parser p = parser_make(tokens);
   var string = dstr_make(scratch);
-
   while (!tok_is_end(p)) {
     Token tok = tok_advance(p);
     switch (tok.type) {
@@ -38,7 +37,6 @@ i32 main(i32 count, char* args[]) {
       } break;
     }
   }
-
   os_file_write(file, string.size, string.str);
   os_exit(0);
 }

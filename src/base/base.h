@@ -108,12 +108,12 @@ const u64 U64_MAX = 0xFFFFFFFFFFFFFFFF;
 const u64 INVALID_ID = U32_MAX;
 const u64 PAGE_SIZE = 4096;
 
-void Swap(var& a, var& b) {
-  var temp = a;
+template<typename T> void Swap(T& a, T& b) {
+  T temp = a;
   a = b;
   b = temp;
 }
-b32 equal(var a, var b) { return a == b; }
+template<typename T> b32 equal(T a, T b) { return a == b; }
 
 NO_DEBUG constexpr u64 KB(u64 x) { return x << 10; }
 NO_DEBUG constexpr u64 MB(u64 x) { return x << 20; }
@@ -136,12 +136,12 @@ void MemZero(void *d, u64 size);
 void MemCopy(void* d, void* s, u64 size);
 b32  MemMatch(void* a, void* b, u64 size);
 
-void MemZeroStruct(var* x)                { MemZero(x, sizeof(*x)); };
-void MemZeroArray(var* x, u64 c)          { MemZero(x, sizeof(*x) * c); };
-void MemCopyStruct(var* d, var* s)        { MemCopy(d, s, sizeof(*d)); }
-void MemCopyArray(var* d, var* s, u64 c)  { MemCopy(d, s, sizeof(*d) * c); }
-b32  MemMatchStruct(var* a, var* b)       { return MemMatch(a, b, sizeof(*a)); }
-b32  MemMatchArray(var* a, var* b, u64 c) { return MemMatch(a, b, sizeof(*a) * c); }
+template<typename T> void MemZeroStruct(T* x)                { MemZero(x, sizeof(*x)); };
+template<typename T> void MemZeroArray(T* x, u64 c)          { MemZero(x, sizeof(*x) * c); };
+template<typename T> void MemCopyStruct(T* d, T* s)          { MemCopy(d, s, sizeof(*d)); }
+template<typename T> void MemCopyArray(T* d, T* s, u64 c)    { MemCopy(d, s, sizeof(*d) * c); }
+template<typename T> b32  MemMatchStruct(T* a, T* b)         { return MemMatch(a, b, sizeof(*a)); }
+template<typename T> b32  MemMatchArray(T* a, T* b, u64 c)   { return MemMatch(a, b, sizeof(*a) * c); }
 
 u64 AlignUp(u64 x, u64 a);
 u64 AlignDown(u64 x, u64 a);
@@ -243,18 +243,23 @@ void DebugTrap();
 ////////////////////////////////////////////////////////////////////////
 // Atomic Operations
 
-#define atomic_inc(x)                    __atomic_fetch_add((x), 1, __ATOMIC_SEQ_CST)
-#define atomic_dec(x)                    __atomic_fetch_sub((x), 1, __ATOMIC_SEQ_CST)
-#define atomic_add(x, v)                 __atomic_fetch_add((x), (v), __ATOMIC_SEQ_CST)
-#define atomic_sub(x, v)                 __atomic_fetch_sub((x), (v), __ATOMIC_SEQ_CST)
-#define atomic_load(x)                   __atomic_load_n((x), __ATOMIC_SEQ_CST)
-#define atomic_store(x, v)               __atomic_store_n((x), (v), __ATOMIC_SEQ_CST)
-#define atomic_or(x, v)                  __atomic_fetch_or((x), (v), __ATOMIC_SEQ_CST)
-#define atomic_and(x, v)                 __atomic_fetch_and((x), (v), __ATOMIC_SEQ_CST)
-#define atomic_xor(x, v)                 __atomic_fetch_xor((x), (v), __ATOMIC_SEQ_CST)
-#define atomic_exchange(x, v)            __atomic_exchange_n((x), (v), __ATOMIC_SEQ_CST)
-#define atomic_cmp_exchange(x, old, new) __atomic_compare_exchange_n((x), (old), (new), 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
-#define atomic_cond_exchange(x, v, c) ({ u32 _new = (c); __atomic_compare_exchange_n((x), (&_new), (v), 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); _new; })
+#define AtomicSeqCst __ATOMIC_SEQ_CST
+#define AtomicRelaxed __ATOMIC_RELAXED
+#define AtomicAcquire __ATOMIC_ACQUIRE
+#define AtomicRelease __ATOMIC_RELEASE
+
+#define atomic_inc(x)                    __atomic_fetch_add((x), 1, AtomicSeqCst)
+#define atomic_dec(x)                    __atomic_fetch_sub((x), 1, AtomicSeqCst)
+#define atomic_add(x, v)                 __atomic_fetch_add((x), (v), AtomicSeqCst)
+#define atomic_sub(x, v)                 __atomic_fetch_sub((x), (v), AtomicSeqCst)
+#define atomic_load(x)                   __atomic_load_n((x), AtomicSeqCst)
+#define atomic_store(x, v)               __atomic_store_n((x), (v), AtomicSeqCst)
+#define atomic_or(x, v)                  __atomic_fetch_or((x), (v), AtomicSeqCst)
+#define atomic_and(x, v)                 __atomic_fetch_and((x), (v), AtomicSeqCst)
+#define atomic_xor(x, v)                 __atomic_fetch_xor((x), (v), AtomicSeqCst)
+#define atomic_exchange(x, v)            __atomic_exchange_n((x), (v), AtomicSeqCst)
+#define atomic_cmp_exchange(x, old, new) __atomic_compare_exchange_n((x), (old), (new), 0, AtomicSeqCst, AtomicSeqCst)
+#define atomic_cond_exchange(x, v, c) ({ u32 _new = (c); __atomic_compare_exchange_n((x), (&_new), (v), 0, AtomicSeqCst, AtomicSeqCst); _new; })
 
 ////////////////////////////////////////////////////////////////////////
 // Link list
@@ -316,7 +321,7 @@ struct _Defer {
 };
 #define defer(code) auto Glue(_defer_, __LINE__) = _Defer([&](){ code; })
 #define DeferLoop(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
-#define IfDeferLoop(begin, end) for (b32 _once = (begin); _once; _once = false, (end))
+#define DeferLoopIf(begin, end) for (int _i_ = (begin); _i_; _i_ = false, (end))
 
 ////////////////////////////////////////////////////////////////////////
 // Error handling
@@ -332,10 +337,6 @@ struct Result {
 
 #define ResultErr(...) {.err = true, __VA_ARGS__};
 #define ResultOk(val) {.v = (val)};
-
-u64 cpu_timer_now();
-u64 cpu_frequency();
-void estimate_cpu_frequency();
 
 const u32 DEFAULT_CAPACITY = 8;
 const u32 DEFAULT_RESIZE_FACTOR = 2;
@@ -392,9 +393,7 @@ struct String {
   u8* str;
   u64 size;
   String() = default;
-  NO_DEBUG String(u8* str_, u64 size_);
   NO_DEBUG String(const char* str_);
-  NO_DEBUG String(u8* str_);
 };
 
 struct String64 {

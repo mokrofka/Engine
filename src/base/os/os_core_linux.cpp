@@ -19,6 +19,38 @@
 #include <pthread.h>
 #include <semaphore.h>
 
+_LockScope::_LockScope(Mutex mutex_) {
+  mutex = mutex_;
+  os_mutex_take(mutex);
+}
+_LockScope::~_LockScope() {
+  os_mutex_drop(mutex);
+}
+
+global u64 _cpu_frequency;
+u64 cpu_timer_now() { return __rdtsc(); }
+u64 cpu_frequency() { return _cpu_frequency; }
+void estimate_cpu_frequency() {
+  u64 os_freq = os_timer_frequency();
+  u64 cpu_start = cpu_timer_now();
+  u64 os_start = os_timer_now();
+  u64 milliseconds = 1;
+  u64 os_end = 0;
+  u64 os_elapsed = 0;
+  u64 os_wait_time = os_freq * milliseconds / 1000;
+  while (os_elapsed < os_wait_time) {
+    os_end = os_timer_now();
+    os_elapsed = os_end - os_start;
+  }
+  u64 cpu_end = cpu_timer_now();
+  u64 cpu_elapsed = cpu_end - cpu_start;
+  u64 cpu_freq = 0;
+  if (cpu_elapsed) {
+    cpu_freq = os_freq * cpu_elapsed / os_elapsed;
+  }
+  _cpu_frequency = cpu_freq;
+}
+
 struct OS_LNX_FileIter {
   DIR* dir;
   struct dirent* dp;
@@ -409,6 +441,7 @@ StringList os_watch_check(Allocator arena, OS_Watch watch) {
   }
   return result;
 }
+
 
 // Directory iteration
 

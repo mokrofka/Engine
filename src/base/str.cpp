@@ -1,6 +1,55 @@
 #include "str.h"
 #include "logger.h"
 
+String str_make(u8* str, u64 size) {
+  String res = {};
+  res.str = str;
+  res.size = size;
+  return res;
+}
+String str_make(Slice<u8> str) {
+  String res = str_make(str.data, str.size);
+  return res;
+}
+u64 cstr_length(const void* c) {
+  u8* p = (u8*)c;
+  for (; *p != 0; ++p);
+  return (u64)(p - (u8*)c);
+}
+
+String::String(const char* str_) { 
+  str = (u8*)str_;
+  size = cstr_length(str);
+}
+
+Dstring dstr_make(Allocator alloc) {
+  Dstring res = {
+    .alloc = alloc,
+  };
+  return res;
+}
+void dstr_add(Dstring& arr, String str) {
+  if (str.size + arr.size > arr.cap) {
+    if (arr.str) {
+      u32 modifier = CeilIntDiv(str.size+arr.size, arr.cap);
+      u32 old_cap = arr.cap;
+      arr.cap *= modifier;
+      arr.str = mem_realloc_array(arr.alloc, arr.str, old_cap, arr.cap);
+    } else {
+      arr.cap = Max(str.size, (u64)DEFAULT_CAPACITY);
+      arr.str = mem_alloc(arr.alloc, arr.cap);
+    }
+  }
+  MemCopy(arr.str+arr.size, str.str, str.size);
+  arr.size += str.size;
+}
+void dstr_clear(Dstring&arr) {
+  arr.size = 0;
+}
+
+Dstring::operator String() { return str_make(str, size); }
+String64::operator String() { return str_make(str, size); }
+
 intern u32 u32_length(u32 v) {
   if (v < 10) return 1;
   if (v < 100) return 2;
@@ -211,7 +260,7 @@ intern u32 my_sprintf(u8* buf, String fmt, VaList argc) {
         ++p; // skip '%'
         switch (*p) {
           case 'i': {
-            if (str_match(String(p+1, 2), "64")) {
+            if (str_match(str_make(p+1, 2), "64")) {
               p += 2; // skip "64"
               i64 val = va_arg(argc, i64);
               length += i64_length(val);
@@ -222,7 +271,7 @@ intern u32 my_sprintf(u8* buf, String fmt, VaList argc) {
             }
           } break;
           case 'u': {
-            if (str_match(String(p+1, 2), "64")) {
+            if (str_match(str_make(p+1, 2), "64")) {
               p += 2; // skip "64"
               u64 val = va_arg(argc, u64);
               length += u64_length(val);
@@ -277,7 +326,7 @@ intern u32 my_sprintf(u8* buf, String fmt, VaList argc) {
       ++p; // skip '%'
       switch (*p) {
         case 'i': {
-          if (str_match(String(p+1, 2), "64")) {
+          if (str_match(str_make(p+1, 2), "64")) {
             p += 2; // skip "64"
             i64 val = va_arg(argc, i64);
             u32 len = i64_write(buf + written, val);
@@ -290,7 +339,7 @@ intern u32 my_sprintf(u8* buf, String fmt, VaList argc) {
           }
         } break;
         case 'u': {
-          if (str_match(String(p+1, 2), "64")) {
+          if (str_match(str_make(p+1, 2), "64")) {
             p += 2; // skip "64"
             u64 val = va_arg(argc, u64);
             u32 len = u64_write(buf + written, val);
@@ -344,56 +393,6 @@ intern u32 my_sprintf(u8* buf, String fmt, VaList argc) {
 }
 
 ////////////////////////////////////////////////////////////////////////
-// Base
-
-u64 cstr_length(const void* c) {
-  u8* p = (u8*)c;
-  for (; *p != 0; ++p);
-  return (u64)(p - (u8*)c);
-}
-
-String::String(u8* str_, u64 size_) {
-  str = str_;
-  size = size_; 
-}
-String::String(const char* str_) { 
-  str = (u8*)str_;
-  size = cstr_length(str);
-}
-String::String(u8* str_){
-  str = (u8*)str_;
-  size = cstr_length(str_) ;
-}
-
-Dstring dstr_make(Allocator alloc) {
-  Dstring res = {
-    .alloc = alloc,
-  };
-  return res;
-}
-void dstr_add(Dstring& arr, String str) {
-  if (str.size + arr.size > arr.cap) {
-    if (arr.str) {
-      u32 modifier = CeilIntDiv(str.size+arr.size, arr.cap);
-      u32 old_cap = arr.cap;
-      arr.cap *= modifier;
-      arr.str = mem_realloc_array(arr.alloc, arr.str, old_cap, arr.cap);
-    } else {
-      arr.cap = Max(str.size, (u64)DEFAULT_CAPACITY);
-      arr.str = mem_alloc(arr.alloc, arr.cap);
-    }
-  }
-  MemCopy(arr.str+arr.size, str.str, str.size);
-  arr.size += str.size;
-}
-void dstr_clear(Dstring&arr) {
-  arr.size = 0;
-}
-
-Dstring::operator String() { return {str, size}; }
-String64::operator String() { return {str, size}; }
-
-////////////////////////////////////////////////////////////////////////
 // Character Classification & Conversion Functions
 
 b32 char_is_space(u8 c) { return c == ' ' || c == '\t'; }
@@ -412,7 +411,7 @@ b32 char_is_number_cont(u8 c) { return (c >= '0' && c <= '9') || c == '.' || c =
 // String Constructors
 
 String str_range(u8* first, u8* one_past_last) {
-  String result = {first, (u32)(one_past_last - first)};
+  String result = str_make(first, (u32)(one_past_last - first));
   return result;
 }
 
@@ -421,7 +420,7 @@ String str_cstr_capped(const void *cstr, const void *cap) {
   u8* opl = (u8*)cap;
   for (;ptr < opl && *ptr != 0; ptr += 1);
   u32 size = (u32)(ptr - (u8*)cstr);
-  String result = String((u8*)cstr, size);
+  String result = str_make((u8*)cstr, size);
   return result;
 }
 
@@ -502,11 +501,11 @@ b32 equal(String a, String b) { return str_match(a, b); }
 ////////////////////////////////////////////////////////////////////////
 // String Slicing
 
-String str_substr(String str, Rng1u32 range) {
+String str_substr(String str, Rng1u range) {
   range.min = ClampTop(range.min, (u32)str.size);
   range.max = ClampTop(range.max, (u32)str.size);
   str.str += range.min;
-  str.size = dim_1u32(range);
+  str.size = rng1u_dim(range);
   return str;
 }
 
@@ -562,11 +561,11 @@ String push_strfv(Allocator arena, String fmt, VaList argc) {
   va_copy(va_list_argc, argc); 
   u32 need_bytes = my_sprintf(null, fmt, va_list_argc);
   va_end(va_list_argc);
-  u8* buf = push_buffer(arena, need_bytes + 1); // for C-str
+  u8* buf = push_buffer(arena, need_bytes + 1);
   va_copy(va_list_argc, argc); 
   u32 final_size = my_sprintf(buf, fmt, va_list_argc);
   va_end(va_list_argc);
-  String result = {buf, final_size};
+  String result = str_make(buf, final_size);
   result.str[result.size] = 0;
   return result;
 }
@@ -628,7 +627,7 @@ String str_next_word(String line, u32& start) {
   u32 token_start = start;
   while (start < line.size && !char_is_space(line.str[start]))
     start++;
-  return {line.str + token_start, start - token_start};
+  return str_make(line.str + token_start, start - token_start);
 }
 
 String str_trim(String string) {
@@ -835,7 +834,7 @@ String push_str_wchar(Allocator arena, const wchar_t* in, u32 wchar_length) {
     buf[i] = in[i];
   }
   buf[wchar_length] = 0;
-  return {buf, wchar_length};
+  return str_make(buf, wchar_length);
 }
 
 Lexer lexer_init(String buffer) {
@@ -855,7 +854,7 @@ String lexer_next_token(Lexer* l) {
   while (l->cur < l->end && !char_is_space(*l->cur)) {
     l->cur++;
   }
-  String result = {current, (u64)l->cur - (u64)current};
+  String result = str_make(current, (u64)l->cur - (u64)current);
   return result;
 }
 
@@ -871,6 +870,6 @@ String lexer_next_integer(Lexer* l) {
   while (char_is_digit(*l->cur)) {
     ++l->cur;
   }
-  String result = {current, (u64)l->cur - (u64)current};
+  String result = str_make(current, (u64)l->cur - (u64)current);
   return result;
 }

@@ -4,7 +4,7 @@
 #include "thread_ctx.h"
 
 enum ProfType {
-  ProfType_Work,
+  ProfType_Default,
   ProfType_Sleep,
   ProfType_Worker,
 };
@@ -39,7 +39,7 @@ struct _ProfBlock {
   String label;
   String func;
   ProfType type;
-  _ProfBlock(String label_, String func_, ProfType type_ = ProfType_Work);
+  _ProfBlock(String label_, String func_, ProfType type_ = ProfType_Default);
   ~_ProfBlock();
 };
 

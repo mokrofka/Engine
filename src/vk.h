@@ -189,9 +189,9 @@ struct VK_Image {
 
 struct VK_Mesh {
   u32 vert_count;
-  u64 vert_offset;
+  u64 vert_mem_offset;
   u32 index_count;
-  u64 index_offset;
+  u64 index_mem_offset;
 };
 
 struct VK_Swapchain {
@@ -493,8 +493,8 @@ void vk_set_entity_color(EntityId entity_handle, v4 color);
 
 void vk_draw_line(v3 a, v3 b, v3 color);
 void vk_draw_line_consistent(v3 a, v3 b, v3 color);
-void vk_draw_cuboid(Rng3f32 rng, v3 color);
-void vk_draw_rect(Rng2f32 rect, v3 color);
+void vk_draw_cuboid(Rng3 rng, v3 color);
+void vk_draw_rect(Rng2 rect, v3 color);
 
 void vk_imgui_init();
 void vk_imgui_begin_frame();

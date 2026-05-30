@@ -76,7 +76,9 @@ union v3b {
     b32 y;
     b32 z;
   };
-  u32 v[3];
+  v3b() = default;
+  v3b(b32 x_, b32 y_, b32 z_);
+  b32 v[3];
 };
 
 ///////////////////////////////////
@@ -114,38 +116,30 @@ union mat4 {
 ///////////////////////////////////
 // dim1
 
-struct Rng1u32 {
+struct Rng1u {
   u32 min;
   u32 max;
-  Rng1u32() = default;
-  Rng1u32(u32 min_, u32 max_);
 };
 
-struct Rng1i32 {
+struct Rng1i {
   i32 min;
   i32 max;
-  Rng1i32() = default;
-  Rng1i32(i32 min_, i32 max_);
 };
 
 struct Rng1u64 {
   u64 min;
   u64 max;
-  Rng1u64() = default;
-  Rng1u64(u64 min_, u64 max_);
 };
 
-struct Rng1f32 {
+struct Rng1 {
   f32 min;
   f32 max;
-  Rng1f32() = default;
-  Rng1f32(f32 min_, f32 max_);
 };
 
 ///////////////////////////////////
 // Dim2
 
-union Rng2f32 {
+union Rng2 {
   struct {
     v2 min;
     v2 max;
@@ -156,14 +150,14 @@ union Rng2f32 {
     f32 x1;
     f32 y1;
   };
-  Rng2f32() = default;
-  Rng2f32(v2 min_, v2 max_);
+  Rng2() = default;
+  Rng2(v2 min_, v2 max_);
 };
 
 ///////////////////////////////////
 // Dim3
 
-struct Rng3f32 {
+union Rng3 {
   v3 min;
   v3 max;
   struct {
@@ -174,13 +168,9 @@ struct Rng3f32 {
     f32 y1;
     f32 z1;
   };
-  Rng3f32() = default;
-  Rng3f32(v3 min_, v3 max_);
+  Rng3() = default;
+  Rng3(v3 min_, v3 max_);
 };
-
-typedef Rng1f32 Rng1;
-typedef Rng2f32 Rng2;
-typedef Rng3f32 Rng3;
 
 ///////////////////////////////////
 // Misc
@@ -199,27 +189,27 @@ struct Ray {
 ////////////////////////////////////////////////////////////////////////
 // Float Ops
 
-NO_DEBUG f32 Sin(f32 a);
-NO_DEBUG f32 Cos(f32 a);
-NO_DEBUG f32 Tan(f32 a);
-NO_DEBUG f32 Asin(f32 a);
-NO_DEBUG f32 Acos(f32 a);
+NO_DEBUG f32 Sin(f32 x);
+NO_DEBUG f32 Cos(f32 x);
+NO_DEBUG f32 Tan(f32 x);
+NO_DEBUG f32 Asin(f32 x);
+NO_DEBUG f32 Acos(f32 x);
 NO_DEBUG f32 Atan2(f32 y, f32 x);
-NO_DEBUG f32 Sqrt(f32 a);
+NO_DEBUG f32 Sqrt(f32 x);
 NO_DEBUG f32 Pow(f32 a, f32 b);
-NO_DEBUG f32 Floor(f32 a);
-NO_DEBUG f32 Ceil(f32 a);
-NO_DEBUG f32 Round(f32 a);
+NO_DEBUG f32 Floor(f32 x);
+NO_DEBUG f32 Ceil(f32 x);
+NO_DEBUG f32 Round(f32 x);
 NO_DEBUG f32 Mod(f32 a, f32 b);
-NO_DEBUG f32 Exp(f32 a);
-NO_DEBUG f32 LogE(f32 a);
-NO_DEBUG f32 Log2(f32 a);
-NO_DEBUG f32 Log10(f32 a);
+NO_DEBUG f32 Exp(f32 x);
+NO_DEBUG f32 LogE(f32 x);
+NO_DEBUG f32 Log2(f32 x);
+NO_DEBUG f32 Log10(f32 x);
 
 NO_DEBUG void SinCos(f32 angle, f32* a, f32* b);
 
-NO_DEBUG f32 SinD(f32 a);
-NO_DEBUG f32 CosD(f32 a);
+NO_DEBUG f32 SinD(f32 x);
+NO_DEBUG f32 CosD(f32 x);
 NO_DEBUG f32 Atan2_360(f32 y, f32 x);
 
 ////////////////////////////////////////////////////////////////////////
@@ -231,7 +221,7 @@ u32 u32_from_rgba(v4 rgba);
 ////////////////////////////////////////////////////////////////////////
 // Hash
 
-u64 squirrel3(u64 at);
+u64 squirrel3(u64 x);
 u64 str_hash_FNV(String str);
 u64 hash_memory(void* data, u64 size);
 u64 hash(u64 x, u64 seed = 0);
@@ -253,104 +243,103 @@ NO_DEBUG f32 rand_rng_f32(f32 min, f32 max);
 NO_DEBUG b32 rand_b32();
 NO_DEBUG void rand_seed();
 NO_DEBUG u32 rand_get_seed();
-template<typename T> void rand_shuffle(Slice<T> slice) {
-  Loop (i, slice.count) {
-    u32 j = rand_rng_u32(i, slice.count - 1);
-    Swap(slice[i], slice[j]);
+template<typename T> void rand_shuffle(Slice<T> data) {
+  Loop (i, data.count) {
+    u32 j = rand_rng_u32(i, data.count - 1);
+    Swap(data[i], data[j]);
   }
 }
 
 ////////////////////////////////////////////////////////////////////////
 // Misc
 
-NO_DEBUG f32 Lerp(f32 a, f32 t, f32 b);
-f32 normalize(f32 a, f32 x, f32 b);
-f64 normalize(f64 a, f64 x, f64 b);
+f32 Lerp(f32 a, f32 t, f32 b);
+f32 Unlerp(f32 a, f32 x, f32 b);
+f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
+f32 remap_clamped(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
 
 ////////////////////////////////////////////////////////////////////////
 // Vector2
 
 NO_DEBUG v2 v2_zero();
 NO_DEBUG v2 v2_one();
-NO_DEBUG v2 v2_scale(f32 a);
+NO_DEBUG v2 v2_splat(f32 x);
 NO_DEBUG v2 v2_up();
 NO_DEBUG v2 v2_down();
 NO_DEBUG v2 v2_left();
 NO_DEBUG v2 v2_right();
-NO_DEBUG v2 v2_of_v3(v3 a);
-NO_DEBUG v2 v2_of_v4(v4 a);
-NO_DEBUG v3 v2_to_v3(v2 a, f32 b);
-NO_DEBUG v4 v2_to_v4(v2 a, f32 b, f32 c);
-NO_DEBUG v2 v2_of_v2i(v2i a);
-NO_DEBUG v2 v2_of_v2u(v2u a);
-NO_DEBUG v2i v2i_of_v2(v2 a);
+NO_DEBUG v2 v2_of_v3(v3 v);
+NO_DEBUG v2 v2_of_v4(v4 v);
+NO_DEBUG v3 v2_to_v3(v2 v, f32 a);
+NO_DEBUG v4 v2_to_v4(v2 v, f32 a, f32 b);
+NO_DEBUG v2 v2_of_v2i(v2i v);
+NO_DEBUG v2 v2_of_v2u(v2u v);
+NO_DEBUG v2i v2i_of_v2(v2 v);
 NO_DEBUG v2  operator+(v2 a, v2 b);
 NO_DEBUG v2  operator-(v2 a, v2 b);
-NO_DEBUG v2  operator*(v2 a, f32 scalar);
-NO_DEBUG v2  operator*(f32 scalar, v2 a);
-NO_DEBUG v2  operator/(v2 a, f32 scalar);
+NO_DEBUG v2  operator*(v2 v, f32 scalar);
+NO_DEBUG v2  operator*(f32 scalar, v2 v);
+NO_DEBUG v2  operator/(v2 v, f32 scalar);
 NO_DEBUG v2  operator+=(v2& a, v2 b);
 NO_DEBUG v2  operator-=(v2& a, v2 b);
-NO_DEBUG v2  operator*=(v2& a, f32 scalar);
-NO_DEBUG v2  operator/=(v2& a, f32 scalar);
+NO_DEBUG v2  operator*=(v2& v, f32 scalar);
+NO_DEBUG v2  operator/=(v2& v, f32 scalar);
 NO_DEBUG b32 operator==(v2 a, v2 b);
 NO_DEBUG b32 operator!=(v2 a, v2 b);
-NO_DEBUG v2  operator-(v2 a);
-NO_DEBUG f32 v2_length_squared(v2 a);
-NO_DEBUG f32 v2_length(v2 a);
-NO_DEBUG v2  v2_norm(v2 a);
+NO_DEBUG v2  operator-(v2 v);
+NO_DEBUG f32 v2_length_squared(v2 v);
+NO_DEBUG f32 v2_length(v2 v);
+NO_DEBUG v2  v2_norm(v2 v);
 NO_DEBUG f32 v2_distance(v2 a, v2 b);
 NO_DEBUG f32 v2_dot(v2 a, v2 b);
-NO_DEBUG f32 v2_cross(v2 a, v2 b);
+NO_DEBUG f32 v2_cross(v2 a, v2 b);  // if > 0 then b is to the left of a
 NO_DEBUG v2  v2_lerp(v2 a, f32 t, v2 b);
 NO_DEBUG v2  v2_hadamard(v2 a, v2 b);
 NO_DEBUG v2  v2_hadamard_div(v2 a, v2 b);
-NO_DEBUG v2  v2_skew(v2 a);
+NO_DEBUG v2  v2_skew(v2 v);
 NO_DEBUG v2  v2_rand_rng(v2 a, v2 b);
 f32 v2_shortest_arc(v2 a, v2 b);
-v2 v2_map_to_v2_11(v2 pos, v2 size);
+v2 v2_map_to_11(v2 pos, v2 range);
 
 ////////////////////////////////////////////////////////////////////////
 // Vector3
 
 NO_DEBUG v3 v3_zero();
 NO_DEBUG v3 v3_one();
-NO_DEBUG v3 v3_scale(f32 a);
+NO_DEBUG v3 v3_splat(f32 v);
 NO_DEBUG v3 v3_up();
 NO_DEBUG v3 v3_down();
 NO_DEBUG v3 v3_left();
 NO_DEBUG v3 v3_right();
 NO_DEBUG v3 v3_forward();
 NO_DEBUG v3 v3_back();
-NO_DEBUG v3 v3_of_v4(v4 a);
-NO_DEBUG v4 v3_to_v4(v3 a, f32 b);
+NO_DEBUG v3 v3_of_v4(v4 v);
+NO_DEBUG v4 v3_to_v4(v3 v, f32 a);
 NO_DEBUG v3  operator+(v3 a, v3 b);
 NO_DEBUG v3  operator-(v3 a, v3 b);
-NO_DEBUG v3  operator*(v3 a, f32 scalar);
-NO_DEBUG v3  operator*(f32 scalar, v3 a);
-NO_DEBUG v3  operator/(v3 a, f32 scalar);
+NO_DEBUG v3  operator*(v3 v, f32 scalar);
+NO_DEBUG v3  operator*(f32 scalar, v3 v);
+NO_DEBUG v3  operator/(v3 v, f32 scalar);
 NO_DEBUG v3  operator+=(v3& a, v3 b);
 NO_DEBUG v3  operator-=(v3& a, v3 b);
-NO_DEBUG v3  operator*=(v3& a, f32 scalar);
-NO_DEBUG v3  operator/=(v3& a, f32 scalar);
+NO_DEBUG v3  operator*=(v3& v, f32 scalar);
+NO_DEBUG v3  operator/=(v3& v, f32 scalar);
 NO_DEBUG b32 operator==(v3 a, v3 b);
 NO_DEBUG b32 operator==(v3u a, v3u b);
 NO_DEBUG b32 operator!=(v3 a, v3 b);
-NO_DEBUG v3  operator-(v3 a);
-NO_DEBUG f32 v3_length_squared(v3 a);
-NO_DEBUG f32 v3_length(v3 a);
-NO_DEBUG v3  v3_norm(v3 a);
+NO_DEBUG v3  operator-(v3 v);
+NO_DEBUG f32 v3_length_squared(v3 v);
+NO_DEBUG f32 v3_length(v3 v);
+NO_DEBUG v3  v3_norm(v3 v);
 NO_DEBUG f32 v3_distance(v3 a, v3 b);
 NO_DEBUG f32 v3_dot(v3 a, v3 b);
 NO_DEBUG v3  v3_cross(v3 a, v3 b);
 NO_DEBUG v3  v3_lerp(v3 a, f32 t, v3 b);
 NO_DEBUG v3  v3_hadamard(v3 a, v3 b);
 NO_DEBUG v3  v3_hadamard_div(v3 a, v3 b);
-NO_DEBUG v3  v3_greater(v3 a, v3 b);
-NO_DEBUG v3  v3_less(v3 a, v3 b);
+NO_DEBUG v3b v3_greater(v3 a, v3 b);
+NO_DEBUG v3b v3_less(v3 a, v3 b);
 NO_DEBUG v3  v3_pos_of_mat4(mat4 mat);
-// NO_DEBUG v3 v3_rot_of_mat4(mat4 mat);
-// NO_DEBUG v3 v3_scale_of_mat4(mat4 mat);
 NO_DEBUG v3  v3_rand_rng(v3 a, v3 b);
 
 ////////////////////////////////////////////////////////////////////////
@@ -358,20 +347,20 @@ NO_DEBUG v3  v3_rand_rng(v3 a, v3 b);
 
 NO_DEBUG v4  v4_zero();
 NO_DEBUG v4  v4_one();
-NO_DEBUG v4  v4_scale(f32 a);
+NO_DEBUG v4  v4_splat(f32 v);
 NO_DEBUG v4  operator+(v4 a, v4 b);
 NO_DEBUG v4  operator-(v4 a, v4 b);
-NO_DEBUG v4  operator*(v4 a, f32 scalar);
-NO_DEBUG v4  operator*(f32 scalar, v4 a);
-NO_DEBUG v4  operator/(v4 a, f32 scalar);
+NO_DEBUG v4  operator*(v4 v, f32 scalar);
+NO_DEBUG v4  operator*(f32 scalar, v4 v);
+NO_DEBUG v4  operator/(v4 v, f32 scalar);
 NO_DEBUG v4  operator+=(v4& a, v4 b);
 NO_DEBUG v4  operator-=(v4& a, v4 b);
-NO_DEBUG v4  operator*=(v4& a, f32 scalar);
-NO_DEBUG v4  operator/=(v4& a, f32 scalar);
-NO_DEBUG v4  operator-(v4 a);
-NO_DEBUG f32 v4_length_squared(v4 a);
-NO_DEBUG f32 v4_length(v4 a);
-NO_DEBUG v4  v4_norm(v4 a);
+NO_DEBUG v4  operator*=(v4& v, f32 scalar);
+NO_DEBUG v4  operator/=(v4& v, f32 scalar);
+NO_DEBUG v4  operator-(v4 v);
+NO_DEBUG f32 v4_length_squared(v4 v);
+NO_DEBUG f32 v4_length(v4 v);
+NO_DEBUG v4  v4_norm(v4 v);
 NO_DEBUG v4  v4_hadamard(v4 a, v4 b);
 
 ////////////////////////////////////////////////////////////////////////
@@ -390,6 +379,7 @@ NO_DEBUG v3 operator*(mat3 mat, v3 vec);
 mat4 mat4_identity();
 mat4 mat4_translate(v3 pos);
 mat4 mat4_scale(v3 scale);
+mat4 mat4_scale_all_elements(mat4 mat, f32 scale);
 mat4 mat4_rotate_x(f32 rad);
 mat4 mat4_rotate_y(f32 rad);
 mat4 mat4_rotate_z(f32 rad);
@@ -416,86 +406,91 @@ v3 mat4_left(mat4 matrix);
 
 ///////////////////////////////////
 // Dim1
-Rng1u32 shift_1u32(Rng1u32 r, u32 x);
-Rng1u32 pad_1u32(Rng1u32 r, u32 x);
-u32 center_1u32(Rng1u32 r);
-b32 contains_1u32(Rng1u32 r, u32 x);
-u32 dim_1u32(Rng1u32 r);
-Rng1u32 union_1u32(Rng1u32 a, Rng1u32 b);
-Rng1u32 intersect_1u32(Rng1u32 a, Rng1u32 b);
-u32 clamp_1u32(Rng1u32 r, u32 v);
+Rng1u rng1u_shift(Rng1u r, u32 x);
+Rng1u rng1u_pad(Rng1u r, u32 x);
+u32 rng1u_center(Rng1u r);
+b32 rng1u_contains(Rng1u r, u32 x);
+u32 rng1u_dim(Rng1u r);
+Rng1u rng1u_union(Rng1u a, Rng1u b);
+Rng1u rng1u_intersect(Rng1u a, Rng1u b);
+u32 rng1u_clamp(Rng1u r, u32 v);
 
-Rng1i32 shift_1i32(Rng1i32 r, i32 x);
-Rng1i32 pad_1i32(Rng1i32 r, i32 x);
-i32 center_1i32(Rng1i32 r);
-b32 contains_1i32(Rng1i32 r, i32 x);
-i32 dim_1i32(Rng1i32 r);
-Rng1i32 union_1i32(Rng1i32 a, Rng1i32 b);
-Rng1i32 intersect_1i32(Rng1i32 a, Rng1i32 b);
-i32 clamp_1i32(Rng1i32 r, i32 v);
+Rng1i rng1i_shift(Rng1i r, i32 x);
+Rng1i rng1i_pad(Rng1i r, i32 x);
+i32 rng1i_center(Rng1i r);
+b32 rng1i_contains(Rng1i r, i32 x);
+i32 rng1i_dim(Rng1i r);
+Rng1i rng1i_union(Rng1i a, Rng1i b);
+Rng1i rng1i_intersect(Rng1i a, Rng1i b);
+i32 rng1i_clamp(Rng1i r, i32 v);
 
-Rng1u64 shift_1u64(Rng1u64 r, u64 x);
-Rng1u64 pad_1u64(Rng1u64 r, u64 x);
-u64 center_1u64(Rng1u64 r);
-b32 contains_1u64(Rng1u64 r, u64 x);
-u64 dim_1u64(Rng1u64 r);
-Rng1u64 union_1u64(Rng1u64 a, Rng1u64 b);
-Rng1u64 intersect_1u64(Rng1u64 a, Rng1u64 b);
-u64 clamp_1u64(Rng1u64 r, u64 v);
+Rng1u64 rng1u64_shift(Rng1u64 r, u64 x);
+Rng1u64 rng1u64_pad(Rng1u64 r, u64 x);
+u64 rng1u64_center(Rng1u64 r);
+b32 rng1u64_contains(Rng1u64 r, u64 x);
+u64 rng1u64_dim(Rng1u64 r);
+Rng1u64 rng1u64_union(Rng1u64 a, Rng1u64 b);
+Rng1u64 rng1u64_intersect(Rng1u64 a, Rng1u64 b);
+u64 rng1u64_clamp(Rng1u64 r, u64 v);
 
-Rng1f32 shift_1f32(Rng1f32 r, f32 x);
-Rng1f32 pad_1f32(Rng1f32 r, f32 x);
-f32 center_1f32(Rng1f32 r);
-b32 contains_1f32(Rng1f32 r, f32 x);
-f32 dim_1f32(Rng1f32 r);
-Rng1f32 union_1f32(Rng1f32 a, Rng1f32 b);
-Rng1f32 intersect_1f32(Rng1f32 a, Rng1f32 b);
-f32 clamp_1f32(Rng1f32 r, f32 v);
+Rng1 rng1_shift(Rng1 r, f32 x);
+Rng1 rng1_pad(Rng1 r, f32 x);
+f32 rng1_center(Rng1 r);
+b32 rng1_contains(Rng1 r, f32 x);
+f32 rng1_dim(Rng1 r);
+Rng1 rng1_union(Rng1 a, Rng1 b);
+Rng1 rng1_intersect(Rng1 a, Rng1 b);
+f32 rng1_clamp(Rng1 r, f32 v);
 
-f32 normalize_1f32(f32 x, Rng1f32 r);
-f32 lerp_1f32(f32 t, Rng1f32 r);
-f32 remap_1f32(f32 x, Rng1f32 from, Rng1f32 to);
-Rng1f32 slice_x_1f32(Rng1f32 r, f32 t0, f32 t1);
+f32 rng1_lerp(Rng1 r, f32 t);
+f32 rng1_unlerp(Rng1 r, f32 x);
 
 ///////////////////////////////////
 // Dim2
-Rng2f32 shift_2f32(Rng2f32 r, v2 x);
-Rng2f32 pad_2f32(Rng2f32 r, f32 x);
-v2 center_2f32(Rng2f32 r);
-b32 contains_2f32(Rng2f32 r, v2 x);
-v2 dim_2f32(Rng2f32 r);
-Rng2f32 union_2f32(Rng2f32 a, Rng2f32 b);
-Rng2f32 intersect_2f32(Rng2f32 a, Rng2f32 b);
-v2 clamp_2f32(Rng2f32 r, v2 v);
+Rng2 rng2_shift(Rng2 r, v2 x);
+Rng2 rng2_pad(Rng2 r, f32 x);
+v2 rng2_center(Rng2 r);
+b32 rng2_contains(Rng2 r, v2 x);
+v2 rng2_dim(Rng2 r);
+Rng2 rng2_union(Rng2 a, Rng2 b);
+Rng2 rng2_intersect(Rng2 a, Rng2 b);
+v2 rng2_clamp(Rng2 r, v2 v);
 
-Rng2f32 slice_x_2f32(Rng2f32 r, Rng1f32 x);
-Rng2f32 slice_y_2f32(Rng2f32 r, Rng1f32 y);
-Rng2f32 slice_x_2f32(Rng2f32 r, f32 t0, f32 t1);
-Rng2f32 fill_x_2f32(Rng2f32 r, f32 t);
-Rng2f32 fill_y_2f32(Rng2f32 r, f32 t);
-Rng2f32 pos_size_2f32(v2 pos, v2 size);
-Rng2f32 center_halfdim_2f32(v2 center, v2 halfdim);
-Rng2f32 center_dim_2f32(v2 center, v2 dim);
-Rng2f32 align_center_2f32(Rng2f32 r, v2 s);
-Rng2f32 align_center_x_2f32(Rng2f32 r, v2 s);
-Rng2f32 align_center_y_2f32(Rng2f32 r, v2 s);
-Rng2f32 scale_2f32(Rng2f32 r, f32 scale);
+Rng2 rng2_make(v2 min, v2 size);             
+Rng2 rng2_make_centered(v2 pos, v2 halfdim); 
+Rng2 rng2_scale_centered(Rng2 r, f32 scale); 
+Rng2 rng2_scale_centered(Rng2 r, v2 scale);  
+Rng2 rng2_scale(Rng2 r, f32 scale);          
+Rng2 rng2_scale(Rng2 r, v2 scale);           
+
+Rng2 rng2_subrng_x(Rng2 r, Rng1 x);
+Rng2 rng2_subrng_y(Rng2 r, Rng1 y);
+Rng2 rng2_subrng_x01(Rng2 r, Rng1 sub);
+Rng2 rng2_subrng_y01(Rng2 r, Rng1 sub);
+Rng2 rng2_align_dim_at_center(Rng2 r, v2 s);
 
 ///////////////////////////////////
 // Dim3
-Rng3f32 shift_3f32(Rng3f32 r, v3 x);
-Rng3f32 pad_3f32(Rng3f32 r, f32 x);
-v3 center_3f32(Rng3f32 r);
-b32 contains_3f32(Rng3f32 r, v3 x);
-v3 dim_3f32(Rng3f32 r);
-Rng3f32 union_3f32(Rng3f32 a, Rng3f32 b);
-Rng3f32 intersect_3f32(Rng3f32 a, Rng3f32 b);
-v3 clamp_3f32(Rng3f32 r, v3 v);
+Rng3 rng3_shift(Rng3 r, v3 x);
+Rng3 rng3_pad(Rng3 r, f32 x);
+v3 rng3_center(Rng3 r);
+b32 rng3_contains(Rng3 r, v3 x);
+v3 rng3_dim(Rng3 r);
+Rng3 rng3_union(Rng3 a, Rng3 b);
+Rng3 rng3_intersect(Rng3 a, Rng3 b);
+v3 rng3_clamp(Rng3 r, v3 v);
+
+Rng3 rng3_make(v3 min, v3 size);
+Rng3 rng3_make_centered(v3 pos, v3 halfdim);
+Rng3 rng3_scale_centered(Rng3 r, f32 scale);
+Rng3 rng3_scale_centered(Rng3 r, v3 scale);
+Rng3 rng3_scale(Rng3 r, f32 scale);
+Rng3 rng3_scale(Rng3 r, v3 scale);
 
 struct Rng2Cursor {
   v2 pos;
 };
 
-Rng2f32 layout_row(Rng2Cursor& c, Rng1f32 x, f32 h);
+Rng2 layout_row(Rng2Cursor& c, Rng1 x, f32 h);
 void layout_next(Rng2Cursor& c, f32 h);
 

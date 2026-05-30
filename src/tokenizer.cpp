@@ -46,6 +46,7 @@ Slice<Token> tokens_from_str(Allocator arena, String string) {
         if (cur_byte() == '"') {
           ++advance;
         }
+        ++off;
       } break;
       default: {
         if (char_is_space(byte)) {
@@ -101,9 +102,13 @@ Slice<Token> tokens_from_str(Allocator arena, String string) {
         }
       }
     }
+    u32 tok_len = advance;
+    if (token_type == TokenType_String) {
+      tok_len -= 2;
+    }
     Token token = {
       .type = token_type,
-      .str = String(str+off, advance),
+      .str = str_make(str+off, tok_len),
       .column = column,
       .line = token_line,
     };
@@ -112,7 +117,7 @@ Slice<Token> tokens_from_str(Allocator arena, String string) {
     } else {
       column += advance;
     }
-    darray_add(tokens, token);
+    array_push(tokens, token);
   }
   return slice(tokens);
 }

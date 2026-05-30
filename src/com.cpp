@@ -110,13 +110,13 @@ f32 get_dt() { return st->dt; }
 f32 get_time() { return st->time; }
 
 Entity& get_entity(EntityId id) {
-  Assert(id_generation(id.v) == st->game.entity_id_pool.generations[id_idx(id.v)])
-  return st->game.entities[id_idx(id.v)];
+  Assert(id_generation(id) == st->game.entity_id_pool.generations[id_idx(id)])
+  return st->game.entities[id_idx(id)];
 }
 
 StaticEntity& get_static_entity(StaticEntityId id) {
-  Assert(id_generation(id.v) == st->game.static_entity_id_pool.generations[id_idx(id.v)]);
-  return st->game.static_entities[id_idx(id.v)];
+  Assert(id_generation(id) == st->game.static_entity_id_pool.generations[id_idx(id)]);
+  return st->game.static_entities[id_idx(id)];
 }
 
 Mesh load_obj(Allocator arena, String name) {
@@ -126,7 +126,7 @@ Mesh load_obj(Allocator arena, String name) {
   var uvs = darray_make<v2>(scratch);
   var indexes = darray_make<v3u>(scratch);
   Slice buf = os_file_path_read_all(scratch, name);
-  Lexer lexer = lexer_init({buf.data, buf.count});
+  Lexer lexer = lexer_init(str_make(buf));
   String word;
   while ((word = lexer_next_token(&lexer)).size) {
     // vert
@@ -136,7 +136,7 @@ Mesh load_obj(Allocator arena, String name) {
         e = f32_from_str(lexer_next_token(&lexer));
       }
       // Info("v %f, %f, %f", v.x, v.y, v.z);
-      darray_add(positions, v);
+      array_push(positions, v);
     }
     // norm
     else if (str_match(word, "vn")) {
@@ -145,7 +145,7 @@ Mesh load_obj(Allocator arena, String name) {
         e = f32_from_str(lexer_next_token(&lexer));
       }
       // Info("vn %f, %f, %f", v.x, v.y, v.z);
-      darray_add(normals, v);
+      array_push(normals, v);
     }
     // uv
     else if (str_match(word, "vt")) {
@@ -154,7 +154,7 @@ Mesh load_obj(Allocator arena, String name) {
         e = f32_from_str(lexer_next_token(&lexer));
       }
       // Info("vt %f, %f", v.x, v.y);
-      darray_add(uvs, v);
+      array_push(uvs, v);
     }
     // indexes
     else if (str_match(word, "f")) {
@@ -165,7 +165,7 @@ Mesh load_obj(Allocator arena, String name) {
         }
         v3u v = {raw.x, raw.z, raw.y};
         // Info("%i, %i, %i", v.x, v.y, v.z);
-        darray_add(indexes, v);
+        array_push(indexes, v);
       }
     }
   }
@@ -182,11 +182,11 @@ Mesh load_obj(Allocator arena, String name) {
     Result res = map_get(map, vertex);
     if (res.err) {
       u32 new_index = vertices.count;
-      darray_add(vertices, vertex);
-      darray_add(final_indices, new_index);
+      array_push(vertices, vertex);
+      array_push(final_indices, new_index);
       map_set(map, vertex, new_index);
     } else {
-      darray_add(final_indices, res.v);
+      array_push(final_indices, res.v);
     }
   }
   Mesh mesh = {
@@ -201,7 +201,7 @@ Mesh load_obj(Allocator arena, String name) {
 Mesh load_gltf(Allocator arena, String name) {
   Scratch scratch(arena);
   Slice buf = os_file_path_read_all(scratch, name);
-  JsonReader r = json_reader_init({buf.data, buf.count});
+  JsonReader r = json_reader_init(str_make(buf));
   struct MeshInfo {
     // u32 pos_idx;
     // u32 norm_idx;
@@ -331,11 +331,11 @@ Mesh load_glb(Allocator arena, String name) {
     u32 chunk_data;
   };
   FileHeader* header = (FileHeader*)buf.data;
-  Assert(str_match(String((u8*)&header->magic, 4), "glTF"));
+  Assert(str_match(str_make((u8*)&header->magic, 4), "glTF"));
   Chunk* json_chunk = (Chunk*)Offset(header, sizeof(FileHeader));
-  Assert(str_match(String((u8*)&json_chunk->chunk_type, 4), "JSON"));
+  Assert(str_match(str_make((u8*)&json_chunk->chunk_type, 4), "JSON"));
   Chunk* bin_chunk = (Chunk*)Offset(json_chunk, sizeof(Chunk)-4 + json_chunk->chunk_length);
-  Assert(str_match(String((u8*)&bin_chunk->chunk_type, 3), "BIN"));
+  Assert(str_match(str_make((u8*)&bin_chunk->chunk_type, 3), "BIN"));
   struct Accessor{
     u32 count;
   };
@@ -352,7 +352,7 @@ Mesh load_glb(Allocator arena, String name) {
     String file_name;
     u32 file_size;
   } info = {};
-  JsonReader r = json_reader_init({(u8*)&json_chunk->chunk_data, buf.count});
+  JsonReader r = json_reader_init(str_make((u8*)&json_chunk->chunk_data, buf.count));
   JSON_OBJ(r, r.base_obj) {
     if (k.match("meshes")) {
       JSON_ARR(r, v) JSON_OBJ(r, obj) {
@@ -459,7 +459,6 @@ Texture load_image(String filepath) {
 ////////////////////////////////////////////////////////////////////////
 // @Assets
 
-// TODO: allocate in hotreload build?
 global String meshes_strs[Mesh_COUNT] = {
 #define X(enum_name, name) [enum_name] = Stringify(name),
   MESH_LIST
@@ -475,14 +474,14 @@ global String textures_strs[Texture_COUNT] = {
 #undef X
 };
 
-GpuMeshId mesh_get(MeshId id) { return st->meshes_ids[id]; }
-void mesh_set(MeshId id, GpuMeshId mesh_handle) { 
-  st->meshes_ids[id] = mesh_handle;
-  String str = push_str_copy(st->arena, meshes_strs[id]);
-  st->mesh_id_to_str[mesh_handle.v] = str;
-  map_set(st->str_to_mesh_id, str, mesh_handle);
+GpuMeshId mesh_get(MeshEnum mesh_enum) { return st->meshes_ids[mesh_enum]; }
+void mesh_set(MeshEnum mesh_enum, GpuMeshId mesh_id) { 
+  st->meshes_ids[mesh_enum] = mesh_id;
+  String str = push_str_copy(st->arena, meshes_strs[mesh_enum]);
+  st->mesh_id_to_str[mesh_id.v] = str;
+  map_set(st->str_to_mesh_id, str, mesh_id);
 }
-GpuMaterialId material_get(MaterialId id) { return st->materials_ids[id]; }
+GpuMaterialId material_get(MaterialEnum id) { return st->materials_ids[id]; }
 
 constexpr ShaderState shader_default_info() {
   ShaderState info = {
@@ -497,9 +496,9 @@ constexpr ShaderState shader_default_info() {
 
 constexpr MaterialProps material_default_props() {
   MaterialProps props = {
-    .ambient = v3_scale(1),
-    .diffuse = v3_scale(1),
-    .specular = v3_scale(1),
+    .ambient = v3_splat(1),
+    .diffuse = v3_splat(1),
+    .specular = v3_splat(1),
     .shininess = 1,
   };
   return props;
@@ -645,9 +644,9 @@ JsonValue json_read(JsonReader* r) {
     } break;
     case 'n': case 't': case 'f': {
       res.type = (*r->cur == 'n') ? JsonType_Null : JsonType_Bool;
-      if (str_match(String(r->cur, 4),  "null")) { r->cur += 4; break; }
-      if (str_match(String(r->cur, 4),  "true")) { r->cur += 4; break; }
-      if (str_match(String(r->cur, 5), "false")) { r->cur += 5; break; }
+      if (str_match(str_make(r->cur, 4),  "null")) { r->cur += 4; break; }
+      if (str_match(str_make(r->cur, 4),  "true")) { r->cur += 4; break; }
+      if (str_match(str_make(r->cur, 5), "false")) { r->cur += 5; break; }
     } // fallthrough
     default: {
       r->error = "unknown token";
@@ -742,7 +741,7 @@ void input_update() {
 ScrollState scroll_state_make(f32 scale) {
   ScrollState res = {
     .scale_level = scale,
-    .scale = v2_scale(scale),
+    .scale = v2_splat(scale),
   };
   return res;
 }
@@ -760,7 +759,7 @@ void ui_handle_scroll(ScrollState& s, ScrollType type) {
           v2 world = (mouse - s.offset) / s.scale_level;
           s.scale_level *= zoom;
           s.offset = mouse - world * s.scale_level;
-          s.scale = v2_scale(s.scale_level);
+          s.scale = v2_splat(s.scale_level);
         } break;
         case ScrollType_PowClamp: {
           v2 world = {
@@ -1040,7 +1039,7 @@ void profiler_view() {
                 }
 
                 f64 width_t = (f64)var_tsc_elapsed_incl / tsc_elapsed;
-                f64 width_t_off = normalize((f64)tsc_start, var_tsc_start, tsc_end);
+                f64 width_t_off = Unlerp((f64)tsc_start, var_tsc_start, tsc_end);
                 if (anchor.tsc_elapsed_incl != anchor.tsc_elapsed_excl) {
                   width_t = (f64)anchor.tsc_elapsed_incl / tsc_elapsed;
                 }
@@ -1048,16 +1047,16 @@ void profiler_view() {
                 f32 height_off = anchor.depth * height;
                 f32 width = width_t * avail_size.x;
                 f32 width_off = width_t_off * avail_size.x;
-                Rng2 rect = pos_size_2f32(v2(width_off, height_off), v2(width, height));
+                Rng2 rect = rng2_make(v2(width_off, height_off), v2(width, height));
                 UI_Item item = {
                   .type = UI_ItemType_Bar,
                   .rect = rect,
                   .anchor = anchor,
                 };
-                darray_add(items, item);
+                array_push(items, item);
               }
             }
-            darray_add(items, {.type = UI_ItemType_NextThread});
+            array_push(items, {.type = UI_ItemType_NextThread});
           }
 
           ///////////////////////////////////
@@ -1068,7 +1067,7 @@ void profiler_view() {
             UI_Item& item = items[i];
             switch (item.type) {
               case UI_ItemType_Bar: {
-                item.rect = shift_2f32(item.rect, v2(width_off, height_off));
+                item.rect = rng2_shift(item.rect, v2(width_off, height_off));
               } break;
               case UI_ItemType_NextThread: {
                 height_off += thread_height_off;
@@ -1078,13 +1077,10 @@ void profiler_view() {
 
           // Scroll
           Loop (i, items.count) {
-            UI_Item& item = items[i];
-            item.rect = shift_2f32(item.rect, cursor_pos);
-            item.rect.min.x *= scroll_state.scale.x;
-            item.rect.min.y *= scroll_state.scale.y;
-            item.rect.max.x *= scroll_state.scale.x;
-            item.rect.max.y *= scroll_state.scale.y;
-            item.rect = shift_2f32(item.rect, scroll_state.offset);
+            Rng2& rect = items[i].rect;
+            rect = rng2_shift(rect, cursor_pos);
+            rect = rng2_scale(rect, scroll_state.scale);
+            rect = rng2_shift(rect, scroll_state.offset);
           }
 
           ///////////////////////////////////
@@ -1099,7 +1095,7 @@ void profiler_view() {
                 ProfAnchor anchor = item.anchor;
                 Rng2 rect = item.rect;
                 switch (anchor.type) {
-                  case ProfType_Work: {
+                  case ProfType_Default: {
                     color = IM_COL32(50, 50, 50, 255);
                     str = String("work");
                   } break;
@@ -1114,10 +1110,10 @@ void profiler_view() {
                 }
                 draw->AddRectFilled(IM_RECT(rect), color);
                 draw->AddRect(IM_RECT(rect), IM_COL32(200, 200, 200, 255));
-                if (contains_2f32(rect, mouse_pos)) {
+                if (rng2_contains(rect, mouse_pos)) {
                   ImGui::BeginTooltip();
                   ImGui::Text("Label: %s", anchor.label.str);
-                  ImGui::Text("Percent: %f%%", dim_2f32(rect).x / avail_size.x * 100);
+                  ImGui::Text("Percent: %f%%", rng2_dim(rect).x / avail_size.x * 100);
                   // ImGui::Text("Hits: %lu", anchor.hit_count);
                   ImGui::Text("Time: %fms", tsc_to_ms(anchor.tsc_elapsed_incl));
                   ImGui::Text("Time exclusive: %fms", tsc_to_ms(anchor.tsc_elapsed_excl));
@@ -1129,15 +1125,15 @@ void profiler_view() {
                 {
                   ImString str = push_strf(scratch, "%s %.3f", anchor.label, tsc_to_ms(anchor.tsc_elapsed_incl));
                   v2 text_size = ImGui::CalcTextSize(str);
-                  if (dim_2f32(rect).x < 30.1 || scroll_state.scale.y < 0.3) {
+                  if (rng2_dim(rect).x < 30.1 || scroll_state.scale.y < 0.3) {
                     continue;
                   }
                   v2 text_pos = {};
-                  if (text_size.x > dim_2f32(rect).x) {
+                  if (text_size.x > rng2_dim(rect).x) {
                     text_pos.x = rect.min.x;
-                    text_pos.y = rect.min.y + (dim_2f32(rect).y - text_size.y) * 0.5;
+                    text_pos.y = rect.min.y + (rng2_dim(rect).y - text_size.y) * 0.5;
                   } else {
-                    text_pos = align_center_2f32(rect, text_size).min;
+                    text_pos = rng2_align_dim_at_center(rect, text_size).min;
                   }
                   draw->PushClipRect(rect.min, rect.max);
                   draw->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), str);
@@ -1186,33 +1182,33 @@ void profiler_view() {
           ImString str = push_strf(scratch, name);
           ImGui::BeginTabItem(str);
           Rng2 tab_rect = Rng2(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
-          if (str_match(name, "root")) {
-            Debug("root");
-            Info("min: %f %f", tab_rect.min.x, tab_rect.min.y);
-            Info("max: %f %f", tab_rect.max.x, tab_rect.max.y);
-          }
-          if (str_match(name, "frames")) {
-            Debug("frames");
-            Info("min: %f %f", tab_rect.min.x, tab_rect.min.y);
-            Info("max: %f %f", tab_rect.max.x, tab_rect.max.y);
-          }
-          if (str_match(name, "time")) {
-            Debug("time");
-            Info("min: %f %f", tab_rect.min.x, tab_rect.min.y);
-            Info("max: %f %f", tab_rect.max.x, tab_rect.max.y);
-          }
-          if (str_match(name, "launch")) {
-            Debug("launch");
-            Info("min: %f %f", tab_rect.min.x, tab_rect.min.y);
-            Info("max: %f %f", tab_rect.max.x, tab_rect.max.y);
-          }
-          if (str_match(name, "memory")) {
-            Debug("memory");
-            Info("min: %f %f", tab_rect.min.x, tab_rect.min.y);
-            Info("max: %f %f", tab_rect.max.x, tab_rect.max.y);
-          }
+          // if (str_match(name, "root")) {
+          //   Debug("root");
+          //   Info("min: %f %f", tab_rect.min.x, tab_rect.min.y);
+          //   Info("max: %f %f", tab_rect.max.x, tab_rect.max.y);
+          // }
+          // if (str_match(name, "frames")) {
+          //   Debug("frames");
+          //   Info("min: %f %f", tab_rect.min.x, tab_rect.min.y);
+          //   Info("max: %f %f", tab_rect.max.x, tab_rect.max.y);
+          // }
+          // if (str_match(name, "time")) {
+          //   Debug("time");
+          //   Info("min: %f %f", tab_rect.min.x, tab_rect.min.y);
+          //   Info("max: %f %f", tab_rect.max.x, tab_rect.max.y);
+          // }
+          // if (str_match(name, "launch")) {
+          //   Debug("launch");
+          //   Info("min: %f %f", tab_rect.min.x, tab_rect.min.y);
+          //   Info("max: %f %f", tab_rect.max.x, tab_rect.max.y);
+          // }
+          // if (str_match(name, "memory")) {
+          //   Debug("memory");
+          //   Info("min: %f %f", tab_rect.min.x, tab_rect.min.y);
+          //   Info("max: %f %f", tab_rect.max.x, tab_rect.max.y);
+          // }
           if (key_pressed(MouseKey_Left)) {
-            if (contains_2f32(tab_rect, mouse_pos)) {
+            if (rng2_contains(tab_rect, mouse_pos)) {
               switch (tab) {
                 case ProfileTabActive_Root: g.future_active_tab = ProfileTabActive_Root; break;
                 case ProfileTabActive_Frames: g.future_active_tab = ProfileTabActive_Frames; break;
@@ -1265,18 +1261,18 @@ void profiler_view() {
               f64 height = max_height / (max_ms / frame_ms);
               v2 size = v2(avail_size.x / ArrayCount(g.frames_times), height);
               v2 min = cursor_pos + v2(i*size.x, -height + max_height);
-              Rng2 rect = pos_size_2f32(min, size);
-              if (contains_2f32(rect, mouse_pos)) {
+              Rng2 rect = rng2_make(min, size);
+              if (rng2_contains(rect, mouse_pos)) {
                 ImGui::BeginTooltip();
                 ImGui::Text("frame: %i", i);
                 ImGui::EndTooltip();
                 if (os_is_key_pressed(MouseKey_Left)) {
                   win.frames_scroll_state.offset.x = -width_size * i;
-                  win.frames_scroll_state.scale = v2_scale(1);
+                  win.frames_scroll_state.scale = v2_splat(1);
                 }
               }
               ImU32 color = IM_COL32(50, 200, 50, 255);
-              if (contains_1f32(Rng1f32(17, 20), frame_ms)) {
+              if (rng1_contains(Rng1(17, 20), frame_ms)) {
                 color = IM_COL32(200, 200, 50, 255);
               } else if (frame_ms > 20) {
                 color = IM_COL32(255, 100, 50, 255);
@@ -1419,7 +1415,7 @@ void profiler_view() {
                   .type = UI_ItemType_MemUsage,
                   .rect = layout_row(curs, Rng1(0, avail_size.x), row_h),
                 };
-                darray_add(items, item);
+                array_push(items, item);
               }
 
               b32 level_drawn[ArrayCount(mem_levels)] = {};
@@ -1441,7 +1437,7 @@ void profiler_view() {
                     .rect = layout_row(curs, Rng1(0, avail_size.x), row_h),
                     .mem_level = mem_level,
                   };
-                  darray_add(items, item);
+                  array_push(items, item);
                 }
     
                 // Arena
@@ -1452,7 +1448,7 @@ void profiler_view() {
                     .info = &info,
                     .mem_level = mem_level,
                   };
-                  darray_add(items, item);
+                  array_push(items, item);
                 }
     
                 // Children
@@ -1464,10 +1460,10 @@ void profiler_view() {
                 var stack = darray_make<StackEntry>(scratch);
                 Slice sorted_children = sort_list_insert(scratch, info.first, [](var a, var b) { return a->pos > b->pos; });
                 ReverseLoop (i, sorted_children.count) {
-                  darray_add(stack, {sorted_children[i], 1});
+                  array_push(stack, {sorted_children[i], 1});
                 }
                 while (stack.count) {
-                  StackEntry entry = darray_pop(stack);
+                  StackEntry entry = array_pop(stack);
                   var child = entry.node;
                   UI_Item item = {
                     .type = UI_ItemType_Child,
@@ -1479,13 +1475,13 @@ void profiler_view() {
                     v2(depth * 10, curs.pos.y),
                     v2(avail_size.x, curs.pos.y + row_h * 0.6)
                   );
-                  darray_add(items, item);
+                  array_push(items, item);
                   layout_next(curs, row_h * 0.6);
                   if (child->first) {
                     ++depth;
                     Slice sorted_children = sort_list_insert(scratch, child->first, [](var a, var b) { return a->pos > b->pos; });
                     ReverseLoop (i, sorted_children.count) {
-                      darray_add(stack, {sorted_children[i], entry.depth + 1});
+                      array_push(stack, {sorted_children[i], entry.depth + 1});
                     }
                   }
                 }
@@ -1494,13 +1490,13 @@ void profiler_view() {
 
             Loop (i, items.count) {
               UI_Item& item = items[i];
-              item.rect = shift_2f32(item.rect, cursor_pos);
-              item.rect = scale_2f32(item.rect, scroll_state.scale.x);
-              item.rect = shift_2f32(item.rect, scroll_state.offset);
+              item.rect = rng2_shift(item.rect, cursor_pos);
+              item.rect = rng2_scale(item.rect, scroll_state.scale);
+              item.rect = rng2_shift(item.rect, scroll_state.offset);
             }
 
-            Rng2 rounding_edge = shift_2f32(scale_2f32(pos_size_2f32(cursor_pos, avail_size), scroll_state.scale.x), scroll_state.offset);
-            rounding_edge = pad_2f32(rounding_edge, 10);
+            Rng2 rounding_edge = rng2_shift(rng2_scale(rng2_make(cursor_pos, avail_size), scroll_state.scale.x), scroll_state.offset);
+            rounding_edge = rng2_pad(rounding_edge, 10);
             draw->AddRect(IM_RECT(rounding_edge), IM_COL32(200, 200, 200, 255));
 
             ///////////////////////////////////
@@ -1520,21 +1516,21 @@ void profiler_view() {
                   ImString str = push_strf(scratch, "%.0f%s", mem_fmt.size, mem_fmt.format);
                   v2 text_size = ImGui::CalcTextSize(str);
                   Rng2 rect = item.rect;
-                  Rng2 text_rect = align_center_2f32(rect, text_size);
-                  Rng2 pad_text_rect = pad_2f32(text_rect, 5);
+                  Rng2 text_rect = rng2_align_dim_at_center(rect, text_size);
+                  Rng2 pad_text_rect = rng2_pad(text_rect, 5);
                   draw->AddRectFilled(IM_RECT(pad_text_rect), IM_COL32(80, 90, 130, 120));
                   draw->AddText(text_rect.min, IM_COL32(255,255,255,255), str);
                 } break;
                 case UI_ItemType_Arena: {
-                  f32 t_w = dim_2f32(item.rect).x;
+                  f32 t_w = rng2_dim(item.rect).x;
                   f32 t_pos = info.pos / mem_levels[item.mem_level];
                   // f32 t_cap = info.cap / mem_levels[item.mem_level];
                   f32 t_excl = info.exclusive_pos / mem_levels[item.mem_level];
                   f32 w_pos = t_w * t_pos;
                   // f32 w_cap = t_w * t_cap;
                   f32 w_excl = t_w * t_excl;
-                  Rng2 excl_rect = slice_x_2f32(item.rect, Rng1(0, w_excl));
-                  Rng2 incl_rect = slice_x_2f32(item.rect, Rng1(w_excl, w_pos));
+                  Rng2 excl_rect = rng2_subrng_x(item.rect, Rng1(0, w_excl));
+                  Rng2 incl_rect = rng2_subrng_x(item.rect, Rng1(w_excl, w_pos));
 
                   draw->AddRectFilled(IM_RECT(excl_rect), IM_COL32(70, 80, 50, 255));
                   draw->AddRect(IM_RECT(excl_rect), IM_COL32(200, 200, 200, 255));
@@ -1549,8 +1545,8 @@ void profiler_view() {
                   ImString mem_str = push_strf(scratch, "%.2f%s pos, %.2f%s cmt", pos.size, pos.format, cmt.size, cmt.format);
 
                   draw->AddText(excl_rect.min, ImGui::GetColorU32(ImGuiCol_Text), name_str);
-                  draw->AddText(slice_x_2f32(item.rect, 0.2, 1).min, ImGui::GetColorU32(ImGuiCol_Text), mem_str);
-                  if (contains_2f32(union_2f32(incl_rect, excl_rect), mouse_pos)) {
+                  draw->AddText(rng2_subrng_x01(item.rect, Rng1(0.2, 1)).min, ImGui::GetColorU32(ImGuiCol_Text), mem_str);
+                  if (rng2_contains(rng2_union(incl_rect, excl_rect), mouse_pos)) {
                     ImGui::BeginTooltip();
                     ImString inclusive = push_strf(scratch, "inclusive: %.2f%s", pos.size, pos.format);
                     ImGui::Text("%s", inclusive.str);
@@ -1560,15 +1556,15 @@ void profiler_view() {
                   }
                 } break;
                 case UI_ItemType_Child: {
-                  f32 t_w = dim_2f32(item.rect).x;
+                  f32 t_w = rng2_dim(item.rect).x;
                   f32 t_pos = info.pos / mem_levels[item.mem_level];
                   f32 t_cap = info.cap / mem_levels[item.mem_level];
                   // f32 t_excl = info.exclusive_pos / mem_levels[item.mem_level];
                   f32 w_pos = t_w * t_pos;
                   f32 w_cap = t_w * t_cap;
                   // f32 w_excl = t_w * t_excl;
-                  Rng2 child_rect = slice_x_2f32(item.rect, Rng1(0, w_pos));
-                  Rng2 child_rect_cap = slice_x_2f32(item.rect, Rng1(w_pos, w_cap));
+                  Rng2 child_rect = rng2_subrng_x(item.rect, Rng1(0, w_pos));
+                  Rng2 child_rect_cap = rng2_subrng_x(item.rect, Rng1(w_pos, w_cap));
 
                   // pos
                   draw->AddRectFilled(IM_RECT(child_rect), IM_COL32(70, 70, 70, 255));
@@ -1582,7 +1578,7 @@ void profiler_view() {
                   ImString child_name_str = push_strf(scratch, "%s", info.name);
                   ImString child_meta_str = push_strf(scratch, "%.2f%s pos, %.2f%s cap, alloc count: %u, free count: %u, current alloc count: %u", pos.size, pos.format, cap.size, cap.format, info.allocs, info.frees, info.current_allocs);
                   draw->AddText(child_rect.min, ImGui::GetColorU32(ImGuiCol_Text), child_name_str);
-                  draw->AddText(slice_x_2f32(child_rect, 0.3, 1).min, ImGui::GetColorU32(ImGuiCol_Text), child_meta_str);
+                  draw->AddText(rng2_subrng_x01(child_rect, Rng1(0.3, 1)).min, ImGui::GetColorU32(ImGuiCol_Text), child_meta_str);
                 } break;
               }
             }
@@ -1692,8 +1688,7 @@ void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser
       } break;
       case MetaType_GpuMeshId: {
         Token tok = tok_require(p, TokenType_String);
-        String str = str_chop(str_skip(tok.str, 1), 1);
-        Result mesh = map_get(st->str_to_mesh_id, str);
+        Result mesh = map_get(st->str_to_mesh_id, tok.str);
         if (mesh.err) {
           InvalidPath;
         }
@@ -1701,8 +1696,7 @@ void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser
       } break;
       case MetaType_GpuMaterialId: {
         Token tok = tok_require(p, TokenType_String);
-        String str = str_chop(str_skip(tok.str, 1), 1);
-        Result material = map_get(st->str_to_material_id, str);
+        Result material = map_get(st->str_to_material_id, tok.str);
         if (material.err) {
           InvalidPath;
         }
@@ -1710,8 +1704,7 @@ void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser
       } break;
       case MetaType_String: {
         Token tok = tok_require(p, TokenType_String);
-        String str = str_chop(str_skip(tok.str, 1), 1);
-        *(String*)Offset(ptr, member.offset) = push_str_copy(st->arena, str);
+        *(String*)Offset(ptr, member.offset) = push_str_copy(st->arena, tok.str);
       } break;
       case MetaType_EntityFlags: {
         *(EntityFlags*)Offset(ptr, member.offset) = (EntityFlags)parse_u32(p);
@@ -1731,7 +1724,7 @@ void watch_add(String watch_name, WatchOp op) {
     .modified = props.modified,
     .op = op,
   };
-  array_add(g.watches, file_watch);
+  array_push(g.watches, file_watch);
 }
 
 void watch_directory_add(String watch_name, WatchOp op, OS_WatchFlags flags) {
@@ -1744,7 +1737,7 @@ void watch_directory_add(String watch_name, WatchOp op, OS_WatchFlags flags) {
     .watch = watch,
     .op = op,
   };
-  array_add(g.directories, dir_watch);
+  array_push(g.directories, dir_watch);
 }
 
 void watch_update() {
@@ -2054,16 +2047,16 @@ v3 ray_from_camera() {
 
 EntityId e_alloc_bare() {
   GameState& g = st->game;
-  EntityId e_id = {static_id_pool_alloc(g.entity_id_pool)};
+  EntityId e_id = {id_pool_push(g.entity_id_pool)};
   Entity& e = get_entity(e_id);
   e = {};
   ++g.entities_count;
-  g.id_track_entities[id_idx(e_id.v)] = object_pool_linklist_alloc(g.all_dynamic_entities, e_id);
+  g.id_track_entities[id_idx(e_id.v)] = obj_pool_push(g.all_dynamic_entities, e_id);
   return e_id;
 }
 EntityId e_alloc(GpuMeshId mesh_id, GpuMaterialId material_id, EntityThing thing = {}) {
   GameState& g = st->game;
-  EntityId e_id = {static_id_pool_alloc(g.entity_id_pool)};
+  EntityId e_id = {id_pool_push(g.entity_id_pool)};
   Entity& e = get_entity(e_id);
   e = {
     .name = thing.name,
@@ -2074,16 +2067,16 @@ EntityId e_alloc(GpuMeshId mesh_id, GpuMaterialId material_id, EntityThing thing
   };
   vk_make_renderable(e_id, mesh_id, material_id);
   ++g.entities_count;
-  g.id_track_entities[id_idx(e_id.v)] = object_pool_linklist_alloc(g.all_dynamic_entities, e_id);
+  g.id_track_entities[id_idx(e_id.v)] = obj_pool_push(g.all_dynamic_entities, e_id);
   return e_id;
 }
-EntityId e_alloc(MeshId mesh_id, MaterialId material_id, EntityThing thing = {}) {
+EntityId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing = {}) {
   return e_alloc(mesh_get(mesh_id), material_get(material_id), thing);
 }
 
 StaticEntityId e_static_alloc(GpuMeshId mesh_id, GpuMaterialId material_id) {
   GameState& g = st->game;
-  StaticEntityId e_id = {static_id_pool_alloc(g.static_entity_id_pool)};
+  StaticEntityId e_id = {id_pool_push(g.static_entity_id_pool)};
   StaticEntity& e = get_static_entity(e_id);
   e = {
     .scale = v3_one(),
@@ -2092,26 +2085,26 @@ StaticEntityId e_static_alloc(GpuMeshId mesh_id, GpuMaterialId material_id) {
   };
   vk_make_renderable_static(e_id, mesh_id, material_id);
   ++g.static_entities_count;
-  g.id_track_static_entities[id_idx(e_id.v)] = object_pool_linklist_alloc(g.all_static_entities, e_id);
+  g.id_track_static_entities[id_idx(e_id.v)] = obj_pool_push(g.all_static_entities, e_id);
   return e_id;
 }
-StaticEntityId e_static_alloc(MeshId mesh_id, MaterialId material_id) {
+StaticEntityId e_static_alloc(MeshEnum mesh_id, MaterialEnum material_id) {
   return e_static_alloc(mesh_get(mesh_id), material_get(material_id));
 }
 
 void e_free(EntityId e_id) {
   GameState& g = st->game;
-  object_pool_linklist_free(g.all_dynamic_entities, g.id_track_entities[id_idx(e_id.v)]);
+  obj_pool_remove(g.all_dynamic_entities, g.id_track_entities[id_idx(e_id.v)]);
   vk_remove_renderable(e_id);
-  static_id_pool_free(g.entity_id_pool, e_id.v);
+  id_pool_remove(g.entity_id_pool, e_id.v);
   --g.entities_count;
 }
 
 void e_static_free(StaticEntityId e_id) {
   GameState& g = st->game;
-  object_pool_linklist_free(g.all_static_entities, g.id_track_static_entities[id_idx(e_id.v)]);
+  obj_pool_remove(g.all_static_entities, g.id_track_static_entities[id_idx(e_id.v)]);
   vk_remove_static_renderable(e_id);
-  static_id_pool_free(g.static_entity_id_pool, e_id.v);
+  id_pool_remove(g.static_entity_id_pool, e_id.v);
   --g.static_entities_count;
 }
 
@@ -2122,7 +2115,7 @@ void select_obj() {
   Entity& e = get_entity(e_id);
   // e.pos() = st->cam.pos + v3_norm(mat4_forward(st->cam.view));
   e.pos = g.cam.pos;
-  e.scale = v3_scale(0.3);
+  e.scale = v3_splat(0.3);
   e.vel = dir * 4;
 }
 
@@ -2223,15 +2216,15 @@ void scene_init() {
   g.rotating_cube_id = e_alloc(Mesh_Cube, Material_Orange, {"rotating_cube", EntityFlag_Referenced});
   g.monkey_id = e_alloc(Mesh_MonkeyGlb, Material_Container, {"monkey", EntityFlag_Referenced});
   Entity& monkey = get_entity(g.monkey_id);
-  monkey.aabb = {v3_scale(-1.2), v3_scale(1.2)};
+  monkey.aabb = {v3_splat(-1.2), v3_splat(1.2)};
   {
     EntityId triangle_id = e_alloc(Mesh_Triangle, Material_Orange);
     Entity& triangle = get_entity(triangle_id);
-    triangle.pos = v3_scale(3);
+    triangle.pos = v3_splat(3);
   }
   {
     EntityId grid_id = e_alloc(Mesh_Grid, Material_Line);
-    vk_set_entity_color(grid_id, v4_scale(0.6));
+    vk_set_entity_color(grid_id, v4_splat(0.6));
     Entity& grid = get_entity(grid_id);
     grid.pos = v3(0,0,-5);
   }
@@ -2242,7 +2235,7 @@ void scene_init() {
     EntityId cube_id = e_alloc(Mesh_Cube, Material_Orange);
     u32 range = 10;
     Entity& cube = get_entity(cube_id);
-    cube.pos = v3_rand_rng(-v3_scale(range), v3_scale(range));
+    cube.pos = v3_rand_rng(-v3_splat(range), v3_splat(range));
   }
 #if 1
   // Loop (i, MB(1)-KB(1)) {
@@ -2251,21 +2244,21 @@ void scene_init() {
     // Handle<StaticEntity> e = entity_static_create(Mesh_Cube, Material_Orange);
     // u32 range = KB(1);
     // e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
-    MeshId meshes[] = {
+    MeshEnum meshes[] = {
       // Mesh_MonkeyGlb,
       // Mesh_Triangle,
       Mesh_Cube,
     };
-    MaterialId materials[] = {
+    MaterialEnum materials[] = {
       Material_Orange,
       // Material_Container,
       // Material_Screen,
     };
     StaticEntityId e_id = e_static_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
-    darray_add(g.static_cubes, e_id);
+    array_push(g.static_cubes, e_id);
     u32 range = KB(1);
     StaticEntity& e = get_static_entity(e_id);
-    e.pos = v3_rand_rng(-v3_scale(range), v3_scale(range));
+    e.pos = v3_rand_rng(-v3_splat(range), v3_splat(range));
     // v3 dir = v3_rand_rng(v3_scale(-1), v3_scale(1));
     // e.pos() = v3_norm(dir) * range;
   }
@@ -2294,18 +2287,18 @@ void scene_init() {
       EntityId e_id = e_alloc(Mesh_Cube, Material_Container);
       u32 range = KB(1);
       Entity& e = get_entity(e_id);
-      e.pos = v3_rand_rng(-v3_scale(range), v3_scale(range));
-      darray_add(g.moving_cubes, e_id);
+      e.pos = v3_rand_rng(-v3_splat(range), v3_splat(range));
+      array_push(g.moving_cubes, e_id);
     }
   }
 
   Loop (i, 0) {
-    MeshId meshes[] = {
+    MeshEnum meshes[] = {
       Mesh_MonkeyGlb,
       Mesh_Triangle,
       Mesh_Cube,
     };
-    MaterialId materials[] = {
+    MaterialEnum materials[] = {
       // Material_Orange,
       Material_Container,
       // Material_Screen,
@@ -2313,8 +2306,8 @@ void scene_init() {
     EntityId e_id = e_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
     u32 range = 100;
     Entity& e = get_entity(e_id);
-    e.pos = v3_rand_rng(-v3_scale(range), v3_scale(range));
-    darray_add(g.moving_cubes, e_id);
+    e.pos = v3_rand_rng(-v3_splat(range), v3_splat(range));
+    array_push(g.moving_cubes, e_id);
   }
 }
 
@@ -2347,7 +2340,7 @@ void scene_update() {
   }
   {
     Entity& e = get_entity(g.monkey_id);
-    vk_draw_cuboid(shift_3f32(e.aabb, e.pos), ColorWhite);
+    vk_draw_cuboid(rng3_shift(e.aabb, e.pos), ColorWhite);
   }
   {
     mat4& view = st->view;
@@ -2359,19 +2352,19 @@ void scene_update() {
     f32 yoff = 0.3f;
     Entity& axis = get_entity(g.axis_attached_to_cam_id);
     axis.pos = g.cam.pos + forward*dist + right*xoff + up*yoff;
-    axis.scale = v3_scale(0.1);
+    axis.scale = v3_splat(0.1);
     // axis.scale = v3_scale(1.1);
   }
 
   ///////////////////////////////////
   // Random creating and moving stuff
   Loop (i, 0) {
-    MeshId meshes[] = {
+    MeshEnum meshes[] = {
       // Mesh_MonkeyGlb,
       // Mesh_Triangle,
       Mesh_Cube,
     };
-    MaterialId materials[] = {
+    MaterialEnum materials[] = {
       Material_Orange,
       // Material_Container,
       // Material_Screen,
@@ -2379,8 +2372,8 @@ void scene_update() {
     EntityId e_id = e_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
     Entity& e = get_entity(e_id);
     u32 range = 100;
-    e.pos = v3_rand_rng(-v3_scale(range), v3_scale(range));
-    darray_add(g.moving_cubes, e_id);
+    e.pos = v3_rand_rng(-v3_splat(range), v3_splat(range));
+    array_push(g.moving_cubes, e_id);
   }
   Loop (i, g.moving_cubes.count) {
     Entity& e = get_entity(g.moving_cubes[i]);
@@ -2417,8 +2410,8 @@ void game_save_state() {
 
   {
     var& p = g.all_dynamic_entities;
-    for (u32 node = p.first; node != U32_MAX; node = p.data[id_idx(node)].next) {
-      Entity& e = get_entity(p.data[id_idx(node)].data);
+    for (IndexId node = p.first; node.v != U32_MAX; node = p.data[id_idx(node)].next) {
+      Entity& e = get_entity(p.data[id_idx(node)].elem);
       dstr_add(data, "Entity {\n");
       dstr_add(data, dumb_struct(scratch, ArraySlice(members_of_Entity), &e, e.flags));
       dstr_add(data, "}\n");
@@ -2426,8 +2419,8 @@ void game_save_state() {
   }
   {
     var& p = g.all_static_entities;
-    for (u32 node = p.first; node != U32_MAX; node = p.data[id_idx(node)].next) {
-      StaticEntity& e = get_static_entity(p.data[id_idx(node)].data);
+    for (IndexId node = p.first; node.v != U32_MAX; node = p.data[id_idx(node)].next) {
+      StaticEntity& e = get_static_entity(p.data[id_idx(node)].elem);
       dstr_add(data, "StaticEntity {\n");
       dstr_add(data, dumb_struct(scratch, ArraySlice(members_of_StaticEntity), &e));
       dstr_add(data, "}\n");
@@ -2443,20 +2436,20 @@ void game_load_state() {
   GameState& g = st->game;
   Scratch scratch;
   Slice data = os_file_path_read_all(scratch, push_strf(scratch, "%s/saved", os_get_current_directory(), String("saved")));
-  Slice tokens = tokens_from_str(scratch, String(data.data, data.size));
+  Slice tokens = tokens_from_str(scratch, str_make(data.data, data.size));
   Parser p = parser_make(tokens);
 
   {
     var& p = g.all_dynamic_entities;
-    for (u32 node = p.first; node != U32_MAX; node = p.data[id_idx(node)].next) {
-      EntityId e_id = p.data[id_idx(node)].data;
+    for (IndexId node = p.first; node.v != U32_MAX; node = p.data[id_idx(node)].next) {
+      EntityId e_id = p.data[id_idx(node)].elem;
       e_free(e_id);
     }
   }
   {
     var& p = g.all_static_entities;
-    for (u32 node = p.first; node != U32_MAX; node = p.data[id_idx(node)].next) {
-      StaticEntityId e_id = p.data[id_idx(node)].data;
+    for (IndexId node = p.first; node.v != U32_MAX; node = p.data[id_idx(node)].next) {
+      StaticEntityId e_id = p.data[id_idx(node)].elem;
       e_static_free(e_id);
     }
   }
@@ -2480,7 +2473,7 @@ void game_load_state() {
               g.axis_attached_to_cam_id = e_id;
             } else if (str_match("rotating_cube", e.name)) {
               g.rotating_cube_id = e_id;
-            }
+            } 
           }
         } else if (str_match(tok.str, "StaticEntity")) {
           StaticEntity entity = {};
@@ -2513,9 +2506,15 @@ void game_view() {
     ImGui::Text("entities: %u, static entities: %u", g.entities_count, g.static_entities_count);
     ImGui::Text("Camera: x: %.2f y: %.2f z: %.2f", pos.x, pos.y, pos.z);
     ImGui::DragFloat("speed", &cam.speed, 1);
-    Camera data = g.cam;
-    ImString str = push_str_copy(scratch, dumb_struct(scratch, ArraySlice(members_of_Camera), &data));
-    ImGui::Text("%s", str.str);
+    {
+      ImString str = push_str_copy(scratch, dumb_struct(scratch, ArraySlice(members_of_Camera), &g.cam));
+      ImGui::Text("%s", str.str);
+    }
+    {
+      Entity& e = get_entity(g.axis_attached_to_cam_id);
+      ImString str = push_str_copy(scratch, dumb_struct(scratch, ArraySlice(members_of_Entity), &e, e.flags));
+      ImGui::Text("%s", str.str);
+    }
 
     if (ImGui::Button("save state")) {
       game_save_state();
@@ -2528,7 +2527,7 @@ void game_view() {
         EntityId e =  g.moving_cubes[i];
         e_free(e);
       }
-      darray_clear(g.moving_cubes);
+      array_clear(g.moving_cubes);
     }
 
     ImGui::End();
@@ -2545,10 +2544,10 @@ void game_init() {
   g.gpa = alloc_seglist_make(g.arena, "game gpa");
   g.timer = timer_make(1);
 
-  g.entity_id_pool = static_id_pool_make(g.arena, MaxEntities);
-  g.static_entity_id_pool = static_id_pool_make(g.arena, MaxStaticEntities);
-  g.all_dynamic_entities = object_pool_linklist_make<EntityId>(g.gpa);
-  g.all_static_entities = object_pool_linklist_make<StaticEntityId>(g.gpa);
+  id_pool_init(g.entity_id_pool);
+  id_pool_init(g.static_entity_id_pool);
+  g.all_dynamic_entities = obj_pool_linklist_make<EntityId, IndexId>(g.gpa);
+  g.all_static_entities = obj_pool_linklist_make<StaticEntityId, IndexId>(g.gpa);
   g.entities = push_array(g.arena, Entity, MaxEntities);
   g.static_entities = push_array(g.arena, StaticEntity, MaxStaticEntities);
   g.moving_cubes = darray_make<EntityId>(g.gpa);

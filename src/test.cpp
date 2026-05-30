@@ -16,11 +16,11 @@ intern void test_global_alloc() {
   Loop (i, TEST_SAMPLES) {
     u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
-    array_add(arr, mem_alloc(alloc, size, align));
+    array_push(arr, mem_alloc(alloc, size, align));
     MemZero(arr[i], size);
   }
   Array<u32, TEST_SAMPLES> indices = {};
-  Loop(i, TEST_SAMPLES) array_add(indices, i);
+  Loop(i, TEST_SAMPLES) array_push(indices, i);
   rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
     mem_free(alloc, arr[indices[i]]);
@@ -30,7 +30,7 @@ intern void test_global_alloc() {
   Loop (i, TEST_SAMPLES) {
     u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
-    array_add(arr, mem_alloc(alloc, size, align));
+    array_push(arr, mem_alloc(alloc, size, align));
     MemZero(arr[i], size);
   }
   rand_shuffle(slice(indices));
@@ -57,7 +57,7 @@ intern void test_arena_alloc() {
     u32 size = sizes[i];
     u32 value = values[i];
     Loop (j, size) {
-      Assert(buf[j] == value);
+      AssertAlways(buf[j] == value);
     }
   }
   arena_free(&arena);
@@ -83,7 +83,7 @@ intern void test_arena_list_alloc() {
     u32 size = sizes[i];
     u32 value = values[i];
     Loop (j, size) {
-      Assert(buf[j] == value);
+      AssertAlways(buf[j] == value);
     }
   }
   alloc_arena_list_clear(arena);
@@ -101,7 +101,7 @@ intern void test_arena_list_alloc() {
     u32 size = sizes[i];
     u32 value = values[i];
     Loop (j, size) {
-      Assert(buf[j] == value);
+      AssertAlways(buf[j] == value);
     }
   }
   alloc_arena_list_clear(arena);
@@ -115,11 +115,11 @@ intern void test_seglist_alloc() {
   Loop (i, TEST_SAMPLES) {
     u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
-    array_add(arr, mem_alloc(alloc, size, align));
+    array_push(arr, mem_alloc(alloc, size, align));
     MemZero(arr[i], size);
   }
   Array<u32, TEST_SAMPLES> indices = {};
-  Loop(i, TEST_SAMPLES) array_add(indices, i);
+  Loop(i, TEST_SAMPLES) array_push(indices, i);
   rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
     mem_free(alloc, arr[indices[i]]);
@@ -129,11 +129,11 @@ intern void test_seglist_alloc() {
   Loop (i, TEST_SAMPLES) {
     u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
-    array_add(arr, mem_alloc(alloc, size, align));
+    array_push(arr, mem_alloc(alloc, size, align));
     MemZero(arr[i], size);
   }
   array_clear(indices);
-  Loop(i, TEST_SAMPLES) array_add(indices, i);
+  Loop(i, TEST_SAMPLES) array_push(indices, i);
   rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
     mem_free(alloc, arr[indices[i]]);
@@ -150,10 +150,10 @@ intern void test_gpu_seglist_alloc() {
   Loop (i, TEST_SAMPLES) {
     u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
-    array_add(arr, gpu_alloc_seglist_alloc(alloc, size, align));
+    array_push(arr, gpu_alloc_seglist_alloc(alloc, size, align));
   }
   Array<u32, TEST_SAMPLES> indices = {};
-  Loop(i, TEST_SAMPLES) array_add(indices, i);
+  Loop(i, TEST_SAMPLES) array_push(indices, i);
   rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
     gpu_alloc_seglist_free(alloc, arr[indices[i]]);
@@ -163,10 +163,10 @@ intern void test_gpu_seglist_alloc() {
   Loop (i, TEST_SAMPLES) {
     u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
-    array_add(arr, gpu_alloc_seglist_alloc(alloc, size, align));
+    array_push(arr, gpu_alloc_seglist_alloc(alloc, size, align));
   }
   array_clear(indices);
-  Loop(i, TEST_SAMPLES) array_add(indices, i);
+  Loop(i, TEST_SAMPLES) array_push(indices, i);
   rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
     gpu_alloc_seglist_free(alloc, arr[indices[i]]);
@@ -182,25 +182,26 @@ intern void test_object_pool() {
     u32 a;
     u32 b;
   };
-  var pool = object_pool_make<A>(scratch);
+  struct AId {u32 v;};
+  var pool = obj_pool_make<A, AId>(scratch);
   Array<A, TEST_SAMPLES> values = {};
-  Array<u32, TEST_SAMPLES> handlers = {};
+  Array<AId, TEST_SAMPLES> handlers = {};
 
   Loop (i, TEST_SAMPLES) {
     values[i].a = rand_rng_u32(0, TEST_SAMPLES);
     values[i].b = rand_rng_u32(0, TEST_SAMPLES);
   };
   Loop (i, TEST_SAMPLES) {
-    handlers[i] = object_pool_alloc(pool, values[i]);
+    handlers[i] = obj_pool_push(pool, values[i]);
   }
   Loop (i, TEST_SAMPLES) {
-    Assert(MemMatchStruct(&values[i], &object_pool_get(pool, handlers[i])));
+    AssertAlways(MemMatchStruct(&values[i], &obj_pool_get(pool, handlers[i])));
   }
   Array<u32, TEST_SAMPLES> indices = {};
-  Loop(i, TEST_SAMPLES) array_add(indices, i);
+  Loop(i, TEST_SAMPLES) array_push(indices, i);
   rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
-    object_pool_free(pool, handlers[i]);
+    obj_pool_remove(pool, handlers[i]);
   }
 
   array_clear(indices);
@@ -209,15 +210,15 @@ intern void test_object_pool() {
     values[i].b = rand_rng_u32(0, TEST_SAMPLES);
   };
   Loop (i, TEST_SAMPLES) {
-    handlers[i] = object_pool_alloc(pool, values[i]);
+    handlers[i] = obj_pool_push(pool, values[i]);
   }
   Loop (i, TEST_SAMPLES) {
-    Assert(MemMatchStruct(&values[i], &object_pool_get(pool, handlers[i])));
+    AssertAlways(MemMatchStruct(&values[i], &obj_pool_get(pool, handlers[i])));
   }
-  Loop(i, TEST_SAMPLES) array_add(indices, i);
+  Loop(i, TEST_SAMPLES) array_push(indices, i);
   rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
-    object_pool_free(pool, handlers[i]);
+    obj_pool_remove(pool, handlers[i]);
   }
 }
 
@@ -227,32 +228,32 @@ intern void test_object_pool_linklist() {
     u32 a;
     u32 b;
   };
-  var pool = object_pool_linklist_make<A>(scratch);
+  var pool = obj_pool_linklist_make<A, IndexId>(scratch);
   Array<A, TEST_SAMPLES> values = {};
-  Array<u32, TEST_SAMPLES> handlers = {};
+  Array<IndexId, TEST_SAMPLES> handlers = {};
 
   Loop (i, TEST_SAMPLES) {
     values[i].a = rand_rng_u32(0, TEST_SAMPLES);
     values[i].b = rand_rng_u32(0, TEST_SAMPLES);
   };
   Loop (i, TEST_SAMPLES) {
-    handlers[i] = object_pool_linklist_alloc(pool, values[i]);
+    handlers[i] = obj_pool_push(pool, values[i]);
   }
   Loop (i, TEST_SAMPLES) {
-    Assert(MemMatchStruct(&values[i], &object_pool_linklist_get(pool, handlers[i])));
+    AssertAlways(MemMatchStruct(&values[i], &obj_pool_get(pool, handlers[i])));
   }
   Array<u32, TEST_SAMPLES> indices = {};
-  Loop(i, TEST_SAMPLES) array_add(indices, i);
+  Loop(i, TEST_SAMPLES) array_push(indices, i);
   rand_shuffle(slice(indices));
 
   u32 i = 0;
-  for (u32 node = pool.first; node != U32_MAX; node = pool.data[id_idx(node)].next) {
-    var elem = pool.data[id_idx(node)].data;
-    Assert(elem.a == values[i].a && elem.a == values[i].a);
+  for (IndexId node = pool.first; node.v != U32_MAX; node = pool.data[id_idx(node)].next) {
+    var elem = pool.data[id_idx(node)].elem;
+    AssertAlways(elem.a == values[i].a && elem.a == values[i].a);
     ++i;
   }
   Loop (i, TEST_SAMPLES) {
-    object_pool_linklist_free(pool, handlers[i]);
+    obj_pool_remove(pool, handlers[i]);
   }
 
   array_clear(indices);
@@ -261,21 +262,21 @@ intern void test_object_pool_linklist() {
     values[i].b = rand_rng_u32(0, TEST_SAMPLES);
   };
   Loop (i, TEST_SAMPLES) {
-    handlers[i] = object_pool_linklist_alloc(pool, values[i]);
+    handlers[i] = obj_pool_push(pool, values[i]);
   }
   Loop (i, TEST_SAMPLES) {
-    Assert(MemMatchStruct(&values[i], &object_pool_linklist_get(pool, handlers[i])));
+    AssertAlways(MemMatchStruct(&values[i], &obj_pool_get(pool, handlers[i])));
   }
-  Loop(i, TEST_SAMPLES) array_add(indices, i);
+  Loop(i, TEST_SAMPLES) array_push(indices, i);
   rand_shuffle(slice(indices));
   i = 0;
-  for (u32 node = pool.first; node != U32_MAX; node = pool.data[id_idx(node)].next) {
-    var elem = pool.data[id_idx(node)].data;
-    Assert(elem.a == values[i].a && elem.a == values[i].a);
+  for (IndexId node = pool.first; node.v != U32_MAX; node = pool.data[id_idx(node)].next) {
+    var elem = pool.data[id_idx(node)].elem;
+    AssertAlways(elem.a == values[i].a && elem.a == values[i].a);
     ++i;
   }
   Loop (i, TEST_SAMPLES) {
-    object_pool_linklist_free(pool, handlers[i]);
+    obj_pool_remove(pool, handlers[i]);
   }
 }
 
@@ -285,25 +286,25 @@ intern void test_handle_darray() {
     u32 a;
     u32 b;
   };
-  var arr = darray_handler_make<A>(scratch);
+  var arr = darray_handler_make<A, IndexId>(scratch);
   Array<A, TEST_SAMPLES> values = {};
-  Array<u32, TEST_SAMPLES> handlers = {};
+  Array<IndexId, TEST_SAMPLES> handlers = {};
 
   Loop (i, TEST_SAMPLES) {
     values[i].a = rand_rng_u32(0, TEST_SAMPLES);
     values[i].b = rand_rng_u32(0, TEST_SAMPLES);
   };
   Loop (i, TEST_SAMPLES) {
-    handlers[i] = darray_handler_add(arr, values[i]);
+    handlers[i] = array_handler_push(arr, values[i]);
   }
   Loop (i, TEST_SAMPLES) {
-    Assert(MemMatchStruct(&values[i], &darray_handler_get(arr, handlers[i])));
+    AssertAlways(MemMatchStruct(&values[i], &array_handler_get(arr, handlers[i])));
   }
   Array<u32, TEST_SAMPLES> indices = {};
-  Loop (i, TEST_SAMPLES) array_add(indices, i);
+  Loop (i, TEST_SAMPLES) array_push(indices, i);
   rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
-    darray_handler_remove(arr, handlers[indices[i]]);
+    array_handler_remove(arr, handlers[indices[i]]);
   }
 
   array_clear(indices);
@@ -312,15 +313,15 @@ intern void test_handle_darray() {
     values[i].b = rand_rng_u32(0, TEST_SAMPLES);
   };
   Loop (i, TEST_SAMPLES) {
-    handlers[i] = darray_handler_add(arr, values[i]);
+    handlers[i] = array_handler_push(arr, values[i]);
   }
   Loop (i, TEST_SAMPLES) {
-    Assert(MemMatchStruct(&values[i], &darray_handler_get(arr, handlers[i])));
+    AssertAlways(MemMatchStruct(&values[i], &array_handler_get(arr, handlers[i])));
   }
-  Loop(i, TEST_SAMPLES) array_add(indices, i);
+  Loop(i, TEST_SAMPLES) array_push(indices, i);
   rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
-    darray_handler_remove(arr, handlers[indices[i]]);
+    array_handler_remove(arr, handlers[indices[i]]);
   }
 }
 
@@ -331,7 +332,7 @@ intern void test_id_pool() {
     Array<u32, TEST_SAMPLES> arr = {};
     Loop (i, TEST_SAMPLES) {
       u32 id = id_pool_alloc(id_pool);
-      array_add(arr, id);
+      array_push(arr, id);
     }
     rand_shuffle(slice(arr));
     Loop (i, arr.count) {
@@ -340,17 +341,17 @@ intern void test_id_pool() {
     Array<u32, TEST_SAMPLES> new_arr = {};
     Loop (i, arr.count) {
       u32 id = id_pool_alloc(id_pool);
-      array_add(new_arr, id);
+      array_push(new_arr, id);
     }
     Loop (i, arr.count) {
       b32 exists = false;
       Loop (j, arr.count) {
         if (id_idx(arr[i]) == id_idx(new_arr[j])) {
-          Assert(exists == false);
+          AssertAlways(exists == false);
           exists = true;
         }
       }
-      Assert(exists);
+      AssertAlways(exists);
     }
     Loop (i, arr.count) {
       id_pool_free(id_pool, new_arr[i]);
@@ -358,34 +359,34 @@ intern void test_id_pool() {
   }
 
   {
-    StaticIdPool static_id_pool;
-    static_id_pool = static_id_pool_make(scratch, TEST_SAMPLES);
+    StaticIdPool<TEST_SAMPLES> static_id_pool = {};
+    id_pool_init(static_id_pool);
     Array<u32, TEST_SAMPLES> arr = {};
     Loop (i, TEST_SAMPLES) {
-      u32 id = static_id_pool_alloc(static_id_pool);
-      array_add(arr, id);
+      u32 id = id_pool_push(static_id_pool);
+      array_push(arr, id);
     }
     rand_shuffle(slice(arr));
     Loop (i, arr.count) {
-      static_id_pool_free(static_id_pool, arr[i]);
+      id_pool_remove(static_id_pool, arr[i]);
     }
     Array<u32, TEST_SAMPLES> new_arr = {};
     Loop (i, arr.count) {
-      u32 id = static_id_pool_alloc(static_id_pool);
-      array_add(new_arr, id);
+      u32 id = id_pool_push(static_id_pool);
+      array_push(new_arr, id);
     }
     Loop (i, arr.count) {
       b32 exists = false;
       Loop (j, arr.count) {
         if (id_idx(arr[i]) == id_idx(new_arr[j])) {
-          Assert(exists == false);
+          AssertAlways(exists == false);
           exists = true;
         }
       }
-      Assert(exists);
+      AssertAlways(exists);
     }
     Loop (i, arr.count) {
-      static_id_pool_free(static_id_pool, new_arr[i]);
+      id_pool_remove(static_id_pool, new_arr[i]);
     }
   }
 }

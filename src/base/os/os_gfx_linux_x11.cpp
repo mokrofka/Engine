@@ -325,7 +325,7 @@ void os_gfx_shutdown() { xcb_disconnect(gfx_st.connection); }
 
 void os_pump_messages() {
   X11State& g = gfx_st;
-  darray_clear(g.input_events);
+  array_clear(g.input_events);
   g.input.mouse_scroll = 0;
   g.input.scroll_h = 0;
 
@@ -369,7 +369,7 @@ void os_pump_messages() {
             .type = OS_EventKind_Modifier,
             .modifier = g.modifiers,
           };
-          darray_add(g.input_events, event);
+          array_push(g.input_events, event);
         }
         OS_InputEvent event = {
           .type = OS_EventKind_Key,
@@ -377,7 +377,7 @@ void os_pump_messages() {
           .is_pressed = true,
           .modifier = g.modifiers,
         };
-        darray_add(g.input_events, event);
+        array_push(g.input_events, event);
       } break;
       case XCB_KEY_RELEASE: {
         xcb_key_press_event_t* kp = (xcb_key_press_event_t*)event;
@@ -408,7 +408,7 @@ void os_pump_messages() {
             .type = OS_EventKind_Modifier,
             .modifier = g.modifiers,
           };
-          darray_add(g.input_events, event);
+          array_push(g.input_events, event);
         }
         OS_InputEvent event = {
           .type = OS_EventKind_Key,
@@ -416,7 +416,7 @@ void os_pump_messages() {
           .is_pressed = false,
           .modifier = g.modifiers,
         };
-        darray_add(g.input_events, event);
+        array_push(g.input_events, event);
       } break;
       case XCB_CONFIGURE_NOTIFY: {
         xcb_configure_notify_event_t* cfg = (xcb_configure_notify_event_t*)event;
@@ -461,7 +461,7 @@ void os_pump_messages() {
           g.input.mouse_scroll = event.scroll;
           event.type = OS_EventKind_Scroll;
         }
-        darray_add(g.input_events, event);
+        array_push(g.input_events, event);
       } break;
       case XCB_BUTTON_RELEASE: {
         xcb_button_press_event_t* bp = (xcb_button_press_event_t*)event;
@@ -475,7 +475,7 @@ void os_pump_messages() {
           event.type = OS_EventKind_MouseButton;
           event.is_pressed = false;
         }
-        darray_add(g.input_events, event);
+        array_push(g.input_events, event);
       } break;
       case XCB_MOTION_NOTIFY: {
         xcb_motion_notify_event_t* motion = (xcb_motion_notify_event_t*)event;
@@ -484,7 +484,7 @@ void os_pump_messages() {
         OS_InputEvent event = {.type = OS_EventKind_MouseMove};
         event.x = g.input.mouse_current.x;
         event.y = g.input.mouse_current.y;
-        darray_add(g.input_events, event);
+        array_push(g.input_events, event);
       } break;
       case XCB_SELECTION_REQUEST: {
         xcb_selection_request_event_t* req = (xcb_selection_request_event_t*)event;
@@ -513,7 +513,7 @@ void os_pump_messages() {
       } break;
     }
   }
-  darray_clear(g.xcb_events);
+  array_clear(g.xcb_events);
 }
 
 void os_clipboard_write(String str) {
@@ -573,13 +573,13 @@ String os_clipboard_read() {
         u8* data = (u8*)xcb_get_property_value(reply);
         u32 len = xcb_get_property_value_length(reply);
         dstr_clear(g.clipboard.str_to_read);
-        dstr_add(g.clipboard.str_to_read, String(data, len));
+        dstr_add(g.clipboard.str_to_read, str_make(data, len));
       }
       break;
     }
     else {
       add_event:
-      darray_add(g.xcb_events, event);
+      array_push(g.xcb_events, event);
     }
   }
   return g.clipboard.str_to_read;

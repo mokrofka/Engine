@@ -35,7 +35,7 @@ _ProfBlock::_ProfBlock(String label_, String func_, ProfType type_) {
     .label = label_,
     .func = func_,
   };
-  darray_add(prof_thread.events[g.current_buf], event);
+  array_push(prof_thread.events[g.current_buf], event);
 }
 
 _ProfBlock::~_ProfBlock() {
@@ -48,7 +48,7 @@ _ProfBlock::~_ProfBlock() {
     .label = label,
     .func = func,
   };
-  darray_add(prof_thread.events[g.current_buf], event);
+  array_push(prof_thread.events[g.current_buf], event);
 }
 
 void prof_begin(u32 current_frame) {
@@ -56,7 +56,7 @@ void prof_begin(u32 current_frame) {
   ProfFrameTime& frame_time = g.current_frame_time;
   for EachElement(i, g.prof_threads) {
     ProfThread& prof_thread = g.prof_threads[i];
-    darray_clear(prof_thread.events[g.current_buf]);
+    array_clear(prof_thread.events[g.current_buf]);
   }
   frame_time.tsc_start = cpu_timer_now();
 }
@@ -98,33 +98,33 @@ void prof_end(u32 current_frame) {
 
           // In prev frame was push event
           if (prof_thread.long_anchors.count) {
-            darray_add(prof_thread.long_anchors, anchor);
+            array_push(prof_thread.long_anchors, anchor);
             continue;
           }
 
-          darray_add(anchors, anchor);
-          darray_add(stack, anchors.count-1);
+          array_push(anchors, anchor);
+          array_push(stack, anchors.count-1);
         } break;
         case ProfEventType_Pop: {
           // In prev frame was push event
           if (prof_thread.long_anchors.count) {
-            ProfAnchor old_anchor = darray_pop(prof_thread.long_anchors);
-            darray_add(anchors, old_anchor);
-            darray_add(stack, anchors.count-1);
+            ProfAnchor old_anchor = array_pop(prof_thread.long_anchors);
+            array_push(anchors, old_anchor);
+            array_push(stack, anchors.count-1);
             ++depth;
           }
 
-          // just can happen
+          // FIXME: shouldn't happen
           if (stack.count == 0) {
             continue;
           }
 
-          u32 anchor_idx = darray_pop(stack);
+          u32 anchor_idx = array_pop(stack);
           ProfAnchor& anchor = anchors[anchor_idx];
           anchor.tsc_end = event.tsc;
           u64 elapsed = anchor.tsc_end - anchor.tsc_start;
           if (stack.count) {
-            u32 parent_idx = darray_back(stack);
+            u32 parent_idx = array_back(stack);
             ProfAnchor& anchor_parent = anchors[parent_idx];
             anchor_parent.tsc_elapsed_excl -= elapsed;
           }
@@ -139,7 +139,7 @@ void prof_end(u32 current_frame) {
     // We save long block time to handle it in next frames
     if (stack.count) {
       Loop (i, stack.count) {
-        darray_add(prof_thread.long_anchors, anchors[anchors.count - stack.count + i]);
+        array_push(prof_thread.long_anchors, anchors[anchors.count - stack.count + i]);
       }
     }
 
@@ -147,7 +147,7 @@ void prof_end(u32 current_frame) {
     // Record anchors
     if (!g.paused) {
       var& write_anchors = prof_thread.recorded_anchors[current_frame % ArrayCount(g.frames_times)];
-      darray_reserve(write_anchors, anchors.count);
+      array_reserve(write_anchors, anchors.count);
       MemCopyArray(write_anchors.data, anchors.data, anchors.count);
       write_anchors.count = anchors.count;
     }
@@ -201,26 +201,26 @@ void prof_launch_end() {
             .tsc_start = event.tsc,
             .depth = depth,
           };
-          darray_add(anchors, anchor);
-          darray_add(stack, anchors.count-1);
+          array_push(anchors, anchor);
+          array_push(stack, anchors.count-1);
           ++depth;
         } break;
         case ProfEventType_Pop: {
           u32 anchor_idx = 0;
           // In some time back block time was longer than frame
           if (prof_thread.long_anchors.count) {
-            ProfAnchor old_anchor = darray_pop(prof_thread.long_anchors);
-            darray_add(anchors, old_anchor);
-            darray_add(stack, anchors.count-1);
+            ProfAnchor old_anchor = array_pop(prof_thread.long_anchors);
+            array_push(anchors, old_anchor);
+            array_push(stack, anchors.count-1);
             ++depth;
           }
 
-          anchor_idx = darray_pop(stack);
+          anchor_idx = array_pop(stack);
           ProfAnchor& anchor = anchors[anchor_idx];
           anchor.tsc_end = event.tsc;
           u64 elapsed = anchor.tsc_end - anchor.tsc_start;
           if (stack.count) {
-            u32 parent_idx = darray_back(stack);
+            u32 parent_idx = array_back(stack);
             ProfAnchor& anchor_parent = anchors[parent_idx];
             anchor_parent.tsc_elapsed_excl -= elapsed;
           }
@@ -235,8 +235,8 @@ void prof_launch_end() {
     // We save long block time to handle it in next frames
     if (stack.count) {
       Loop (i, stack.count) {
-        darray_add(prof_thread.long_anchors, anchors[anchors.count - stack.count + i]);
-        darray_add(prof_thread.launch_anchors, anchors[anchors.count - stack.count + i]);
+        array_push(prof_thread.long_anchors, anchors[anchors.count - stack.count + i]);
+        array_push(prof_thread.launch_anchors, anchors[anchors.count - stack.count + i]);
       }
     }
 
@@ -244,10 +244,10 @@ void prof_launch_end() {
     // Record anchors
     var& write_anchors = prof_thread.recorded_anchors[0];
     var& launch_anchors = prof_thread.launch_anchors;
-    darray_reserve(write_anchors, anchors.count);
+    array_reserve(write_anchors, anchors.count);
     MemCopyArray(write_anchors.data, anchors.data, anchors.count);
     write_anchors.count = anchors.count;
-    darray_reserve(launch_anchors, anchors.count);
+    array_reserve(launch_anchors, anchors.count);
     MemCopyArray(launch_anchors.data, anchors.data, anchors.count);
     launch_anchors.count = anchors.count;
   }

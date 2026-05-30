@@ -154,48 +154,18 @@ u32 id_pool_alloc(IdPool& p) {
 }
 void id_pool_free(IdPool& p, u32 h) {
   u32 idx = id_idx(h);
-  Assert(generation_bits(p.generations[idx]++) == id_generation(h));
+  Assert(generation_bitmask(p.generations[idx]++) == id_generation(h));
   p.ids[--p.count] = idx;
+}
+void id_pool_destroy(IdPool& p) {
+  if (p.ids) { 
+    mem_free(p.alloc, p.ids);
+#if BUILD_DEBUG
+    mem_free(p.alloc, p.generations);
+#endif
+  }
 }
 void id_pool_clear(IdPool& p) {
-  p.count = 0;
-#if BUILD_DEBUG
-  MemZeroArray(p.generations, p.cap);
-#endif
-}
-
-StaticIdPool static_id_pool_make(Allocator alloc, u32 cap) {
-  StaticIdPool res = {
-    .cap = cap,
-    .ids = push_array(alloc, u32, cap),
-  };
-#if BUILD_DEBUG
-  res.generations = push_array_zero(alloc, u32, cap);
-  res.generations[0] = 1;
-#endif
-  Loop (i, cap) {
-    res.ids[i] = i;
-  }
-  return res;
-}
-
-u32 static_id_pool_alloc(StaticIdPool& p) {
-  Assert(p.count + 1 <= p.cap);
-#if BUILD_DEBUG
-  u32 res = id_make(p.generations[p.count], p.count++);
-  return res;
-#else
-  return p.ids[p.count++];
-#endif
-}
-
-void static_id_pool_free(StaticIdPool& p, u32 h) {
-  u32 idx = id_idx(h);
-  Assert(generation_bits(p.generations[idx]++) == id_generation(h));
-  p.ids[--p.count] = idx;
-}
-
-void static_id_pool_clear(StaticIdPool& p) {
   p.count = 0;
 }
 

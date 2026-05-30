@@ -16,7 +16,6 @@ MemberDefinition members_of_Entity[] = {
   {MetaType_v3, "vel", OffsetOf(Entity,vel)},
   {MetaType_GpuMeshId, "mesh_id", OffsetOf(Entity,mesh_id)},
   {MetaType_GpuMaterialId, "material_id", OffsetOf(Entity,material_id)},
-  {MetaType_RenderId, "render_id", OffsetOf(Entity,render_id)},
 };
 MemberDefinition members_of_StaticEntity[] = {
   {MetaType_v3, "pos", OffsetOf(StaticEntity,pos)},
@@ -24,5 +23,4 @@ MemberDefinition members_of_StaticEntity[] = {
   {MetaType_v3, "scale", OffsetOf(StaticEntity,scale)},
   {MetaType_GpuMeshId, "mesh_id", OffsetOf(StaticEntity,mesh_id)},
   {MetaType_GpuMaterialId, "material_id", OffsetOf(StaticEntity,material_id)},
-  {MetaType_RenderId, "render_id", OffsetOf(StaticEntity,render_id)},
 };

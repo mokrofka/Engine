@@ -62,7 +62,7 @@ struct GpuShaderId { u32 v; };
 struct GpuCubemapId { u32 v; };
 struct EntityId { u32 v; };
 struct StaticEntityId { u32 v; };
-struct RenderId { u32 v; };
+struct IndexId { u32 v; };
 
 struct PointLight {
   v3 color;
@@ -108,6 +108,9 @@ struct Mesh {
   u32* indices;
   u32 vert_count;
   u32 index_count;
+  f32 bounds_min;
+  f32 bounds_max;
+  f32 bounds_rad;
 };
 
 enum ShaderType {
@@ -193,7 +196,7 @@ Texture load_image(String filepath);
   X(Mesh_Axis) \
   X(Mesh_Sphere)
 
-enum MeshId {
+enum MeshEnum {
 #define X(enum_name, name) enum_name,
   MESH_LIST
 #undef X
@@ -227,16 +230,16 @@ enum TextureId {
   X(Material_Line, .name = "e_color", .state.topology = ShaderTopology_Line) \
   X(Material_Screen, .name = "e_texture", .texture_handle.v = null, .texture = "") \
 
-enum MaterialId {
+enum MaterialEnum {
 #define X(enum_name, ...) enum_name,
   MATERIAL_LIST
 #undef X
   Material_COUNT,
 };
 
-GpuMeshId mesh_get(MeshId id);
-void mesh_set(MeshId id, GpuMeshId mesh_handle);
-GpuMaterialId material_get(MaterialId id);
+GpuMeshId mesh_get(MeshEnum id);
+void mesh_set(MeshEnum id, GpuMeshId mesh_handle);
+GpuMaterialId material_get(MaterialEnum id);
 GpuMeshId mesh_load(String name);
 GpuShaderId shader_load(ShaderDesc shader);
 GpuCubemapId cubemap_load(String name);
@@ -432,7 +435,6 @@ Introspect struct Entity {
   v3 vel;
   GpuMeshId mesh_id;
   GpuMaterialId material_id;
-  RenderId render_id;
 };
 
 Entity& get_entity(EntityId id);
@@ -443,7 +445,6 @@ Introspect struct StaticEntity {
   v3 scale;
   GpuMeshId mesh_id;
   GpuMaterialId material_id;
-  RenderId render_id;
 };
 
 StaticEntity& get_static_entity(StaticEntityId id);
@@ -455,22 +456,23 @@ struct GameState {
   Timer timer;
 
   Entity* entities;
-  u32 id_track_entities[MaxEntities];
+  IndexId id_track_entities[MaxEntities];
   StaticEntity* static_entities;
-  u32 id_track_static_entities[MaxStaticEntities];
+  IndexId id_track_static_entities[MaxStaticEntities];
   u32 entities_count;
   u32 static_entities_count;
-  StaticIdPool entity_id_pool;
-  StaticIdPool static_entity_id_pool;
+  StaticIdPool<MaxEntities> entity_id_pool;
+  StaticIdPool<MaxStaticEntities> static_entity_id_pool;
 
   Darray<EntityId> moving_cubes;
   Darray<StaticEntityId> static_cubes;
-  ObjectPoolLinklist<EntityId> all_dynamic_entities;
-  ObjectPoolLinklist<StaticEntityId> all_static_entities;
+  ObjPoolLinklist<EntityId, IndexId> all_dynamic_entities;
+  ObjPoolLinklist<StaticEntityId, IndexId> all_static_entities;
   EntityId axis_attached_to_cam_id;
   EntityId monkey_id;
   EntityId rotating_cube_id;
   Map<String, EntityId> find_entity;
+  EntityId referenced_entities[0];
 };
 
 void game_init();
@@ -510,7 +512,7 @@ struct GlobalState {
   Array<String, MaxMeshes> mesh_id_to_str;
   Array<String, MaxMaterials> material_id_to_str;
 
-  ThreadPool thread_pool;
+  // ThreadPool thread_pool;
   WatchState watch;
   ProfWindow profile_win;
   GameState game;

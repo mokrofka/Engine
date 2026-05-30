@@ -3,9 +3,7 @@
 #include "base/str.h"
 #include "base/mem.h"
 
-struct OS_Handle {
-  u64 v;
-};
+struct OS_Handle { u64 v; };
 
 typedef u32 FilePropertyFlags;
 enum {
@@ -60,14 +58,23 @@ struct OS_Watch{
   OS_WatchFlags flags;
 };
 
-///////////////////////////////////
-// Threads
 typedef void ThreadEntryPointFn(void* p);
 struct Thread { u64 v; };
 struct Mutex { u64 v; };
 struct CondVar { u64 v; };
 struct Semaphore { u64 v; };
 struct Barrier { u64 v; };
+
+struct _LockScope {
+  Mutex mutex;
+  _LockScope(Mutex mutex_);
+  ~_LockScope();
+};
+#define LockScope(m) _LockScope Glue(_lock_scope, __LINE__)(m)
+
+u64 cpu_timer_now();
+u64 cpu_frequency();
+void estimate_cpu_frequency();
 
 String os_get_current_filepath();
 String os_get_current_directory();
@@ -108,12 +115,14 @@ void           os_file_path_copy_mtime(String src, String dst);
 FileProperties os_file_path_properties(String path);
 b32            os_file_path_equal_mtime(String a, String b);
 
+///////////////////////////////////
 // Directory
 OS_Handle os_directory_open(String path);
 OS_Handle os_directory_create(String path);
 OS_Handle os_directory_create_p(String path);
 b32       os_directory_path_exist(String path);
 
+///////////////////////////////////
 // Watch
 OS_Watch   os_watch_open(OS_WatchFlags flags);
 void       os_watch_close(OS_Watch watch);
@@ -121,6 +130,7 @@ OS_Handle  os_watch_attach(OS_Watch watch, String name);
 void       os_watch_deattach(OS_Watch watch, OS_Handle attached);
 StringList os_watch_check(Allocator arena, OS_Watch watch);
 
+///////////////////////////////////
 // Directory iteration
 OS_FileIter* os_file_iter_begin(Allocator arena, String path, OS_FileIterFlags flags);
 b32          os_file_iter_next(Allocator arena, OS_FileIter* iter, OS_FileInfo* info_out);
@@ -128,20 +138,17 @@ void         os_file_iter_end(OS_FileIter* iter);
 
 ///////////////////////////////////
 // Processes
-
 OS_Handle os_process_launch(StringList list);
 i32       os_process_join(OS_Handle handle);
 
 ///////////////////////////////////
 // Threads
-
 Thread os_thread_launch(ThreadEntryPointFn* func, void *ptr);
 b32 os_thread_join(Thread handle);
 void os_thread_detach(Thread handle);
 
 ///////////////////////////////////
 // Sync primitives
-
 Mutex os_mutex_alloc();
 void  os_mutex_release(Mutex mutex);
 void  os_mutex_take(Mutex mutex);

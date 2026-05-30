@@ -1,6 +1,6 @@
 #include "lib.h"
-#undef Info
-#define Info(...)
+#undef Debug
+#define Debug(...)
 
 i32 main(i32 args_count, char* args[]) {
   os_init(args[0]);
@@ -9,11 +9,11 @@ i32 main(i32 args_count, char* args[]) {
 
   Scratch scratch;
   String cur_dir = os_get_current_directory();
-  Info("current directory: %s", cur_dir);
+  Debug("current directory: %s", cur_dir);
   String shader_dir = push_strf(scratch, "%s/%s", cur_dir, String(args[1]));
-  Info("shader directory: %s", shader_dir);
+  Debug("shader directory: %s", shader_dir);
   String compiled_shader_dir = push_strf(scratch, "%s/%s", cur_dir, String(args[2]));
-  Info("compiled directory: %s", compiled_shader_dir);
+  Debug("compiled directory: %s", compiled_shader_dir);
   String time_stamps_file_path = push_strf(scratch, "%s/%s", cur_dir, "saved_time_stamps_for_shad");
 
   if (!os_directory_path_exist(shader_dir)) {
@@ -75,7 +75,7 @@ i32 main(i32 args_count, char* args[]) {
           .shader_path = shader_path,
           .compiled_shader_path = compiled_shader_path,
         };
-        darray_add(compiled_shaders, f);
+        array_push(compiled_shaders, f);
       }
     }
     os_file_iter_end(it);
