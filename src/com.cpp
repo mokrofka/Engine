@@ -11,6 +11,52 @@
 ////////////////////////////////////////////////////////////////////////
 // @Common
 
+ImGui_DrawList imgui_get_window_drawlist() {
+  ImGui_DrawList res = {
+    .draw = ImGui::GetWindowDrawList(),
+  };
+  return res;
+}
+void imgui_draw_rect(ImGui_DrawList draw, Rng2 rect, v4 col, f32 rounding, ImDrawFlags flags, f32 thickness) {
+  draw.draw->AddRect(rect.min, rect.max, u32_from_rgba(col), rounding, flags, thickness);
+}
+void imgui_draw_rect_filled(ImGui_DrawList draw, Rng2 rect, v4 col, f32 rounding, ImDrawFlags flags) {
+  draw.draw->AddRectFilled(rect.min, rect.max, u32_from_rgba(col));
+}
+void imgui_draw_push_clip_rect(ImGui_DrawList draw, Rng2 rect) {
+  draw.draw->PushClipRect(rect.min, rect.max);
+}
+void imgui_draw_pop_clip_rect(ImGui_DrawList draw) {
+  draw.draw->PopClipRect();
+}
+void imgui_draw_line(ImGui_DrawList draw, v2 p0, v2 p1, v4 col, f32 thickness) {
+  draw.draw->AddLine(p0, p1, u32_from_rgba(col));
+}
+void imgui_draw_text(ImGui_DrawList draw, v2 pos, v4 col, String fmt, ...) {
+  Scratch scratch;
+  VaList args;
+  va_start(args, fmt);
+  String formateted = push_strfv(scratch, fmt, args);
+  va_end(args);
+  draw.draw->AddText(pos, u32_from_rgba(col), (char*)formateted.str, (char*)(formateted.str + formateted.size));
+}
+void imgui_text(String fmt, ...) {
+  Scratch scratch;
+  VaList args;
+  va_start(args, fmt);
+  String formateted = push_strfv(scratch, fmt, args);
+  va_end(args);
+  ImGui::TextUnformatted((char*)formateted.str);
+}
+v2 imgui_calc_text_size(String str) {
+  return ImGui::CalcTextSize((char*)str.str, (char*)str.str+str.size);
+}
+void imgui_begin_tab_item(String str) {
+  Scratch scratch;
+  String str_c = push_str_copy(scratch, str);
+  ImGui::BeginTabItem((char*)str_c.str);
+}
+
 Vertex cube_vertices[] = {
   // Front face (0, 0, 1)
   {.pos = v3(-1.00, -1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0.0f, 0.0f)},
@@ -459,7 +505,7 @@ Texture load_image(String filepath) {
 ////////////////////////////////////////////////////////////////////////
 // @Assets
 
-global String meshes_strs[Mesh_COUNT] = {
+global String meshes_strs[] = {
 #define X(enum_name, name) [enum_name] = Stringify(name),
   MESH_LIST
 #undef X
@@ -468,9 +514,15 @@ global String meshes_strs[Mesh_COUNT] = {
 #undef X
 };
 
-global String textures_strs[Texture_COUNT] = {
+global String textures_strs[] = {
 #define X(enum_name, name) [enum_name] = Stringify(name),
   TEXTURE_LIST
+#undef X
+};
+
+global String materials_strs[] = {
+#define X(enum_name, ...) [enum_name] = Stringify(enum_name),
+  MATERIAL_LIST
 #undef X
 };
 
@@ -483,7 +535,7 @@ void mesh_set(MeshEnum mesh_enum, GpuMeshId mesh_id) {
 }
 GpuMaterialId material_get(MaterialEnum id) { return st->materials_ids[id]; }
 
-constexpr ShaderState shader_default_info() {
+constexpr ShaderState shader_default_state() {
   ShaderState info = {
     .type = ShaderType_Drawing,
     .topology = ShaderTopology_Triangle,
@@ -552,49 +604,78 @@ GpuCubemapId cubemap_load(String name) {
 
 void assets_load() {
   GlobalState& g = *st;
-#define X(enum_name, name) \
-  g.meshes_ids[enum_name] = mesh_load(meshes_strs[enum_name]); \
-  map_set(g.str_to_mesh_id, String(Stringify(name)), g.meshes_ids[enum_name]); \
-  g.mesh_id_to_str[g.meshes_ids[enum_name].v] = Stringify(name);
+  var m_load = [&](MeshEnum enum_name, String name) {
+    g.meshes_ids[enum_name] = mesh_load(meshes_strs[enum_name]);
+    String str = push_str_copy(g.arena, meshes_strs[enum_name]);
+    map_set(g.str_to_mesh_id, str, g.meshes_ids[enum_name]);
+    g.mesh_id_to_str[id_idx(g.meshes_ids[enum_name])] = str;
+  };
+#define X(enum_name, name) m_load(enum_name, Stringify(name));
   MESH_LIST
 #undef X
 
-#define X(enum_name, name) \
-  g.textures_ids[enum_name] = texture_load(textures_strs[enum_name]); \
-  map_set(g.str_to_texture_id, String(Stringify(name)), g.textures_ids[enum_name]);
+  var t_load = [&](TextureEnum enum_name, String name) {
+    g.textures_ids[enum_name] = texture_load(textures_strs[enum_name]); \
+    String str = push_str_copy(g.arena, textures_strs[enum_name]);
+    map_set(g.str_to_texture_id, str, g.textures_ids[enum_name]);
+    g.texture_id_to_str[id_idx(g.textures_ids[enum_name])] = str;
+  };
+#define X(enum_name, name) t_load(enum_name, Stringify(name));
   TEXTURE_LIST
 #undef X
 
-  struct TakeMaterial { \
-    String name = "e_texture";
-    ShaderState state = shader_default_info();
-    MaterialProps props = material_default_props();
-    String texture = "container.jpg";
-    GpuTextureId texture_handle;
-    operator MaterialDesc() {
-      return {
-        .shader = {
-          .name = name,
-          .state = state,
-        },
-        .props = props,
-        .texture = texture,
-        // .texture_id = texture_handle,
-      };
-    }
+  var mat_load = [&](MaterialEnum enum_name, MaterialDesc desc) {
+    g.materials_ids[enum_name] = vk_material_load(desc);
+    String str = push_str_copy(g.arena, materials_strs[enum_name]);
+    map_set(g.str_to_material_id, str, g.materials_ids[enum_name]);
+    g.material_id_to_str[id_idx(g.materials_ids[enum_name])] = str;
   };
-#define X(enum_name, ...) \
-  { \
-    TakeMaterial mat = { \
-      __VA_ARGS__ \
-    }; \
-    g.materials_ids[enum_name] = vk_material_load(mat); \
-    String str = push_str_copy(g.arena, String(Stringify(enum_name))); \
-    map_set(g.str_to_material_id, str, g.materials_ids[enum_name]); \
-    g.material_id_to_str[g.materials_ids[enum_name].v] = str; \
-  }
-  MATERIAL_LIST
-#undef X
+  mat_load(Material_Orange, {
+    .shader = {
+      .name = "e_texture",
+      .state = shader_default_state(),
+    },
+    .props = material_default_props(),
+    .texture = "orange_lines_512.png",
+  });
+  mat_load(Material_Container, {
+    .shader = {
+      .name = "e_texture",
+      .state = shader_default_state(),
+    },
+    .props = material_default_props(),
+    .texture = "container.jpg",
+  });
+  mat_load(Material_Axis, {
+    .shader = {
+      .name = "e_vert_color",
+      .state = {
+        .topology = ShaderTopology_Line,
+        .samples = 4,
+        .use_depth = true,
+      },
+    },
+  });
+  mat_load(Material_Line, {
+    .shader = {
+      .name = "e_color",
+      .state = {
+        .topology = ShaderTopology_Line,
+        .samples = 4,
+        .use_depth = true,
+      },
+    },
+  });
+  mat_load(Material_Line, {
+    .shader = {
+      .name = "e_color",
+      .state = {
+        .topology = ShaderTopology_Line,
+        .samples = 4,
+        .use_depth = true,
+      },
+    },
+  });
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -986,7 +1067,7 @@ void profiler_view() {
 
       ImGui::SetWindowFontScale(0.8f);
       if (ImGui::BeginTabBar("MyTabBar")) {
-        ImDrawList* draw = ImGui::GetWindowDrawList();
+        ImGui_DrawList draw = imgui_get_window_drawlist();
         v2 cursor_pos = ImGui::GetCursorScreenPos();
         v2 mouse_pos = os_get_mouse_pos();
         v2 win_pos = ImGui::GetWindowPos();
@@ -1090,41 +1171,41 @@ void profiler_view() {
             switch (item.type) {
               default:{}break;
               case UI_ItemType_Bar: {
-                ImU32 color = {};
-                ImString str = {};
+                v4 color = {};
+                String str = {};
                 ProfAnchor anchor = item.anchor;
                 Rng2 rect = item.rect;
                 switch (anchor.type) {
                   case ProfType_Default: {
-                    color = IM_COL32(50, 50, 50, 255);
-                    str = String("work");
+                    color = ColorGreyDark;
+                    str = "work";
                   } break;
                   case ProfType_Sleep: {
-                    color = IM_COL32(50, 70, 80, 255);
-                    str = String("sleep");
+                    // color = ColorGreen0;
+                    color = ColorGreenUi;
+                    str = "sleep";
                   } break;
                   case ProfType_Worker: {
-                    color = IM_COL32(50, 100, 80, 255);
-                    str = String("job");
+                    color = ColorOrangeUi;
+                    str = "job";
                   } break;
                 }
-                draw->AddRectFilled(IM_RECT(rect), color);
-                draw->AddRect(IM_RECT(rect), IM_COL32(200, 200, 200, 255));
+                imgui_draw_rect_filled(draw, rect, color);
+                imgui_draw_rect(draw, rect, ColorGreyLight);
                 if (rng2_contains(rect, mouse_pos)) {
                   ImGui::BeginTooltip();
-                  ImGui::Text("Label: %s", anchor.label.str);
-                  ImGui::Text("Percent: %f%%", rng2_dim(rect).x / avail_size.x * 100);
-                  // ImGui::Text("Hits: %lu", anchor.hit_count);
-                  ImGui::Text("Time: %fms", tsc_to_ms(anchor.tsc_elapsed_incl));
-                  ImGui::Text("Time exclusive: %fms", tsc_to_ms(anchor.tsc_elapsed_excl));
-                  ImGui::Text("Type: %s", str.str);
+                  imgui_text("Label: %s", anchor.label.str);
+                  imgui_text("Percent: %f%%", rng2_dim(rect).x / avail_size.x * 100);
+                  imgui_text("Time: %fms", tsc_to_ms(anchor.tsc_elapsed_incl));
+                  imgui_text("Time exclusive: %fms", tsc_to_ms(anchor.tsc_elapsed_excl));
+                  imgui_text("Type: %s", str.str);
                   ImGui::EndTooltip();
                 }
 
                 // Text
                 {
-                  ImString str = push_strf(scratch, "%s %.3f", anchor.label, tsc_to_ms(anchor.tsc_elapsed_incl));
-                  v2 text_size = ImGui::CalcTextSize(str);
+                  String str = push_strf(scratch, "%s %.3f", anchor.label, tsc_to_ms(anchor.tsc_elapsed_incl));
+                  v2 text_size = imgui_calc_text_size(str);
                   if (rng2_dim(rect).x < 30.1 || scroll_state.scale.y < 0.3) {
                     continue;
                   }
@@ -1135,17 +1216,17 @@ void profiler_view() {
                   } else {
                     text_pos = rng2_align_dim_at_center(rect, text_size).min;
                   }
-                  draw->PushClipRect(rect.min, rect.max);
-                  draw->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), str);
-                  draw->PopClipRect();
+                  imgui_draw_push_clip_rect(draw, rect);
+                  imgui_draw_text(draw, text_pos, ColorWhite, str);
+                  imgui_draw_pop_clip_rect(draw);
                 }
               } break;
             }
           }
         };
 
-        ImGui::Text("%.1ffps %.1fms CPU %.1fGhz, Recording: %s", 1000 / tsc_to_ms(tsc_elapsed), tsc_to_ms(tsc_elapsed), (f64)cpu_freq / Billion(1), g.paused ? "off" : "on");
-        ImGui::Text("avg %.1fms, max %.1f, min %.1f", g.frame_avg_time, g.frame_max_time, g.frame_min_time);
+        imgui_text("%.1ffps %.1fms CPU %.1fGhz, Recording: %s", 1000 / tsc_to_ms(tsc_elapsed), tsc_to_ms(tsc_elapsed), (f64)cpu_freq / Billion(1), g.paused ? "off" : "on");
+        imgui_text("avg %.1fms, max %.1f, min %.1f", g.frame_avg_time, g.frame_max_time, g.frame_min_time);
         f32 info_height = 60;
         cursor_pos.y += info_height;
 
@@ -1156,20 +1237,20 @@ void profiler_view() {
           f32 thread_height_offset = 0;
           f32 text_off_above = -40;
           {
-            ImString str = push_strf(scratch, "Main thread");
+            String str = push_strf(scratch, "Main thread");
             v2 text_pos = (v2(0, text_off_above) + cursor_pos);
             text_pos.y *= scroll_state.scale.y;
             text_pos.y += scroll_state.offset.y;
-            draw->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), str);
+            imgui_draw_text(draw, text_pos, ColorWhite, str);
           }
           {
             Loop (i, THREAD_COUNT) {
               thread_height_offset += thread_height;
-              ImString str = push_strf(scratch, "Worker %i", i);
+              String str = push_strf(scratch, "Worker %i", i);
               v2 text_pos = v2(0, thread_height_offset + text_off_above) + cursor_pos;
               text_pos.y *= scroll_state.scale.y;
               text_pos.y += scroll_state.offset.y;
-              draw->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), str);
+              imgui_draw_text(draw, text_pos, ColorWhite, str);
             }
             thread_height_offset = 0;
           }
@@ -1179,8 +1260,8 @@ void profiler_view() {
         // Tab mouse click
         var tab_mouse_click_handle = [&](String name, ProfTabActive tab) {
           Scratch scratch;
-          ImString str = push_strf(scratch, name);
-          ImGui::BeginTabItem(str);
+          String str = push_strf(scratch, name);
+          imgui_begin_tab_item(str);
           Rng2 tab_rect = Rng2(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
           // if (str_match(name, "root")) {
           //   Debug("root");
@@ -1271,21 +1352,21 @@ void profiler_view() {
                   win.frames_scroll_state.scale = v2_splat(1);
                 }
               }
-              ImU32 color = IM_COL32(50, 200, 50, 255);
-              if (rng1_contains(Rng1(17, 20), frame_ms)) {
-                color = IM_COL32(200, 200, 50, 255);
+              v4 color = ColorGreen;
+              if (rng1_contains(Rng1(17, 21), frame_ms)) {
+                color = ColorYellow;
               } else if (frame_ms > 20) {
-                color = IM_COL32(255, 100, 50, 255);
+                color = ColorRed;
               }
               if (i == st->current_frame % ArrayCount(g.frames_times)) {
-                color = IM_COL32(230,230,230,255);
+                color = ColorGrey3;
               }
+
               if (i == st->current_frame % ArrayCount(g.frames_times)) {
-                draw->AddRectFilled(IM_RECT(rect), color);
-                draw->AddRect(IM_RECT(rect), IM_COL32(10, 10, 10, 100));
+                imgui_draw_rect_filled(draw, rect, color);
               } else {
-                draw->AddRectFilled(IM_RECT(rect), color);
-                draw->AddRect(IM_RECT(rect), IM_COL32(10, 10, 10, 100));
+                imgui_draw_rect_filled(draw, rect, color);
+                imgui_draw_rect(draw, rect, v4_set_w(ColorGrey0, 0.3));
               }
             }
             cursor_pos.y += 80;
@@ -1306,9 +1387,9 @@ void profiler_view() {
                 p1 = p1 * scroll_state.scale.x + scroll_state.offset;
                 p2 = p2 * scroll_state.scale.x + scroll_state.offset;
                 p3 = p3 * scroll_state.scale.x + scroll_state.offset;
-                draw->AddLine(p0, p1, IM_COL32(200, 200, 200, 255), thick);
+                imgui_draw_line(draw, p0, p1, ColorGrey3, thick);
                 if (i == st->current_frame % ArrayCount(g.frames_times)) {
-                  draw->AddRectFilled(p0, p3, IM_COL32(100, 100, 100, 100));
+                  imgui_draw_rect_filled(draw, Rng2(p0, p3), v4(0.4,0.4,0.4,0.4));
                 }
                 width_offset += width_size;
               }
@@ -1344,17 +1425,16 @@ void profiler_view() {
               v2 size = v2(width_exclusive, height);
               Rng2 rect = Rng2(offset, size + offset);
 
-              ImDrawList* draw = ImGui::GetWindowDrawList();
-              draw->AddRectFilled(IM_RECT(rect), IM_COL32(50, 50, 50, 255));
-              draw->AddRect(IM_RECT(rect), IM_COL32(200, 200, 200, 255));
+              imgui_draw_rect_filled(draw, rect, ColorGreyDark);
+              imgui_draw_rect(draw, rect, ColorGreyLight);
 
-              ImString name_str = push_strf(scratch, "%s", anchor.label);
-              ImString ms_str = push_strf(scratch, "%.3fms", (f64)anchor.tsc_elapsed_excl / cpu_freq * 1000);
+              String name_str = push_strf(scratch, "%s", anchor.label);
+              String ms_str = push_strf(scratch, "%.3fms", (f64)anchor.tsc_elapsed_excl / cpu_freq * 1000);
               v2 name_offset = v2(0, height * i) + cursor_pos;
               v2 ms_offset = v2(avail_size.x * 0.82, height * i) + cursor_pos;
 
-              draw->AddText(name_offset, ImGui::GetColorU32(ImGuiCol_Text), name_str);
-              draw->AddText(ms_offset, ImGui::GetColorU32(ImGuiCol_Text), ms_str);
+              imgui_draw_text(draw, name_offset, ColorWhite, name_str);
+              imgui_draw_text(draw, ms_offset, ColorWhite, ms_str);
 
               ImGui::PopID();
             }
@@ -1497,7 +1577,7 @@ void profiler_view() {
 
             Rng2 rounding_edge = rng2_shift(rng2_scale(rng2_make(cursor_pos, avail_size), scroll_state.scale.x), scroll_state.offset);
             rounding_edge = rng2_pad(rounding_edge, 10);
-            draw->AddRect(IM_RECT(rounding_edge), IM_COL32(200, 200, 200, 255));
+            imgui_draw_rect(draw, rounding_edge, ColorGreyLight);
 
             ///////////////////////////////////
             // Drawing
@@ -1508,18 +1588,18 @@ void profiler_view() {
               switch (item.type) {
                 case UI_ItemType_MemUsage: {
                   MemFormatSize mem_fmt = mem_format_size(mem_usage);
-                  ImString mem_usage_str = push_strf(scratch, "mem usage: %.2f%s", mem_fmt.size, mem_fmt.format);
-                  draw->AddText(cursor_pos, IM_COL32(255,255,255,255), mem_usage_str);
+                  String mem_usage_str = push_strf(scratch, "mem usage: %.2f%s", mem_fmt.size, mem_fmt.format);
+                  imgui_draw_text(draw, cursor_pos, ColorWhite, mem_usage_str);
                 } break;
                 case UI_ItemType_MemLevel: {
                   MemFormatSize mem_fmt = mem_format_size(mem_levels[item.mem_level]);
-                  ImString str = push_strf(scratch, "%.0f%s", mem_fmt.size, mem_fmt.format);
-                  v2 text_size = ImGui::CalcTextSize(str);
+                  String str = push_strf(scratch, "%.0f%s", mem_fmt.size, mem_fmt.format);
+                  v2 text_size = imgui_calc_text_size(str);
                   Rng2 rect = item.rect;
                   Rng2 text_rect = rng2_align_dim_at_center(rect, text_size);
                   Rng2 pad_text_rect = rng2_pad(text_rect, 5);
-                  draw->AddRectFilled(IM_RECT(pad_text_rect), IM_COL32(80, 90, 130, 120));
-                  draw->AddText(text_rect.min, IM_COL32(255,255,255,255), str);
+                  imgui_draw_rect_filled(draw, pad_text_rect, v4(0.3, 3.5, 0.5, 0.5));
+                  imgui_draw_text(draw, text_rect.min, ColorWhite, str);
                 } break;
                 case UI_ItemType_Arena: {
                   f32 t_w = rng2_dim(item.rect).x;
@@ -1532,26 +1612,25 @@ void profiler_view() {
                   Rng2 excl_rect = rng2_subrng_x(item.rect, Rng1(0, w_excl));
                   Rng2 incl_rect = rng2_subrng_x(item.rect, Rng1(w_excl, w_pos));
 
-                  draw->AddRectFilled(IM_RECT(excl_rect), IM_COL32(70, 80, 50, 255));
-                  draw->AddRect(IM_RECT(excl_rect), IM_COL32(200, 200, 200, 255));
-                  draw->AddRectFilled(IM_RECT(incl_rect), IM_COL32(40, 70, 120, 255));
-                  draw->AddRect(IM_RECT(incl_rect), IM_COL32(200, 200, 200, 255));
+                  imgui_draw_rect_filled(draw, excl_rect, ColorGreenUi);
+                  imgui_draw_rect(draw, excl_rect, ColorGreyLight);
+                  imgui_draw_rect_filled(draw, incl_rect, ColorBlueUi);
+                  imgui_draw_rect(draw, incl_rect, ColorGreyLight);
 
                   MemFormatSize pos = mem_format_size(info.pos);
                   MemFormatSize pos_exclusive = mem_format_size(info.exclusive_pos);
                   MemFormatSize cmt = mem_format_size(info.cmt);
 
-                  ImString name_str = push_strf(scratch, "%s", info.name);
-                  ImString mem_str = push_strf(scratch, "%.2f%s pos, %.2f%s cmt", pos.size, pos.format, cmt.size, cmt.format);
+                  String name_str = push_strf(scratch, "%s", info.name);
+                  String mem_str = push_strf(scratch, "%.2f%s pos, %.2f%s cmt", pos.size, pos.format, cmt.size, cmt.format);
 
-                  draw->AddText(excl_rect.min, ImGui::GetColorU32(ImGuiCol_Text), name_str);
-                  draw->AddText(rng2_subrng_x01(item.rect, Rng1(0.2, 1)).min, ImGui::GetColorU32(ImGuiCol_Text), mem_str);
+                  imgui_draw_text(draw, excl_rect.min, ColorWhite, name_str);
+                  imgui_draw_text(draw, rng2_subrng_x01(item.rect, Rng1(0.2, 1)).min, ColorWhite, mem_str);
+                  
                   if (rng2_contains(rng2_union(incl_rect, excl_rect), mouse_pos)) {
                     ImGui::BeginTooltip();
-                    ImString inclusive = push_strf(scratch, "inclusive: %.2f%s", pos.size, pos.format);
-                    ImGui::Text("%s", inclusive.str);
-                    ImString exclusive = push_strf(scratch, "exclusive: %.2f%s", pos_exclusive.size, pos_exclusive.format);
-                    ImGui::Text("%s", exclusive.str);
+                    imgui_text(push_strf(scratch, "inclusive: %.2f%s", pos.size, pos.format));
+                    imgui_text(push_strf(scratch, "exclusive: %.2f%s", pos_exclusive.size, pos_exclusive.format));
                     ImGui::EndTooltip();
                   }
                 } break;
@@ -1567,18 +1646,19 @@ void profiler_view() {
                   Rng2 child_rect_cap = rng2_subrng_x(item.rect, Rng1(w_pos, w_cap));
 
                   // pos
-                  draw->AddRectFilled(IM_RECT(child_rect), IM_COL32(70, 70, 70, 255));
-                  draw->AddRect(IM_RECT(child_rect), IM_COL32(200, 200, 200, 255));
+                  imgui_draw_rect_filled(draw, child_rect, ColorGreyDark);
+                  imgui_draw_rect(draw, child_rect, ColorGreyLight);
+                  
                   // cap
-                  draw->AddRectFilled(IM_RECT(child_rect_cap), IM_COL32(80, 40, 40, 255));
-                  draw->AddRect(IM_RECT(child_rect_cap), IM_COL32(100, 100, 100, 255));
+                  imgui_draw_rect_filled(draw, child_rect_cap, ColorRedUi);
+                  imgui_draw_rect(draw, child_rect_cap, ColorGrey);
 
                   MemFormatSize pos = mem_format_size(info.pos);
                   MemFormatSize cap = mem_format_size(info.cap);
-                  ImString child_name_str = push_strf(scratch, "%s", info.name);
-                  ImString child_meta_str = push_strf(scratch, "%.2f%s pos, %.2f%s cap, alloc count: %u, free count: %u, current alloc count: %u", pos.size, pos.format, cap.size, cap.format, info.allocs, info.frees, info.current_allocs);
-                  draw->AddText(child_rect.min, ImGui::GetColorU32(ImGuiCol_Text), child_name_str);
-                  draw->AddText(rng2_subrng_x01(child_rect, Rng1(0.3, 1)).min, ImGui::GetColorU32(ImGuiCol_Text), child_meta_str);
+                  String child_name_str = push_strf(scratch, "%s", info.name);
+                  String child_meta_str = push_strf(scratch, "%.2f%s pos, %.2f%s cap, alloc count: %u, free count: %u, current alloc count: %u", pos.size, pos.format, cap.size, cap.format, info.allocs, info.frees, info.current_allocs);
+                  imgui_draw_text(draw, child_rect.min, ColorWhite, child_name_str);
+                  imgui_draw_text(draw, rng2_subrng_x01(child_rect, Rng1(0.3, 1)).min, ColorWhite, child_meta_str);
                 } break;
               }
             }
@@ -1602,46 +1682,46 @@ String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, 
     switch (members[i].type) {
       default:{} break;
       case MetaType_u32: {
-        dstr_add(string, push_strf(scratch, "%s %u\n", member.name, *(u32*)member_ptr));
+        dstr_push(string, push_strf(scratch, "%s %u\n", member.name, *(u32*)member_ptr));
       } break;
       case MetaType_i32: {
-        dstr_add(string, push_strf(scratch, "%s %u\n", member.name, *(i32*)member_ptr));
+        dstr_push(string, push_strf(scratch, "%s %u\n", member.name, *(i32*)member_ptr));
       } break;
       case MetaType_b32: {
-        dstr_add(string, push_strf(scratch, "%s %u\n", member.name, *(b32*)member_ptr));
+        dstr_push(string, push_strf(scratch, "%s %u\n", member.name, *(b32*)member_ptr));
       } break;
       case MetaType_f32: {
-        dstr_add(string, push_strf(scratch, "%s %f\n", member.name, *(f32*)member_ptr));
+        dstr_push(string, push_strf(scratch, "%s %f\n", member.name, *(f32*)member_ptr));
       } break;
       case MetaType_v2: {
         v2 v = *((v2*)member_ptr);
-        dstr_add(string, push_strf(scratch, "%s %f %f\n", member.name, v.x, v.y));
+        dstr_push(string, push_strf(scratch, "%s %f %f\n", member.name, v.x, v.y));
       } break;
       case MetaType_v3: {
         v3 v = *((v3*)member_ptr);
-        dstr_add(string, push_strf(scratch, "%s %f %f %f\n", member.name, v.x, v.y, v.z));
+        dstr_push(string, push_strf(scratch, "%s %f %f %f\n", member.name, v.x, v.y, v.z));
       } break;
       case MetaType_Rng3: {
         Rng3 v = *((Rng3*)member_ptr);
-        dstr_add(string, push_strf(scratch, "%s %f %f %f %f %f %f\n", member.name, v.min.x,v.min.y,v.min.z, v.max.x,v.max.y,v.max.z));
+        dstr_push(string, push_strf(scratch, "%s %f %f %f %f %f %f\n", member.name, v.min.x,v.min.y,v.min.z, v.max.x,v.max.y,v.max.z));
       } break;
       case MetaType_GpuMeshId: {
         GpuMeshId v = *((GpuMeshId*)member_ptr);
-        dstr_add(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->mesh_id_to_str[v.v]));
+        dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->mesh_id_to_str[v.v]));
       } break;
       case MetaType_GpuMaterialId: {
         GpuMaterialId v = *((GpuMaterialId*)member_ptr);
-        dstr_add(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->material_id_to_str[v.v]));
+        dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->material_id_to_str[v.v]));
       } break;
       case MetaType_String: {
         if (FlagHas(flags, EntityFlag_Referenced)) {
           String v = *((String*)member_ptr);
-          dstr_add(string, push_strf(scratch, "%s \"%s\"\n", member.name, v));
+          dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, v));
         }
       } break;
       case MetaType_EntityFlags: {
         EntityFlags v = *((EntityFlags*)member_ptr);
-        dstr_add(string, push_strf(scratch, "%s %u\n", member.name, v));
+        dstr_push(string, push_strf(scratch, "%s %u\n", member.name, v));
       } break;
     }
   }
@@ -1897,6 +1977,7 @@ if (data->ctx == null) {
 
   u64 target_fps = Billion(1) / 60;
   u64 last_time = os_now_ns();
+
 
   while (!os_window_should_close()) {
     if (st->should_hotreload) {
@@ -2322,8 +2403,8 @@ void scene_update() {
   GameState& g = st->game;
   if (key_pressed(MouseKey_Left)) {
     // select_obj();
-    v3 dir = ray_from_camera();
-    vk_draw_line_consistent(g.cam.pos - v3(0,0.1,0), g.cam.pos + dir*100, ColorWhite);
+    // v3 dir = ray_from_camera();
+    // vk_draw_line_consistent(g.cam.pos - v3(0,0.1,0), g.cam.pos + dir*100, ColorWhite);
     // v3 max = st->cam.pos + v3_one();
     // v3 min = st->cam.pos - v3_one();
   }
@@ -2404,26 +2485,26 @@ void game_save_state() {
   GameState& g = st->game;
 
   Dstring data = dstr_make(scratch);
-  dstr_add(data, "Camera {\n");
-  dstr_add(data, dumb_struct(scratch, ArraySlice(members_of_Camera), &g.cam));
-  dstr_add(data, "}\n");
+  dstr_push(data, "Camera {\n");
+  dstr_push(data, dumb_struct(scratch, ArraySlice(members_of_Camera), &g.cam));
+  dstr_push(data, "}\n");
 
   {
     var& p = g.all_dynamic_entities;
     for (IndexId node = p.first; node.v != U32_MAX; node = p.data[id_idx(node)].next) {
       Entity& e = get_entity(p.data[id_idx(node)].elem);
-      dstr_add(data, "Entity {\n");
-      dstr_add(data, dumb_struct(scratch, ArraySlice(members_of_Entity), &e, e.flags));
-      dstr_add(data, "}\n");
+      dstr_push(data, "Entity {\n");
+      dstr_push(data, dumb_struct(scratch, ArraySlice(members_of_Entity), &e, e.flags));
+      dstr_push(data, "}\n");
     }
   }
   {
     var& p = g.all_static_entities;
     for (IndexId node = p.first; node.v != U32_MAX; node = p.data[id_idx(node)].next) {
       StaticEntity& e = get_static_entity(p.data[id_idx(node)].elem);
-      dstr_add(data, "StaticEntity {\n");
-      dstr_add(data, dumb_struct(scratch, ArraySlice(members_of_StaticEntity), &e));
-      dstr_add(data, "}\n");
+      dstr_push(data, "StaticEntity {\n");
+      dstr_push(data, dumb_struct(scratch, ArraySlice(members_of_StaticEntity), &e));
+      dstr_push(data, "}\n");
     }
   }
 
@@ -2496,6 +2577,8 @@ void game_view() {
     imgui_window_apply_state(win);
     ImGui::Begin("Game");
 
+    ImGui::ColorEdit4("color picker", g.color.v, ImGuiColorEditFlags_Float);
+
     if (ImGui::IsWindowHovered()) {
       if (key_pressed(Key_V)) {
         imgui_window_toggle_fullscreen(win);
@@ -2507,13 +2590,11 @@ void game_view() {
     ImGui::Text("Camera: x: %.2f y: %.2f z: %.2f", pos.x, pos.y, pos.z);
     ImGui::DragFloat("speed", &cam.speed, 1);
     {
-      ImString str = push_str_copy(scratch, dumb_struct(scratch, ArraySlice(members_of_Camera), &g.cam));
-      ImGui::Text("%s", str.str);
+      imgui_text(push_str_copy(scratch, dumb_struct(scratch, ArraySlice(members_of_Camera), &g.cam)));
     }
     {
       Entity& e = get_entity(g.axis_attached_to_cam_id);
-      ImString str = push_str_copy(scratch, dumb_struct(scratch, ArraySlice(members_of_Entity), &e, e.flags));
-      ImGui::Text("%s", str.str);
+      imgui_text(push_str_copy(scratch, dumb_struct(scratch, ArraySlice(members_of_Entity), &e, e.flags)));
     }
 
     if (ImGui::Button("save state")) {
@@ -2628,4 +2709,6 @@ void game_update() {
   }
   scene_update();
 }
+
+
 

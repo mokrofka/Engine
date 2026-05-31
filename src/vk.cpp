@@ -2664,23 +2664,23 @@ void vk_set_entity_color(EntityId entity_handle, v4 color) {
   st->vk.gpu_entities[id_idx(entity_handle)].color = color;
 }
 
-void vk_draw_line(v3 a, v3 b, v3 color) {
+void vk_draw_line(v3 a, v3 b, v4 color) {
   Vertex vert[] = {
-    {.pos = a, .color = color},
-    {.pos = b, .color = color},
+    {.pos = a, .color = v3_of_v4(color)},
+    {.pos = b, .color = v3_of_v4(color)},
   };
   array_push(st->vk.draw_lines, {vert[0], vert[1]});
 }
 
-void vk_draw_line_consistent(v3 a, v3 b, v3 color) {
+void vk_draw_line_consistent(v3 a, v3 b, v4 color) {
   Vertex vert[] = {
-    {.pos = a, .color = color},
-    {.pos = b, .color = color},
+    {.pos = a, .color = v3_of_v4(color)},
+    {.pos = b, .color = v3_of_v4(color)},
   };
   array_push(st->vk.draw_lines_consistent, {vert[0], vert[1]});
 }
 
-void vk_draw_cuboid(Rng3 rng, v3 color) {
+void vk_draw_cuboid(Rng3 rng, v4 color) {
   v3 p000 = {rng.min.x, rng.min.y, rng.min.z};
   v3 p001 = {rng.min.x, rng.min.y, rng.max.z};
   v3 p010 = {rng.min.x, rng.max.y, rng.min.z};
@@ -2709,7 +2709,7 @@ void vk_draw_cuboid(Rng3 rng, v3 color) {
   vk_draw_line(p100, p110, color);
 }
 
-void vk_draw_rect(Rng2 rect, v3 color) {
+void vk_draw_rect(Rng2 rect, v4 color) {
   v2 size = v2_of_v2u(os_get_window_size());
   rect.min = v2_map_to_11(rect.min, size);
   rect.min.y = -rect.min.y;
@@ -2717,12 +2717,12 @@ void vk_draw_rect(Rng2 rect, v3 color) {
   rect.max.y = -rect.max.y;
   DebugDrawRect square = {
     .vert = {
-      {.pos = v2_to_v3(rect.min, 0), .color = color},
-      {.pos = v2_to_v3(v2(rect.min.x, rect.max.y), 0), .color = color},
-      {.pos = v2_to_v3(rect.max, 0), .color = color},
-      {.pos = v2_to_v3(rect.max, 0), .color = color},
-      {.pos = v2_to_v3(v2(rect.max.x, rect.min.y), 0), .color = color},
-      {.pos = v2_to_v3(rect.min, 0), .color = color},
+      {.pos = v2_to_v3(rect.min, 0), .color = v3_of_v4(color)},
+      {.pos = v2_to_v3(v2(rect.min.x, rect.max.y), 0), .color = v3_of_v4(color)},
+      {.pos = v2_to_v3(rect.max, 0), .color = v3_of_v4(color)},
+      {.pos = v2_to_v3(rect.max, 0), .color = v3_of_v4(color)},
+      {.pos = v2_to_v3(v2(rect.max.x, rect.min.y), 0), .color = v3_of_v4(color)},
+      {.pos = v2_to_v3(rect.min, 0), .color = v3_of_v4(color)},
     }
   };
   array_push(st->vk.draw_rects, square);

@@ -18,7 +18,7 @@ i32 main(i32 count, char* args[]) {
         if (str_match(tok.str, "Introspect")) {
           tok_ident_require(p, "struct");
           Token struct_name = tok_require(p, TokenType_Identifier);
-          dstr_add(string, push_strf(scratch, "MemberDefinition members_of_%s[] = {\n", struct_name.str));
+          dstr_push(string, push_strf(scratch, "MemberDefinition members_of_%s[] = {\n", struct_name.str));
           tok_require(p, TokenType_OpenBrace);
           while (!tok_match(p, TokenType_CloseBrace)) {
             Token field_type = tok_require(p, TokenType_Identifier);
@@ -30,9 +30,9 @@ i32 main(i32 count, char* args[]) {
             Token field_name = tok_require(p, TokenType_Identifier);
             tok_require(p, TokenType_Semicolon);
             String s = push_strf(scratch, "  {MetaType_%s, \"%s\", OffsetOf(%s,%s)},\n", field_type.str, field_name.str, struct_name.str, field_name.str);
-            dstr_add(string, s);
+            dstr_push(string, s);
           }
-          dstr_add(string, String("};\n"));
+          dstr_push(string, String("};\n"));
         }
       } break;
     }

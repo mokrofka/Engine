@@ -347,6 +347,7 @@ NO_DEBUG v3  v3_rand_rng(v3 a, v3 b);
 
 NO_DEBUG v4  v4_zero();
 NO_DEBUG v4  v4_one();
+NO_DEBUG v4  v4_set_w(v4 v, f32 w);
 NO_DEBUG v4  v4_splat(f32 v);
 NO_DEBUG v4  operator+(v4 a, v4 b);
 NO_DEBUG v4  operator-(v4 a, v4 b);
@@ -454,7 +455,7 @@ b32 rng2_contains(Rng2 r, v2 x);
 v2 rng2_dim(Rng2 r);
 Rng2 rng2_union(Rng2 a, Rng2 b);
 Rng2 rng2_intersect(Rng2 a, Rng2 b);
-v2 rng2_clamp(Rng2 r, v2 v);
+v2 rng2_clamp(Rng2 r, v2 x);
 
 Rng2 rng2_make(v2 min, v2 size);             
 Rng2 rng2_make_centered(v2 pos, v2 halfdim); 
@@ -467,7 +468,7 @@ Rng2 rng2_subrng_x(Rng2 r, Rng1 x);
 Rng2 rng2_subrng_y(Rng2 r, Rng1 y);
 Rng2 rng2_subrng_x01(Rng2 r, Rng1 sub);
 Rng2 rng2_subrng_y01(Rng2 r, Rng1 sub);
-Rng2 rng2_align_dim_at_center(Rng2 r, v2 s);
+Rng2 rng2_align_dim_at_center(Rng2 r, v2 size);
 
 ///////////////////////////////////
 // Dim3
@@ -478,7 +479,7 @@ b32 rng3_contains(Rng3 r, v3 x);
 v3 rng3_dim(Rng3 r);
 Rng3 rng3_union(Rng3 a, Rng3 b);
 Rng3 rng3_intersect(Rng3 a, Rng3 b);
-v3 rng3_clamp(Rng3 r, v3 v);
+v3 rng3_clamp(Rng3 r, v3 x);
 
 Rng3 rng3_make(v3 min, v3 size);
 Rng3 rng3_make_centered(v3 pos, v3 halfdim);

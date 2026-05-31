@@ -18,7 +18,7 @@ struct Dstring {
 };
 
 Dstring dstr_make(Allocator alloc);
-void dstr_add(Dstring& arr, String str);
+void dstr_push(Dstring& arr, String str);
 void dstr_clear(Dstring& arr);
 
 struct StringArray {
@@ -58,10 +58,6 @@ b32 char_is_number_cont(u8 c);
 ////////////////////////////////////////////////////////////////////////
 // String Constructors
 
-//        hello_world
-// first = e
-// one_past_last = r
-// result: ello_wor
 String str_range(u8* first, u8* one_past_last);
 String str_cstr_capped(const void* String, const void* cap);
 
@@ -94,7 +90,7 @@ String str_chop(String str, u64 amt);
 
 String push_str_cat(Allocator arena, String s1, String s2);
 String push_str_copy(Allocator arena, String s);
-String push_strfv(Allocator arena, String fmt, VaList argc);
+String push_strfv(Allocator arena, String fmt, VaList args);
 String push_strf(Allocator arena, String fmt, ...);
 
 ////////////////////////////////////////////////////////////////////////

@@ -519,7 +519,7 @@ void os_pump_messages() {
 void os_clipboard_write(String str) {
   X11State& g = gfx_st;
   dstr_clear(g.clipboard.str_to_write);
-  dstr_add(g.clipboard.str_to_write, str);
+  dstr_push(g.clipboard.str_to_write, str);
   xcb_set_selection_owner(g.connection, g.window, g.clipboard.atom, XCB_CURRENT_TIME);
   xcb_flush(g.connection);
 }
@@ -573,7 +573,7 @@ String os_clipboard_read() {
         u8* data = (u8*)xcb_get_property_value(reply);
         u32 len = xcb_get_property_value_length(reply);
         dstr_clear(g.clipboard.str_to_read);
-        dstr_add(g.clipboard.str_to_read, str_make(data, len));
+        dstr_push(g.clipboard.str_to_read, str_make(data, len));
       }
       break;
     }

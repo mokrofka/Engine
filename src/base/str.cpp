@@ -28,7 +28,7 @@ Dstring dstr_make(Allocator alloc) {
   };
   return res;
 }
-void dstr_add(Dstring& arr, String str) {
+void dstr_push(Dstring& arr, String str) {
   if (str.size + arr.size > arr.cap) {
     if (arr.str) {
       u32 modifier = CeilIntDiv(str.size+arr.size, arr.cap);
@@ -556,13 +556,13 @@ String push_str_copy(Allocator arena, String s) {
   return str;
 }
 
-String push_strfv(Allocator arena, String fmt, VaList argc) {
+String push_strfv(Allocator arena, String fmt, VaList args) {
   VaList va_list_argc;
-  va_copy(va_list_argc, argc); 
+  va_copy(va_list_argc, args); 
   u32 need_bytes = my_sprintf(null, fmt, va_list_argc);
   va_end(va_list_argc);
   u8* buf = push_buffer(arena, need_bytes + 1);
-  va_copy(va_list_argc, argc); 
+  va_copy(va_list_argc, args); 
   u32 final_size = my_sprintf(buf, fmt, va_list_argc);
   va_end(va_list_argc);
   String result = str_make(buf, final_size);

@@ -137,7 +137,6 @@ void thread_wait_task(TaskId task_id) {
 
 void thread_wait_for() {
   TaskQueue& q = thread_pool.queue;
-  os_mutex_take(q.mutex);
   LockScope(q.mutex);
   if (q.remaining_tasks > 0) {
     os_cond_var_wait(q.finished, q.mutex);

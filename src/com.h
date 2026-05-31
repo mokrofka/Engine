@@ -24,6 +24,7 @@
 // full metaprogramming
 // metadesk tables?
 // serelization/deserialization
+// imgui draw text font
 
 ////////////////////////////////////////////////////////////////////////
 // @Common
@@ -33,27 +34,55 @@
         operator v2() const { return v2(x,y); }
 #include "imgui/imgui.h"
 
-struct ImString {
-  u8* str;
-  u64 size;
-  ImString() = default;
-  ImString(const String& f) : str(f.str), size(f.size) {}
-  operator char*() { return (char*)str; }
+struct ImGui_DrawList {
+  ImDrawList* draw;
 };
 
-#define IM_RECT(rect) rect.min, rect.max
+ImGui_DrawList imgui_get_window_drawlist();
+void imgui_draw_rect(ImGui_DrawList draw, Rng2 rect, v4 col, f32 rounding = 0, ImDrawFlags flags = 0, f32 thickness = 1);
+void imgui_draw_rect_filled(ImGui_DrawList draw, Rng2 rect, v4 col, f32 rounding = 0, ImDrawFlags flags = 0);
+void imgui_draw_push_clip_rect(ImGui_DrawList draw, Rng2 rect);
+void imgui_draw_pop_clip_rect(ImGui_DrawList draw);
+void imgui_draw_line(ImGui_DrawList draw, v2 p0, v2 p1, v4 col, f32 thickness = 1);
+void imgui_draw_text(ImGui_DrawList draw, v2 pos, v4 col, String fmt, ...);
+void imgui_text(String fmt, ...);
+v2 imgui_calc_text_size(String str);
+void imgui_begin_tab_item(String str);
 
-const v3 ColorRed   = v3(1,0,0);
-const v3 ColorGreen = v3(0,1,0);
-const v3 ColorBlue  = v3(0,0,1);
-const v3 ColorWhite = v3(1,1,1);
-const v3 ColorBlack = v3(0,0,0);
-const v3 ColorGrey  = v3(0.8,0.8,0.8);
+const v4 ColorWhite       = v4(1,    1,    1,    1);
+const v4 ColorBlack       = v4(0,    0,    0,    1);
+const v4 ColorGrey        = v4(0.5,  0.5,  0.5,  1);
+const v4 ColorGreyDark    = v4(0.25, 0.25, 0.25, 1);
+const v4 ColorGreyLight   = v4(0.75, 0.75, 0.75, 1);
+const v4 ColorGrey0       = v4(0.15, 0.15, 0.15, 1);
+const v4 ColorGrey1       = v4(0.35, 0.35, 0.35, 1);
+const v4 ColorGrey2       = v4(0.60, 0.60, 0.60, 1);
+const v4 ColorGrey3       = v4(0.85, 0.85, 0.85, 1);
+
+const v4 ColorRed         = v4(0.89, 0.33, 0.23, 1.0);
+const v4 ColorOrange      = v4(0.95, 0.65, 0.30, 1.0);
+const v4 ColorYellow      = v4(0.90, 0.82, 0.35, 1.0);
+const v4 ColorGreen       = v4(0.14, 0.8,  0.01, 1.0);
+const v4 ColorCyan        = v4(0.35, 0.78, 0.82, 1.0);
+const v4 ColorBlue        = v4(0.38, 0.65, 0.95, 1.0);
+const v4 ColorPurple      = v4(0.72, 0.55, 0.92, 1.0);
+const v4 ColorPink        = v4(0.90, 0.45, 0.65, 1.0);
+
+const v4 ColorRedUi        = v4(0.3, 0.15, 0.15, 1);
+const v4 ColorRedUiBright  = v4(0.41, 0.19, 0.21, 1);
+const v4 ColorGreenUi      = v4(0.3, 0.4, 0.2, 1);
+const v4 ColorBlueUi       = v4(0.15, 0.3, 0.5, 1);
+const v4 ColorOrangeUi     = v4(0.4, 0.28, 0.15, 1);
+const v4 ColorYellowUi     = v4(0.4, 0.43, 0.2, 1);
+const v4 ColorCyanUi       = v4(0.15, 0.4, 0.36, 1);
+const v4 ColorPurpleUi     = v4(0.32, 0.19, 0.41, 1);
+
+const v4 ColorBounds     = v4(0.38, 0.65, 0.95, 1);
+const v4 ColorSelection  = v4(0.95, 0.65, 0.30, 1);
+const v4 ColorCollision  = v4(0.86, 0.33, 0.33, 1);
 
 const u32 MaxEntities = KB(10);
 const u32 MaxStaticEntities = KB(10);
-// const u32 MaxEntities = KB(200);
-// const u32 MaxStaticEntities = MB(1);
 
 struct GpuTextureId { u32 v; };
 struct GpuMaterialId { u32 v; };
@@ -203,11 +232,6 @@ enum MeshEnum {
 #define X(enum_name) enum_name,
   MESH_0_LIST
 #undef X
-  
-  // Mesh_Triangle,
-  // Mesh_Grid,
-  // Mesh_Axis,
-  // Mesh_Sphere,
   Mesh_COUNT,
 };
 
@@ -216,7 +240,7 @@ enum MeshEnum {
   X(Texture_Container, container.jpg) \
   // X(Texture_Castle, castle_diffuse.png) \
 
-enum TextureId {
+enum TextureEnum {
 #define X(enum_name, name) enum_name,
   TEXTURE_LIST
 #undef X
@@ -224,14 +248,14 @@ enum TextureId {
 };
 
 #define MATERIAL_LIST \
-  X(Material_Orange, .name = "e_texture", .texture = "orange_lines_512.png") \
-  X(Material_Container, .name = "e_texture", .texture = "container.jpg") \
-  X(Material_Axis, .name = "e_vert_color", .state.topology = ShaderTopology_Line) \
-  X(Material_Line, .name = "e_color", .state.topology = ShaderTopology_Line) \
-  X(Material_Screen, .name = "e_texture", .texture_handle.v = null, .texture = "") \
+  X(Material_Orange) \
+  X(Material_Container) \
+  X(Material_Axis) \
+  X(Material_Line) \
+  X(Material_Screen) \
 
 enum MaterialEnum {
-#define X(enum_name, ...) enum_name,
+#define X(enum_name) enum_name,
   MATERIAL_LIST
 #undef X
   Material_COUNT,
@@ -473,6 +497,8 @@ struct GameState {
   EntityId rotating_cube_id;
   Map<String, EntityId> find_entity;
   EntityId referenced_entities[0];
+
+  v4 color;
 };
 
 void game_init();
@@ -512,7 +538,6 @@ struct GlobalState {
   Array<String, MaxMeshes> mesh_id_to_str;
   Array<String, MaxMaterials> material_id_to_str;
 
-  // ThreadPool thread_pool;
   WatchState watch;
   ProfWindow profile_win;
   GameState game;

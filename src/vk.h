@@ -491,10 +491,10 @@ void vk_remove_renderable(EntityId entity_id);
 void vk_remove_static_renderable(StaticEntityId entity_id);
 void vk_set_entity_color(EntityId entity_handle, v4 color);
 
-void vk_draw_line(v3 a, v3 b, v3 color);
-void vk_draw_line_consistent(v3 a, v3 b, v3 color);
-void vk_draw_cuboid(Rng3 rng, v3 color);
-void vk_draw_rect(Rng2 rect, v3 color);
+void vk_draw_line(v3 a, v3 b, v4 color);
+void vk_draw_line_consistent(v3 a, v3 b, v4 color);
+void vk_draw_cuboid(Rng3 rng, v4 color);
+void vk_draw_rect(Rng2 rect, v4 color);
 
 void vk_imgui_init();
 void vk_imgui_begin_frame();

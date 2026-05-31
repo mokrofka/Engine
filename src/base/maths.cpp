@@ -229,9 +229,10 @@ v3  v3_rand_rng(v3 a, v3 b)     { return v3(rand_rng_f32(a.x, b.x), rand_rng_f32
 ////////////////////////////////////////////////////////////////////////
 // Vector4
 
-v4 v4_zero()       { return v4{}; }
-v4 v4_one()        { return v4(1, 1, 1, 1); }
-v4 v4_splat(f32 v) { return v4(v,v,v,v); }
+v4 v4_zero()              { return v4{}; }
+v4 v4_one()               { return v4(1, 1, 1, 1); }
+v4 v4_set_w(v4 v, f32 w)  { return v4(v.x, v.y, v.x, w); }
+v4 v4_splat(f32 v)        { return v4(v,v,v,v); }
 
 v4  operator+(v4 a, v4 b)          { return v4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w); }
 v4  operator-(v4 a, v4 b)          { return v4(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w); }
@@ -679,7 +680,7 @@ Rng3 rng3_intersect(Rng3 a, Rng3 b) {
   return Rng3(v3(Max(a.min.x, b.min.x), Max(a.min.y, b.min.y), Max(a.min.z, b.min.z)),
               v3(Min(a.max.x, b.max.x), Min(a.max.y, b.max.y), Min(a.max.z, b.max.z)));
 }
-v3 rng3_clamp(Rng3 r, v3 v) { return v3(Clamp(r.min.x, v.x, r.max.x), Clamp(r.min.y, v.y, r.max.y), Clamp(r.min.z, v.z, r.max.z)); }
+v3 rng3_clamp(Rng3 r, v3 x) { return v3(Clamp(r.min.x, x.x, r.max.x), Clamp(r.min.y, x.y, r.max.y), Clamp(r.min.z, x.z, r.max.z)); }
 
 Rng3 rng3_make(v3 min, v3 size)             { return Rng3(min, min+size); }
 Rng3 rng3_make_centered(v3 pos, v3 halfdim) { return Rng3(pos - halfdim, pos + halfdim); }

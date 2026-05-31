@@ -15,10 +15,10 @@ void _log_output(LogLevel level, String fmt, ...) {
 
 void _log_output(Allocator arena, LogLevel level, String fmt, ...) {
   String level_strings[] = {"[TRACE]: ", "[DEBUG]: ", "[INFO]:  ", "[WARN]:  ", "[ERROR]: ",};
-  VaList argc;
-  va_start(argc, fmt);
-  String formatted = push_strfv(arena, fmt, argc);
-  va_end(argc);
+  VaList args;
+  va_start(args, fmt);
+  String formatted = push_strfv(arena, fmt, args);
+  va_end(args);
   String out_message = push_strf(arena, "%s%s\n", level_strings[level-1], formatted);
   os_console_write(out_message, level);
 }
