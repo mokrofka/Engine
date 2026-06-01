@@ -2728,20 +2728,11 @@ void vk_draw_rect(Rng2 rect, v4 color) {
   array_push(st->vk.draw_rects, square);
 }
 
+////////////////////////////////////////////////////////////////////////
+// @Dear imgui
+
 #if DEAR_IMGUI
 #include "imgui/imgui_impl_vulkan.h"
-
-void imgui_impl_init() {
-  ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
-  platform_io.Platform_GetClipboardTextFn = [](ImGuiContext*)->const char* {
-    Scratch scratch;
-    String str = push_str_copy(scratch, os_clipboard_read());
-    return (const char*)str.str;
-  };
-  platform_io.Platform_SetClipboardTextFn = [](ImGuiContext*, const char* text) { 
-    os_clipboard_write(text);
-  };
-}
 
 ImGuiKey imgui_keycode_translate(Key key) {
   switch (key) {
@@ -2864,10 +2855,10 @@ void imgui_impl_new_frame() {
       case OS_EventKind_Key: {
         ImGuiKey key = imgui_keycode_translate(event.key);
         io.AddKeyEvent(key, event.is_pressed);
-          if (event.is_pressed) {
-            // io.AddInputCharacter(os_key_to_str(event.key, event.modifier));
-            io.AddInputCharacter(os_key_to_str(event.key, event.modifier));
-          }
+        // Info("%u %u", event.key, event.is_pressed);
+        if (event.is_pressed) {
+          io.AddInputCharacter(os_key_to_str(event.key, event.modifier));
+        }
       } break;
       case OS_EventKind_MouseButton: {
         ImGuiKey key = imgui_keycode_translate(event.key);
@@ -2882,8 +2873,10 @@ void imgui_impl_new_frame() {
       case OS_EventKind_Modifier:
         if (FlagHas(event.modifier, OS_Modifier_Shift)) {
           io.AddKeyEvent(ImGuiMod_Shift, true);
+          // Info("mod shift true");
         } else {
           io.AddKeyEvent(ImGuiMod_Shift, false);
+          // Info("mod shift false");
         }
         if (FlagHas(event.modifier, OS_Modifier_Alt)) {
           io.AddKeyEvent(ImGuiMod_Alt, true);
@@ -2899,10 +2892,6 @@ void imgui_impl_new_frame() {
   }
 }
 
-PFN_vkVoidFunction imgui_load_fn(const char* function_name, void* user_data) {
-  return (PFN_vkVoidFunction)os_lib_get_proc(st->vk.lib, function_name);
-}
-
 void vk_imgui_init() {
   ProfFunc;
   VK_State& g = st->vk;
@@ -2912,7 +2901,12 @@ void vk_imgui_init() {
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
   ImGuiStyle& style = ImGui::GetStyle();
   style.FontScaleDpi = 1.3;
-  imgui_impl_init();
+  // ImFont* font = io.Fonts
+
+  ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+  platform_io.Platform_GetClipboardTextFn = imgui_platform_get_clipboard_text;
+  platform_io.Platform_SetClipboardTextFn = imgui_platform_set_clipboard_text;
+
   VkDescriptorPoolSize pool_sizes[] = {
     {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
   };
@@ -2945,13 +2939,15 @@ void vk_imgui_init() {
     },
     .UseDynamicRendering = true,
   };
-  ImGui_ImplVulkan_LoadFunctions(VK_API_VERSION_1_4, imgui_load_fn, null);
+  ImGui_ImplVulkan_LoadFunctions(VK_API_VERSION_1_4, [](const char* function_name, void* user_data) {
+    return (PFN_vkVoidFunction)os_lib_get_proc(st->vk.lib, function_name);
+  }, null);
   ImGui_ImplVulkan_Init(&init_info);
 }
 
 void vk_imgui_begin_frame() {
-  ImGui_ImplVulkan_NewFrame();
   imgui_impl_new_frame();
+  ImGui_ImplVulkan_NewFrame();
   ImGui::NewFrame();
 }
 

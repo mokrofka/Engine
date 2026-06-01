@@ -6,6 +6,32 @@
 #include <xcb/xcb.h>
 #include <xcb/xcb_keysyms.h>
 
+extern "C" {
+#define XCB_XKB_MAJOR_VERSION 1
+#define XCB_XKB_MINOR_VERSION 0
+typedef struct xcb_xkb_use_extension_cookie_t {
+  unsigned int sequence;
+} xcb_xkb_use_extension_cookie_t;
+typedef struct xcb_xkb_per_client_flags_cookie_t {
+  unsigned int sequence;
+} xcb_xkb_per_client_flags_cookie_t;
+typedef uint16_t xcb_xkb_device_spec_t;
+xcb_xkb_use_extension_cookie_t
+xcb_xkb_use_extension (xcb_connection_t *c,
+                       uint16_t          wantedMajor,
+                       uint16_t          wantedMinor);
+xcb_xkb_per_client_flags_cookie_t
+xcb_xkb_per_client_flags (xcb_connection_t      *c,
+                          xcb_xkb_device_spec_t  deviceSpec,
+                          uint32_t               change,
+                          uint32_t               value,
+                          uint32_t               ctrlsToChange,
+                          uint32_t               autoCtrls,
+                          uint32_t               autoCtrlsValues);
+#define XCB_XKB_ID_USE_CORE_KBD 256
+#define XCB_XKB_PER_CLIENT_FLAG_DETECTABLE_AUTO_REPEAT 1
+}
+
 struct Clipboard {
   xcb_atom_t atom;
   xcb_atom_t targets_atom;
@@ -46,7 +72,9 @@ struct X11State {
   } input;
   Darray<OS_InputEvent> input_events;
   Darray<xcb_generic_event_t*> xcb_events;
-  OS_Modifiers modifiers = 0;
+  OS_Modifiers modifiers;
+  Key last_key;
+  u32 last_key_timestamp;
 };
 
 global X11State gfx_st;
@@ -285,6 +313,14 @@ void os_gfx_init() {
   }
   g.screen = iter.data;
   g.window = xcb_generate_id(g.connection);
+
+  xcb_xkb_use_extension(g.connection, XCB_XKB_MAJOR_VERSION, XCB_XKB_MINOR_VERSION);
+  xcb_xkb_per_client_flags(g.connection,
+    XCB_XKB_ID_USE_CORE_KBD,
+    XCB_XKB_PER_CLIENT_FLAG_DETECTABLE_AUTO_REPEAT,
+    XCB_XKB_PER_CLIENT_FLAG_DETECTABLE_AUTO_REPEAT,
+    0, 0, 0);
+
   u32 mask = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK;
   u32 values[] = {
     g.screen->black_pixel,
@@ -344,8 +380,13 @@ void os_pump_messages() {
         xcb_key_press_event_t* kp = (xcb_key_press_event_t*)event;
         xcb_keysym_t sym = xcb_key_symbols_get_keysym(g.key_symbols, kp->detail, 0);
         Key key = lnx_keycode_translate(sym);
+
+        if (os_is_key_down(key)) {
+          break;
+        }
         g.input.keyboard_current.keys[key] = true;
         b32 modifier_changed = false;
+        // Info("pressed %u", kp->time);
         if (key == Key_Shift) {
           if (!FlagHas(g.modifiers, OS_Modifier_Shift)) {
             modifier_changed = true;
@@ -380,11 +421,12 @@ void os_pump_messages() {
         array_push(g.input_events, event);
       } break;
       case XCB_KEY_RELEASE: {
-        xcb_key_press_event_t* kp = (xcb_key_press_event_t*)event;
+        xcb_key_release_event_t* kp = (xcb_key_release_event_t*)event;
         xcb_keysym_t sym = xcb_key_symbols_get_keysym(g.key_symbols, kp->detail, 0);
         Key key = lnx_keycode_translate(sym);
         g.input.keyboard_current.keys[key] = false;
         b32 modifier_changed = false;
+        // Info("released %u", kp->time);
         if (key == Key_Shift) {
           if (FlagHas(g.modifiers, OS_Modifier_Shift)) {
             modifier_changed = true;
@@ -615,5 +657,15 @@ b32 os_was_key_down(Key key)      { return gfx_st.input.keyboard_previous.keys[k
 b32 os_was_key_up(Key key)        { return gfx_st.input.keyboard_previous.keys[key] == false; }
 b32 os_is_key_pressed(Key key)    { return os_is_key_down(key) && os_was_key_up(key); }
 b32 os_is_key_released(Key key)   { return os_is_key_up(key) && os_was_key_down(key); }
+
+const char* imgui_platform_get_clipboard_text(struct ImGuiContext* ctx) {
+  Scratch scratch;
+  String str = push_str_copy(scratch, os_clipboard_read());
+  return (const char*)str.str;
+}
+
+void imgui_platform_set_clipboard_text(struct ImGuiContext* ctx, const char* text) {
+  os_clipboard_write(text);
+}
 
 #endif

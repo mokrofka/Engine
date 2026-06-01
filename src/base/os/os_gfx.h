@@ -171,3 +171,5 @@ b32 os_is_key_released(Key key);
 void os_clipboard_write(String str);
 String os_clipboard_read();
 
+const char* imgui_platform_get_clipboard_text(struct ImGuiContext* ctx);
+void imgui_platform_set_clipboard_text(struct ImGuiContext* ctx, const char* text);
