@@ -206,11 +206,10 @@ NO_DEBUG f32 LogE(f32 x);
 NO_DEBUG f32 Log2(f32 x);
 NO_DEBUG f32 Log10(f32 x);
 
-NO_DEBUG void SinCos(f32 angle, f32* a, f32* b);
+NO_DEBUG void SinCos(f32 rad, f32* a, f32* b);
 
 NO_DEBUG f32 SinD(f32 x);
 NO_DEBUG f32 CosD(f32 x);
-NO_DEBUG f32 Atan2_360(f32 y, f32 x);
 
 ////////////////////////////////////////////////////////////////////////
 // Color
@@ -292,14 +291,21 @@ NO_DEBUG f32 v2_length(v2 v);
 NO_DEBUG v2  v2_norm(v2 v);
 NO_DEBUG f32 v2_distance(v2 a, v2 b);
 NO_DEBUG f32 v2_dot(v2 a, v2 b);
-NO_DEBUG f32 v2_cross(v2 a, v2 b);  // if > 0 then b is to the left of a
+NO_DEBUG f32 v2_cross(v2 a, v2 b);  // if > 0 then a is at right
 NO_DEBUG v2  v2_lerp(v2 a, f32 t, v2 b);
 NO_DEBUG v2  v2_hadamard(v2 a, v2 b);
 NO_DEBUG v2  v2_hadamard_div(v2 a, v2 b);
-NO_DEBUG v2  v2_skew(v2 v);
+NO_DEBUG v2  v2_rotate_90(v2 v);
+NO_DEBUG v2  v2_rotate_negative_90(v2 v);
+NO_DEBUG v2  v2_rotate(v2 v, f32 sine, f32 cosine);
+NO_DEBUG v2  v2_rotate(v2 v, f32 rad);
+NO_DEBUG v2  v2_rotate_relative(v2 v, v2 pivot, f32 rad);
+NO_DEBUG v2  v2_project(v2 a, v2 b);
+NO_DEBUG v2  v2_project_norm(v2 a, v2 b);
 NO_DEBUG v2  v2_rand_rng(v2 a, v2 b);
-f32 v2_shortest_arc(v2 a, v2 b);
-v2 v2_map_to_11(v2 pos, v2 range);
+NO_DEBUG f32 v2_angle(v2 a, v2 b);
+NO_DEBUG v2  v2_invert_y(v2 v);
+NO_DEBUG v2  v2_map_to_11(v2 pos, v2 range);
 
 ////////////////////////////////////////////////////////////////////////
 // Vector3
@@ -337,6 +343,9 @@ NO_DEBUG v3  v3_cross(v3 a, v3 b);
 NO_DEBUG v3  v3_lerp(v3 a, f32 t, v3 b);
 NO_DEBUG v3  v3_hadamard(v3 a, v3 b);
 NO_DEBUG v3  v3_hadamard_div(v3 a, v3 b);
+NO_DEBUG v3  v3_rotate_x(v3 v, f32 rad);
+NO_DEBUG v3  v3_rotate_y(v3 v, f32 rad);
+NO_DEBUG v3  v3_rotate_z(v3 v, f32 rad);
 NO_DEBUG v3b v3_greater(v3 a, v3 b);
 NO_DEBUG v3b v3_less(v3 a, v3 b);
 NO_DEBUG v3  v3_pos_of_mat4(mat4 mat);
@@ -361,18 +370,40 @@ NO_DEBUG v4  operator/=(v4& v, f32 scalar);
 NO_DEBUG v4  operator-(v4 v);
 NO_DEBUG f32 v4_length_squared(v4 v);
 NO_DEBUG f32 v4_length(v4 v);
-NO_DEBUG v4  v4_norm(v4 v);
+NO_DEBUG v4  v4_norm(v4 a);
+NO_DEBUG f32 v4_dot(v4 v);
+NO_DEBUG v4  v4_lerp(v4 a, f32 t, v4 b);
 NO_DEBUG v4  v4_hadamard(v4 a, v4 b);
+
+////////////////////////////////////////////////////////////////////////
+// Quatornion
+
+v4 quat_identity();
+v4 quat_norm(v4 q);
+v4 quat_conjugate(v4 q);
+v4 quat_inverse(v4 q);
+v4 quat_axis_angle(v3 axis, f32 rad);
+v3 quat_rotate(v4 q, v3 v);
+v4 quat_mul(v4 a, v4 b);
+mat3 quat_to_mat3(v4 q);
+mat4 quat_to_mat4(v4 q);
+v4 quat_slerp(v4 a, v4 b, f32 t);
+v4 quat_nlerp(v4 a, v4 b, f32 t);
+v4 quat_from_to(v3 a, v3 b);
+v4 quat_from_euler(v3 e);
+
+////////////////////////////////////////////////////////////////////////
+// Matrix2
 
 ////////////////////////////////////////////////////////////////////////
 // Matrix3
 
-NO_DEBUG mat3 mat3_identity();
-NO_DEBUG mat3 mat3_translate(v2 pos);
-NO_DEBUG mat3 mat3_scale(v2 scale);
-NO_DEBUG mat3 operator*(mat3 a, mat3 b);
-NO_DEBUG mat3& operator*=(mat3& a, mat3 b);
-NO_DEBUG v3 operator*(mat3 mat, v3 vec);
+mat3 mat3_identity();
+mat3 mat3_translate(v2 pos);
+mat3 mat3_scale(v2 scale);
+mat3 operator*(mat3 a, mat3 b);
+mat3& operator*=(mat3& a, mat3 b);
+v3 operator*(mat3 mat, v3 vec);
 
 ////////////////////////////////////////////////////////////////////////
 // Matrix4
@@ -381,12 +412,12 @@ mat4 mat4_identity();
 mat4 mat4_translate(v3 pos);
 mat4 mat4_scale(v3 scale);
 mat4 mat4_scale_all_elements(mat4 mat, f32 scale);
-mat4 mat4_rotate_x(f32 rad);
-mat4 mat4_rotate_y(f32 rad);
-mat4 mat4_rotate_z(f32 rad);
 mat4 operator*(mat4 a, mat4 b);
 mat4& operator*=(mat4& a, mat4 b);
 v4 operator*(mat4 mat, v4 vec);
+mat4 mat4_rotate_x(f32 rad);
+mat4 mat4_rotate_y(f32 rad);
+mat4 mat4_rotate_z(f32 rad);
 mat4 mat4_rotate_xyz(v3 rot);
 mat4 mat4_transform(v3 pos, v3 rot, v3 scale);
 mat4 mat4_transform(Transform trans);

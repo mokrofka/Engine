@@ -2,6 +2,7 @@
 #include "lib.h"
 #include "tokenizer.h"
 #include "meta.h"
+#include "generated.h"
 
 // TODO:
 // dummy assets/null 
@@ -25,29 +26,12 @@
 // metadesk tables?
 // serelization/deserialization
 // imgui draw text font
+// wrap out of window
+// 2x2 matrix multiplication for v2?
+// 3x3 matrix multiplication for v3?
 
 ////////////////////////////////////////////////////////////////////////
 // @Common
-
-#define IM_VEC2_CLASS_EXTRA                               \
-        constexpr ImVec2(const v2& f) : x(f.x), y(f.y) {} \
-        operator v2() const { return v2(x,y); }
-#include "imgui/imgui.h"
-
-struct ImGui_DrawList {
-  ImDrawList* draw;
-};
-
-ImGui_DrawList imgui_get_window_drawlist();
-void imgui_draw_rect(ImGui_DrawList draw, Rng2 rect, v4 col, f32 rounding = 0, ImDrawFlags flags = 0, f32 thickness = 1);
-void imgui_draw_rect_filled(ImGui_DrawList draw, Rng2 rect, v4 col, f32 rounding = 0, ImDrawFlags flags = 0);
-void imgui_draw_push_clip_rect(ImGui_DrawList draw, Rng2 rect);
-void imgui_draw_pop_clip_rect(ImGui_DrawList draw);
-void imgui_draw_line(ImGui_DrawList draw, v2 p0, v2 p1, v4 col, f32 thickness = 1);
-void imgui_draw_text(ImGui_DrawList draw, v2 pos, v4 col, String fmt, ...);
-void imgui_text(String fmt, ...);
-v2 imgui_calc_text_size(String str);
-void imgui_begin_tab_item(String str);
 
 const v4 ColorWhite       = v4(1,    1,    1,    1);
 const v4 ColorBlack       = v4(0,    0,    0,    1);
@@ -83,6 +67,11 @@ const v4 ColorCollision  = v4(0.86, 0.33, 0.33, 1);
 
 const u32 MaxEntities = KB(10);
 const u32 MaxStaticEntities = KB(10);
+
+struct MyHandle {
+  u32 idx;
+  u32 gen;
+};
 
 struct GpuTextureId { u32 v; };
 struct GpuMaterialId { u32 v; };
@@ -328,7 +317,6 @@ b32 key_pressed_consume(Key key);
 b32 key_down(Key key);
 b32 key_down_consume(Key key);
 void key_consume(Key key);
-void input_update();
 
 ////////////////////////////////////////////////////////////////////////
 // @UI
@@ -344,27 +332,19 @@ struct ScrollState {
   f32 scale_level;
 };
 
-struct ImguiWindow {
+struct UI_Window {
   v2 pos;
   v2 size;
   b32 toggle_fullscreen;
   b32 fullscreen;
   b32 open;
-  ImGuiWindowFlags flags;
-};
-
-struct ProfWindow : ImguiWindow {
-  ScrollState root_scroll_state;
-  ScrollState frames_scroll_state;
-  ScrollState launch_time_scroll_state;
-  ScrollState mem_scroll_state;
 };
 
 ScrollState scroll_state_make(f32 scale);
-void ui_handle_scroll(ScrollState& s, ScrollType type = ScrollType_Default);
-void imgui_window_toggle_fullscreen(ImguiWindow& window);
-void imgui_window_apply_state(ImguiWindow& window);
-void imgui_window_track_state(ImguiWindow& window);
+void scroll_state_update(ScrollState& s, ScrollType type = ScrollType_Default);
+
+#include "vk.h"
+#include "debug.h"
 
 // struct UI_Window {
 //   v2 pos;
@@ -498,14 +478,27 @@ struct GameState {
   Map<String, EntityId> find_entity;
   EntityId referenced_entities[0];
 
+  v3 a;
+  v3 b;
+  v2 a_v2;
+  v2 b_v2;
+  EntityId e;
+  f32 t;
   v4 color;
 };
 
+EntityId e_alloc_bare();
+EntityId e_alloc(GpuMeshId mesh_id, GpuMaterialId material_id, EntityThing thing = {});
+EntityId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing = {});
+void e_free(EntityId e_id);
 void game_init();
 void game_update();
 void game_view();
+void game_save_state();
+void game_load_state();
 
-#include "vk.h"
+String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, EntityFlags flags = {});
+void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser);
 
 ////////////////////////////////////////////////////////////////////////
 // @State
@@ -539,16 +532,14 @@ struct GlobalState {
   Array<String, MaxMaterials> material_id_to_str;
 
   WatchState watch;
-  ProfWindow profile_win;
   GameState game;
-  ImguiWindow game_win;
-  b32 imgui_demo_open;
   InputState input;
 
   Darray<OS_Handle> shader_module_compilation_pids;
   Slice<String> shader_module_compiled_names;
 
   VK_State vk;
+  DebugState debug;
 };
 
 extern GlobalState* st;

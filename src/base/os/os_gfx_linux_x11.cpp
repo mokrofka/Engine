@@ -2,35 +2,13 @@
 
 #if OS_LINUX && GFX_X11
 
+#define explicit xxxxx
+#include <xcb/xkb.h>
+#undef explicit
+
 #include <X11/keysym.h>
 #include <xcb/xcb.h>
 #include <xcb/xcb_keysyms.h>
-
-extern "C" {
-#define XCB_XKB_MAJOR_VERSION 1
-#define XCB_XKB_MINOR_VERSION 0
-typedef struct xcb_xkb_use_extension_cookie_t {
-  unsigned int sequence;
-} xcb_xkb_use_extension_cookie_t;
-typedef struct xcb_xkb_per_client_flags_cookie_t {
-  unsigned int sequence;
-} xcb_xkb_per_client_flags_cookie_t;
-typedef uint16_t xcb_xkb_device_spec_t;
-xcb_xkb_use_extension_cookie_t
-xcb_xkb_use_extension (xcb_connection_t *c,
-                       uint16_t          wantedMajor,
-                       uint16_t          wantedMinor);
-xcb_xkb_per_client_flags_cookie_t
-xcb_xkb_per_client_flags (xcb_connection_t      *c,
-                          xcb_xkb_device_spec_t  deviceSpec,
-                          uint32_t               change,
-                          uint32_t               value,
-                          uint32_t               ctrlsToChange,
-                          uint32_t               autoCtrls,
-                          uint32_t               autoCtrlsValues);
-#define XCB_XKB_ID_USE_CORE_KBD 256
-#define XCB_XKB_PER_CLIENT_FLAG_DETECTABLE_AUTO_REPEAT 1
-}
 
 struct Clipboard {
   xcb_atom_t atom;

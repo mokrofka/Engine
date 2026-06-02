@@ -2901,7 +2901,6 @@ void vk_imgui_init() {
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
   ImGuiStyle& style = ImGui::GetStyle();
   style.FontScaleDpi = 1.3;
-  // ImFont* font = io.Fonts
 
   ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
   platform_io.Platform_GetClipboardTextFn = imgui_platform_get_clipboard_text;
