@@ -65,6 +65,12 @@ void debug_game() {
     ImGui::Begin("Game");
 
     ImGui::ColorEdit4("color picker", g.color.v, ImGuiColorEditFlags_Float);
+    local f32 f = 0;
+    local i32 i = 0;
+    ImGui::SliderFloat("sliderf32", &f, -20, 20);
+    ImGui::SliderInt("slideri32", &i, -20, 20);
+    f = wrap_f32(-10, f, 10);
+    i = wrap_i32(-10, i, 10);
 
     if (ImGui::IsWindowHovered()) {
       if (key_pressed(Key_V)) {

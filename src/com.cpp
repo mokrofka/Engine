@@ -1699,7 +1699,7 @@ void scene_init() {
     g.b = v3(0, 10, 0);
     g.e = e_alloc(Mesh_Cube, Material_Container);
     Entity& e = get_entity(g.e);
-    e.pos = v3(10, 10, 10);
+    e.pos = v3(10, 10, 20);
   }
 
   {
@@ -1811,9 +1811,10 @@ void scene_update() {
 
   v2 pivot = v2(20, 10);
   // e.pos = v2_to_v3(v2_rotate_relative(v2_of_v3(e.pos), pivot, degtorad(20 * get_dt())), 0);
-  e.pos = v3_rotate_z(e.pos, degtorad(20) * get_dt());
-  e.pos = v3_rotate_y(e.pos, degtorad(20) * get_dt());
-  e.pos = v3_rotate_z(e.pos, degtorad(20) * get_dt());
+  // e.pos = v3_rotate_z(e.pos, degtorad(20) * get_dt());
+  // e.pos = v3_rotate_y(e.pos, degtorad(20) * get_dt());
+  // e.pos = v3_rotate_z(e.pos, degtorad(20) * get_dt());
+  e.pos = v3_rotate_around_axis(e.pos, v3(1,1,1), degtorad(60)*get_dt());
 
 }
 

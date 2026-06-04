@@ -183,7 +183,6 @@ b32 FlagIntersects(u64 x, u64 f);
 #define Clamp(a, x, b)         (((x) < (a)) ? (a) : ((x) > (b)) ? (b) : (x))
 #define Clamp01(x)             Clamp(0, (x), 1)
 #define ReverseClamp(a, x, b)  (((x) < (a)) ? (b) : ((b) < (x)) ? (a) : (x))
-#define Wrap(a, x, b)          (((x) < (a)) ? (b) : ((b) < (x)) ? (a) : (x))
 #define Square(x)              ((x) * (x))
 #define Cube(x)                ((x) * (x) * (x))
 #define Sign(x)                (((x) < 0) ? -1 : ((x) > 0) ? 1 : 0)

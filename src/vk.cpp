@@ -2711,9 +2711,9 @@ void vk_draw_cuboid(Rng3 rng, v4 color) {
 
 void vk_draw_rect(Rng2 rect, v4 color) {
   v2 size = v2_of_v2u(os_get_window_size());
-  rect.min = v2_map_to_11(rect.min, size);
+  rect.min = v2_remap_01_to_11(rect.min, size);
   rect.min.y = -rect.min.y;
-  rect.max = v2_map_to_11(rect.max, size);
+  rect.max = v2_remap_01_to_11(rect.max, size);
   rect.max.y = -rect.max.y;
   DebugDrawRect square = {
     .vert = {
