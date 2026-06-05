@@ -1,4 +1,6 @@
 #include "lib.h"
+#include <errno.h>
+#include <string.h>
 
 #if OS_LINUX
 
@@ -218,6 +220,10 @@ OS_Handle os_file_open(String path, OS_AccessFlags flags) {
     lnx_flags |= O_CREAT;
   }
   int fd = open((char*)path_c.str, lnx_flags, 0755);
+  // if (fd == -1) {
+  //   String str = strerror(errno);
+  //   Info("%s", str);
+  // }
   OS_Handle handle = {};
   if (fd != -1) {
     handle.v = fd;

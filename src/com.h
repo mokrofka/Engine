@@ -7,7 +7,7 @@
 // TODO:
 // dummy assets/null 
 // obj mouse selection
-// UI rendering
+// UI
 // memory visualisation thread safe, and gpu memory
 // thread graph visualisation
 // sample profiler
@@ -18,17 +18,10 @@
 // async
 // glb loader
 // introspection
-// upgrade vulkan
 // font rendering
 // reading json 
 // editor
-// full metaprogramming
-// metadesk tables?
-// serelization/deserialization
-// imgui draw text font
-// wrap out of window
-// 2x2 matrix multiplication for v2?
-// 3x3 matrix multiplication for v3?
+// upgrade vulkan
 
 ////////////////////////////////////////////////////////////////////////
 // @Common

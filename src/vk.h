@@ -477,7 +477,6 @@ GpuCubemapId vk_cubemap_load(Texture* textures);
 GpuMeshId vk_mesh_load(Mesh mesh);
 
 void vk_shader_reload(String name);
-void vk_shader_compile_and_load_modules();
 
 void vk_begin_draw_frame();
 void vk_end_draw_frame();
@@ -507,18 +506,4 @@ Slice<String> vk_shader_compile(Allocator arena);
         operator v2() const { return v2(x,y); }
 #include "imgui/imgui.h"
 
-struct ImGui_DrawList {
-  ImDrawList* draw;
-};
-
-ImGui_DrawList imgui_get_window_drawlist();
-void imgui_draw_rect(ImGui_DrawList draw, Rng2 rect, v4 col, f32 rounding = 0, ImDrawFlags flags = 0, f32 thickness = 1);
-void imgui_draw_rect_filled(ImGui_DrawList draw, Rng2 rect, v4 col, f32 rounding = 0, ImDrawFlags flags = 0);
-void imgui_draw_push_clip_rect(ImGui_DrawList draw, Rng2 rect);
-void imgui_draw_pop_clip_rect(ImGui_DrawList draw);
-void imgui_draw_line(ImGui_DrawList draw, v2 p0, v2 p1, v4 col, f32 thickness = 1);
-void imgui_draw_text(ImGui_DrawList draw, v2 pos, v4 col, String fmt, ...);
-void imgui_text(String fmt, ...);
-v2 imgui_calc_text_size(String str);
-void imgui_begin_tab_item(String str);
 

@@ -130,7 +130,7 @@ intern String vk_result_string(VkResult result) {
         xcb_connection_t* connection;
         xcb_window_t window;
       } vk_surface; 
-      os_get_gfx_api_handlers(&vk_surface);
+      os_get_gfx_handlers(&vk_surface);
       VkXcbSurfaceCreateInfoKHR surfaceInfo = {
         .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
         .connection = vk_surface.connection,
@@ -2834,12 +2834,16 @@ ImGuiKey imgui_keycode_translate(Key key) {
     case Key_RBracket:    return ImGuiKey_RightBracket;
     case Key_Apostrophe:  return ImGuiKey_Apostrophe;
 
-    // Mouse
-    case MouseKey_Left:   return (ImGuiKey)ImGuiMouseButton_Left;
-    case MouseKey_Right:  return (ImGuiKey)ImGuiMouseButton_Right;
-    case MouseKey_Middle: return (ImGuiKey)ImGuiMouseButton_Middle;
-
     default: return ImGuiKey_None;
+  }
+}
+
+u32 imgui_mouse_button_translate(MouseButton button) {
+  switch (button) {
+    default: return 0;
+    case MouseButton_Left:   return ImGuiMouseButton_Left;
+    case MouseButton_Right:  return ImGuiMouseButton_Right;
+    case MouseButton_Middle: return ImGuiMouseButton_Middle;
   }
 }
 
@@ -2848,29 +2852,28 @@ void imgui_impl_new_frame() {
   io.DeltaTime = get_dt();
   v2u win_size = os_get_window_size();
   io.DisplaySize = ImVec2(win_size.x, win_size.y);
-  Slice<OS_InputEvent> events = os_get_events();
+  Slice<OS_InputEvent> events = os_get_input_events();
   Loop (i, events.count) {
     OS_InputEvent event = events[i];
     switch (event.type) {
-      case OS_EventKind_Key: {
+      case OS_EventType_Key: {
         ImGuiKey key = imgui_keycode_translate(event.key);
         io.AddKeyEvent(key, event.is_pressed);
         // Info("%u %u", event.key, event.is_pressed);
         if (event.is_pressed) {
-          io.AddInputCharacter(os_key_to_str(event.key, event.modifier));
+          io.AddInputCharacter(os_key_to_character(event.key, event.modifier));
         }
       } break;
-      case OS_EventKind_MouseButton: {
-        ImGuiKey key = imgui_keycode_translate(event.key);
-        io.AddMouseButtonEvent(key, event.is_pressed);
+      case OS_EventType_MouseButton: {
+        io.AddMouseButtonEvent(imgui_mouse_button_translate(event.mouse_button), event.is_pressed);
       } break;
-      case OS_EventKind_MouseMove: {
+      case OS_EventType_MouseMove: {
         io.AddMousePosEvent(event.x, event.y);
       } break;
-      case OS_EventKind_Scroll: {
+      case OS_EventType_Scroll: {
         io.AddMouseWheelEvent(0, event.scroll);
       } break;
-      case OS_EventKind_Modifier:
+      case OS_EventType_Modifier:
         if (FlagHas(event.modifier, OS_Modifier_Shift)) {
           io.AddKeyEvent(ImGuiMod_Shift, true);
           // Info("mod shift true");

@@ -1,5 +1,59 @@
 #include "debug.h"
 
+ImGui_DrawList imgui_get_window_drawlist() {
+  ImGui_DrawList res = {
+    .draw = ImGui::GetWindowDrawList(),
+  };
+  return res;
+}
+void imgui_draw_rect(ImGui_DrawList draw, Rng2 rect, v4 col, f32 rounding, ImDrawFlags flags, f32 thickness) {
+  draw.draw->AddRect(rect.min, rect.max, u32_from_rgba(col), rounding, flags, thickness);
+}
+void imgui_draw_rect_filled(ImGui_DrawList draw, Rng2 rect, v4 col, f32 rounding, ImDrawFlags flags) {
+  draw.draw->AddRectFilled(rect.min, rect.max, u32_from_rgba(col));
+}
+void imgui_draw_push_clip_rect(ImGui_DrawList draw, Rng2 rect) {
+  draw.draw->PushClipRect(rect.min, rect.max, true);
+}
+void imgui_draw_pop_clip_rect(ImGui_DrawList draw) {
+  draw.draw->PopClipRect();
+}
+void imgui_draw_line(ImGui_DrawList draw, v2 p0, v2 p1, v4 col, f32 thickness) {
+  draw.draw->AddLine(p0, p1, u32_from_rgba(col));
+}
+void imgui_draw_text(ImGui_DrawList draw, v2 pos, v4 col, String fmt, ...) {
+  Scratch scratch;
+  VaList args;
+  va_start(args, fmt);
+  String formateted = push_strfv(scratch, fmt, args);
+  va_end(args);
+  draw.draw->AddText(pos, u32_from_rgba(col), (char*)formateted.str, (char*)(formateted.str + formateted.size));
+}
+void imgui_draw_text(ImGui_DrawList draw, ImFont* font, f32 font_size, v2 pos, v4 col, String fmt, ...) {
+  Scratch scratch;
+  VaList args;
+  va_start(args, fmt);
+  String formateted = push_strfv(scratch, fmt, args);
+  va_end(args);
+  draw.draw->AddText(font, font_size, pos, u32_from_rgba(col), (char*)formateted.str, (char*)(formateted.str + formateted.size));
+}
+void imgui_text(String fmt, ...) {
+  Scratch scratch;
+  VaList args;
+  va_start(args, fmt);
+  String formateted = push_strfv(scratch, fmt, args);
+  va_end(args);
+  ImGui::TextUnformatted((char*)formateted.str);
+}
+v2 imgui_calc_text_size(String str) {
+  return ImGui::CalcTextSize((char*)str.str, (char*)str.str+str.size);
+}
+void imgui_begin_tab_item(String str) {
+  Scratch scratch;
+  String str_c = push_str_copy(scratch, str);
+  ImGui::BeginTabItem((char*)str_c.str);
+}
+
 void debug_window_apply_state(DebugWindow& win) {
   if (win.toggle_fullscreen) {
     if (!win.fullscreen) {
@@ -140,10 +194,17 @@ void debug_prof_view() {
   }
 
   if (prof_win.win.open) {
+    f32 thread_name_text_size = 20;
+    f32 time_bar_text_size = 15;
+
     debug_window_apply_state(prof_win.win);
 
     if (ImGui::Begin("Profiler", null, prof_win.win.flags)) {
       debug_window_track_state(prof_win.win);
+
+      Rng2 win_rect = rng2_make(prof_win.win.pos, prof_win.win.size);
+      ImGui::PushClipRect(win_rect.min, win_rect.max, false);
+
       if (key_pressed(Key_1)) prof.future_active_tab = ProfileTabActive_Root;
       if (key_pressed(Key_2)) prof.future_active_tab = ProfileTabActive_Frames;
       if (key_pressed(Key_3)) prof.future_active_tab = ProfileTabActive_Time;
@@ -156,11 +217,10 @@ void debug_prof_view() {
         }
       }
 
-      ImGui::SetWindowFontScale(0.8f);
       if (ImGui::BeginTabBar("MyTabBar")) {
         ImGui_DrawList draw = imgui_get_window_drawlist();
         v2 cursor_pos = ImGui::GetCursorScreenPos();
-        v2 mouse_pos = os_get_mouse_pos();
+        v2 mouse_pos = os_mouse_get_pos();
         v2 win_pos = ImGui::GetWindowPos();
         v2 avail_size = ImGui::GetWindowSize();
         avail_size.x -= (cursor_pos - win_pos).x * 2;
@@ -272,7 +332,6 @@ void debug_prof_view() {
                     str = "work";
                   } break;
                   case ProfType_Sleep: {
-                    // color = ColorGreen0;
                     color = ColorGreenUi;
                     str = "sleep";
                   } break;
@@ -308,7 +367,7 @@ void debug_prof_view() {
                     text_pos = rng2_align_dim_at_center(rect, text_size).min;
                   }
                   imgui_draw_push_clip_rect(draw, rect);
-                  imgui_draw_text(draw, text_pos, ColorWhite, str);
+                  imgui_draw_text(draw, debug.font, time_bar_text_size, text_pos, ColorWhite, str);
                   imgui_draw_pop_clip_rect(draw);
                 }
               } break;
@@ -333,7 +392,8 @@ void debug_prof_view() {
             text_pos.y *= scroll_state.scale.y;
             text_pos.y += scroll_state.offset.y;
             // imgui_draw_text(draw, text_pos, ColorWhite, str);
-            draw.draw->AddText(debug.font, 20, text_pos, u32_from_rgba(ColorWhite), (char*)str.str);
+            imgui_draw_text(draw, debug.font, thread_name_text_size, text_pos, ColorWhite, str);
+            // draw.draw->AddText(debug.font, 20, text_pos, u32_from_rgba(ColorWhite), (char*)str.str);
           }
           {
             Loop (i, THREAD_COUNT) {
@@ -342,7 +402,8 @@ void debug_prof_view() {
               v2 text_pos = v2(0, thread_height_offset + text_off_above) + cursor_pos;
               text_pos.y *= scroll_state.scale.y;
               text_pos.y += scroll_state.offset.y;
-              imgui_draw_text(draw, text_pos, ColorWhite, str);
+              // imgui_draw_text(draw, text_pos, ColorWhite, str);
+              imgui_draw_text(draw, debug.font, thread_name_text_size, text_pos, ColorWhite, str);
             }
             thread_height_offset = 0;
           }
@@ -380,7 +441,7 @@ void debug_prof_view() {
           //   Info("min: %f %f", tab_rect.min.x, tab_rect.min.y);
           //   Info("max: %f %f", tab_rect.max.x, tab_rect.max.y);
           // }
-          if (key_pressed(MouseKey_Left)) {
+          if (os_mouse_is_button_pressed(MouseButton_Left)) {
             if (rng2_contains(tab_rect, mouse_pos)) {
               switch (tab) {
                 case ProfileTabActive_Root: prof.future_active_tab = ProfileTabActive_Root; break;
@@ -439,7 +500,7 @@ void debug_prof_view() {
                 ImGui::BeginTooltip();
                 ImGui::Text("frame: %i", i);
                 ImGui::EndTooltip();
-                if (os_is_key_pressed(MouseKey_Left)) {
+                if (os_mouse_is_button_pressed(MouseButton_Left)) {
                   prof_win.frames_scroll_state.offset.x = -width_size * i;
                   prof_win.frames_scroll_state.scale = v2_splat(1);
                 }
@@ -759,6 +820,8 @@ void debug_prof_view() {
         }
         ImGui::EndTabBar();
       }
+
+      ImGui::PopClipRect();
     } ImGui::End();
   }
 

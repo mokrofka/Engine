@@ -12,52 +12,6 @@
 ////////////////////////////////////////////////////////////////////////
 // @Common
 
-ImGui_DrawList imgui_get_window_drawlist() {
-  ImGui_DrawList res = {
-    .draw = ImGui::GetWindowDrawList(),
-  };
-  return res;
-}
-void imgui_draw_rect(ImGui_DrawList draw, Rng2 rect, v4 col, f32 rounding, ImDrawFlags flags, f32 thickness) {
-  draw.draw->AddRect(rect.min, rect.max, u32_from_rgba(col), rounding, flags, thickness);
-}
-void imgui_draw_rect_filled(ImGui_DrawList draw, Rng2 rect, v4 col, f32 rounding, ImDrawFlags flags) {
-  draw.draw->AddRectFilled(rect.min, rect.max, u32_from_rgba(col));
-}
-void imgui_draw_push_clip_rect(ImGui_DrawList draw, Rng2 rect) {
-  draw.draw->PushClipRect(rect.min, rect.max);
-}
-void imgui_draw_pop_clip_rect(ImGui_DrawList draw) {
-  draw.draw->PopClipRect();
-}
-void imgui_draw_line(ImGui_DrawList draw, v2 p0, v2 p1, v4 col, f32 thickness) {
-  draw.draw->AddLine(p0, p1, u32_from_rgba(col));
-}
-void imgui_draw_text(ImGui_DrawList draw, v2 pos, v4 col, String fmt, ...) {
-  Scratch scratch;
-  VaList args;
-  va_start(args, fmt);
-  String formateted = push_strfv(scratch, fmt, args);
-  va_end(args);
-  draw.draw->AddText(pos, u32_from_rgba(col), (char*)formateted.str, (char*)(formateted.str + formateted.size));
-}
-void imgui_text(String fmt, ...) {
-  Scratch scratch;
-  VaList args;
-  va_start(args, fmt);
-  String formateted = push_strfv(scratch, fmt, args);
-  va_end(args);
-  ImGui::TextUnformatted((char*)formateted.str);
-}
-v2 imgui_calc_text_size(String str) {
-  return ImGui::CalcTextSize((char*)str.str, (char*)str.str+str.size);
-}
-void imgui_begin_tab_item(String str) {
-  Scratch scratch;
-  String str_c = push_str_copy(scratch, str);
-  ImGui::BeginTabItem((char*)str_c.str);
-}
-
 Vertex cube_vertices[] = {
   // Front face (0, 0, 1)
   {.pos = v3(-1.00, -1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0.0f, 0.0f)},
@@ -780,7 +734,7 @@ b32 json_iter_array(JsonReader* r, JsonValue arr, JsonValue* val) {
 // @Input
 
 b32 key_pressed(Key key) {
-  if (os_is_key_pressed(key)) {
+  if (os_key_is_pressed(key)) {
     if (!st->input.consumed[key]) return true;
   }
   return false;
@@ -795,7 +749,7 @@ b32 key_pressed_consume(Key key) {
 }
 
 b32 key_down(Key key) {
-  if (os_is_key_down(key)) {
+  if (os_key_is_down(key)) {
     if (!st->input.consumed[key]) return true;
   }
   return false;
@@ -825,10 +779,10 @@ ScrollState scroll_state_make(f32 scale) {
 }
 
 void scroll_state_update(ScrollState& s, ScrollType type) {
-  f32 wheel = os_get_scroll();
+  f32 wheel = os_mouse_get_wheel();
   if (wheel) {
-    if (os_is_key_down(Key_Ctrl)) {
-      v2 mouse = os_get_mouse_pos();
+    if (os_key_is_down(Key_Ctrl)) {
+      v2 mouse = os_mouse_get_pos();
       f32 sensity = 1.3;
       f32 zoom = (wheel > 0) ? sensity : 1.0f/sensity;
       switch (type) {
@@ -868,10 +822,10 @@ void scroll_state_update(ScrollState& s, ScrollType type) {
     }
   }
 
-  f32 scroll_h = os_get_scroll_h();
+  f32 scroll_h = os_mouse_get_wheel_horizontal();
   if (scroll_h) {
     f32 sensity = 100;
-    if (os_is_key_down(Key_Shift)) {
+    if (os_key_is_down(Key_Shift)) {
       sensity *= 3;
     }
     s.offset.x += scroll_h * sensity;
@@ -1406,7 +1360,7 @@ Mesh grid_generate(Allocator arena, u32 size, f32 step) {
 }
 
 v3 ray_from_camera() {
-  v2 mouse_pos = os_get_mouse_pos();
+  v2 mouse_pos = os_mouse_get_pos();
   v2u win_size = os_get_window_size();
   v2 norm_coords = v2(2 * (mouse_pos.x/win_size.x) - 1, 2 * -(mouse_pos.y/win_size.y) + 1);
   v4 clip_coords = v4(norm_coords.x, norm_coords.y, -1, 1);
@@ -1532,50 +1486,53 @@ void camera_update() {
   // Camera rotation
   {
     f32 rotation_speed = 180.0f * get_dt();
-    if (os_is_key_down(Key_A)) {
+    if (os_key_is_down(Key_A)) {
       cam.yaw += -rotation_speed;
     }
-    if (os_is_key_down(Key_D)) {
+    if (os_key_is_down(Key_D)) {
       cam.yaw += rotation_speed;
     }
-    if (os_is_key_down(Key_R)) {
+    if (os_key_is_down(Key_R)) {
       cam.pitch += rotation_speed;
     }
-    if (os_is_key_down(Key_F)) {
+    if (os_key_is_down(Key_F)) {
       cam.pitch += -rotation_speed;
     }
+    f32 rot_speed = 10;
+    cam.pitch -= os_mouse_get_delta().y * get_dt() * rot_speed;
+    cam.yaw += os_mouse_get_delta().x * get_dt() * rot_speed;
   }
 
   // Camera movement
   {
     f32 speed = cam.speed*1;
     v3 velocity = {};
-    if (os_is_key_down(Key_W)) {
+    if (os_key_is_down(Key_W)) {
       v3 forward = mat4_forward(view);
       velocity += forward;
     }
-    if (os_is_key_down(Key_S)) {
+    if (os_key_is_down(Key_S)) {
       v3 backward = mat4_backward(view);
       velocity += backward;
     }
-    if (os_is_key_down(Key_Q)) {
+    if (os_key_is_down(Key_Q)) {
       v3 left = mat4_left(view);
       velocity += left;
     }
-    if (os_is_key_down(Key_E)) {
+    if (os_key_is_down(Key_E)) {
       v3 right = mat4_right(view);
       velocity += right;
     }
-    if (os_is_key_down(Key_Space)) {
+    if (os_key_is_down(Key_Space)) {
       velocity.y += 1.0f;
     }
-    if (os_is_key_down(Key_X)) {
+    if (os_key_is_down(Key_X)) {
       velocity.y -= 1.0f;
     }
-    if (os_is_key_down(Key_Shift)) {
+    if (os_key_is_down(Key_Shift)) {
       speed *= 20;
     }
-    if (os_is_key_down(Key_LAlt)) {
+    if (os_key_is_down(Key_LAlt)) {
       speed *= 0.1;
     }
     if (velocity != v3_zero()) {
@@ -1721,7 +1678,7 @@ void scene_deinit() {
 void scene_update() {
   Scratch scratch;
   GameState& g = st->game;
-  if (key_pressed(MouseKey_Left)) {
+  if (os_mouse_is_button_pressed(MouseButton_Left)) {
     // select_obj();
     // v3 dir = ray_from_camera();
     // vk_draw_line_consistent(g.cam.pos - v3(0,0.1,0), g.cam.pos + dir*100, ColorWhite);
@@ -1816,6 +1773,23 @@ void scene_update() {
   // e.pos = v3_rotate_z(e.pos, degtorad(20) * get_dt());
   e.pos = v3_rotate_around_axis(e.pos, v3(1,1,1), degtorad(60)*get_dt());
 
+  {
+    if (os_key_is_pressed(Key_U)) {
+      // os_cursor_hide();
+      os_cursor_lock();
+      // os_cursor_confine_window();
+    }
+    if (os_key_is_pressed(Key_I)) {
+      // os_cursor_show();
+      os_cursor_unlock();
+      // os_cursor_release_window();
+    }
+    if (os_key_is_pressed(Key_Y)) {
+      os_mouse_set_pos(v2i(100, 100));
+      v2 pos = os_mouse_get_pos();
+      Info("x %f, y %f", pos.x, pos.y);
+    }
+  }
 }
 
 void game_save_state() {
@@ -1991,11 +1965,11 @@ void game_update() {
   
   Scratch scratch;
   camera_update();
-  if (os_is_key_down(Key_T)) {
+  if (os_key_is_down(Key_T)) {
     scene_deinit();
     scene_init();
   }
-  if (os_is_key_down(Key_Escape)) {
+  if (os_key_is_down(Key_Escape)) {
     os_close_window();
   }
   scene_update();

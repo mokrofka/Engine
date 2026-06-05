@@ -67,7 +67,7 @@ project(Engine)
   set(game_source src/com.cpp)
   # set(game_source src/com.cpp src/tokenizer.cpp)
   set(exe_source src/main.cpp)
-  set(X11_libs -lxcb -lxcb-xkb -lxcb-keysyms)
+  set(X11_libs -lxcb -lxcb-xkb -lxcb-keysyms -lxcb-xinput)
 
   if (dev_build) # reduce build time in release build
     add_compile_definitions(DEAR_IMGUI=1)

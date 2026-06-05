@@ -2,22 +2,9 @@
 #include "os_core.h"
 #include "base/maths.h"
 
-void os_gfx_init();
-void os_gfx_shutdown();
-
-void os_pump_messages();
-b32  os_window_should_close();
-v2u  os_get_window_size();
-v2   os_get_mouse_pos();
-f32  os_get_scroll();
-f32  os_get_scroll_h();
-v2u  os_get_screen_size();
-void os_get_gfx_api_handlers(void* out);
-void os_close_window();
-
 enum Key {
   // Control keys
-  Key_Backspace,
+  Key_Backspace = 1,
   Key_Enter,
   Key_Tab,
   Key_Delete,
@@ -121,14 +108,14 @@ enum Key {
   Key_Slash,
   Key_Backslash,
 
-  // Mouse
-  MouseKey_Left,
-  MouseKey_Right,
-  MouseKey_Middle,
-
-  ScrollKey,
-
   Key_COUNT
+};
+
+enum MouseButton {
+  MouseButton_Left,
+  MouseButton_Right,
+  MouseButton_Middle,
+  MouseButton_COUNT,
 };
 
 typedef u32 OS_Modifiers;
@@ -139,16 +126,17 @@ enum {
 };
 
 enum OS_EventKind {
-  OS_EventKind_Key,
-  OS_EventKind_MouseButton,
-  OS_EventKind_MouseMove,
-  OS_EventKind_Scroll,
-  OS_EventKind_Modifier,
+  OS_EventType_Key,
+  OS_EventType_MouseButton,
+  OS_EventType_MouseMove,
+  OS_EventType_Scroll,
+  OS_EventType_Modifier,
 };
 
 struct OS_InputEvent {
   OS_EventKind type;
   Key key;
+  MouseButton mouse_button;
   u32 character;
   b32 is_pressed;
   OS_Modifiers modifier;
@@ -156,20 +144,55 @@ struct OS_InputEvent {
   f32 scroll;
 };
 
-u32 os_key_to_str(Key key, OS_Modifiers modifiers);
-Slice<OS_InputEvent> os_get_events();
+u32 os_key_to_character(Key key, OS_Modifiers modifiers);
 
+void os_gfx_init();
+void os_gfx_shutdown();
+
+////////////////////////////////////////////////////////////////////////
+// Window related
+void   os_pump_messages();
+b32    os_window_should_close();
+void   os_close_window();
+v2u    os_get_window_size();
+v2u    os_get_screen_size();
+void   os_get_gfx_handlers(void* out);
+void   os_clipboard_text_set(String str);
+String os_clipboard_text_get();
+
+////////////////////////////////////////////////////////////////////////
+// Cursor
+void os_cursor_show();
+void os_cursor_hide();
+b32  os_cursor_is_hiden();
+void os_cursor_confine_window();
+void os_cursor_release_window();
+void os_cursor_lock();
+void os_cursor_unlock();
+
+////////////////////////////////////////////////////////////////////////
+// Input
 void os_input_update();
+Slice<OS_InputEvent> os_get_input_events();
 
-b32 os_is_key_down(Key key);
-b32 os_is_key_up(Key key);
-b32 os_was_key_down(Key key);
-b32 os_was_key_up(Key key);
-b32 os_is_key_pressed(Key key);
-b32 os_is_key_released(Key key);
+b32 os_key_is_down(Key key);
+b32 os_key_is_up(Key key);
+b32 os_key_was_down(Key key);
+b32 os_key_was_up(Key key);
+b32 os_key_is_pressed(Key key);
+b32 os_key_is_released(Key key);
 
-void os_clipboard_write(String str);
-String os_clipboard_read();
+b32 os_mouse_is_button_down(MouseButton button);
+b32 os_mouse_is_button_up(MouseButton button);
+b32 os_mouse_was_button_down(MouseButton button);
+b32 os_mouse_was_button_up(MouseButton button);
+b32 os_mouse_is_button_pressed(MouseButton button);
+b32 os_mouse_is_button_released(MouseButton button);
+v2  os_mouse_get_pos();
+f32 os_mouse_get_wheel();
+f32 os_mouse_get_wheel_horizontal();
+v2  os_mouse_get_delta();
+void os_mouse_set_pos(v2i pos); // works only when cursor is hidden
 
 const char* imgui_platform_get_clipboard_text(struct ImGuiContext* ctx);
 void imgui_platform_set_clipboard_text(struct ImGuiContext* ctx, const char* text);
