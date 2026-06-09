@@ -180,7 +180,7 @@ typedef u32 GpuMemId;
 struct GpuBlockList {
   u32 next;
   b32 is_allocated;
-  BufferRegion range;
+  Region range;
 };
 
 struct GpuAllocSegList {

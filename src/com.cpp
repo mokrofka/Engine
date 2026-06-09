@@ -1,5 +1,6 @@
 #include "com.h"
 
+#include "gfx.cpp"
 #include "vk.cpp"
 #include "test.cpp"
 #include "tokenizer.cpp"
@@ -89,15 +90,10 @@ Timer timer_make(f32 interval) {
   return timer;
 }
 
-void timer_tick(Timer& t) {
-  t.passed += st->dt;
+b32 timer_passed(Timer& t) {
+  t.passed += get_dt();
   if (t.passed >= t.interval) {
     t.passed = 0;
-  }
-}
-
-b32 timer_passed(Timer& t) {
-  if (t.passed >= t.interval) {
     return true;
   }
   return false;
@@ -212,7 +208,7 @@ Mesh load_gltf(Allocator arena, String name) {
     // u32 vert_count[10];
     u32 vert_count;
     u32 index_count;
-    BufferRegion ranges[10];
+    Region ranges[10];
     String file_name;
     u32 file_size;
   } info = {};
@@ -348,7 +344,7 @@ Mesh load_glb(Allocator arena, String name) {
   };
   struct MeshInfo {
     Accessor accessors[10];
-    BufferRegion buffer_views[10];
+    Region buffer_views[10];
     Primitives primitives;
     String file_name;
     u32 file_size;
@@ -1236,7 +1232,6 @@ if (data->ctx == null) {
   u64 target_fps = Billion(1) / 60;
   u64 last_time = os_now_ns();
 
-
   while (!os_window_should_close()) {
     if (st->should_hotreload) {
       goto hotreload;
@@ -1256,7 +1251,6 @@ if (data->ctx == null) {
       game_update();
       // ui_end();
       vk_end_draw_frame();
-      os_input_update();
       watch_update();
 
       u64 frame_duration = os_now_ns() - start_time;
@@ -1277,6 +1271,32 @@ if (data->ctx == null) {
 
   hotreload:
   thread_wait_for();
+}
+
+void gfx_api_design_foo() {
+  // {
+  //   bind_pipeline(shader0);
+  //   draw_thing(mesh0, pos0);
+  
+  //   bind_pipeline(shader1);
+  //   draw_thing(mesh1, pos1);
+  // }
+
+  // {
+  //   push_pipeline(shader0);
+  //   draw_thing(mesh, pos);
+  //   pop_pipeline();
+  
+  //   push_pipeline(shader1);
+  //   draw_thing(mesh1, pos1);
+  //   pop_pipeline();
+  // }
+
+  // {
+  //   init:
+  //   make_renderable(e_id0, mesh0, pipeline0);
+  //   make_renderable(e_id1, mesh1, pipeline1);
+  // }
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -1359,18 +1379,6 @@ Mesh grid_generate(Allocator arena, u32 size, f32 step) {
   return mesh;
 }
 
-v3 ray_from_camera() {
-  v2 mouse_pos = os_mouse_get_pos();
-  v2u win_size = os_get_window_size();
-  v2 norm_coords = v2(2 * (mouse_pos.x/win_size.x) - 1, 2 * -(mouse_pos.y/win_size.y) + 1);
-  v4 clip_coords = v4(norm_coords.x, norm_coords.y, -1, 1);
-  v4 eye_coord = mat4_inverse(st->projection) * clip_coords;
-  eye_coord = v4(eye_coord.x, eye_coord.y, -1, 0);
-  v3 world_coord = v3_of_v4(st->view * eye_coord);
-  world_coord = v3_norm(world_coord);
-  return world_coord;
-}
-
 // b32 ray_intersect_AABB(Ray ray, AABB aabb) {
 //   v3 tMin = v3_hadamard_div(aabb.min - ray.origin, ray.dir);
 //   v3 tMax = v3_hadamard_div(aabb.max - ray.origin, ray.dir);
@@ -1403,6 +1411,7 @@ EntityId e_alloc(GpuMeshId mesh_id, GpuMaterialId material_id, EntityThing thing
     .scale = v3_one(),
     .mesh_id = mesh_id,
     .material_id = material_id,
+    .aabb = Rng3(v3_splat(-1), v3_splat(1)),
   };
   vk_make_renderable(e_id, mesh_id, material_id);
   ++g.entities_count;
@@ -1449,7 +1458,7 @@ void e_static_free(StaticEntityId e_id) {
 
 void select_obj() {
   GameState& g = st->game;
-  v3 dir = ray_from_camera();
+  v3 dir = ray_from_screen(os_mouse_get_pos(), os_get_window_size(), g.cam.pos, st->view, st->projection).dir;
   EntityId e_id = e_alloc(Mesh_Cube, Material_Orange);
   Entity& e = get_entity(e_id);
   // e.pos() = st->cam.pos + v3_norm(mat4_forward(st->cam.view));
@@ -1498,9 +1507,11 @@ void camera_update() {
     if (os_key_is_down(Key_F)) {
       cam.pitch += -rotation_speed;
     }
-    f32 rot_speed = 10;
-    cam.pitch -= os_mouse_get_delta().y * get_dt() * rot_speed;
-    cam.yaw += os_mouse_get_delta().x * get_dt() * rot_speed;
+    if (g.fps_camera) {
+      f32 rot_speed = 10;
+      cam.pitch -= os_mouse_get_delta().y * get_dt() * rot_speed;
+      cam.yaw += os_mouse_get_delta().x * get_dt() * rot_speed;
+    }
   }
 
   // Camera movement
@@ -1558,7 +1569,7 @@ void scene_init() {
   g.rotating_cube_id = e_alloc(Mesh_Cube, Material_Orange, {"rotating_cube", EntityFlag_Referenced});
   g.monkey_id = e_alloc(Mesh_MonkeyGlb, Material_Container, {"monkey", EntityFlag_Referenced});
   Entity& monkey = get_entity(g.monkey_id);
-  monkey.aabb = {v3_splat(-1.2), v3_splat(1.2)};
+  monkey.aabb = Rng3(v3_splat(-1.2), v3_splat(1.2));
   {
     EntityId triangle_id = e_alloc(Mesh_Triangle, Material_Orange);
     Entity& triangle = get_entity(triangle_id);
@@ -1680,8 +1691,9 @@ void scene_update() {
   GameState& g = st->game;
   if (os_mouse_is_button_pressed(MouseButton_Left)) {
     // select_obj();
-    // v3 dir = ray_from_camera();
-    // vk_draw_line_consistent(g.cam.pos - v3(0,0.1,0), g.cam.pos + dir*100, ColorWhite);
+    // v3 dir = ray_from_screen();
+    Ray ray = ray_from_screen(os_mouse_get_pos(), os_get_window_size(), g.cam.pos, st->view, st->projection);
+    vk_draw_line_consistent(ray.pos - v3(0,0.1,0), g.cam.pos + ray.dir*100, ColorWhite);
     // v3 max = st->cam.pos + v3_one();
     // v3 min = st->cam.pos - v3_one();
   }
@@ -1775,19 +1787,12 @@ void scene_update() {
 
   {
     if (os_key_is_pressed(Key_U)) {
-      // os_cursor_hide();
-      os_cursor_lock();
-      // os_cursor_confine_window();
-    }
-    if (os_key_is_pressed(Key_I)) {
-      // os_cursor_show();
-      os_cursor_unlock();
-      // os_cursor_release_window();
-    }
-    if (os_key_is_pressed(Key_Y)) {
-      os_mouse_set_pos(v2i(100, 100));
-      v2 pos = os_mouse_get_pos();
-      Info("x %f, y %f", pos.x, pos.y);
+      if (g.fps_camera) {
+        os_cursor_unlock();
+      } else {
+        os_cursor_lock();
+      }
+      g.fps_camera = !g.fps_camera;
     }
   }
 }
@@ -1947,7 +1952,6 @@ void game_init() {
 void game_update() {
   ProfFunc;
   GameState& g = st->game;
-  timer_tick(g.timer);
   {
     Entity& e = get_entity(g.monkey_id);
     e.pos.x += get_dt() * 1;

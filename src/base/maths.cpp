@@ -1,4 +1,5 @@
 #include "maths.h"
+#include "os/os_core.h"
 
 f32 degtorad(f32 degrees) { return degrees * PI / 180.0f; }
 f32 radtodeg(f32 radians) { return radians * 180.0f / PI; }
@@ -110,7 +111,7 @@ f32 rand_f32_11()                     { return rand_f32_01()*2.0f - 1.0f; }
 f32 rand_f32()                        { return rand_f32_01()*2*U16_MAX - U16_MAX; }
 f32 rand_rng_f32(f32 min, f32 max)    { return rand_f32_01()*(max - min) + min ; }
 b32 rand_b32()                        { return rand_u32() % 2; }
-void rand_seed()                      { _seed = cpu_timer_now(); }
+void rand_set_seed()                      { _seed = cpu_timer_now(); }
 u32 rand_get_seed()                   { return _seed; }
 
 ////////////////////////////////////////////////////////////////////////
@@ -899,6 +900,26 @@ mat4 mat4_inverse(mat4 m) {
   f32 one_over_det = 1 / dot1;
   
   return mat4_scale_all_elements(inverse, one_over_det);
+}
+
+////////////////////////////////////////////////////////////////////////
+// Misc
+
+Ray ray_make(v3 pos, v3 dir) { return Ray(pos, dir); }
+Ray ray_from_screen(v2 screen_pos, v2u viewport_rect, v3 origin, mat4 view, mat4 projection) {
+  v2 mouse_pos = screen_pos;
+  v2u win_size = viewport_rect;
+  v2 norm_coords = v2(2 * (mouse_pos.x/win_size.x) - 1, 2 * -(mouse_pos.y/win_size.y) + 1);
+  v4 clip_coords = v4(norm_coords.x, norm_coords.y, -1, 1);
+  v4 eye_coord = mat4_inverse(projection) * clip_coords;
+  eye_coord = v4(eye_coord.x, eye_coord.y, -1, 0);
+  v3 world_coord = v3_of_v4(view * eye_coord);
+  world_coord = v3_norm(world_coord);
+  return ray_make(origin, world_coord);
+}
+v2 world_to_screen(v3 pos, v3 camera_pos, mat4 view, mat4 projection) {
+
+  return {};
 }
 
 ////////////////////////////////////////////////////////////////////////

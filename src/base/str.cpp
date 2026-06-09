@@ -724,7 +724,7 @@ f32 f32_from_str(String str) { return f64_from_str(str); };
 ////////////////////////////////////////////////////////////////////////
 // String Path Helpers
 
-String str_chop_after_last_slash(String string){
+String str_chop_past_last_slash(String string){
   if (string.size > 0) {
     u8* ptr = string.str + string.size - 1;
     for (; ptr >= string.str; --ptr) {

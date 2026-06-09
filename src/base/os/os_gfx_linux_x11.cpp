@@ -75,6 +75,8 @@ Key lnx_x11_keycode_translate(u32 keysym) {
     case XK_Alt_R:        return Key_RAlt;
     case XK_Escape:       return Key_Escape;
     case XK_Caps_Lock:    return Key_Capslock;
+    case XK_Super_L:      return Key_Super;
+    case XK_Super_R:      return Key_Super;
 
     // Navigation
     case XK_space:        return Key_Space;
@@ -364,6 +366,7 @@ void os_gfx_shutdown() { xcb_disconnect(gfx_st.connection); }
 
 void os_pump_messages() {
   X11State& g = gfx_st;
+  os_input_update();
   array_clear(g.input_events);
   g.input.wheel = 0;
   g.input.wheel_horizontal = 0;
@@ -741,14 +744,13 @@ b32 os_key_is_released(Key key)                     { return os_key_is_up(key) &
 
 b32 os_mouse_is_button_down(MouseButton button)     { return gfx_st.input.mouse_current.buttons[button] == true; }
 b32 os_mouse_is_button_up(MouseButton button)       { return gfx_st.input.mouse_current.buttons[button] == false; }
-b32 os_mouse_was_button_down(MouseButton button)    { return gfx_st.input.mouse_previous.buttons[button] = true; }
-b32 os_mouse_was_button_up(MouseButton button)      { return gfx_st.input.mouse_previous.buttons[button] = false; }
+b32 os_mouse_was_button_down(MouseButton button)    { return gfx_st.input.mouse_previous.buttons[button] == true; }
+b32 os_mouse_was_button_up(MouseButton button)      { return gfx_st.input.mouse_previous.buttons[button] == false; }
 b32 os_mouse_is_button_pressed(MouseButton button)  { return os_mouse_is_button_down(button) && os_mouse_was_button_up(button); }
 b32 os_mouse_is_button_released(MouseButton button) { return os_mouse_is_button_up(button) && os_mouse_was_button_down(button); }
 v2  os_mouse_get_pos()                              { return v2(gfx_st.input.mouse_current.x, gfx_st.input.mouse_current.y); }
 f32 os_mouse_get_wheel()                            { return gfx_st.input.wheel; }
 f32 os_mouse_get_wheel_horizontal()                 { return gfx_st.input.wheel_horizontal; }
-// v2  os_mouse_get_delta()                            { return v2(gfx_st.input.mouse_current.x - gfx_st.input.mouse_previous.x, gfx_st.input.mouse_current.y - gfx_st.input.mouse_previous.y); }
 v2  os_mouse_get_delta()                            { return v2(gfx_st.input.mouse_x_delta, gfx_st.input.mouse_y_delta); }
 void os_mouse_set_pos(v2i pos) {
   X11State& g = gfx_st;

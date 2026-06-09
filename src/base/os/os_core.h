@@ -110,16 +110,19 @@ u64            os_file_size(OS_Handle file);
 FileProperties os_file_properties(OS_Handle file);
 Slice<u8>      os_file_path_read_all(Allocator arena, String path);
 b32            os_file_path_exists(String path);
-b32            os_file_path_copy(String dst, String src);
+b32            os_file_path_copy(String src, String dst);
 void           os_file_path_copy_mtime(String src, String dst);
 FileProperties os_file_path_properties(String path);
-b32            os_file_path_equal_mtime(String a, String b);
+DenseTime      os_file_path_mtime(String path);
+void           os_file_path_rename(String path, String new_name);
+void           os_file_path_remove(String path);
+void           os_file_path_move(String src, String dst);
 
 ///////////////////////////////////
 // Directory
 OS_Handle os_directory_open(String path);
-OS_Handle os_directory_create(String path);
-OS_Handle os_directory_create_p(String path);
+OS_Handle os_directory_make(String path);
+OS_Handle os_directory_make_p(String path);
 b32       os_directory_path_exist(String path);
 
 ///////////////////////////////////
@@ -135,6 +138,7 @@ StringList os_watch_check(Allocator arena, OS_Watch watch);
 OS_FileIter* os_file_iter_begin(Allocator arena, String path, OS_FileIterFlags flags);
 b32          os_file_iter_next(Allocator arena, OS_FileIter* iter, OS_FileInfo* info_out);
 void         os_file_iter_end(OS_FileIter* iter);
+StringList   os_file_iter_directory(Allocator arena, String path, OS_FileIterFlags flags);
 
 ///////////////////////////////////
 // Processes

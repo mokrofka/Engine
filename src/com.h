@@ -21,7 +21,7 @@
 // font rendering
 // reading json 
 // editor
-// upgrade vulkan
+// upgrade vulkan: new gfx api, shader object, bufferaddress, descriptor buffer
 
 ////////////////////////////////////////////////////////////////////////
 // @Common
@@ -169,7 +169,6 @@ struct Timer {
 };
 
 Timer timer_make(f32 interval);
-void timer_tick(Timer& t);
 b32 timer_passed(Timer& t);
 
 f64 tsc_to_ms(u64 tsc);
@@ -336,6 +335,7 @@ struct UI_Window {
 ScrollState scroll_state_make(f32 scale);
 void scroll_state_update(ScrollState& s, ScrollType type = ScrollType_Default);
 
+#include "gfx.h"
 #include "vk.h"
 #include "debug.h"
 
@@ -450,6 +450,7 @@ struct GameState {
   Arena arena;
   AllocSegList gpa;
   Camera cam;
+  b32 fps_camera;
   Timer timer;
 
   Entity* entities;

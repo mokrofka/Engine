@@ -34,7 +34,7 @@ u32 ctz(u64 val)                   { return __builtin_ctzll(val); }
 u32 count_bits_set(u64 val)        { return __builtin_popcountll(val); }
 u32 most_significant_bit(u64 size) { return 63 - clz(size); }
 
-u64 BitHas(u64 x, u64 pos)       { return x & (1 << pos); }
+b32 BitHas(u64 x, u64 pos)       { return x & (1 << pos); }
 u64 FlagSet(u64 x, u64 f)        { return x | f; }
 u64 FlagClear(u64 x, u64 f)      { return x & ~f; }
 u64 FlagToggle(u64 x, u64 f)     { return x ^ f; }

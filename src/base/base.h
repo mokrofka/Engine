@@ -163,7 +163,7 @@ u32 count_bits_set(u64 val);
 u32 most_significant_bit(u64 size);
 
 #define Bit(x) (1 << (x))
-u64 BitHas(u64 x, u64 pos);
+b32 BitHas(u64 x, u64 pos);
 u64 FlagSet(u64 x, u64 f);
 u64 FlagClear(u64 x, u64 f);
 u64 FlagToggle(u64 x, u64 f);
@@ -346,9 +346,12 @@ const u32 THREAD_COUNT = 2;
 ////////////////////////////////////////////////////////////////////////
 // Types
 
-struct BufferRegion {
+struct Region {
   u64 offset;
-  u64 size;
+  union {
+    u64 size;
+    u64 count;
+  };
 };
 
 struct RingBuffer {

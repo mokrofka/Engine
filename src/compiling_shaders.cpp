@@ -17,10 +17,10 @@ i32 main(i32 args_count, char* args[]) {
   String time_stamps_file_path = push_strf(scratch, "%s/%s", cur_dir, "saved_time_stamps_for_shad");
 
   if (!os_directory_path_exist(shader_dir)) {
-    os_directory_create_p(shader_dir);
+    os_directory_make_p(shader_dir);
   }
   if (!os_directory_path_exist(compiled_shader_dir)) {
-    os_directory_create_p(compiled_shader_dir);
+    os_directory_make_p(compiled_shader_dir);
   }
 
   String com_slang_file_path = push_strf(scratch, "%s/%s", shader_dir, String("com.slang"));
@@ -70,7 +70,7 @@ i32 main(i32 args_count, char* args[]) {
       String shader_path = push_strf(scratch, "%s/%s", shader_dir, info.name);
       String shader_name = str_chop_last_dot(info.name);
       String compiled_shader_path = push_strf(scratch, "%s/%s.spv", compiled_shader_dir, shader_name);
-      if ((!os_file_path_equal_mtime(shader_path, compiled_shader_path) || is_change) && (!str_match(info.name, "com.slang") && !str_match(info.name, "lib.slang"))) {
+      if ((os_file_path_mtime(shader_path) != os_file_path_mtime(compiled_shader_path) || is_change) && (!str_match(info.name, "com.slang") && !str_match(info.name, "lib.slang"))) {
         Shader f = {
           .shader_path = shader_path,
           .compiled_shader_path = compiled_shader_path,

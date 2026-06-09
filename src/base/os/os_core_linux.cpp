@@ -280,7 +280,7 @@ b32 os_file_path_exists(String path) {
   return false;
 }
 
-b32 os_file_path_copy(String dst, String src) {
+b32 os_file_path_copy(String src, String dst) {
   b32 result = 0;
   OS_Handle src_h = os_file_open(src, OS_AccessFlag_Read);
   OS_Handle dst_h = os_file_open(dst, OS_AccessFlag_Write);
@@ -327,15 +327,23 @@ Slice<u8> os_file_path_read_all(Allocator arena, String path) {
   return {buffer, read_size};
 }
 
-b32 os_file_path_equal_mtime(String a, String b) {
-  FileProperties props_a = os_file_path_properties(a);
-  FileProperties props_b = os_file_path_properties(b);
-  if (props_a.modified == props_b.modified) {
-    return true;
-  }
-  return false;
+DenseTime os_file_path_mtime(String path) {
+  return os_file_path_properties(path).modified;
 }
 
+void os_file_path_rename(String path, String new_name) {
+
+}
+
+void os_file_path_remove(String path) {
+
+}
+
+void os_file_path_move(String src, String dst) {
+
+}
+
+///////////////////////////////////
 // Directory
 
 OS_Handle os_directory_open(String path) {
@@ -349,7 +357,7 @@ OS_Handle os_directory_open(String path) {
   return result;
 }
 
-OS_Handle os_directory_create(String path) {
+OS_Handle os_directory_make(String path) {
   Scratch scratch;
   String path_c = push_str_copy(scratch, path);
   int fd = mkdir((char*)path_c.str, S_IRWXU);
@@ -360,17 +368,17 @@ OS_Handle os_directory_create(String path) {
   return result;
 }
 
-OS_Handle os_directory_create_p(String path) {
+OS_Handle os_directory_make_p(String path) {
   Scratch scratch;
   Loop (i, path.size) {
     if (char_is_slash(path.str[i])) {
       String parent_dir = push_str_copy(scratch, str_prefix(path, i));
       if (!os_directory_path_exist(parent_dir)) {
-        os_directory_create(parent_dir);
+        os_directory_make(parent_dir);
       }
     }
   }
-  OS_Handle result = os_directory_create(path);
+  OS_Handle result = os_directory_make(path);
   return result;
 }
 
@@ -386,6 +394,7 @@ b32 os_directory_path_exist(String path) {
   return false;
 }
 
+///////////////////////////////////
 // Watch
 
 OS_Watch os_watch_open(OS_WatchFlags flags) {
@@ -448,7 +457,7 @@ StringList os_watch_check(Allocator arena, OS_Watch watch) {
   return result;
 }
 
-
+///////////////////////////////////
 // Directory iteration
 
 OS_FileIter* os_file_iter_begin(Allocator arena, String path, OS_FileIterFlags flags) {
@@ -498,6 +507,16 @@ b32 os_file_iter_next(Allocator arena, OS_FileIter* iter, OS_FileInfo* info_out)
 void os_file_iter_end(OS_FileIter *iter) {
   OS_LNX_FileIter *lnx_iter = (OS_LNX_FileIter*)iter->memory;
   closedir(lnx_iter->dir);
+}
+
+StringList os_file_iter_directory(Allocator arena, String path, OS_FileIterFlags flags) {
+  StringList res = {};
+  OS_FileIter* it = os_file_iter_begin(arena, path, flags);
+  for (OS_FileInfo info = {}; os_file_iter_next(arena, it, &info);) {
+    str_list_push(arena, &res, info.name);
+  }
+  os_file_iter_end(it);
+  return res;
 }
 
 ////////////////////////////////////////////////////////////////////////

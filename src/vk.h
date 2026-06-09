@@ -1,8 +1,6 @@
 #pragma once
 #include "vk_bindings.h"
 
-#include "vulkan/vulkan_core.h"
-
 const u32 MaxMaterials  = KB(1);
 const u32 MaxLights     = KB(1);
 const u32 MaxLines      = KB(1);
@@ -15,7 +13,7 @@ const u32 MaxDebugLines = KB(1);
   #define VK_CHECK(expr)                     \
     {                                        \
       if (expr != VK_SUCCESS) {              \
-        Error("%s", vk_result_string(expr)); \
+        Error("%s", vk_result_str(expr)); \
         InvalidPath;                         \
       }                                      \
     }
@@ -33,31 +31,22 @@ struct GpuMaterial {
   u32 texture_idx;
 };
 
-typedef u32 VK_BufferUsageFlags;
-enum {
-  VK_BufferUsageFlag_Vert = Bit(0),
-  VK_BufferUsageFlag_Index = Bit(1),
-  VK_BufferUsageFlag_Dst = Bit(2),
-  VK_BufferUsageFlag_Src = Bit(3),
-  VK_BufferUsageFlag_Storage = Bit(4),
-  VK_BufferUsageFlag_Indirect = VK_BufferUsageFlag_Storage | Bit(5),
-};
-
 enum VK_DescriptorType {
   VK_DescriptorType_Storage,
   VK_DescriptorType_Image,
   VK_DescriptorType_Sampler,
 };
 
-enum VK_MemType {
-  VK_MemType_Gpu,
-  VK_MemType_Cpu,
-};
-
 enum VK_RenderpassType {
   VK_RenderpassType_World,
   VK_RenderpassType_UI,
   VK_RenderpassType_Screen,
+};
+
+struct GPUJob {
+  VkFence fence;
+  void (*on_complete)(void*);
+  void* user_data;
 };
 
 ///////////////////////////////////
@@ -112,7 +101,7 @@ struct GlobalStateGPU {
   u32 entity_indices[MaxEntities+MaxStaticEntities];
 };
 
-struct VK_Pipeline {
+struct VK_Pipeline0 {
   VkPipeline h;
   u32 batch_idx;
 };
@@ -150,43 +139,6 @@ struct VK_PushConstant {
   u32 drawcall_offset;
 };
 
-struct VK_Memory {
-  VkDeviceMemory h;
-  u8* mapped_mem;
-  u64 pos;
-  u64 cap;
-};
-
-struct VK_Buffer {
-  VkBuffer h;
-  u8* base;
-  u64 pos;
-  u64 cap;
-};
-
-struct VK_ImageInfo {
-  VkImageType image_type;
-  u32 width;
-  u32 height;
-  u32 miplevels_count;
-  VkImageCreateFlags flags;
-  VkFormat format;
-  u32 array_layers_count;
-  VkSampleCountFlagBits samples;
-  VkImageTiling tiling;
-  VkImageUsageFlags usage;
-  VkMemoryPropertyFlags memory_flags;
-  VkImageAspectFlags aspect;
-  VkImageViewType view_type;
-};
-
-struct VK_Image {
-  VkImage h;
-  VkImageView view;
-  VK_ImageInfo info;
-  u64 offset;
-};
-
 struct VK_Mesh {
   u32 vert_count;
   u64 vert_mem_offset;
@@ -194,60 +146,10 @@ struct VK_Mesh {
   u64 index_mem_offset;
 };
 
-struct VK_Swapchain {
-  VkSwapchainKHR h;
-  VkSwapchainKHR h_old;
-  VkSurfaceFormatKHR format;  
-  VkPresentModeKHR present_mode;
-  VK_Image images[4];
-  VK_Image old_images[4];
-  VK_Image depth_attachment;
-  u64 depth_image_mem_offset;
-};
-
-struct VK_SwapchainSupportInfo {
-  VkSurfaceCapabilitiesKHR capabilities;
-  u32 format_count;
-  VkSurfaceFormatKHR* formats;
-  u32 present_mode_count;
-  VkPresentModeKHR* present_modes;
-};
-
-struct VK_Device {
-  VkPhysicalDevice physical_device;
-  VkDevice logical_device;
-  VK_SwapchainSupportInfo swapchain_support;
-  u32 graphics_queue_family_idx;
-  u32 transfer_queue_family_idx;
-  u32 compute_queue_family_idx;
-  VkQueue graphics_queue;
-  VkQueue present_queue;
-  VkQueue transfer_queue;
-  VkQueue compute_queue;
-  VkCommandPool cmd_pool;
-  VkPhysicalDeviceProperties properties;
-  VkPhysicalDeviceFeatures features;
-  VkPhysicalDeviceMemoryProperties memory;
-  u32 gpu_type_idx;
-  u32 cpu_type_idx;
-  VkFormat depth_format;
-};
-
-struct VK_ShaderModule {
-  VkPipelineShaderStageCreateInfo stages[2];
-};
-
 struct VK_ShaderModuleEntry {
-  VK_ShaderModule module;
+  VK_Shader module;
   Darray<u32> track_pipelines;
   Darray<u32> track_shader_states;
-};
-
-struct VK_SyncObj {
-  VkSemaphore* image_available_semaphores;
-  VkSemaphore* render_complete_semaphores;
-  VkSemaphore* compute_complete_semaphores;
-  VkFence* in_flight_fences;
 };
 
 struct VK_DrawCallInfo {
@@ -274,13 +176,25 @@ struct VK_State {
   VkDebugUtilsMessengerEXT debug_messenger;
   
   VK_Device device;
-  VK_SyncObj sync;
   VK_Swapchain swapchain;
+
+  VkSemaphore* image_available_semaphores;
+  VkSemaphore* render_complete_semaphores;
+  VkSemaphore* compute_complete_semaphores;
+  VkFence* in_flight_fences;
+
+  // VK_Semaphore* frames_upload_semaphores;
+  VkCommandBuffer* cmds_frames_upload;
+  VkFence* fences_frames_upload;
+  VkCommandBuffer* cmds_render;
+  VkCommandBuffer* cmds_upload;
+  VkFence* fences_async_upload;
 
   u32 images_in_flight;
   u32 frames_in_flight;
   u32 current_image_idx;
   u32 current_frame_idx;
+  u32 current_frame_idx_one_more;
   u32 width;
   u32 height;
   f32 scale;
@@ -298,8 +212,6 @@ struct VK_State {
   VkDescriptorSetLayout descriptor_set_layout;
   VkDescriptorSet descriptor_sets;
 
-  VkCommandBuffer* cmds;
-  VkCommandBuffer upload_cmd;
   VkSampler sampler;
   VkPipelineLayout pipeline_layout;
 
@@ -307,7 +219,7 @@ struct VK_State {
   VK_Image offscreen_depth_buffer;
   VK_Image* texture_targets;
 
-  Darray<VK_Pipeline> pipelines;
+  Darray<VK_Pipeline0> pipelines0;
   Darray<u32> entity_pipelines;
   u32 screen_pipeline;
   u32 cubemap_pipeline;
@@ -341,6 +253,12 @@ struct VK_State {
   MaterialGPU* gpu_materials;
   VK_DrawCallInfo* gpu_draw_call_infos;
   u32* gpu_entities_indices;
+
+  Array<VK_Shader, Gfx_MaxShaders> shaders;
+  Array<VK_Pipeline, Gfx_MaxPipelines> pipelines;
+  Array<VK_Image, Gfx_MaxImages> images;
+  Array<VK_View, Gfx_MaxViews> views;
+  Array<VK_Sampler, Gfx_MaxSamplers> samplers;
 
   ///////////////////////////////////
   // Vulkan loader
@@ -391,11 +309,13 @@ struct VK_State {
     X(BindImageMemory) \
     X(CreateSemaphore) \
     X(DestroySemaphore) \
+    X(WaitSemaphores) \
     X(CreateFence) \
     X(DestroyFence) \
     X(WaitForFences) \
-    X(AcquireNextImageKHR) \
     X(ResetFences) \
+    X(GetFenceStatus) \
+    X(AcquireNextImageKHR) \
     X(CreateDescriptorSetLayout) \
     X(DestroyDescriptorSetLayout) \
     X(CreateDescriptorPool) \
@@ -414,6 +334,7 @@ struct VK_State {
     X(CreatePipelineLayout) \
     X(DestroyPipelineLayout) \
     X(CreateGraphicsPipelines) \
+    X(CreateComputePipelines) \
     X(DestroyPipeline) \
     X(AllocateDescriptorSets) \
     X(FreeDescriptorSets) \
@@ -466,6 +387,10 @@ struct VK_State {
   VK_DEVICE_GET_PROC_LIST;
 #undef X
 };
+
+void vk_image_layout_transition(VkCommandBuffer cmd, VK_Image image, VkImageLayout old_layout, VkImageLayout new_layout, VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT);
+void vk_image_upload_to_gpu(VkCommandBuffer cmd, VK_Image image);
+void vk_texture_generate_mipmaps(VK_Image image);
 
 v4& get_pos();
 mat4& get_mat();

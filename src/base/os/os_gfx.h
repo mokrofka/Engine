@@ -19,6 +19,7 @@ enum Key {
   Key_RAlt,
   Key_Escape,
   Key_Capslock,
+  Key_Super,
 
   // Navigation
   Key_Space,

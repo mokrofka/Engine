@@ -86,9 +86,9 @@ union v3b {
     b32 y;
     b32 z;
   };
+  b32 v[3];
   v3b() = default;
   v3b(b32 x_, b32 y_, b32 z_);
-  b32 v[3];
 };
 
 ///////////////////////////////////
@@ -168,8 +168,10 @@ union Rng2 {
 // Dim3
 
 union Rng3 {
-  v3 min;
-  v3 max;
+  struct {
+    v3 min;
+    v3 max;
+  };
   struct {
     f32 x0;
     f32 y0;
@@ -192,7 +194,7 @@ struct Transform {
 };
 
 struct Ray {
-  v3 origin;
+  v3 pos;
   v3 dir;
 };
 
@@ -250,7 +252,7 @@ NO_DEBUG f32 rand_f32_11();
 NO_DEBUG f32 rand_f32();
 NO_DEBUG f32 rand_rng_f32(f32 min, f32 max);
 NO_DEBUG b32 rand_b32();
-NO_DEBUG void rand_seed();
+NO_DEBUG void rand_set_seed();
 NO_DEBUG u32 rand_get_seed();
 template<typename T> void rand_shuffle(Slice<T> data) {
   Loop (i, data.count) {
@@ -508,6 +510,13 @@ mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far);
 mat4 mat4_look_at(v3 pos, v3 dir, v3 up);
 mat4 mat4_transpose(mat4 matrix);
 mat4 mat4_inverse(mat4 matrix);
+
+////////////////////////////////////////////////////////////////////////
+// Misc
+
+Ray ray_make(v3 pos, v3 dir);
+Ray ray_from_screen(v2 screen_pos, v2u viewport_rect, v3 origin, mat4 view, mat4 projection);
+v2 world_to_screen(v3 pos, v3 camera_pos, mat4 view, mat4 projection);
 
 ////////////////////////////////////////////////////////////////////////
 // Range Ops

@@ -124,7 +124,7 @@ f32 f32_from_str(String str);
 // String Path Helpers
 
 // one/two/three -> one/two/
-String str_chop_after_last_slash(String string);
+String str_chop_past_last_slash(String string);
 
 // one/two/three -> one/two
 String str_chop_last_slash(String string);
