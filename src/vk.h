@@ -135,15 +135,11 @@ struct VK_RenderEntity {
 #endif
 };
 
-struct VK_PushConstant {
-  u32 drawcall_offset;
-};
-
 struct VK_Mesh {
   u32 vert_count;
-  u64 vert_mem_offset;
+  u32 base_vert;
   u32 index_count;
-  u64 index_mem_offset;
+  u32 base_index;
 };
 
 struct VK_ShaderModuleEntry {
@@ -157,12 +153,12 @@ struct VK_DrawCallInfo {
     VkDrawIndirectCommand draw_command;
     VkDrawIndexedIndirectCommand index_draw_command;
   };
-  u32 entity_inst_offset;
+  u32 base_instance;
 };
 
 struct VK_IndirectDrawCall {
-  u32 draw_call_offset; // push constant and mem offset * sizeof()
-  u32 draw_call_count;
+  u32 drawcall_base; // push constant and mem offset * sizeof()
+  u32 drawcall_count;
 };
 
 struct VK_State {
@@ -221,11 +217,6 @@ struct VK_State {
 
   Darray<VK_Pipeline0> pipelines0;
   Darray<u32> entity_pipelines;
-  u32 screen_pipeline;
-  u32 cubemap_pipeline;
-  u32 debug_line_pipeline;
-  u32 ui_pipeline;
-  u32 triangle_pipeline;
   Darray<VK_ShaderModuleEntry> modules;
   Map<VK_KeyToShaderPipeline, u32> shader_to_pipeline;
   Map<String, u32> shader_to_module;
@@ -259,6 +250,13 @@ struct VK_State {
   Array<VK_Image, Gfx_MaxImages> images;
   Array<VK_View, Gfx_MaxViews> views;
   Array<VK_Sampler, Gfx_MaxSamplers> samplers;
+  Gfx_Pass cur_pass;
+
+  Gfx_Pipeline triangle_pip;
+  Gfx_Pipeline screen_pip;
+  Gfx_Pipeline cubemap_pip;
+  Gfx_Pipeline debug_line_pip;
+  Gfx_Pipeline ui_pip;
 
   ///////////////////////////////////
   // Vulkan loader
@@ -341,6 +339,7 @@ struct VK_State {
     X(UpdateDescriptorSets) \
     X(CmdBindPipeline) \
     X(CmdPipelineBarrier) \
+    X(CmdPipelineBarrier2) \
     X(CmdBlitImage) \
     X(CmdCopyBuffer) \
     X(CmdCopyBufferToImage) \

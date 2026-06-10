@@ -327,6 +327,8 @@ Slice<u8> os_file_path_read_all(Allocator arena, String path) {
   return {buffer, read_size};
 }
 
+String os_file_path_read_all_str(Allocator arena, String path) { return str_make(os_file_path_read_all(arena, path)); }
+
 DenseTime os_file_path_mtime(String path) {
   return os_file_path_properties(path).modified;
 }

@@ -21,7 +21,7 @@
 // font rendering
 // reading json 
 // editor
-// upgrade vulkan: new gfx api, shader object, bufferaddress, descriptor buffer
+// upgrade vulkan: new gfx api, shader object, bufferaddress, sync2
 
 ////////////////////////////////////////////////////////////////////////
 // @Common
@@ -58,8 +58,8 @@ const v4 ColorBounds     = v4(0.38, 0.65, 0.95, 1);
 const v4 ColorSelection  = v4(0.95, 0.65, 0.30, 1);
 const v4 ColorCollision  = v4(0.86, 0.33, 0.33, 1);
 
-const u32 MaxEntities = KB(10);
-const u32 MaxStaticEntities = KB(10);
+const u32 MaxEntities = KB(4);
+const u32 MaxStaticEntities = KB(4);
 
 struct MyHandle {
   u32 idx;
@@ -435,6 +435,7 @@ Introspect struct Entity {
 };
 
 Entity& get_entity(EntityId id);
+Transform get_entity_transform(EntityId id);
 
 Introspect struct StaticEntity {
   v3 pos;
@@ -445,6 +446,7 @@ Introspect struct StaticEntity {
 };
 
 StaticEntity& get_static_entity(StaticEntityId id);
+Transform get_static_entity_transform(StaticEntityId id);
 
 struct GameState {
   Arena arena;

@@ -896,27 +896,25 @@ intern void vk_swapchain_destroy(VK_Swapchain swapchain) {
 
 GpuMeshId vk_mesh_load(Mesh mesh) {
   VK_State& g = st->vk;
-  VK_Buffer& vert_buff = g.vert_buffer;
+  VK_Buffer& vert_buf = g.vert_buffer;
   u64 vert_size = mesh.vert_count*sizeof(Vertex);
-  u64 vert_offset = vert_buff.pos;
-  vert_buff.pos += vert_size;
-  Region vert_range = { .offset = vert_offset, .size = vert_size };
-  vk_buffer_upload(g.vert_buffer, vert_range, mesh.vertices);
+  u64 vert_offset = offset_push(vert_buf.pos, vert_size, 4);
+  Region vert_range = {.offset = vert_offset, .size = vert_size};
+  vk_buffer_upload(vert_buf, vert_range, mesh.vertices);
 
-  VK_Buffer& index_buff = g.index_buffer;
+  VK_Buffer& index_buf = g.index_buffer;
   u64 index_size = mesh.index_count*sizeof(u32);
-  u64 index_offset = index_buff.pos;
-  index_buff.pos += index_size;
-  Region index_range = { .offset = index_offset, .size = index_size };
+  u64 index_offset = offset_push(index_buf.pos, index_size, 4);
+  Region index_range = {.offset = index_offset, .size = index_size};
   if (mesh.indices) {
-    vk_buffer_upload(g.index_buffer, index_range, mesh.indices);
+    vk_buffer_upload(index_buf, index_range, mesh.indices);
   }
 
   VK_Mesh vk_mesh = {
     .vert_count = mesh.vert_count,
-    .vert_mem_offset = vert_range.offset,
+    .base_vert = (u32)(vert_offset/sizeof(Vertex)),
     .index_count = mesh.index_count,
-    .index_mem_offset = index_range.offset,
+    .base_index = (u32)(index_offset/sizeof(u32)),
   };
   u32 id = g.meshes.count;
   array_push(g.meshes, vk_mesh);
@@ -926,6 +924,63 @@ GpuMeshId vk_mesh_load(Mesh mesh) {
 
 ////////////////////////////////////////////////////////////////////////
 // @Drawing
+
+struct IndirectBatch {
+  u32 base_entity;   // offset into gpu_entities_indices
+  u32 base_drawcall; // offset into gpu_draw_call_infos
+  u32 entity_count;
+  u32 drawcall_count;
+};
+
+struct IndirectWriter {
+  // GPU-side arrays (pointers into your existing buffers)
+  EntityGPU* entities;
+  u32* entity_indices;
+  VK_DrawCallInfo* drawcalls;
+
+  // Cursors — the only state that advances
+  u32 entity_cursor;
+  u32 drawcall_cursor;
+};
+
+void indirect_push_entity(IndirectWriter* w, u32 entity_idx, mat4 model) {
+}
+
+void indirect_push_drawcall(IndirectWriter* w, VK_Mesh mesh, u32 instance_count, u32 base_instance) {
+  VK_DrawCallInfo info = {};
+  if (mesh.index_count) {
+    info.index_draw_command = (VkDrawIndexedIndirectCommand){
+      .indexCount = mesh.index_count,
+      .instanceCount = instance_count,
+      .firstIndex = mesh.base_index,
+      .vertexOffset = (i32)mesh.base_vert,
+      .firstInstance = 0,
+    };
+  } else {
+    info.draw_command = (VkDrawIndirectCommand){
+      .vertexCount = mesh.vert_count,
+      .instanceCount = instance_count,
+      .firstVertex = mesh.base_vert,
+      .firstInstance = 0,
+    };
+  }
+  info.base_instance = base_instance;
+  w->drawcalls[w->drawcall_cursor++] = info;
+}
+
+IndirectBatch indirect_begin_batch(IndirectWriter* w) {
+  IndirectBatch res = {
+    .base_entity = w->entity_cursor,
+    .base_drawcall = w->drawcall_cursor,
+  };
+  return res;
+}
+
+IndirectBatch indirect_end_batch(IndirectWriter* w, IndirectBatch began) {
+  began.entity_count = w->entity_cursor - began.base_entity;
+  began.drawcall_count = w->drawcall_cursor - began.base_drawcall;
+  return began;
+}
 
 void vk_draw() {
   ProfFunc;
@@ -938,7 +993,7 @@ void vk_draw() {
     rebuild_static_buffer = true;
   }
 
-  VkCommandBuffer cmd = vk_get_current_cmd();
+  VkCommandBuffer cmd = vk_get_cur_cmd();
   g.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipeline_layout, 0, 1, &g.descriptor_sets, 0, null);
   VkDeviceSize size = 0;
   g.CmdBindVertexBuffers(cmd, 0, 1, &g.vert_buffer.h, &size);
@@ -948,112 +1003,91 @@ void vk_draw() {
   shader_st.projection_view = st->projection * st->view;
   shader_st.projection = st->projection;
   shader_st.view = st->view;
-  
-  struct RenderCtx {
-    u32 draw_call_count;
-    u32 entities_count;
-    u32 static_draw_call_count;
-    u32 static_entities_count;
-    EntityGPU* gpu_entities;
-    u32* gpu_entities_indices;
-    VK_DrawCallInfo* gpu_draw_call_infos;
-  } ctx = {
-    .gpu_entities = g.gpu_entities,
-    .gpu_entities_indices = g.gpu_entities_indices,
-    .gpu_draw_call_infos = g.gpu_draw_call_infos,
+
+  IndirectWriter dyn_writer = {
+    .entities = g.gpu_entities,
+    .entity_indices = g.gpu_entities_indices,
+    .drawcalls = g.gpu_draw_call_infos,
+    .entity_cursor = 0,
+    .drawcall_cursor = 0,
+  };
+  IndirectWriter static_writer = {
+    .entities = g.gpu_entities + MaxEntities,
+    .entity_indices = g.gpu_entities_indices + MaxEntities,
+    .drawcalls = g.gpu_draw_call_infos + MaxDrawCalls / 2,
+    .entity_cursor = 0,
+    .drawcall_cursor = 0,
   };
 
   Loop (i, g.entity_pipelines.count) {
     VK_Pipeline0 pipeline = g.pipelines0[g.entity_pipelines[i]];
-    vk_bind_pipeline(cmd, pipeline.h);
+    vk_bind_pipeline(pipeline.h);
     VK_PipelineBatch& batch = g.batches[pipeline.batch_idx];
-    var fill_buffer = [&](VK_BatchType type) {
-      VK_MeshesBatches shader_batch = batch.batches[type];
-      b32 is_static = type & (Bit(1));
-      u32 entity_offset = 0;
-      u32 draw_call_offset = 0;
-      u32* entities_count = &ctx.entities_count;
-      u32* draw_call_count = &ctx.draw_call_count;
-      if (is_static) {
-        entity_offset = MaxEntities;
-        draw_call_offset = MaxDrawCalls / 2;
-        entities_count = &ctx.static_entities_count;
-        draw_call_count = &ctx.static_draw_call_count;
-      }
-      u32 draw_calls = 0;
+
+    var fill = [&](IndirectWriter* w, VK_MeshesBatches shader_batch) -> VK_IndirectDrawCall {
+      IndirectBatch range = indirect_begin_batch(w);
       Loop (i, shader_batch.mesh_batches.count) {
-        VK_MeshBatch mesh_batch = shader_batch.mesh_batches[i];
-        if (mesh_batch.entities.count == 0) continue;
-        Loop (i, mesh_batch.entities.count) {
-          u32 e_id = mesh_batch.entities[i];
-          u32 entity_idx = entity_offset + id_idx(e_id);
-          Transform trans = {};
-          if (is_static) {
-            StaticEntity& e = get_static_entity(StaticEntityId(e_id));
-            trans = Transform{e.pos, e.rot, e.scale};
-          } else {
-            Entity& e = get_entity(EntityId(e_id));
-            trans = Transform{e.pos, e.rot, e.scale};
-          }
-          ctx.gpu_entities[entity_idx].model = mat4_transform(trans);
-          ctx.gpu_entities_indices[entity_offset + (*entities_count)++] = entity_idx;
+        VK_MeshBatch& mb = shader_batch.mesh_batches[i];
+        if (mb.entities.count == 0) continue;
+        u32 base_instance = w->entity_cursor;
+        Loop (j, mb.entities.count) {
+          u32 e_id = mb.entities[j];
+          w->entities[id_idx(e_id)].model = mat4_transform(get_entity_transform({e_id}));
+          w->entity_indices[w->entity_cursor++] = id_idx(e_id);
         }
-        u32 mesh_idx = id_idx(mesh_batch.mesh_id.v);
-        VK_Mesh mesh = g.meshes[mesh_idx];
-        VK_DrawCallInfo info = {};
-        if (mesh.index_count) {
-          info = {
-            .index_draw_command = {
-              .indexCount = (u32)mesh.index_count,
-              .instanceCount = mesh_batch.entities.count,
-              .firstIndex = (u32)(mesh.index_mem_offset / sizeof(u32)),
-              .vertexOffset = (i32)(mesh.vert_mem_offset / sizeof(Vertex)),
-              .firstInstance = 0,
-            },
-            .entity_inst_offset = entity_offset + *entities_count - mesh_batch.entities.count,
-          };
-        } else {
-          info = {
-            .draw_command = {
-              .vertexCount = (u32)mesh.vert_count,
-              .instanceCount = mesh_batch.entities.count,
-              .firstVertex = (u32)(mesh.vert_mem_offset / sizeof(Vertex)),
-              .firstInstance = 0,
-            },
-            .entity_inst_offset = entity_offset + *entities_count - mesh_batch.entities.count,
-          };
-        }
-        ctx.gpu_draw_call_infos[draw_call_offset + (*draw_call_count)++] = info;
-        ++draw_calls;
+        indirect_push_drawcall(w, g.meshes[id_idx(mb.mesh_id.v)], mb.entities.count, base_instance);
       }
-      VK_IndirectDrawCall drawcall = {
-        .draw_call_count = draw_calls,
-        .draw_call_offset = draw_call_offset + *draw_call_count - draw_calls
+      range = indirect_end_batch(w, range);
+      VK_IndirectDrawCall res = {
+        .drawcall_count = range.drawcall_count,
+        .drawcall_base = range.base_drawcall,
       };
-      return drawcall;
+      return res;
+    };
+    var fill_static = [&](IndirectWriter* w, VK_MeshesBatches shader_batch) -> VK_IndirectDrawCall {
+      IndirectBatch range = indirect_begin_batch(w);
+      Loop (i, shader_batch.mesh_batches.count) {
+        VK_MeshBatch& mb = shader_batch.mesh_batches[i];
+        if (mb.entities.count == 0) continue;
+        u32 base_instance = w->entity_cursor+MaxEntities;
+        Loop (j, mb.entities.count) {
+          u32 e_id = mb.entities[j];
+          w->entities[id_idx(e_id)].model = mat4_transform(get_static_entity_transform({e_id}));
+          w->entity_indices[w->entity_cursor++] = id_idx(e_id)+MaxEntities;
+        }
+        indirect_push_drawcall(w, g.meshes[id_idx(mb.mesh_id.v)], mb.entities.count, base_instance);
+      }
+      range = indirect_end_batch(w, range);
+      VK_IndirectDrawCall res = {
+        .drawcall_count = range.drawcall_count,
+        .drawcall_base = range.base_drawcall + MaxDrawCalls/2,
+      };
+      return res;
     };
 
     var make_draw = [&](VK_IndirectDrawCall draw, b32 indexed) {
-      if (draw.draw_call_count) {
-        VK_PushConstant push = {.drawcall_offset = draw.draw_call_offset};
-        g.CmdPushConstants(cmd, g.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &push);
-        u64 draw_call_mem_offset = push.drawcall_offset*sizeof(VK_DrawCallInfo);
+      if (draw.drawcall_count) {
+        vk_push_constants({.drawcall_base = draw.drawcall_base});
         if (indexed) {
-          g.CmdDrawIndexedIndirect(cmd, g.indirect_draw_buffer.h, draw_call_mem_offset, draw.draw_call_count, sizeof(VK_DrawCallInfo));
+          gfx_draw_indexed_indirect(draw.drawcall_base, draw.drawcall_count);
         } else {
-          g.CmdDrawIndirect(cmd, g.indirect_draw_buffer.h, draw_call_mem_offset, draw.draw_call_count, sizeof(VK_DrawCallInfo));
+          gfx_draw_indirect(draw.drawcall_base, draw.drawcall_count);
         }
       }
     };
 
-    make_draw(fill_buffer(VK_BatchType_Indexed), true);
-    make_draw(fill_buffer(VK_BatchType_Unindexed), false);
+    VK_IndirectDrawCall indexed_drawcall = fill(&dyn_writer, batch.batches[VK_BatchType_Indexed]);
+    VK_IndirectDrawCall drawcall = fill(&dyn_writer, batch.batches[VK_BatchType_Unindexed]);
+    make_draw(indexed_drawcall, true);
+    make_draw(drawcall, false);
 
     ///////////////////////////////////
     // Static entities
     if (rebuild_static_buffer) {
-      g.static_draw_calls[i*2] = fill_buffer(VK_BatchType_StaticIndexed);
-      g.static_draw_calls[i*2 + 1] = fill_buffer(VK_BatchType_StaticUnindexed);
+      VK_IndirectDrawCall drawcall_indexed = fill_static(&static_writer, batch.batches[VK_BatchType_StaticIndexed]);
+      VK_IndirectDrawCall drawcall = fill_static(&static_writer, batch.batches[VK_BatchType_StaticUnindexed]);
+      g.static_draw_calls[i*2] = drawcall_indexed;
+      g.static_draw_calls[i*2 + 1] = drawcall;
     }
     make_draw(g.static_draw_calls[i*2], true);
     make_draw(g.static_draw_calls[i*2+1], false);
@@ -1061,49 +1095,44 @@ void vk_draw() {
 
   // Debug drawing
   if (g.draw_lines.count > 0) {
-    g.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipelines0[g.debug_line_pipeline].h);
-    g.CmdBindVertexBuffers(cmd, 0, 1, &g.vert_buffer.h, (VkDeviceSize*)&g.draw_lines_offset);
-    g.CmdDraw(cmd, g.draw_lines.count*2, 1, 0, 0);
+    gfx_pipeline_bind(g.debug_line_pip);
+    gfx_draw(g.draw_lines_offset/sizeof(Vertex), g.draw_lines.count*2);
     array_clear(g.draw_lines);
   }
   if (g.draw_lines_consistent.count > 0) {
-    g.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipelines0[g.debug_line_pipeline].h);
-    g.CmdBindVertexBuffers(cmd, 0, 1, &g.vert_buffer.h, (VkDeviceSize*)&g.draw_lines_consistent_offset);
-    g.CmdDraw(cmd, g.draw_lines_consistent.count*2, 1, 0, 0);
-  }
-
-  // Cube map
-  g.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipelines0[g.cubemap_pipeline].h);
-  GpuMeshId h = mesh_get(Mesh_Cube);
-  VK_Mesh mesh = g.meshes[h.v];
-  g.CmdBindVertexBuffers(cmd, 0, 1, &g.vert_buffer.h, &mesh.vert_mem_offset);
-  if (mesh.index_count) {
-    g.CmdBindIndexBuffer(cmd, g.index_buffer.h, mesh.index_mem_offset, VK_INDEX_TYPE_UINT32);
-    g.CmdDrawIndexed(cmd, mesh.index_count, 1, 0, 0, 0);
-  } else {
-    g.CmdDraw(cmd, mesh.vert_count, 1, 0, 0);
-  }
-
-  // Rect drawing
-  g.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipelines0[g.ui_pipeline].h);
-  if (g.draw_rects.count > 0) {
-    g.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipelines0[g.ui_pipeline].h);
-    g.CmdBindVertexBuffers(cmd, 0, 1, &g.vert_buffer.h, (VkDeviceSize*)&g.draw_rects_offset);
-    g.CmdDraw(cmd, g.draw_rects.count*6, 1, 0, 0);
-    array_clear(g.draw_rects);
+    gfx_pipeline_bind(g.debug_line_pip);
+    gfx_draw(g.draw_lines_consistent_offset/sizeof(Vertex), g.draw_lines_consistent.count*2);
   }
 
   // Hello world
-  g.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipelines0[g.triangle_pipeline].h);
-  g.CmdDraw(cmd, 3, 1, 0, 0);
+  gfx_pipeline_bind(g.triangle_pip);
+  gfx_draw(0, 3);
+
+  // Cube map
+  gfx_pipeline_bind(g.cubemap_pip);
+  GpuMeshId h = mesh_get(Mesh_Cube);
+  VK_Mesh mesh = g.meshes[h.v];
+  if (mesh.index_count) {
+    gfx_draw_indexed(mesh.base_index, mesh.index_count, mesh.base_vert);
+  } else {
+    gfx_draw(mesh.base_vert, mesh.vert_count);
+  }
+
+  // Rect drawing
+  if (g.draw_rects.count > 0) {
+    gfx_pipeline_bind(g.ui_pip);
+    gfx_draw(g.draw_rects_offset/sizeof(Vertex), g.draw_rects.count*6);
+    array_clear(g.draw_rects);
+  }
 }
 
 void vk_draw_screen() {
   VK_State& g = st->vk;
-  VkCommandBuffer cmd = vk_get_current_cmd();
+  VkCommandBuffer cmd = vk_get_cur_cmd();
   VK_PushConstant push = {g.current_image_idx};
   g.CmdPushConstants(cmd, g.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &push);
-  g.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipelines0[g.screen_pipeline].h);
+  // g.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipelines0[g.screen_pipeline0].h);
+  gfx_pipeline_bind(g.screen_pip);
   g.CmdDraw(cmd, 3, 1, 0, 0);
 }
 
@@ -1469,13 +1498,13 @@ void vk_init() {
   ///////////////////////////////////
   // Buffers
   {
-    g.gpu_mem = vk_mem_alloc(Gfx_MemoryType_Gpu, MB(200));
-    g.cpu_mem = vk_mem_alloc(Gfx_MemoryType_Cpu, MB(300));
-    g.vert_buffer = vk_buffer_alloc(MB(1), Gfx_BufferUsage_Vert | Gfx_BufferUsage_Dst, Gfx_MemoryType_Gpu);
-    g.index_buffer = vk_buffer_alloc(MB(1), Gfx_BufferUsage_Index | Gfx_BufferUsage_Dst, Gfx_MemoryType_Gpu);
-    g.stage_buffer = vk_buffer_alloc(MB(10), Gfx_BufferUsage_Src, Gfx_MemoryType_Cpu);
-    g.storage_buffer = vk_buffer_alloc(MB(200), Gfx_BufferUsage_Storage, Gfx_MemoryType_Cpu);
-    g.indirect_draw_buffer = vk_buffer_alloc(MB(10), Gfx_BufferUsage_Indirect, Gfx_MemoryType_Cpu);
+    g.gpu_mem = vk_mem_alloc(VK_MemoryType_Gpu, MB(200));
+    g.cpu_mem = vk_mem_alloc(VK_MemoryType_Cpu, MB(300));
+    g.vert_buffer = vk_buffer_alloc(MB(1), VK_BufferUsage_Vert | VK_BufferUsage_Dst, VK_MemoryType_Gpu);
+    g.index_buffer = vk_buffer_alloc(MB(1), VK_BufferUsage_Index | VK_BufferUsage_Dst, VK_MemoryType_Gpu);
+    g.stage_buffer = vk_buffer_alloc(MB(10), VK_BufferUsage_Src, VK_MemoryType_Cpu);
+    g.storage_buffer = vk_buffer_alloc(MB(200), VK_BufferUsage_Storage, VK_MemoryType_Cpu);
+    g.indirect_draw_buffer = vk_buffer_alloc(MB(10), VK_BufferUsage_Indirect, VK_MemoryType_Cpu);
   }
 
   g.draw_lines_offset = offset_push_array(g.vert_buffer.pos, Vertex, KB(1));
@@ -1814,63 +1843,48 @@ void vk_init() {
     vk_shader_compile_join(st->shader_module_compiled_names);
   }
 
+  {
+    g.triangle_pip = gfx_pipeline_make({
+      .shader = gfx_shader_make({.shader = os_file_path_read_all_str(scratch, "../assets/shaders/compiled/triangle.spv")}),
+      .depth = {
+        .compare = Gfx_CompareOp_Less,
+        .write_enabled = true,
+      },
+    });
+  }
+
   ///////////////////////////////////
   // Load basic shaders
-  {
-    ShaderDesc shader = {
-      .name = "line",
-      .state = {
-        .topology = ShaderTopology_Line,
-        .is_transparent = true,
-        .use_depth = true,
+  g.debug_line_pip = gfx_pipeline_make({
+    .shader = gfx_shader_make({.shader = os_file_path_read_all_str(scratch, "../assets/shaders/compiled/line.spv")}),
+    .primitive_type = Gfx_PrimitiveType_Line,
+    .depth = {
+      .compare = Gfx_CompareOp_Less,
+      .write_enabled = true,
+    },
+    .color = {
+      .blend = {
+        .enabled = true,
+        .src_factor_rgb = Gfx_BlendFactor_SrcAlpha,
+        .dst_factor_rgb = Gfx_BlendFactor_OneMinusSrcAlpha,
+        .src_factor_alpha = Gfx_BlendFactor_SrcAlpha,
+        .dst_factor_alpha = Gfx_BlendFactor_OneMinusSrcAlpha,
       },
-    };
-    g.debug_line_pipeline = vk_shader_pipeline_alloc(shader);
-  }
-  {
-    ShaderDesc shader = {
-      .name = "screen",
-      .state = {
-        .topology = ShaderTopology_Triangle,
-        .samples = 1,
-      },
-    };
-    g.screen_pipeline = vk_shader_pipeline_alloc(shader);
-  }
-  {
-    ShaderDesc shader = {
-      .name = "cubemap",
-      .state = {
-        .type = ShaderType_Cube,
-        .topology = ShaderTopology_Triangle,
-        .is_transparent = false,
-        .use_depth = true,
-      },
-    };
-    g.cubemap_pipeline = vk_shader_pipeline_alloc(shader);
-  }
-  {
-    ShaderDesc shader = {
-      .name = "ui",
-      .state = {
-        .type = ShaderType_Drawing,
-        .topology = ShaderTopology_Triangle,
-        .is_transparent = false,
-        .use_depth = false,
-      },
-    };
-    g.ui_pipeline = vk_shader_pipeline_alloc(shader);
-  }
-  {
-    ShaderDesc shader = {
-      .name = "triangle",
-      .state = {
-        .type = ShaderType_Drawing,
-        .topology = ShaderTopology_Triangle,
-      },
-    };
-    g.triangle_pipeline = vk_shader_pipeline_alloc(shader);
-  }
+    },
+  });
+  g.screen_pip = gfx_pipeline_make({
+    .shader = gfx_shader_make({.shader = os_file_path_read_all_str(scratch, "../assets/shaders/compiled/screen.spv")}),
+    .sample_count = 1,
+  });
+  g.cubemap_pip = gfx_pipeline_make({
+    .shader = gfx_shader_make({.shader = os_file_path_read_all_str(scratch, "../assets/shaders/compiled/cubemap.spv")}),
+    .depth = {
+      .compare = Gfx_CompareOp_LessEqual,
+    },
+  });
+  g.ui_pip = gfx_pipeline_make({
+    .shader = gfx_shader_make({.shader = os_file_path_read_all_str(scratch, "../assets/shaders/compiled/ui.spv")}),
+  });
   
   Info("Vulkan renderer initialized");
 }
@@ -2020,7 +2034,7 @@ void vk_begin_frame() {
     VK_CHECK(g.ResetFences(vkdevice, 1, &g.in_flight_fences[g.current_frame_idx]));
   }
 
-  VkCommandBuffer cmd = vk_get_current_cmd();
+  VkCommandBuffer cmd = vk_get_cur_cmd();
   vk_cmd_begin(cmd);
 
   // Resize?
@@ -2069,30 +2083,14 @@ void vk_begin_frame() {
 #endif
   }
 
-  // NOTE: we flip Y coordinate so Y:0 is on bottom of screen
-  VkViewport viewport = {
-    .x = 0.0f,
-    .y = (f32)g.height*g.scale,
-    .width = (f32)g.width*g.scale,
-    .height = -(f32)g.height*g.scale,
-    .minDepth = 0.0f,
-    .maxDepth = 1.0f,
-  };
-  g.CmdSetViewport(cmd, 0, 1, &viewport);
-  VkRect2D scissor = {
-    .offset = {.x = 0, .y = 0},
-    .extent = {
-      .width = (u32)(g.width*g.scale), 
-      .height = (u32)(g.height*g.scale)
-    },
-  };
-  g.CmdSetScissor(cmd, 0, 1, &scissor);
+  gfx_apply_viewport(0, 0, g.width*g.scale, g.height*g.scale);
+  gfx_apply_scissor(0, 0, g.width, g.height);
 }
 
 void vk_end_frame() {
   ProfFunc;
   VK_State& g = st->vk;
-  VkCommandBuffer cmd = vk_get_current_cmd();
+  VkCommandBuffer cmd = vk_get_cur_cmd();
   vk_cmd_end(cmd);
 
   ///////////////////////////////////
@@ -2188,7 +2186,7 @@ intern VkRenderingInfo vk_default_rendering_info(VkRenderingAttachmentInfo* colo
 
 void vk_begin_renderpass(VK_RenderpassType renderpass_id) {
   VK_State& g = st->vk;
-  VkCommandBuffer cmd = vk_get_current_cmd();
+  VkCommandBuffer cmd = vk_get_cur_cmd();
   switch (renderpass_id) {
     case VK_RenderpassType_World: {
       vk_image_layout_transition(cmd, g.msaa_texture, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -2204,34 +2202,6 @@ void vk_begin_renderpass(VK_RenderpassType renderpass_id) {
       VkRenderingInfo render_info = vk_default_rendering_info(&color_attachment, &depth_attachment);
       render_info.renderArea.extent = {g.texture_targets->info.width, g.texture_targets->info.height};
       g.CmdBeginRendering(cmd, &render_info);
-
-      ///////////////////////////////////
-      // vk_image_layout_transition(cmd, g_g.msaa_texture_target, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-      // vk_image_layout_transition(cmd, g_g.swapchain.depth_attachment, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
-      // vk_image_layout_transition(cmd, g_g.swapchain.images[g_g.current_image_idx], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-
-      // VkRenderingAttachmentInfo color_attachment = vk_default_color_attachment_info(g_g.msaa_texture_target.view);
-      // color_attachment.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
-      // color_attachment.resolveImageView = g_g.swapchain.views[g_g.current_image_idx];
-      // color_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-      // VkRenderingAttachmentInfo depth_attachment = vk_default_depth_attachment_info(g_g.swapchain.depth_attachment.view);
-      // // depth_attachment
-      
-      // VkRenderingInfo render_info = vk_default_rendering_info(&color_attachment, &depth_attachment);
-      // g_g.CmdBeginRendering(cmd, &render_info);
-
-      ///////////////////////////////////
-      // // OLD
-      // // Color
-      // vk_image_layout_transition(cmd, g_g.swapchain.images[g_g.current_image_idx], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-      // // Depth
-      // vk_image_layout_transition(cmd, g_g.swapchain.depth_attachment, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
-      // // Render
-      // VkRenderingAttachmentInfo color_attachment = vk_default_color_attachment_info(g_g.swapchain.views[g_g.current_image_idx]);
-      // VkRenderingAttachmentInfo depth_attachment = vk_default_depth_attachment_info(g_g.swapchain.depth_attachment.view);
-      // VkRenderingInfo render_info = vk_default_rendering_info(&color_attachment, &depth_attachment);
-      // g_g.CmdBeginRendering(cmd, &render_info);
     } break;
     case VK_RenderpassType_UI: {
     } break;
@@ -2247,14 +2217,11 @@ void vk_begin_renderpass(VK_RenderpassType renderpass_id) {
 
 void vk_end_renderpass(VK_RenderpassType renderpass) {
   VK_State& g = st->vk;
-  VkCommandBuffer cmd = vk_get_current_cmd();
+  VkCommandBuffer cmd = vk_get_cur_cmd();
   switch (renderpass) {
     case VK_RenderpassType_World: {
       g.CmdEndRendering(cmd);
       vk_image_layout_transition(cmd, g.texture_targets[g.current_image_idx], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-      ///////////////////////////////////
-      // vk_image_layout_transition(cmd, g_g.swapchain.images[g_g.current_image_idx], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
     } break;
     case VK_RenderpassType_UI: {
     } break;
@@ -2291,24 +2258,8 @@ void vk_end_draw_frame() {
   // }
   // Screen
   {
-    VkCommandBuffer cmd = vk_get_current_cmd();
-    VkViewport viewport = {
-      .x = 0.0f,
-      .y = (f32)g.height,
-      .width = (f32)g.width,
-      .height = -(f32)g.height,
-      .minDepth = 0.0f,
-      .maxDepth = 1.0f,
-    };
-    g.CmdSetViewport(cmd, 0, 1, &viewport);
-    VkRect2D scissor = {
-      .offset = {.x = 0, .y = 0},
-      .extent = {
-        .width = (u32)g.width, 
-        .height = (u32)g.height
-      },
-    };
-    g.CmdSetScissor(cmd, 0, 1, &scissor);
+    gfx_apply_viewport(0, 0, g.width, g.height);
+    gfx_apply_scissor(0, 0, g.width, g.height);
     vk_begin_renderpass(VK_RenderpassType_Screen);
     vk_draw_screen();
     vk_imgui_end_frame();

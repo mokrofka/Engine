@@ -4,7 +4,6 @@ struct Gfx_Sampler  { u32 id; };
 struct Gfx_Shader   { u32 id; };
 struct Gfx_Pipeline { u32 id; };
 struct Gfx_View     { u32 id; };
-struct Gfx_Cmd      { u32 id; };
 
 // Configuration
 enum {
@@ -204,14 +203,23 @@ struct Gfx_StencilAttachmentAction {
 };
 
 struct Gfx_PassAction {
-  Gfx_ColorAttachmentAction colors[Gfx_MaxColorAttachments];
+  union {
+    Gfx_ColorAttachmentAction colors[Gfx_MaxColorAttachments];
+    Gfx_ColorAttachmentAction color;
+  };
   Gfx_DepthAttachmentAction depth;
   Gfx_StencilAttachmentAction stencil;
 };
 
 struct Gfx_Attachments {
-  Gfx_View colors[Gfx_MaxColorAttachments];
-  Gfx_View resolves[Gfx_MaxColorAttachments];
+  union {
+    Gfx_View colors[Gfx_MaxColorAttachments];
+    Gfx_View color;
+  };
+  union {
+    Gfx_View resolves[Gfx_MaxColorAttachments];
+    Gfx_View resolve;
+  };
   Gfx_View depth_stencil;
 };
 
@@ -314,6 +322,7 @@ struct Gfx_DepthState {
   Gfx_PixelFormat pixel_format;
   Gfx_CompareOp compare;
   b32 write_enabled;
+  b32 test_disable;
   f32 bias;
   f32 bias_slope_scale;
   f32 bias_clamp;
@@ -348,7 +357,10 @@ struct Gfx_PipelineDesc {
   Gfx_DepthState depth;
   Gfx_StencilState stencil;
   u32 color_count;
-  Gfx_ColorTargetState colors[Gfx_MaxColorAttachments];
+  union {
+    Gfx_ColorTargetState colors[Gfx_MaxColorAttachments];
+    Gfx_ColorTargetState color;
+  };
   Gfx_PrimitiveType primitive_type;
   Gfx_CullMode cull_mode;
   Gfx_FaceWinding face_winding;
@@ -360,22 +372,40 @@ struct Gfx_PipelineDesc {
 ////////////////////////////////////////////////////////////////////////
 // Vulkan
 
-enum Gfx_MemType {
-  Gfx_MemoryType_Cpu,
-  Gfx_MemoryType_Gpu,
-};
-
-typedef u32 Gfx_BufferUsage;
-enum {
-  Gfx_BufferUsage_Vert = Bit(0),
-  Gfx_BufferUsage_Index = Bit(1),
-  Gfx_BufferUsage_Dst = Bit(2),
-  Gfx_BufferUsage_Src = Bit(3),
-  Gfx_BufferUsage_Storage = Bit(4),
-  Gfx_BufferUsage_Indirect = Gfx_BufferUsage_Storage | Bit(5),
-};
-
 #include "vulkan/vulkan_core.h"
+
+enum VK_MemType {
+  VK_MemoryType_Cpu,
+  VK_MemoryType_Gpu,
+};
+
+typedef u32 VK_BufferUsage;
+enum {
+  VK_BufferUsage_Vert = Bit(0),
+  VK_BufferUsage_Index = Bit(1),
+  VK_BufferUsage_Dst = Bit(2),
+  VK_BufferUsage_Src = Bit(3),
+  VK_BufferUsage_Storage = Bit(4),
+  VK_BufferUsage_Indirect = VK_BufferUsage_Storage | Bit(5),
+};
+
+typedef u32 VK_Access;
+enum {
+  VK_Access_None = 0,
+  VK_Access_Staging = Bit(0),
+  VK_Access_VertBuffer = Bit(1),
+  VK_Access_IndexBuffer = Bit(2),
+  VK_Access_StorageBuffer_RO = Bit(3),
+  VK_Access_StorageBuffer_RW = Bit(4),
+  VK_Access_Texture = Bit(5),
+  VK_Access_StorageImage = Bit(6),
+  VK_Access_ColorAttachment = Bit(7),
+  VK_Access_ResolveAttachment = Bit(8),
+  VK_Access_DepthAttachment = Bit(9),
+  VK_Access_StencilAttachment = Bit(10),
+  VK_Access_Discard = Bit(11),
+  VK_Access_Present = Bit(12),
+};
 
 struct VK_Memory {
   VkDeviceMemory h;
@@ -387,8 +417,17 @@ struct VK_Memory {
 struct VK_Buffer {
   VkBuffer h;
   u8* base;
+  // u64 base;
   u64 pos;
   u64 cap;
+};
+
+struct VK_BufferRegion {
+  VkBuffer h;
+  u64 base;
+  u64 pos;
+  u64 cap;
+  VK_Access cur_access;
 };
 
 struct VK_ImageInfo {
@@ -420,13 +459,14 @@ struct VK_Image {
   Gfx_ImageUsage usage;
   Gfx_PixelFormat pixel_format;
   u32 sample_count;
+  VK_Access cur_access;
 
   u64 mem_offset;
 };
 
 struct VK_View {
   VkImageView h;
-  VK_Image ref;
+  Gfx_Image ref;
   Gfx_ViewType type;
   u32 mip_level;
   u32 slice;
@@ -510,6 +550,11 @@ struct VK_Semaphore {
   u64 counter;
 };
 
+union VK_PushConstant {
+  u32 drawcall_base;
+  u32 image_index;
+};
+
 String vk_result_str(VkResult result);
 void vk_surface_create();
 
@@ -518,10 +563,11 @@ void vk_surface_create();
 
 VkSemaphore vk_get_current_image_available_semaphore();
 VkSemaphore vk_get_current_render_complete_semaphore();
-VkCommandBuffer vk_get_current_cmd();
+VkCommandBuffer vk_get_cur_cmd();
 
-void vk_bind_pipeline(VkCommandBuffer cmd, VkPipeline pipeline);
+void vk_bind_pipeline(VkPipeline pipeline);
 u32 vk_find_memory_idx(u32 type_filter, u32 property_flags);
+void vk_push_constants(VK_PushConstant constants);
 // VK_Semaphore vk_semaphore_make(u64 initial_counter = 0);
 // void vk_semaphore_wait(VK_Semaphore semaphore, u64 counter);
 
@@ -540,9 +586,12 @@ void vk_cmd_end_free(VkCommandBuffer cmd);
 ////////////////////////////////////////////////////////////////////////
 // @Buffer
 
-VK_Memory vk_mem_alloc(Gfx_MemType type, u64 size);
-VK_Buffer vk_buffer_alloc(u64 size, Gfx_BufferUsage usage, Gfx_MemType mem_type);
+VK_Memory vk_mem_alloc(VK_MemType type, u64 size);
+VK_Buffer vk_buffer_alloc(u64 size, VK_BufferUsage usage, VK_MemType mem_type);
 void vk_buffer_upload(VK_Buffer buffer, Region region, void* data);
+
+////////////////////////////////////////////////////////////////////////
+// Gfx
 
 Gfx_Shader gfx_shader_make(Gfx_ShaderDesc desc);
 Gfx_Pipeline gfx_pipeline_make(Gfx_PipelineDesc desc);
@@ -551,8 +600,14 @@ Gfx_View gfx_view_make(Gfx_ViewDesc desc);
 Gfx_Sampler gfx_sampler_make(Gfx_SamplerDesc desc);
 
 void gfx_pass_begin(Gfx_Pass pass);
+void gfx_pass_end();
 void gfx_apply_viewport(f32 x, f32 y, f32 width, f32 height);
 void gfx_apply_scissor(f32 x, f32 y, f32 width, f32 height);
+void gfx_pipeline_bind(Gfx_Pipeline pip);
+void gfx_draw(u32 base_vert, u32 vert_count, u32 instance_count = 1, u32 base_instance = 0);
+void gfx_draw_indexed(u32 base_index, u32 index_count, u32 base_vert, u32 instance_count = 1, u32 base_instance = 0);
+void gfx_draw_indirect(u32 draw_base, u32 draw_count);
+void gfx_draw_indexed_indirect(u32 draw_base, u32 draw_count);
 
 
 

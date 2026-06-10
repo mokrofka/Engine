@@ -111,9 +111,29 @@ Entity& get_entity(EntityId id) {
   return st->game.entities[id_idx(id)];
 }
 
+Transform get_entity_transform(EntityId id) {
+  Entity& e = get_entity(id);
+  Transform res = {
+    .pos = e.pos,
+    .rot = e.rot,
+    .scale = e.scale,
+  };
+  return res;
+}
+
 StaticEntity& get_static_entity(StaticEntityId id) {
   Assert(id_generation(id) == st->game.static_entity_id_pool.generations[id_idx(id)]);
   return st->game.static_entities[id_idx(id)];
+}
+
+Transform get_static_entity_transform(StaticEntityId id) {
+  StaticEntity& e = get_static_entity(id);
+  Transform res = {
+    .pos = e.pos,
+    .rot = e.rot,
+    .scale = e.scale,
+  };
+  return res;
 }
 
 Mesh load_obj(Allocator arena, String name) {
@@ -1795,6 +1815,8 @@ void scene_update() {
       g.fps_camera = !g.fps_camera;
     }
   }
+
+  vk_draw_rect(Rng2(v2(0,0), v2(100,100)), ColorWhite);
 }
 
 void game_save_state() {
