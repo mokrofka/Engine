@@ -218,6 +218,7 @@ u32 prev_pow2(u32 n);
 #define EachNonZeroEnumVal(type, it) (type it = (type)1; it < type##_COUNT; it = (type)(it+1))
 #define EachInRange(it, range)       (u64 it = (range).min; it < (range).max; ++it)
 #define EachNode(it, T, first)       (T* it = first; it != 0; it = it->next)
+#define EachNodePool(it, p)          (i32 it = p.first; it != 0; it = p.data[it].next) 
 
 ////////////////////////////////////////////////////////////////////////
 // Asserts
@@ -342,6 +343,12 @@ const u32 DEFAULT_RESIZE_FACTOR = 2;
 const u32 THREAD_COUNT = 2;
 
 #define Introspect
+
+#define MakeId(T) \
+  struct T {      \
+    u32 idx;      \
+    u32 gen;      \
+  };
 
 ////////////////////////////////////////////////////////////////////////
 // Types

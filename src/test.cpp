@@ -182,26 +182,25 @@ intern void test_object_pool() {
     u32 a;
     u32 b;
   };
-  struct AId {u32 v;};
-  var pool = obj_pool_make<A, AId>(scratch);
+  var pool = dpool_make<A, OpaqueId>(scratch);
   Array<A, TEST_SAMPLES> values = {};
-  Array<AId, TEST_SAMPLES> handlers = {};
+  Array<OpaqueId, TEST_SAMPLES> handlers = {};
 
   Loop (i, TEST_SAMPLES) {
     values[i].a = rand_rng_u32(0, TEST_SAMPLES);
     values[i].b = rand_rng_u32(0, TEST_SAMPLES);
   };
   Loop (i, TEST_SAMPLES) {
-    handlers[i] = obj_pool_push(pool, values[i]);
+    handlers[i] = pool_push(pool, values[i]);
   }
   Loop (i, TEST_SAMPLES) {
-    AssertAlways(MemMatchStruct(&values[i], &obj_pool_get(pool, handlers[i])));
+    AssertAlways(MemMatchStruct(&values[i], &pool_get(pool, handlers[i])));
   }
   Array<u32, TEST_SAMPLES> indices = {};
   Loop(i, TEST_SAMPLES) array_push(indices, i);
   rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
-    obj_pool_remove(pool, handlers[i]);
+    pool_remove(pool, handlers[i]);
   }
 
   array_clear(indices);
@@ -210,15 +209,15 @@ intern void test_object_pool() {
     values[i].b = rand_rng_u32(0, TEST_SAMPLES);
   };
   Loop (i, TEST_SAMPLES) {
-    handlers[i] = obj_pool_push(pool, values[i]);
+    handlers[i] = pool_push(pool, values[i]);
   }
   Loop (i, TEST_SAMPLES) {
-    AssertAlways(MemMatchStruct(&values[i], &obj_pool_get(pool, handlers[i])));
+    AssertAlways(MemMatchStruct(&values[i], &pool_get(pool, handlers[i])));
   }
   Loop(i, TEST_SAMPLES) array_push(indices, i);
   rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
-    obj_pool_remove(pool, handlers[i]);
+    pool_remove(pool, handlers[i]);
   }
 }
 
@@ -228,32 +227,32 @@ intern void test_object_pool_linklist() {
     u32 a;
     u32 b;
   };
-  var pool = obj_pool_linklist_make<A, IndexId>(scratch);
+  var pool = dpool_linklist_make<A, OpaqueId>(scratch);
   Array<A, TEST_SAMPLES> values = {};
-  Array<IndexId, TEST_SAMPLES> handlers = {};
+  Array<OpaqueId, TEST_SAMPLES> handlers = {};
 
   Loop (i, TEST_SAMPLES) {
     values[i].a = rand_rng_u32(0, TEST_SAMPLES);
     values[i].b = rand_rng_u32(0, TEST_SAMPLES);
   };
   Loop (i, TEST_SAMPLES) {
-    handlers[i] = obj_pool_push(pool, values[i]);
+    handlers[i] = pool_push(pool, values[i]);
   }
   Loop (i, TEST_SAMPLES) {
-    AssertAlways(MemMatchStruct(&values[i], &obj_pool_get(pool, handlers[i])));
+    AssertAlways(MemMatchStruct(&values[i], &pool_get(pool, handlers[i])));
   }
   Array<u32, TEST_SAMPLES> indices = {};
   Loop(i, TEST_SAMPLES) array_push(indices, i);
   rand_shuffle(slice(indices));
 
   u32 i = 0;
-  for (IndexId node = pool.first; node.v != U32_MAX; node = pool.data[id_idx(node)].next) {
-    var elem = pool.data[id_idx(node)].elem;
+  for EachNodePool(it, pool) {
+    A elem = pool.data[it].elem;
     AssertAlways(elem.a == values[i].a && elem.a == values[i].a);
     ++i;
   }
   Loop (i, TEST_SAMPLES) {
-    obj_pool_remove(pool, handlers[i]);
+    pool_remove(pool, handlers[i]);
   }
 
   array_clear(indices);
@@ -262,21 +261,21 @@ intern void test_object_pool_linklist() {
     values[i].b = rand_rng_u32(0, TEST_SAMPLES);
   };
   Loop (i, TEST_SAMPLES) {
-    handlers[i] = obj_pool_push(pool, values[i]);
+    handlers[i] = pool_push(pool, values[i]);
   }
   Loop (i, TEST_SAMPLES) {
-    AssertAlways(MemMatchStruct(&values[i], &obj_pool_get(pool, handlers[i])));
+    AssertAlways(MemMatchStruct(&values[i], &pool_get(pool, handlers[i])));
   }
   Loop(i, TEST_SAMPLES) array_push(indices, i);
   rand_shuffle(slice(indices));
   i = 0;
-  for (IndexId node = pool.first; node.v != U32_MAX; node = pool.data[id_idx(node)].next) {
-    var elem = pool.data[id_idx(node)].elem;
+  for EachNodePool(it, pool) {
+    A elem = pool.data[it].elem;
     AssertAlways(elem.a == values[i].a && elem.a == values[i].a);
     ++i;
   }
   Loop (i, TEST_SAMPLES) {
-    obj_pool_remove(pool, handlers[i]);
+    pool_remove(pool, handlers[i]);
   }
 }
 
@@ -286,9 +285,9 @@ intern void test_handle_darray() {
     u32 a;
     u32 b;
   };
-  var arr = darray_handler_make<A, IndexId>(scratch);
+  var arr = darray_handler_make<A, OpaqueId>(scratch);
   Array<A, TEST_SAMPLES> values = {};
-  Array<IndexId, TEST_SAMPLES> handlers = {};
+  Array<OpaqueId, TEST_SAMPLES> handlers = {};
 
   Loop (i, TEST_SAMPLES) {
     values[i].a = rand_rng_u32(0, TEST_SAMPLES);

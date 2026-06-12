@@ -18,7 +18,7 @@ struct ThreadPool {
   Thread threads[16];
   u32 num_threads;
   TaskQueue queue;
-  ObjectPool<u32, CounterId> counters;
+  Pool<u32, MAX_TASKS, CounterId> counters;
 };
 
 global ThreadPool thread_pool;
@@ -33,7 +33,7 @@ TaskId thread_task_push(Task t, b32 async) {
   os_cond_var_signal(q.cond_not_empty);
   t.async = async;
   if (!t.async) {
-    t.counter_id = obj_pool_push(g.counters, (u32)1);
+    t.counter_id = pool_push(g.counters, (u32)1);
   }
   ring_write_struct(q.ring, &t);
   ++q.count;
@@ -82,7 +82,7 @@ intern void thread_worker(void* ctx) {
     ProfBlock("working", ProfType_Worker);
     t.func(t.ctx);
     if (!t.async) {
-      atomic_sub(&obj_pool_get(g.counters, t.counter_id), 1);
+      atomic_sub(&pool_get(g.counters, t.counter_id), 1);
     }
     LockScope(q.mutex);
     --q.remaining_tasks;
@@ -97,7 +97,6 @@ void thread_pool_init(u32 num_threads) {
   ThreadPool& g = thread_pool;
   g.arena = arena_make();
   g.num_threads = num_threads;
-  g.counters = obj_pool_make<u32, CounterId>(g.arena);
   TaskQueue& q = g.queue;
   q.tasks = push_array(g.arena, Task, MAX_TASKS);
   q.ring = ring_make(q.tasks, MAX_TASKS * sizeof(Task));
@@ -114,7 +113,7 @@ void thread_wait_task(TaskId task_id) {
   ProfFunc;
   ThreadPool& g = thread_pool;
   TaskQueue& q = thread_pool.queue;
-  while (atomic_load(&obj_pool_get(g.counters, task_id.counter_id)) > 0) {
+  while (atomic_load(&pool_get(g.counters, task_id.counter_id)) > 0) {
     Result res = thread_task_try_pop();
     if (res.err) {
       os_sleep_ms(1);
@@ -124,7 +123,7 @@ void thread_wait_task(TaskId task_id) {
     Task t = res.v;
     t.func(t.ctx);
     if (!t.async) {
-      atomic_sub(&obj_pool_get(g.counters, t.counter_id), 1);
+      atomic_sub(&pool_get(g.counters, t.counter_id), 1);
     }
     LockScope(q.mutex);
     --q.remaining_tasks;
@@ -132,7 +131,7 @@ void thread_wait_task(TaskId task_id) {
       os_cond_var_signal(q.finished);
     }
   }
-  obj_pool_remove(g.counters, task_id.counter_id);
+  pool_remove(g.counters, task_id.counter_id);
 }
 
 void thread_wait_for() {

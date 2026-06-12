@@ -61,19 +61,15 @@ const v4 ColorCollision  = v4(0.86, 0.33, 0.33, 1);
 const u32 MaxEntities = KB(4);
 const u32 MaxStaticEntities = KB(4);
 
-struct MyHandle {
-  u32 idx;
-  u32 gen;
-};
-
-struct GpuTextureId { u32 v; };
-struct GpuMaterialId { u32 v; };
-struct GpuMeshId { u32 v; };
-struct GpuShaderId { u32 v; };
-struct GpuCubemapId { u32 v; };
-struct EntityId { u32 v; };
-struct StaticEntityId { u32 v; };
-struct IndexId { u32 v; };
+MakeId(OpaqueId)
+MakeId(GpuTextureId)
+MakeId(GpuMaterialId)
+MakeId(GpuMeshId)
+MakeId(GpuShaderId)
+MakeId(GpuCubemapId)
+MakeId(EntityId)
+MakeId(StaticEntityId)
+MakeId(IndexId)
 
 struct PointLight {
   v3 color;
@@ -455,23 +451,17 @@ struct GameState {
   b32 fps_camera;
   Timer timer;
 
-  Entity* entities;
-  IndexId id_track_entities[MaxEntities];
-  StaticEntity* static_entities;
-  IndexId id_track_static_entities[MaxStaticEntities];
   u32 entities_count;
   u32 static_entities_count;
-  StaticIdPool<MaxEntities> entity_id_pool;
-  StaticIdPool<MaxStaticEntities> static_entity_id_pool;
+  PoolLinkList<Entity, MaxEntities, EntityId> entities;
+  PoolLinkList<StaticEntity, MaxStaticEntities, StaticEntityId> static_entities;
 
   Darray<EntityId> moving_cubes;
   Darray<StaticEntityId> static_cubes;
-  ObjPoolLinklist<EntityId, IndexId> all_dynamic_entities;
-  ObjPoolLinklist<StaticEntityId, IndexId> all_static_entities;
   EntityId axis_attached_to_cam_id;
   EntityId monkey_id;
   EntityId rotating_cube_id;
-  Map<String, EntityId> find_entity;
+  Map<String, EntityId, 32> find_entity;
   EntityId referenced_entities[0];
 
   v3 a;
@@ -513,16 +503,14 @@ struct GlobalState {
   GpuTextureId textures_ids[Texture_COUNT];
   GpuMaterialId materials_ids[Material_COUNT];
 
-  // Array<MaterialDesc, MaxMaterials> materials_desc;
-
   String asset_path;
   String shader_dir;
   String shader_compiled_dir;
   String models_dir;
   String textures_dir;
-  Map<String, GpuTextureId> str_to_texture_id;
-  Map<String, GpuMeshId> str_to_mesh_id;
-  Map<String, GpuMaterialId> str_to_material_id;
+  Map<String, GpuTextureId, MaxTextures> str_to_texture_id;
+  Map<String, GpuMeshId, MaxMeshes> str_to_mesh_id;
+  Map<String, GpuMaterialId, MaxMaterials> str_to_material_id;
   Array<String, MaxTextures> texture_id_to_str;
   Array<String, MaxMeshes> mesh_id_to_str;
   Array<String, MaxMaterials> material_id_to_str;

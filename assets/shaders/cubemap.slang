@@ -13,6 +13,6 @@ VS_Entry VSOutput vs_main(VSInput in) {
 }
 
 FS_Entry v4 fs_main(VSOutput in) {
-  v4 color = cube_texture.Sample(samplers[0], in.color);
+  v4 color = cube_texture.Sample(samplers[1], in.color);
   return color;
 }

@@ -16,7 +16,7 @@ VS_Entry VSOutput vs_main(VSInput in) {
 FS_Entry v4 fs_main(VSOutput in) {
   Entity e = entities[in.entity_id];
   Material material = materials[e.material];
-  v4 color = textures[material.texture].Sample(samplers[0], in.uv);
+  v4 color = textures[material.texture].Sample(samplers[1], in.uv);
   // color = v4(0,0,0,0);
 
   return color;

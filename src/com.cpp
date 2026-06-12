@@ -107,8 +107,7 @@ f32 get_dt() { return st->dt; }
 f32 get_time() { return st->time; }
 
 Entity& get_entity(EntityId id) {
-  Assert(id_generation(id) == st->game.entity_id_pool.generations[id_idx(id)])
-  return st->game.entities[id_idx(id)];
+  return pool_get(st->game.entities, id);
 }
 
 Transform get_entity_transform(EntityId id) {
@@ -122,8 +121,7 @@ Transform get_entity_transform(EntityId id) {
 }
 
 StaticEntity& get_static_entity(StaticEntityId id) {
-  Assert(id_generation(id) == st->game.static_entity_id_pool.generations[id_idx(id)]);
-  return st->game.static_entities[id_idx(id)];
+  return pool_get(st->game.static_entities, id);
 }
 
 Transform get_static_entity_transform(StaticEntityId id) {
@@ -501,7 +499,7 @@ GpuMeshId mesh_get(MeshEnum mesh_enum) { return st->meshes_ids[mesh_enum]; }
 void mesh_set(MeshEnum mesh_enum, GpuMeshId mesh_id) { 
   st->meshes_ids[mesh_enum] = mesh_id;
   String str = push_str_copy(st->arena, meshes_strs[mesh_enum]);
-  st->mesh_id_to_str[mesh_id.v] = str;
+  st->mesh_id_to_str[mesh_id.idx] = str;
   map_set(st->str_to_mesh_id, str, mesh_id);
 }
 GpuMaterialId material_get(MaterialEnum id) { return st->materials_ids[id]; }
@@ -579,7 +577,7 @@ void assets_load() {
     g.meshes_ids[enum_name] = mesh_load(meshes_strs[enum_name]);
     String str = push_str_copy(g.arena, meshes_strs[enum_name]);
     map_set(g.str_to_mesh_id, str, g.meshes_ids[enum_name]);
-    g.mesh_id_to_str[id_idx(g.meshes_ids[enum_name])] = str;
+    g.mesh_id_to_str[g.meshes_ids[enum_name].idx] = str;
   };
 #define X(enum_name, name) m_load(enum_name, Stringify(name));
   MESH_LIST
@@ -589,7 +587,7 @@ void assets_load() {
     g.textures_ids[enum_name] = texture_load(textures_strs[enum_name]); \
     String str = push_str_copy(g.arena, textures_strs[enum_name]);
     map_set(g.str_to_texture_id, str, g.textures_ids[enum_name]);
-    g.texture_id_to_str[id_idx(g.textures_ids[enum_name])] = str;
+    g.texture_id_to_str[g.textures_ids[enum_name].idx] = str;
   };
 #define X(enum_name, name) t_load(enum_name, Stringify(name));
   TEXTURE_LIST
@@ -599,7 +597,7 @@ void assets_load() {
     g.materials_ids[enum_name] = vk_material_load(desc);
     String str = push_str_copy(g.arena, materials_strs[enum_name]);
     map_set(g.str_to_material_id, str, g.materials_ids[enum_name]);
-    g.material_id_to_str[id_idx(g.materials_ids[enum_name])] = str;
+    g.material_id_to_str[g.materials_ids[enum_name].idx] = str;
   };
   mat_load(Material_Orange, {
     .shader = {
@@ -992,11 +990,11 @@ String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, 
       } break;
       case MetaType_GpuMeshId: {
         GpuMeshId v = *((GpuMeshId*)member_ptr);
-        dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->mesh_id_to_str[v.v]));
+        dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->mesh_id_to_str[v.idx]));
       } break;
       case MetaType_GpuMaterialId: {
         GpuMaterialId v = *((GpuMaterialId*)member_ptr);
-        dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->material_id_to_str[v.v]));
+        dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->material_id_to_str[v.idx]));
       } break;
       case MetaType_String: {
         if (FlagHas(flags, EntityFlag_Referenced)) {
@@ -1189,9 +1187,6 @@ void com_init() {
     g.shader_compiled_dir = push_str_cat(g.arena, g.shader_dir, "/compiled");
     g.models_dir = push_str_cat(g.arena, g.asset_path, "/models");
     g.textures_dir = push_str_cat(g.arena, g.asset_path, "/textures");
-    g.str_to_texture_id = map_make<String, GpuTextureId>(g.gpa);
-    g.str_to_mesh_id = map_make<String, GpuMeshId>(g.gpa);
-    g.str_to_material_id = map_make<String, GpuMaterialId>(g.gpa);
     g.watch.arena = g.arena;
     watch_directory_add(g.shader_dir, WatchOp_RecompileShader);
     watch_directory_add(g.shader_compiled_dir, WatchOp_ShaderReload);
@@ -1414,18 +1409,13 @@ Mesh grid_generate(Allocator arena, u32 size, f32 step) {
 
 EntityId e_alloc_bare() {
   GameState& g = st->game;
-  EntityId e_id = {id_pool_push(g.entity_id_pool)};
-  Entity& e = get_entity(e_id);
-  e = {};
+  EntityId e_id = pool_push(g.entities, {});
   ++g.entities_count;
-  g.id_track_entities[id_idx(e_id.v)] = obj_pool_push(g.all_dynamic_entities, e_id);
   return e_id;
 }
 EntityId e_alloc(GpuMeshId mesh_id, GpuMaterialId material_id, EntityThing thing) {
   GameState& g = st->game;
-  EntityId e_id = {id_pool_push(g.entity_id_pool)};
-  Entity& e = get_entity(e_id);
-  e = {
+  Entity e = {
     .name = thing.name,
     .flags = thing.flags,
     .scale = v3_one(),
@@ -1433,9 +1423,9 @@ EntityId e_alloc(GpuMeshId mesh_id, GpuMaterialId material_id, EntityThing thing
     .material_id = material_id,
     .aabb = Rng3(v3_splat(-1), v3_splat(1)),
   };
+  EntityId e_id = pool_push(g.entities, e);
   vk_make_renderable(e_id, mesh_id, material_id);
   ++g.entities_count;
-  g.id_track_entities[id_idx(e_id.v)] = obj_pool_push(g.all_dynamic_entities, e_id);
   return e_id;
 }
 EntityId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing) {
@@ -1444,16 +1434,14 @@ EntityId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing) 
 
 StaticEntityId e_static_alloc(GpuMeshId mesh_id, GpuMaterialId material_id) {
   GameState& g = st->game;
-  StaticEntityId e_id = {id_pool_push(g.static_entity_id_pool)};
-  StaticEntity& e = get_static_entity(e_id);
-  e = {
+  StaticEntity e = {
     .scale = v3_one(),
     .mesh_id = mesh_id,
     .material_id = material_id,
   };
+  StaticEntityId e_id = pool_push(g.static_entities, e);
   vk_make_renderable_static(e_id, mesh_id, material_id);
   ++g.static_entities_count;
-  g.id_track_static_entities[id_idx(e_id.v)] = obj_pool_push(g.all_static_entities, e_id);
   return e_id;
 }
 StaticEntityId e_static_alloc(MeshEnum mesh_id, MaterialEnum material_id) {
@@ -1462,17 +1450,15 @@ StaticEntityId e_static_alloc(MeshEnum mesh_id, MaterialEnum material_id) {
 
 void e_free(EntityId e_id) {
   GameState& g = st->game;
-  obj_pool_remove(g.all_dynamic_entities, g.id_track_entities[id_idx(e_id.v)]);
   vk_remove_renderable(e_id);
-  id_pool_remove(g.entity_id_pool, e_id.v);
+  pool_remove(g.entities, e_id);
   --g.entities_count;
 }
 
 void e_static_free(StaticEntityId e_id) {
   GameState& g = st->game;
-  obj_pool_remove(g.all_static_entities, g.id_track_static_entities[id_idx(e_id.v)]);
   vk_remove_static_renderable(e_id);
-  id_pool_remove(g.static_entity_id_pool, e_id.v);
+  pool_remove(g.static_entities, e_id);
   --g.static_entities_count;
 }
 
@@ -1829,18 +1815,18 @@ void game_save_state() {
   dstr_push(data, "}\n");
 
   {
-    var& p = g.all_dynamic_entities;
-    for (IndexId node = p.first; node.v != U32_MAX; node = p.data[id_idx(node)].next) {
-      Entity& e = get_entity(p.data[id_idx(node)].elem);
+    var& p = g.entities;
+    for EachNodePool(i, p) {
+      Entity& e = p.data[i].elem;
       dstr_push(data, "Entity {\n");
       dstr_push(data, dumb_struct(scratch, ArraySlice(members_of_Entity), &e, e.flags));
       dstr_push(data, "}\n");
     }
   }
   {
-    var& p = g.all_static_entities;
-    for (IndexId node = p.first; node.v != U32_MAX; node = p.data[id_idx(node)].next) {
-      StaticEntity& e = get_static_entity(p.data[id_idx(node)].elem);
+    var& p = g.static_entities;
+    for EachNodePool(i, p) {
+      StaticEntity& e = p.data[i].elem;
       dstr_push(data, "StaticEntity {\n");
       dstr_push(data, dumb_struct(scratch, ArraySlice(members_of_StaticEntity), &e));
       dstr_push(data, "}\n");
@@ -1860,16 +1846,16 @@ void game_load_state() {
   Parser p = parser_make(tokens);
 
   {
-    var& p = g.all_dynamic_entities;
-    for (IndexId node = p.first; node.v != U32_MAX; node = p.data[id_idx(node)].next) {
-      EntityId e_id = p.data[id_idx(node)].elem;
+    var& p = g.entities;
+    for EachNodePool(i, p) {
+      EntityId e_id = pool_get_handler(p, i);
       e_free(e_id);
     }
   }
   {
-    var& p = g.all_static_entities;
-    for (IndexId node = p.first; node.v != U32_MAX; node = p.data[id_idx(node)].next) {
-      StaticEntityId e_id = p.data[id_idx(node)].elem;
+    var& p = g.static_entities;
+    for EachNodePool(i, p) {
+      StaticEntityId e_id = pool_get_handler(p, i);
       e_static_free(e_id);
     }
   }
@@ -1917,15 +1903,8 @@ void game_init() {
   g.gpa = alloc_seglist_make(g.arena, "game gpa");
   g.timer = timer_make(1);
 
-  id_pool_init(g.entity_id_pool);
-  id_pool_init(g.static_entity_id_pool);
-  g.all_dynamic_entities = obj_pool_linklist_make<EntityId, IndexId>(g.gpa);
-  g.all_static_entities = obj_pool_linklist_make<StaticEntityId, IndexId>(g.gpa);
-  g.entities = push_array(g.arena, Entity, MaxEntities);
-  g.static_entities = push_array(g.arena, StaticEntity, MaxStaticEntities);
   g.moving_cubes = darray_make<EntityId>(g.gpa);
   g.static_cubes = darray_make<StaticEntityId>(g.gpa);
-  g.find_entity = map_make<String, EntityId>(g.gpa);
 
   // Mesh cube_mesh = {.vertices = cube_vertices, .vert_count = ArrayCount(cube_vertices)};
   // mesh_set(Mesh_Cube, vk_mesh_load(cube_mesh));

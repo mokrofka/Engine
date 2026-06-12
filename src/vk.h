@@ -1,21 +1,21 @@
 #pragma once
 #include "vk_bindings.h"
 
-const u32 MaxMaterials  = KB(1);
-const u32 MaxLights     = KB(1);
+const u32 MaxMaterials  = 32;
+const u32 MaxLights     = 32;
+const u32 MaxMeshes     = 128;
+const u32 MaxTextures   = 32;
 const u32 MaxLines      = KB(1);
-const u32 MaxMeshes     = KB(1);
-const u32 MaxTextures   = KB(1);
 const u32 MaxDrawCalls  = KB(1);
 const u32 MaxDebugLines = KB(1);
 
 #if BUILD_DEBUG
-  #define VK_CHECK(expr)                     \
-    {                                        \
-      if (expr != VK_SUCCESS) {              \
+  #define VK_CHECK(expr)                  \
+    {                                     \
+      if (expr != VK_SUCCESS) {           \
         Error("%s", vk_result_str(expr)); \
-        InvalidPath;                         \
-      }                                      \
+        InvalidPath;                      \
+      }                                   \
     }
 #else
   #define VK_CHECK(expr) expr
@@ -108,12 +108,12 @@ struct VK_Pipeline0 {
 
 struct VK_MeshBatch {
   GpuMeshId mesh_id;
-  Darray<u32> entities;
+  Darray<OpaqueId> entities;
 };
 
 struct VK_MeshesBatches {
   Darray<VK_MeshBatch> mesh_batches;
-  Map<u32, u32> mesh_to_batch;
+  Dmap<u32, u32> mesh_to_batch;
 };
 
 typedef u32 VK_BatchType;
@@ -211,15 +211,15 @@ struct VK_State {
   VkSampler sampler;
   VkPipelineLayout pipeline_layout;
 
-  VK_Image msaa_texture;
-  VK_Image offscreen_depth_buffer;
-  VK_Image* texture_targets;
+  VK_Image msaa_texture0;
+  VK_Image offscreen_depth_buffer0;
+  VK_Image texture_targets0[16];
 
   Darray<VK_Pipeline0> pipelines0;
   Darray<u32> entity_pipelines;
   Darray<VK_ShaderModuleEntry> modules;
-  Map<VK_KeyToShaderPipeline, u32> shader_to_pipeline;
-  Map<String, u32> shader_to_module;
+  Map<VK_KeyToShaderPipeline, u32, Gfx_MaxPipelines> shader_to_pipeline;
+  Map<String, u32, Gfx_MaxShaders> shader_to_module;
   Array<GpuMaterial, MaxMaterials> materials;
   Darray<ShaderState> shader_states;
   Darray<VK_PipelineBatch> batches;
@@ -245,11 +245,11 @@ struct VK_State {
   VK_DrawCallInfo* gpu_draw_call_infos;
   u32* gpu_entities_indices;
 
-  Array<VK_Shader, Gfx_MaxShaders> shaders;
-  Array<VK_Pipeline, Gfx_MaxPipelines> pipelines;
-  Array<VK_Image, Gfx_MaxImages> images;
-  Array<VK_View, Gfx_MaxViews> views;
-  Array<VK_Sampler, Gfx_MaxSamplers> samplers;
+  Pool<VK_Shader, Gfx_MaxShaders, Gfx_Shader> shaders;
+  Pool<VK_Pipeline, Gfx_MaxPipelines, Gfx_Pipeline> pipelines;
+  Pool<VK_Image, Gfx_MaxImages, Gfx_Image> images;
+  Pool<VK_View, Gfx_MaxViews, Gfx_View> views;
+  Pool<VK_Sampler, Gfx_MaxSamplers, Gfx_Sampler> samplers;
   Gfx_Pass cur_pass;
 
   Gfx_Pipeline triangle_pip;
@@ -257,6 +257,18 @@ struct VK_State {
   Gfx_Pipeline cubemap_pip;
   Gfx_Pipeline debug_line_pip;
   Gfx_Pipeline ui_pip;
+
+  Gfx_Sampler com_sampler;
+
+  Gfx_Image image_color;
+  Gfx_Image image_resolve;
+  Gfx_Image image_depth;
+  Gfx_View views_color[4];
+  u64 views_color_mem_offsets;
+  Gfx_View views_resolve[4];
+  u64 views_resolve_mem_offsets;
+  Gfx_View views_depth[4];
+  u64 views_depth_mem_offsets;
 
   ///////////////////////////////////
   // Vulkan loader
@@ -388,6 +400,7 @@ struct VK_State {
 };
 
 void vk_image_layout_transition(VkCommandBuffer cmd, VK_Image image, VkImageLayout old_layout, VkImageLayout new_layout, VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT);
+void vk_image_layout_transition_swapchain(VkCommandBuffer cmd, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout, VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT);
 void vk_image_upload_to_gpu(VkCommandBuffer cmd, VK_Image image);
 void vk_texture_generate_mipmaps(VK_Image image);
 

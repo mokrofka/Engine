@@ -1,9 +1,9 @@
 
-struct Gfx_Image    { u32 id; };
-struct Gfx_Sampler  { u32 id; };
-struct Gfx_Shader   { u32 id; };
-struct Gfx_Pipeline { u32 id; };
-struct Gfx_View     { u32 id; };
+MakeId(Gfx_Image)
+MakeId(Gfx_Sampler)
+MakeId(Gfx_Shader)
+MakeId(Gfx_Pipeline)
+MakeId(Gfx_View)
 
 // Configuration
 enum {
@@ -16,6 +16,8 @@ enum {
   Gfx_MaxViews = 32,
   Gfx_MaxImages = 32,
   Gfx_MaxSamplers = 32,
+  Gfx_MaxCubeTextures = 16,
+  Gfx_MaxStorageBuffers = 16,
 
   Gfx_DefaultSampleCount = 4,
 };
@@ -449,6 +451,7 @@ struct VK_ImageInfo {
 struct VK_Image {
   VK_ImageInfo info;
 
+  VkDeviceMemory memory;
   VkImage h;
   VkImageView view;
   Gfx_ImageType type;
@@ -494,10 +497,12 @@ struct VK_Swapchain {
   VkSwapchainKHR h;
   VkSurfaceFormatKHR format;  
   VkPresentModeKHR present_mode;
-  VK_Image images[4];
+  VkImage images[4];
+  VkImageView views[4];
   VK_Image depth_attachment;
+
   VkSwapchainKHR h_old;
-  VK_Image old_images[4];
+  VkImageView old_view[4];
 };
 
 struct VK_Shader {
@@ -599,6 +604,9 @@ Gfx_Image gfx_image_make(Gfx_ImageDesc desc);
 Gfx_View gfx_view_make(Gfx_ViewDesc desc);
 Gfx_Sampler gfx_sampler_make(Gfx_SamplerDesc desc);
 
+void gfx_image_destroy(Gfx_Image img);
+void gfx_view_destroy(Gfx_View view);
+
 void gfx_pass_begin(Gfx_Pass pass);
 void gfx_pass_end();
 void gfx_apply_viewport(f32 x, f32 y, f32 width, f32 height);
@@ -608,6 +616,8 @@ void gfx_draw(u32 base_vert, u32 vert_count, u32 instance_count = 1, u32 base_in
 void gfx_draw_indexed(u32 base_index, u32 index_count, u32 base_vert, u32 instance_count = 1, u32 base_instance = 0);
 void gfx_draw_indirect(u32 draw_base, u32 draw_count);
 void gfx_draw_indexed_indirect(u32 draw_base, u32 draw_count);
+
+// descriptors
 
 
 

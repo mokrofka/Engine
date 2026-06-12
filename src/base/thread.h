@@ -4,7 +4,7 @@
 
 #define MAX_TASKS 1024
 
-struct CounterId {u32 v;};
+MakeId(CounterId)
 struct TaskId { CounterId counter_id; };
 
 struct Task {
