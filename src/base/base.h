@@ -160,7 +160,8 @@ b32 PtrMatch(void* a, void* b);
 u32 clz(u64 val);
 u32 ctz(u64 val);
 u32 count_bits_set(u64 val);
-u32 most_significant_bit(u64 size);
+u32 most_significant_bitu32(u32 size);
+u64 most_significant_bitu64(u64 size);
 
 #define Bit(x) (1 << (x))
 b32 BitHas(u64 x, u64 pos);
@@ -170,6 +171,7 @@ u64 FlagToggle(u64 x, u64 f);
 b32 FlagHas(u64 x, u64 f);
 b32 FlagEquals(u64 x, u64 f);
 b32 FlagIntersects(u64 x, u64 f);
+b32 FlagIsSubset(u64 x, u64 f);
 
 ////////////////////////////////////////////////////////////////////////
 // Common operations
@@ -349,6 +351,8 @@ const u32 THREAD_COUNT = 2;
     u32 idx;      \
     u32 gen;      \
   };
+
+#define Transmute(T) *(T*)
 
 ////////////////////////////////////////////////////////////////////////
 // Types

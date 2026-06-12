@@ -707,57 +707,6 @@ GpuTextureId vk_texture_load(Texture texture) {
   return handle;
 }
 
-intern void vk_texture_resize_target() {
-  VK_State& g = st->vk;
-  Debug("texture target resized: x = %u y = %u", st->vk.width, st->vk.height);
-  VK_CHECK(g.DeviceWaitIdle(vkdevice));
-  u32 width = g.width * g.scale;
-  u32 height = g.height * g.scale;
-  if (width == 0) width = 1;
-  if (height == 0) height = 1;
-
-  // Msaa
-  vk_image_destroy(g.msaa_texture0);
-  VK_ImageInfo image_info = vk_image_info_default(width, height);
-  image_info.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-  image_info.format = VK_FORMAT_B8G8R8A8_UNORM;
-  image_info.samples = VK_SAMPLE_COUNT_4_BIT;
-  g.msaa_texture0 = vk_image_create(image_info);
-
-  // Texture target
-  Loop (i, g.images_in_flight) {
-    vk_image_destroy(g.texture_targets0[i]);
-    VK_ImageInfo image_info = vk_image_info_default(width, height);
-    image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-    image_info.format = VK_FORMAT_B8G8R8A8_UNORM;
-    g.texture_targets0[i] = vk_image_create(image_info);
-    VkDescriptorImageInfo descriptor_image_info = {
-      .imageView = g.texture_targets0[i].view,
-      .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    };
-    VkWriteDescriptorSet texture_write_descriptor = {
-      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-      .dstSet = g.descriptor_sets,
-      .dstBinding = 1,
-      .dstArrayElement = (u32)i,
-      .descriptorCount = 1,
-      .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-      .pImageInfo = &descriptor_image_info,
-    };
-    VkWriteDescriptorSet descriptors[] = {texture_write_descriptor};
-    g.UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
-  }
-
-  // Offscreen depth buffer
-  vk_image_destroy(g.offscreen_depth_buffer0);
-  VK_ImageInfo depth_info = vk_image_info_default(width, height);
-  depth_info.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-  depth_info.aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
-  depth_info.format = g.device.depth_format;
-  depth_info.samples = VK_SAMPLE_COUNT_4_BIT;
-  g.offscreen_depth_buffer0 = vk_image_create(depth_info);
-}
-
 GpuMaterialId vk_material_load(MaterialDesc material) {
   VK_State& g = st->vk;
   VK_KeyToShaderPipeline key = {material.shader.name, material.shader.state};
@@ -1047,7 +996,6 @@ void vk_draw() {
         if (mb.entities.count == 0) continue;
         u32 base_instance = w->entity_cursor + w->entity_idx_offset;
         Loop (j, mb.entities.count) {
-          #define Transmute(T) *(T*)
           OpaqueId e_id = mb.entities[j];
           w->entities[e_id.idx].model = w->is_static ? mat4_transform(get_static_entity_transform(Transmute(StaticEntityId)&e_id)) : mat4_transform(get_entity_transform(Transmute(EntityId)&e_id));
           w->entity_indices[w->entity_cursor++] = e_id.idx + w->entity_idx_offset;
@@ -1121,16 +1069,6 @@ void vk_draw() {
     gfx_draw(g.draw_rects_offset/sizeof(Vertex), g.draw_rects.count*6);
     array_clear(g.draw_rects);
   }
-}
-
-void vk_draw_screen() {
-  VK_State& g = st->vk;
-  VkCommandBuffer cmd = vk_get_cur_cmd();
-  VK_PushConstant push = {g.current_image_idx};
-  // VK_PushConstant push = {g.views_color[g.current_image_idx].id};
-  vk_push_constants(push);
-  gfx_pipeline_bind(g.screen_pip);
-  g.CmdDraw(cmd, 3, 1, 0, 0);
 }
 
 void vk_loader_load_core() {
@@ -1419,9 +1357,16 @@ intern void vk_device_init() {
     
     ///////////////////////////////////
     // Features
+    // Sync2
+    VkPhysicalDeviceSynchronization2Features sync2 = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES,
+      .synchronization2 = true,
+    };
+
     // Indirect drawing
     VkPhysicalDeviceShaderDrawParametersFeatures draw_features = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES,
+      .pNext = &sync2,
       .shaderDrawParameters = VK_TRUE,
     };
     // Bindless
@@ -1755,91 +1700,43 @@ void vk_init() {
     VK_CHECK(g.CreatePipelineLayout(vkdevice, &pipeline_layout_info, g.allocator, &g.pipeline_layout));
   }
 
-  {
-    g.image_color = gfx_image_make({
+  Loop (i, g.images_in_flight) {
+    g.image_color[i] = gfx_image_make({
       .type = Gfx_ImageType_Array,
       .usage = Gfx_ImageUsage_ColorAttachment,
       .width = g.width,
       .height = g.height,
       .slices_count = g.images_in_flight,
     });
-    g.image_depth = gfx_image_make({
+    g.image_resolve[i] = gfx_image_make({
       .type = Gfx_ImageType_Array,
       .usage = Gfx_ImageUsage_ResolveAttachment,
       .width = g.width,
       .height = g.height,
       .slices_count = g.images_in_flight,
     });
-    g.image_resolve = gfx_image_make({
+    g.image_depth[i] = gfx_image_make({
       .type = Gfx_ImageType_Array,
       .usage = Gfx_ImageUsage_DepthStencilAttachment,
       .width = g.width,
       .height = g.height,
       .slices_count = g.images_in_flight,
     });
-    Loop (i, g.images_in_flight) {
-      g.views_color[i] = gfx_view_make({
-        .texture = {
-          .image = g.image_color,
-          .slice = (u32)i,
-        }
-      });
-      g.views_depth[i] = gfx_view_make({
-        .texture = {
-          .image = g.image_depth,
-          .slice = (u32)i,
-        }
-      });
-      g.views_resolve[i] = gfx_view_make({
-        .texture = {
-          .image = g.image_resolve,
-          .slice = (u32)i,
-        }
-      });
-    }
-  }
-
-  // Texture targets
-  {
-    g.textures.count = g.images_in_flight;
-    // Msaa
-    v2u size = os_get_screen_size();
-    VK_ImageInfo image_info = vk_image_info_default(size.x, size.y);
-    image_info.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    image_info.format = VK_FORMAT_B8G8R8A8_UNORM;
-    image_info.samples = VK_SAMPLE_COUNT_4_BIT;
-    g.msaa_texture0 = vk_image_create(image_info);
-    // Textures
-    Loop (i, g.images_in_flight) {
-      vk_image_destroy(g.texture_targets0[i]);
-      VK_ImageInfo image_info = vk_image_info_default(size.x, size.y);
-      image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-      image_info.format = VK_FORMAT_B8G8R8A8_UNORM;
-      g.texture_targets0[i] = vk_image_create(image_info);
-      VkDescriptorImageInfo descriptor_image_info = {
-        .sampler = g.sampler,
-        .imageView = g.texture_targets0[i].view,
-        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-      };
-      VkWriteDescriptorSet texture_write_descriptor = {
-        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-        .dstSet = g.descriptor_sets,
-        .dstBinding = 1,
-        .dstArrayElement = (u32)i,
-        .descriptorCount = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-        .pImageInfo = &descriptor_image_info,
-      };
-      VkWriteDescriptorSet descriptors[] = {texture_write_descriptor};
-      g.UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
-    }
-    // Depth buffer
-    VK_ImageInfo depth_info = vk_image_info_default(size.x, size.y);
-    depth_info.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    depth_info.aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
-    depth_info.format = g.device.depth_format;
-    depth_info.samples = VK_SAMPLE_COUNT_4_BIT;
-    g.offscreen_depth_buffer0 = vk_image_create(depth_info);
+    g.views_color[i] = gfx_view_make({
+      .color_attachment = {
+        .image = g.image_color[i],
+      }
+    });
+    g.views_resolve[i] = gfx_view_make({
+      .resolve_attachment = {
+        .image = g.image_resolve[i],
+      },
+    });
+    g.views_depth[i] = gfx_view_make({
+      .depth_stencil_attachment = {
+        .image = g.image_depth[i],
+      }
+    });
   }
 
   {
@@ -2028,80 +1925,51 @@ void vk_begin_frame() {
     VK_CHECK(g.DeviceWaitIdle(vkdevice));
     vk_swapchain_create();
     Info("Swapchain recreated x: %i y: %i", g.width, g.height);
-    // vk_texture_resize_target();
 
-    gfx_image_destroy(g.image_color);
-    gfx_image_destroy(g.image_depth);
-    gfx_image_destroy(g.image_resolve);
     Loop (i, g.images_in_flight) {
+      gfx_image_destroy(g.image_color[i]);
+      gfx_image_destroy(g.image_depth[i]);
+      gfx_image_destroy(g.image_resolve[i]);
       gfx_view_destroy(g.views_color[i]);
       gfx_view_destroy(g.views_depth[i]);
       gfx_view_destroy(g.views_resolve[i]);
     }
 
-    g.image_color = gfx_image_make({
-      .type = Gfx_ImageType_Array,
-      .usage = Gfx_ImageUsage_ColorAttachment,
-      .width = g.width,
-      .height = g.height,
-      .slices_count = g.images_in_flight,
-    });
-    g.image_depth = gfx_image_make({
-      .type = Gfx_ImageType_Array,
-      .usage = Gfx_ImageUsage_ResolveAttachment,
-      .width = g.width,
-      .height = g.height,
-      .slices_count = g.images_in_flight,
-    });
-    g.image_resolve = gfx_image_make({
-      .type = Gfx_ImageType_Array,
-      .usage = Gfx_ImageUsage_DepthStencilAttachment,
-      .width = g.width,
-      .height = g.height,
-      .slices_count = g.images_in_flight,
-    });
     Loop (i, g.images_in_flight) {
-      g.views_color[i] = gfx_view_make({
-        .texture = {
-          .image = g.image_color,
-          .slice = (u32)i,
-        }
+      g.image_color[i] = gfx_image_make({
+        .type = Gfx_ImageType_Array,
+        .usage = Gfx_ImageUsage_ColorAttachment,
+        .width = g.width,
+        .height = g.height,
       });
-      g.views_depth[i] = gfx_view_make({
-        .texture = {
-          .image = g.image_depth,
-          .slice = (u32)i,
+      g.image_resolve[i] = gfx_image_make({
+        .type = Gfx_ImageType_Array,
+        .usage = Gfx_ImageUsage_ResolveAttachment,
+        .width = g.width,
+        .height = g.height,
+      });
+      g.image_depth[i] = gfx_image_make({
+        .type = Gfx_ImageType_Array,
+        .usage = Gfx_ImageUsage_DepthStencilAttachment,
+        .width = g.width,
+        .height = g.height,
+      });
+      g.views_color[i] = gfx_view_make({
+        .color_attachment = {
+          .image = g.image_color[i],
         }
       });
       g.views_resolve[i] = gfx_view_make({
-        .texture = {
-          .image = g.image_resolve,
-          .slice = (u32)i,
+        .resolve_attachment = {
+          .image = g.image_resolve[i],
+        },
+      });
+      g.views_depth[i] = gfx_view_make({
+        .depth_stencil_attachment = {
+          .image = g.image_depth[i],
         }
       });
     }
-
-    vk_image_handle_update(g.msaa_texture0, g.width, g.height);
-    Loop (i, g.images_in_flight) {
-      vk_image_handle_update(g.texture_targets0[i], g.width, g.height);
-      VkDescriptorImageInfo descriptor_image_info = {
-        .sampler = g.sampler,
-        .imageView = g.texture_targets0[i].view,
-        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-      };
-      VkWriteDescriptorSet texture_write_descriptor = {
-        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-        .dstSet = g.descriptor_sets,
-        .dstBinding = 1,
-        .dstArrayElement = (u32)i,
-        .descriptorCount = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-        .pImageInfo = &descriptor_image_info,
-      };
-      VkWriteDescriptorSet descriptors[] = {texture_write_descriptor};
-      g.UpdateDescriptorSets(vkdevice, ArrayCount(descriptors), descriptors, 0, null);
-    }
-    vk_image_handle_update(g.offscreen_depth_buffer0, g.width, g.height);
   }
 
   // Next image
@@ -2116,9 +1984,6 @@ void vk_begin_frame() {
   VK_CHECK(g_g.AcquireNextImageKHR(vkdevice, g_g.swapchain.handle, U64_MAX, image_available_semaphore, null, &image_index));
 #endif
   }
-
-  gfx_apply_viewport(0, 0, g.width*g.scale, g.height*g.scale);
-  gfx_apply_scissor(0, 0, g.width, g.height);
 }
 
 void vk_end_frame() {
@@ -2174,143 +2039,43 @@ void vk_end_frame() {
   g.current_frame_idx_one_more = (g.current_frame_idx_one_more + 1) % (g.frames_in_flight+1);
 }
 
-intern VkRenderingAttachmentInfo vk_default_color_attachment_info(VkImageView view) {
-  VkRenderingAttachmentInfo result = {
-    .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    .imageView = view,
-    .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-    .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-    .clearValue = {
-      .color = {0.1f, 0.1f, 0.1f, 1.0f},
-    }
-  };
-  return result;
-}
-
-intern VkRenderingAttachmentInfo vk_default_depth_attachment_info(VkImageView view) {
-  VkRenderingAttachmentInfo result = {
-    .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    .imageView = view,
-    .imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-    .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-    .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-    .clearValue = { 
-      .depthStencil = {1, 0} 
-    }
-  };
-  return result;
-}
-
-intern VkRenderingInfo vk_default_rendering_info(VkRenderingAttachmentInfo* color_attachment, VkRenderingAttachmentInfo* depth_attachment = null) {
-  VK_State& g = st->vk;
-  VkRenderingInfo result = {
-    .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-    .renderArea = {
-      .offset = {.x = 0, .y = 0}, 
-      .extent = {.width = g.width, .height = g.height}
-    },
-    .layerCount = 1,
-    .colorAttachmentCount = 1,
-    .pColorAttachments = color_attachment,
-    .pDepthAttachment = depth_attachment
-  };
-  return result;
-}
-
-void vk_begin_renderpass(VK_RenderpassType renderpass_id) {
-  VK_State& g = st->vk;
-  VkCommandBuffer cmd = vk_get_cur_cmd();
-  switch (renderpass_id) {
-    case VK_RenderpassType_World: {
-      vk_image_layout_transition(cmd, g.msaa_texture0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-      vk_image_layout_transition(cmd, g.offscreen_depth_buffer0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
-      vk_image_layout_transition(cmd, g.texture_targets0[g.current_image_idx], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-
-      VkRenderingAttachmentInfo color_attachment = vk_default_color_attachment_info(g.msaa_texture0.view);
-      color_attachment.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
-      color_attachment.resolveImageView = g.texture_targets0[g.current_image_idx].view;
-      color_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-      VkRenderingAttachmentInfo depth_attachment = vk_default_depth_attachment_info(g.offscreen_depth_buffer0.view);
-      
-      VkRenderingInfo render_info = vk_default_rendering_info(&color_attachment, &depth_attachment);
-      render_info.renderArea.extent = {g.texture_targets0->info.width, g.texture_targets0->info.height};
-      g.CmdBeginRendering(cmd, &render_info);
-    } break;
-    case VK_RenderpassType_UI: {
-    } break;
-    case VK_RenderpassType_Screen: {
-      vk_image_layout_transition_swapchain(cmd, g.swapchain.images[g.current_image_idx], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-      VkRenderingAttachmentInfo color_attachment = vk_default_color_attachment_info(g.swapchain.views[g.current_image_idx]);
-      VkRenderingInfo render_info = vk_default_rendering_info(&color_attachment);
-      g.CmdBeginRendering(cmd, &render_info);
-    } break;
-  }
-  return;
-}
-
-void vk_end_renderpass(VK_RenderpassType renderpass) {
-  VK_State& g = st->vk;
-  VkCommandBuffer cmd = vk_get_cur_cmd();
-  switch (renderpass) {
-    case VK_RenderpassType_World: {
-      g.CmdEndRendering(cmd);
-      vk_image_layout_transition(cmd, g.texture_targets0[g.current_image_idx], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    } break;
-    case VK_RenderpassType_UI: {
-    } break;
-    case VK_RenderpassType_Screen: {
-      g.CmdEndRendering(cmd);
-      vk_image_layout_transition_swapchain(cmd, g.swapchain.images[g.current_image_idx], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-    } break;
-  }
-  return;
-}
-
 void vk_begin_draw_frame() {
   vk_imgui_begin_frame();
 }
-
 
 void vk_end_draw_frame() {
   ProfFunc;
   VK_State& g = st->vk;
   vk_begin_frame();
-  if (0) {
-  
-  }
+  gfx_apply_viewport(rng2_make(v2_zero(), v2(g.width, g.height)));
+  gfx_apply_scissor(rng2_make(v2_zero(), v2(g.width, g.height)));
   // World
   {
-    gfx_pass_begin({
-      
-    });
+    Gfx_Pass pass = {
+      .attachments = {
+        .color = g.views_color[g.current_image_idx],
+        .resolve = g.views_resolve[g.current_image_idx],
+        .depth_stencil = g.views_depth[g.current_image_idx],
+      },
+    };
+    gfx_pass_begin(pass);
     vk_draw();
     gfx_pass_end();
   }
+  // Swapchain
   {
-    gfx_apply_viewport(0, 0, g.width, g.height);
-    gfx_apply_scissor(0, 0, g.width, g.height);
-    vk_begin_renderpass(VK_RenderpassType_Screen);
-    vk_draw_screen();
+    gfx_pass_begin({});
+    gfx_apply_viewport(rng2_make(v2_zero(), v2(g.width, g.height)));
+    gfx_apply_scissor(rng2_make(v2_zero(), v2(g.width, g.height)));
+    VK_State& g = st->vk;
+    VK_PushConstant push = {g.views_resolve[g.current_image_idx].idx};
+    gfx_pipeline_bind(g.screen_pip);
+    vk_push_constants(push);
+    gfx_draw(0, 3);
+
     vk_imgui_end_frame();
-    vk_end_renderpass(VK_RenderpassType_Screen);
+    gfx_pass_end();
   }
-  // World
-  // {
-  //   vk_begin_renderpass(VK_RenderpassType_World);
-  //   vk_draw();
-  //   vk_end_renderpass(VK_RenderpassType_World);
-  // }
-  // Screen
-  // Screen
-  // {
-  //   gfx_apply_viewport(0, 0, g.width, g.height);
-  //   gfx_apply_scissor(0, 0, g.width, g.height);
-  //   vk_begin_renderpass(VK_RenderpassType_Screen);
-  //   vk_draw_screen();
-  //   vk_imgui_end_frame();
-  //   vk_end_renderpass(VK_RenderpassType_Screen);
-  // }
   vk_end_frame();
 }
 

@@ -241,11 +241,11 @@ enum Gfx_ImageType {
 
 typedef u32 Gfx_ImageUsage;
 enum {
-  Gfx_ImageUsage_StorageImage,
-  Gfx_ImageUsage_ColorAttachment,
-  Gfx_ImageUsage_ResolveAttachment,
-  Gfx_ImageUsage_DepthStencilAttachment,
-  Gfx_ImageUsage_Immutable,
+  Gfx_ImageUsage_StorageImage = Bit(0),
+  Gfx_ImageUsage_ColorAttachment = Bit(1),
+  Gfx_ImageUsage_ResolveAttachment = Bit(2),
+  Gfx_ImageUsage_DepthStencilAttachment = Bit(3),
+  Gfx_ImageUsage_Immutable = Bit(4),
 };
 
 struct Gfx_ImageDesc {
@@ -609,8 +609,8 @@ void gfx_view_destroy(Gfx_View view);
 
 void gfx_pass_begin(Gfx_Pass pass);
 void gfx_pass_end();
-void gfx_apply_viewport(f32 x, f32 y, f32 width, f32 height);
-void gfx_apply_scissor(f32 x, f32 y, f32 width, f32 height);
+void gfx_apply_viewport(Rng2 rect);
+void gfx_apply_scissor(Rng2 rect);
 void gfx_pipeline_bind(Gfx_Pipeline pip);
 void gfx_draw(u32 base_vert, u32 vert_count, u32 instance_count = 1, u32 base_instance = 0);
 void gfx_draw_indexed(u32 base_index, u32 index_count, u32 base_vert, u32 instance_count = 1, u32 base_instance = 0);

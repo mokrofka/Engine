@@ -29,10 +29,11 @@ b32 PtrMatch(void* a, void* b) { return (u8*)a == (u8*)b; }
 ////////////////////////////////////////////////////////////////////////
 // Bits
 
-u32 clz(u64 val)                   { return __builtin_clzll(val); }
-u32 ctz(u64 val)                   { return __builtin_ctzll(val); }
-u32 count_bits_set(u64 val)        { return __builtin_popcountll(val); }
-u32 most_significant_bit(u64 size) { return 63 - clz(size); }
+u32 clz(u64 val)                      { return __builtin_clzll(val); }
+u32 ctz(u64 val)                      { return __builtin_ctzll(val); }
+u32 count_bits_set(u64 val)           { return __builtin_popcountll(val); }
+u32 most_significant_bitu32(u32 size) { return 31 - clz(size); }
+u64 most_significant_bitu64(u64 size) { return 63 - clz(size); }
 
 b32 BitHas(u64 x, u64 pos)       { return x & (1 << pos); }
 u64 FlagSet(u64 x, u64 f)        { return x | f; }
@@ -41,6 +42,7 @@ u64 FlagToggle(u64 x, u64 f)     { return x ^ f; }
 b32 FlagHas(u64 x, u64 f)        { return (x & f) == (f); }
 b32 FlagEquals(u64 x, u64 f)     { return x == f; }
 b32 FlagIntersects(u64 x, u64 f) { return (x & f) > 0; }
+b32 FlagIsSubset(u64 x, u64 f)   { return (x & ~f) == 0; }
 
 ////////////////////////////////////////////////////////////////////////
 // Common operations

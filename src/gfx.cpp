@@ -178,13 +178,13 @@ VkImageType vk_image_type(Gfx_ImageType t) {
 VkImageUsageFlags vk_image_usage(Gfx_ImageUsage usg) {
   VkImageUsageFlags res = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
   res |= VK_IMAGE_USAGE_SAMPLED_BIT;
-  if (usg == Gfx_ImageUsage_StorageImage) {
+  if (FlagHas(usg, Gfx_ImageUsage_StorageImage)) {
     res |= VK_IMAGE_USAGE_STORAGE_BIT;
   }
-  if (usg == Gfx_ImageUsage_ColorAttachment || usg == Gfx_ImageUsage_ResolveAttachment) {
+  if (FlagHas(usg, Gfx_ImageUsage_ColorAttachment) || FlagHas(usg, Gfx_ImageUsage_ResolveAttachment)) {
     res |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
   }
-  if (usg == Gfx_ImageUsage_DepthStencilAttachment) {
+  if (FlagHas(usg, Gfx_ImageUsage_DepthStencilAttachment)) {
     res |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
   }
   return res;
@@ -383,9 +383,9 @@ VkBorderColor vk_sampler_border_color(Gfx_BorderColor c) {
   }
 }
 
-b32 vk_barrier_needed(VK_Access prev, VK_Access next) {
+b32 vk_is_read_access(VK_Access access) {
   VK_Access read_bits = VK_Access_IndexBuffer | VK_Access_VertBuffer | VK_Access_StorageBuffer_RO | VK_Access_Texture | VK_Access_Present;
-  return !((prev & ~read_bits) == 0) && ((next & ~read_bits) == 0);
+  return FlagIsSubset(access, read_bits);
 }
 
 VkPipelineStageFlags2 vk_stage_mask(VK_Access access, b32 is_dst_access) {
@@ -546,10 +546,10 @@ void vk_swapchain_end_barrier(VkImage vkimg, VK_Access pass_access) {
     .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
     .srcStageMask = vk_src_stage_mask(pass_access),
     .srcAccessMask = vk_src_access_mask(pass_access),
-    .oldLayout = vk_image_layout(pass_access),
+    .oldLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
     .dstStageMask = vk_src_stage_mask(pass_access),
     .dstAccessMask = vk_src_access_mask(pass_access),
-    .newLayout = vk_image_layout(pass_access),
+    .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
     .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
     .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
     .image = vkimg,
@@ -569,14 +569,14 @@ void vk_swapchain_end_barrier(VkImage vkimg, VK_Access pass_access) {
 
 void vk_image_barrier(VK_Image* img, VK_Access new_access) {
   VK_State& g = st->vk;
-  if (!vk_barrier_needed(img->cur_access, new_access)) return;
+  if (vk_is_read_access(img->cur_access) && vk_is_read_access(new_access)) return;
   VkImageMemoryBarrier2 barrier = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
     .srcStageMask = vk_src_stage_mask(img->cur_access),
     .srcAccessMask = vk_src_access_mask(img->cur_access),
     .oldLayout = vk_image_layout(img->cur_access),
-    .dstStageMask = vk_src_stage_mask(new_access),
-    .dstAccessMask = vk_src_access_mask(new_access),
+    .dstStageMask = vk_dst_stage_mask(new_access),
+    .dstAccessMask = vk_dst_access_mask(new_access),
     .newLayout = vk_image_layout(new_access),
     .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
     .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -593,17 +593,18 @@ void vk_image_barrier(VK_Image* img, VK_Access new_access) {
     .pImageMemoryBarriers = &barrier,
   };
   g.CmdPipelineBarrier2(vk_get_cur_cmd(), &dep_info);
+  img->cur_access = new_access;
 }
 
 void vk_buffer_barrier(VK_BufferRegion buf, VK_Access new_access) {
   VK_State& g = st->vk;
-  if (!vk_barrier_needed(buf.cur_access, new_access)) return;
+  if (vk_is_read_access(buf.cur_access) && vk_is_read_access(new_access)) return;
   VkBufferMemoryBarrier2 barrier = {
     .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
     .srcStageMask = vk_src_stage_mask(buf.cur_access),
     .srcAccessMask = vk_src_access_mask(buf.cur_access),
-    .dstStageMask = vk_src_stage_mask(new_access),
-    .dstAccessMask = vk_src_access_mask(new_access),
+    .dstStageMask = vk_dst_stage_mask(new_access),
+    .dstAccessMask = vk_dst_access_mask(new_access),
     .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
     .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
     .buffer = buf.h,
@@ -612,7 +613,7 @@ void vk_buffer_barrier(VK_BufferRegion buf, VK_Access new_access) {
   };
   VkDependencyInfo dep_info = {
     .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-    .imageMemoryBarrierCount = 1,
+    .bufferMemoryBarrierCount = 1,
     .pBufferMemoryBarriers = &barrier,
   };
   g.CmdPipelineBarrier2(vk_get_cur_cmd(), &dep_info);
@@ -1165,6 +1166,9 @@ void gfx_image_desc_defaults(Gfx_ImageDesc* desc) {
   } else if (FlagHas(desc->usage, Gfx_ImageUsage_DepthStencilAttachment)) {
     desc->pixel_format = _Def(desc->pixel_format, Gfx_DefaultDepthFormat);
     desc->sample_count = _Def(desc->sample_count, Gfx_DefaultSampleCount);
+  } else if (FlagHas(desc->usage, Gfx_ImageUsage_ResolveAttachment)) {
+    desc->pixel_format = _Def(desc->pixel_format, Gfx_DefaultTextureTargetColorFormat);
+    desc->sample_count = _Def(desc->sample_count, 1);
   } else {
     desc->pixel_format = _Def(desc->pixel_format, Gfx_PixelFormat_RGBA8);
     desc->sample_count = _Def(desc->sample_count, 1);
@@ -1234,7 +1238,7 @@ Gfx_Image gfx_image_make(Gfx_ImageDesc desc) {
     vk_cmd_end_submit(cmd);
   }
 
-  Gfx_Image res = {pool_push(g.images, image)};
+  Gfx_Image res = pool_push(g.images, image);
   return res;
 }
 
@@ -1419,24 +1423,65 @@ void gfx_view_destroy(Gfx_View view) {
   pool_remove(g.views, view);
 }
 
+void gfx_pass_defaults(Gfx_Pass* pass) {
+  Gfx_PassAction& action = pass->action;
+  Loop (i, Gfx_MaxColorAttachments) {
+    if (action.colors[i].load_action == Gfx_LoadAction_Default) {
+      action.colors[i].load_action = Gfx_LoadAction_Clear;
+      action.colors[i].clear_value.v[0] = 0.3;
+      action.colors[i].clear_value.v[1] = 0.3;
+      action.colors[i].clear_value.v[2] = 0.3;
+      action.colors[i].clear_value.v[3] = 1.0;
+    }
+    if (action.colors[i].store_action == Gfx_StoreAction_Default) {
+      action.colors[i].store_action = Gfx_StoreAction_Store;
+    }
+  }
+  if (action.depth.load_action == Gfx_LoadAction_Default) {
+    action.depth.load_action = Gfx_LoadAction_Clear;
+    action.depth.clear_value = 1.0;
+  }
+  if (action.depth.store_action == Gfx_StoreAction_Default) {
+    action.depth.store_action = Gfx_StoreAction_DontCare;
+  }
+  if (action.stencil.load_action == Gfx_LoadAction_Default) {
+    action.stencil.load_action = Gfx_LoadAction_Clear;
+    action.stencil.clear_value = 1.0;
+  }
+  if (action.stencil.store_action == Gfx_StoreAction_Default) {
+    action.stencil.store_action = Gfx_StoreAction_DontCare;
+  }
+}
+
 void gfx_pass_begin(Gfx_Pass pass) {
   VK_State& g = st->vk;
+  gfx_pass_defaults(&pass);
+  g.cur_pass.action = pass.action;
+  g.cur_pass.attachments = pass.attachments;
   
   ///////////////////////////////////
-  // Barrier
+  // Is swapchain?
   b32 is_swapchain_pass = true;
   Loop (i, Gfx_MaxColorAttachments) {
     if (pass.attachments.colors[i].idx != Gfx_InvalidId) is_swapchain_pass = false;
     if (pass.attachments.resolves[i].idx != Gfx_InvalidId) is_swapchain_pass = false;
   }
   if (pass.attachments.depth_stencil.idx != Gfx_InvalidId) is_swapchain_pass = false;
+
+  ///////////////////////////////////
+  // Barrier
   if (is_swapchain_pass) {
-    // vk_image_barrier(&g.swapchain.images[g.current_image_idx], VK_Access_ColorAttachment);
+    g.cur_pass.size = {g.width, g.height};
+    vk_swapchain_beginpass_barrier(g.swapchain.images[g.current_image_idx], VK_Access_ColorAttachment);
   }
   else {
+    // Color + Resolve
     Loop (i, Gfx_MaxColorAttachments) {
       if (pass.attachments.colors[i].idx == Gfx_InvalidId) break;
-      VK_Image& color_image = pool_get(g.images, pool_get(g.views, pass.attachments.colors[i]).ref);
+      Gfx_View color_view_id = pass.attachments.colors[i];
+      VK_View& color_view = pool_get(g.views, color_view_id);
+      VK_Image& color_image = pool_get(g.images, color_view.ref);
+      if (i == 0) g.cur_pass.size = {color_image.width, color_image.height};
       if (pass.action.colors[i].load_action != Gfx_LoadAction_Load) {
         color_image.cur_access |= VK_Access_Discard;
       }
@@ -1447,8 +1492,11 @@ void gfx_pass_begin(Gfx_Pass pass) {
         vk_image_barrier(&resolve_image, VK_Access_ResolveAttachment);
       }
     }
+
+    // Depth / Stencil
     if (pass.attachments.depth_stencil.idx != Gfx_InvalidId) {
-      VK_Image& ds_image = pool_get(g.images, pool_get(g.views, pass.attachments.depth_stencil).ref);
+      Gfx_Image img = pool_get(g.views, pass.attachments.depth_stencil).ref;
+      VK_Image& ds_image = pool_get(g.images, img);
       b32 has_stencil = ds_image.pixel_format == Gfx_PixelFormat_DepthStencil;
       if ((pass.action.depth.load_action != Gfx_LoadAction_Load) && (pass.action.stencil.load_action != Gfx_LoadAction_Load)) {
         ds_image.cur_access |= VK_Access_Discard;
@@ -1461,52 +1509,67 @@ void gfx_pass_begin(Gfx_Pass pass) {
     }
   }
 
+  ///////////////////////////////////
+  // Begin attachments
   Gfx_PassAction action = pass.action;
-
   VkRenderingAttachmentInfo color_att_infos[Gfx_MaxColorAttachments] = {};
   VkRenderingAttachmentInfo depth_att_info = {};
   VkRenderingAttachmentInfo stencil_att_info = {};
-  VkRenderingInfo render_info = {};
+  VkRenderingInfo render_info = {
+    .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+    .renderArea.extent = {
+      .width = g.cur_pass.size.x,
+      .height = g.cur_pass.size.y,
+    },
+    .layerCount = 1,
+  };
 
-  ///////////////////////////////////
-  // Begin
   if (is_swapchain_pass) {
     VkImageView vk_color_view = g.swapchain.views[g.current_image_idx];
     vk_init_color_attachment_info(&color_att_infos[0], action.colors[0], vk_color_view, null);
     render_info.colorAttachmentCount = 1;
     render_info.pColorAttachments = color_att_infos;
-  } else {
+  }
+  else {
+    // Color
     u32 color_view_count = 0;
     Loop (i, Gfx_MaxColorAttachments) {
       if (pass.attachments.colors[i].idx == Gfx_InvalidId) break;
       VkImageView vk_color_view = pool_get(g.views, pass.attachments.colors[i]).h;
       VkImageView vk_resolve_view = pool_get(g.views, pass.attachments.resolves[i]).h;
-      vk_init_color_attachment_info(&color_att_infos[i], action.colors[0], vk_color_view, vk_resolve_view);
+      vk_init_color_attachment_info(&color_att_infos[i], action.colors[i], vk_color_view, vk_resolve_view);
       ++color_view_count;
     }
     if (color_view_count) {
       render_info.colorAttachmentCount = color_view_count;
       render_info.pColorAttachments = color_att_infos;
     }
+
+    // Depth / Stencil
     if (pass.attachments.depth_stencil.idx != Gfx_InvalidId) {
       VK_View ds_view = pool_get(g.views, pass.attachments.depth_stencil);
       VK_Image ds_image = pool_get(g.images, ds_view.ref);
-      b32 has_stencil = ds_image.pixel_format == Gfx_PixelFormat_DepthStencil;
       vk_init_depth_attachment_info(&depth_att_info, action.depth, ds_view.h);
       render_info.pDepthAttachment = &depth_att_info;
+      b32 has_stencil = ds_image.pixel_format == Gfx_PixelFormat_DepthStencil;
       if (has_stencil) {
         vk_init_stencil_attachment_info(&stencil_att_info, action.stencil, ds_view.h);
         render_info.pStencilAttachment = &stencil_att_info;
       }
     }
   }
-
   g.CmdBeginRendering(vk_get_cur_cmd(), &render_info);
 }
 
 void gfx_pass_end() {
   VK_State& g = st->vk;
+
+  ///////////////////////////////////
+  // End
   g.CmdEndRendering(vk_get_cur_cmd());
+
+  ///////////////////////////////////
+  // Barrier
   b32 is_swapchain_pass = true;
   Loop (i, Gfx_MaxColorAttachments) {
     if (g.cur_pass.attachments.colors[i].idx != Gfx_InvalidId) is_swapchain_pass = false;
@@ -1520,7 +1583,7 @@ void gfx_pass_end() {
   else {
     Loop (i, Gfx_MaxColorAttachments) {
       if (g.cur_pass.attachments.colors[i].idx == Gfx_InvalidId) break;
-      if (g.cur_pass.attachments.colors[i].idx == Gfx_StoreAction_Store) {
+      if (g.cur_pass.action.colors[i].store_action == Gfx_StoreAction_Store) {
         VK_Image& img = pool_get(g.images, pool_get(g.views, g.cur_pass.attachments.colors[i]).ref);
         vk_image_barrier(&img, VK_Access_Texture);
       }
@@ -1538,27 +1601,29 @@ void gfx_pass_end() {
   }
 }
 
-void gfx_apply_viewport(f32 x, f32 y, f32 width, f32 height) {
+void gfx_apply_viewport(Rng2 rect) {
   VK_State& g = st->vk;
   // NOTE: we flip Y coordinate so Y:0 is on bottom of screen
+  v2 dim = rng2_dim(rect);
   VkViewport viewport = {
-    .x = x,
-    .y = (f32)g.height-y,
-    .width = (f32)g.width,
-    .height = -(f32)g.height,
+    .x = rect.min.x,
+    .y = dim.y-rect.min.y,
+    .width = (f32)dim.x,
+    .height = -(f32)dim.y,
     .minDepth = 0.0f,
     .maxDepth = 1.0f,
   };
   g.CmdSetViewport(vk_get_cur_cmd(), 0, 1, &viewport);
 }
 
-void gfx_apply_scissor(f32 x, f32 y, f32 width, f32 height) {
+void gfx_apply_scissor(Rng2 rect) {
   VK_State& g = st->vk;
+  v2 dim = rng2_dim(rect);
   VkRect2D scissor = {
-    .offset = {.x = (i32)x, .y = (i32)y},
+    .offset = {.x = (i32)rect.min.x, .y = (i32)rect.min.y},
     .extent = {
-      .width = (u32)width, 
-      .height = (u32)height
+      .width = (u32)dim.x, 
+      .height = (u32)dim.y,
     },
   };
   g.CmdSetScissor(vk_get_cur_cmd(), 0, 1, &scissor);

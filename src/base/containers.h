@@ -327,7 +327,7 @@ template<typename T, i32 N, typename Handle> Handle pool_push_empty(Pool<T, N, H
 }
 template<typename T, i32 N, typename Handle> Handle pool_push(Pool<T, N, Handle>& p, T a) {
   Handle h = pool_push_empty(p);
-  pool_get(p, h) = a;
+  p.data[h.idx].elem = a;
   return h;
 }
 template<typename T, i32 N, typename Handle> void pool_remove(Pool<T, N, Handle>& p, Handle h) {

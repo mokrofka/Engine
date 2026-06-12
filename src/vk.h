@@ -250,7 +250,12 @@ struct VK_State {
   Pool<VK_Image, Gfx_MaxImages, Gfx_Image> images;
   Pool<VK_View, Gfx_MaxViews, Gfx_View> views;
   Pool<VK_Sampler, Gfx_MaxSamplers, Gfx_Sampler> samplers;
-  Gfx_Pass cur_pass;
+  struct {
+    v2u size;
+    b32 compute;
+    Gfx_PassAction action;
+    Gfx_Attachments attachments;
+  } cur_pass;
 
   Gfx_Pipeline triangle_pip;
   Gfx_Pipeline screen_pip;
@@ -260,15 +265,12 @@ struct VK_State {
 
   Gfx_Sampler com_sampler;
 
-  Gfx_Image image_color;
-  Gfx_Image image_resolve;
-  Gfx_Image image_depth;
+  Gfx_Image image_color[4];
+  Gfx_Image image_resolve[4];
+  Gfx_Image image_depth[4];
   Gfx_View views_color[4];
-  u64 views_color_mem_offsets;
   Gfx_View views_resolve[4];
-  u64 views_resolve_mem_offsets;
   Gfx_View views_depth[4];
-  u64 views_depth_mem_offsets;
 
   ///////////////////////////////////
   // Vulkan loader
