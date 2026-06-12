@@ -190,19 +190,12 @@ struct VK_State {
   u32 frames_in_flight;
   u32 current_image_idx;
   u32 current_frame_idx;
-  u32 current_frame_idx_one_more;
+  u32 current_frame_idx_plus_one;
   u32 width;
   u32 height;
   f32 scale;
   f32 old_scale;
 
-  VK_Memory gpu_mem;
-  VK_Memory cpu_mem;
-  VK_Buffer vert_buffer;
-  VK_Buffer index_buffer;
-  VK_Buffer stage_buffer;
-  VK_Buffer indirect_draw_buffer;
-  VK_Buffer storage_buffer;
   
   VkDescriptorPool descriptor_pool;
   VkDescriptorSetLayout descriptor_set_layout;
@@ -232,12 +225,6 @@ struct VK_State {
   u32 static_entities_count;
   u32 static_entities_count_old;
 
-  u64 draw_lines_offset;
-  u64 draw_lines_consistent_offset;
-  u64 draw_rects_offset;
-  Array<DebugDrawLine, MaxDebugLines> draw_lines;
-  Array<DebugDrawLine, MaxDebugLines> draw_lines_consistent;
-  Array<DebugDrawRect, MaxDebugLines> draw_rects;
 
   GlobalStateGPU* gpu_global_shader_st;
   EntityGPU* gpu_entities;
@@ -262,7 +249,6 @@ struct VK_State {
   Gfx_Pipeline cubemap_pip;
   Gfx_Pipeline debug_line_pip;
   Gfx_Pipeline ui_pip;
-
   Gfx_Sampler com_sampler;
 
   Gfx_Image image_color[4];
@@ -271,6 +257,23 @@ struct VK_State {
   Gfx_View views_color[4];
   Gfx_View views_resolve[4];
   Gfx_View views_depth[4];
+
+  VK_Memory gpu_mem;
+  VK_Memory cpu_mem;
+  VK_Buffer vert_buffer;
+  VK_Buffer index_buffer;
+  VK_Buffer stage_buffer;
+  VK_Buffer indirect_draw_buffer;
+  VK_Buffer storage_buffer;
+
+  RingBuffer vert_ring_buffer;
+  VK_Buffer vert_buffer_each_frame;
+  Array<DebugDrawLine, MaxDebugLines> draw_lines;
+  Array<DebugDrawLine, MaxDebugLines> draw_lines_consistent;
+  Array<DebugDrawRect, MaxDebugLines> draw_rects;
+  u64 draw_lines_offset;
+  u64 draw_lines_consistent_offset;
+  u64 draw_rects_offset;
 
   ///////////////////////////////////
   // Vulkan loader

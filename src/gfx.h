@@ -419,7 +419,6 @@ struct VK_Memory {
 struct VK_Buffer {
   VkBuffer h;
   u8* base;
-  // u64 base;
   u64 pos;
   u64 cap;
 };
@@ -594,6 +593,8 @@ void vk_cmd_end_free(VkCommandBuffer cmd);
 VK_Memory vk_mem_alloc(VK_MemType type, u64 size);
 VK_Buffer vk_buffer_alloc(u64 size, VK_BufferUsage usage, VK_MemType mem_type);
 void vk_buffer_upload(VK_Buffer buffer, Region region, void* data);
+void vk_bind_vert_buffer(VK_Buffer buffer);
+void vk_bind_index_buffer(VK_Buffer buffer);
 
 ////////////////////////////////////////////////////////////////////////
 // Gfx

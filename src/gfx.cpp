@@ -869,6 +869,17 @@ void vk_buffer_upload(VK_Buffer buffer, Region region, void* data) {
   vk_cmd_end_submit(g.cmds_upload[0]);
 }
 
+void vk_bind_vert_buffer(VK_Buffer buffer) {
+  VK_State& g = st->vk;
+  VkDeviceSize size = 0;
+  g.CmdBindVertexBuffers(vk_get_cur_cmd(), 0, 1, &buffer.h, &size);
+}
+
+void vk_bind_index_buffer(VK_Buffer buffer) {
+  VK_State& g = st->vk;
+  g.CmdBindIndexBuffer(vk_get_cur_cmd(), g.index_buffer.h, 0, VK_INDEX_TYPE_UINT32);
+}
+
 Gfx_Shader gfx_shader_make(Gfx_ShaderDesc desc) {
   Scratch scratch;
   VK_State& g = st->vk;

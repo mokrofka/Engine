@@ -961,9 +961,8 @@ void vk_draw() {
 
   VkCommandBuffer cmd = vk_get_cur_cmd();
   g.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipeline_layout, 0, 1, &g.descriptor_sets, 0, null);
-  VkDeviceSize size = 0;
-  g.CmdBindVertexBuffers(cmd, 0, 1, &g.vert_buffer.h, &size);
-  g.CmdBindIndexBuffer(cmd, g.index_buffer.h, 0, VK_INDEX_TYPE_UINT32);
+  vk_bind_vert_buffer(g.vert_buffer);
+  vk_bind_index_buffer(g.index_buffer);
 
   GlobalStateGPU& shader_st = *g.gpu_global_shader_st;
   shader_st.projection_view = st->projection * st->view;
@@ -1038,7 +1037,12 @@ void vk_draw() {
     make_draw(g.static_draw_calls[i*2+1], false);
   }
 
+  // Hello world
+  gfx_pipeline_bind(g.triangle_pip);
+  gfx_draw(0, 3);
+
   // Debug drawing
+  vk_bind_vert_buffer(g.vert_buffer_each_frame);
   if (g.draw_lines.count > 0) {
     gfx_pipeline_bind(g.debug_line_pip);
     gfx_draw(g.draw_lines_offset/sizeof(Vertex), g.draw_lines.count*2);
@@ -1049,12 +1053,10 @@ void vk_draw() {
     gfx_draw(g.draw_lines_consistent_offset/sizeof(Vertex), g.draw_lines_consistent.count*2);
   }
 
-  // Hello world
-  gfx_pipeline_bind(g.triangle_pip);
-  gfx_draw(0, 3);
-
   // Cube map
   gfx_pipeline_bind(g.cubemap_pip);
+  vk_bind_vert_buffer(g.vert_buffer);
+  vk_bind_index_buffer(g.index_buffer);
   GpuMeshId h = mesh_get(Mesh_Cube);
   VK_Mesh mesh = g.meshes[h.idx];
   if (mesh.index_count) {
@@ -1064,6 +1066,7 @@ void vk_draw() {
   }
 
   // Rect drawing
+  vk_bind_vert_buffer(g.vert_buffer_each_frame);
   if (g.draw_rects.count > 0) {
     gfx_pipeline_bind(g.ui_pip);
     gfx_draw(g.draw_rects_offset/sizeof(Vertex), g.draw_rects.count*6);
@@ -1444,18 +1447,16 @@ void vk_init() {
   ///////////////////////////////////
   // Buffers
   {
-    g.gpu_mem = vk_mem_alloc(VK_MemoryType_Gpu, MB(300));
-    g.cpu_mem = vk_mem_alloc(VK_MemoryType_Cpu, MB(300));
+    g.gpu_mem = vk_mem_alloc(VK_MemoryType_Gpu, MB(100));
+    g.cpu_mem = vk_mem_alloc(VK_MemoryType_Cpu, MB(100));
     g.vert_buffer = vk_buffer_alloc(MB(1), VK_BufferUsage_Vert | VK_BufferUsage_Dst, VK_MemoryType_Gpu);
     g.index_buffer = vk_buffer_alloc(MB(1), VK_BufferUsage_Index | VK_BufferUsage_Dst, VK_MemoryType_Gpu);
     g.stage_buffer = vk_buffer_alloc(MB(10), VK_BufferUsage_Src, VK_MemoryType_Cpu);
-    g.storage_buffer = vk_buffer_alloc(MB(200), VK_BufferUsage_Storage, VK_MemoryType_Cpu);
-    g.indirect_draw_buffer = vk_buffer_alloc(MB(10), VK_BufferUsage_Indirect, VK_MemoryType_Cpu);
+    g.storage_buffer = vk_buffer_alloc(MB(10), VK_BufferUsage_Storage, VK_MemoryType_Cpu);
+    g.indirect_draw_buffer = vk_buffer_alloc(MB(1), VK_BufferUsage_Indirect, VK_MemoryType_Cpu);
+    g.vert_buffer_each_frame = vk_buffer_alloc(MB(1), VK_BufferUsage_Storage | VK_BufferUsage_Vert, VK_MemoryType_Cpu);
+    g.vert_ring_buffer = ring_make(g.vert_buffer_each_frame.base, MB(1));
   }
-
-  g.draw_lines_offset = offset_push_array(g.vert_buffer.pos, Vertex, KB(1));
-  g.draw_lines_consistent_offset = offset_push_array(g.vert_buffer.pos, Vertex, KB(1));
-  g.draw_rects_offset = offset_push_array(g.vert_buffer.pos, Vertex, KB(1));
 
   ///////////////////////////////////
   // Device stuff
@@ -1835,86 +1836,76 @@ void vk_shutdown() {
 void vk_begin_frame() {
   ProfFunc;
   VK_State& g = st->vk;
-  
-  // for (i32 i = 0; i < g.debug_lines_remain.count; ) {
-  //   g_st->vk.debug_line_times[i] -= g_dt;
-  //   if (g_st->vk.debug_line_times[i] <= 0) {
-  //     g_st->vk.debug_lines_remain.swap_remove(i);
-  //   } else {
-  //     ++i;
-  //   }
-  // }
-
-  // linear memory - ring buffer/double buffering
-  // gaps in memory: ring buffer/double buffering
-  // async uploading: accumulate all uploads and make one uppload at the time, return dummy or not ready yet handle
-  // each frame/per n frames: be valid at the time
 
   {
-    ProfBlock("block");
-    VkFence& fence = g.fences_frames_upload[g.current_frame_idx];
-    g.WaitForFences(vkdevice, 1, &fence, true, U64_MAX);
-    g.ResetFences(vkdevice, 1, &fence);
-    VkCommandBuffer cmd = g.cmds_frames_upload[g.current_frame_idx];
-    vk_cmd_begin(cmd);
+    // ProfBlock("block");
+    // VkFence& fence = g.fences_frames_upload[g.current_frame_idx];
+    // g.WaitForFences(vkdevice, 1, &fence, true, U64_MAX);
+    // g.ResetFences(vkdevice, 1, &fence);
+    // VkCommandBuffer cmd = g.cmds_frames_upload[g.current_frame_idx];
+    // vk_cmd_begin(cmd);
     
-    u32 stage_offset = 0;
-    if (g.draw_lines.count > 0) {
-      ProfBlock("1");
-      u32 size = g.draw_lines.count * sizeof(DebugDrawLine);
-      void* data = g.draw_lines.data;
-      MemCopy(g.stage_buffer.base+stage_offset, data, size);
-      VkBufferCopy copy_region = {
-        .srcOffset = stage_offset,
-        .dstOffset = g.draw_lines_offset,
-        .size = size,
-      };
-      g.CmdCopyBuffer(cmd, g.stage_buffer.h, g.vert_buffer.h, 1, &copy_region);
-      stage_offset += size;
-    }
-    if (g.draw_lines_consistent.count > 0) {
-      ProfBlock("2");
-      u32 size = g.draw_lines_consistent.count * sizeof(DebugDrawLine);
-      void* data = g.draw_lines_consistent.data;
-      MemCopy(g.stage_buffer.base+stage_offset, data, size);
-      VkBufferCopy copy_region = {
-        .srcOffset = stage_offset,
-        .dstOffset = g.draw_lines_consistent_offset,
-        .size = size,
-      };
-      g.CmdCopyBuffer(cmd, g.stage_buffer.h, g.vert_buffer.h, 1, &copy_region);
-      stage_offset += size;
-    }
-    if (g.draw_rects.count > 0) {
-      ProfBlock("3");
-      u32 size = g.draw_rects.count * sizeof(DebugDrawRect);
-      void* data = g.draw_rects.data;
-      MemCopy(g.stage_buffer.base+stage_offset, data, size);
-      VkBufferCopy copy_region = {
-        .srcOffset = stage_offset,
-        .dstOffset = g.draw_rects_offset,
-        .size = size,
-      };
-      g.CmdCopyBuffer(cmd, g.stage_buffer.h, g.vert_buffer.h, 1, &copy_region);
-      stage_offset += size;
-    }
-    vk_cmd_end(cmd);
+    // u32 stage_offset = 0;
+    // if (g.draw_lines.count > 0) {
+    //   ProfBlock("1");
+    //   u32 size = g.draw_lines.count * sizeof(DebugDrawLine);
+    //   void* data = g.draw_lines.data;
+    //   MemCopy(g.stage_buffer.base+stage_offset, data, size);
+    //   VkBufferCopy copy_region = {
+    //     .srcOffset = stage_offset,
+    //     .dstOffset = g.draw_lines_offset,
+    //     .size = size,
+    //   };
+    //   g.CmdCopyBuffer(cmd, g.stage_buffer.h, g.vert_buffer.h, 1, &copy_region);
+    //   stage_offset += size;
+    // }
+    // if (g.draw_lines_consistent.count > 0) {
+    //   ProfBlock("2");
+    //   u32 size = g.draw_lines_consistent.count * sizeof(DebugDrawLine);
+    //   void* data = g.draw_lines_consistent.data;
+    //   MemCopy(g.stage_buffer.base+stage_offset, data, size);
+    //   VkBufferCopy copy_region = {
+    //     .srcOffset = stage_offset,
+    //     .dstOffset = g.draw_lines_consistent_offset,
+    //     .size = size,
+    //   };
+    //   g.CmdCopyBuffer(cmd, g.stage_buffer.h, g.vert_buffer.h, 1, &copy_region);
+    //   stage_offset += size;
+    // }
+    // if (g.draw_rects.count > 0) {
+    //   ProfBlock("3");
+    //   u32 size = g.draw_rects.count * sizeof(DebugDrawRect);
+    //   void* data = g.draw_rects.data;
+    //   MemCopy(g.stage_buffer.base+stage_offset, data, size);
+    //   VkBufferCopy copy_region = {
+    //     .srcOffset = stage_offset,
+    //     .dstOffset = g.draw_rects_offset,
+    //     .size = size,
+    //   };
+    //   g.CmdCopyBuffer(cmd, g.stage_buffer.h, g.vert_buffer.h, 1, &copy_region);
+    //   stage_offset += size;
+    // }
+    // vk_cmd_end(cmd);
 
-    VkSubmitInfo submit = {
-      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-      .commandBufferCount = 1,
-      .pCommandBuffers = &cmd,
-    };
-    g.QueueSubmit(g.device.transfer_queue, 1, &submit, fence);
+    // VkSubmitInfo submit = {
+    //   .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+    //   .commandBufferCount = 1,
+    //   .pCommandBuffers = &cmd,
+    // };
+    // g.QueueSubmit(g.device.transfer_queue, 1, &submit, fence);
   }
+
+  {
+    g.draw_lines_offset = ring_write_nowrap_array(g.vert_ring_buffer, g.draw_lines.data, g.draw_lines.count);
+    g.draw_lines_consistent_offset = ring_write_nowrap_array(g.vert_ring_buffer, g.draw_lines_consistent.data, g.draw_lines_consistent.count);
+    g.draw_rects_offset = ring_write_nowrap_array(g.vert_ring_buffer, g.draw_rects.data, g.draw_rects.count);
+  }
+
   {
     ProfBlock("rendering waiting");
     VK_CHECK(g.WaitForFences(vkdevice, 1, &g.in_flight_fences[g.current_frame_idx], true, U64_MAX));
     VK_CHECK(g.ResetFences(vkdevice, 1, &g.in_flight_fences[g.current_frame_idx]));
   }
-
-  VkCommandBuffer cmd = vk_get_cur_cmd();
-  vk_cmd_begin(cmd);
 
   // Resize?
   v2u win_size = os_get_window_size();
@@ -2036,7 +2027,7 @@ void vk_end_frame() {
 #endif
   }
   g.current_frame_idx = (g.current_frame_idx + 1) % g.frames_in_flight;
-  g.current_frame_idx_one_more = (g.current_frame_idx_one_more + 1) % (g.frames_in_flight+1);
+  g.current_frame_idx_plus_one = (g.current_frame_idx_plus_one + 1) % (g.frames_in_flight+1);
 }
 
 void vk_begin_draw_frame() {
@@ -2065,9 +2056,9 @@ void vk_end_draw_frame() {
   // Swapchain
   {
     gfx_pass_begin({});
+
     gfx_apply_viewport(rng2_make(v2_zero(), v2(g.width, g.height)));
     gfx_apply_scissor(rng2_make(v2_zero(), v2(g.width, g.height)));
-    VK_State& g = st->vk;
     VK_PushConstant push = {g.views_resolve[g.current_image_idx].idx};
     gfx_pipeline_bind(g.screen_pip);
     vk_push_constants(push);

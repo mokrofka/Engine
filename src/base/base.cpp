@@ -89,9 +89,9 @@ RingBuffer ring_make(void* base, u64 size) {
   return res;
 }
 
-void ring_write(RingBuffer& ring, void *src, u64 src_size) {
-  Assert(src_size <= (ring.size - (ring.write_pos - ring.read_pos)));
-  u64 offset = ModPow2(ring.write_pos, ring.size);
+u64 ring_write(RingBuffer& ring, void* src, u64 src_size) {
+  Assert(ring.size >= src_size);
+  u64 offset = ring.write_pos % ring.size;
   u64 first = Min(ring.size - offset, src_size);
   u64 second = src_size - first;
   MemCopy(ring.base + offset, src, first);
@@ -99,11 +99,12 @@ void ring_write(RingBuffer& ring, void *src, u64 src_size) {
     MemCopy(ring.base, Offset(src, first), second);
   }
   ring.write_pos += src_size;
+  return offset;
 }
 
-void ring_read(RingBuffer& ring, void *dst, u64 dst_size) {
-  Assert(dst_size <= (ring.write_pos - ring.read_pos));
-  u64 offset = ModPow2(ring.read_pos, ring.size);
+u64 ring_read(RingBuffer& ring, void* dst, u64 dst_size) {
+  Assert(ring.size >= dst_size);
+  u64 offset = ring.read_pos % ring.size;
   u64 first = Min(ring.size - offset, dst_size);
   u64 second = dst_size - first;
   MemCopy(dst, ring.base+offset, first);
@@ -111,4 +112,33 @@ void ring_read(RingBuffer& ring, void *dst, u64 dst_size) {
     MemCopy(Offset(dst, first), ring.base, second);
   }
   ring.read_pos += dst_size;
+  return offset;
+}
+
+u64 ring_write_nowrap(RingBuffer& ring, void* src, u64 src_size, u64 align) {
+  Assert(ring.size >= src_size);
+  u64 offset = AlignUp(ring.write_pos, align) % ring.size;
+  u64 tail = ring.size - offset;
+  b32 wrap = src_size > tail;
+  if (wrap) {
+    ring.write_pos += tail;
+    offset = 0;
+  }
+  MemCopy(ring.base + offset, src, src_size);
+  ring.write_pos += src_size;
+  return offset;
+}
+
+u64 ring_read_nowrap(RingBuffer& ring, void* dst, u64 dst_size) {
+  Assert(ring.size >= dst_size);
+  u64 offset = ring.read_pos % ring.size;
+  u64 tail = ring.size - offset;
+  b32 wrap = dst_size > tail;
+  if (wrap) {
+    ring.read_pos += tail;
+    offset = 0;
+  }
+  MemCopy(dst, ring.base+offset, dst_size);
+  ring.read_pos += dst_size;
+  return offset;
 }

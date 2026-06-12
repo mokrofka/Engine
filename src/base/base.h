@@ -373,10 +373,19 @@ struct RingBuffer {
 };
 
 RingBuffer ring_make(void* base, u64 size);
-void ring_write(RingBuffer& ring, void *src, u64 src_size);
-void ring_read(RingBuffer& ring, void *dst, u64 read_size);
+u64 ring_write(RingBuffer& ring, void* src, u64 src_size);
+u64 ring_read(RingBuffer& ring, void* dst, u64 dst_size);
 #define ring_write_struct(ring, ptr) ring_write((ring), (ptr), sizeof(*(ptr)))
 #define ring_read_struct(ring, ptr) ring_read((ring), (ptr), sizeof(*(ptr)))
+#define ring_write_array(ring, ptr, c) ring_write((ring), (ptr), (c) * sizeof(*(ptr)))
+#define ring_read_array(ring, ptr, c) ring_read((ring), (ptr), (c) * sizeof(*(ptr)))
+
+u64 ring_write_nowrap(RingBuffer& ring, void* src, u64 src_size, u64 align = 0);
+u64 ring_read_nowrap(RingBuffer& ring, void* dst, u64 read_size);
+#define ring_write_nowrap_struct(ring, ptr) ring_write_nowrap((ring), (ptr), sizeof(*(ptr)), alingof(*(ptr)))
+#define ring_read_nowrap_struct(ring, ptr) ring_read_nowrap((ring), (ptr), sizeof(*(ptr)))
+#define ring_write_nowrap_array(ring, ptr, c) ring_write_nowrap((ring), (ptr), (c) * sizeof(*(ptr)), alignof(*(ptr)))
+#define ring_read_nowrap_array(ring, ptr, c) ring_read_nowrap((ring), (ptr), (c) * sizeof(*(ptr)))
 
 template<typename T>
 struct Slice {
