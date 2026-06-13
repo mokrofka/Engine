@@ -4,11 +4,13 @@ MakeId(Gfx_Sampler)
 MakeId(Gfx_Shader)
 MakeId(Gfx_Pipeline)
 MakeId(Gfx_View)
+MakeId(Gfx_Buffer)
 
 // Configuration
 enum {
   Gfx_InvalidId,
-  Gfx_NumInFlightFrames = 2,
+  Gfx_NumFramesInFlight = 2,
+  Gfx_MaxImagesInFlight = 4,
   Gfx_MaxColorAttachments = 8,
   Gfx_MaxMipmaps = 16,
   Gfx_MaxShaders = 32,
@@ -16,8 +18,11 @@ enum {
   Gfx_MaxViews = 32,
   Gfx_MaxImages = 32,
   Gfx_MaxSamplers = 32,
+  Gfx_MaxBuffers = 32,
   Gfx_MaxCubeTextures = 16,
   Gfx_MaxStorageBuffers = 16,
+
+  Gfx_MaxBindings = 64,
 
   Gfx_DefaultSampleCount = 4,
 };
@@ -371,24 +376,63 @@ struct Gfx_PipelineDesc {
   b32 alpha_to_coverage_enabled;
 };
 
+enum Gfx_MemType {
+  Gfx_MemType_Default,
+  Gfx_MemType_Cpu,
+  Gfx_MemType_Gpu,
+};
+
+struct Gfx_BufferDesc {
+  Gfx_MemType type;
+  u64 size;
+};
+
+enum Gfx_BindType {
+  Gfx_BindType_Default,
+  Gfx_BindType_Storage,
+  Gfx_BindType_Image,
+  Gfx_BindType_Sampler,
+};
+
+struct Gfx_DescriptorDesc {
+  Gfx_BindType type;
+  u32 binding;
+  u32 count;
+};
+
+struct Gfx_IndirectDrawcall {
+  u32 base;
+  u32 count;
+};
+
+struct Gfx_Mesh {
+  u32 vert_count;
+  u32 base_vert;
+  u32 index_count;
+  u32 base_index;
+};
+
 ////////////////////////////////////////////////////////////////////////
 // Vulkan
 
 #include "vulkan/vulkan_core.h"
 
+#if BUILD_DEBUG
+  #define VK_CHECK(expr)                  \
+    {                                     \
+      if (expr != VK_SUCCESS) {           \
+        Error("%s", vk_result_str(expr)); \
+        InvalidPath;                      \
+      }                                   \
+    }
+#else
+  #define VK_CHECK(expr) expr
+#endif
+#define vkdevice st->vk.device.logical_device
+
 enum VK_MemType {
   VK_MemoryType_Cpu,
   VK_MemoryType_Gpu,
-};
-
-typedef u32 VK_BufferUsage;
-enum {
-  VK_BufferUsage_Vert = Bit(0),
-  VK_BufferUsage_Index = Bit(1),
-  VK_BufferUsage_Dst = Bit(2),
-  VK_BufferUsage_Src = Bit(3),
-  VK_BufferUsage_Storage = Bit(4),
-  VK_BufferUsage_Indirect = VK_BufferUsage_Storage | Bit(5),
 };
 
 typedef u32 VK_Access;
@@ -559,6 +603,15 @@ union VK_PushConstant {
   u32 image_index;
 };
 
+struct VK_DescriptorWriter {
+  VkDescriptorBindingFlags binding_flags[Gfx_MaxBindings];
+  VkDescriptorSetLayoutBinding bindings[Gfx_MaxBindings];
+  u32 binds_count;
+  VkDescriptorBufferInfo buffers[Gfx_MaxBindings];
+  VkWriteDescriptorSet writes[Gfx_MaxBindings];
+  u32 writes_count;
+};
+
 String vk_result_str(VkResult result);
 void vk_surface_create();
 
@@ -591,7 +644,7 @@ void vk_cmd_end_free(VkCommandBuffer cmd);
 // @Buffer
 
 VK_Memory vk_mem_alloc(VK_MemType type, u64 size);
-VK_Buffer vk_buffer_alloc(u64 size, VK_BufferUsage usage, VK_MemType mem_type);
+VK_Buffer vk_buffer_alloc(u64 size, VK_MemType mem_type = VK_MemoryType_Gpu);
 void vk_buffer_upload(VK_Buffer buffer, Region region, void* data);
 void vk_bind_vert_buffer(VK_Buffer buffer);
 void vk_bind_index_buffer(VK_Buffer buffer);
@@ -599,11 +652,36 @@ void vk_bind_index_buffer(VK_Buffer buffer);
 ////////////////////////////////////////////////////////////////////////
 // Gfx
 
+struct Gfx_Environment {
+  u64 gpu_mem_size;
+  u64 cpu_mem_size;
+};
+
+struct Gfx_State {
+  Gfx_Environment environment;
+  VK_Memory gpu_memory;
+  VK_Memory cpu_memory;
+  VK_DescriptorWriter descriptor_writer;
+  Pool<VK_Buffer, Gfx_MaxBuffers, Gfx_Buffer> buffers;
+
+  // Indirect drawing
+  u32* base_index;
+  u32 entity_cursor;
+  u32 drawcall_cursor;
+};
+
+void gfx_init(Gfx_Environment environment);
+
 Gfx_Shader gfx_shader_make(Gfx_ShaderDesc desc);
 Gfx_Pipeline gfx_pipeline_make(Gfx_PipelineDesc desc);
 Gfx_Image gfx_image_make(Gfx_ImageDesc desc);
 Gfx_View gfx_view_make(Gfx_ViewDesc desc);
 Gfx_Sampler gfx_sampler_make(Gfx_SamplerDesc desc);
+Gfx_Buffer gfx_buffer_make(Gfx_BufferDesc desc);
+void gfx_binding_make(Gfx_DescriptorDesc desc);
+#define gfx_push_data(buf, bind, T, c) (T*)_gfx_push_data((buf), (bind), sizeof(T) * (c), alignof(T))
+u8* _gfx_push_data(Gfx_Buffer buf, u32 binding, u64 size, u64 align);
+void gfx_flush();
 
 void gfx_image_destroy(Gfx_Image img);
 void gfx_view_destroy(Gfx_View view);
@@ -615,11 +693,18 @@ void gfx_apply_scissor(Rng2 rect);
 void gfx_pipeline_bind(Gfx_Pipeline pip);
 void gfx_draw(u32 base_vert, u32 vert_count, u32 instance_count = 1, u32 base_instance = 0);
 void gfx_draw_indexed(u32 base_index, u32 index_count, u32 base_vert, u32 instance_count = 1, u32 base_instance = 0);
-void gfx_draw_indirect(u32 draw_base, u32 draw_count);
-void gfx_draw_indexed_indirect(u32 draw_base, u32 draw_count);
+void gfx_draw_indirect(Gfx_IndirectDrawcall drawcall);
+void gfx_draw_indexed_indirect(Gfx_IndirectDrawcall drawcall);
 
-// descriptors
+void gfx_push_indirect(Gfx_Mesh mesh, u32 id, u32 instance_count = 1);
+u32  gfx_indirect_begin();
+Gfx_IndirectDrawcall gfx_indirect_end(u32 base);
 
+void gfx_push_indirect_instanced(Gfx_Mesh mesh, u32 count);
+void gfx_instance_set_indices(u32* indices);
+u32* gfx_indirect_indices();
+
+void gfx_end();
 
 
 

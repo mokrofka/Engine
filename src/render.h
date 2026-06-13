@@ -1,30 +1,16 @@
-#pragma once
-#include "vk_bindings.h"
 
 const u32 MaxMaterials  = 32;
 const u32 MaxLights     = 32;
-const u32 MaxMeshes     = 128;
+const u32 MaxMeshes     = 32;
 const u32 MaxTextures   = 32;
-const u32 MaxLines      = KB(1);
 const u32 MaxDrawCalls  = KB(1);
 const u32 MaxDebugLines = KB(1);
 
-#if BUILD_DEBUG
-  #define VK_CHECK(expr)                  \
-    {                                     \
-      if (expr != VK_SUCCESS) {           \
-        Error("%s", vk_result_str(expr)); \
-        InvalidPath;                      \
-      }                                   \
-    }
-#else
-  #define VK_CHECK(expr) expr
-#endif
-#define vkdevice st->vk.device.logical_device
+struct R_KeyToShaderPipeline { String name; ShaderState state; };
+u64 hash(R_KeyToShaderPipeline x);
+b32 equal(R_KeyToShaderPipeline a, R_KeyToShaderPipeline b);
 
-struct VK_KeyToShaderPipeline { String name; ShaderState state; };
-u64 hash(VK_KeyToShaderPipeline x);
-b32 equal(VK_KeyToShaderPipeline a, VK_KeyToShaderPipeline b);
+#include "vk_bindings.h"
 
 struct GpuMaterial {
   u32 pipeline_idx;
@@ -135,13 +121,6 @@ struct VK_RenderEntity {
 #endif
 };
 
-struct VK_Mesh {
-  u32 vert_count;
-  u32 base_vert;
-  u32 index_count;
-  u32 base_index;
-};
-
 struct VK_ShaderModuleEntry {
   VK_Shader module;
   Darray<u32> track_pipelines;
@@ -154,11 +133,6 @@ struct VK_DrawCallInfo {
     VkDrawIndexedIndirectCommand index_draw_command;
   };
   u32 base_instance;
-};
-
-struct VK_IndirectDrawCall {
-  u32 drawcall_base; // push constant and mem offset * sizeof()
-  u32 drawcall_count;
 };
 
 struct VK_State {
@@ -174,17 +148,17 @@ struct VK_State {
   VK_Device device;
   VK_Swapchain swapchain;
 
-  VkSemaphore* image_available_semaphores;
-  VkSemaphore* render_complete_semaphores;
-  VkSemaphore* compute_complete_semaphores;
-  VkFence* in_flight_fences;
+  VkSemaphore image_available_semaphores[Gfx_MaxImagesInFlight];
+  VkSemaphore render_complete_semaphores[Gfx_MaxImagesInFlight];
+  VkSemaphore compute_complete_semaphores[Gfx_MaxImagesInFlight];
+  VkFence in_flight_fences[Gfx_NumFramesInFlight];
 
   // VK_Semaphore* frames_upload_semaphores;
-  VkCommandBuffer* cmds_frames_upload;
-  VkFence* fences_frames_upload;
-  VkCommandBuffer* cmds_render;
-  VkCommandBuffer* cmds_upload;
-  VkFence* fences_async_upload;
+  VkCommandBuffer cmds_frames_upload[Gfx_NumFramesInFlight];
+  VkFence fences_frames_upload[Gfx_NumFramesInFlight];
+  VkCommandBuffer cmds_render[Gfx_NumFramesInFlight];
+  VkCommandBuffer cmds_upload[Gfx_NumFramesInFlight];
+  VkFence fences_async_upload[Gfx_NumFramesInFlight];
 
   u32 images_in_flight;
   u32 frames_in_flight;
@@ -195,48 +169,32 @@ struct VK_State {
   u32 height;
   f32 scale;
   f32 old_scale;
-
   
   VkDescriptorPool descriptor_pool;
   VkDescriptorSetLayout descriptor_set_layout;
   VkDescriptorSet descriptor_sets;
-
-  VkSampler sampler;
   VkPipelineLayout pipeline_layout;
-
-  VK_Image msaa_texture0;
-  VK_Image offscreen_depth_buffer0;
-  VK_Image texture_targets0[16];
 
   Darray<VK_Pipeline0> pipelines0;
   Darray<u32> entity_pipelines;
   Darray<VK_ShaderModuleEntry> modules;
-  Map<VK_KeyToShaderPipeline, u32, Gfx_MaxPipelines> shader_to_pipeline;
+  Map<R_KeyToShaderPipeline, u32, Gfx_MaxPipelines> shader_to_pipeline;
   Map<String, u32, Gfx_MaxShaders> shader_to_module;
   Array<GpuMaterial, MaxMaterials> materials;
   Darray<ShaderState> shader_states;
   Darray<VK_PipelineBatch> batches;
-
   Array<VK_RenderEntity, MaxEntities+MaxStaticEntities> entities;
-  Array<VK_Mesh, MaxMeshes> meshes;
+  Array<Gfx_Mesh, MaxMeshes> meshes;
   Array<VK_Image, MaxTextures> textures;
-
-  Darray<VK_IndirectDrawCall> static_draw_calls;
   u32 static_entities_count;
   u32 static_entities_count_old;
-
-
-  GlobalStateGPU* gpu_global_shader_st;
-  EntityGPU* gpu_entities;
-  MaterialGPU* gpu_materials;
-  VK_DrawCallInfo* gpu_draw_call_infos;
-  u32* gpu_entities_indices;
 
   Pool<VK_Shader, Gfx_MaxShaders, Gfx_Shader> shaders;
   Pool<VK_Pipeline, Gfx_MaxPipelines, Gfx_Pipeline> pipelines;
   Pool<VK_Image, Gfx_MaxImages, Gfx_Image> images;
   Pool<VK_View, Gfx_MaxViews, Gfx_View> views;
   Pool<VK_Sampler, Gfx_MaxSamplers, Gfx_Sampler> samplers;
+  // Pool<
   struct {
     v2u size;
     b32 compute;
@@ -274,6 +232,12 @@ struct VK_State {
   u64 draw_lines_offset;
   u64 draw_lines_consistent_offset;
   u64 draw_rects_offset;
+
+  GlobalStateGPU* gpu_global_shader_st;
+  EntityGPU* gpu_entities;
+  MaterialGPU* gpu_materials;
+  VK_DrawCallInfo* gpu_draw_call_infos;
+  u32* gpu_entities_indices;
 
   ///////////////////////////////////
   // Vulkan loader

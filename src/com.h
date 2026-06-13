@@ -332,7 +332,7 @@ ScrollState scroll_state_make(f32 scale);
 void scroll_state_update(ScrollState& s, ScrollType type = ScrollType_Default);
 
 #include "gfx.h"
-#include "vk.h"
+#include "render.h"
 #include "debug.h"
 
 // struct UI_Window {
@@ -523,6 +523,7 @@ struct GlobalState {
   Slice<String> shader_module_compiled_names;
 
   VK_State vk;
+  Gfx_State gfx;
   DebugState debug;
 };
 

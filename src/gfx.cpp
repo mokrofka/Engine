@@ -808,15 +808,15 @@ VK_Memory vk_mem_alloc(VK_MemType type, u64 size) {
   return res;
 }
 
-VK_Buffer vk_buffer_alloc(u64 size, VK_BufferUsage usage, VK_MemType mem_type) {
+VK_Buffer vk_buffer_alloc(u64 size, VK_MemType mem_type) {
   VK_State& g = st->vk;
   VkBufferUsageFlags buf_usage_flags = 0;
-  if (FlagHas(usage, VK_BufferUsage_Vert)) buf_usage_flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-  if (FlagHas(usage, VK_BufferUsage_Index)) buf_usage_flags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-  if (FlagHas(usage, VK_BufferUsage_Dst)) buf_usage_flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-  if (FlagHas(usage, VK_BufferUsage_Src)) buf_usage_flags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-  if (FlagHas(usage, VK_BufferUsage_Storage)) buf_usage_flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-  if (FlagHas(usage, VK_BufferUsage_Indirect)) buf_usage_flags |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+  buf_usage_flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+  buf_usage_flags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+  buf_usage_flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+  buf_usage_flags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+  buf_usage_flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+  buf_usage_flags |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
   VkBufferCreateInfo buffer_create_info = {
     .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
     .size = size,
@@ -878,6 +878,13 @@ void vk_bind_vert_buffer(VK_Buffer buffer) {
 void vk_bind_index_buffer(VK_Buffer buffer) {
   VK_State& g = st->vk;
   g.CmdBindIndexBuffer(vk_get_cur_cmd(), g.index_buffer.h, 0, VK_INDEX_TYPE_UINT32);
+}
+
+void gfx_init(Gfx_Environment environment) {
+  Gfx_State& g = st->gfx;
+  g.environment = environment;
+  g.gpu_memory = vk_mem_alloc(VK_MemoryType_Gpu, environment.gpu_mem_size);
+  g.cpu_memory = vk_mem_alloc(VK_MemoryType_Cpu, environment.cpu_mem_size);
 }
 
 Gfx_Shader gfx_shader_make(Gfx_ShaderDesc desc) {
@@ -1422,6 +1429,142 @@ Gfx_Sampler gfx_sampler_make(Gfx_SamplerDesc desc) {
   return res;
 }
 
+Gfx_Buffer gfx_buffer_make(Gfx_BufferDesc desc) {
+  VK_State& g = st->vk;
+  VkBufferUsageFlags buf_usage_flags = 0;
+  buf_usage_flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+  buf_usage_flags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+  buf_usage_flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+  buf_usage_flags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+  buf_usage_flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+  buf_usage_flags |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+  VkBufferCreateInfo buffer_create_info = {
+    .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+    .size = desc.size,
+    .usage = buf_usage_flags,
+    .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+  };
+  VK_Buffer buf = {.cap = desc.size};
+  VK_CHECK(g.CreateBuffer(vkdevice, &buffer_create_info, g.allocator, &buf.h));
+  if (desc.type == Gfx_MemType_Default) {
+    desc.type = Gfx_MemType_Gpu;
+  }
+
+  u32 mem_prop_flags = 0;
+  if (desc.type == Gfx_MemType_Gpu) mem_prop_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  else if (desc.type == Gfx_MemType_Cpu) mem_prop_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+  VkMemoryRequirements requirements;
+  g.GetBufferMemoryRequirements(vkdevice, buf.h, &requirements);
+  // u32 mem_idx = vk_find_memory_idx(requirements.memoryTypeBits, mem_prop_flags);
+  // VkMemoryAllocateInfo alloc_info = {
+  //   .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+  //   .allocationSize = requirements.size,
+  //   .memoryTypeIndex = mem_idx,
+  // };
+  // UnusedVariable(alloc_info);
+
+  VK_Memory* mem = null;
+  u64 offset = 0;
+  if (desc.type == Gfx_MemType_Gpu) {
+    mem = &g.gpu_mem;
+    offset = offset_push(mem->pos, desc.size, requirements.alignment);
+  }
+  else if (desc.type == Gfx_MemType_Cpu) {
+    mem = &g.cpu_mem;
+    offset = offset_push(mem->pos, desc.size, requirements.alignment);
+  }
+  VK_CHECK(st->vk.BindBufferMemory(vkdevice, buf.h, mem->h, offset));
+  buf.base = Offset(mem->mapped_mem, offset);
+  Gfx_Buffer res = pool_push(st->gfx.buffers, buf);
+  return res;
+}
+
+void gfx_binding_make(Gfx_DescriptorDesc desc) {
+  Gfx_State& g = st->gfx;
+  if (desc.count == 0) {
+    desc.count = 1;
+  }
+  if (desc.type == Gfx_BindType_Default) {
+    desc.type = Gfx_BindType_Storage;
+  }
+  VK_DescriptorWriter& writer = g.descriptor_writer;
+  VkDescriptorBindingFlags flags = {};
+  if (desc.type == Gfx_BindType_Image) {
+    flags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
+  }
+  writer.binding_flags[writer.binds_count] = flags;
+  VkDescriptorType descriptor_type;
+  switch (desc.type) {
+    InvalidDefaultCase;
+    case Gfx_BindType_Storage: descriptor_type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; break;
+    case Gfx_BindType_Image: descriptor_type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE; break;
+    case Gfx_BindType_Sampler: descriptor_type = VK_DESCRIPTOR_TYPE_SAMPLER; break;
+  }
+  writer.bindings[writer.binds_count] = {
+    .binding = desc.binding,
+    .descriptorType = descriptor_type,
+    .descriptorCount = desc.count,
+    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+  };
+  ++writer.binds_count;
+}
+
+u8* _gfx_push_data(Gfx_Buffer buf, u32 binding, u64 size, u64 align) {
+  Gfx_State& g = st->gfx;
+  gfx_binding_make({.binding = binding});
+  VK_DescriptorWriter& writer = g.descriptor_writer;
+  VK_Buffer buffer = pool_get(g.buffers, buf);
+  u64 off = offset_push(buffer.pos, size, align);
+  Assert(off <= buffer.cap);
+  writer.buffers[writer.writes_count] = {
+    .buffer = buffer.h,
+    .offset = off,
+    .range = size,
+  };
+  writer.writes[writer.writes_count] = {
+    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+    .dstSet = st->vk.descriptor_sets,
+    .dstBinding = binding,
+    .dstArrayElement = 0,
+    .descriptorCount = 1,
+    .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+    .pBufferInfo = &writer.buffers[writer.writes_count],
+  };
+  ++writer.writes_count;
+  u8* res = Offset(buffer.base, off);
+  return res;
+}
+
+void gfx_flush() {
+  VK_State& g = st->vk;
+  VK_DescriptorWriter& writer = st->gfx.descriptor_writer;
+  VkDescriptorSetLayoutBindingFlagsCreateInfo binding_flags_info = {
+    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+    .pNext = null,
+    .bindingCount = writer.binds_count,
+    .pBindingFlags = writer.binding_flags,
+  };
+  VkDescriptorSetLayoutCreateInfo layout_info = {
+    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+    .pNext = &binding_flags_info,
+    .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT,
+    .bindingCount = writer.binds_count,
+    .pBindings = writer.bindings,
+  };
+  g.CreateDescriptorSetLayout(vkdevice, &layout_info, g.allocator, &g.descriptor_set_layout);
+  VkDescriptorSetAllocateInfo alloc_info = {
+    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+    .descriptorPool = g.descriptor_pool,
+    .descriptorSetCount = 1,
+    .pSetLayouts = &g.descriptor_set_layout,
+  };
+  VK_CHECK(g.AllocateDescriptorSets(vkdevice, &alloc_info, &g.descriptor_sets));
+  Loop(i, writer.writes_count) {
+    writer.writes[i].dstSet = g.descriptor_sets;
+  }
+  g.UpdateDescriptorSets(vkdevice, writer.writes_count, writer.writes, 0, null);
+}
+
 void gfx_image_destroy(Gfx_Image img) {
   VK_State& g = st->vk;
   g.DestroyImage(vkdevice, pool_get(g.images, img).h, g.allocator);
@@ -1653,10 +1796,60 @@ void gfx_draw_indexed(u32 base_index, u32 index_count, u32 base_vert, u32 instan
   st->vk.CmdDrawIndexed(vk_get_cur_cmd(), index_count, instance_count, base_index, base_vert, base_instance);
 }
 
-void gfx_draw_indirect(u32 draw_base, u32 draw_count) {
-  st->vk.CmdDrawIndirect(vk_get_cur_cmd(), st->vk.indirect_draw_buffer.h, draw_base*sizeof(VK_DrawCallInfo), draw_count, sizeof(VK_DrawCallInfo));
+void gfx_draw_indirect(Gfx_IndirectDrawcall drawcall) {
+  st->vk.CmdDrawIndirect(vk_get_cur_cmd(), st->vk.indirect_draw_buffer.h, drawcall.base*sizeof(VK_DrawCallInfo), drawcall.count, sizeof(VK_DrawCallInfo));
 }
 
-void gfx_draw_indexed_indirect(u32 draw_base, u32 draw_count) {
-  st->vk.CmdDrawIndexedIndirect(vk_get_cur_cmd(), st->vk.indirect_draw_buffer.h, draw_base*sizeof(VK_DrawCallInfo), draw_count, sizeof(VK_DrawCallInfo));
+void gfx_draw_indexed_indirect(Gfx_IndirectDrawcall drawcall) {
+  st->vk.CmdDrawIndexedIndirect(vk_get_cur_cmd(), st->vk.indirect_draw_buffer.h, drawcall.base*sizeof(VK_DrawCallInfo), drawcall.count, sizeof(VK_DrawCallInfo));
+}
+
+u32 gfx_indirect_begin() {
+  return st->gfx.drawcall_cursor;
+}
+Gfx_IndirectDrawcall gfx_indirect_end(u32 base) {
+  Gfx_IndirectDrawcall res = {
+    .base = base,
+    .count = st->gfx.drawcall_cursor - base,
+  };
+  return res;
+}
+void gfx_push_indirect(Gfx_Mesh mesh, u32 id, u32 instance_count) {
+  VK_DrawCallInfo info = {};
+  if (mesh.index_count) {
+    info.index_draw_command = (VkDrawIndexedIndirectCommand){
+      .indexCount = mesh.index_count,
+      .instanceCount = instance_count,
+      .firstIndex = mesh.base_index,
+      .vertexOffset = (i32)mesh.base_vert,
+      .firstInstance = 0,
+    };
+  } else {
+    info.draw_command = (VkDrawIndirectCommand){
+      .vertexCount = mesh.vert_count,
+      .instanceCount = instance_count,
+      .firstVertex = mesh.base_vert,
+      .firstInstance = 0,
+    };
+  }
+  info.base_instance = id;
+  VK_DrawCallInfo* drawcalls = (VK_DrawCallInfo*)st->vk.indirect_draw_buffer.base;
+  drawcalls[st->gfx.drawcall_cursor++] = info;
+}
+
+void gfx_push_indirect_instanced(Gfx_Mesh mesh, u32 count) {
+  gfx_push_indirect(mesh, st->gfx.entity_cursor, count);
+  st->gfx.entity_cursor += count;
+}
+void gfx_instance_set_indices(u32* indices) {
+  st->gfx.base_index = indices;
+}
+
+u32* gfx_indirect_indices() { return st->gfx.base_index + st->gfx.entity_cursor; }
+void gfx_end() {
+  Gfx_State& g = st->gfx;
+
+  g.base_index = null;
+  g.entity_cursor = 0;
+  g.drawcall_cursor = 0;
 }
