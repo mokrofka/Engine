@@ -89,7 +89,7 @@
 //       SoA_push_field(&sparse, u32),
 //       SoA_push_field(&dense, u32),
 //     };
-//     mem_realloc_soa(alloc, cap_old, cap, ArraySlice(fields));
+//     mem_realloc_soa(alloc, cap_old, cap, slice(fields));
 //   }
 //   else {
 //     cap = DEFAULT_CAPACITY;
@@ -97,7 +97,7 @@
 //       SoA_push_field(&sparse, u32),
 //       SoA_push_field(&dense, u32),
 //     };
-//     mem_alloc_soa(alloc, cap, ArraySlice(fields));
+//     mem_alloc_soa(alloc, cap, slice(fields));
 //   }
 // }
 

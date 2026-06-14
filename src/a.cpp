@@ -12,7 +12,7 @@ IndirectInstanceCtx ctx;
 IndirectCursor w;
 
 void gfx_push_indirect(Gfx_Mesh mesh, u32 id, u32 instance_count = 1) {
-  VK_DrawCallInfo info = {};
+  VK_DrawCall info = {};
   if (mesh.index_count) {
     info.index_draw_command = (VkDrawIndexedIndirectCommand){
       .indexCount = mesh.index_count,
@@ -30,7 +30,7 @@ void gfx_push_indirect(Gfx_Mesh mesh, u32 id, u32 instance_count = 1) {
     };
   }
   info.base_instance = id;
-  VK_DrawCallInfo* drawcalls = (VK_DrawCallInfo*)st->vk.indirect_draw_buffer.base;
+  VK_DrawCall* drawcalls = (VK_DrawCall*)st->vk.indirect_draw_buffer.base;
   drawcalls[w.drawcall_cursor++] = info;
 }
 

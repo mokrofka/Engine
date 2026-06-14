@@ -137,11 +137,11 @@ void debug_game() {
     ImGui::Text("Camera: x: %.2f y: %.2f z: %.2f", pos.x, pos.y, pos.z);
     ImGui::DragFloat("speed", &cam.speed, 1);
     {
-      imgui_text(push_str_copy(scratch, dumb_struct(scratch, ArraySlice(members_of_Camera), &g.cam)));
+      imgui_text(push_str_copy(scratch, dumb_struct(scratch, slice(members_of_Camera), &g.cam)));
     }
     {
       Entity& e = get_entity(g.axis_attached_to_cam_id);
-      imgui_text(push_str_copy(scratch, dumb_struct(scratch, ArraySlice(members_of_Entity), &e, e.flags)));
+      imgui_text(push_str_copy(scratch, dumb_struct(scratch, slice(members_of_Entity), &e, e.flags)));
     }
 
     if (ImGui::Button("save state")) {
@@ -475,7 +475,7 @@ void debug_prof_view() {
               slices[i] = slice(prof.prof_threads[i].recorded_anchors[idx]);
             }
             ProfFrameTime time = prof.frames_times[idx];
-            draw_frame_graph(ArraySlice(slices), time, 0, scroll_state);
+            draw_frame_graph(slice(slices), time, 0, scroll_state);
             ImGui::EndTabItem();
           } break;
           case ProfileTabActive_Frames: {
@@ -558,7 +558,7 @@ void debug_prof_view() {
                 slices[i] = slice(prof.prof_threads[i].recorded_anchors[j]);
               }
               ProfFrameTime time = prof.frames_times[j];
-              draw_frame_graph(ArraySlice(slices), time, j * width_size, scroll_state);
+              draw_frame_graph(slice(slices), time, j * width_size, scroll_state);
             }
             ImGui::EndTabItem();
           } break;
@@ -606,7 +606,7 @@ void debug_prof_view() {
               slices[i] = slice(prof.prof_threads[i].launch_anchors);
             }
             ProfFrameTime time = prof.launch_time;
-            draw_frame_graph(ArraySlice(slices), time, 0, scroll_state, true);
+            draw_frame_graph(slice(slices), time, 0, scroll_state, true);
             ImGui::EndTabItem();
           } break;
           case ProfileTabActive_Memory: {

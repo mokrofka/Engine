@@ -255,7 +255,7 @@ template<typename T, typename Handle> void array_handler_grow(DarrayHandler<T, H
       SoA_push_field(a.data),
       SoA_push_field(a.generations),
     };
-    mem_realloc_soa(a.alloc, cap_old, a.cap, ArraySlice(fields));
+    mem_realloc_soa(a.alloc, cap_old, a.cap, slice(fields));
     MemZeroArray(a.generations+cap_old, a.cap-cap_old);
   } else {
     a.cap = DEFAULT_CAPACITY;
@@ -265,7 +265,7 @@ template<typename T, typename Handle> void array_handler_grow(DarrayHandler<T, H
       SoA_push_field(a.data),
       SoA_push_field(a.generations),
     };
-    mem_alloc_soa(a.alloc, a.cap, ArraySlice(fields));
+    mem_alloc_soa(a.alloc, a.cap, slice(fields));
     MemZeroArray(a.generations, a.cap);
   }
 }
@@ -389,7 +389,7 @@ template<typename T, typename Handle> void pool_grow(Dpool<T, Handle>& p) {
       SoA_push_field(p.generations),
       SoA_push_field(p.data),
     };
-    mem_realloc_soa(p.alloc, cap_old, p.cap, ArraySlice(fields));
+    mem_realloc_soa(p.alloc, cap_old, p.cap, slice(fields));
     MemZeroArray(p.generations + cap_old, p.cap - cap_old);
   } else {
     p.cap = DEFAULT_CAPACITY;
@@ -397,7 +397,7 @@ template<typename T, typename Handle> void pool_grow(Dpool<T, Handle>& p) {
       SoA_push_field(p.generations),
       SoA_push_field(p.data),
     };
-    mem_alloc_soa(p.alloc, p.cap, ArraySlice(fields));
+    mem_alloc_soa(p.alloc, p.cap, slice(fields));
     MemZeroArray(p.generations, p.cap);
   }
 }
@@ -580,7 +580,7 @@ template<typename T, typename Handle> void pool_grow(DpoolLinkList<T, Handle>& p
       SoA_push_field(p.generations),
       SoA_push_field(p.data),
     };
-    mem_realloc_soa(p.alloc, cap_old, p.cap, ArraySlice(fields));
+    mem_realloc_soa(p.alloc, cap_old, p.cap, slice(fields));
     MemZeroArray(p.generations + cap_old, p.cap - cap_old);
     MemZeroArray(p.data + cap_old, p.cap - cap_old);
   } else {
@@ -589,7 +589,7 @@ template<typename T, typename Handle> void pool_grow(DpoolLinkList<T, Handle>& p
       SoA_push_field(p.generations),
       SoA_push_field(p.data),
     };
-    mem_alloc_soa(p.alloc, p.cap, ArraySlice(fields));
+    mem_alloc_soa(p.alloc, p.cap, slice(fields));
     MemZeroArray(p.generations, p.cap);
     MemZeroArray(p.data, p.cap);
   }
@@ -732,7 +732,7 @@ template<typename T, typename Handle> b32 pool_is_handle_valid(DpoolLinkList<T, 
 //         SoA_push_field(&dense, u32),
 //         SoA_push_field(&data, T),
 //       };
-//       mem_realloc_soa(alloc, cap_old, cap, ArraySlice(fields));
+//       mem_realloc_soa(alloc, cap_old, cap, slice(fields));
 //     }
 //     else {
 //       cap = DEFAULT_CAPACITY;
@@ -740,7 +740,7 @@ template<typename T, typename Handle> b32 pool_is_handle_valid(DpoolLinkList<T, 
 //         SoA_push_field(&dense, u32),
 //         SoA_push_field(&data, T),
 //       };
-//       mem_alloc_soa(alloc, cap, ArraySlice(fields));
+//       mem_alloc_soa(alloc, cap, slice(fields));
 //       sparse = push_array(alloc, u32, cap);
 //     }
 //   }
@@ -941,7 +941,7 @@ template<typename Key, typename T> void map_grow(Dmap<Key, T>& m) {
       SoA_push_field(m.keys),
       SoA_push_field(m.is_occupied),
     };
-    mem_alloc_soa(m.alloc, m.cap, ArraySlice(fields));
+    mem_alloc_soa(m.alloc, m.cap, slice(fields));
     Loop (i, old_cap) {
       if (old_is_occupied[i] == MapSlot_Occupied) {
         map_set(m, old_keys[i], old_data[i]);
@@ -956,7 +956,7 @@ template<typename Key, typename T> void map_grow(Dmap<Key, T>& m) {
       SoA_push_field(m.keys),
       SoA_push_field(m.is_occupied),
     };
-    mem_alloc_soa(m.alloc, m.cap, ArraySlice(fields));
+    mem_alloc_soa(m.alloc, m.cap, slice(fields));
   }
 }
 template<typename Key, typename T> T* map_set(Dmap<Key, T>& m, Key key, T val) {

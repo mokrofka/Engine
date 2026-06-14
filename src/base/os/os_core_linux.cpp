@@ -237,17 +237,17 @@ void os_file_close(OS_Handle file) {
   close(fd); 
 }
 
-u64 os_file_read(OS_Handle file, u64 size, void* out_data) {
+u64 os_file_read(OS_Handle file, Slice<u8> out_data) {
   if (file.v == 0) { return 0; }
   int fd = file.v;
-  u64 read_result = read(fd, out_data, size);
+  u64 read_result = read(fd, out_data.data, out_data.size);
   return read_result;
 }
 
-u64 os_file_write(OS_Handle file, u64 size, void* data) {
+u64 os_file_write(OS_Handle file, Slice<u8> data) {
   if (file.v == 0) { return 0; }
   int fd = file.v;
-  u64 size_written = write(fd, data, size);
+  u64 size_written = write(fd, data.data, data.size);
   return size_written;
 }
 
@@ -321,10 +321,10 @@ Slice<u8> os_file_path_read_all(Allocator arena, String path) {
   Scratch scratch(arena);
   OS_Handle f = os_file_open(path, OS_AccessFlag_Read);
   u64 file_size = os_file_size(f);
-  u8* buffer = push_buffer(arena, file_size);
-  u64 read_size = os_file_read(f, file_size, buffer);
+  Slice buffer = push_buffer_slice(arena, file_size);
+  u64 read_size = os_file_read(f, buffer);
   os_file_close(f);
-  return {buffer, read_size};
+  return {buffer.data, read_size};
 }
 
 String os_file_path_read_all_str(Allocator arena, String path) { return str_make(os_file_path_read_all(arena, path)); }
@@ -361,26 +361,20 @@ OS_Handle os_directory_open(String path) {
 
 OS_Handle os_directory_make(String path) {
   Scratch scratch;
-  String path_c = push_str_copy(scratch, path);
-  int fd = mkdir((char*)path_c.str, S_IRWXU);
-  OS_Handle result = {};
-  if (fd != -1) {
-    result.v = fd;
-  }
-  return result;
-}
-
-OS_Handle os_directory_make_p(String path) {
-  Scratch scratch;
   Loop (i, path.size) {
     if (char_is_slash(path.str[i])) {
       String parent_dir = push_str_copy(scratch, str_prefix(path, i));
       if (!os_directory_path_exist(parent_dir)) {
-        os_directory_make(parent_dir);
+        mkdir((char*)parent_dir.str, S_IRWXU);
       }
     }
   }
-  OS_Handle result = os_directory_make(path);
+  OS_Handle result = {};
+  String path_c = push_str_copy(scratch, path);
+  int fd = mkdir((char*)path_c.str, S_IRWXU);
+  if (fd != -1) {
+    result.v = fd;
+  }
   return result;
 }
 
@@ -441,22 +435,22 @@ void os_watch_deattach(OS_Watch watch, OS_Handle attached) {
   inotify_rm_watch(watch_fd, fd);
 }
 
-StringList os_watch_check(Allocator arena, OS_Watch watch) {
-  u8* buf = push_buffer(arena, KB(1));
-  u64 read_size = os_file_read(watch.handle, KB(1), buf);
+Slice<String> os_watch_check(Allocator arena, OS_Watch watch) {
+  Slice buf = push_buffer_slice(arena, KB(1));
+  u64 read_size = os_file_read(watch.handle, buf);
   if (read_size == -1) {
     return {};
   }
-  StringList result = {};
+  var strs = darray_make<String>(arena);
   int offset = 0;
   while (offset < read_size) {
     struct inotify_event* event = (struct inotify_event*)&buf[offset];
     if (event->len) {
-      str_list_push(arena, &result, event->name);
+      array_push(strs, event->name);
     }
     offset += sizeof(struct inotify_event) + event->len;
   }
-  return result;
+  return slice(strs);
 }
 
 ///////////////////////////////////
@@ -511,14 +505,14 @@ void os_file_iter_end(OS_FileIter *iter) {
   closedir(lnx_iter->dir);
 }
 
-StringList os_file_iter_directory(Allocator arena, String path, OS_FileIterFlags flags) {
-  StringList res = {};
+Slice<OS_FileInfo> os_file_iter_directory(Allocator arena, String path, OS_FileIterFlags flags) {
+  var file_pathes = darray_make<OS_FileInfo>(arena);
   OS_FileIter* it = os_file_iter_begin(arena, path, flags);
   for (OS_FileInfo info = {}; os_file_iter_next(arena, it, &info);) {
-    str_list_push(arena, &res, info.name);
+    array_push(file_pathes, info);
   }
   os_file_iter_end(it);
-  return res;
+  return slice(file_pathes);
 }
 
 ////////////////////////////////////////////////////////////////////////

@@ -412,8 +412,13 @@ struct Gfx_Mesh {
   u32 base_index;
 };
 
+struct Gfx_Task {
+  void (*on_complete)(void*);
+  void* user_data;
+};
+
 ////////////////////////////////////////////////////////////////////////
-// Vulkan
+// @Vulkan
 
 #include "vulkan/vulkan_core.h"
 
@@ -428,7 +433,7 @@ struct Gfx_Mesh {
 #else
   #define VK_CHECK(expr) expr
 #endif
-#define vkdevice st->vk.device.logical_device
+#define vkdevice st->gfx.device.logical_device
 
 enum VK_MemType {
   VK_MemoryType_Cpu,
@@ -536,18 +541,6 @@ struct VK_Sampler {
   u32 max_anisotropy;
 };
 
-struct VK_Swapchain {
-  VkSwapchainKHR h;
-  VkSurfaceFormatKHR format;  
-  VkPresentModeKHR present_mode;
-  VkImage images[4];
-  VkImageView views[4];
-  VK_Image depth_attachment;
-
-  VkSwapchainKHR h_old;
-  VkImageView old_view[4];
-};
-
 struct VK_Shader {
   VkShaderModule h;
   b32 vert;
@@ -557,6 +550,8 @@ struct VK_Shader {
 
 struct VK_Pipeline {
   VkPipeline h;
+  Gfx_Shader shd_ref;
+  b32 compute;
   Gfx_DepthState depth;
   Gfx_StencilState stencil;
   u32 color_count;
@@ -593,6 +588,17 @@ struct VK_Device {
   VkFormat depth_format;
 };
 
+struct VK_Swapchain {
+  VkSwapchainKHR h;
+  VkSurfaceFormatKHR format;  
+  VkPresentModeKHR present_mode;
+  VkImage images[4];
+  VkImageView views[4];
+  VK_Image depth_attachment;
+  VkSwapchainKHR h_old;
+  VkImageView old_view[4];
+};
+
 struct VK_Semaphore {
   VkSemaphore h;
   u64 counter;
@@ -612,8 +618,17 @@ struct VK_DescriptorWriter {
   u32 writes_count;
 };
 
+struct VK_Drawcall {
+  union {
+    VkDrawIndirectCommand draw_command;
+    VkDrawIndexedIndirectCommand index_draw_command;
+  };
+  u32 base_instance;
+};
+
 String vk_result_str(VkResult result);
 void vk_surface_create();
+void vk_swapchain_create();
 
 ////////////////////////////////////////////////////////////////////////
 // @Misc
@@ -645,12 +660,11 @@ void vk_cmd_end_free(VkCommandBuffer cmd);
 
 VK_Memory vk_mem_alloc(VK_MemType type, u64 size);
 VK_Buffer vk_buffer_alloc(u64 size, VK_MemType mem_type = VK_MemoryType_Gpu);
-void vk_buffer_upload(VK_Buffer buffer, Region region, void* data);
 void vk_bind_vert_buffer(VK_Buffer buffer);
 void vk_bind_index_buffer(VK_Buffer buffer);
 
 ////////////////////////////////////////////////////////////////////////
-// Gfx
+// @Gfx
 
 struct Gfx_Environment {
   u64 gpu_mem_size;
@@ -658,19 +672,196 @@ struct Gfx_Environment {
 };
 
 struct Gfx_State {
+  Arena arena;
+  VkAllocationCallbacks allocator_;
+  VkAllocationCallbacks* allocator;
+  VkInstance instance;
+  VkSurfaceKHR surface;
+  VkDebugUtilsMessengerEXT debug_messenger;
+  VK_Device device;
+  VK_Swapchain swapchain;
+
+  VkSemaphore image_available_semaphores[Gfx_MaxImagesInFlight];
+  VkSemaphore render_complete_semaphores[Gfx_MaxImagesInFlight];
+  VkSemaphore compute_complete_semaphores[Gfx_MaxImagesInFlight];
+  VkFence in_flight_fences[Gfx_NumFramesInFlight];
+
+  VkCommandBuffer cmds_frames_upload[Gfx_NumFramesInFlight];
+  VkFence fences_frames_upload[Gfx_NumFramesInFlight];
+  VkCommandBuffer cmds_render[Gfx_NumFramesInFlight];
+  VkCommandBuffer cmds_upload[Gfx_NumFramesInFlight];
+  VkFence fences_async_upload[Gfx_NumFramesInFlight];
+
+  VkDescriptorPool descriptor_pool;
+  VkDescriptorSetLayout descriptor_set_layout;
+  VkDescriptorSet descriptor_sets;
+  VkPipelineLayout pipeline_layout;
+
   Gfx_Environment environment;
-  VK_Memory gpu_memory;
-  VK_Memory cpu_memory;
+  VK_Memory gpu_mem;
+  VK_Memory cpu_mem;
   VK_DescriptorWriter descriptor_writer;
+
+  v2u size;
+  b32 swapchain_resized;
+  u32 images_in_flight;
+  u32 frames_in_flight;
+  u32 current_image_idx;
+  u32 current_frame_idx;
+  u32 current_frame_idx_plus_one;
+
   Pool<VK_Buffer, Gfx_MaxBuffers, Gfx_Buffer> buffers;
+  Pool<VK_Shader, Gfx_MaxShaders, Gfx_Shader> shaders;
+  Pool<VK_Pipeline, Gfx_MaxPipelines, Gfx_Pipeline> pipelines;
+  Pool<VK_Image, Gfx_MaxImages, Gfx_Image> images;
+  Pool<VK_View, Gfx_MaxViews, Gfx_View> views;
+  Pool<VK_Sampler, Gfx_MaxSamplers, Gfx_Sampler> samplers;
+
+  struct {
+    v2u size;
+    b32 compute;
+    Gfx_PassAction action;
+    Gfx_Attachments attachments;
+  } cur_pass;
 
   // Indirect drawing
+  Gfx_Buffer drawcall_buf;
   u32* base_index;
   u32 entity_cursor;
   u32 drawcall_cursor;
-};
 
-void gfx_init(Gfx_Environment environment);
+  ///////////////////////////////////
+  // User
+  Gfx_Buffer stage_buffer;
+
+  ///////////////////////////////////
+  // Vulkan loader
+  #define VK_GET_PROC_LIST \
+    X(GetInstanceProcAddr) \
+    X(EnumerateInstanceExtensionProperties) \
+    X(EnumerateInstanceVersion) \
+    X(EnumerateInstanceLayerProperties) \
+    X(CreateInstance) \
+
+  #define VK_INSTANCE_GET_PROC_LIST \
+    X(DestroyInstance) \
+    X(EnumeratePhysicalDevices) \
+    X(GetDeviceProcAddr) \
+    X(GetPhysicalDeviceProperties) \
+    X(GetPhysicalDeviceFeatures) \
+    X(GetPhysicalDeviceMemoryProperties) \
+    X(GetPhysicalDeviceQueueFamilyProperties) \
+    X(GetPhysicalDeviceFormatProperties) \
+    X(GetPhysicalDeviceSurfaceFormatsKHR) \
+    X(GetPhysicalDeviceSurfaceCapabilitiesKHR) \
+    X(GetPhysicalDeviceSurfacePresentModesKHR) \
+    X(GetPhysicalDeviceSurfaceSupportKHR) \
+    X(EnumerateDeviceExtensionProperties) \
+    X(CreateDevice) \
+    X(DestroySurfaceKHR) \
+
+  #define VK_DEVICE_GET_PROC_LIST \
+    X(GetDeviceQueue) \
+    X(DeviceWaitIdle) \
+    X(CreateCommandPool) \
+    X(DestroyCommandPool) \
+    X(DestroyDevice) \
+    X(CreateSwapchainKHR) \
+    X(DestroySwapchainKHR) \
+    X(GetSwapchainImagesKHR) \
+    X(CreateImage) \
+    X(CreateImageView) \
+    X(DestroyImage) \
+    X(DestroyImageView) \
+    X(GetImageMemoryRequirements) \
+    X(AllocateMemory) \
+    X(FreeMemory) \
+    X(AllocateCommandBuffers) \
+    X(FreeCommandBuffers) \
+    X(BeginCommandBuffer) \
+    X(EndCommandBuffer) \
+    X(BindImageMemory) \
+    X(CreateSemaphore) \
+    X(DestroySemaphore) \
+    X(WaitSemaphores) \
+    X(CreateFence) \
+    X(DestroyFence) \
+    X(WaitForFences) \
+    X(ResetFences) \
+    X(GetFenceStatus) \
+    X(AcquireNextImageKHR) \
+    X(CreateDescriptorSetLayout) \
+    X(DestroyDescriptorSetLayout) \
+    X(CreateDescriptorPool) \
+    X(DestroyDescriptorPool) \
+    X(CreateShaderModule) \
+    X(DestroyShaderModule) \
+    X(CreateSampler) \
+    X(DestroySampler) \
+    X(CreateBuffer) \
+    X(DestroyBuffer) \
+    X(GetBufferMemoryRequirements) \
+    X(BindBufferMemory) \
+    X(MapMemory) \
+    X(UnmapMemory) \
+    X(FlushMappedMemoryRanges) \
+    X(CreatePipelineLayout) \
+    X(DestroyPipelineLayout) \
+    X(CreateGraphicsPipelines) \
+    X(CreateComputePipelines) \
+    X(DestroyPipeline) \
+    X(AllocateDescriptorSets) \
+    X(FreeDescriptorSets) \
+    X(UpdateDescriptorSets) \
+    X(CmdBindPipeline) \
+    X(CmdPipelineBarrier) \
+    X(CmdPipelineBarrier2) \
+    X(CmdBlitImage) \
+    X(CmdCopyBuffer) \
+    X(CmdCopyBufferToImage) \
+    X(CmdCopyImageToBuffer) \
+    X(CmdExecuteCommands) \
+    X(CmdSetViewport) \
+    X(CmdSetScissor) \
+    X(CmdSetFrontFace) \
+    X(CmdSetCullMode) \
+    X(CmdSetStencilTestEnable) \
+    X(CmdSetDepthTestEnable) \
+    X(CmdSetDepthWriteEnable) \
+    X(CmdSetStencilReference) \
+    X(CmdSetStencilOp) \
+    X(CmdBeginRendering) \
+    X(CmdEndRendering) \
+    X(CmdSetStencilCompareMask) \
+    X(CmdSetStencilWriteMask) \
+    X(CmdClearColorImage) \
+    X(CmdClearDepthStencilImage) \
+    X(CmdSetPrimitiveTopology) \
+    X(CmdPushConstants) \
+    X(CmdBindVertexBuffers) \
+    X(CmdBindIndexBuffer) \
+    X(CmdDraw) \
+    X(CmdDrawIndexed) \
+    X(CmdDrawIndirect) \
+    X(CmdDrawIndexedIndirect) \
+    X(CmdBindDescriptorSets) \
+    X(QueueSubmit) \
+    X(QueueWaitIdle) \
+    X(QueuePresentKHR) \
+
+  #define VK_DECL(name) Glue(PFN_, vk##name) name;
+  #define VK_GET_PROC(name) g.name = (Glue(PFN_, vk##name))os_lib_get_proc(g.lib, Stringify(vk##name));
+  #define VK_INSTANCE_GET_PROC(name) g.name = (Glue(PFN_, vk##name))g.GetInstanceProcAddr(g.instance, Stringify(vk##name));
+  #define VK_DEVICE_GET_PROC(name) g.name = (Glue(PFN_, vk##name))g.GetDeviceProcAddr(vkdevice, Stringify(vk##name));
+
+  OS_Handle lib;
+
+#define X(name) VK_DECL(name)
+  VK_GET_PROC_LIST;
+  VK_INSTANCE_GET_PROC_LIST;
+  VK_DEVICE_GET_PROC_LIST;
+#undef X
+};
 
 Gfx_Shader gfx_shader_make(Gfx_ShaderDesc desc);
 Gfx_Pipeline gfx_pipeline_make(Gfx_PipelineDesc desc);
@@ -683,8 +874,14 @@ void gfx_binding_make(Gfx_DescriptorDesc desc);
 u8* _gfx_push_data(Gfx_Buffer buf, u32 binding, u64 size, u64 align);
 void gfx_flush();
 
+Gfx_PipelineDesc gfx_query_pipeline_desc(Gfx_Pipeline pip);
+void gfx_shader_update(Gfx_Shader shd, Gfx_ShaderDesc desc);
+void gfx_pipeline_update(Gfx_Pipeline pip, Gfx_PipelineDesc desc);
+
 void gfx_image_destroy(Gfx_Image img);
 void gfx_view_destroy(Gfx_View view);
+void gfx_shader_destroy(Gfx_Shader shd);
+void gfx_pipeline_destroy(Gfx_Pipeline pip);
 
 void gfx_pass_begin(Gfx_Pass pass);
 void gfx_pass_end();
@@ -704,7 +901,16 @@ void gfx_push_indirect_instanced(Gfx_Mesh mesh, u32 count);
 void gfx_instance_set_indices(u32* indices);
 u32* gfx_indirect_indices();
 
-void gfx_end();
+u8* gfx_buffer_base(Gfx_Buffer buf);
+u64 gfx_buffer_pos(Gfx_Buffer buf);
+void gfx_buffer_upload(Gfx_Buffer buf, Slice<u8> data);
+void gfx_bind_vert(Gfx_Buffer buf);
+void gfx_bind_index(Gfx_Buffer buf);
 
+void gfx_idle();
+void gfx_init(Gfx_Environment environment);
+void gfx_shutdown();
+void gfx_begin();
+void gfx_end();
 
 

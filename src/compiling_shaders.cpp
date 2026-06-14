@@ -17,10 +17,10 @@ i32 main(i32 args_count, char* args[]) {
   String time_stamps_file_path = push_strf(scratch, "%s/%s", cur_dir, "saved_time_stamps_for_shad");
 
   if (!os_directory_path_exist(shader_dir)) {
-    os_directory_make_p(shader_dir);
+    os_directory_make(shader_dir);
   }
   if (!os_directory_path_exist(compiled_shader_dir)) {
-    os_directory_make_p(compiled_shader_dir);
+    os_directory_make(compiled_shader_dir);
   }
 
   String com_slang_file_path = push_strf(scratch, "%s/%s", shader_dir, String("com.slang"));
@@ -41,17 +41,17 @@ i32 main(i32 args_count, char* args[]) {
       com_slang_modified,
       lib_slang_modified,
     };
-    os_file_write(file, sizeof(stamps), &stamps);
+    os_file_write(file, slice_struct_to_bytes(&stamps));
   } else {
     OS_Handle file = os_file_open(time_stamps_file_path, OS_AccessFlag_Read | OS_AccessFlag_Write);
-    os_file_read(file, sizeof(stamps), &stamps);
+    os_file_read(file, slice_struct_to_bytes(&stamps));
     if (stamps.com_slang_modified != com_slang_modified || stamps.lib_slang_modified != lib_slang_modified) {
       is_change = true;
       stamps = {
         com_slang_modified,
         lib_slang_modified,
       };
-      os_file_write(file, sizeof(stamps), &stamps);
+      os_file_write(file, slice_struct_to_bytes(&stamps));
     }
   }
 

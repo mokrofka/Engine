@@ -111,10 +111,8 @@ struct DebugDrawLine { Vertex vert[2]; };
 struct DebugDrawRect { Vertex vert[6]; };
 
 struct Mesh {
-  Vertex* vertices;
-  u32* indices;
-  u32 vert_count;
-  u32 index_count;
+  Slice<Vertex> vertices;
+  Slice<u32> indices;
   f32 bounds_min;
   f32 bounds_max;
   f32 bounds_rad;
@@ -151,12 +149,6 @@ struct MaterialProps {
   v3 diffuse;
   v3 specular;
   f32 shininess;
-};
-
-struct MaterialDesc {
-  ShaderDesc shader;
-  MaterialProps props;
-  String texture;
 };
 
 struct Timer {
@@ -519,10 +511,9 @@ struct GlobalState {
   GameState game;
   InputState input;
 
-  Darray<OS_Handle> shader_module_compilation_pids;
   Slice<String> shader_module_compiled_names;
 
-  VK_State vk;
+  R_State r;
   Gfx_State gfx;
   DebugState debug;
 };

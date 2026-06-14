@@ -205,10 +205,8 @@ Mesh load_obj(Allocator arena, String name) {
     }
   }
   Mesh mesh = {
-    .vertices = vertices.data,
-    .indices = final_indices.data,
-    .vert_count = vertices.count,
-    .index_count = final_indices.count,
+    .vertices = slice(vertices),
+    .indices = slice(final_indices),
   };
   return mesh;
 }
@@ -311,8 +309,8 @@ Mesh load_gltf(Allocator arena, String name) {
   v3* vertices_norm = (v3*)Offset(buf1.data, info.ranges[1].offset);
   v2* vertices_uv = (v2*)Offset(buf1.data, info.ranges[2].offset);
   u16* vertices_indices = (u16*)Offset(buf1.data, info.ranges[3].offset);
-  Vertex* vertices = push_array(arena, Vertex, info.vert_count);
-  u32* indices = push_array(arena, u32, info.index_count);
+  var vertices = push_slice(arena, Vertex, info.vert_count);
+  var indices = push_slice(arena, u32, info.index_count);
   Loop (i, info.index_count) {
     indices[i] = vertices_indices[i];
   }
@@ -325,9 +323,7 @@ Mesh load_gltf(Allocator arena, String name) {
   }
   Mesh mesh = {
     .vertices = vertices,
-    .indices = (u32*)indices,
-    .vert_count = info.vert_count,
-    .index_count = info.index_count,
+    .indices = indices,
   };
   return mesh;
 }
@@ -438,8 +434,8 @@ Mesh load_glb(Allocator arena, String name) {
   u16* vertices_indices = (u16*)Offset(data, info.buffer_views[info.primitives.index].offset);
   u32 vertex_count = info.accessors[info.primitives.pos].count;
   u32 index_count = info.accessors[info.primitives.index].count;
-  Vertex* vertices = push_array(arena, Vertex, vertex_count);
-  u32* indices = push_array(arena, u32, index_count);
+  var vertices = push_slice(arena, Vertex, vertex_count);
+  var indices = push_slice(arena, u32, index_count);
   Loop (i, index_count) {
     indices[i] = vertices_indices[i];
   }
@@ -453,8 +449,6 @@ Mesh load_glb(Allocator arena, String name) {
   Mesh mesh = {
     .vertices = vertices,
     .indices = indices,
-    .vert_count = vertex_count,
-    .index_count = index_count,
   };
   return mesh;
 }
@@ -540,7 +534,7 @@ GpuMeshId mesh_load(String name) {
   } else {
     InvalidPath;
   }
-  GpuMeshId handle = vk_mesh_load(mesh);
+  GpuMeshId handle = r_mesh_load(mesh);
   return handle;
 }
 
@@ -549,7 +543,7 @@ GpuTextureId texture_load(String name) {
   Scratch scratch;
   String filepath = push_strf(scratch, "%s/%s", g.textures_dir, name);
   Texture texture = load_image(filepath);
-  GpuTextureId handle = vk_texture_load(texture);
+  GpuTextureId handle = r_texture_load(texture);
   return handle;
 }
 
@@ -567,7 +561,7 @@ GpuCubemapId cubemap_load(String name) {
     String filepath = push_strf(scratch, "%s/%s", g.textures_dir, texture_name);
     textures[i] = load_image(filepath);
   }
-  vk_cubemap_load(textures);
+  r_cubemap_load(textures);
   return {};
 }
 
@@ -594,57 +588,102 @@ void assets_load() {
 #undef X
 
   var mat_load = [&](MaterialEnum enum_name, MaterialDesc desc) {
-    g.materials_ids[enum_name] = vk_material_load(desc);
+    g.materials_ids[enum_name] = r_material_load(desc);
     String str = push_str_copy(g.arena, materials_strs[enum_name]);
     map_set(g.str_to_material_id, str, g.materials_ids[enum_name]);
     g.material_id_to_str[g.materials_ids[enum_name].idx] = str;
   };
   mat_load(Material_Orange, {
-    .shader = {
-      .name = "e_texture",
-      .state = shader_default_state(),
+    .shader_name = "e_texture",
+    .pipeline_desc = {
+      .depth = {
+        .compare = Gfx_CompareOp_Less,
+        .write_enabled = true,
+      }
     },
     .props = material_default_props(),
     .texture = "orange_lines_512.png",
   });
   mat_load(Material_Container, {
-    .shader = {
-      .name = "e_texture",
-      .state = shader_default_state(),
+    .shader_name = "e_texture",
+    .pipeline_desc = {
+      .depth = {
+        .compare = Gfx_CompareOp_Less,
+        .write_enabled = true,
+      }
     },
     .props = material_default_props(),
     .texture = "container.jpg",
   });
   mat_load(Material_Axis, {
-    .shader = {
-      .name = "e_vert_color",
-      .state = {
-        .topology = ShaderTopology_Line,
-        .samples = 4,
-        .use_depth = true,
-      },
+    .shader_name = "e_vert_color",
+    .pipeline_desc = {
+      .primitive_type = Gfx_PrimitiveType_Line,
+      .depth = {
+        .compare = Gfx_CompareOp_Less,
+        .write_enabled = true,
+      }
     },
+    .props = material_default_props(),
   });
   mat_load(Material_Line, {
-    .shader = {
-      .name = "e_color",
-      .state = {
-        .topology = ShaderTopology_Line,
-        .samples = 4,
-        .use_depth = true,
-      },
+    .shader_name = "e_color",
+    .pipeline_desc = {
+      .primitive_type = Gfx_PrimitiveType_Line,
+      .depth = {
+        .compare = Gfx_CompareOp_Less,
+        .write_enabled = true,
+      }
     },
+    .props = material_default_props(),
   });
-  mat_load(Material_Line, {
-    .shader = {
-      .name = "e_color",
-      .state = {
-        .topology = ShaderTopology_Line,
-        .samples = 4,
-        .use_depth = true,
-      },
-    },
-  });
+
+  // mat_load(Material_Orange, {
+  //   .shader = {
+  //     .name = "e_texture",
+  //     .state = shader_default_state(),
+  //   },
+  //   .props = material_default_props(),
+  //   .texture = "orange_lines_512.png",
+  // });
+  // mat_load(Material_Container, {
+  //   .shader = {
+  //     .name = "e_texture",
+  //     .state = shader_default_state(),
+  //   },
+  //   .props = material_default_props(),
+  //   .texture = "container.jpg",
+  // });
+  // mat_load(Material_Axis, {
+  //   .shader = {
+  //     .name = "e_vert_color",
+  //     .state = {
+  //       .topology = ShaderTopology_Line,
+  //       .samples = 4,
+  //       .use_depth = true,
+  //     },
+  //   },
+  // });
+  // mat_load(Material_Line, {
+  //   .shader = {
+  //     .name = "e_color",
+  //     .state = {
+  //       .topology = ShaderTopology_Line,
+  //       .samples = 4,
+  //       .use_depth = true,
+  //     },
+  //   },
+  // });
+  // mat_load(Material_Line, {
+  //   .shader = {
+  //     .name = "e_color",
+  //     .state = {
+  //       .topology = ShaderTopology_Line,
+  //       .samples = 4,
+  //       .use_depth = true,
+  //     },
+  //   },
+  // });
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -1121,9 +1160,9 @@ void watch_update() {
   }
   Loop (i, g.directories.count) {
     WatchDirectory x = g.directories[i];
-    StringList list = os_watch_check(scratch, x.watch);
-    for EachNode(it, StringNode, list.first) {
-      String name = it->string;
+    Slice strs = os_watch_check(scratch, x.watch);
+    Loop (i, strs.count) {
+      String name = strs[i];
       switch (x.op) {
         case WatchOp_RecompileShader: {
           GlobalState& g = *st;
@@ -1147,7 +1186,7 @@ void watch_update() {
           String shader_filepath = push_strf(scratch, "%s/%s", g.shader_dir, shader_name_slang);
           String shader_compiled_filepath = push_strf(scratch, "%s/%s", g.shader_compiled_dir, name);
           os_file_path_copy_mtime(shader_filepath, shader_compiled_filepath);
-          vk_shader_reload(shader_name);
+          r_shader_reload(shader_name);
         } break;
         InvalidDefaultCase break;
       }
@@ -1169,14 +1208,6 @@ void com_init() {
   prof_launch_begin();
 
   {
-    // v2 a = v2(-10, 10);
-    // v2 b = v2(10, 10);
-    // Info("%f", radtodeg(v2_angle(a, b)));
-    // Info("%f", radtodeg(v2_shortest_arc(a, b)));
-    // Info("%f", v2_cross(v2(-1, 1), v2(1, 1)));
-    // Info("%f", v3_cross(v3(-1, 1, 0), v3(1, 1, 0)).z);
-    v2 v = v2(0, 1);
-    Info("%f", radtodeg(Atan2(v.y, v.x)));
     ProfBlock("init");
     thread_pool_init(THREAD_COUNT);
     test();
@@ -1190,10 +1221,9 @@ void com_init() {
     g.watch.arena = g.arena;
     watch_directory_add(g.shader_dir, WatchOp_RecompileShader);
     watch_directory_add(g.shader_compiled_dir, WatchOp_ShaderReload);
-    g.shader_module_compilation_pids = darray_make<OS_Handle>(g.gpa);
-    g.shader_module_compiled_names = vk_shader_compile(scratch);
+    r_shaders_compile(scratch);
 
-    vk_init();
+    r_init();
     debug_init();
     game_init();
   }
@@ -1260,12 +1290,12 @@ if (data->ctx == null) {
       g.dt = f64(start_time - last_time) / Billion(1);
       g.time += g.dt;
       last_time = start_time;
-      vk_begin_draw_frame();
+      r_begin();
       // ui_begin();
       com_update();
       game_update();
       // ui_end();
-      vk_end_draw_frame();
+      r_end();
       watch_update();
 
       u64 frame_duration = os_now_ns() - start_time;
@@ -1322,8 +1352,8 @@ Mesh sphere_generate(Allocator arena) {
   u32 lon_steps = 10;
   u32 vert_count = lat_steps*lon_steps;
   u32 index_count = (lat_steps - 1) * lon_steps * 6;
-  Vertex* vertices = push_array(arena, Vertex, vert_count);
-  u32* indices = push_array(arena, u32, index_count);
+  var vertices = push_slice(arena, Vertex, vert_count);
+  var indices = push_slice(arena, u32, index_count);
   f32 lat_step_angle = PI / lat_steps;
   f32 lon_step_angle = 2*PI / lon_steps;
   for (u32 i = 0; i < lat_steps; ++i) {
@@ -1359,37 +1389,34 @@ Mesh sphere_generate(Allocator arena) {
       indices[k++] = v3;
     }
   }
-  u32 north_pole_index = vert_count - 1; // last vertex
-  for (u32 j = 0; j < lon_steps; ++j) {
-    u32 next_j = (j + 1) % lon_steps;
-    indices[k++] = idx(lat_steps - 2, j); // last row before pole
-    indices[k++] = north_pole_index;      // pole
-    indices[k++] = idx(lat_steps - 2, next_j);
-  }
+  // u32 north_pole_index = vert_count - 1; // last vertex
+  // for (u32 j = 0; j < lon_steps; ++j) {
+  //   u32 next_j = (j + 1) % lon_steps;
+  //   indices[k++] = idx(lat_steps - 2, j); // last row before pole
+  //   indices[k++] = north_pole_index;      // pole
+  //   indices[k++] = idx(lat_steps - 2, next_j);
+  // }
   Mesh mesh = {
-    .vert_count = lat_steps * lon_steps,
     .vertices = vertices,
-    .index_count = index_count,
     .indices = indices,
   };
   return mesh;
 }
 
 Mesh grid_generate(Allocator arena, u32 size, f32 step) {
-  Vertex* vertices = push_array(arena, Vertex, size*4);
+  var vertices = push_slice(arena, Vertex, size*4);
   v3 pos_offset = v3(-(i32)size/2, 0, -(i32)size/2);
   for (i32 i = 0; i < size; ++i) {
     vertices[i*2].pos = pos_offset + v3(0, 0, i*step);
     vertices[i*2+1].pos = pos_offset + v3(size*step, 0, i*step);
   }
-  Vertex* vertical_vertices = vertices + size*2;
+  var vertical_vertices = slice_skip(vertices, size*2);
   for (i32 i = 0; i < size; ++i) {
     vertical_vertices[i*2].pos = pos_offset + v3(i*step, 0, 0);
     vertical_vertices[i*2+1].pos = pos_offset + v3(i*step, 0, size*step);
   }
   Mesh mesh = {
     .vertices = vertices,
-    .vert_count = size*4,
   };
   return mesh;
 }
@@ -1811,7 +1838,7 @@ void game_save_state() {
 
   Dstring data = dstr_make(scratch);
   dstr_push(data, "Camera {\n");
-  dstr_push(data, dumb_struct(scratch, ArraySlice(members_of_Camera), &g.cam));
+  dstr_push(data, dumb_struct(scratch, slice(members_of_Camera), &g.cam));
   dstr_push(data, "}\n");
 
   {
@@ -1819,7 +1846,7 @@ void game_save_state() {
     for EachNodePool(i, p) {
       Entity& e = p.data[i].elem;
       dstr_push(data, "Entity {\n");
-      dstr_push(data, dumb_struct(scratch, ArraySlice(members_of_Entity), &e, e.flags));
+      dstr_push(data, dumb_struct(scratch, slice(members_of_Entity), &e, e.flags));
       dstr_push(data, "}\n");
     }
   }
@@ -1828,13 +1855,13 @@ void game_save_state() {
     for EachNodePool(i, p) {
       StaticEntity& e = p.data[i].elem;
       dstr_push(data, "StaticEntity {\n");
-      dstr_push(data, dumb_struct(scratch, ArraySlice(members_of_StaticEntity), &e));
+      dstr_push(data, dumb_struct(scratch, slice(members_of_StaticEntity), &e));
       dstr_push(data, "}\n");
     }
   }
 
   OS_Handle file = os_file_open(push_strf(scratch, "%s/saved", os_get_current_directory(), String("saved")), OS_AccessFlag_Write | OS_AccessFlag_Trunc);
-  os_file_write(file, data.size, data.str);
+  os_file_write(file, dstr_slice(data));
   os_file_close(file);
 }
 
@@ -1866,11 +1893,11 @@ void game_load_state() {
       default:{} break;
       case TokenType_Identifier: {
         if (str_match(tok.str, "Camera")) {
-          dumb_struct_load(ArraySlice(members_of_Camera), &g.cam, &p);
+          dumb_struct_load(slice(members_of_Camera), &g.cam, &p);
         } else if (str_match(tok.str, "Entity")) {
           EntityId e_id = e_alloc_bare();
           Entity& e = get_entity(e_id);
-          dumb_struct_load(ArraySlice(members_of_Entity), &e, &p);
+          dumb_struct_load(slice(members_of_Entity), &e, &p);
           vk_make_renderable(e_id, e.mesh_id, e.material_id);
           if (FlagHas(e.flags, EntityFlag_Referenced)) {
             if (str_match("monkey", e.name)) {
@@ -1883,7 +1910,7 @@ void game_load_state() {
           }
         } else if (str_match(tok.str, "StaticEntity")) {
           StaticEntity entity = {};
-          dumb_struct_load(ArraySlice(members_of_StaticEntity), &entity, &p);
+          dumb_struct_load(slice(members_of_StaticEntity), &entity, &p);
           StaticEntityId e_id = e_static_alloc(entity.mesh_id, entity.material_id);
           StaticEntity&e = get_static_entity(e_id);
           e = entity;
@@ -1906,16 +1933,14 @@ void game_init() {
   g.moving_cubes = darray_make<EntityId>(g.gpa);
   g.static_cubes = darray_make<StaticEntityId>(g.gpa);
 
-  // Mesh cube_mesh = {.vertices = cube_vertices, .vert_count = ArrayCount(cube_vertices)};
-  // mesh_set(Mesh_Cube, vk_mesh_load(cube_mesh));
-  Mesh triangle_mesh =  {.vertices = triangle_vertices, .vert_count = ArrayCount(triangle_vertices)};
-  mesh_set(Mesh_Triangle, vk_mesh_load(triangle_mesh));
+  Mesh triangle_mesh = {.vertices = slice(triangle_vertices)};
+  mesh_set(Mesh_Triangle, r_mesh_load(triangle_mesh));
   Mesh grid_mesh = grid_generate(scratch, 100, 1);
-  mesh_set(Mesh_Grid, vk_mesh_load(grid_mesh));
-  Mesh axis_mesh = {.vertices = axis_vertices, .vert_count = ArrayCount(axis_vertices)};
-  mesh_set(Mesh_Axis, vk_mesh_load(axis_mesh));
+  mesh_set(Mesh_Grid, r_mesh_load(grid_mesh));
+  Mesh axis_mesh = {.vertices = slice(axis_vertices)};
+  mesh_set(Mesh_Axis, r_mesh_load(axis_mesh));
   Mesh sphere = sphere_generate(scratch);
-  mesh_set(Mesh_Sphere, vk_mesh_load(sphere));
+  mesh_set(Mesh_Sphere, r_mesh_load(sphere));
   cubemap_load("night_cubemap");
   assets_load();
   scene_init();

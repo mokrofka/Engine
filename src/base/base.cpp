@@ -71,6 +71,8 @@ u32 prev_pow2(u32 n) {
 	n |= n >> 16;
 	return n - (n >> 1);
 }
+b32 is_finite_f32(f32 x) { return (Transmute(u32, x) & 0x7F800000) != 0x7F800000; }
+b32 is_nan_f32(f32 x)    { u32 bits = Transmute(u32, x); return ((bits & 0x7F800000) == 0x7F800000) && ((bits & 0x007FFFFF) != 0); }
 
 ////////////////////////////////////////////////////////////////////////
 // Asserts
@@ -80,6 +82,16 @@ void DebugTrap() { __builtin_debugtrap(); }
 
 ////////////////////////////////////////////////////////////////////////
 // Types
+
+void bit_set(BitArray* bits, u64 idx) {
+  bits->words[idx >> 6] |= 1ull << (idx & 63);
+}
+void bit_clear(BitArray* bits, u64 idx) {
+  bits->words[idx >> 6] &= ~(1ull << (idx & 63));
+}
+b32 bit_get(BitArray* bits, u64 idx) {
+  return (bits->words[idx >> 6] >> (idx & 63)) & 1;
+}
 
 RingBuffer ring_make(void* base, u64 size) {
   RingBuffer res = {

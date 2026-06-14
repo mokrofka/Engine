@@ -17,6 +17,7 @@ struct Dstring {
   operator String();
 };
 
+Slice<u8> dstr_slice(Dstring dstr);
 Dstring dstr_make(Allocator alloc);
 void dstr_push(Dstring& arr, String str);
 void dstr_clear(Dstring& arr);

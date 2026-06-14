@@ -198,12 +198,13 @@ u64 RoundDown(u64 x, u64 a);
 u64 Compose64Bit(u64 a, u64 b);
 u32 next_pow2(u32 v);
 u32 prev_pow2(u32 n);
+b32 is_finite_f32(f32 x);
+b32 is_nan_f32(f32 x);
 
 ////////////////////////////////////////////////////////////////////////
 // Shenanigans
 
 #define ArrayCount(x)   (sizeof((x)) / sizeof((x)[0]))
-#define ArraySlice(arr) slice(arr, ArrayCount(arr))
 #define ArrayRand(arr)  arr[rand_rng_u32(0, ArrayCount(arr)-1)]
 #define ArrayZero(arr)  MemZeroArray((arr), ArrayCount((arr)))
 #define ArrayCopy(d, s) MemCopyArray((d), (s), ArrayCount((d)))
@@ -352,10 +353,19 @@ const u32 THREAD_COUNT = 2;
     u32 gen;      \
   };
 
-#define Transmute(T) *(T*)
+#define Transmute(T, x) (*(T*)&(x))
 
 ////////////////////////////////////////////////////////////////////////
 // Types
+
+struct BitArray {
+  u64* words;
+  u64 bit_count;
+};
+
+void bit_set(BitArray* bits, u64 idx);
+void bit_clear(BitArray* bits, u64 idx);
+b32 bit_get(BitArray* bits, u64 idx);
 
 struct Region {
   u64 offset;
@@ -398,17 +408,41 @@ struct Slice {
     Assert(idx < count);
     return data[idx];
   }
+  Slice(T* data_, u64 count_) { data = data_; count = count_; }
+  Slice() = default;
 };
-template<typename T> Slice<T> slice(T* data, u64 count) {
-  Slice<T> res = {
-    .data = data,
-    .count = count,
-  };
-  return res;
+template<typename T> Slice<T> slice(Slice<T> a, u64 li, u64 hi) {
+  Assert(li <= hi && hi <= a.count);
+  return Slice(a.data + li, hi - li);
 }
-template<typename T> Slice<T> slice(Slice<T> arr, u64 li, u64 hi) {
-  Assert(0 <= li && li <= hi && hi <= arr.count);
-  return Slice(arr.data + li, hi - li);
+template<typename T> Slice<T> slice_prefix(Slice<T> a, u64 n) {
+  Assert(n <= a.count);
+  return Slice(a.data, n);
+}
+template<typename T> Slice<T> slice_postfix(Slice<T> a, u64 n) {
+  Assert(n <= a.count);
+  return Slice(a.data + (a.count - n), n);
+}
+template<typename T> Slice<T> slice_skip(Slice<T> a, u64 n) {
+  Assert(n <= a.count);
+  return Slice(a.data + n, a.count - n);
+}
+template<typename T> Slice<T> slice_chop(Slice<T> a, u64 n) {
+  Assert(n <= a.count);
+  return Slice(a.data, a.count - n);
+}
+template<typename T, u64 N> Slice<T> slice(T (&a)[N]) {
+  return Slice(a, N);
+}
+template<typename T> Slice<u8> slice_to_bytes(Slice<T> s) {
+  return Slice((u8*)s.data, s.count * sizeof(T));
+}
+template<typename T> Slice<u8> slice_struct_to_bytes(T* s) {
+  return Slice((u8*)s, sizeof(T));
+}
+template<typename To, typename From> Slice<u8> slice_reinterpret(Slice<From> s) {
+  Assert((s.count * sizeof(From)) % sizeof(To) == 0);
+  return slice((To*)s.data, (s.count*sizeof(From)) / sizeof(To));
 }
 
 struct String {

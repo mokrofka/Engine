@@ -287,6 +287,9 @@ NO_DEBUG b32 operator==(v2 a, v2 b);
 NO_DEBUG b32 operator!=(v2 a, v2 b);
 NO_DEBUG v2  operator-(v2 v);
 
+NO_DEBUG b32 operator==(v2u a, v2u b);
+NO_DEBUG b32 operator!=(v2u a, v2u b);
+
 NO_DEBUG v2  v2_of_v3(v3 v);
 NO_DEBUG v2  v2_of_v4(v4 v);
 NO_DEBUG v3  v2_to_v3(v2 v, f32 a);

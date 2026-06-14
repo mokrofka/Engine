@@ -151,6 +151,9 @@ b32 operator==(v2 a, v2 b)         { return (Abs(a.x - b.x) <= FloatEpsilon) && 
 b32 operator!=(v2 a, v2 b)         { return !(a == b); }
 v2  operator-(v2 v)                { return v2(-v.x, -v.y); }
 
+b32 operator==(v2u a, v2u b)       { return (a.x == b.x) && (a.y == b.y); }
+b32 operator!=(v2u a, v2u b)       { return !(a == b); }
+
 v2  v2_of_v3(v3 v)                  { return v2(v.x, v.y); }
 v2  v2_of_v4(v4 v)                  { return v2(v.x, v.y); }
 v3  v2_to_v3(v2 v, f32 a)           { return v3(v.x, v.y, a); }

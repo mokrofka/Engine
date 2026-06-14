@@ -752,7 +752,7 @@ void test_sort() {
   {
     Info("insert");
     i32 arr[] = {0, -4, -3, 7, 3};
-    sort_insert(ArraySlice(arr), [](var a, var b) { return a < b; });
+    sort_insert(slice(arr), [](var a, var b) { return a < b; });
     for EachElement(i, arr) {
       print("%i ", arr[i]);
     }
@@ -761,7 +761,7 @@ void test_sort() {
   {
     Info("quick");
     i32 arr[] = {0, -4, -3, 7, 3};
-    sort_quick(ArraySlice(arr), [](var a, var b) { return a < b;});
+    sort_quick(slice(arr), [](var a, var b) { return a < b;});
     for EachElement(i, arr) {
       print("%i ", arr[i]);
     }
@@ -771,7 +771,7 @@ void test_sort() {
     Scratch scratch;
     Info("merge");
     i32 arr[] = {0, -4, -3, 7, 3};
-    sort_merge(scratch, ArraySlice(arr), [](var a, var b) { return a < b;});
+    sort_merge(scratch, slice(arr), [](var a, var b) { return a < b;});
     for EachElement(i, arr) {
       print("%i ", arr[i]);
     }

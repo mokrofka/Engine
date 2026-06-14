@@ -22,6 +22,9 @@ String::String(const char* str_) {
   size = cstr_length(str);
 }
 
+Slice<u8> dstr_slice(Dstring dstr) {
+  return Slice(dstr.str, dstr.size);
+}
 Dstring dstr_make(Allocator alloc) {
   Dstring res = {
     .alloc = alloc,

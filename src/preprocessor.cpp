@@ -37,6 +37,6 @@ i32 main(i32 count, char* args[]) {
       } break;
     }
   }
-  os_file_write(file, string.size, string.str);
+  os_file_write(file, dstr_slice(string));
   os_exit(0);
 }

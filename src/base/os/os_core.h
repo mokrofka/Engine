@@ -104,8 +104,8 @@ void os_release(void* ptr, u64 size);
 
 OS_Handle      os_file_open(String path, OS_AccessFlags flags);
 void           os_file_close(OS_Handle file);
-u64            os_file_read(OS_Handle file, u64 size, void* out_data);
-u64            os_file_write(OS_Handle file, u64 size, void* data);
+u64            os_file_read(OS_Handle file, Slice<u8> out_data);
+u64            os_file_write(OS_Handle file, Slice<u8> data);
 u64            os_file_size(OS_Handle file);
 FileProperties os_file_properties(OS_Handle file);
 Slice<u8>      os_file_path_read_all(Allocator arena, String path);
@@ -123,23 +123,22 @@ void           os_file_path_move(String src, String dst);
 // Directory
 OS_Handle os_directory_open(String path);
 OS_Handle os_directory_make(String path);
-OS_Handle os_directory_make_p(String path);
 b32       os_directory_path_exist(String path);
 
 ///////////////////////////////////
 // Watch
-OS_Watch   os_watch_open(OS_WatchFlags flags);
-void       os_watch_close(OS_Watch watch);
-OS_Handle  os_watch_attach(OS_Watch watch, String name);
-void       os_watch_deattach(OS_Watch watch, OS_Handle attached);
-StringList os_watch_check(Allocator arena, OS_Watch watch);
+OS_Watch      os_watch_open(OS_WatchFlags flags);
+void          os_watch_close(OS_Watch watch);
+OS_Handle     os_watch_attach(OS_Watch watch, String name);
+void          os_watch_deattach(OS_Watch watch, OS_Handle attached);
+Slice<String> os_watch_check(Allocator arena, OS_Watch watch);
 
 ///////////////////////////////////
 // Directory iteration
-OS_FileIter* os_file_iter_begin(Allocator arena, String path, OS_FileIterFlags flags);
-b32          os_file_iter_next(Allocator arena, OS_FileIter* iter, OS_FileInfo* info_out);
-void         os_file_iter_end(OS_FileIter* iter);
-StringList   os_file_iter_directory(Allocator arena, String path, OS_FileIterFlags flags);
+OS_FileIter*       os_file_iter_begin(Allocator arena, String path, OS_FileIterFlags flags);
+b32                os_file_iter_next(Allocator arena, OS_FileIter* iter, OS_FileInfo* info_out);
+void               os_file_iter_end(OS_FileIter* iter);
+Slice<OS_FileInfo> os_file_iter_directory(Allocator arena, String path, OS_FileIterFlags flags);
 
 ///////////////////////////////////
 // Processes
