@@ -312,7 +312,7 @@ intern u8* seglist_alloc(AllocSegList* alloc, u64 size, u64 align) {
     *header = {
       .size = size,
       .guard = MEM_ALLOC_HEADER_GUARD,
-      .pad = (u32)MemDiff(result, buf),
+      .pad = (u32)PtrDiff(result, buf),
     };
     u32* tail = (u32*)Offset(result, size);
     *tail = MEM_ALLOC_TAIL_GUARD;
@@ -337,7 +337,7 @@ intern u8* seglist_alloc(AllocSegList* alloc, u64 size, u64 align) {
   *header = {
     .size = size,
     .guard = MEM_ALLOC_HEADER_GUARD,
-    .pad = (u32)MemDiff(result, OffsetBack(alloc_buff, sizeof(u32))),
+    .pad = (u32)PtrDiff(result, OffsetBack(alloc_buff, sizeof(u32))),
   };
   u32* tail = (u32*)Offset(result, size);
   *tail = MEM_ALLOC_TAIL_GUARD;
@@ -378,7 +378,7 @@ intern void seglist_free(AllocSegList* alloc, void* ptr) {
   SegListHeader* header = (SegListHeader*)OffsetBack(ptr, sizeof(SegListHeader));
   Assert(header->guard == MEM_ALLOC_HEADER_GUARD);
   header->guard = MEM_DEALLOC_HEADER_GUARD;
-  u32* tail = (u32*)Offset(ptr, header->size);
+  u32* tail = OffsetAs(ptr, u32, header->size);
   Assert(*tail == MEM_ALLOC_TAIL_GUARD);
   u32* pool_idx = (u32*)OffsetBack(ptr, header->pad);
   MemPoolPow2& p = *(MemPoolPow2*)&alloc->pools[*pool_idx];

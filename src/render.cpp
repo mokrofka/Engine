@@ -44,8 +44,7 @@ void r_shader_reload(String name) {
   Scratch scratch;
   R_State& g = st->r;
   Info("reload '%s' shader", name);
-  Result module_idx_res = map_get(g.shader_to_module_idx, name);
-  u32 module_idx = module_idx_res.v;
+  u32 module_idx = map_get(g.shader_to_module_idx, name);
   R_ShaderModuleEntry entry = g.modules[module_idx];
   String shader = os_file_path_read_all_str(scratch, push_strf(scratch, "%s/%s.spv", st->shader_compiled_dir, name));
   gfx_shader_update(entry.shd, {.shader = shader});
@@ -59,18 +58,20 @@ Gfx_Pipeline r_pipeline_make(String name, Gfx_PipelineDesc desc) {
   Scratch scratch;
   R_State& g = st->r;
   R_KeyToShaderPipeline key = {name, desc};
-  Result module_idx = map_get(g.shader_to_module_idx, name);
-  if (module_idx.err) {
+  Result module_idx_r = map_get(g.shader_to_module_idx, name);
+  if (module_idx_r.err) {
     R_ShaderModuleEntry entry = r_shader_module_entry_make(g.gpa);
     String shader = os_file_path_read_all_str(scratch, push_strf(scratch, "%s/%s.spv", st->shader_compiled_dir, name));
     entry.shd = gfx_shader_make({.shader = shader});
-    module_idx.v = array_push(g.modules, entry);
-    map_set(g.shader_to_module_idx, name, module_idx.v);
+    u32 module_idx = array_push(g.modules, entry);
+    map_set(g.shader_to_module_idx, name, module_idx);
+    module_idx_r = module_idx;
   }
-  desc.shader = g.modules[module_idx.v].shd;
+  u32 module_idx = module_idx_r;
+  desc.shader = g.modules[module_idx].shd;
   Gfx_Pipeline pip = gfx_pipeline_make(desc);
   map_set(g.shader_to_pipeline, key, pip);
-  R_ShaderModuleEntry& entry = g.modules[module_idx.v];
+  R_ShaderModuleEntry& entry = g.modules[module_idx];
   array_push(entry.track_pipelines, pip);
   return pip;
 }
@@ -190,7 +191,7 @@ GpuMeshId r_mesh_load(Mesh mesh) {
   gfx_buffer_upload(g.vert_buffer, slice_to_bytes(mesh.vertices));
   if (mesh.indices.count) {
     base_index = gfx_buffer_pos(g.index_buffer) / sizeof(u32);
-    gfx_buffer_upload(g.index_buffer, slice_to_bytes(mesh.vertices));
+    gfx_buffer_upload(g.index_buffer, slice_to_bytes(mesh.indices));
   }
   Gfx_Mesh vk_mesh = {
     .vert_count = (u32)mesh.vertices.count,
@@ -497,29 +498,29 @@ GpuTextureId r_texture_load(Texture texture) {
 GpuMaterialId r_material_load(MaterialDesc material) {
   R_State& g = st->r;
   R_KeyToShaderPipeline key = {material.shader_name, material.pipeline_desc};
-  Result pip_res = map_get(g.shader_to_pipeline, key);
-  if (pip_res.err) {
-    pip_res.v = r_pipeline_make(material.shader_name, material.pipeline_desc);
+  var pip_r = map_get(g.shader_to_pipeline, key);
+  if (pip_r.err) {
+    pip_r = r_pipeline_make(material.shader_name, material.pipeline_desc);
   }
-  Result batch_idx = map_get(g.pip_idx_to_entity_batch, pip_res.v.idx);
-  if (batch_idx.err) {
-    batch_idx.v = array_push(g.entity_pipelines, {.pip = pip_res.v, .batch_idx = array_push(g.batches, r_render_batch_make(g.gpa))});
-    map_set(g.pip_idx_to_entity_batch, pip_res.v.idx, batch_idx.v);
+  Gfx_Pipeline pip = pip_r;
+  var batch_idx_r = map_get(g.pip_idx_to_entity_batch_idx, pip.idx);
+  if (batch_idx_r.err) {
+    u32 batch_idx = array_push(g.entity_pipelines, {.pip = pip, .batch_idx = array_push(g.batches, r_render_batch_make(g.gpa))});
+    map_set(g.pip_idx_to_entity_batch_idx, pip.idx, batch_idx);
+    batch_idx_r = batch_idx;
   }
-  Result texture_id = map_get(st->str_to_texture_id, material.texture);
-  if (texture_id.err) {
-    texture_id.v = {0};
-  }
+  u32 batch_idx = batch_idx_r;
+  GpuTextureId texture_id = map_get(st->str_to_texture_id, material.texture);
   g.gpu_materials[g.materials.count] = {
     .ambient = material.props.ambient,
     .diffuse = material.props.diffuse,
     .specular = material.props.specular,
     .shininess = material.props.shininess, 
-    .texture_idx = texture_id.v.idx,
+    .texture_idx = texture_id.idx,
   };
   R_GpuMaterial mat = {
-    .entity_pipeline_idx = batch_idx.v,
-    .texture_idx = texture_id.v.idx,
+    .entity_pipeline_idx = batch_idx,
+    .texture_idx = texture_id.idx,
   };
   GpuMaterialId result = {g.materials.count};
   array_push(g.materials, mat);
@@ -721,24 +722,6 @@ void r_shutdown() {
 
 void r_begin() {
   vk_imgui_begin_frame();
-}
-
-void foo() {
-  // RenderTexture texture0 = r_render_texture_make(width, height);
-  // RenderTexture texture1 = r_render_texture_make(width, height);
-
-  // r_begin_pass(texture0);
-  // r_draw(...);
-  // r_end_pass();
-
-  // r_begin_pass(texture1);
-  // r_draw(...);
-  // r_end_pass();
-
-  // r_being_pass(swapchain);
-  // r_draw(texture, pos0);
-  // r_draw(texture, pos1);
-  // r_end_pass();
 }
 
 void r_end() {
@@ -990,14 +973,16 @@ void vk_register_entity(OpaqueId entity_id, GpuMeshId mesh_id, GpuMaterialId mat
   Gfx_Mesh mesh = pool_get(g.meshes, mesh_id);
   R_BatchType type = (mesh.index_count == 0) | (is_static << 1);
   R_MeshesBatches& shader_batch = g.batches[g.entity_pipelines[pipeline_idx].batch_idx].batches[type];
-  Result mesh_idx_in_array = map_get(shader_batch.mesh_to_batch, mesh_idx);
-  if (mesh_idx_in_array.err) {
+  Result mesh_idx_in_array_r = map_get(shader_batch.mesh_to_batch, mesh_idx);
+  if (mesh_idx_in_array_r.err) {
     R_MeshBatch mesh_batch = r_mesh_batch_make(g.gpa);
     mesh_batch.mesh_id = mesh_id;
-    mesh_idx_in_array.v = array_push(shader_batch.mesh_batches, mesh_batch);
-    map_set(shader_batch.mesh_to_batch, mesh_id.idx, mesh_idx_in_array.v);
+    u32 mesh_idx_in_array = array_push(shader_batch.mesh_batches, mesh_batch);
+    map_set(shader_batch.mesh_to_batch, mesh_id.idx, mesh_idx_in_array);
+    mesh_idx_in_array_r = mesh_idx_in_array;
   }
-  R_MeshBatch& mesh_batch = shader_batch.mesh_batches[mesh_idx_in_array.v];
+  u32 mesh_idx_in_array = mesh_idx_in_array_r;
+  R_MeshBatch& mesh_batch = shader_batch.mesh_batches[mesh_idx_in_array];
   u32 entity_idx_in_array = array_push(mesh_batch.entities, entity_id);
   g.entities[entity_idx].entity_idx_in_mesh_batch = entity_idx_in_array;
   g.gpu_entities[entity_idx].material_idx = material_idx;
@@ -1036,7 +1021,8 @@ void vk_unregister_entity(OpaqueId entity_id, b32 is_static) {
   R_MeshesBatches& shader_batch = g.batches[g.entity_pipelines[pipeline_idx].batch_idx].batches[type];
 
   Result mesh_batch_idx = map_get(shader_batch.mesh_to_batch, mesh_id.idx);
-  R_MeshBatch& mesh_batch = shader_batch.mesh_batches[mesh_batch_idx.v];
+  Assert(!mesh_batch_idx.err);
+  R_MeshBatch& mesh_batch = shader_batch.mesh_batches[mesh_batch_idx];
 
   u32 idx = g.entities[entity_idx].entity_idx_in_mesh_batch;
   u32 last_idx = mesh_batch.entities.count-1;

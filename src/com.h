@@ -184,8 +184,8 @@ Texture load_image(String filepath);
 // @Assets
 
 #define MESH_LIST \
-  X(Mesh_MonkeyGlb, monkey.glb) \
   X(Mesh_Cube, cube.glb) \
+  X(Mesh_MonkeyGlb, monkey.glb) \
   // X(Mesh_Castle, castle.obj) \
 
 #define MESH_0_LIST \
@@ -237,6 +237,264 @@ GpuMeshId mesh_load(String name);
 GpuShaderId shader_load(ShaderDesc shader);
 GpuCubemapId cubemap_load(String name);
 void assets_load();
+
+////////////////////////////////////////////////////////////////////////
+// @Json
+
+enum JsType {
+  JsType_Null,
+  JsType_Bool,
+  JsType_Number,
+  JsType_Str,
+  JsType_Array,
+  JsType_Obj,
+};
+
+struct JsField {
+  String key;
+  struct JsVal* val;
+};
+
+struct JsObj {
+  Slice<JsField> fields;
+};
+
+struct JsVal {
+  JsType type;
+  union {
+    b32 boolean;
+    f64 number;
+    String str;
+    Slice<JsVal*> array;
+    JsObj obj;
+  };
+};
+
+struct JsParser {
+  Allocator arena;
+  String str;
+  u32 cursor;
+};
+
+JsParser js_parse_make(Allocator arena, String str) {
+  JsParser res = {
+    .arena = arena,
+    .str = str,
+  };
+  return res;
+}
+
+u8 js_peek(JsParser* p) {
+  return p->str.str[p->cursor];
+}
+
+void js_advance(JsParser* p) {
+  ++p->cursor;
+}
+
+void js_skip_ws(JsParser* p) {
+  while (char_is_ws(js_peek(p))) {
+    js_advance(p);
+  }
+}
+
+String js_parse_str(JsParser* p) {
+  Assert(js_peek(p) == '\"');
+  js_advance(p);
+  u32 start = p->cursor;
+  while (js_peek(p) != '\"') {
+    js_advance(p);
+  }
+  String res = str_substr(p->str, Rng1u(start, p->cursor));
+  js_advance(p);
+  return res;
+}
+
+f64 js_parse_number(JsParser* p) {
+  u32 start = p->cursor;
+  while (char_is_number_cont(js_peek(p))) {
+    js_advance(p);
+  }
+  String str = str_substr(p->str, Rng1u(start, p->cursor));
+  f64 res = f64_from_str(str);
+  return res;
+}
+
+JsVal js_parse(JsParser* p) {
+  js_skip_ws(p);
+  switch (js_peek(p)) {
+    default: {
+      f64 num = js_parse_number(p);
+      JsVal res = {
+        .type = JsType_Number,
+        .number = num
+      };
+      return res;
+    } break;
+    case '\"': {
+      String str = js_parse_str(p);
+      JsVal res = {
+        .type = JsType_Str,
+        .str = str,
+      };
+      return res;
+    } break;
+    case 't': {
+      p->cursor += 4;
+      JsVal res = {
+        .type = JsType_Bool,
+        .boolean = true,
+      };
+      return res;
+    } break;
+    case 'f': {
+      p->cursor += 5;
+      JsVal res = {
+        .type = JsType_Bool,
+        .boolean = false,
+      };
+      return res;
+    } break;
+    case 'n': {
+      p->cursor += 4;
+      JsVal res = {
+        .type = JsType_Null,
+      };
+      return res;
+    } break;
+    case '[': {
+      js_advance(p);
+      var arr = darray_make<JsVal*>(p->arena);
+      while (true) {
+        js_skip_ws(p);
+        if (js_peek(p) == ']') {
+          js_advance(p);
+          break;
+        }
+        JsVal* val = push_struct(p->arena, JsVal);
+        *val = js_parse(p);
+        array_push(arr, val);
+        js_skip_ws(p);
+        if (js_peek(p) == ',') {
+          js_advance(p);
+        }
+      }
+      JsVal res = {
+        .type = JsType_Array,
+        .array = slice(arr),
+      };
+      return res;
+    } break;
+    case '{': {
+      js_advance(p);
+      var fields = darray_make<JsField>(p->arena);
+      while (true) {
+        js_skip_ws(p);
+        if (js_peek(p) == '}') {
+          js_advance(p);
+          break;
+        }
+        String key = js_parse_str(p);
+        js_skip_ws(p);
+        Assert(js_peek(p) == ':');
+        js_advance(p);
+        
+        JsVal* val = push_struct(p->arena, JsVal);
+        *val = js_parse(p);
+        array_push(fields, {.key = key, .val = val});
+        js_skip_ws(p);
+        if (js_peek(p) == ',') {
+          js_advance(p);
+        }
+      }
+      JsVal res = {
+        .type = JsType_Obj,
+        .obj = slice(fields),
+      };
+      return res;
+    } break;
+  }
+}
+
+JsVal js_get_val(JsVal val, String key) {
+  Loop (i, val.obj.fields.count) {
+    JsField& field = val.obj.fields[i];
+    if (str_match(field.key, key)) {
+      // Assert(field.val->type == JsType_Obj);
+      return *field.val;
+    }
+  }
+  return {};
+}
+
+b32 js_get_bool(JsObj obj, String key) {
+  Loop (i, obj.fields.count) {
+    JsField& field = obj.fields[i];
+    if (str_match(field.key, key)) {
+      Assert(field.val->type == JsType_Bool);
+      return field.val->boolean;
+    }
+  }
+  return {};
+}
+
+f64 js_get_number(JsObj obj, String key) {
+  Loop (i, obj.fields.count) {
+    JsField& field = obj.fields[i];
+    if (str_match(field.key, key)) {
+      Assert(field.val->type == JsType_Number);
+      return field.val->number;
+    }
+  }
+  return {};
+}
+
+String js_get_str(JsObj obj, String key) {
+  Loop (i, obj.fields.count) {
+    JsField& field = obj.fields[i];
+    if (str_match(field.key, key)) {
+      Assert(field.val->type == JsType_Str);
+      return field.val->str;
+    }
+  }
+  return {};
+}
+
+Slice<JsVal*> js_get_array(JsObj obj, String key) {
+  Loop (i, obj.fields.count) {
+    JsField& field = obj.fields[i];
+    if (str_match(field.key, key)) {
+      Assert(field.val->type == JsType_Array);
+      return field.val->array;
+    }
+  }
+  return {};
+}
+
+JsObj js_get_obj(JsObj obj, String key) {
+  Loop (i, obj.fields.count) {
+    JsField& field = obj.fields[i];
+    if (str_match(field.key, key)) {
+      Assert(field.val->type == JsType_Obj);
+      return field.val->obj;
+    }
+  }
+  return {};
+}
+
+// Something parse_object() {
+  
+// }
+
+// inline void parse_gltf() {
+//   var tokens = json_tokenize(str);
+//   JsonParser p = ...;
+//   while(...) {
+//     var t = next_token(p);
+//     if (...)
+//     ...
+//   }
+// }
 
 ////////////////////////////////////////////////////////////////////////
 // @Json

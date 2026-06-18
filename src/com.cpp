@@ -194,14 +194,16 @@ Mesh load_obj(Allocator arena, String name) {
       .norm = normals[idx.y],
       .uv = uvs[idx.z],
     };
-    Result res = map_get(map, vertex);
-    if (res.err) {
+    Result vert_index_r = map_get(map, vertex);
+    if (vert_index_r.err) {
       u32 new_index = vertices.count;
       array_push(vertices, vertex);
       array_push(final_indices, new_index);
       map_set(map, vertex, new_index);
-    } else {
-      array_push(final_indices, res.v);
+    }
+    u32 vert_index = vert_index_r;
+    if (!vert_index_r.err) {
+      array_push(final_indices, vert_index);
     }
   }
   Mesh mesh = {
@@ -209,6 +211,10 @@ Mesh load_obj(Allocator arena, String name) {
     .indices = slice(final_indices),
   };
   return mesh;
+}
+
+Mesh load_gltf(Allocator alloc, String name, b32 is_glb) {
+  
 }
 
 Mesh load_gltf(Allocator arena, String name) {
@@ -1067,7 +1073,8 @@ void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser
       default:{} break;
       case MetaType_u32: {
         Token tok = tok_advance(p);
-        *(u32*)Offset(ptr, member.offset) = u32_from_str(tok.str);
+        // *(u32*)Offset(ptr, member.offset) 
+        *OffsetAs(ptr, u32, member.offset) = u32_from_str(tok.str);
       } break;
       case MetaType_i32: {
         *(i32*)Offset(ptr, member.offset) = parse_i32(p);
@@ -1091,18 +1098,14 @@ void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser
       case MetaType_GpuMeshId: {
         Token tok = tok_require(p, TokenType_String);
         Result mesh = map_get(st->str_to_mesh_id, tok.str);
-        if (mesh.err) {
-          InvalidPath;
-        }
-        *(GpuMeshId*)Offset(ptr, member.offset) = mesh.v;
+        Assert(!mesh.err);
+        *(GpuMeshId*)Offset(ptr, member.offset) = mesh;
       } break;
       case MetaType_GpuMaterialId: {
         Token tok = tok_require(p, TokenType_String);
         Result material = map_get(st->str_to_material_id, tok.str);
-        if (material.err) {
-          InvalidPath;
-        }
-        *(GpuMaterialId*)Offset(ptr, member.offset) = material.v;
+        Assert(!material.err);
+        *(GpuMaterialId*)Offset(ptr, member.offset) = material;
       } break;
       case MetaType_String: {
         Token tok = tok_require(p, TokenType_String);
@@ -1197,8 +1200,109 @@ void watch_update() {
 ////////////////////////////////////////////////////////////////////////
 // @State
 
+void foo() {
+  String d = R"(
+  {
+    "name": "cube",
+    "visible": true,
+    "pos": [1.0, 2.0, 3.0],
+    "material": {
+      "color": [1.0, 0.0, 0.0],
+      "roughness": 0.5
+    }
+  }
+  )";
+
+  Scratch scratch;
+
+  {
+    struct {
+      String name;
+      b32 visible;
+      v3 pos;
+      struct {
+        v3 color;
+        f32 roughness;
+      } material;
+    } res = {};
+
+    JsParser p = js_parse_make(scratch, d);
+    JsObj root = js_parse(&p).obj;
+    Loop (i, root.fields.count) {
+      var [k, v] = root.fields[i];
+      if (str_match(k, "name")) {
+        res.name = push_str_copy(scratch, v->str);
+      }
+      else if (str_match(k, "visible")) {
+        res.visible = v->boolean;
+      }
+      else if (str_match(k, "pos")) {
+        Loop (i, v->array.count) {
+          res.pos.v[i] = v->array[i]->number;
+        }
+      }
+      else if (str_match(k, "material")) {
+        JsObj material = v->obj;
+        Loop (i, material.fields.count) {
+          var [k, v] = material.fields[i];
+          if (str_match(k, "color")) {
+            Loop (i, v->array.count) {
+              res.material.color.v[i] = v->array[i]->number;
+            }
+          } else if (str_match(k, "roughness")) {
+            res.material.roughness = v->number;
+          }
+        }
+      }
+    }
+  }
+
+  {
+    JsParser p = js_parse_make(scratch, d);
+    JsObj root = js_parse(&p).obj;
+    String name = js_get_str(root, "name");
+    Info("%s", name);
+    b32 visible = js_get_bool(root, "visible");
+    Info("%u", visible);
+    Slice pos = js_get_array(root, "pos");
+    Loop (i, pos.count) {
+      Info("%f", pos[i]->number);
+    }
+    {
+      JsObj material = js_get_obj(root, "material");
+      Slice color = js_get_array(material, "color");
+      Loop (i, color.count) {
+        Info("%f", color[i]->number);
+      }
+      f64 roughness = js_get_number(material, "roughness");
+      Info("%f", roughness);
+    }
+  }
+
+  {
+    JsParser p = js_parse_make(scratch, d);
+    JsVal root = js_parse(&p);
+    JsVal name = js_get_val(root, "name");
+    Info("%s", name.str);
+    JsVal visible = js_get_val(root, "visible");
+    Info("%u", visible.boolean);
+    JsVal pos = js_get_val(root, "pos");
+    Loop (i, pos.array.count) {
+      Info("%f", pos.array[i]->number);
+    }
+    JsVal material = js_get_val(root, "material");
+    JsVal color = js_get_val(material, "color");
+    Loop (i, color.array.count) {
+      Info("%f", color.array[i]->number);
+    }
+    JsVal roughness = js_get_val(material, "roughness");
+    Info("%f", roughness.number);
+  }
+}
+
 void com_init() {
   Scratch scratch;
+  foo();
 
   GlobalState& g = *st;
   estimate_cpu_frequency();
@@ -2004,6 +2108,5 @@ void game_update() {
   }
   scene_update();
 }
-
 
 

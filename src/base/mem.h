@@ -213,9 +213,9 @@ u8* mem_alloc_soa(Allocator alloc, u32 count, Slice<SoA_Field> fields);
 u8* mem_realloc_soa(Allocator alloc, u32 old_count, u32 new_count, Slice<SoA_Field> fields);
 
 void* offset_mem_push(void*& offset, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
-u64 offset_push(u64& offset, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
 #define offset_mem_push_struct(a, T)  (T*)offset_mem_push(a, sizeof(T), alignof(T))
 #define offset_mem_push_array(a, T, c)(T*)offset_mem_push(a, sizeof(T)*(c), alignof(T))
+u64 offset_push(u64& offset, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
 #define offset_push_struct(a, T)          offset_push(a, sizeof(T), alignof(T))
 #define offset_push_array(a, T, c)        offset_push(a, sizeof(T)*(c), alignof(T))
 

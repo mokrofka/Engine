@@ -130,3 +130,286 @@ void instanced_drawcall() {
 //   drawcall = drawcall_end(base_drawcall);
 //   gfx_draw_indirect(drawcall);
 // }
+
+struct Node {
+  Node* next;
+  Node* prev;
+};
+
+struct List {
+  Node* first;
+  Node* last;
+  u32 count;
+};
+
+void list_push_front(List* list, Node* n) {
+  n->next = list->first;
+  n->prev = null;
+  if (list->first) {
+    list->first->prev = n;
+  } else {
+    list->last = n;
+  }
+  list->first = n;
+  ++list->count;
+}
+void list_push(List* list, Node* n) {
+  n->prev = list->last;
+  n->next = null;
+  if (list->last) {
+    list->last->next = n;
+  } else {
+    list->first = n;
+  }
+  list->last = n;
+  ++list->count;
+}
+void list_remove(List* list, Node* n) {
+  if (n == null) return;
+  if (n->prev) {
+    n->prev->next = n->next;
+  } else {
+    list->first = n->next;
+  }
+  if (n->next) {
+    n->next->prev = n->prev;
+  } else {
+    list->last = n->prev;
+  }
+  --list->count;
+}
+Node* list_pop_front(List* list) {
+	Node* n = list->first;
+	if (n == null) return null;
+  list->first = n->next;
+  if (list->first) {
+    list->first->prev = null;
+  } else {
+    list->last = null;
+  }
+  --list->count;
+  return n;
+}
+Node* list_pop(List* list) {
+	Node* n = list->first;
+	if (n == null) return null;
+  list->last = n->prev;
+  if (list->last) {
+    list->last->next = null;
+  } else {
+    list->first = null;
+  }
+  --list->count;
+  return n;
+}
+
+void sll_queue_push(List* list, Node* n) {
+  n->next = null;
+  if (list->last) {
+    list->last->next = n;
+  } else {
+    list->first = n;
+  }
+  list->last = n;
+  ++list->count;
+}
+Node* sll_queue_pop(List* list) {
+  Node* n = list->first;
+  if (!n) return null;
+  list->first = n->next;
+  if (list->first == null) {
+    list->last = null;
+  }
+  --list->count;
+  return n;
+}
+
+void sll_stack_push(Node* first, Node* n) {
+  n->next = first;
+  first = n;
+}
+void sll_stack_pop(Node* first, Node* n) {
+  first = first->next;
+}
+
+#define ListFor(it, T, list)                       \
+  for (T* it = ContainerOf((list).first, T, node); \
+       &it->node != null;                          \
+       it = ContainerOf(it->node.next, T, node))
+
+struct NodeIdx {
+  u32 next;
+  u32 prev;
+};
+
+struct ListIdx {
+  u32 first;
+  u32 last;
+  u32 count;
+};
+
+template<typename T> void list_push_front(T* p, ListIdx* list, u32 n) {
+  T* arr = p->data;
+  NodeIdx& node = p->data[n].node;
+  node.next = list->first;
+  node.prev = 0;
+  if (list->first) {
+    arr[list->first].node.prev = n;
+  } else {
+    list->last = n;
+  }
+  list->first = n;
+}
+template<typename T> void list_push(T* p, ListIdx* list, u32 n) {
+  T* arr = p->data;
+  NodeIdx& node = p->data[n].node;
+  node.next = list->last;
+  node.prev = 0;
+  if (list->last) {
+    arr[list->last].next = n;
+  } else {
+    list->first = n;
+  }
+  list->last = n;
+}
+template<typename T> void list_remove(T* p, ListIdx* list, u32 n) {
+  if (n == 0) return;
+  T* arr = p->data;
+  NodeIdx& node = p->data[n].node;
+  if (node.prev) {
+    arr[node.prev].next = node.next;
+  } else {
+    list->first = node.next;
+  }
+  if (node.next) {
+    arr[node.next].prev = node.prev;
+  } else {
+    list->last = node.prev;
+  }
+}
+template<typename T> u32 list_pop_front(T* p, ListIdx* list) {
+	u32 n = list->first;
+	if (n == 0) return 0;
+  T* arr = p->data;
+  NodeIdx& node = p->data[n].node;
+  list->first = node.next;
+  if (list->first) {
+    arr[list->first].prev = 0;
+  } else {
+    list->last = null;
+  }
+  return n;
+}
+template<typename T> u32 list_pop(T* p, ListIdx* list) {
+	u32 n = list->first;
+	if (n == 0) return 0;
+  T* arr = p->data;
+  NodeIdx& node = p->data[n].node;
+  list->last = node.prev;
+  if (list->last) {
+    arr[list->last].next = 0;
+  } else {
+    list->first = 0;
+  }
+  return n;
+}
+
+template<typename T, typename L, typename H> void list_push_front(T* p,  L* list, H n) {
+  T* arr = p->data;
+  NodeIdx& node = p->data[n].node;
+  node.next = list->first;
+  node.prev = 0;
+  if (list->first) {
+    arr[list->first].node.prev = n;
+  } else {
+    list->last = n;
+  }
+  list->first = n;
+}
+
+struct ThingId {
+  u32 idx;
+  u32 gen;
+};
+
+struct Thing {
+  ThingId parent;
+  ThingId first;
+  ThingId last;
+  ThingId next;
+  ThingId prev;
+};
+
+Pool<Thing, 100, ThingId> things;
+
+void foo() {
+  ThingId id = pool_push(things);
+  Thing& thing = pool_get(id);
+}
+
+struct TreeNode {
+  TreeNode* parent;
+  List list;
+  Node node;
+};
+
+struct A {
+  TreeNode tree;
+  // A* parent;
+  // A* first;
+  // A* last;
+  // A* next;
+  // A* prev;
+};
+
+struct Dar {
+  Node node;
+  u32 a;
+  u32 b;
+};
+
+struct Entity {
+  EntityId parent;
+  EntityId first;
+  EntityId last;
+  EntityId next;
+  EntityId prev;
+};
+
+void foo() { 
+  Scratch scratch;
+  List list = {};
+  Dar d0 = {.a = 0};
+  Dar d1 = {.a = 1};
+  Dar d2 = {.a = 2};
+  list_push(&list, &d0.node);
+  list_push(&list, &d1.node);
+  list_push(&list, &d2.node);
+
+  ListFor (i, Dar, list) {
+    Info("%i", i->a);
+  }
+  #define ForEach ()
+  // EachElement
+
+  // Slice<u8> data = os_read_all(...);
+  // struct Header {
+  //   u32 a;
+  //   u32 b;
+  //   u32 c;
+  // };
+  // Header* header = (Header*)data.data;
+  // u32* magic = (u32*)slice_skip(data, sizeof(Header)).data;
+
+
+
+}
+
+// void foo() {
+//   struct A {
+//     u32 a;
+//     u32 b;
+//   } a;
+//   u32* pb = &a.b;
+//   A* pa = ContainerOf(pb, A, b);
+// }

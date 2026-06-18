@@ -15,16 +15,21 @@ void MemZero(void *d, u64 size)           { MemSet(d, 0, size); }
 void MemCopy(void* d, void* s, u64 size)  { __builtin_memcpy(d, s, size); }
 b32  MemMatch(void* a, void* b, u64 size) { return (__builtin_memcmp(a, b, size) == 0); }
 
-u64 AlignUp(u64 x, u64 a)      { return (x + a - 1) & ~(a - 1); }
-u64 AlignDown(u64 x, u64 a)    { return x & ~(a - 1); }
-u64 AlignPadUp(u64 x, u64 a)   { return -x & (a - 1); }
-u64 AlignPadDown(u64 x, u64 a) { return x & (a - 1); }
-b32 IsPow2(u64 x)              { return ((x - 1) & x) == 0; }
-b32 IsAligned(u64 x, u64 a)    { return ((a - 1) & x) == 0; }
-u8* Offset(void* x, u64 a)     { return (u8*)x + a; }
-u8* OffsetBack(void* x, u64 a) { return (u8*)x - a; }
-u64 MemDiff(void* x, void* a)  { return (u8*)x - (u8*)a; }
-b32 PtrMatch(void* a, void* b) { return (u8*)a == (u8*)b; }
+u64 AlignUp(u64 x, u64 a)           { return (x + a - 1) & ~(a - 1); }
+u64 AlignDown(u64 x, u64 a)         { return x & ~(a - 1); }
+u64 AlignPadUp(u64 x, u64 a)        { return -x & (a - 1); }
+u64 AlignPadDown(u64 x, u64 a)      { return x & (a - 1); }
+b32 IsAligned(u64 x, u64 a)         { return ((a - 1) & x) == 0; }
+u8* PtrAlignUp(void* x, u64 a)      { return (u8*)AlignUp(u64(x), a); }
+u8* PtrAlignDown(void* x, u64 a)    { return (u8*)AlignDown(u64(x), a); }
+u8* PtrAlignPadUp(void* x, u64 a)   { return (u8*)AlignPadUp(u64(x), a); }
+u8* PtrAlignPadDown(void* x, u64 a) { return (u8*)AlignPadDown(u64(x), a); }
+b32 PtrIsAligned(void* x, u64 a)    { return  IsAligned(u64(x), a); }
+b32 IsPow2(u64 x)                   { return ((x - 1) & x) == 0; }
+u8* Offset(void* x, u64 a)          { return (u8*)x + a; }
+u8* OffsetBack(void* x, u64 a)      { return (u8*)x - a; }
+u64 PtrDiff(void* a, void* b)       { return (u8*)a - (u8*)a; }
+b32 PtrMatch(void* a, void* b)      { return (u8*)a == (u8*)b; }
 
 ////////////////////////////////////////////////////////////////////////
 // Bits
@@ -83,13 +88,13 @@ void DebugTrap() { __builtin_debugtrap(); }
 ////////////////////////////////////////////////////////////////////////
 // Types
 
-void bit_set(BitArray* bits, u64 idx) {
+void array_bit_set(ArrayBit* bits, u64 idx) {
   bits->words[idx >> 6] |= 1ull << (idx & 63);
 }
-void bit_clear(BitArray* bits, u64 idx) {
+void array_bit_clear(ArrayBit* bits, u64 idx) {
   bits->words[idx >> 6] &= ~(1ull << (idx & 63));
 }
-b32 bit_get(BitArray* bits, u64 idx) {
+b32 array_bit_get(ArrayBit* bits, u64 idx) {
   return (bits->words[idx >> 6] >> (idx & 63)) & 1;
 }
 

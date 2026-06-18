@@ -46,6 +46,7 @@ u64 cstr_length(const void* c);
 
 b32 char_is_space(u8 c);
 b32 char_is_newline(u8 c);
+b32 char_is_ws(u8);
 b32 char_is_upper(u8 c);
 b32 char_is_lower(u8 c);
 b32 char_is_alpha(u8 c);

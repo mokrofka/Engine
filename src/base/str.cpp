@@ -398,17 +398,18 @@ intern u32 my_sprintf(u8* buf, String fmt, VaList argc) {
 ////////////////////////////////////////////////////////////////////////
 // Character Classification & Conversion Functions
 
-b32 char_is_space(u8 c) { return c == ' ' || c == '\t'; }
-b32 char_is_newline(u8 c) { return c == '\r' || c == '\n'; }
-b32 char_is_upper(u8 c) { return 'A' <= c && c <= 'Z'; }
-b32 char_is_lower(u8 c) { return 'a' <= c && c <= 'z'; }
-b32 char_is_alpha(u8 c) { return char_is_upper(c) || char_is_lower(c); }
-b32 char_is_slash(u8 c) { return c == '/' || c == '\\'; }
-b32 char_is_digit(u8 c) { return (c >= '0' && c <= '9'); }
-u8 char_to_lower(u8 c) { if (char_is_upper(c)) { c += ('a' - 'A'); } return c; }
-u8 char_to_upper(u8 c) { if (char_is_lower(c)) { c += ('A' - 'a'); } return c; }
+b32 char_is_space(u8 c)        { return c == ' ' || c == '\t'; }
+b32 char_is_newline(u8 c)      { return c == '\r' || c == '\n'; }
+b32 char_is_ws(u8 c)           { return char_is_space(c) || char_is_newline(c); }
+b32 char_is_upper(u8 c)        { return 'A' <= c && c <= 'Z'; }
+b32 char_is_lower(u8 c)        { return 'a' <= c && c <= 'z'; }
+b32 char_is_alpha(u8 c)        { return char_is_upper(c) || char_is_lower(c); }
+b32 char_is_slash(u8 c)        { return c == '/' || c == '\\'; }
+b32 char_is_digit(u8 c)        { return (c >= '0' && c <= '9'); }
+u8 char_to_lower(u8 c)         { if (char_is_upper(c)) { c += ('a' - 'A'); } return c; }
+u8 char_to_upper(u8 c)         { if (char_is_lower(c)) { c += ('A' - 'a'); } return c; }
 u8 char_to_correct_slash(u8 c) { if (char_is_slash(c)) { c = '/'; } return c; }
-b32 char_is_number_cont(u8 c) { return (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '+'; }
+b32 char_is_number_cont(u8 c)  { return (c >= '0' && c <= '9') || c == '.' || c == '-'; }
 
 ////////////////////////////////////////////////////////////////////////
 // String Constructors

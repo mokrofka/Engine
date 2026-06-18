@@ -126,7 +126,7 @@ struct R_State {
   Darray<R_EntityPipeline> entity_pipelines;
   Darray<R_ShaderModuleEntry> modules;
   Map<R_KeyToShaderPipeline, Gfx_Pipeline, Gfx_MaxPipelines> shader_to_pipeline;
-  Map<u32, u32, Gfx_MaxPipelines> pip_idx_to_entity_batch;
+  Map<u32, u32, Gfx_MaxPipelines> pip_idx_to_entity_batch_idx;
   Map<String, u32, Gfx_MaxShaders> shader_to_module_idx;
   Array<R_GpuMaterial, MaxMaterials> materials;
   Darray<R_EntityPipelineBatch> batches;

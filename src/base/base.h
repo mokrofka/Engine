@@ -129,7 +129,14 @@ NO_DEBUG f32 BytesToGB(u64 x);
 ////////////////////////////////////////////////////////////////////////
 // Memory
 
-#define OffsetOf(T,m) (u64)(&((T*)0)->m)
+#define OffsetOf(T,m)                (u64)(&((T*)0)->m)
+#define ContainerOf(ptr,T,m)         (T*)(((u8*)(ptr) - OffsetOf(T,m)))
+#define OffsetAs(ptr,T,off)          (T*)(Offset((ptr), (off)))
+#define OffsetStruct(ptr,T)          (T*)(Offset((ptr), sizeof(T)))
+#define OffsetArray(ptr,T,c)         (T*)(Offset((ptr), sizeof(T) * (c)))
+#define OffsetBackAs(ptr,T,off)      (T*)(OffsetBack((ptr), (off)))
+#define OffsetBackStruct(ptr,T)      (T*)(OffsetBack((ptr), sizeof(T)))
+#define OffsetBackArray(ptr,T,c)     (T*)(OffsetBack((ptr), sizeof(T) * (c)))
 
 void MemSet(void *d, i32 byte, u64 size);
 void MemZero(void *d, u64 size);
@@ -147,11 +154,16 @@ u64 AlignUp(u64 x, u64 a);
 u64 AlignDown(u64 x, u64 a);
 u64 AlignPadUp(u64 x, u64 a);
 u64 AlignPadDown(u64 x, u64 a);
-b32 IsPow2(u64 x);
 b32 IsAligned(u64 x, u64 a);
+u8* PtrAlignUp(void* x, u64 a);
+u8* PtrAlignDown(void* x, u64 a);
+u8* PtrAlignPadUp(void* x, u64 a);
+u8* PtrAlignPadDown(void* x, u64 a);
+b32 PtrIsAligned(void* x, u64 a);
+b32 IsPow2(u64 x);
 u8* Offset(void* x, u64 a);
 u8* OffsetBack(void* x, u64 a);
-u64 MemDiff(void* x, void* a);
+u64 PtrDiff(void* a, void* b);
 b32 PtrMatch(void* a, void* b);
 
 ////////////////////////////////////////////////////////////////////////
@@ -213,6 +225,7 @@ b32 is_nan_f32(f32 x);
 #define Stringify(S)   _Stringify(S)
 #define _Glue(A,B)     A##B
 #define Glue(A,B)      _Glue(A,B)
+#define Transmute(T, x) (*(T*)&(x))
 
 #define Loop(it, c)                  for (i32 it = 0; it < c; ++it)
 #define ReverseLoop(i, count)        for (i32 i = count - 1; i >= 0; --i)
@@ -329,17 +342,45 @@ struct _Defer {
 ////////////////////////////////////////////////////////////////////////
 // Error handling
 
-template <typename T, typename ErrorType = i32>
+template <typename E = b32>
+struct _Unexpected {
+  E e;
+};
+
+template <typename E = b32>
+_Unexpected<E> Err(E err = {}) {
+  return {err};
+}
+
+template<typename T, typename E = b32>
 struct Result {
   union {
     T v;
-    ErrorType err_type;
+    E e;
   };
   b32 err;
+  Result(T val) : v(val), err(false) {}
+  Result(_Unexpected<E> err_) {
+    v = {};
+    e = err_.e;
+    err = true;
+  }
+  template<typename U> Result(_Unexpected<U> u) : e(E(u.e)), err(true) {}
+  operator T() const { return v; }
+  T& operator*()     { return v; }
+  T* operator->()    { return &v; }
+  E  error()         { Assert(!err); return e; }
 };
 
-#define ResultErr(...) {.err = true, __VA_ARGS__};
-#define ResultOk(val) {.v = (val)};
+#define Try(expr)                       \
+  ({                                    \
+    var _r = (expr);                    \
+    if (_r.err) return Err(_r.error()); \
+    *_r;                                \
+  })
+
+////////////////////////////////////////////////////////////////////////
+// Types
 
 const u32 DEFAULT_CAPACITY = 8;
 const u32 DEFAULT_RESIZE_FACTOR = 2;
@@ -353,19 +394,14 @@ const u32 THREAD_COUNT = 2;
     u32 gen;      \
   };
 
-#define Transmute(T, x) (*(T*)&(x))
-
-////////////////////////////////////////////////////////////////////////
-// Types
-
-struct BitArray {
+struct ArrayBit {
   u64* words;
   u64 bit_count;
 };
 
-void bit_set(BitArray* bits, u64 idx);
-void bit_clear(BitArray* bits, u64 idx);
-b32 bit_get(BitArray* bits, u64 idx);
+void array_bit_set(ArrayBit* bits, u64 idx);
+void array_bit_clear(ArrayBit* bits, u64 idx);
+b32 array_bit_get(ArrayBit* bits, u64 idx);
 
 struct Region {
   u64 offset;
@@ -411,35 +447,14 @@ struct Slice {
   Slice(T* data_, u64 count_) { data = data_; count = count_; }
   Slice() = default;
 };
-template<typename T> Slice<T> slice(Slice<T> a, u64 li, u64 hi) {
-  Assert(li <= hi && hi <= a.count);
-  return Slice(a.data + li, hi - li);
-}
-template<typename T> Slice<T> slice_prefix(Slice<T> a, u64 n) {
-  Assert(n <= a.count);
-  return Slice(a.data, n);
-}
-template<typename T> Slice<T> slice_postfix(Slice<T> a, u64 n) {
-  Assert(n <= a.count);
-  return Slice(a.data + (a.count - n), n);
-}
-template<typename T> Slice<T> slice_skip(Slice<T> a, u64 n) {
-  Assert(n <= a.count);
-  return Slice(a.data + n, a.count - n);
-}
-template<typename T> Slice<T> slice_chop(Slice<T> a, u64 n) {
-  Assert(n <= a.count);
-  return Slice(a.data, a.count - n);
-}
-template<typename T, u64 N> Slice<T> slice(T (&a)[N]) {
-  return Slice(a, N);
-}
-template<typename T> Slice<u8> slice_to_bytes(Slice<T> s) {
-  return Slice((u8*)s.data, s.count * sizeof(T));
-}
-template<typename T> Slice<u8> slice_struct_to_bytes(T* s) {
-  return Slice((u8*)s, sizeof(T));
-}
+template<typename T> Slice<T> slice(Slice<T> a, u64 li, u64 hi) { Assert(li <= hi && hi <= a.count); return Slice(a.data + li, hi - li); }
+template<typename T> Slice<T> slice_prefix(Slice<T> a, u64 n)   { Assert(n <= a.count); return Slice(a.data, n); }
+template<typename T> Slice<T> slice_postfix(Slice<T> a, u64 n)  { Assert(n <= a.count); return Slice(a.data + (a.count - n), n); }
+template<typename T> Slice<T> slice_skip(Slice<T> a, u64 n)     { Assert(n <= a.count); return Slice(a.data + n, a.count - n); }
+template<typename T> Slice<T> slice_chop(Slice<T> a, u64 n)     { Assert(n <= a.count); return Slice(a.data, a.count - n); }
+template<typename T, u64 N> Slice<T> slice(T (&a)[N])           { return Slice(a, N); }
+template<typename T> Slice<u8> slice_to_bytes(Slice<T> s)       { return Slice((u8*)s.data, s.count * sizeof(T)); }
+template<typename T> Slice<u8> slice_struct_to_bytes(T* s)      { return Slice((u8*)s, sizeof(T)); }
 template<typename To, typename From> Slice<u8> slice_reinterpret(Slice<From> s) {
   Assert((s.count * sizeof(From)) % sizeof(To) == 0);
   return slice((To*)s.data, (s.count*sizeof(From)) / sizeof(To));

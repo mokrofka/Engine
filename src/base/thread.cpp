@@ -62,7 +62,7 @@ intern Result<Task> thread_task_try_pop() {
   TaskQueue& q = thread_pool.queue;
   LockScope(q.mutex);
   if (q.count == 0) {
-    return ResultErr();
+    return Err();
   }
   if (q.count == MAX_TASKS) {
     os_cond_var_signal(q.cond_not_full);
@@ -70,7 +70,7 @@ intern Result<Task> thread_task_try_pop() {
   Task t;
   ring_read_struct(q.ring, &t);
   --q.count;
-  return ResultOk(t);
+  return t;
 }
 
 intern void thread_worker(void* ctx) {
@@ -114,13 +114,13 @@ void thread_wait_task(TaskId task_id) {
   ThreadPool& g = thread_pool;
   TaskQueue& q = thread_pool.queue;
   while (atomic_load(&pool_get(g.counters, task_id.counter_id)) > 0) {
-    Result res = thread_task_try_pop();
-    if (res.err) {
+    Result t_r = thread_task_try_pop();
+    if (t_r.err) {
       os_sleep_ms(1);
       continue;
     }
+    Task t = t_r;
     ProfBlock("Working", ProfType_Worker);
-    Task t = res.v;
     t.func(t.ctx);
     if (!t.async) {
       atomic_sub(&pool_get(g.counters, t.counter_id), 1);
