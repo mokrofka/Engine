@@ -455,9 +455,9 @@ template<typename T> Slice<T> slice_chop(Slice<T> a, u64 n)     { Assert(n <= a.
 template<typename T, u64 N> Slice<T> slice(T (&a)[N])           { return Slice(a, N); }
 template<typename T> Slice<u8> slice_to_bytes(Slice<T> s)       { return Slice((u8*)s.data, s.count * sizeof(T)); }
 template<typename T> Slice<u8> slice_struct_to_bytes(T* s)      { return Slice((u8*)s, sizeof(T)); }
-template<typename To, typename From> Slice<u8> slice_reinterpret(Slice<From> s) {
+template<typename To, typename From> Slice<To> slice_reinterpret(Slice<From> s) {
   Assert((s.count * sizeof(From)) % sizeof(To) == 0);
-  return slice((To*)s.data, (s.count*sizeof(From)) / sizeof(To));
+  return Slice((To*)s.data, (s.count*sizeof(From)) / sizeof(To));
 }
 
 struct String {

@@ -177,7 +177,6 @@ f32 get_time();
 
 Mesh load_obj(Allocator arena, String name);
 Mesh load_gltf(Allocator arena, String name);
-Mesh load_glb(Allocator arena, String name);
 Texture load_image(String filepath);
 
 ////////////////////////////////////////////////////////////////////////
@@ -192,7 +191,8 @@ Texture load_image(String filepath);
   X(Mesh_Triangle) \
   X(Mesh_Grid) \
   X(Mesh_Axis) \
-  X(Mesh_Sphere)
+  X(Mesh_Sphere) \
+  X(Mesh_CubeGlft)
 
 enum MeshEnum {
 #define X(enum_name, name) enum_name,
@@ -481,57 +481,6 @@ JsObj js_get_obj(JsObj obj, String key) {
   }
   return {};
 }
-
-// Something parse_object() {
-  
-// }
-
-// inline void parse_gltf() {
-//   var tokens = json_tokenize(str);
-//   JsonParser p = ...;
-//   while(...) {
-//     var t = next_token(p);
-//     if (...)
-//     ...
-//   }
-// }
-
-////////////////////////////////////////////////////////////////////////
-// @Json
-
-enum JsonType {
-  JsonType_Error,
-  JsonType_Bool,
-  JsonType_Number,
-  JsonType_String,
-  JsonType_Array,
-  JsonType_Object,
-  JsonType_Null,
-  JsonType_End,
-};
-
-struct JsonValue {
-  JsonType type;
-  String str;
-  i32 depth;
-  b32 match(String name) { return str_match(str, name); };
-};
-
-struct JsonReader {
-  u8* cur;
-  u8* end;
-  i32 depth;
-  String error;
-  JsonValue base_obj;
-};
-
-JsonReader json_reader_init(String buffer);
-b32 json_iter_object(JsonReader* r, JsonValue obj, JsonValue *key, JsonValue *val);
-b32 json_iter_array(JsonReader* r, JsonValue arr, JsonValue* val);
-
-#define JSON_OBJ(r, o) for (JsonValue k, v; json_iter_object(&r, o, &k, &v);)
-#define JSON_OBJ_(r, o) for (JsonValue key, val; json_iter_object(&r, o, &key, &val);)
-#define JSON_ARR(r, val) for (JsonValue obj; json_iter_array(&r, val, &obj);)
 
 ////////////////////////////////////////////////////////////////////////
 // @Serialization

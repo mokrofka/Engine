@@ -2355,7 +2355,6 @@ void gfx_buffer_upload(Gfx_Buffer buf, Slice<u8> data) {
   vk_cmd_end_submit(g.cmds_upload[0]);
 }
 
-
 void gfx_bind_vert(Gfx_Buffer buf) {
   Gfx_State& g = st->gfx;
   VK_Buffer buffer = pool_get(st->gfx.buffers, buf);

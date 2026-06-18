@@ -213,243 +213,133 @@ Mesh load_obj(Allocator arena, String name) {
   return mesh;
 }
 
-Mesh load_gltf(Allocator alloc, String name, b32 is_glb) {
-  
-}
+#define Gltf_i8  5120
+#define Gltf_u8  5121
+#define Gltf_i16 5122
+#define Gltf_u16 5123
+#define Gltf_u32 5125
+#define Gltf_f32 5126
 
-Mesh load_gltf(Allocator arena, String name) {
+Mesh load_gltf(Allocator arena, String path, b32 is_glb) {
   Scratch scratch(arena);
-  Slice buf = os_file_path_read_all(scratch, name);
-  JsonReader r = json_reader_init(str_make(buf));
-  struct MeshInfo {
-    // u32 pos_idx;
-    // u32 norm_idx;
-    // u32 uv_idx;
-    // u32 indices_idx;
-    // b32 arr[10];
-    // u32 vert_count[10];
-    u32 vert_count;
-    u32 index_count;
-    Region ranges[10];
-    String file_name;
-    u32 file_size;
-  } info = {};
-  // Parsing json
-  JSON_OBJ(r, r.base_obj) {
-  //   if (k.match("meshes")) {
-  //     JSON_ARR(r, v) JSON_OBJ(r, obj) {
-  //       if (k.match("primitives")) {
-  //         u32 i = 0;
-  //         JSON_ARR(r, v) JSON_OBJ(r, obj) {
-  //           if (k.match("attributes")) {
-  //             JSON_OBJ_(r, v) {
-  //               if (key.match("POSITION")) {
-  //                 info.pos_idx = i;
-  //                 // info.arr[i] = true;
-  //               }
-  //               else if (key.match("NORMAL")) {
-  //                 info.norm_idx = i;
-  //                 // info.arr[i] = true;
-  //               }
-  //               else if (key.match("TEXCOORD_0")) {
-  //                 info.uv_idx = i;
-  //                 // info.arr[i] = true;
-  //               }
-  //               ++i;
-  //             }
-  //           }
-  //           else if (k.match("indices")) {
-  //             info.indices_idx = i;
-  //             // info.arr[i] = true;
-  //           }
-  //         }
-  //       }
-  //     }
-  //   }
-    if (k.match("accessors")) {
-      u32 i = 0;
-      JSON_ARR(r, v) {
-        JSON_OBJ(r, obj) {
-          if (k.match("count")) {
-            if (i == 0) {
-              info.vert_count = u32_from_str(v.str);
-            }
-            else if (i == 3) {
-              info.index_count = u32_from_str(v.str);
-            }
-          }
-        }
-        ++i;
-      }
-    }
-    else if (k.match("bufferViews")) {
-      u32 i = 0;
-      JSON_ARR(r, v) {
-        JSON_OBJ(r, obj) {
-          if (k.match("byteLength")) {
-            info.ranges[i].size = u32_from_str(v.str);
-          }
-          else if (k.match("byteOffset")) {
-            info.ranges[i].offset = u32_from_str(v.str);
-          }
-        }
-        ++i;
-      }
-    }
-    else if (k.match("buffers")) {
-      JSON_ARR(r, v) {
-        JSON_OBJ(r, obj) {
-          if (k.match("byteLength")) {
-            info.file_size = u32_from_str(v.str);
-          }
-          else if (k.match("uri")) {
-            info.file_name = v.str;
-          }
-        }
-      }
-    }
-  }
-  String model_dir = str_chop_last_slash(name);
-  Slice buf1 = os_file_path_read_all(scratch, push_strf(scratch, "%s/%s", model_dir, info.file_name));
-  v3* vertices_pos = (v3*)Offset(buf1.data, info.ranges[0].offset);
-  v3* vertices_norm = (v3*)Offset(buf1.data, info.ranges[1].offset);
-  v2* vertices_uv = (v2*)Offset(buf1.data, info.ranges[2].offset);
-  u16* vertices_indices = (u16*)Offset(buf1.data, info.ranges[3].offset);
-  var vertices = push_slice(arena, Vertex, info.vert_count);
-  var indices = push_slice(arena, u32, info.index_count);
-  Loop (i, info.index_count) {
-    indices[i] = vertices_indices[i];
-  }
-  Loop (i, info.vert_count) {
-    vertices[i] = {
-      .pos = vertices_pos[i],
-      .norm = vertices_norm[i],
-      .uv = vertices_uv[i],
+
+  String json = {};
+  Slice<u8> cursor = {};
+  if (is_glb) {
+    struct FileHeader {
+      u32 magic;
+      u32 version;
+      u32 size;
     };
-  }
-  Mesh mesh = {
-    .vertices = vertices,
-    .indices = indices,
-  };
-  return mesh;
-}
+    struct ChunkHeader {
+      u32 chunk_length;
+      u32 chunk_type;
+    };
+    cursor = os_file_path_read_all(scratch, path);
 
-Mesh load_glb(Allocator arena, String name) {
-  Scratch scratch(arena);
-  Slice buf = os_file_path_read_all(scratch, name);
-  struct FileHeader {
-    u32 magic;
-    u32 version;
-    u32 length;
-  };
-  struct Chunk {
-    u32 chunk_length;
-    u32 chunk_type;
-    u32 chunk_data;
-  };
-  FileHeader* header = (FileHeader*)buf.data;
-  Assert(str_match(str_make((u8*)&header->magic, 4), "glTF"));
-  Chunk* json_chunk = (Chunk*)Offset(header, sizeof(FileHeader));
-  Assert(str_match(str_make((u8*)&json_chunk->chunk_type, 4), "JSON"));
-  Chunk* bin_chunk = (Chunk*)Offset(json_chunk, sizeof(Chunk)-4 + json_chunk->chunk_length);
-  Assert(str_match(str_make((u8*)&bin_chunk->chunk_type, 3), "BIN"));
-  struct Accessor{
+    FileHeader* header = (FileHeader*)cursor.data;
+    Assert(str_match(str_make((u8*)&header->magic, 4), "glTF"));
+    cursor = slice_skip(cursor, sizeof(FileHeader));
+
+    ChunkHeader* json_chunk = (ChunkHeader*)cursor.data;
+    Assert(str_match(str_make((u8*)&json_chunk->chunk_type, 4), "JSON"));
+    cursor = slice_skip(cursor, sizeof(ChunkHeader));
+    json = str_make(slice_prefix(cursor, json_chunk->chunk_length));
+    cursor = slice_skip(cursor, json_chunk->chunk_length);
+
+    ChunkHeader* bin_chunk = (ChunkHeader*)cursor.data;
+    Assert(str_match(str_make((u8*)&bin_chunk->chunk_type, 3), "BIN"));
+    cursor = slice_skip(cursor, sizeof(ChunkHeader));
+
+  } else {
+    json = os_file_path_read_all_str(scratch, path);
+  }
+
+  struct Accessor {
+    u32 buffer_view;
     u32 count;
   };
-  struct Primitives {
-    u32 pos;
-    u32 norm;
-    u32 uv;
-    u32 index;
-  };
-  struct MeshInfo {
-    Accessor accessors[10];
-    Region buffer_views[10];
-    Primitives primitives;
-    String file_name;
-    u32 file_size;
-  } info = {};
-  JsonReader r = json_reader_init(str_make((u8*)&json_chunk->chunk_data, buf.count));
-  JSON_OBJ(r, r.base_obj) {
-    if (k.match("meshes")) {
-      JSON_ARR(r, v) JSON_OBJ(r, obj) {
-        if (k.match("primitives")) {
-          JSON_ARR(r, v) JSON_OBJ(r, obj) {
-            if (k.match("attributes")) {
-              JSON_OBJ_(r, v) {
-                if (key.match("POSITION")) {
-                  info.primitives.pos = u32_from_str(val.str);
-                }
-                else if (key.match("NORMAL")) {
-                  info.primitives.norm = u32_from_str(val.str);
-                }
-                else if (key.match("TEXCOORD_0")) {
-                  info.primitives.uv = u32_from_str(val.str);
-                }
-              }
-            }
-            else if (k.match("indices")) {
-              info.primitives.index = u32_from_str(v.str);
-            }
-          }
-        }
+
+  struct {
+    u32 pos_attribute;
+    u32 norm_attribute;
+    u32 texcoord_attribute;
+    u32 indices_attribute;
+    Accessor pos_accessor;
+    Accessor norm_accessor;
+    Accessor texcoord_accessor;
+    Accessor indices_accessor;
+    Region pos_buffer_view;
+    Region norm_buffer_view;
+    Region texcoord_buffer_view;
+    Region indices_buffer_view;
+  } gltf;
+
+  JsParser p = js_parse_make(scratch, json);
+  JsObj root = js_parse(&p).obj;
+  {
+    Slice meshes = js_get_array(root, "meshes");
+    JsObj mesh = meshes[0]->obj;
+    {
+      Slice primitives = js_get_array(mesh, "primitives");
+      JsObj first = primitives[0]->obj;
+      {
+        JsObj attributes = js_get_obj(first, "attributes");
+        gltf.pos_attribute = js_get_number(attributes, "POSITION");
+        gltf.norm_attribute = js_get_number(attributes, "NORMAL");
+        gltf.texcoord_attribute = js_get_number(attributes, "TEXCOORD_0");
       }
-    }
-    if (k.match("accessors")) {
-      u32 i = 0;
-      JSON_ARR(r, v) {
-        JSON_OBJ(r, obj) {
-          if (k.match("count")) {
-            info.accessors[i].count = u32_from_str(v.str);
-          }
-        }
-        ++i;
-      }
-    }
-    else if (k.match("bufferViews")) {
-      u32 i = 0;
-      JSON_ARR(r, v) {
-        JSON_OBJ(r, obj) {
-          if (k.match("byteLength")) {
-            info.buffer_views[i].size = u32_from_str(v.str);
-          }
-          else if (k.match("byteOffset")) {
-            info.buffer_views[i].offset = u32_from_str(v.str);
-          }
-        }
-        ++i;
-      }
-    }
-    else if (k.match("buffers")) {
-      JSON_ARR(r, v) {
-        JSON_OBJ(r, obj) {
-          if (k.match("byteLength")) {
-            info.file_size = u32_from_str(v.str);
-          }
-          else if (k.match("uri")) {
-            info.file_name = v.str;
-          }
-        }
-      }
+      gltf.indices_attribute = js_get_number(first, "indices");
     }
   }
-  u8* data = (u8*)&bin_chunk->chunk_data;
-  v3* vertices_pos = (v3*)Offset(data, info.buffer_views[info.primitives.pos].offset);
-  v3* vertices_norm = (v3*)Offset(data, info.buffer_views[info.primitives.norm].offset);
-  v2* vertices_uv = (v2*)Offset(data, info.buffer_views[info.primitives.uv].offset);
-  u16* vertices_indices = (u16*)Offset(data, info.buffer_views[info.primitives.index].offset);
-  u32 vertex_count = info.accessors[info.primitives.pos].count;
-  u32 index_count = info.accessors[info.primitives.index].count;
-  var vertices = push_slice(arena, Vertex, vertex_count);
-  var indices = push_slice(arena, u32, index_count);
-  Loop (i, index_count) {
-    indices[i] = vertices_indices[i];
+  {
+    Slice accessors = js_get_array(root, "accessors");
+    JsObj pos_accessor = accessors[gltf.pos_attribute]->obj;
+    gltf.pos_accessor.buffer_view = js_get_number(pos_accessor, "bufferView");
+    gltf.pos_accessor.count = js_get_number(pos_accessor, "count");
+    JsObj norm_accessor = accessors[gltf.norm_attribute]->obj;
+    gltf.norm_accessor.buffer_view = js_get_number(norm_accessor, "bufferView");
+    gltf.norm_accessor.count = js_get_number(norm_accessor, "count");
+    JsObj texcoord_accessor = accessors[gltf.texcoord_attribute]->obj;
+    gltf.texcoord_accessor.buffer_view = js_get_number(texcoord_accessor, "bufferView");
+    gltf.texcoord_accessor.count = js_get_number(texcoord_accessor, "count");
+    JsObj indices_accessor = accessors[gltf.indices_attribute]->obj;
+    gltf.indices_accessor.buffer_view = js_get_number(indices_accessor, "bufferView");
+    gltf.indices_accessor.count = js_get_number(indices_accessor, "count");
   }
-  Loop (i, vertex_count) {
+  {
+    Slice buffer_views = js_get_array(root, "bufferViews");
+    JsObj pos_buffer_view = buffer_views[gltf.pos_accessor.buffer_view]->obj;
+    gltf.pos_buffer_view.size = js_get_number(pos_buffer_view, "byteLength");
+    gltf.pos_buffer_view.offset = js_get_number(pos_buffer_view, "byteOffset");
+    JsObj norm_buffer_view = buffer_views[gltf.norm_accessor.buffer_view]->obj;
+    gltf.norm_buffer_view.size = js_get_number(norm_buffer_view, "byteLength");
+    gltf.norm_buffer_view.offset = js_get_number(norm_buffer_view, "byteOffset");
+    JsObj texcoord_buffer_view = buffer_views[gltf.texcoord_accessor.buffer_view]->obj;
+    gltf.texcoord_buffer_view.size = js_get_number(texcoord_buffer_view, "byteLength");
+    gltf.texcoord_buffer_view.offset = js_get_number(texcoord_buffer_view, "byteOffset");
+    JsObj indices_buffer_view = buffer_views[gltf.indices_accessor.buffer_view]->obj;
+    gltf.indices_buffer_view.size = js_get_number(indices_buffer_view, "byteLength");
+    gltf.indices_buffer_view.offset = js_get_number(indices_buffer_view, "byteOffset");
+  }
+  String file_path = str_chop_last_dot(path);
+  String file_path_bin = push_strf(scratch, "%s.bin", file_path);
+  Slice data = is_glb ? cursor : os_file_path_read_all(scratch, file_path_bin);
+  Slice pos = slice_reinterpret<v3>(slice(data, gltf.pos_buffer_view.offset, gltf.pos_buffer_view.offset + gltf.pos_buffer_view.size));
+  Slice norm = slice_reinterpret<v3>(slice(data, gltf.norm_buffer_view.offset, gltf.norm_buffer_view.offset + gltf.norm_buffer_view.size));
+  Slice texcoord = slice_reinterpret<v2>(slice(data, gltf.texcoord_buffer_view.offset, gltf.texcoord_buffer_view.offset + gltf.texcoord_buffer_view.size));
+  Slice indices_u16 = slice_reinterpret<u16>(slice(data, gltf.indices_buffer_view.offset, gltf.indices_buffer_view.offset + gltf.indices_buffer_view.size));
+
+  Slice vertices = push_slice(arena, Vertex, gltf.pos_accessor.count);
+  Slice indices = push_slice(arena, u32, gltf.indices_accessor.count);
+  Loop (i, indices.count) {
+    indices[i] = indices_u16[i];
+  }
+  Loop (i, vertices.count) {
     vertices[i] = {
-      .pos = vertices_pos[i],
-      .norm = vertices_norm[i],
-      .uv = vertices_uv[i],
+      .pos = pos[i],
+      .norm = norm[i],
+      .uv = texcoord[i],
     };
   }
   Mesh mesh = {
@@ -532,9 +422,9 @@ GpuMeshId mesh_load(String name) {
   String format = str_skip_last_dot(name);
   Mesh mesh = {};
   if (str_match(format, "glb")) {
-    mesh = load_glb(scratch, filepath);
+    mesh = load_gltf(scratch, filepath, true);
   } else if (str_match(format, "gltf")) {
-    mesh = load_gltf(scratch, filepath);
+    mesh = load_gltf(scratch, filepath, false);
   } else if (str_match(format, "obj")) {
     mesh = load_obj(scratch, filepath);
   } else {
@@ -690,100 +580,6 @@ void assets_load() {
   //     },
   //   },
   // });
-}
-
-////////////////////////////////////////////////////////////////////////
-// @Json
-
-// https://github.com/rxi/sj.h.git
-JsonValue json_read(JsonReader* r) {
-  JsonValue res = {};
-  top:
-  if (r->error.str) { return { .type = JsonType_Error, .str = str_range(r->cur, r->end)}; }
-  u8* start = r->cur;
-  switch (*r->cur) {
-    case ' ': case '\n': case '\r': case '\t':
-    case ':': case ',': {
-      ++r->cur;
-      goto top;
-    }
-    case '-': case '0': case '1': case '2': case '3': case '4':
-    case '5': case '6': case '7': case '8': case '9': {
-      res.type = JsonType_Number;
-      while (r->cur != r->end && char_is_number_cont(*r->cur)) { ++r->cur; }
-    } break;
-    case '"': {
-      res.type = JsonType_String;
-      start = ++r->cur;
-      while (true) {
-        if (r->cur == r->end) { r->error = "unclosed string"; goto top; }
-        if (*r->cur == '"')   { break; }
-        if (*r->cur == '\\')  { r->cur++; }
-        if (r->cur != r->end) { r->cur++; }
-      }
-      res.str = str_range(start, r->cur++);
-      return res;
-    }
-    case '{': case '[': {
-      res.type = (*r->cur == '{') ? JsonType_Object : JsonType_Array;
-      res.depth = ++r->depth;
-      r->cur++;
-    } break;
-    case '}': case ']': {
-      res.type = JsonType_End;
-      if (--r->depth < 0) {
-        r->error = (*r->cur == '}') ? "stray '}'" : "stray ']'";
-        goto top;
-      }
-      r->cur++;
-    } break;
-    case 'n': case 't': case 'f': {
-      res.type = (*r->cur == 'n') ? JsonType_Null : JsonType_Bool;
-      if (str_match(str_make(r->cur, 4),  "null")) { r->cur += 4; break; }
-      if (str_match(str_make(r->cur, 4),  "true")) { r->cur += 4; break; }
-      if (str_match(str_make(r->cur, 5), "false")) { r->cur += 5; break; }
-    } // fallthrough
-    default: {
-      r->error = "unknown token";
-      goto top;
-    }
-  }
-  res.str = str_range(start, r->cur);
-  return res;
-}
-
-JsonReader json_reader_init(String buffer) {
-  JsonReader r = {
-    .cur = buffer.str,
-    .end = buffer.str + buffer.size,
-  };
-  r.base_obj = json_read(&r);
-  return r;
-}
-
-intern void json_discard_until(JsonReader* r, i32 depth) {
-  JsonValue val;
-  val.type = JsonType_Null;
-  while (r->depth != depth && val.type != JsonType_Error) {
-    val = json_read(r);
-  }
-}
-
-b32 json_iter_object(JsonReader* r, JsonValue obj, JsonValue *key, JsonValue *val) {
-  json_discard_until(r, obj.depth);
-  *key = json_read(r);
-  if (key->type == JsonType_Error || key->type == JsonType_End) { return false; }
-  *val = json_read(r);
-  if (val->type == JsonType_End)   { r->error = "unexpected object end"; return false; }
-  if (val->type == JsonType_Error) { return false; }
-  return true;
-}
-
-b32 json_iter_array(JsonReader* r, JsonValue arr, JsonValue* val) {
-  json_discard_until(r, arr.depth);
-  *val = json_read(r);
-  if (val->type == JsonType_Error || val->type == JsonType_End) { return false; }
-  return true;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -1815,6 +1611,12 @@ void scene_init() {
     v = quat_rotate(quat, v);
     Info("%f %f %f", v.x,v.y,v.z);
   }
+
+  {
+    EntityId e_id = e_alloc(Mesh_CubeGlft, Material_Container);
+    Entity& e = get_entity(e_id);
+    e.pos = v3(0,3,3);
+  }
 }
 
 void scene_deinit() {
@@ -2045,6 +1847,9 @@ void game_init() {
   mesh_set(Mesh_Axis, r_mesh_load(axis_mesh));
   Mesh sphere = sphere_generate(scratch);
   mesh_set(Mesh_Sphere, r_mesh_load(sphere));
+
+  st->meshes_ids[Mesh_CubeGlft] = mesh_load("cube.gltf");
+
   cubemap_load("night_cubemap");
   assets_load();
   scene_init();
