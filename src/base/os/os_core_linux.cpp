@@ -329,6 +329,13 @@ Slice<u8> os_file_path_read_all(Allocator arena, String path) {
 
 String os_file_path_read_all_str(Allocator arena, String path) { return str_make(os_file_path_read_all(arena, path)); }
 
+u64 os_file_path_write_all(String path, Slice<u8> data) {
+  OS_Handle file = os_file_open(path, OS_AccessFlag_Write);
+  u64 write_size = os_file_write(file, data);
+  os_file_close(file);
+  return write_size;
+}
+
 DenseTime os_file_path_mtime(String path) {
   return os_file_path_properties(path).modified;
 }

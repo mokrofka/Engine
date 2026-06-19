@@ -110,6 +110,7 @@ u64            os_file_size(OS_Handle file);
 FileProperties os_file_properties(OS_Handle file);
 Slice<u8>      os_file_path_read_all(Allocator arena, String path);
 String         os_file_path_read_all_str(Allocator arena, String path);
+u64            os_file_path_write_all(String path, Slice<u8> data);
 b32            os_file_path_exists(String path);
 b32            os_file_path_copy(String src, String dst);
 void           os_file_path_copy_mtime(String src, String dst);

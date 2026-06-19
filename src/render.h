@@ -116,6 +116,12 @@ struct R_ShaderModuleEntry {
   Darray<Gfx_Pipeline> track_pipelines;
 };
 
+struct R_ArenaBuffer {
+  Gfx_Buffer buf;
+  u64 pos;
+  u64 cap;
+};
+
 struct R_State {
   Arena arena;
   AllocSegList gpa;
@@ -153,30 +159,34 @@ struct R_State {
   Gfx_View views_depth[4];
 
   VK_Memory gpu_mem;
-  // VK_Buffer vert_buffer;
-  // VK_Buffer index_buffer;
-  Gfx_Buffer vert_buffer;
-  Gfx_Buffer index_buffer;
+  R_ArenaBuffer vert_arena;
+  R_ArenaBuffer index_arena;
 
   Gfx_Buffer vert_buffer_each_frame;
   RingBuffer vert_ring_buffer;
   Array<DebugDrawLine, MaxDebugLines> draw_lines;
   Array<DebugDrawLine, MaxDebugLines> draw_lines_consistent;
   Array<DebugDrawRect, MaxDebugLines> draw_rects;
-  u64 draw_lines_offset;
-  u64 draw_lines_consistent_offset;
-  u64 draw_rects_offset;
+  u64 draw_base_lines;
+  u64 draw_base_consistent_lines;
+  u64 draw_base_rects;
 
-  Gfx_Buffer storage_buf;
+  Gfx_Buffer gpu_global_buf;
+  Gfx_Buffer gpu_entities_buf;
+  Gfx_Buffer gpu_entities_indices_buf;
+  Gfx_Buffer gpu_materials_buf;
   R_GlobalStateGPU* gpu_global;
   R_EntityGPU* gpu_entities;
   u32* gpu_entities_indices;
   R_MaterialGPU* gpu_materials;
-  VK_Drawcall* gpu_drawcalls;
 
   Slice<OS_Handle> shader_module_compilation_pids;
   Slice<String> shaders_to_compile;
 };
+
+R_ArenaBuffer r_arena_buffer_make(u64 size, Gfx_MemType type = Gfx_MemType_Gpu);
+R_ArenaBuffer r_arena_buffer_make_round(u64 size, u64 round, Gfx_MemType type = Gfx_MemType_Gpu);
+u64 r_arena_buffer_push(R_ArenaBuffer* buf, u64 size);
 
 void vk_image_layout_transition(VkCommandBuffer cmd, VK_Image image, VkImageLayout old_layout, VkImageLayout new_layout, VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT);
 void vk_image_layout_transition_swapchain(VkCommandBuffer cmd, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout, VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT);

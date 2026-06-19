@@ -37,6 +37,28 @@ R_ShaderModuleEntry r_shader_module_entry_make(Allocator alloc) {
   return res;
 }
 
+R_ArenaBuffer r_arena_buffer_make(u64 size, Gfx_MemType type) {
+  R_ArenaBuffer res = {
+    .buf = gfx_buffer_make(size, type),
+    .cap = size,
+  };
+  return res;
+}
+
+R_ArenaBuffer r_arena_buffer_make_round(u64 size, u64 round, Gfx_MemType type) {
+  R_ArenaBuffer res = {
+    .buf = gfx_buffer_make_round(size, round, type),
+    .cap = size,
+  };
+  return res;
+}
+
+u64 r_arena_buffer_push(R_ArenaBuffer* buf, u64 size) {
+  u64 res = offset_push(buf->pos, size);
+  Assert(buf->pos <= buf->cap);
+  return res;
+}
+
 ////////////////////////////////////////////////////////////////////////
 // @Shader
 
@@ -185,6 +207,7 @@ void r_shader_compile_join() {
 }
 
 GpuMeshId r_mesh_load(Mesh mesh) {
+  #if 0
   R_State& g = st->r;
   u32 base_vert = gfx_buffer_pos(g.vert_buffer) / sizeof(Vertex);
   u32 base_index = 0;
@@ -192,6 +215,27 @@ GpuMeshId r_mesh_load(Mesh mesh) {
   if (mesh.indices.count) {
     base_index = gfx_buffer_pos(g.index_buffer) / sizeof(u32);
     gfx_buffer_upload(g.index_buffer, slice_to_bytes(mesh.indices));
+  }
+  Gfx_Mesh vk_mesh = {
+    .vert_count = (u32)mesh.vertices.count,
+    .base_vert = base_vert,
+    .index_count = (u32)mesh.indices.count,
+    .base_index = base_index,
+  };
+  GpuMeshId res = pool_push(g.meshes, vk_mesh);
+  return res;
+  #endif
+
+  R_State& g = st->r;
+  u64 offset = r_arena_buffer_push(&g.vert_arena, slice_size(mesh.vertices));
+  u32 base_vert = (gfx_buffer_base(g.vert_arena.buf) + offset) / sizeof(Vertex);
+  gfx_buffer_upload(g.vert_arena.buf, offset, slice_to_bytes(mesh.vertices));
+
+  u32 base_index = 0;
+  if (mesh.indices.count) {
+    u64 offset = r_arena_buffer_push(&g.vert_arena, slice_size(mesh.vertices));
+    base_index = (gfx_buffer_base(g.index_arena.buf) + offset) / sizeof(u32);
+    gfx_buffer_upload(g.index_arena.buf, offset, slice_to_bytes(mesh.indices));
   }
   Gfx_Mesh vk_mesh = {
     .vert_count = (u32)mesh.vertices.count,
@@ -381,8 +425,9 @@ void vk_image_layout_transition(VkCommandBuffer cmd, VK_Image image, VkImageLayo
 }
 
 void vk_image_upload_to_gpu(VkCommandBuffer cmd, VK_Image image) {
+  Buffer stage_buf = pool_get(st->gfx.buffers, st->gfx.stage_buffer);
   VkBufferImageCopy region = {
-    .bufferOffset = 0,
+    .bufferOffset = stage_buf.base,
     .bufferRowLength = 0,
     .bufferImageHeight = 0,
     .imageSubresource = {
@@ -393,8 +438,7 @@ void vk_image_upload_to_gpu(VkCommandBuffer cmd, VK_Image image) {
     },
     .imageExtent = { image.info.width, image.info.height, 1 },
   };
-  VK_Buffer stage_buffer = pool_get(st->gfx.buffers, st->gfx.stage_buffer);
-  st->gfx.CmdCopyBufferToImage(cmd, stage_buffer.h, image.h, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+  st->gfx.CmdCopyBufferToImage(cmd, st->gfx.cpu_buf.h, image.h, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 }
 
 void vk_texture_generate_mipmaps(VK_Image image) {
@@ -460,8 +504,7 @@ void vk_texture_generate_mipmaps(VK_Image image) {
 GpuTextureId r_texture_load(Texture texture) {
   R_State& g = st->r;
   u64 size = texture.width * texture.height * 4;
-  VK_Buffer stage_buffer = pool_get(st->gfx.buffers, st->gfx.stage_buffer);
-  MemCopy(stage_buffer.base, texture.data, size);
+  MemCopy(gfx_buffer_base_ptr(st->gfx.stage_buffer), texture.data, size);
   VK_ImageInfo image_info = vk_image_info_default(texture.width, texture.height);
   image_info.miplevels_count = Floor(Log2(Max(image_info.width, image_info.height))) + 1;
   image_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -532,8 +575,7 @@ GpuCubemapId r_cubemap_load(Texture* textures) {
   u32 height = textures->height;
   u64 size = width * height * 4;
   Loop (i, 6) {
-    VK_Buffer stage_buffer = pool_get(st->gfx.buffers, st->gfx.stage_buffer);
-    MemCopy(Offset(stage_buffer.base, size * i), textures[i].data, size);
+    MemCopy(Offset(gfx_buffer_base_ptr(st->gfx.stage_buffer), size * i), textures[i].data, size);
   }
   VK_ImageInfo image_info = vk_image_info_default(width, height);
   image_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -586,22 +628,16 @@ void r_init() {
     pool_push_empty(st->gfx.views);
   }
 
-  gfx_init({.cpu_mem_size = MB(100), .gpu_mem_size = MB(10)});
+  gfx_init({.cpu_mem_size = MB(100), .gpu_mem_size = MB(10), .image_mem_size = MB(10)});
 
   ///////////////////////////////////
   // Buffers
   {
-    g.gpu_mem = vk_mem_alloc(VK_MemoryType_Gpu, MB(100));
-    // g.vert_buffer = vk_buffer_alloc(MB(1));
-    // g.index_buffer = vk_buffer_alloc(MB(1));
-    // g.vert_buffer_each_frame = vk_buffer_alloc(MB(1), VK_MemoryType_Cpu);
-    // g.vert_ring_buffer = ring_make(g.vert_buffer_each_frame.base, MB(1));
-    g.vert_buffer = gfx_buffer_make({.size = MB(1)});
-    g.index_buffer = gfx_buffer_make({.size = MB(1)});
-    g.vert_buffer_each_frame = gfx_buffer_make({.type = Gfx_MemType_Cpu, .size = MB(1)});
-    g.vert_ring_buffer = ring_make(gfx_buffer_base(g.vert_buffer_each_frame), MB(1));
-
-    st->gfx.stage_buffer = gfx_buffer_make({.type = Gfx_MemType_Cpu, .size = MB(10)});
+    g.gpu_mem = vk_mem_make(Gfx_MemType_Gpu, MB(100));
+    g.vert_buffer_each_frame = gfx_buffer_make_round(MB(1), sizeof(Vertex), Gfx_MemType_Cpu);
+    g.vert_ring_buffer = ring_make(gfx_buffer_base_ptr(g.vert_buffer_each_frame), MB(1));
+    g.vert_arena = r_arena_buffer_make_round(MB(1) + sizeof(Vertex), sizeof(Vertex));
+    g.index_arena = r_arena_buffer_make_round(MB(1) + sizeof(u32), sizeof(u32));
   }
 
   // VkSemaphoreTypeCreateInfo timelineInfo = {
@@ -620,15 +656,24 @@ void r_init() {
   ///////////////////////////////////
   // Descriptors
   {
-    gfx_binding_make({.type = Gfx_BindType_Image, .binding = Bindings::Textures, .count = Gfx_MaxImages});
-    gfx_binding_make({.type = Gfx_BindType_Sampler, .binding = Bindings::Samplers, .count = Gfx_MaxSamplers});
-    gfx_binding_make({.type = Gfx_BindType_Image, .binding = Bindings::CubeTextures, .count = Gfx_MaxCubeTextures});
-    Gfx_Buffer buf = gfx_buffer_make({.type = Gfx_MemType_Cpu, .size = MB(10)});
-    g.storage_buf = buf;
-    g.gpu_global = gfx_push_data(buf, Bindings::State, R_GlobalStateGPU, 1);
-    g.gpu_entities = gfx_push_data(buf, Bindings::Entities, R_EntityGPU, MaxEntities+MaxStaticEntities);
-    g.gpu_materials = gfx_push_data(buf, Bindings::Materials, R_MaterialGPU, MaxMaterials);
+    gfx_make_bind({.type = Gfx_BindType_Image, .binding = Bindings::Textures, .count = Gfx_MaxImages});
+    gfx_make_bind({.type = Gfx_BindType_Sampler, .binding = Bindings::Samplers, .count = Gfx_MaxSamplers});
+    gfx_make_bind({.type = Gfx_BindType_Image, .binding = Bindings::CubeTextures, .count = Gfx_MaxCubeTextures});
+    gfx_make_bind({.binding = Bindings::State});
+    gfx_make_bind({.binding = Bindings::Entities});
+    gfx_make_bind({.binding = Bindings::Materials});
+    g.gpu_global_buf = gfx_buffer_make(sizeof(R_GlobalStateGPU), Gfx_MemType_Cpu);
+    g.gpu_entities_buf = gfx_buffer_make((MaxEntities+MaxStaticEntities) * sizeof(R_EntityGPU), Gfx_MemType_Cpu);
+    g.gpu_materials_buf = gfx_buffer_make(MaxMaterials * sizeof(R_EntityGPU), Gfx_MemType_Cpu);
+
+    g.gpu_entities = (R_EntityGPU*)gfx_buffer_base_ptr(g.gpu_entities_buf);
+    g.gpu_global = (R_GlobalStateGPU*)gfx_buffer_base_ptr(g.gpu_global_buf);
+    g.gpu_materials = (R_MaterialGPU*)gfx_buffer_base_ptr(g.gpu_materials_buf);
     g.gpu_entities_indices = g.gpu_global->entity_indices;
+
+    gfx_bind_buffer(g.gpu_global_buf, Bindings::State);
+    gfx_bind_buffer(g.gpu_entities_buf, Bindings::Entities);
+    gfx_bind_buffer(g.gpu_materials_buf, Bindings::Materials);
     gfx_flush();
   }
 
@@ -784,9 +829,13 @@ void r_end() {
   }
 
   {
-    g.draw_lines_offset = ring_write_nowrap_array(g.vert_ring_buffer, g.draw_lines.data, g.draw_lines.count);
-    g.draw_lines_consistent_offset = ring_write_nowrap_array(g.vert_ring_buffer, g.draw_lines_consistent.data, g.draw_lines_consistent.count);
-    g.draw_rects_offset = ring_write_nowrap_array(g.vert_ring_buffer, g.draw_rects.data, g.draw_rects.count);
+    u64 base = gfx_buffer_base(g.vert_buffer_each_frame);
+    g.draw_base_lines = base + ring_write_nowrap_array(g.vert_ring_buffer, g.draw_lines.data, g.draw_lines.count);
+    g.draw_base_consistent_lines = base + ring_write_nowrap_array(g.vert_ring_buffer, g.draw_lines_consistent.data, g.draw_lines_consistent.count);
+    g.draw_base_rects = base + ring_write_nowrap_array(g.vert_ring_buffer, g.draw_rects.data, g.draw_rects.count);
+    g.draw_base_lines /= sizeof(Vertex);
+    g.draw_base_consistent_lines /= sizeof(Vertex);
+    g.draw_base_rects /= sizeof(Vertex);
   }
 
   ///////////////////////////////////
@@ -809,8 +858,8 @@ void r_end() {
         rebuild_static_buffer = true;
       }
 
-      gfx_bind_vert(g.vert_buffer);
-      gfx_bind_index(g.index_buffer);
+      gfx_bind_vert();
+      gfx_bind_index();
 
       R_GlobalStateGPU& shader_st = *g.gpu_global;
       shader_st.projection_view = st->projection * st->view;
@@ -904,21 +953,20 @@ void r_end() {
       gfx_draw(0, 3);
 
       // Debug drawing
-      gfx_bind_vert(g.vert_buffer_each_frame);
+      gfx_bind_vert(Gfx_MemType_Cpu);
       if (g.draw_lines.count > 0) {
         gfx_pipeline_bind(g.debug_line_pip);
-        gfx_draw(g.draw_lines_offset / sizeof(Vertex), g.draw_lines.count * 2);
+        gfx_draw(g.draw_base_lines, g.draw_lines.count * 2);
         array_clear(g.draw_lines);
       }
       if (g.draw_lines_consistent.count > 0) {
         gfx_pipeline_bind(g.debug_line_pip);
-        gfx_draw(g.draw_lines_consistent_offset / sizeof(Vertex), g.draw_lines_consistent.count * 2);
+        gfx_draw(g.draw_base_consistent_lines, g.draw_lines_consistent.count * 2);
       }
 
       // Cube map
       gfx_pipeline_bind(g.cubemap_pip);
-      gfx_bind_vert(g.vert_buffer);
-      gfx_bind_index(g.index_buffer);
+      gfx_bind_vert();
       Gfx_Mesh mesh = pool_get(g.meshes, mesh_get(Mesh_Cube));
       if (mesh.index_count) {
         gfx_draw_indexed(mesh.base_index, mesh.index_count, mesh.base_vert);
@@ -927,10 +975,10 @@ void r_end() {
       }
 
       // Rect drawing
-      gfx_bind_vert(g.vert_buffer_each_frame);
+      gfx_bind_vert(Gfx_MemType_Cpu);
       if (g.draw_rects.count > 0) {
         gfx_pipeline_bind(g.ui_pip);
-        gfx_draw(g.draw_rects_offset / sizeof(Vertex), g.draw_rects.count * 6);
+        gfx_draw(g.draw_base_rects, g.draw_rects.count * 6);
         array_clear(g.draw_rects);
       }
     }

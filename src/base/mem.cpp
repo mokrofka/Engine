@@ -618,9 +618,8 @@ u8* mem_realloc_soa(Allocator alloc, u32 old_count, u32 new_count, Slice<SoA_Fie
   return buf;
 }
 
-
-void* offset_mem_push(void*& offset, u64 size, u64 align) {
-  void* result = (void*)AlignUp((u64)offset, align);
+u8* offset_ptr_push(void*& offset, u64 size, u64 align) {
+  u8* result = PtrAlignUp(offset, align);
   offset = Offset(result, size);
   return result;
 }

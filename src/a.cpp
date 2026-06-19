@@ -413,3 +413,20 @@ void foo() {
 //   u32* pb = &a.b;
 //   A* pa = ContainerOf(pb, A, b);
 // }
+
+struct Buffer {
+  u32 type; // cpu/gpu
+  u64 base;
+  u64 size;
+};
+
+void foo() {
+  Buffer some_cpu_buf = buffer_make(KB(1), CPU_Type);
+  Buffer some_gpu_buf = buffer_make(KB(1), GPU_Type);
+  u8* some_cpu_base = buffer_base(some_cpu_buf);
+  Slice<u8> data_to_upload = ...;
+  u64 offset = ...;
+  buffer_upload(some_gpu_buf, offset, data_to_upload);
+  bind_vert()
+}
+

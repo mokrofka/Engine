@@ -264,17 +264,17 @@ void DebugTrap();
 #define AtomicAcquire __ATOMIC_ACQUIRE
 #define AtomicRelease __ATOMIC_RELEASE
 
-#define atomic_inc(x)                    __atomic_fetch_add((x), 1, AtomicSeqCst)
-#define atomic_dec(x)                    __atomic_fetch_sub((x), 1, AtomicSeqCst)
-#define atomic_add(x, v)                 __atomic_fetch_add((x), (v), AtomicSeqCst)
-#define atomic_sub(x, v)                 __atomic_fetch_sub((x), (v), AtomicSeqCst)
-#define atomic_load(x)                   __atomic_load_n((x), AtomicSeqCst)
-#define atomic_store(x, v)               __atomic_store_n((x), (v), AtomicSeqCst)
-#define atomic_or(x, v)                  __atomic_fetch_or((x), (v), AtomicSeqCst)
-#define atomic_and(x, v)                 __atomic_fetch_and((x), (v), AtomicSeqCst)
-#define atomic_xor(x, v)                 __atomic_fetch_xor((x), (v), AtomicSeqCst)
-#define atomic_exchange(x, v)            __atomic_exchange_n((x), (v), AtomicSeqCst)
-#define atomic_cmp_exchange(x, old, new) __atomic_compare_exchange_n((x), (old), (new), 0, AtomicSeqCst, AtomicSeqCst)
+#define atomic_inc(x)                     __atomic_fetch_add((x), 1, AtomicSeqCst)
+#define atomic_dec(x)                     __atomic_fetch_sub((x), 1, AtomicSeqCst)
+#define atomic_add(x, v)                  __atomic_fetch_add((x), (v), AtomicSeqCst)
+#define atomic_sub(x, v)                  __atomic_fetch_sub((x), (v), AtomicSeqCst)
+#define atomic_load(x)                    __atomic_load_n((x), AtomicSeqCst)
+#define atomic_store(x, v)                __atomic_store_n((x), (v), AtomicSeqCst)
+#define atomic_or(x, v)                   __atomic_fetch_or((x), (v), AtomicSeqCst)
+#define atomic_and(x, v)                  __atomic_fetch_and((x), (v), AtomicSeqCst)
+#define atomic_xor(x, v)                  __atomic_fetch_xor((x), (v), AtomicSeqCst)
+#define atomic_exchange(x, v)             __atomic_exchange_n((x), (v), AtomicSeqCst)
+#define atomic_cmp_exchange(x, expect, v) __atomic_compare_exchange_n((x), (expect), (new), 0, AtomicSeqCst, AtomicSeqCst)
 #define atomic_cond_exchange(x, v, c) ({ u32 _new = (c); __atomic_compare_exchange_n((x), (&_new), (v), 0, AtomicSeqCst, AtomicSeqCst); _new; })
 
 ////////////////////////////////////////////////////////////////////////
@@ -455,6 +455,7 @@ template<typename T> Slice<T> slice_chop(Slice<T> a, u64 n)     { Assert(n <= a.
 template<typename T, u64 N> Slice<T> slice(T (&a)[N])           { return Slice(a, N); }
 template<typename T> Slice<u8> slice_to_bytes(Slice<T> s)       { return Slice((u8*)s.data, s.count * sizeof(T)); }
 template<typename T> Slice<u8> slice_struct_to_bytes(T* s)      { return Slice((u8*)s, sizeof(T)); }
+template<typename T> u64 slice_size(Slice<T> s)                 { return s.count * sizeof(T); }
 template<typename To, typename From> Slice<To> slice_reinterpret(Slice<From> s) {
   Assert((s.count * sizeof(From)) % sizeof(To) == 0);
   return Slice((To*)s.data, (s.count*sizeof(From)) / sizeof(To));

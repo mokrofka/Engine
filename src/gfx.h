@@ -6,7 +6,6 @@ MakeId(Gfx_Pipeline)
 MakeId(Gfx_View)
 MakeId(Gfx_Buffer)
 
-// Configuration
 enum {
   Gfx_InvalidId,
   Gfx_NumFramesInFlight = 2,
@@ -21,9 +20,7 @@ enum {
   Gfx_MaxBuffers = 32,
   Gfx_MaxCubeTextures = 16,
   Gfx_MaxStorageBuffers = 16,
-
   Gfx_MaxBindings = 64,
-
   Gfx_DefaultSampleCount = 4,
 };
 
@@ -47,21 +44,6 @@ enum Gfx_PixelFormat {
   Gfx_DefaultTextureTargetColorFormat = Gfx_PixelFormat_BGRA8,
   Gfx_DefaultDepthFormat = Gfx_PixelFormat_Depth,
 };
-
-// enum Gfx_ImageSamplerType {
-//   Gfx_ImageSamplerType_Default,
-//   Gfx_ImageSamplerType_Float,
-//   Gfx_ImageSamplerType_Depth,
-//   Gfx_ImageSamplerType_SInt,
-//   Gfx_ImageSamplerType_UInt,
-// };
-
-// enum Gfx_SamplerType {
-//   Gfx_SamplerType_Default,
-//   Gfx_SamplerType_Filtering,
-//   Gfx_SamplerType_NonFiltering,
-//   Gfx_SamplerType_Comparison,
-// };
 
 enum Gfx_PrimitiveType {
   Gfx_PrimitiveType_Default,
@@ -351,13 +333,6 @@ struct Gfx_ColorTargetState {
   Gfx_BlendState blend;
 };
 
-// enum Gfx_ShaderStage {
-//   Gfx_ShaderStage_None,
-//   Gfx_ShaderStage_Vertex,
-//   Gfx_ShaderStage_Fragment,
-//   Gfx_ShaderStage_Compute,
-// };
-
 struct Gfx_PipelineDesc {
   b32 compute;
   Gfx_Shader shader;
@@ -435,11 +410,6 @@ struct Gfx_Task {
 #endif
 #define vkdevice st->gfx.device.logical_device
 
-enum VK_MemType {
-  VK_MemoryType_Cpu,
-  VK_MemoryType_Gpu,
-};
-
 typedef u32 VK_Access;
 enum {
   VK_Access_None = 0,
@@ -478,6 +448,12 @@ struct VK_BufferRegion {
   u64 pos;
   u64 cap;
   VK_Access cur_access;
+};
+
+struct Buffer {
+  Gfx_MemType type;
+  u64 base;
+  u64 size;
 };
 
 struct VK_ImageInfo {
@@ -658,10 +634,11 @@ void vk_cmd_end_free(VkCommandBuffer cmd);
 ////////////////////////////////////////////////////////////////////////
 // @Buffer
 
-VK_Memory vk_mem_alloc(VK_MemType type, u64 size);
-VK_Buffer vk_buffer_alloc(u64 size, VK_MemType mem_type = VK_MemoryType_Gpu);
+VK_Memory vk_mem_make(Gfx_MemType type, u64 size);
+VK_Buffer vk_buffer_make(u64 size, Gfx_MemType type = Gfx_MemType_Gpu);
 void vk_bind_vert_buffer(VK_Buffer buffer);
 void vk_bind_index_buffer(VK_Buffer buffer);
+VK_Buffer* vk_choose_buffer(Gfx_Buffer buf);
 
 ////////////////////////////////////////////////////////////////////////
 // @Gfx
@@ -669,6 +646,7 @@ void vk_bind_index_buffer(VK_Buffer buffer);
 struct Gfx_Environment {
   u64 gpu_mem_size;
   u64 cpu_mem_size;
+  u64 image_mem_size;
 };
 
 struct Gfx_State {
@@ -702,6 +680,9 @@ struct Gfx_State {
   VK_Memory cpu_mem;
   VK_DescriptorWriter descriptor_writer;
 
+  VK_Buffer gpu_buf;
+  VK_Buffer cpu_buf;
+
   v2u size;
   b32 swapchain_resized;
   u32 images_in_flight;
@@ -710,7 +691,7 @@ struct Gfx_State {
   u32 current_frame_idx;
   u32 current_frame_idx_plus_one;
 
-  Pool<VK_Buffer, Gfx_MaxBuffers, Gfx_Buffer> buffers;
+  Pool<Buffer, Gfx_MaxBuffers, Gfx_Buffer> buffers;
   Pool<VK_Shader, Gfx_MaxShaders, Gfx_Shader> shaders;
   Pool<VK_Pipeline, Gfx_MaxPipelines, Gfx_Pipeline> pipelines;
   Pool<VK_Image, Gfx_MaxImages, Gfx_Image> images;
@@ -730,8 +711,6 @@ struct Gfx_State {
   u32 entity_cursor;
   u32 drawcall_cursor;
 
-  ///////////////////////////////////
-  // User
   Gfx_Buffer stage_buffer;
 
   ///////////////////////////////////
@@ -868,10 +847,10 @@ Gfx_Pipeline gfx_pipeline_make(Gfx_PipelineDesc desc);
 Gfx_Image gfx_image_make(Gfx_ImageDesc desc);
 Gfx_View gfx_view_make(Gfx_ViewDesc desc);
 Gfx_Sampler gfx_sampler_make(Gfx_SamplerDesc desc);
-Gfx_Buffer gfx_buffer_make(Gfx_BufferDesc desc);
-void gfx_binding_make(Gfx_DescriptorDesc desc);
-#define gfx_push_data(buf, bind, T, c) (T*)_gfx_push_data((buf), (bind), sizeof(T) * (c), alignof(T))
-u8* _gfx_push_data(Gfx_Buffer buf, u32 binding, u64 size, u64 align);
+Gfx_Buffer gfx_buffer_make(u64 size, Gfx_MemType type = Gfx_MemType_Gpu, u64 align = 16);
+Gfx_Buffer gfx_buffer_make_round(u64 size, u64 round, Gfx_MemType type = Gfx_MemType_Gpu, u64 align = 16);
+void gfx_make_bind(Gfx_DescriptorDesc desc);
+void gfx_bind_buffer(Gfx_Buffer buf, u32 binding);
 void gfx_flush();
 
 Gfx_PipelineDesc gfx_query_pipeline_desc(Gfx_Pipeline pip);
@@ -901,11 +880,11 @@ void gfx_push_indirect_instanced(Gfx_Mesh mesh, u32 count);
 void gfx_instance_set_indices(u32* indices);
 u32* gfx_indirect_indices();
 
-u8* gfx_buffer_base(Gfx_Buffer buf);
-u64 gfx_buffer_pos(Gfx_Buffer buf);
-void gfx_buffer_upload(Gfx_Buffer buf, Slice<u8> data);
-void gfx_bind_vert(Gfx_Buffer buf);
-void gfx_bind_index(Gfx_Buffer buf);
+u8* gfx_buffer_base_ptr(Gfx_Buffer buf);
+u64 gfx_buffer_base(Gfx_Buffer buf);
+void gfx_buffer_upload(Gfx_Buffer buf, u64 offset, Slice<u8> data);
+void gfx_bind_vert(Gfx_MemType type = Gfx_MemType_Gpu);
+void gfx_bind_index(Gfx_MemType type = Gfx_MemType_Gpu);
 
 void gfx_idle();
 void gfx_init(Gfx_Environment environment);

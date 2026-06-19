@@ -791,14 +791,15 @@ void vk_cmd_end_free(VkCommandBuffer cmd) {
 ////////////////////////////////////////////////////////////////////////
 // @Buffer
 
-VK_Memory vk_mem_alloc(VK_MemType type, u64 size) {
+VK_Memory vk_mem_make(Gfx_MemType type, u64 size) {
   Gfx_State& g = st->gfx;
   u32 mem_idx = 0;
   switch (type) {
-    case VK_MemoryType_Gpu: {
+    InvalidDefaultCase;
+    case Gfx_MemType_Gpu: {
       mem_idx = g.device.gpu_type_idx; 
     } break;
-    case VK_MemoryType_Cpu: {
+    case Gfx_MemType_Cpu: {
       mem_idx = g.device.cpu_type_idx; 
     } break;
   }
@@ -809,13 +810,13 @@ VK_Memory vk_mem_alloc(VK_MemType type, u64 size) {
   };
   VK_Memory res = {.cap = size};
   VK_CHECK(g.AllocateMemory(vkdevice, &alloc_info, g.allocator, &res.h));
-  if (type == VK_MemoryType_Cpu) {
+  if (type == Gfx_MemType_Cpu) {
     VK_CHECK(g.MapMemory(vkdevice, res.h, 0, size, 0, (void**)&res.mapped_mem));
   }
   return res;
 }
 
-VK_Buffer vk_buffer_alloc(u64 size, VK_MemType mem_type) {
+VK_Buffer vk_buffer_make(u64 size, Gfx_MemType type) {
   Gfx_State& g = st->gfx;
   VkBufferUsageFlags buf_usage_flags = 0;
   buf_usage_flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
@@ -832,10 +833,13 @@ VK_Buffer vk_buffer_alloc(u64 size, VK_MemType mem_type) {
   };
   VK_Buffer res = {.cap = size};
   VK_CHECK(g.CreateBuffer(vkdevice, &buffer_create_info, g.allocator, &res.h));
+  if (type == Gfx_MemType_Default) {
+    type = Gfx_MemType_Gpu;
+  }
 
   u32 mem_prop_flags = 0;
-  if (mem_type == VK_MemoryType_Gpu) mem_prop_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-  if (mem_type == VK_MemoryType_Cpu) mem_prop_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+  if (type == Gfx_MemType_Gpu) mem_prop_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  else if (type == Gfx_MemType_Cpu) mem_prop_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
   VkMemoryRequirements requirements;
   g.GetBufferMemoryRequirements(vkdevice, res.h, &requirements);
   // u32 mem_idx = vk_find_memory_idx(requirements.memoryTypeBits, mem_prop_flags);
@@ -848,15 +852,15 @@ VK_Buffer vk_buffer_alloc(u64 size, VK_MemType mem_type) {
 
   VK_Memory* mem = null;
   u64 offset = 0;
-  switch (mem_type) {
-    case VK_MemoryType_Gpu: {
-      mem = &g.gpu_mem;
-      offset = offset_push(mem->pos, size, requirements.alignment);
-    } break;
-    case VK_MemoryType_Cpu: {
-      mem = &g.cpu_mem;
-      offset = offset_push(mem->pos, size, requirements.alignment);
-    } break;
+  if (type == Gfx_MemType_Gpu) {
+    mem = &g.gpu_mem;
+    offset = offset_push(mem->pos, size, requirements.alignment);
+    Assert(mem->pos <= mem->cap);
+  }
+  else if (type == Gfx_MemType_Cpu) {
+    mem = &g.cpu_mem;
+    offset = offset_push(mem->pos, size, requirements.alignment);
+    Assert(mem->pos <= mem->cap);
   }
   VK_CHECK(g.BindBufferMemory(vkdevice, res.h, mem->h, offset));
   res.base = Offset(mem->mapped_mem, offset);
@@ -872,6 +876,18 @@ void vk_bind_vert_buffer(VK_Buffer buffer) {
 void vk_bind_index_buffer(VK_Buffer buffer) {
   Gfx_State& g = st->gfx;
   g.CmdBindIndexBuffer(vk_get_cur_cmd(), buffer.h, 0, VK_INDEX_TYPE_UINT32);
+}
+
+VK_Buffer* vk_choose_buffer(Gfx_Buffer buf) {
+  Gfx_State& g = st->gfx;
+  Buffer buffer = pool_get(st->gfx.buffers, buf);
+  VK_Buffer* res = null;
+  switch (buffer.type) {
+    InvalidDefaultCase;
+    case Gfx_MemType_Cpu: res = &g.cpu_buf; break;
+    case Gfx_MemType_Gpu: res = &g.gpu_buf; break;
+  }
+  return res;
 }
 
 VkShaderModule vk_shader_create(Gfx_ShaderDesc desc) {
@@ -1691,8 +1707,7 @@ Gfx_Image gfx_image_make(Gfx_ImageDesc desc) {
     VkCommandBuffer cmd = g.cmds_upload[0];
     vk_cmd_begin(cmd);
     vk_image_layout_transition(cmd, image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    VK_Buffer stage_buffer = pool_get(g.buffers, g.stage_buffer);
-    MemCopy(stage_buffer.base, desc.data, desc.width * desc.height * 4);
+    MemCopy(gfx_buffer_base_ptr(g.stage_buffer), desc.data, desc.width * desc.height * 4);
     vk_image_upload_to_gpu(cmd, image);
     if (desc.mipmaps) {
       vk_texture_generate_mipmaps(image);
@@ -1860,9 +1875,9 @@ Gfx_Sampler gfx_sampler_make(Gfx_SamplerDesc desc) {
   return res;
 }
 
-Gfx_Buffer gfx_buffer_make(Gfx_BufferDesc desc) {
+Gfx_Buffer gfx_buffer_make(u64 size, Gfx_MemType type, u64 align) {
+  #if 0
   Gfx_State& g = st->gfx;
-  Gfx_State& vk = st->gfx;
   VkBufferUsageFlags buf_usage_flags = 0;
   buf_usage_flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
   buf_usage_flags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
@@ -1877,7 +1892,7 @@ Gfx_Buffer gfx_buffer_make(Gfx_BufferDesc desc) {
     .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
   };
   VK_Buffer buf = {.cap = desc.size};
-  VK_CHECK(vk.CreateBuffer(vkdevice, &buffer_create_info, vk.allocator, &buf.h));
+  VK_CHECK(g.CreateBuffer(vkdevice, &buffer_create_info, g.allocator, &buf.h));
   if (desc.type == Gfx_MemType_Default) {
     desc.type = Gfx_MemType_Gpu;
   }
@@ -1886,7 +1901,7 @@ Gfx_Buffer gfx_buffer_make(Gfx_BufferDesc desc) {
   if (desc.type == Gfx_MemType_Gpu) mem_prop_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
   else if (desc.type == Gfx_MemType_Cpu) mem_prop_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
   VkMemoryRequirements requirements;
-  vk.GetBufferMemoryRequirements(vkdevice, buf.h, &requirements);
+  g.GetBufferMemoryRequirements(vkdevice, buf.h, &requirements);
   // u32 mem_idx = vk_find_memory_idx(requirements.memoryTypeBits, mem_prop_flags);
   // VkMemoryAllocateInfo alloc_info = {
   //   .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
@@ -1900,18 +1915,50 @@ Gfx_Buffer gfx_buffer_make(Gfx_BufferDesc desc) {
   if (desc.type == Gfx_MemType_Gpu) {
     mem = &g.gpu_mem;
     offset = offset_push(mem->pos, desc.size, requirements.alignment);
+    Assert(mem->pos <= mem->cap);
   }
   else if (desc.type == Gfx_MemType_Cpu) {
     mem = &g.cpu_mem;
     offset = offset_push(mem->pos, desc.size, requirements.alignment);
+    Assert(mem->pos <= mem->cap);
   }
   VK_CHECK(g.BindBufferMemory(vkdevice, buf.h, mem->h, offset));
   buf.base = Offset(mem->mapped_mem, offset);
   Gfx_Buffer res = pool_push(st->gfx.buffers, buf);
   return res;
+  #endif
+
+  Gfx_State& g = st->gfx;
+  VK_Buffer* buffer = null;
+  u64 offset = 0;
+  if (type == Gfx_MemType_Gpu) {
+    buffer = &g.gpu_buf;;
+    offset = offset_push(buffer->pos, size, align);
+    Assert(buffer->pos <= buffer->cap);
+  }
+  else if (type == Gfx_MemType_Cpu) {
+    buffer = &g.cpu_buf;
+    offset = offset_push(buffer->pos, size, align);
+    Assert(buffer->pos <= buffer->cap);
+  }
+  Buffer buf = {
+    .type = type,
+    .base = offset,
+    .size = size,
+  };
+  Gfx_Buffer res = pool_push(st->gfx.buffers, buf);
+  return res;
 }
 
-void gfx_binding_make(Gfx_DescriptorDesc desc) {
+Gfx_Buffer gfx_buffer_make_round(u64 size, u64 round, Gfx_MemType type, u64 align) {
+  Gfx_State& g = st->gfx;
+  Gfx_Buffer buf = gfx_buffer_make(size, type, align);
+  Buffer& buffer = pool_get(g.buffers, buf);
+  buffer.base = RoundUp(buffer.base, round);
+  return buf;
+}
+
+void gfx_make_bind(Gfx_DescriptorDesc desc) {
   Gfx_State& g = st->gfx;
   if (desc.count == 0) {
     desc.count = 1;
@@ -1941,17 +1988,15 @@ void gfx_binding_make(Gfx_DescriptorDesc desc) {
   ++writer.binds_count;
 }
 
-u8* _gfx_push_data(Gfx_Buffer buf, u32 binding, u64 size, u64 align) {
+void gfx_bind_buffer(Gfx_Buffer buf, u32 binding) {
   Gfx_State& g = st->gfx;
-  gfx_binding_make({.binding = binding});
   VK_DescriptorWriter& writer = g.descriptor_writer;
-  VK_Buffer& buffer = pool_get(g.buffers, buf);
-  u64 off = offset_push(buffer.pos, size, align);
-  Assert(buffer.pos <= buffer.cap);
+  Buffer buffer = pool_get(g.buffers, buf);
+  VK_Buffer vkbuf = *vk_choose_buffer(buf);
   writer.buffers[writer.writes_count] = {
-    .buffer = buffer.h,
-    .offset = off,
-    .range = size,
+    .buffer = vkbuf.h,
+    .offset = buffer.base,
+    .range = buffer.size,
   };
   writer.writes[writer.writes_count] = {
     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -1963,8 +2008,6 @@ u8* _gfx_push_data(Gfx_Buffer buf, u32 binding, u64 size, u64 align) {
     .pBufferInfo = &writer.buffers[writer.writes_count],
   };
   ++writer.writes_count;
-  u8* res = Offset(buffer.base, off);
-  return res;
 }
 
 void gfx_flush() {
@@ -2273,17 +2316,15 @@ void gfx_draw_indexed(u32 base_index, u32 index_count, u32 base_vert, u32 instan
 
 void gfx_draw_indirect(Gfx_IndirectDrawcall drawcall) {
   Gfx_State& g = st->gfx;
-  VK_Buffer buf = pool_get(g.buffers, g.drawcall_buf);
-  st->gfx.CmdDrawIndirect(vk_get_cur_cmd(), buf.h, drawcall.base*sizeof(VK_Drawcall), drawcall.count, sizeof(VK_Drawcall));
+  Buffer buf = pool_get(g.buffers, g.drawcall_buf);
+  st->gfx.CmdDrawIndirect(vk_get_cur_cmd(), g.cpu_buf.h, buf.base + drawcall.base*sizeof(VK_Drawcall), drawcall.count, sizeof(VK_Drawcall));
 }
 
 void gfx_draw_indexed_indirect(Gfx_IndirectDrawcall drawcall) {
   Gfx_State& g = st->gfx;
-  VK_Buffer buf = pool_get(g.buffers, g.drawcall_buf);
-  st->gfx.CmdDrawIndexedIndirect(vk_get_cur_cmd(), buf.h, drawcall.base*sizeof(VK_Drawcall), drawcall.count, sizeof(VK_Drawcall));
+  Buffer buf = pool_get(g.buffers, g.drawcall_buf);
+  st->gfx.CmdDrawIndexedIndirect(vk_get_cur_cmd(), g.cpu_buf.h, buf.base + drawcall.base*sizeof(VK_Drawcall), drawcall.count, sizeof(VK_Drawcall));
 }
-
-
 
 u32 gfx_indirect_begin() {
   return st->gfx.drawcall_cursor;
@@ -2314,7 +2355,7 @@ void gfx_push_indirect(Gfx_Mesh mesh, u32 id, u32 instance_count) {
     };
   }
   info.base_instance = id;
-  VK_Drawcall* drawcalls = (VK_Drawcall*)gfx_buffer_base(st->gfx.drawcall_buf);
+  VK_Drawcall* drawcalls = (VK_Drawcall*)gfx_buffer_base_ptr(st->gfx.drawcall_buf);
   drawcalls[st->gfx.drawcall_cursor++] = info;
 }
 
@@ -2328,20 +2369,29 @@ void gfx_instance_set_indices(u32* indices) {
 
 u32* gfx_indirect_indices() { return st->gfx.base_index + st->gfx.entity_cursor; }
 
-u8* gfx_buffer_base(Gfx_Buffer buf) {
+u8* gfx_buffer_base_ptr(Gfx_Buffer buf) {
+  #if 0
   VK_Buffer buffer = pool_get(st->gfx.buffers, buf);
+  return buffer.base;
+  #endif
+
+  Gfx_State& g = st->gfx;
+  Buffer buffer = pool_get(g.buffers, buf);
+  VK_Buffer* vkbuf = vk_choose_buffer(buf);
+  return Offset(vkbuf->base, buffer.base);
+}
+
+u64 gfx_buffer_base(Gfx_Buffer buf) {
+  Gfx_State& g = st->gfx;
+  Buffer buffer = pool_get(g.buffers, buf);
   return buffer.base;
 }
 
-u64 gfx_buffer_pos(Gfx_Buffer buf) {
-  VK_Buffer buffer = pool_get(st->gfx.buffers, buf);
-  return buffer.pos;
-}
-
-void gfx_buffer_upload(Gfx_Buffer buf, Slice<u8> data) {
+void gfx_buffer_upload(Gfx_Buffer buf, u64 offset, Slice<u8> data) {
+  #if 0
   Gfx_State& g = st->gfx;
   VK_Buffer& buffer = pool_get(g.buffers, buf);
-  u64 offset = offset_push(buffer.pos, data.size, 4);
+  u64 offset = offset_push(buffer.pos, data.size, 1);
   Assert(buffer.pos <= buffer.cap);
   VK_Buffer stage_buffer = pool_get(g.buffers, g.stage_buffer);
   MemCopy(stage_buffer.base, data.data, data.size);
@@ -2353,19 +2403,52 @@ void gfx_buffer_upload(Gfx_Buffer buf, Slice<u8> data) {
   };
   g.CmdCopyBuffer(g.cmds_upload[0], stage_buffer.h, buffer.h, 1, &copy_region);
   vk_cmd_end_submit(g.cmds_upload[0]);
+  #endif
+
+  Gfx_State& g = st->gfx;
+  Buffer buffer = pool_get(g.buffers, buf);
+  Assert(offset+data.size <= buffer.size);
+
+  MemCopy(gfx_buffer_base_ptr(g.stage_buffer), data.data, data.size);
+  vk_cmd_begin(g.cmds_upload[0]);
+  Buffer stage_buffer = pool_get(g.buffers, g.stage_buffer);
+  VkBufferCopy copy_region = {
+    .srcOffset = stage_buffer.base,
+    .dstOffset = buffer.base + offset,
+    .size = data.size,
+  };
+  g.CmdCopyBuffer(g.cmds_upload[0], g.cpu_buf.h, g.gpu_buf.h, 1, &copy_region);
+  vk_cmd_end_submit(g.cmds_upload[0]);
 }
 
-void gfx_bind_vert(Gfx_Buffer buf) {
+void gfx_bind_vert(Gfx_MemType type) {
+  #if 0
   Gfx_State& g = st->gfx;
-  VK_Buffer buffer = pool_get(st->gfx.buffers, buf);
+  VK_Buffer buffer = pool_get(g.buffers, buf);
   VkDeviceSize size = 0;
   g.CmdBindVertexBuffers(vk_get_cur_cmd(), 0, 1, &buffer.h, &size);
+  #endif
+
+  Gfx_State& g = st->gfx;
+  VK_Buffer buf = {};
+  if (type == Gfx_MemType_Gpu) buf = g.gpu_buf;
+  else if (type == Gfx_MemType_Cpu) buf = g.cpu_buf;
+  VkDeviceSize offset = 0;
+  g.CmdBindVertexBuffers(vk_get_cur_cmd(), 0, 1, &buf.h, &offset);
 }
 
-void gfx_bind_index(Gfx_Buffer buf) {
+void gfx_bind_index(Gfx_MemType type) {
+  #if 0
   Gfx_State& g = st->gfx;
   VK_Buffer buffer = pool_get(st->gfx.buffers, buf);
   g.CmdBindIndexBuffer(vk_get_cur_cmd(), buffer.h, 0, VK_INDEX_TYPE_UINT32);
+  #endif
+
+  Gfx_State& g = st->gfx;
+  VK_Buffer buf = {};
+  if (type == Gfx_MemType_Gpu) buf = g.gpu_buf;
+  else if (type == Gfx_MemType_Cpu) buf = g.cpu_buf;
+  g.CmdBindIndexBuffer(vk_get_cur_cmd(), buf.h, 0, VK_INDEX_TYPE_UINT32);
 }
 
 void gfx_idle() {
@@ -2476,10 +2559,15 @@ void gfx_init(Gfx_Environment environment) {
     g.CreateDescriptorPool(vkdevice, &pool_info, g.allocator, &g.descriptor_pool);
   }
 
-  g.gpu_mem = vk_mem_alloc(VK_MemoryType_Gpu, environment.gpu_mem_size);
-  g.cpu_mem = vk_mem_alloc(VK_MemoryType_Cpu, environment.cpu_mem_size);
-  g.drawcall_buf = gfx_buffer_make({.type = Gfx_MemType_Cpu, .size = MB(1)});
-  gfx_push_data(g.drawcall_buf, Bindings::Drawinfo, VK_Drawcall, MaxDrawCalls);
+  u32 drawcall_mem = MaxDrawCalls * sizeof(VK_Drawcall);
+  g.gpu_mem = vk_mem_make(Gfx_MemType_Gpu, environment.gpu_mem_size + environment.image_mem_size);
+  g.cpu_mem = vk_mem_make(Gfx_MemType_Cpu, environment.cpu_mem_size);
+  g.gpu_buf = vk_buffer_make(environment.gpu_mem_size);
+  g.cpu_buf = vk_buffer_make(environment.cpu_mem_size - drawcall_mem, Gfx_MemType_Cpu);
+  g.drawcall_buf = gfx_buffer_make(drawcall_mem, Gfx_MemType_Cpu);
+  gfx_make_bind({.binding = Bindings::Drawinfo});
+  gfx_bind_buffer(g.drawcall_buf, Bindings::Drawinfo);
+  g.stage_buffer = gfx_buffer_make(MB(10), Gfx_MemType_Cpu);
 }
 
 void gfx_shutdown() {
