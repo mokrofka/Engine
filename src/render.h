@@ -15,7 +15,6 @@ b32 equal(R_KeyToShaderPipeline a, R_KeyToShaderPipeline b);
 struct MaterialDesc {
   String shader_name;
   Gfx_PipelineDesc pipeline_desc;
-  // ShaderDesc shader;
   MaterialProps props;
   String texture;
 };
@@ -23,6 +22,11 @@ struct MaterialDesc {
 struct R_GpuMaterial {
   u32 entity_pipeline_idx;
   u32 texture_idx;
+};
+
+struct R_Texture {
+  Gfx_Image image;
+  Gfx_View view;
 };
 
 ///////////////////////////////////
@@ -122,6 +126,52 @@ struct R_ArenaBuffer {
   u64 cap;
 };
 
+R_ArenaBuffer r_arena_buffer_make(u64 size, Gfx_MemType type = Gfx_MemType_Gpu);
+R_ArenaBuffer r_arena_buffer_make_round(u64 size, u64 round, Gfx_MemType type = Gfx_MemType_Gpu);
+u64 r_arena_buffer_push(R_ArenaBuffer* buf, u64 size);
+
+enum R_AttachmentType {
+  R_AttachmentType_Default,
+  R_AttachmentType_Color,
+  R_AttachmentType_Resolve,
+  R_AttachmentType_Depth,
+};
+
+struct R_Attachment {
+  R_AttachmentType type;
+  Gfx_Image images[Gfx_MaxImagesInFlight];
+  Gfx_View views[Gfx_MaxImagesInFlight];
+};
+
+struct R_AttachmentDesc {
+  R_AttachmentType type;
+  v2u size;
+};
+
+R_Attachment r_attachment_make(R_AttachmentDesc desc);
+void r_attachment_destroy(R_Attachment attachment);
+void r_attachment_recreate(R_Attachment* attachment, v2u size);
+
+typedef u32 R_RenderTargetUsage;
+enum {
+  R_RenderTargetUsage_Default = 0,
+  R_RenderTargetUsage_Color = Bit(0),
+  R_RenderTargetUsage_Resolve = Bit(1),
+  R_RenderTargetUsage_Depth = Bit(2),
+};
+
+struct R_RenderTarget {
+  R_RenderTargetUsage attachments;
+  R_Attachment color;
+  R_Attachment resolve;
+  R_Attachment depth;
+};
+
+R_RenderTarget r_render_target_make(R_RenderTargetUsage usage, v2u size);
+void r_render_target_destroy(R_RenderTarget rt);
+void r_render_target_recreate(R_RenderTarget* rt, v2u size);
+Gfx_Attachments r_render_target_to_attachments(R_RenderTarget rt);
+
 struct R_State {
   Arena arena;
   AllocSegList gpa;
@@ -138,11 +188,12 @@ struct R_State {
   Darray<R_EntityPipelineBatch> batches;
   Array<R_RenderEntity, MaxEntities+MaxStaticEntities> entities;
   // Array<Gfx_Mesh, MaxMeshes> meshes;
-  Array<VK_Image, MaxTextures> textures;
+  // Array<VK_Image, MaxTextures> textures;
   u32 static_entities_count;
   u32 static_entities_count_old;
 
   Pool<Gfx_Mesh, MaxMeshes, GpuMeshId> meshes;
+  Pool<R_Texture, MaxTextures, GpuTextureId> textures;
 
   Gfx_Pipeline triangle_pip;
   Gfx_Pipeline screen_pip;
@@ -151,12 +202,7 @@ struct R_State {
   Gfx_Pipeline ui_pip;
   Gfx_Sampler com_sampler;
 
-  Gfx_Image image_color[4];
-  Gfx_Image image_resolve[4];
-  Gfx_Image image_depth[4];
-  Gfx_View views_color[4];
-  Gfx_View views_resolve[4];
-  Gfx_View views_depth[4];
+  R_RenderTarget world_rt;
 
   VK_Memory gpu_mem;
   R_ArenaBuffer vert_arena;
@@ -184,15 +230,6 @@ struct R_State {
   Slice<String> shaders_to_compile;
 };
 
-R_ArenaBuffer r_arena_buffer_make(u64 size, Gfx_MemType type = Gfx_MemType_Gpu);
-R_ArenaBuffer r_arena_buffer_make_round(u64 size, u64 round, Gfx_MemType type = Gfx_MemType_Gpu);
-u64 r_arena_buffer_push(R_ArenaBuffer* buf, u64 size);
-
-void vk_image_layout_transition(VkCommandBuffer cmd, VK_Image image, VkImageLayout old_layout, VkImageLayout new_layout, VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT);
-void vk_image_layout_transition_swapchain(VkCommandBuffer cmd, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout, VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT);
-void vk_image_upload_to_gpu(VkCommandBuffer cmd, VK_Image image);
-void vk_texture_generate_mipmaps(VK_Image image);
-
 v4& get_pos();
 mat4& get_mat();
 void r_init();
@@ -216,14 +253,14 @@ void vk_remove_renderable(EntityId entity_id);
 void vk_remove_static_renderable(StaticEntityId entity_id);
 void vk_set_entity_color(EntityId entity_handle, v4 color);
 
-void vk_draw_line(v3 a, v3 b, v4 color);
-void vk_draw_line_consistent(v3 a, v3 b, v4 color);
-void vk_draw_cuboid(Rng3 rng, v4 color);
-void vk_draw_rect(Rng2 rect, v4 color);
+void r_debug_line(v3 a, v3 b, v4 color);
+void r_debug_line_persistent(v3 a, v3 b, v4 color);
+void r_debug_cuboid(Rng3 rng, v4 color);
+void r_draw_rect(Rng2 rect, v4 color);
 
-void vk_imgui_init();
-void vk_imgui_begin_frame();
-void vk_imgui_end_frame();
+void imgui_init();
+void imgui_begin_frame();
+void imgui_end_frame();
 
 void r_shaders_compile(Allocator arena);
 

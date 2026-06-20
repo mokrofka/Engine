@@ -311,7 +311,7 @@ struct Pool {
 };
 
 template<typename T, i32 N, typename Handle> T& pool_get(Pool<T, N, Handle>& p, Handle h) {
-  Assert(pool_is_handle_valid(p, h));
+  Assert(pool_is_valid_slot(p, h));
   return p.data[h.idx].elem;
 }
 template<typename T, i32 N, typename Handle> Handle pool_push_empty(Pool<T, N, Handle>& p) {
@@ -331,7 +331,7 @@ template<typename T, i32 N, typename Handle> Handle pool_push(Pool<T, N, Handle>
   return h;
 }
 template<typename T, i32 N, typename Handle> void pool_remove(Pool<T, N, Handle>& p, Handle h) {
-  Assert(pool_is_handle_valid(p, h));
+  Assert(pool_is_valid_slot(p, h));
   ++p.generations[h.idx];
   p.data[h.idx].next_free = p.head;
   p.head = h.idx;
@@ -344,7 +344,7 @@ template<typename T, i32 N, typename Handle> u32 pool_clear(Pool<T, N, Handle>& 
     ++p.generations;
   }
 }
-template<typename T, i32 N, typename Handle> b32 pool_is_handle_valid(Pool<T, N, Handle>& p, Handle h) {
+template<typename T, i32 N, typename Handle> b32 pool_is_valid_slot(Pool<T, N, Handle>& p, Handle h) {
   if (h.idx <= 0 || h.idx > p.max_idx) {
     return false;
   }
@@ -378,7 +378,7 @@ template<typename T, typename Handle> Dpool<T, Handle> dpool_make(Allocator allo
   return res;
 }
 template<typename T, typename Handle> T& pool_get(Dpool<T, Handle>& p, Handle h) {
-  Assert(pool_is_handle_valid(p, h));
+  Assert(pool_is_valid_slot(p, h));
   return p.data[h.idx].elem;
 }
 template<typename T, typename Handle> void pool_grow(Dpool<T, Handle>& p) {
@@ -420,7 +420,7 @@ template<typename T, typename Handle> Handle pool_push(Dpool<T, Handle>& p, T a)
   return h;
 }
 template<typename T, typename Handle> void pool_remove(Dpool<T, Handle>& p, Handle h) {
-  pool_is_handle_valid(p, h);
+  pool_is_valid_slot(p, h);
   ++p.generations[h.idx];
   p.data[h.idx].next_free = p.head;
   p.head = h.idx;
@@ -433,7 +433,7 @@ template<typename T, typename Handle> u32 pool_clear(Dpool<T, Handle>& p) {
     ++p.generations;
   }
 }
-template<typename T, typename Handle> b32 pool_is_handle_valid(Dpool<T, Handle>& p, Handle h) {
+template<typename T, typename Handle> b32 pool_is_valid_slot(Dpool<T, Handle>& p, Handle h) {
   if (h.idx <= 0 || h.idx > p.max_idx) {
     return false;
   }
@@ -446,7 +446,6 @@ template<typename T, typename Handle> b32 pool_is_handle_valid(Dpool<T, Handle>&
 ///////////////////////////////////
 // PoolLinkList
 
-// for (u32 node = pool.first; node != U32_MAX; node = pool.data[node].next) {
 template<typename T, i32 N, typename Handle>
 struct PoolLinkList {
   static_assert(sizeof(T) >= 4);
@@ -467,7 +466,7 @@ struct PoolLinkList {
 };
 
 template<typename T, i32 N, typename Handle> T& pool_get(PoolLinkList<T, N, Handle>& p, Handle h) {
-  Assert(pool_is_handle_valid(p, h));
+  Assert(pool_is_valid_slot(p, h));
   return p.data[h.idx].elem;
 }
 template<typename T, i32 N, typename Handle> Handle pool_push(PoolLinkList<T, N, Handle>& p) {
@@ -499,7 +498,7 @@ template<typename T, i32 N, typename Handle> Handle pool_push(PoolLinkList<T, N,
   return h;
 }
 template<typename T, i32 N, typename Handle> void pool_remove(PoolLinkList<T, N, Handle>& p, Handle h) {
-  Assert(pool_is_handle_valid(p, h));
+  Assert(pool_is_valid_slot(p, h));
   ++p.generations[h.idx];
   p.data[h.idx].next_free = p.head;
   p.head = h.idx;
@@ -529,7 +528,7 @@ template<typename T, i32 N, typename Handle> void pool_clear(PoolLinkList<T, N, 
     ++p.generations;
   }
 }
-template<typename T, i32 N, typename Handle> b32 pool_is_handle_valid(PoolLinkList<T, N, Handle>& p, Handle h) {
+template<typename T, i32 N, typename Handle> b32 pool_is_valid_slot(PoolLinkList<T, N, Handle>& p, Handle h) {
   if (h.idx <= 0 || h.idx > p.max_idx) {
     return false;
   }
@@ -569,7 +568,7 @@ template<typename T, typename Handle> DpoolLinkList<T, Handle> dpool_linklist_ma
   return res;
 }
 template<typename T, typename Handle> T& pool_get(DpoolLinkList<T, Handle>& p, Handle h) {
-  Assert(pool_is_handle_valid(p, h));
+  Assert(pool_is_valid_slot(p, h));
   return p.data[h.idx].elem;
 }
 template<typename T, typename Handle> void pool_grow(DpoolLinkList<T, Handle>& p) {
@@ -625,7 +624,7 @@ template<typename T, typename Handle> Handle pool_push(DpoolLinkList<T, Handle>&
   return h;
 }
 template<typename T, typename Handle> void pool_remove(DpoolLinkList<T, Handle>& p, Handle h) {
-  pool_is_handle_valid(p, h);
+  pool_is_valid_slot(p, h);
   ++p.generations[h.idx];
   p.data[h.idx].next_free = p.head;
   p.head = h.idx;
@@ -655,7 +654,7 @@ template<typename T, typename Handle> void pool_clear(DpoolLinkList<T, Handle>& 
     ++p.generations;
   }
 }
-template<typename T, typename Handle> b32 pool_is_handle_valid(DpoolLinkList<T, Handle>& p, Handle h) {
+template<typename T, typename Handle> b32 pool_is_valid_slot(DpoolLinkList<T, Handle>& p, Handle h) {
   if (h.idx <= 0 || h.idx > p.max_idx) {
     return false;
   }

@@ -119,7 +119,7 @@ struct Vertex {
   v3 pos;
   v3 norm;
   v2 uv;
-  v3 color;
+  v4 color;
 };
 u64 hash(Vertex vert);
 b32 equal(Vertex a, Vertex b);
@@ -168,12 +168,18 @@ struct MaterialProps {
 };
 
 struct Timer {
-  f32 passed;
   f32 interval;
+  f32 acc;
 };
 
 Timer timer_make(f32 interval);
-b32 timer_passed(Timer& t);
+b32 timer_update(Timer& t);
+b32 timer_ready(Timer& t);
+void timer_trigger(Timer& t);
+
+struct Cooldown {
+  f32 remaining;
+};
 
 f64 tsc_to_ms(u64 tsc);
 

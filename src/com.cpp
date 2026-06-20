@@ -64,18 +64,18 @@ Vertex cube_vertices[] = {
 };
 
 Vertex triangle_vertices[] = {
-  {.pos = v3( 0.0,   0.5, 0), .uv = v2(0.5, 1), .color = v3(1,0,0)},
-  {.pos = v3(-0.5,  -0.5, 0), .uv = v2(0.0, 0), .color = v3(0,1,0)},
-  {.pos = v3( 0.5,  -0.5, 0), .uv = v2(1.0, 0), .color = v3(0,0,1)},
+  {.pos = v3( 0.0,   0.5, 0), .uv = v2(0.5, 1), .color = v4(1,0,0,1)},
+  {.pos = v3(-0.5,  -0.5, 0), .uv = v2(0.0, 0), .color = v4(0,1,0,1)},
+  {.pos = v3( 0.5,  -0.5, 0), .uv = v2(1.0, 0), .color = v4(0,0,1,1)},
 };
 
 Vertex axis_vertices[] = {
-  {.pos = v3_zero(), .color = v3(1,0,0)},
-  {.pos = v3(1,0,0), .color = v3(1,0,0)},
-  {.pos = v3_zero(), .color = v3(0,1,0)},
-  {.pos = v3(0,1,0), .color = v3(0,1,0)},
-  {.pos = v3_zero(), .color = v3(0,0,1)},
-  {.pos = v3(0,0,1), .color = v3(0,0,1)},
+  {.pos = v3_zero(), .color = v4(1,0,0,1)},
+  {.pos = v3(1,0,0), .color = v4(1,0,0,1)},
+  {.pos = v3_zero(), .color = v4(0,1,0,1)},
+  {.pos = v3(0,1,0), .color = v4(0,1,0,1)},
+  {.pos = v3_zero(), .color = v4(0,0,1,1)},
+  {.pos = v3(0,0,1), .color = v4(0,0,1,1)},
 };
 
 u64 hash(Vertex x) { return hash_memory(&x, sizeof(x)); }
@@ -90,13 +90,41 @@ Timer timer_make(f32 interval) {
   return timer;
 }
 
-b32 timer_passed(Timer& t) {
-  t.passed += get_dt();
-  if (t.passed >= t.interval) {
-    t.passed = 0;
+b32 timer_update(Timer& t) {
+  t.acc += get_dt();
+  if (t.acc >= t.interval) {
+    t.acc -= t.interval;
     return true;
   }
   return false;
+}
+
+b32 timer_passed(Timer& t) {
+  return t.acc >= t.interval;
+}
+
+void timer_tick(Timer& t) {
+  t.acc += get_dt();
+}
+
+void timer_trigger(Timer& t) {
+  t.acc -= t.interval;
+}
+
+void timer_reset(Timer& t) {
+  t.acc = 0;
+}
+
+b32 cooldown_ready(Cooldown& cd) {
+  return cd.remaining <= 0;
+}
+
+void cooldown_tick(Cooldown& cd, f32 dt) {
+  if (cd.remaining > 0) cd.remaining -= dt;
+}
+
+void cooldown_start(Cooldown& cd, f32 duration) {
+  cd.remaining = duration;
 }
 
 f64 tsc_to_ms(u64 tsc) {
@@ -1841,7 +1869,7 @@ void scene_update() {
     // select_obj();
     // v3 dir = ray_from_screen();
     Ray ray = ray_from_screen(os_mouse_get_pos(), os_get_window_size(), g.cam.pos, st->view, st->projection);
-    vk_draw_line_consistent(ray.pos - v3(0,0.1,0), g.cam.pos + ray.dir*100, ColorWhite);
+    r_debug_line_persistent(ray.pos - v3(0,0.1,0), g.cam.pos + ray.dir*100, ColorWhite);
     // v3 max = st->cam.pos + v3_one();
     // v3 min = st->cam.pos - v3_one();
   }
@@ -1858,7 +1886,7 @@ void scene_update() {
   }
   {
     Entity& e = get_entity(g.monkey_id);
-    vk_draw_cuboid(rng3_shift(e.aabb, e.pos), ColorWhite);
+    r_debug_cuboid(rng3_shift(e.aabb, e.pos), ColorWhite);
   }
   {
     mat4& view = st->view;
@@ -1944,7 +1972,7 @@ void scene_update() {
     }
   }
 
-  vk_draw_rect(Rng2(v2(0,0), v2(100,100)), ColorWhite);
+  r_draw_rect(Rng2(v2(0,0), v2(100,100)), ColorWhite);
 }
 
 void game_save_state() {
@@ -2103,7 +2131,7 @@ void game_update() {
   }
 
   // push_array(g.arena, u32, 100);
-  if (timer_passed(g.timer)) {
+  if (timer_update(g.timer)) {
     // push_array(g.gpa, u32, 1000);
     // push_array(g.gpa_arena0, u32, 200);
     // push_array(g.gpa_arena1, u32, 500);

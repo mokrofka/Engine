@@ -23,10 +23,10 @@
 
 _LockScope::_LockScope(Mutex mutex_) {
   mutex = mutex_;
-  os_mutex_take(mutex);
+  os_mutex_lock(mutex);
 }
 _LockScope::~_LockScope() {
-  os_mutex_drop(mutex);
+  os_mutex_unlock(mutex);
 }
 
 global u64 _cpu_frequency;
@@ -593,12 +593,12 @@ void os_mutex_release(Mutex mutex) {
   os_lnx_entity_release(entity);
 }
 
-void os_mutex_take(Mutex mutex) {
+void os_mutex_lock(Mutex mutex) {
   OS_LNX_Entity* entity = (OS_LNX_Entity*)mutex.v;
   pthread_mutex_lock(&entity->mutex);
 }
 
-void os_mutex_drop(Mutex mutex) {
+void os_mutex_unlock(Mutex mutex) {
   OS_LNX_Entity* entity = (OS_LNX_Entity*)mutex.v;
   pthread_mutex_unlock(&entity->mutex);
 }

@@ -156,8 +156,8 @@ void os_thread_detach(Thread handle);
 // Sync primitives
 Mutex os_mutex_alloc();
 void  os_mutex_release(Mutex mutex);
-void  os_mutex_take(Mutex mutex);
-void  os_mutex_drop(Mutex mutex);
+void  os_mutex_lock(Mutex mutex);
+void  os_mutex_unlock(Mutex mutex);
 
 CondVar os_cond_var_alloc();
 void    os_cond_var_release(CondVar cv);

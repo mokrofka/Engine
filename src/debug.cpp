@@ -92,7 +92,7 @@ void debug_init() {
     .win.open = false,
   };
   g.imgui_demo_open = false;
-  vk_imgui_init();
+  imgui_init();
   ImGuiIO& io = ImGui::GetIO();
   g.font = io.Fonts->AddFontDefault();
 }

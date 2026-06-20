@@ -181,7 +181,7 @@ VkImageType vk_image_type(Gfx_ImageType t) {
 
 VkImageUsageFlags vk_image_usage(Gfx_ImageUsage usg) {
   VkImageUsageFlags res = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-  res |= VK_IMAGE_USAGE_SAMPLED_BIT;
+  res |= VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
   if (FlagHas(usg, Gfx_ImageUsage_StorageImage)) {
     res |= VK_IMAGE_USAGE_STORAGE_BIT;
   }
@@ -571,7 +571,7 @@ void vk_swapchain_end_barrier(VkImage vkimg, VK_Access pass_access) {
   g.CmdPipelineBarrier2(vk_get_cur_cmd(), &dep_info);
 }
 
-void vk_image_barrier(VK_Image* img, VK_Access new_access) {
+void vk_image_barrier(VkCommandBuffer cmd, VK_Image* img, VK_Access new_access) {
   Gfx_State& g = st->gfx;
   if (vk_is_read_access(img->cur_access) && vk_is_read_access(new_access)) return;
   VkImageMemoryBarrier2 barrier = {
@@ -596,7 +596,7 @@ void vk_image_barrier(VK_Image* img, VK_Access new_access) {
     .imageMemoryBarrierCount = 1,
     .pImageMemoryBarriers = &barrier,
   };
-  g.CmdPipelineBarrier2(vk_get_cur_cmd(), &dep_info);
+  g.CmdPipelineBarrier2(cmd, &dep_info);
   img->cur_access = new_access;
 }
 
@@ -968,7 +968,7 @@ VkPipeline vk_pipeline_create(Gfx_PipelineDesc desc) {
     [3] = {
       .location = 3,
       .binding = 0,
-      .format = VK_FORMAT_R32G32B32_SFLOAT,
+      .format = VK_FORMAT_R32G32B32A32_SFLOAT,
       .offset = (u32)OffsetOf(Vertex, color),
     },
   };
@@ -1514,6 +1514,96 @@ void vk_swapchain_create() {
   }
 }
 
+void vk_image_upload(VkCommandBuffer cmd, VK_Image image) {
+  Buffer stage_buf = pool_get(st->gfx.buffers, st->gfx.stage_buffer);
+  VkBufferImageCopy region = {
+    .bufferOffset = stage_buf.base,
+    .bufferRowLength = 0,
+    .bufferImageHeight = 0,
+    .imageSubresource = {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .mipLevel = 0,
+      .baseArrayLayer = 0,
+      .layerCount = image.slices_count,
+    },
+    .imageExtent = { image.width, image.height, 1 },
+  };
+  st->gfx.CmdCopyBufferToImage(cmd, st->gfx.cpu_buf.h, image.h, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+}
+
+void vk_texture_generate_mipmaps(VK_Image image) {
+  Gfx_State& g = st->gfx;
+  VkCommandBuffer cmd = st->gfx.cmds_upload[0];
+  VkImageMemoryBarrier2 barrier = {
+    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    .image = image.h,
+    .subresourceRange = {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .baseArrayLayer = 0,
+      .layerCount = 1,
+      .levelCount = 1,
+    },
+  };
+  VkDependencyInfo dep = {
+    .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+    .imageMemoryBarrierCount = 1,
+    .pImageMemoryBarriers = &barrier,
+  };
+  i32 width = image.width;
+  i32 height = image.height;
+  LoopRange(i, 1, image.mipmaps_count) {
+    barrier.subresourceRange.baseMipLevel = i - 1;
+
+    // DST -> SRC
+    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    barrier.srcStageMask = VK_PIPELINE_STAGE_2_BLIT_BIT;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_BLIT_BIT;
+    barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+    g.CmdPipelineBarrier2(cmd, &dep);
+
+    VkImageBlit blit = {
+      .srcOffsets[1] = {width, height, 1},
+      .srcSubresource = {
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .mipLevel = (u32)i - 1,
+        .baseArrayLayer = 0,
+        .layerCount = 1,
+      },
+      .dstSubresource = {
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .mipLevel = (u32)i,
+        .baseArrayLayer = 0,
+        .layerCount = 1,
+      },
+    };
+    width = width > 1 ? width / 2 : 1;
+    height = height > 1 ? height / 2 : 1;
+    blit.dstOffsets[1] = {width, height, 1};
+    g.CmdBlitImage(cmd, image.h, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image.h, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+
+    // SRC -> SHADER_READ
+    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier.srcStageMask = VK_PIPELINE_STAGE_2_BLIT_BIT;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+    barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+    g.CmdPipelineBarrier2(cmd, &dep);
+  }
+  barrier.subresourceRange.baseMipLevel = image.mipmaps_count - 1;
+  barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  barrier.srcStageMask = VK_PIPELINE_STAGE_2_BLIT_BIT;
+  barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+  barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+  barrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+  g.CmdPipelineBarrier2(cmd, &dep);
+}
+
 ////////////////////////////////////////////////////////////////////////
 // @Gfx
 
@@ -1704,11 +1794,18 @@ Gfx_Image gfx_image_make(Gfx_ImageDesc desc) {
   VK_CHECK(g.BindImageMemory(vkdevice, image.h, image.memory, 0));
 
   if (desc.data) {
+    if (desc.type == Gfx_ImageType_Cube) {
+      u64 size = desc.width * desc.height * 4;
+      Loop (i, 6) {
+        MemCopy(Offset(gfx_buffer_base_ptr(st->gfx.stage_buffer), size * i), desc.cube[i], size);
+      }
+    } else {
+      MemCopy(gfx_buffer_base_ptr(g.stage_buffer), desc.data, desc.width * desc.height * 4);
+    }
     VkCommandBuffer cmd = g.cmds_upload[0];
     vk_cmd_begin(cmd);
-    vk_image_layout_transition(cmd, image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    MemCopy(gfx_buffer_base_ptr(g.stage_buffer), desc.data, desc.width * desc.height * 4);
-    vk_image_upload_to_gpu(cmd, image);
+    vk_image_barrier(cmd, &image, VK_Access_Staging);
+    vk_image_upload(cmd, image);
     if (desc.mipmaps) {
       vk_texture_generate_mipmaps(image);
     }
@@ -1811,7 +1908,7 @@ Gfx_View gfx_view_make(Gfx_ViewDesc desc) {
     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
     .dstSet = g.descriptor_sets,
     .dstBinding = (img.type == Gfx_ImageType_2D || img.type == Gfx_ImageType_Array) ? Bindings::Textures : Bindings::CubeTextures,
-    .dstArrayElement = res.idx,
+    .dstArrayElement = img.type == Gfx_ImageType_Cube ? g.cube_idx++ : res.idx,
     .descriptorCount = 1,
     .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
     .pImageInfo = &descriptor_image_info,
@@ -1876,58 +1973,6 @@ Gfx_Sampler gfx_sampler_make(Gfx_SamplerDesc desc) {
 }
 
 Gfx_Buffer gfx_buffer_make(u64 size, Gfx_MemType type, u64 align) {
-  #if 0
-  Gfx_State& g = st->gfx;
-  VkBufferUsageFlags buf_usage_flags = 0;
-  buf_usage_flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-  buf_usage_flags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-  buf_usage_flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-  buf_usage_flags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-  buf_usage_flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-  buf_usage_flags |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
-  VkBufferCreateInfo buffer_create_info = {
-    .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-    .size = desc.size,
-    .usage = buf_usage_flags,
-    .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-  };
-  VK_Buffer buf = {.cap = desc.size};
-  VK_CHECK(g.CreateBuffer(vkdevice, &buffer_create_info, g.allocator, &buf.h));
-  if (desc.type == Gfx_MemType_Default) {
-    desc.type = Gfx_MemType_Gpu;
-  }
-
-  u32 mem_prop_flags = 0;
-  if (desc.type == Gfx_MemType_Gpu) mem_prop_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-  else if (desc.type == Gfx_MemType_Cpu) mem_prop_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-  VkMemoryRequirements requirements;
-  g.GetBufferMemoryRequirements(vkdevice, buf.h, &requirements);
-  // u32 mem_idx = vk_find_memory_idx(requirements.memoryTypeBits, mem_prop_flags);
-  // VkMemoryAllocateInfo alloc_info = {
-  //   .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-  //   .allocationSize = requirements.size,
-  //   .memoryTypeIndex = mem_idx,
-  // };
-  // UnusedVariable(alloc_info);
-
-  VK_Memory* mem = null;
-  u64 offset = 0;
-  if (desc.type == Gfx_MemType_Gpu) {
-    mem = &g.gpu_mem;
-    offset = offset_push(mem->pos, desc.size, requirements.alignment);
-    Assert(mem->pos <= mem->cap);
-  }
-  else if (desc.type == Gfx_MemType_Cpu) {
-    mem = &g.cpu_mem;
-    offset = offset_push(mem->pos, desc.size, requirements.alignment);
-    Assert(mem->pos <= mem->cap);
-  }
-  VK_CHECK(g.BindBufferMemory(vkdevice, buf.h, mem->h, offset));
-  buf.base = Offset(mem->mapped_mem, offset);
-  Gfx_Buffer res = pool_push(st->gfx.buffers, buf);
-  return res;
-  #endif
-
   Gfx_State& g = st->gfx;
   VK_Buffer* buffer = null;
   u64 offset = 0;
@@ -2157,11 +2202,11 @@ void gfx_pass_begin(Gfx_Pass pass) {
       if (pass.action.colors[i].load_action != Gfx_LoadAction_Load) {
         color_image.cur_access |= VK_Access_Discard;
       }
-      vk_image_barrier(&color_image, VK_Access_ColorAttachment);
+      vk_image_barrier(vk_get_cur_cmd(), &color_image, VK_Access_ColorAttachment);
       if (pass.attachments.resolves[i].idx != Gfx_InvalidId) {
         VK_Image& resolve_image = pool_get(g.images, pool_get(g.views, pass.attachments.resolves[i]).ref);
         resolve_image.cur_access |= VK_Access_Discard;
-        vk_image_barrier(&resolve_image, VK_Access_ResolveAttachment);
+        vk_image_barrier(vk_get_cur_cmd(), &resolve_image, VK_Access_ResolveAttachment);
       }
     }
 
@@ -2177,7 +2222,7 @@ void gfx_pass_begin(Gfx_Pass pass) {
       if (has_stencil) {
         dst_access |= VK_Access_StencilAttachment;
       }
-      vk_image_barrier(&ds_image, dst_access);
+      vk_image_barrier(vk_get_cur_cmd(), &ds_image, dst_access);
     }
   }
 
@@ -2257,17 +2302,17 @@ void gfx_pass_end() {
       if (g.cur_pass.attachments.colors[i].idx == Gfx_InvalidId) break;
       if (g.cur_pass.action.colors[i].store_action == Gfx_StoreAction_Store) {
         VK_Image& img = pool_get(g.images, pool_get(g.views, g.cur_pass.attachments.colors[i]).ref);
-        vk_image_barrier(&img, VK_Access_Texture);
+        vk_image_barrier(vk_get_cur_cmd(), &img, VK_Access_Texture);
       }
       if (g.cur_pass.attachments.resolves[i].idx != Gfx_InvalidId) {
         VK_Image& img = pool_get(g.images, pool_get(g.views, g.cur_pass.attachments.resolves[i]).ref);
-        vk_image_barrier(&img, VK_Access_Texture);
+        vk_image_barrier(vk_get_cur_cmd(), &img, VK_Access_Texture);
       }
     }
     if (g.cur_pass.attachments.depth_stencil.idx != Gfx_InvalidId) {
       VK_Image& img = pool_get(g.images, pool_get(g.views, g.cur_pass.attachments.depth_stencil).ref);
       if (g.cur_pass.action.depth.store_action == Gfx_StoreAction_Store) {
-        vk_image_barrier(&img, VK_Access_Texture);
+        vk_image_barrier(vk_get_cur_cmd(), &img, VK_Access_Texture);
       }
     }
   }
@@ -2370,11 +2415,6 @@ void gfx_instance_set_indices(u32* indices) {
 u32* gfx_indirect_indices() { return st->gfx.base_index + st->gfx.entity_cursor; }
 
 u8* gfx_buffer_base_ptr(Gfx_Buffer buf) {
-  #if 0
-  VK_Buffer buffer = pool_get(st->gfx.buffers, buf);
-  return buffer.base;
-  #endif
-
   Gfx_State& g = st->gfx;
   Buffer buffer = pool_get(g.buffers, buf);
   VK_Buffer* vkbuf = vk_choose_buffer(buf);
@@ -2388,23 +2428,6 @@ u64 gfx_buffer_base(Gfx_Buffer buf) {
 }
 
 void gfx_buffer_upload(Gfx_Buffer buf, u64 offset, Slice<u8> data) {
-  #if 0
-  Gfx_State& g = st->gfx;
-  VK_Buffer& buffer = pool_get(g.buffers, buf);
-  u64 offset = offset_push(buffer.pos, data.size, 1);
-  Assert(buffer.pos <= buffer.cap);
-  VK_Buffer stage_buffer = pool_get(g.buffers, g.stage_buffer);
-  MemCopy(stage_buffer.base, data.data, data.size);
-  vk_cmd_begin(g.cmds_upload[0]);
-  VkBufferCopy copy_region = {
-    .srcOffset = 0,
-    .dstOffset = offset,
-    .size = data.size,
-  };
-  g.CmdCopyBuffer(g.cmds_upload[0], stage_buffer.h, buffer.h, 1, &copy_region);
-  vk_cmd_end_submit(g.cmds_upload[0]);
-  #endif
-
   Gfx_State& g = st->gfx;
   Buffer buffer = pool_get(g.buffers, buf);
   Assert(offset+data.size <= buffer.size);
@@ -2422,13 +2445,6 @@ void gfx_buffer_upload(Gfx_Buffer buf, u64 offset, Slice<u8> data) {
 }
 
 void gfx_bind_vert(Gfx_MemType type) {
-  #if 0
-  Gfx_State& g = st->gfx;
-  VK_Buffer buffer = pool_get(g.buffers, buf);
-  VkDeviceSize size = 0;
-  g.CmdBindVertexBuffers(vk_get_cur_cmd(), 0, 1, &buffer.h, &size);
-  #endif
-
   Gfx_State& g = st->gfx;
   VK_Buffer buf = {};
   if (type == Gfx_MemType_Gpu) buf = g.gpu_buf;
@@ -2438,12 +2454,6 @@ void gfx_bind_vert(Gfx_MemType type) {
 }
 
 void gfx_bind_index(Gfx_MemType type) {
-  #if 0
-  Gfx_State& g = st->gfx;
-  VK_Buffer buffer = pool_get(st->gfx.buffers, buf);
-  g.CmdBindIndexBuffer(vk_get_cur_cmd(), buffer.h, 0, VK_INDEX_TYPE_UINT32);
-  #endif
-
   Gfx_State& g = st->gfx;
   VK_Buffer buf = {};
   if (type == Gfx_MemType_Gpu) buf = g.gpu_buf;
@@ -2540,6 +2550,18 @@ void gfx_init(Gfx_Environment environment) {
       VK_CHECK(g.CreateFence(vkdevice, &fence_create_info, g.allocator, &g.fences_frames_upload[i]));
       // g.frames_upload_semaphores[i] = vk_semaphore_make(1);
     }
+
+  // VkSemaphoreTypeCreateInfo timelineInfo = {
+  //   .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
+  //   .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
+  //   .initialValue = 0
+  // };
+  // VkSemaphoreCreateInfo createInfo = {
+  //   .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+  //   .pNext = &timelineInfo
+  // };
+  // VkSemaphore semaphore;
+  // g.CreateSemaphore(vkdevice, &createInfo, g.allocator, &semaphore);
   }
 
   {
@@ -2568,6 +2590,8 @@ void gfx_init(Gfx_Environment environment) {
   gfx_make_bind({.binding = Bindings::Drawinfo});
   gfx_bind_buffer(g.drawcall_buf, Bindings::Drawinfo);
   g.stage_buffer = gfx_buffer_make(MB(10), Gfx_MemType_Cpu);
+
+  // g.cube_idx = 1;
 }
 
 void gfx_shutdown() {

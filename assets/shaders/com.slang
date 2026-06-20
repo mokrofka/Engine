@@ -94,7 +94,7 @@ struct VSInput {
   v3 pos;
   v3 norm;
   v2 uv;
-  v3 color;
+  v4 color;
   u32 vert_id : SV_VertexID;
   u32 draw_id : SV_DrawIndex;
   u32 inst_id : SV_InstanceID;
@@ -104,7 +104,7 @@ struct VSOutput {
   v4 pos : SV_Position;
   v3 norm;
   v2 uv;
-  v3 color;
+  v4 color;
   u32 entity_id;
 };
 

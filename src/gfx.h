@@ -244,7 +244,10 @@ struct Gfx_ImageDesc {
   b32 mipmaps;
   Gfx_PixelFormat pixel_format;
   u32 sample_count;
-  u8* data;
+  union {
+    u8* data;
+    u8* cube[6];
+  };
 };
 
 enum Gfx_ViewType {
@@ -698,6 +701,7 @@ struct Gfx_State {
   Pool<VK_View, Gfx_MaxViews, Gfx_View> views;
   Pool<VK_Sampler, Gfx_MaxSamplers, Gfx_Sampler> samplers;
 
+  u32 cube_idx;
   struct {
     v2u size;
     b32 compute;

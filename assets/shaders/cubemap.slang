@@ -8,11 +8,11 @@ VS_Entry VSOutput vs_main(VSInput in) {
   view[2][3] = 0;
   v4 pos = g.projection * view * v4(in.pos, 1);
   o.pos = v4(pos.xy, pos.w, pos.w);
-  o.color = in.pos;
+  o.color = v4(in.pos, 1);
   return o;
 }
 
 FS_Entry v4 fs_main(VSOutput in) {
-  v4 color = cube_texture.Sample(samplers[1], in.color);
+  v4 color = cube_texture.Sample(samplers[1], in.color.xyz);
   return color;
 }
