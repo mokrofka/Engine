@@ -148,21 +148,7 @@ Transform get_entity_transform(EntityId id) {
   return res;
 }
 
-StaticEntity& get_static_entity(StaticEntityId id) {
-  return pool_get(st->game.static_entities, id);
-}
-
-Transform get_static_entity_transform(StaticEntityId id) {
-  StaticEntity& e = get_static_entity(id);
-  Transform res = {
-    .pos = e.pos,
-    .rot = e.rot,
-    .scale = e.scale,
-  };
-  return res;
-}
-
-Mesh load_obj(Allocator arena, String name) {
+MeshDesc load_obj(Allocator arena, String name) {
   Scratch scratch(arena);
   var positions = darray_make<v3>(scratch);
   var normals = darray_make<v3>(scratch);
@@ -234,7 +220,7 @@ Mesh load_obj(Allocator arena, String name) {
       array_push(final_indices, vert_index);
     }
   }
-  Mesh mesh = {
+  MeshDesc mesh = {
     .vertices = slice(vertices),
     .indices = slice(final_indices),
   };
@@ -248,7 +234,7 @@ Mesh load_obj(Allocator arena, String name) {
 #define Gltf_u32 5125
 #define Gltf_f32 5126
 
-Mesh load_gltf(Allocator arena, String path, b32 is_glb) {
+MeshDesc load_gltf(Allocator arena, String path, b32 is_glb) {
   Scratch scratch(arena);
 
   String json = {};
@@ -353,10 +339,10 @@ Mesh load_gltf(Allocator arena, String path, b32 is_glb) {
   String file_path = str_chop_last_dot(path);
   String file_path_bin = push_strf(scratch, "%s.bin", file_path);
   Slice data = is_glb ? cursor : os_file_path_read_all(scratch, file_path_bin);
-  Slice pos = slice_reinterpret<v3>(slice(data, gltf.pos_buffer_view.offset, gltf.pos_buffer_view.offset + gltf.pos_buffer_view.size));
-  Slice norm = slice_reinterpret<v3>(slice(data, gltf.norm_buffer_view.offset, gltf.norm_buffer_view.offset + gltf.norm_buffer_view.size));
-  Slice texcoord = slice_reinterpret<v2>(slice(data, gltf.texcoord_buffer_view.offset, gltf.texcoord_buffer_view.offset + gltf.texcoord_buffer_view.size));
-  Slice indices_u16 = slice_reinterpret<u16>(slice(data, gltf.indices_buffer_view.offset, gltf.indices_buffer_view.offset + gltf.indices_buffer_view.size));
+  Slice pos = slice_reinterpret<v3>(slice_n(data, gltf.pos_buffer_view.offset, gltf.pos_buffer_view.size));
+  Slice norm = slice_reinterpret<v3>(slice_n(data, gltf.norm_buffer_view.offset, gltf.norm_buffer_view.size));
+  Slice texcoord = slice_reinterpret<v2>(slice_n(data, gltf.texcoord_buffer_view.offset, gltf.texcoord_buffer_view.size));
+  Slice indices_u16 = slice_reinterpret<u16>(slice_n(data, gltf.indices_buffer_view.offset, gltf.indices_buffer_view.size));
 
   Slice vertices = push_slice(arena, Vertex, gltf.pos_accessor.count);
   Slice indices = push_slice(arena, u32, gltf.indices_accessor.count);
@@ -370,68 +356,54 @@ Mesh load_gltf(Allocator arena, String path, b32 is_glb) {
       .uv = texcoord[i],
     };
   }
-  Mesh mesh = {
+  MeshDesc mesh = {
     .vertices = vertices,
     .indices = indices,
   };
   return mesh;
 }
 
-Texture load_image(String filepath) {
+TextureDesc image_load(String filepath) {
   Scratch scratch;
-  Texture texture = {};
   u32 required_channel_count = 4;
   u32 channel_count;
   Slice buf = os_file_path_read_all(scratch, filepath);
-  u8* data = stbi_load_from_memory(buf.data, buf.count, (i32*)&texture.width, (i32*)&texture.height, (i32*)&channel_count, required_channel_count);
-  Assert(data);
-  texture.data = data;
-  return texture;
+  TextureDesc res = {};
+  res.data = stbi_load_from_memory(buf.data, buf.count, (i32*)&res.width, (i32*)&res.height, (i32*)&channel_count, required_channel_count);
+  Assert(res.data);
+  return res;
 }
 
 ////////////////////////////////////////////////////////////////////////
 // @Assets
 
 global String meshes_strs[] = {
-#define X(enum_name, name) [enum_name] = Stringify(name),
+#define X(name) [Glue(Mesh_, name)] = Stringify(name),
   MESH_LIST
-#undef X
-#define X(enum_name) [enum_name] = Stringify(enum_name),
-  MESH_0_LIST
 #undef X
 };
 
 global String textures_strs[] = {
-#define X(enum_name, name) [enum_name] = Stringify(name),
+#define X(name) [Glue(Texture_, name)] = Stringify(name),
   TEXTURE_LIST
 #undef X
 };
 
 global String materials_strs[] = {
-#define X(enum_name, ...) [enum_name] = Stringify(enum_name),
+#define X(name) [Glue(Material_, name)] = Stringify(name),
   MATERIAL_LIST
 #undef X
 };
 
-GpuMeshId mesh_get(MeshEnum mesh_enum) { return st->meshes_ids[mesh_enum]; }
-void mesh_set(MeshEnum mesh_enum, GpuMeshId mesh_id) { 
-  st->meshes_ids[mesh_enum] = mesh_id;
-  String str = push_str_copy(st->arena, meshes_strs[mesh_enum]);
-  st->mesh_id_to_str[mesh_id.idx] = str;
-  map_set(st->str_to_mesh_id, str, mesh_id);
+MeshId mesh_get(MeshEnum mesh_enum) { return st->meshes_ids[mesh_enum]; }
+void mesh_set(MeshEnum mesh_enum, MeshId id) { 
+  GlobalState& g = *st;
+  g.meshes_ids[mesh_enum] = id;
+  String str = push_str_copy(g.arena, meshes_strs[mesh_enum]);
+  map_set(g.str_to_mesh_id, str, id);
+  g.mesh_id_to_str[id.idx] = str;
 }
-GpuMaterialId material_get(MaterialEnum id) { return st->materials_ids[id]; }
-
-constexpr ShaderState shader_default_state() {
-  ShaderState info = {
-    .type = ShaderType_Drawing,
-    .topology = ShaderTopology_Triangle,
-    .samples = 4,
-    .is_transparent = false,
-    .use_depth = true,
-  };
-  return info;
-}
+MaterialId material_get(MaterialEnum id) { return st->materials_ids[id]; }
 
 constexpr MaterialProps material_default_props() {
   MaterialProps props = {
@@ -443,12 +415,12 @@ constexpr MaterialProps material_default_props() {
   return props;
 }
 
-GpuMeshId mesh_load(String name) {
+MeshId mesh_load(String name) {
   GlobalState& g = *st;
   Scratch scratch;
   String filepath = push_strf(scratch, "%s/%s", g.models_dir, name);
   String format = str_skip_last_dot(name);
-  Mesh mesh = {};
+  MeshDesc mesh = {};
   if (str_match(format, "glb")) {
     mesh = load_gltf(scratch, filepath, true);
   } else if (str_match(format, "gltf")) {
@@ -458,156 +430,37 @@ GpuMeshId mesh_load(String name) {
   } else {
     InvalidPath;
   }
-  GpuMeshId handle = r_mesh_load(mesh);
-  return handle;
+  MeshId res = r_mesh_load(mesh);
+  return res;
 }
 
-GpuTextureId texture_load(String name) {
+TextureId texture_load(String name) {
   GlobalState& g = *st;
   Scratch scratch;
   String filepath = push_strf(scratch, "%s/%s", g.textures_dir, name);
-  Texture texture = load_image(filepath);
-  GpuTextureId handle = r_texture_load(texture);
-  return handle;
+  TextureDesc texture = image_load(filepath);
+  TextureId res = r_texture_load(texture);
+  return res;
 }
 
-GpuCubemapId cubemap_load(String name) {
+CubemapId cubemap_load(String name) {
   GlobalState& g = *st;
   Scratch scratch;
-  Texture textures[6];
   String sides[] = {
     "right", "left",
     "top", "bottom",
     "front", "back",
   };
-  for EachElement(i, textures) {
-    String texture_name = push_strf(scratch, "%s/%s%s", name, sides[i], String(".png"));
-    String filepath = push_strf(scratch, "%s/%s", g.textures_dir, texture_name);
-    textures[i] = load_image(filepath);
+  String texture_name = push_strf(scratch, "%s/%s%s", name, sides[0], String(".png"));
+  String filepath = push_strf(scratch, "%s/%s", g.textures_dir, texture_name);
+  TextureDesc texture = image_load(filepath);
+  LoopRange(i, 1, ArrayCount(sides)) {
+    texture_name = push_strf(scratch, "%s/%s%s", name, sides[i], String(".png"));
+    filepath = push_strf(scratch, "%s/%s", g.textures_dir, texture_name);
+    texture.cube[i] = image_load(filepath).data;
   }
-  r_cubemap_load(textures);
+  r_cubemap_load(texture);
   return {};
-}
-
-void assets_load() {
-  GlobalState& g = *st;
-  var m_load = [&](MeshEnum enum_name, String name) {
-    g.meshes_ids[enum_name] = mesh_load(meshes_strs[enum_name]);
-    String str = push_str_copy(g.arena, meshes_strs[enum_name]);
-    map_set(g.str_to_mesh_id, str, g.meshes_ids[enum_name]);
-    g.mesh_id_to_str[g.meshes_ids[enum_name].idx] = str;
-  };
-#define X(enum_name, name) m_load(enum_name, Stringify(name));
-  MESH_LIST
-#undef X
-
-  var t_load = [&](TextureEnum enum_name, String name) {
-    g.textures_ids[enum_name] = texture_load(textures_strs[enum_name]); \
-    String str = push_str_copy(g.arena, textures_strs[enum_name]);
-    map_set(g.str_to_texture_id, str, g.textures_ids[enum_name]);
-    g.texture_id_to_str[g.textures_ids[enum_name].idx] = str;
-  };
-#define X(enum_name, name) t_load(enum_name, Stringify(name));
-  TEXTURE_LIST
-#undef X
-
-  var mat_load = [&](MaterialEnum enum_name, MaterialDesc desc) {
-    g.materials_ids[enum_name] = r_material_load(desc);
-    String str = push_str_copy(g.arena, materials_strs[enum_name]);
-    map_set(g.str_to_material_id, str, g.materials_ids[enum_name]);
-    g.material_id_to_str[g.materials_ids[enum_name].idx] = str;
-  };
-  mat_load(Material_Orange, {
-    .shader_name = "e_texture",
-    .pipeline_desc = {
-      .depth = {
-        .compare = Gfx_CompareOp_Less,
-        .write_enabled = true,
-      }
-    },
-    .props = material_default_props(),
-    .texture = "orange_lines_512.png",
-  });
-  mat_load(Material_Container, {
-    .shader_name = "e_texture",
-    .pipeline_desc = {
-      .depth = {
-        .compare = Gfx_CompareOp_Less,
-        .write_enabled = true,
-      }
-    },
-    .props = material_default_props(),
-    .texture = "container.jpg",
-  });
-  mat_load(Material_Axis, {
-    .shader_name = "e_vert_color",
-    .pipeline_desc = {
-      .primitive_type = Gfx_PrimitiveType_Line,
-      .depth = {
-        .compare = Gfx_CompareOp_Less,
-        .write_enabled = true,
-      }
-    },
-    .props = material_default_props(),
-  });
-  mat_load(Material_Line, {
-    .shader_name = "e_color",
-    .pipeline_desc = {
-      .primitive_type = Gfx_PrimitiveType_Line,
-      .depth = {
-        .compare = Gfx_CompareOp_Less,
-        .write_enabled = true,
-      }
-    },
-    .props = material_default_props(),
-  });
-
-  // mat_load(Material_Orange, {
-  //   .shader = {
-  //     .name = "e_texture",
-  //     .state = shader_default_state(),
-  //   },
-  //   .props = material_default_props(),
-  //   .texture = "orange_lines_512.png",
-  // });
-  // mat_load(Material_Container, {
-  //   .shader = {
-  //     .name = "e_texture",
-  //     .state = shader_default_state(),
-  //   },
-  //   .props = material_default_props(),
-  //   .texture = "container.jpg",
-  // });
-  // mat_load(Material_Axis, {
-  //   .shader = {
-  //     .name = "e_vert_color",
-  //     .state = {
-  //       .topology = ShaderTopology_Line,
-  //       .samples = 4,
-  //       .use_depth = true,
-  //     },
-  //   },
-  // });
-  // mat_load(Material_Line, {
-  //   .shader = {
-  //     .name = "e_color",
-  //     .state = {
-  //       .topology = ShaderTopology_Line,
-  //       .samples = 4,
-  //       .use_depth = true,
-  //     },
-  //   },
-  // });
-  // mat_load(Material_Line, {
-  //   .shader = {
-  //     .name = "e_color",
-  //     .state = {
-  //       .topology = ShaderTopology_Line,
-  //       .samples = 4,
-  //       .use_depth = true,
-  //     },
-  //   },
-  // });
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -1067,11 +920,11 @@ String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, 
         dstr_push(string, push_strf(scratch, "%s %f %f %f %f %f %f\n", member.name, v.min.x,v.min.y,v.min.z, v.max.x,v.max.y,v.max.z));
       } break;
       case MetaType_GpuMeshId: {
-        GpuMeshId v = *((GpuMeshId*)member_ptr);
+        MeshId v = *((MeshId*)member_ptr);
         dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->mesh_id_to_str[v.idx]));
       } break;
       case MetaType_GpuMaterialId: {
-        GpuMaterialId v = *((GpuMaterialId*)member_ptr);
+        MaterialId v = *((MaterialId*)member_ptr);
         dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->material_id_to_str[v.idx]));
       } break;
       case MetaType_String: {
@@ -1132,13 +985,13 @@ void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser
         Token tok = tok_require(p, TokenType_String);
         Result mesh = map_get(st->str_to_mesh_id, tok.str);
         Assert(!mesh.err);
-        *(GpuMeshId*)Offset(ptr, member.offset) = mesh;
+        *(MeshId*)Offset(ptr, member.offset) = mesh;
       } break;
       case MetaType_GpuMaterialId: {
         Token tok = tok_require(p, TokenType_String);
         Result material = map_get(st->str_to_material_id, tok.str);
         Assert(!material.err);
-        *(GpuMaterialId*)Offset(ptr, member.offset) = material;
+        *(MaterialId*)Offset(ptr, member.offset) = material;
       } break;
       case MetaType_String: {
         Token tok = tok_require(p, TokenType_String);
@@ -1350,11 +1203,11 @@ void com_init() {
     test();
 
     g.gpa = alloc_seglist_make(g.arena);
-    g.asset_path = push_strf(g.arena, "%s/%s", os_get_current_directory(), String("../assets"));
-    g.shader_dir = push_str_cat(g.arena, g.asset_path, "/shaders");
+    g.asset_dir = push_strf(g.arena, "%s/%s", os_get_current_directory(), String("../assets"));
+    g.shader_dir = push_str_cat(g.arena, g.asset_dir, "/shaders");
     g.shader_compiled_dir = push_str_cat(g.arena, g.shader_dir, "/compiled");
-    g.models_dir = push_str_cat(g.arena, g.asset_path, "/models");
-    g.textures_dir = push_str_cat(g.arena, g.asset_path, "/textures");
+    g.models_dir = push_str_cat(g.arena, g.asset_dir, "/models");
+    g.textures_dir = push_str_cat(g.arena, g.asset_dir, "/textures");
     g.watch.arena = g.arena;
     watch_directory_add(g.shader_dir, WatchOp_RecompileShader);
     watch_directory_add(g.shader_compiled_dir, WatchOp_ShaderReload);
@@ -1484,7 +1337,7 @@ void gfx_api_design_foo() {
 ////////////////////////////////////////////////////////////////////////
 // @Game
 
-Mesh sphere_generate(Allocator arena) {
+MeshDesc sphere_generate(Allocator arena) {
   u32 lat_steps = 10;
   u32 lon_steps = 10;
   u32 vert_count = lat_steps*lon_steps;
@@ -1533,14 +1386,14 @@ Mesh sphere_generate(Allocator arena) {
   //   indices[k++] = north_pole_index;      // pole
   //   indices[k++] = idx(lat_steps - 2, next_j);
   // }
-  Mesh mesh = {
+  MeshDesc mesh = {
     .vertices = vertices,
     .indices = indices,
   };
   return mesh;
 }
 
-Mesh grid_generate(Allocator arena, u32 size, f32 step) {
+MeshDesc grid_generate(Allocator arena, u32 size, f32 step) {
   var vertices = push_slice(arena, Vertex, size*4);
   v3 pos_offset = v3(-(i32)size/2, 0, -(i32)size/2);
   for (i32 i = 0; i < size; ++i) {
@@ -1552,7 +1405,7 @@ Mesh grid_generate(Allocator arena, u32 size, f32 step) {
     vertical_vertices[i*2].pos = pos_offset + v3(i*step, 0, 0);
     vertical_vertices[i*2+1].pos = pos_offset + v3(i*step, 0, size*step);
   }
-  Mesh mesh = {
+  MeshDesc mesh = {
     .vertices = vertices,
   };
   return mesh;
@@ -1577,7 +1430,8 @@ EntityId e_alloc_bare() {
   ++g.entities_count;
   return e_id;
 }
-EntityId e_alloc(GpuMeshId mesh_id, GpuMaterialId material_id, EntityThing thing) {
+
+EntityId e_alloc(MeshId mesh_id, MaterialId material_id, EntityThing thing) {
   GameState& g = st->game;
   Entity e = {
     .name = thing.name,
@@ -1588,7 +1442,6 @@ EntityId e_alloc(GpuMeshId mesh_id, GpuMaterialId material_id, EntityThing thing
     .aabb = Rng3(v3_splat(-1), v3_splat(1)),
   };
   EntityId e_id = pool_push(g.entities, e);
-  vk_make_renderable(e_id, mesh_id, material_id);
   ++g.entities_count;
   return e_id;
 }
@@ -1596,34 +1449,10 @@ EntityId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing) 
   return e_alloc(mesh_get(mesh_id), material_get(material_id), thing);
 }
 
-StaticEntityId e_static_alloc(GpuMeshId mesh_id, GpuMaterialId material_id) {
-  GameState& g = st->game;
-  StaticEntity e = {
-    .scale = v3_one(),
-    .mesh_id = mesh_id,
-    .material_id = material_id,
-  };
-  StaticEntityId e_id = pool_push(g.static_entities, e);
-  vk_make_renderable_static(e_id, mesh_id, material_id);
-  ++g.static_entities_count;
-  return e_id;
-}
-StaticEntityId e_static_alloc(MeshEnum mesh_id, MaterialEnum material_id) {
-  return e_static_alloc(mesh_get(mesh_id), material_get(material_id));
-}
-
 void e_free(EntityId e_id) {
   GameState& g = st->game;
-  vk_remove_renderable(e_id);
   pool_remove(g.entities, e_id);
   --g.entities_count;
-}
-
-void e_static_free(StaticEntityId e_id) {
-  GameState& g = st->game;
-  vk_remove_static_renderable(e_id);
-  pool_remove(g.static_entities, e_id);
-  --g.static_entities_count;
 }
 
 void select_obj() {
@@ -1747,7 +1576,7 @@ void scene_init() {
   }
   {
     EntityId grid_id = e_alloc(Mesh_Grid, Material_Line);
-    vk_set_entity_color(grid_id, v4_splat(0.6));
+    r_set_entity_color(grid_id, v4_splat(0.6));
     Entity& grid = get_entity(grid_id);
     grid.pos = v3(0,0,-5);
   }
@@ -1761,9 +1590,8 @@ void scene_init() {
     cube.pos = v3_rand_rng(-v3_splat(range), v3_splat(range));
   }
 #if 1
-  // Loop (i, MB(1)-KB(1)) {
-  // Loop (i, KB(100)) {
-  Loop (i, KB(1)) {
+  // Loop (i, 128) {
+  Loop (i, MaxEntities - KB(1)) {
     // Handle<StaticEntity> e = entity_static_create(Mesh_Cube, Material_Orange);
     // u32 range = KB(1);
     // e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
@@ -1777,10 +1605,10 @@ void scene_init() {
       // Material_Container,
       // Material_Screen,
     };
-    StaticEntityId e_id = e_static_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
-    array_push(g.static_cubes, e_id);
+    EntityId e_id = e_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
+    // array_push(g.static_cubes, e_id);
     u32 range = KB(1);
-    StaticEntity& e = get_static_entity(e_id);
+    Entity& e = get_entity(e_id);
     e.pos = v3_rand_rng(-v3_splat(range), v3_splat(range));
     // v3 dir = v3_rand_rng(v3_scale(-1), v3_scale(1));
     // e.pos() = v3_norm(dir) * range;
@@ -1857,9 +1685,8 @@ void scene_init() {
 }
 
 void scene_deinit() {
-  // st->entity_pool = {};
-  // st->entity_pool.clear();
-  // arena_clear(&st->arena);
+  GameState& g = st->game;
+  pool_clear(g.entities);
 }
 
 void scene_update() {
@@ -1973,6 +1800,12 @@ void scene_update() {
   }
 
   r_draw_rect(Rng2(v2(0,0), v2(100,100)), ColorWhite);
+
+  for EachNodePool(i, g.entities) {
+    EntityId e_id = pool_get_slot(g.entities, i);
+    Entity& e = pool_get(g.entities, e_id);
+    r_push_mesh(e_id, e.mesh_id, e.material_id);
+  }
 }
 
 void game_save_state() {
@@ -1994,13 +1827,13 @@ void game_save_state() {
     }
   }
   {
-    var& p = g.static_entities;
-    for EachNodePool(i, p) {
-      StaticEntity& e = p.data[i].elem;
-      dstr_push(data, "StaticEntity {\n");
-      dstr_push(data, dumb_struct(scratch, slice(members_of_StaticEntity), &e));
-      dstr_push(data, "}\n");
-    }
+    // var& p = g.static_entities;
+    // for EachNodePool(i, p) {
+    //   StaticEntity& e = p.data[i].elem;
+    //   dstr_push(data, "StaticEntity {\n");
+    //   dstr_push(data, dumb_struct(scratch, slice(members_of_StaticEntity), &e));
+    //   dstr_push(data, "}\n");
+    // }
   }
 
   OS_Handle file = os_file_open(push_strf(scratch, "%s/saved", os_get_current_directory(), String("saved")), OS_AccessFlag_Write | OS_AccessFlag_Trunc);
@@ -2018,16 +1851,16 @@ void game_load_state() {
   {
     var& p = g.entities;
     for EachNodePool(i, p) {
-      EntityId e_id = pool_get_handler(p, i);
+      EntityId e_id = pool_get_slot(p, i);
       e_free(e_id);
     }
   }
   {
-    var& p = g.static_entities;
-    for EachNodePool(i, p) {
-      StaticEntityId e_id = pool_get_handler(p, i);
-      e_static_free(e_id);
-    }
+    // var& p = g.static_entities;
+    // for EachNodePool(i, p) {
+    //   StaticEntityId e_id = pool_get_handler(p, i);
+    //   e_static_free(e_id);
+    // }
   }
 
   while (!tok_is_end(p)) {
@@ -2041,7 +1874,6 @@ void game_load_state() {
           EntityId e_id = e_alloc_bare();
           Entity& e = get_entity(e_id);
           dumb_struct_load(slice(members_of_Entity), &e, &p);
-          vk_make_renderable(e_id, e.mesh_id, e.material_id);
           if (FlagHas(e.flags, EntityFlag_Referenced)) {
             if (str_match("monkey", e.name)) {
               g.monkey_id = e_id;
@@ -2051,13 +1883,14 @@ void game_load_state() {
               g.rotating_cube_id = e_id;
             } 
           }
-        } else if (str_match(tok.str, "StaticEntity")) {
-          StaticEntity entity = {};
-          dumb_struct_load(slice(members_of_StaticEntity), &entity, &p);
-          StaticEntityId e_id = e_static_alloc(entity.mesh_id, entity.material_id);
-          StaticEntity&e = get_static_entity(e_id);
-          e = entity;
-        }
+        } 
+        // else if (str_match(tok.str, "StaticEntity")) {
+        //   StaticEntity entity = {};
+        //   dumb_struct_load(slice(members_of_StaticEntity), &entity, &p);
+        //   StaticEntityId e_id = e_static_alloc(entity.mesh_id, entity.material_id);
+        //   StaticEntity&e = get_static_entity(e_id);
+        //   e = entity;
+        // }
       }
     }
   }
@@ -2074,22 +1907,97 @@ void game_init() {
   g.timer = timer_make(1);
 
   g.moving_cubes = darray_make<EntityId>(g.gpa);
-  g.static_cubes = darray_make<StaticEntityId>(g.gpa);
+  // g.static_cubes = darray_make<StaticEntityId>(g.gpa);
 
-  Mesh triangle_mesh = {.vertices = slice(triangle_vertices)};
+  MeshDesc triangle_mesh = {.vertices = slice(triangle_vertices)};
   mesh_set(Mesh_Triangle, r_mesh_load(triangle_mesh));
-  Mesh grid_mesh = grid_generate(scratch, 100, 1);
+  MeshDesc grid_mesh = grid_generate(scratch, 100, 1);
   mesh_set(Mesh_Grid, r_mesh_load(grid_mesh));
-  Mesh axis_mesh = {.vertices = slice(axis_vertices)};
+  MeshDesc axis_mesh = {.vertices = slice(axis_vertices)};
   mesh_set(Mesh_Axis, r_mesh_load(axis_mesh));
-  Mesh sphere = sphere_generate(scratch);
+  MeshDesc sphere = sphere_generate(scratch);
   mesh_set(Mesh_Sphere, r_mesh_load(sphere));
 
-  st->meshes_ids[Mesh_CubeGlft] = mesh_load("cube.gltf");
-
   cubemap_load("night_cubemap");
-  assets_load();
+
+  {
+    GlobalState& g = *st;
+    var m_load = [&](MeshEnum enum_name, String name) {
+      MeshId id = mesh_load(name);
+      g.meshes_ids[enum_name] = id;
+      String str = push_str_copy(g.arena, name);
+      map_set(g.str_to_mesh_id, str, id);
+      g.mesh_id_to_str[id.idx] = str;
+    };
+    m_load(Mesh_Cube, "cube.glb");
+    m_load(Mesh_MonkeyGlb, "monkey.glb");
+    m_load(Mesh_CubeGlft, "cube.gltf");
+  
+    var t_load = [&](TextureEnum enum_name, String name) {
+      TextureId id = texture_load(name); \
+      g.textures_ids[enum_name] = id;
+      String str = push_str_copy(g.arena, name);
+      map_set(g.str_to_texture_id, str, id);
+      g.texture_id_to_str[id.idx] = str;
+    };
+    t_load(Texture_Orange, "orange_lines_512.png");
+    t_load(Texture_Container, "container.jpg");
+  
+    var mat_load = [&](MaterialEnum enum_name, MaterialDesc desc) {
+      MaterialId id = r_material_make(desc);
+      g.materials_ids[enum_name] = id;
+      String str = push_str_copy(g.arena, materials_strs[enum_name]);
+      map_set(g.str_to_material_id, str, id);
+      g.material_id_to_str[id.idx] = str;
+    };
+    mat_load(Material_Orange, {
+      .shader_name = "e_texture",
+      .pipeline_desc = {
+        .depth = {
+          .compare = Gfx_CompareOp_Less,
+          .write_enabled = true,
+        }
+      },
+      .props = material_default_props(),
+      .texture = "orange_lines_512.png",
+    });
+    mat_load(Material_Container, {
+      .shader_name = "e_texture",
+      .pipeline_desc = {
+        .depth = {
+          .compare = Gfx_CompareOp_Less,
+          .write_enabled = true,
+        }
+      },
+      .props = material_default_props(),
+      .texture = "container.jpg",
+    });
+    mat_load(Material_Axis, {
+      .shader_name = "e_vert_color",
+      .pipeline_desc = {
+        .primitive_type = Gfx_PrimitiveType_Line,
+        .depth = {
+          .compare = Gfx_CompareOp_Less,
+          .write_enabled = true,
+        }
+      },
+      .props = material_default_props(),
+    });
+    mat_load(Material_Line, {
+      .shader_name = "e_color",
+      .pipeline_desc = {
+        .primitive_type = Gfx_PrimitiveType_Line,
+        .depth = {
+          .compare = Gfx_CompareOp_Less,
+          .write_enabled = true,
+        }
+      },
+      .props = material_default_props(),
+    });
+  }
+
   scene_init();
+
 
   // camera_init();
   // g.cube0 = e_alloc(Mesh_Cube, Material_Container);
@@ -2150,5 +2058,3 @@ void game_update() {
   }
   scene_update();
 }
-
-

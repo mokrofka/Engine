@@ -9,12 +9,46 @@ struct DebugWindow {
   ImGuiWindowFlags flags;
 };
 
+Rng2 debug_window_get_rect(DebugWindow win);
+
+enum ProfTabActive {
+  ProfileTabActive_Root,
+  ProfileTabActive_Frames,
+  ProfileTabActive_Time,
+  ProfileTabActive_LaunchTime,
+  ProfileTabActive_Memory,
+};
+
+struct ProfColors {
+  v4 work;
+  v4 sleep;
+  v4 job;
+  v4 selected;
+  v4 hovered;
+  v4 border;
+  v4 text;
+  v4 text_dim;
+  v4 current_frame;
+  v4 frame_ok;     // < 16ms
+  v4 frame_warn;   // 16-20ms
+  v4 frame_bad;    // > 20ms
+  v4 mem_used;
+  v4 mem_committed;
+  v4 mem_cap;
+};
+
 struct DebugProfWindow {
   DebugWindow win;
   ScrollState root_scroll_state;
   ScrollState frames_scroll_state;
   ScrollState launch_time_scroll_state;
   ScrollState mem_scroll_state;
+  ProfTabActive active_tab;
+  ProfTabActive future_active_tab;
+  f32 frame_avg_time;
+  f32 frame_min_time;
+  f32 frame_max_time;
+  ProfColors colors;
 };
 
 struct DebugState {

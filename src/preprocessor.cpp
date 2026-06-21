@@ -1,5 +1,5 @@
 #include "lib.h"
-#include "tokenizer.h"
+#include "tokenizer.cpp"
 
 i32 main(i32 count, char* args[]) {
   tctx_init();

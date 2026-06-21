@@ -2384,7 +2384,7 @@ Gfx_IndirectDrawcall gfx_indirect_end(u32 base) {
 void gfx_push_indirect(Gfx_Mesh mesh, u32 id, u32 instance_count) {
   VK_Drawcall info = {};
   if (mesh.index_count) {
-    info.index_draw_command = (VkDrawIndexedIndirectCommand){
+    info.index_draw_command = {
       .indexCount = mesh.index_count,
       .instanceCount = instance_count,
       .firstIndex = mesh.base_index,
@@ -2392,7 +2392,7 @@ void gfx_push_indirect(Gfx_Mesh mesh, u32 id, u32 instance_count) {
       .firstInstance = 0,
     };
   } else {
-    info.draw_command = (VkDrawIndirectCommand){
+    info.draw_command = {
       .vertexCount = mesh.vert_count,
       .instanceCount = instance_count,
       .firstVertex = mesh.base_vert,
@@ -2581,7 +2581,7 @@ void gfx_init(Gfx_Environment environment) {
     g.CreateDescriptorPool(vkdevice, &pool_info, g.allocator, &g.descriptor_pool);
   }
 
-  u32 drawcall_mem = MaxDrawCalls * sizeof(VK_Drawcall);
+  u32 drawcall_mem = MaxEntities * sizeof(VK_Drawcall);
   g.gpu_mem = vk_mem_make(Gfx_MemType_Gpu, environment.gpu_mem_size + environment.image_mem_size);
   g.cpu_mem = vk_mem_make(Gfx_MemType_Cpu, environment.cpu_mem_size);
   g.gpu_buf = vk_buffer_make(environment.gpu_mem_size);

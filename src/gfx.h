@@ -459,28 +459,9 @@ struct Buffer {
   u64 size;
 };
 
-struct VK_ImageInfo {
-  VkImageType image_type;
-  u32 width;
-  u32 height;
-  u32 miplevels_count;
-  VkImageCreateFlags flags;
-  VkFormat format;
-  u32 array_layers_count;
-  VkSampleCountFlagBits samples;
-  VkImageTiling tiling;
-  VkImageUsageFlags usage;
-  VkMemoryPropertyFlags memory_flags;
-  VkImageAspectFlags aspect;
-  VkImageViewType view_type;
-};
-
 struct VK_Image {
-  VK_ImageInfo info;
-
   VkDeviceMemory memory;
   VkImage h;
-  VkImageView view;
   Gfx_ImageType type;
   u32 width;
   u32 height;
@@ -490,8 +471,6 @@ struct VK_Image {
   Gfx_PixelFormat pixel_format;
   u32 sample_count;
   VK_Access cur_access;
-
-  u64 mem_offset;
 };
 
 struct VK_View {
@@ -506,7 +485,6 @@ struct VK_View {
 
 struct VK_Sampler {
   VkSampler h;
-
   Gfx_Filter min_filter;
   Gfx_Filter mag_filter;
   Gfx_Filter mipmap_filter;

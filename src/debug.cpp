@@ -1,5 +1,13 @@
 #include "debug.h"
 
+Rng2 debug_window_get_rect(DebugWindow win) {
+  if (win.fullscreen) {
+    return rng2_make(v2_zero(), v2_of_v2u(os_get_window_size()));
+  } else {
+    return rng2_make(win.pos, win.size);
+  }
+}
+
 ImGui_DrawList imgui_get_window_drawlist() {
   ImGui_DrawList res = {
     .draw = ImGui::GetWindowDrawList(),
@@ -95,6 +103,18 @@ void debug_init() {
   imgui_init();
   ImGuiIO& io = ImGui::GetIO();
   g.font = io.Fonts->AddFontDefault();
+  g.prof_win.colors = {
+    .work = ColorGreyDark,
+    .sleep = ColorGreenUi,
+    .job = ColorOrangeUi,
+    .current_frame = ColorGrey3,
+    .frame_ok = ColorGreen,
+    .frame_warn = ColorYellow,
+    .frame_bad = ColorRed,
+    .mem_used = ColorGreenUi,
+    .mem_committed = ColorBlueUi,
+    .mem_cap = ColorRedUi,
+  };
 }
 
 void debug_update() {
@@ -133,7 +153,7 @@ void debug_game() {
     }
 
     v3 pos = cam.pos;
-    ImGui::Text("entities: %u, static entities: %u", g.entities_count, g.static_entities_count);
+    ImGui::Text("entities: %u", g.entities_count);
     ImGui::Text("Camera: x: %.2f y: %.2f z: %.2f", pos.x, pos.y, pos.z);
     ImGui::DragFloat("speed", &cam.speed, 1);
     {
@@ -169,15 +189,9 @@ void debug_prof_view() {
   DebugProfWindow& prof_win = st->debug.prof_win;
 
   // Avg, min, max
-  ProfFrame prev_frame = prof_get_prev_frame(st->current_frame);
-  var anchors = prev_frame.anchors;
-  u64 cpu_freq = cpu_frequency();
-  u64 tsc_start = prev_frame.frame_time.tsc_start;
-  u64 tsc_end = prev_frame.frame_time.tsc_end;
-  u64 tsc_elapsed = tsc_end - tsc_start;
   u64 tsc_elapsed_sum = 0;
-  u64 tsc_elapsed_max = prof.frames_times[0].tsc_end - prof.frames_times[0].tsc_start;
-  u64 tsc_elapsed_min = prof.frames_times[0].tsc_end - prof.frames_times[0].tsc_start;
+  u64 tsc_elapsed_max = 0;
+  u64 tsc_elapsed_min = U32_MAX;
   for EachElement(i, prof.frames_times) {
     ProfFrameTime frame = prof.frames_times[i];
     u64 elapsed = frame.tsc_end - frame.tsc_start;
@@ -185,9 +199,16 @@ void debug_prof_view() {
     tsc_elapsed_max = Max(tsc_elapsed_max, elapsed);
     tsc_elapsed_min = Min(tsc_elapsed_min, elapsed);
   }
-  prof.frame_avg_time = tsc_to_ms(tsc_elapsed_sum / 120);
-  prof.frame_max_time = tsc_to_ms(tsc_elapsed_max);
-  prof.frame_min_time = tsc_to_ms(tsc_elapsed_min);
+  prof_win.frame_avg_time = tsc_to_ms(tsc_elapsed_sum / ProfRecordHistoryNum);
+  prof_win.frame_max_time = tsc_to_ms(tsc_elapsed_max);
+  prof_win.frame_min_time = tsc_to_ms(tsc_elapsed_min);
+
+  ProfFrame prev_frame = prof_get_prev_frame(st->current_frame);
+  var anchors = prev_frame.anchors;
+  u64 tsc_start = prev_frame.frame_time.tsc_start;
+  u64 tsc_end = prev_frame.frame_time.tsc_end;
+  u64 tsc_elapsed = tsc_end - tsc_start;
+  ProfColors colors = prof_win.colors;
 
   if (key_pressed(Key_H)) {
     ImGui::SetNextWindowFocus(); 
@@ -202,14 +223,14 @@ void debug_prof_view() {
     if (ImGui::Begin("Profiler", null, prof_win.win.flags)) {
       debug_window_track_state(prof_win.win);
 
-      Rng2 win_rect = rng2_make(prof_win.win.pos, prof_win.win.size);
+      Rng2 win_rect = debug_window_get_rect(prof_win.win);
       ImGui::PushClipRect(win_rect.min, win_rect.max, false);
 
-      if (key_pressed(Key_1)) prof.future_active_tab = ProfileTabActive_Root;
-      if (key_pressed(Key_2)) prof.future_active_tab = ProfileTabActive_Frames;
-      if (key_pressed(Key_3)) prof.future_active_tab = ProfileTabActive_Time;
-      if (key_pressed(Key_4)) prof.future_active_tab = ProfileTabActive_LaunchTime;
-      if (key_pressed(Key_5)) prof.future_active_tab = ProfileTabActive_Memory;
+      if (key_pressed(Key_1)) prof_win.future_active_tab = ProfileTabActive_Root;
+      if (key_pressed(Key_2)) prof_win.future_active_tab = ProfileTabActive_Frames;
+      if (key_pressed(Key_3)) prof_win.future_active_tab = ProfileTabActive_Time;
+      if (key_pressed(Key_4)) prof_win.future_active_tab = ProfileTabActive_LaunchTime;
+      if (key_pressed(Key_5)) prof_win.future_active_tab = ProfileTabActive_Memory;
       if (key_pressed(Key_P)) prof.paused = !prof.paused;
       if (ImGui::IsWindowHovered()) {
         if (key_pressed(Key_V)) {
@@ -244,7 +265,6 @@ void debug_prof_view() {
             ///////////////////////////////////
             // Build rect layout
             {
-              // ProfFrameTime time = g.frames_times[anchors_idx];
               u64 tsc_start = time.tsc_start;
               u64 tsc_end = time.tsc_end;
               u64 tsc_elapsed = tsc_end - tsc_start;
@@ -270,15 +290,10 @@ void debug_prof_view() {
                   }
                 }
 
-                f64 width_t = (f64)var_tsc_elapsed_incl / tsc_elapsed;
-                f64 width_t_off = Unlerp((f64)tsc_start, var_tsc_start, tsc_end);
-                if (anchor.tsc_elapsed_incl != anchor.tsc_elapsed_excl) {
-                  width_t = (f64)anchor.tsc_elapsed_incl / tsc_elapsed;
-                }
                 f32 height = 30;
                 f32 height_off = anchor.depth * height;
-                f32 width = width_t * avail_size.x;
-                f32 width_off = width_t_off * avail_size.x;
+                f32 width = (f64)var_tsc_elapsed_incl / tsc_elapsed * avail_size.x;
+                f32 width_off = remapf64(var_tsc_start, tsc_start, tsc_end, 0, avail_size.x);
                 Rng2 rect = rng2_make(v2(width_off, height_off), v2(width, height));
                 UI_Item item = {
                   .type = UI_ItemType_Bar,
@@ -328,15 +343,15 @@ void debug_prof_view() {
                 Rng2 rect = item.rect;
                 switch (anchor.type) {
                   case ProfType_Default: {
-                    color = ColorGreyDark;
+                    color = colors.work;
                     str = "work";
                   } break;
                   case ProfType_Sleep: {
-                    color = ColorGreenUi;
+                    color = colors.sleep;
                     str = "sleep";
                   } break;
                   case ProfType_Worker: {
-                    color = ColorOrangeUi;
+                    color = colors.job;
                     str = "job";
                   } break;
                 }
@@ -344,11 +359,11 @@ void debug_prof_view() {
                 imgui_draw_rect(draw, rect, ColorGreyLight);
                 if (rng2_contains(rect, mouse_pos)) {
                   ImGui::BeginTooltip();
-                  imgui_text("Label: %s", anchor.label.str);
+                  imgui_text("Label: %s", anchor.label);
                   imgui_text("Percent: %f%%", rng2_dim(rect).x / avail_size.x * 100);
                   imgui_text("Time: %fms", tsc_to_ms(anchor.tsc_elapsed_incl));
                   imgui_text("Time exclusive: %fms", tsc_to_ms(anchor.tsc_elapsed_excl));
-                  imgui_text("Type: %s", str.str);
+                  imgui_text("Type: %s", str);
                   ImGui::EndTooltip();
                 }
 
@@ -375,8 +390,8 @@ void debug_prof_view() {
           }
         };
 
-        imgui_text("%.1ffps %.1fms CPU %.1fGhz, Recording: %s", 1000 / tsc_to_ms(tsc_elapsed), tsc_to_ms(tsc_elapsed), (f64)cpu_freq / Billion(1), prof.paused ? "off" : "on");
-        imgui_text("avg %.1fms, max %.1f, min %.1f", prof.frame_avg_time, prof.frame_max_time, prof.frame_min_time);
+        imgui_text("%.1ffps %.1fms CPU %.1fGhz, Recording: %s", 1000 / tsc_to_ms(tsc_elapsed), tsc_to_ms(tsc_elapsed), (f64)cpu_frequency() / Billion(1), prof.paused ? String("off") : String("on"));
+        imgui_text("avg %.1fms, max %.1f, min %.1f", prof_win.frame_avg_time, prof_win.frame_max_time, prof_win.frame_min_time);
         f32 info_height = 60;
         cursor_pos.y += info_height;
 
@@ -391,9 +406,7 @@ void debug_prof_view() {
             v2 text_pos = (v2(0, text_off_above) + cursor_pos);
             text_pos.y *= scroll_state.scale.y;
             text_pos.y += scroll_state.offset.y;
-            // imgui_draw_text(draw, text_pos, ColorWhite, str);
             imgui_draw_text(draw, debug.font, thread_name_text_size, text_pos, ColorWhite, str);
-            // draw.draw->AddText(debug.font, 20, text_pos, u32_from_rgba(ColorWhite), (char*)str.str);
           }
           {
             Loop (i, THREAD_COUNT) {
@@ -402,7 +415,6 @@ void debug_prof_view() {
               v2 text_pos = v2(0, thread_height_offset + text_off_above) + cursor_pos;
               text_pos.y *= scroll_state.scale.y;
               text_pos.y += scroll_state.offset.y;
-              // imgui_draw_text(draw, text_pos, ColorWhite, str);
               imgui_draw_text(draw, debug.font, thread_name_text_size, text_pos, ColorWhite, str);
             }
             thread_height_offset = 0;
@@ -444,11 +456,11 @@ void debug_prof_view() {
           if (os_mouse_is_button_pressed(MouseButton_Left)) {
             if (rng2_contains(tab_rect, mouse_pos)) {
               switch (tab) {
-                case ProfileTabActive_Root: prof.future_active_tab = ProfileTabActive_Root; break;
-                case ProfileTabActive_Frames: prof.future_active_tab = ProfileTabActive_Frames; break;
-                case ProfileTabActive_Time: prof.future_active_tab = ProfileTabActive_Time; break;
-                case ProfileTabActive_LaunchTime: prof.future_active_tab = ProfileTabActive_LaunchTime; break;
-                case ProfileTabActive_Memory: prof.future_active_tab = ProfileTabActive_Memory; break;
+                case ProfileTabActive_Root: prof_win.future_active_tab = ProfileTabActive_Root; break;
+                case ProfileTabActive_Frames: prof_win.future_active_tab = ProfileTabActive_Frames; break;
+                case ProfileTabActive_Time: prof_win.future_active_tab = ProfileTabActive_Time; break;
+                case ProfileTabActive_LaunchTime: prof_win.future_active_tab = ProfileTabActive_LaunchTime; break;
+                case ProfileTabActive_Memory: prof_win.future_active_tab = ProfileTabActive_Memory; break;
               }
             }
           }
@@ -461,7 +473,7 @@ void debug_prof_view() {
         tab_mouse_click_handle("time", ProfileTabActive_Time);
         tab_mouse_click_handle("launch", ProfileTabActive_LaunchTime);
         tab_mouse_click_handle("memory", ProfileTabActive_Memory);
-        switch (prof.active_tab) {
+        switch (prof_win.active_tab) {
           case ProfileTabActive_Root: {
             ScrollState& scroll_state = prof_win.root_scroll_state;
             if (ImGui::IsWindowHovered()) {
@@ -505,19 +517,16 @@ void debug_prof_view() {
                   prof_win.frames_scroll_state.scale = v2_splat(1);
                 }
               }
-              v4 color = ColorGreen;
-              if (rng1_contains(Rng1(17, 21), frame_ms)) {
-                color = ColorYellow;
-              } else if (frame_ms > 20) {
-                color = ColorRed;
-              }
               if (i == st->current_frame % ArrayCount(prof.frames_times)) {
-                color = ColorGrey3;
+                imgui_draw_rect_filled(draw, rect, colors.current_frame);
               }
-
-              if (i == st->current_frame % ArrayCount(prof.frames_times)) {
-                imgui_draw_rect_filled(draw, rect, color);
-              } else {
+              else {
+                v4 color = colors.frame_ok;
+                if (rng1_contains(Rng1(17, 21), frame_ms)) {
+                  color = colors.frame_warn;
+                } else if (frame_ms > 20) {
+                  color = colors.frame_bad;
+                }
                 imgui_draw_rect_filled(draw, rect, color);
                 imgui_draw_rect(draw, rect, v4_set_w(ColorGrey0, 0.3));
               }
@@ -582,7 +591,7 @@ void debug_prof_view() {
               imgui_draw_rect(draw, rect, ColorGreyLight);
 
               String name_str = push_strf(scratch, "%s", anchor.label);
-              String ms_str = push_strf(scratch, "%.3fms", (f64)anchor.tsc_elapsed_excl / cpu_freq * 1000);
+              String ms_str = push_strf(scratch, "%.3fms", (f64)anchor.tsc_elapsed_excl / cpu_frequency() * 1000);
               v2 name_offset = v2(0, height * i) + cursor_pos;
               v2 ms_offset = v2(avail_size.x * 0.82, height * i) + cursor_pos;
 
@@ -825,5 +834,5 @@ void debug_prof_view() {
     } ImGui::End();
   }
 
-  prof.active_tab = prof.future_active_tab;
+  prof_win.active_tab = prof_win.future_active_tab;
 }

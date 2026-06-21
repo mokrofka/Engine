@@ -19,9 +19,7 @@
 // glb loader
 // introspection
 // font rendering
-// reading json 
 // editor
-// upgrade vulkan: new gfx api, shader object, bufferaddress, sync2
 
 ////////////////////////////////////////////////////////////////////////
 // @Common
@@ -59,61 +57,14 @@ const v4 ColorSelection  = v4(0.95, 0.65, 0.30, 1);
 const v4 ColorCollision  = v4(0.86, 0.33, 0.33, 1);
 
 const u32 MaxEntities = KB(4);
-const u32 MaxStaticEntities = KB(4);
 
 MakeId(OpaqueId)
-MakeId(GpuTextureId)
-MakeId(GpuMaterialId)
-MakeId(GpuMeshId)
-MakeId(GpuShaderId)
-MakeId(GpuCubemapId)
+MakeId(TextureId)
+MakeId(MaterialId)
+MakeId(MeshId)
+MakeId(CubemapId)
 MakeId(EntityId)
 MakeId(StaticEntityId)
-MakeId(IndexId)
-MakeId(TextureId);
-struct MyTexture {
-  u32 width;
-  u32 height;
-  u8* data;
-  u8 channels;
-  GpuTextureId gpu_texture;
-};
-
-struct TextureDesc {
-  b32 cpu;
-};
-
-TextureId load_texture(String path) {
-  return {};
-}
-
-struct PointLight {
-  v3 color;
-  v3 pos;
-  f32 intensity;
-  f32 rad;
-};
-
-struct DirLight {
-  v3 color;
-  v3 dir;
-  f32 intensity;
-};
-
-struct SpotLight {
-  v3 color;
-  v3 pos;
-  v3 dir;
-  f32 intensity;
-  f32 inner_cutoff;
-  f32 outer_cutoff;
-};
-
-struct Texture {
-  u32 width;
-  u32 height;
-  u8* data;
-};
 
 struct Vertex {
   v3 pos;
@@ -126,38 +77,38 @@ b32 equal(Vertex a, Vertex b);
 struct DebugDrawLine { Vertex vert[2]; };
 struct DebugDrawRect { Vertex vert[6]; };
 
-struct Mesh {
+enum LightType {
+  LightType_Point,
+  LightType_Dir,
+  LightType_Spot,
+};
+
+struct Light {
+  LightType type;
+  v3 pos;
+  v3 dir;
+  v3 color;
+  f32 intensity;
+  f32 radius;
+  f32 cone_angle;
+  b32 cast_shadow;
+};
+
+struct TextureDesc {
+  u32 width;
+  u32 height;
+  union {
+    u8* data;
+    u8* cube[6];
+  };
+};
+
+struct MeshDesc {
   Slice<Vertex> vertices;
   Slice<u32> indices;
   f32 bounds_min;
   f32 bounds_max;
   f32 bounds_rad;
-};
-
-enum ShaderType {
-  ShaderType_Drawing,
-  ShaderType_Screen,
-  ShaderType_Cube,
-  ShaderType_Compute,
-};
-
-enum ShaderTopology {
-  ShaderTopology_Triangle,
-  ShaderTopology_Line,
-  ShaderTopology_Point,
-};
-
-struct ShaderState {
-  ShaderType type;
-  ShaderTopology topology;
-  u32 samples = 4;
-  b8 is_transparent;
-  b8 use_depth = true;
-};
-
-struct ShaderDesc {
-  String name;
-  ShaderState state;
 };
 
 struct MaterialProps {
@@ -197,67 +148,58 @@ struct TimeScope {
 f32 get_dt();
 f32 get_time();
 
-Mesh load_obj(Allocator arena, String name);
-Mesh load_gltf(Allocator arena, String name);
-Texture load_image(String filepath);
+MeshDesc load_obj(Allocator arena, String name);
+MeshDesc load_gltf(Allocator arena, String name);
 
 ////////////////////////////////////////////////////////////////////////
 // @Assets
 
 #define MESH_LIST \
-  X(Mesh_Cube, cube.glb) \
-  X(Mesh_MonkeyGlb, monkey.glb) \
-  // X(Mesh_Castle, castle.obj) \
-
-#define MESH_0_LIST \
-  X(Mesh_Triangle) \
-  X(Mesh_Grid) \
-  X(Mesh_Axis) \
-  X(Mesh_Sphere) \
-  X(Mesh_CubeGlft)
+  X(Cube) \
+  X(MonkeyGlb) \
+  X(Triangle) \
+  X(Grid) \
+  X(Axis) \
+  X(Sphere) \
+  X(CubeGlft)
 
 enum MeshEnum {
-#define X(enum_name, name) enum_name,
+#define X(name) Glue(Mesh_, name),
   MESH_LIST
-#undef X
-#define X(enum_name) enum_name,
-  MESH_0_LIST
 #undef X
   Mesh_COUNT,
 };
 
 #define TEXTURE_LIST \
-  X(Texture_Orange, orange_lines_512.png) \
-  X(Texture_Container, container.jpg) \
-  // X(Texture_Castle, castle_diffuse.png) \
+  X(Orange) \
+  X(Container) \
 
 enum TextureEnum {
-#define X(enum_name, name) enum_name,
+#define X(name) Glue(Texture_, name),
   TEXTURE_LIST
 #undef X
   Texture_COUNT,
 };
 
 #define MATERIAL_LIST \
-  X(Material_Orange) \
-  X(Material_Container) \
-  X(Material_Axis) \
-  X(Material_Line) \
-  X(Material_Screen) \
+  X(Orange) \
+  X(Container) \
+  X(Axis) \
+  X(Line) \
+  X(Screen) \
 
 enum MaterialEnum {
-#define X(enum_name) enum_name,
+#define X(name) Glue(Material_, name),
   MATERIAL_LIST
 #undef X
   Material_COUNT,
 };
 
-GpuMeshId mesh_get(MeshEnum id);
-void mesh_set(MeshEnum id, GpuMeshId mesh_handle);
-GpuMaterialId material_get(MaterialEnum id);
-GpuMeshId mesh_load(String name);
-GpuShaderId shader_load(ShaderDesc shader);
-GpuCubemapId cubemap_load(String name);
+MeshId mesh_get(MeshEnum id);
+void mesh_set(MeshEnum id, MeshId mesh_handle);
+MaterialId material_get(MaterialEnum id);
+MeshId mesh_load(String name);
+CubemapId cubemap_load(String name);
 void assets_load();
 
 ////////////////////////////////////////////////////////////////////////
@@ -455,23 +397,12 @@ Introspect struct Entity {
   v3 scale;
   Rng3 aabb;
   v3 vel;
-  GpuMeshId mesh_id;
-  GpuMaterialId material_id;
+  MeshId mesh_id;
+  MaterialId material_id;
 };
 
 Entity& get_entity(EntityId id);
 Transform get_entity_transform(EntityId id);
-
-Introspect struct StaticEntity {
-  v3 pos;
-  v3 rot;
-  v3 scale;
-  GpuMeshId mesh_id;
-  GpuMaterialId material_id;
-};
-
-StaticEntity& get_static_entity(StaticEntityId id);
-Transform get_static_entity_transform(StaticEntityId id);
 
 struct GameState {
   Arena arena;
@@ -481,12 +412,9 @@ struct GameState {
   Timer timer;
 
   u32 entities_count;
-  u32 static_entities_count;
   PoolLinkList<Entity, MaxEntities, EntityId> entities;
-  PoolLinkList<StaticEntity, MaxStaticEntities, StaticEntityId> static_entities;
 
   Darray<EntityId> moving_cubes;
-  Darray<StaticEntityId> static_cubes;
   EntityId axis_attached_to_cam_id;
   EntityId monkey_id;
   EntityId rotating_cube_id;
@@ -503,7 +431,7 @@ struct GameState {
 };
 
 EntityId e_alloc_bare();
-EntityId e_alloc(GpuMeshId mesh_id, GpuMaterialId material_id, EntityThing thing = {});
+EntityId e_alloc(MeshId mesh_id, MaterialId material_id, EntityThing thing = {});
 EntityId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing = {});
 void e_free(EntityId e_id);
 void game_init();
@@ -528,18 +456,18 @@ struct GlobalState {
   mat4 view;
   mat4 projection;
 
-  GpuMeshId meshes_ids[Mesh_COUNT];
-  GpuTextureId textures_ids[Texture_COUNT];
-  GpuMaterialId materials_ids[Material_COUNT];
+  MeshId meshes_ids[Mesh_COUNT];
+  TextureId textures_ids[Texture_COUNT];
+  MaterialId materials_ids[Material_COUNT];
 
-  String asset_path;
+  String asset_dir;
   String shader_dir;
   String shader_compiled_dir;
   String models_dir;
   String textures_dir;
-  Map<String, GpuTextureId, MaxTextures> str_to_texture_id;
-  Map<String, GpuMeshId, MaxMeshes> str_to_mesh_id;
-  Map<String, GpuMaterialId, MaxMaterials> str_to_material_id;
+  Map<String, TextureId, MaxTextures> str_to_texture_id;
+  Map<String, MeshId, MaxMeshes> str_to_mesh_id;
+  Map<String, MaterialId, MaxMaterials> str_to_material_id;
   Array<String, MaxTextures> texture_id_to_str;
   Array<String, MaxMeshes> mesh_id_to_str;
   Array<String, MaxMaterials> material_id_to_str;
@@ -547,9 +475,6 @@ struct GlobalState {
   WatchState watch;
   GameState game;
   InputState input;
-
-  Slice<String> shader_module_compiled_names;
-
   R_State r;
   Gfx_State gfx;
   DebugState debug;

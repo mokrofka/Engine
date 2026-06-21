@@ -423,4 +423,3 @@ struct Texture {
 void foo() {
   
 }
-

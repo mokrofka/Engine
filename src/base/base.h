@@ -448,15 +448,16 @@ struct Slice {
   Slice(T* data_, u64 count_) { data = data_; count = count_; }
   Slice() = default;
 };
-template<typename T> Slice<T> slice(Slice<T> a, u64 li, u64 hi) { Assert(li <= hi && hi <= a.count); return Slice(a.data + li, hi - li); }
-template<typename T> Slice<T> slice_prefix(Slice<T> a, u64 n)   { Assert(n <= a.count); return Slice(a.data, n); }
-template<typename T> Slice<T> slice_postfix(Slice<T> a, u64 n)  { Assert(n <= a.count); return Slice(a.data + (a.count - n), n); }
-template<typename T> Slice<T> slice_skip(Slice<T> a, u64 n)     { Assert(n <= a.count); return Slice(a.data + n, a.count - n); }
-template<typename T> Slice<T> slice_chop(Slice<T> a, u64 n)     { Assert(n <= a.count); return Slice(a.data, a.count - n); }
-template<typename T, u64 N> Slice<T> slice(T (&a)[N])           { return Slice(a, N); }
-template<typename T> Slice<u8> slice_to_bytes(Slice<T> s)       { return Slice((u8*)s.data, s.count * sizeof(T)); }
-template<typename T> Slice<u8> slice_struct_to_bytes(T* s)      { return Slice((u8*)s, sizeof(T)); }
-template<typename T> u64 slice_size(Slice<T> s)                 { return s.count * sizeof(T); }
+template<typename T> Slice<T> slice(Slice<T> a, u64 li, u64 hi)      { Assert(li <= hi && hi <= a.count); return Slice(a.data + li, hi - li); }
+template<typename T> Slice<T> slice_n(Slice<T> a, u64 off, u64 size) { Assert(off+size <= a.count); return Slice(a.data + off, size); }
+template<typename T> Slice<T> slice_prefix(Slice<T> a, u64 n)        { Assert(n <= a.count); return Slice(a.data, n); }
+template<typename T> Slice<T> slice_postfix(Slice<T> a, u64 n)       { Assert(n <= a.count); return Slice(a.data + (a.count - n), n); }
+template<typename T> Slice<T> slice_skip(Slice<T> a, u64 n)          { Assert(n <= a.count); return Slice(a.data + n, a.count - n); }
+template<typename T> Slice<T> slice_chop(Slice<T> a, u64 n)          { Assert(n <= a.count); return Slice(a.data, a.count - n); }
+template<typename T, u64 N> Slice<T> slice(T (&a)[N])                { return Slice(a, N); }
+template<typename T> Slice<u8> slice_to_bytes(Slice<T> s)            { return Slice((u8*)s.data, s.count * sizeof(T)); }
+template<typename T> Slice<u8> slice_struct_to_bytes(T* s)           { return Slice((u8*)s, sizeof(T)); }
+template<typename T> u64 slice_size(Slice<T> s)                      { return s.count * sizeof(T); }
 template<typename To, typename From> Slice<To> slice_reinterpret(Slice<From> s) {
   Assert((s.count * sizeof(From)) % sizeof(To) == 0);
   return Slice((To*)s.data, (s.count*sizeof(From)) / sizeof(To));

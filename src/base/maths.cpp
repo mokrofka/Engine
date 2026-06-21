@@ -125,9 +125,13 @@ f32 wrap_f32(f32 min, f32 x, f32 max) {
   f32 res = x - (max - min)*Floor((x - min)/(max - min));
   return res;
 }
-f32 Lerp(f32 a, f32 t, f32 b)   { return (1 - t)*a + t*b; }
-f32 Unlerp(f32 a, f32 x, f32 b) { return (x - a) / (b - a); }
+f32 Lerp(f32 a, f32 t, f32 b)      { return (1 - t)*a + t*b; }
+f32 Unlerp(f32 a, f32 x, f32 b)    { return (x - a) / (b - a); }
+f64 Unlerpf64(f64 a, f64 x, f64 b) { return (x - a) / (b - a); }
 f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max) {
+  return new_min + (((x - old_min) * (new_max - new_min)) / (old_max - old_min));
+}
+f64 remapf64(f64 x, f64 old_min, f64 old_max, f64 new_min, f64 new_max) {
   return new_min + (((x - old_min) * (new_max - new_min)) / (old_max - old_min));
 }
 f32 remap(f32 x, Rng1 old, Rng1 new_) { return remap(x, old.min, old.max, new_.min, new_.max);}

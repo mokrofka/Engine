@@ -65,7 +65,6 @@ project(Engine)
     vendor/vendor_impl.cpp
   )
   set(game_source src/com.cpp)
-  # set(game_source src/com.cpp src/tokenizer.cpp)
   set(exe_source src/main.cpp)
   set(X11_libs -lxcb -lxcb-xkb -lxcb-keysyms -lxcb-xinput)
 

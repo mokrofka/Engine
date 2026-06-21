@@ -8,6 +8,6 @@ VS_Entry VSOutput vs_main(VSInput in) {
 }
 
 FS_Entry v4 fs_main(VSOutput in) {
-  v4 color = v4(in.color, 1);
+  v4 color = in.color;
   return color;
 }

@@ -268,7 +268,9 @@ i32 wrap_i32(i32 min, i32 x, i32 max);
 f32 wrap_f32(f32 min, f32 x, f32 max);
 f32 Lerp(f32 a, f32 t, f32 b);
 f32 Unlerp(f32 a, f32 x, f32 b);
+f64 Unlerpf64(f64 a, f64 x, f64 b);
 f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
+f64 remapf64(f64 x, f64 old_min, f64 old_max, f64 new_min, f64 new_max);
 f32 remap_clamped(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
 
 ////////////////////////////////////////////////////////////////////////

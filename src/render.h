@@ -3,7 +3,6 @@ const u32 MaxMaterials  = 32;
 const u32 MaxLights     = 32;
 const u32 MaxMeshes     = 32;
 const u32 MaxTextures   = 32;
-const u32 MaxDrawCalls  = KB(1);
 const u32 MaxDebugLines = KB(1);
 
 struct R_KeyToShaderPipeline { String name; Gfx_PipelineDesc pipeline_desc; };
@@ -19,14 +18,30 @@ struct MaterialDesc {
   String texture;
 };
 
-struct R_GpuMaterial {
-  u32 entity_pipeline_idx;
-  u32 texture_idx;
+struct R_Material {
+  MaterialDesc desc;
+  u32 entity_batch_idx;
+  u32 texture_descriptor_idx;
 };
 
 struct R_Texture {
+  u32 width;
+  u32 height;
+  union {
+    u8* data;
+    u8* cube[6];
+  };
   Gfx_Image image;
   Gfx_View view;
+};
+
+struct R_Mesh {
+  Slice<Vertex> vertices;
+  Slice<u32> indices;
+  f32 bounds_min;
+  f32 bounds_max;
+  f32 bounds_rad;
+  Gfx_Mesh mesh;
 };
 
 ///////////////////////////////////
@@ -78,47 +93,29 @@ struct R_GlobalStateGPU {
   u32 point_light_count;
   u32 dir_light_count;
   u32 spot_light_count;
-  u32 entity_indices[MaxEntities+MaxStaticEntities];
+  u32 entity_indices[MaxEntities];
 };
 
-struct R_EntityPipeline {
+struct R_MeshPush {
+  EntityId id;
+  MeshId mesh;
+  MaterialId material;
+};
+
+struct R_EntityBatch {
   Gfx_Pipeline pip;
-  u32 batch_idx;
+  Darray<R_MeshPush> pushed_meshes;
+  Darray<R_MeshPush> pushed_meshes_unindexed;
 };
 
-struct R_MeshBatch {
-  GpuMeshId mesh_id;
-  Darray<OpaqueId> entities;
-};
-
-struct R_MeshesBatches {
-  Darray<R_MeshBatch> mesh_batches;
-  Dmap<u32, u32> mesh_to_batch;
-};
-
-struct R_EntityPipelineBatch {
-  R_MeshesBatches batches[4];
-};
-
-typedef u32 R_BatchType;
-enum {
-  VK_BatchType_Indexed,
-  VK_BatchType_Unindexed,
-  VK_BatchType_StaticIndexed,
-  VK_BatchType_StaticUnindexed,
-};
-
-struct R_RenderEntity {
-  u32 entity_idx_in_mesh_batch;
-#if BUILD_DEBUG
-  b32 is_init;
-#endif
-};
+R_EntityBatch r_entity_batch_make(Allocator alloc, Gfx_Pipeline pip);
 
 struct R_ShaderModuleEntry {
   Gfx_Shader shd;
   Darray<Gfx_Pipeline> track_pipelines;
 };
+
+R_ShaderModuleEntry r_shader_module_entry_make(Allocator alloc);
 
 struct R_ArenaBuffer {
   Gfx_Buffer buf;
@@ -179,21 +176,15 @@ struct R_State {
   f32 scale;
   f32 old_scale;
   
-  Darray<R_EntityPipeline> entity_pipelines;
-  Darray<R_ShaderModuleEntry> modules;
-  Map<R_KeyToShaderPipeline, Gfx_Pipeline, Gfx_MaxPipelines> shader_to_pipeline;
-  Map<u32, u32, Gfx_MaxPipelines> pip_idx_to_entity_batch_idx;
+  Array<R_ShaderModuleEntry, Gfx_MaxShaders> modules;
   Map<String, u32, Gfx_MaxShaders> shader_to_module_idx;
-  Array<R_GpuMaterial, MaxMaterials> materials;
-  Darray<R_EntityPipelineBatch> batches;
-  Array<R_RenderEntity, MaxEntities+MaxStaticEntities> entities;
-  // Array<Gfx_Mesh, MaxMeshes> meshes;
-  // Array<VK_Image, MaxTextures> textures;
-  u32 static_entities_count;
-  u32 static_entities_count_old;
+  Map<R_KeyToShaderPipeline, Gfx_Pipeline, Gfx_MaxPipelines> shader_to_pipeline;
+  Pool<R_Material, MaxMaterials, MaterialId> materials;
+  Array<R_EntityBatch, Gfx_MaxShaders> entity_batches;
+  Map<u32, u32, Gfx_MaxPipelines> pip_idx_to_entity_batch_idx;
 
-  Pool<Gfx_Mesh, MaxMeshes, GpuMeshId> meshes;
-  Pool<R_Texture, MaxTextures, GpuTextureId> textures;
+  Pool<Gfx_Mesh, MaxMeshes, MeshId> meshes;
+  Pool<R_Texture, MaxTextures, TextureId> textures;
 
   Gfx_Pipeline triangle_pip;
   Gfx_Pipeline screen_pip;
@@ -204,7 +195,6 @@ struct R_State {
 
   R_RenderTarget world_rt;
 
-  VK_Memory gpu_mem;
   R_ArenaBuffer vert_arena;
   R_ArenaBuffer index_arena;
 
@@ -234,10 +224,10 @@ v4& get_pos();
 mat4& get_mat();
 void r_init();
 
-GpuMeshId r_mesh_load(Mesh mesh);
-GpuTextureId r_texture_load(Texture texture);
-GpuMaterialId r_material_load(MaterialDesc material);
-GpuCubemapId r_cubemap_load(Texture* textures);
+MeshId r_mesh_load(MeshDesc mesh);
+TextureId r_texture_load(TextureDesc texture);
+MaterialId r_material_make(MaterialDesc material);
+void r_cubemap_load(TextureDesc texture);
 
 void r_shader_reload(String name);
 
@@ -247,11 +237,9 @@ void r_end();
 void r_init();
 void r_shutdown();
 
-void vk_make_renderable(EntityId entity, GpuMeshId mesh_id, GpuMaterialId material_id);
-void vk_make_renderable_static(StaticEntityId entity, GpuMeshId mesh_id, GpuMaterialId material_id);
-void vk_remove_renderable(EntityId entity_id);
-void vk_remove_static_renderable(StaticEntityId entity_id);
-void vk_set_entity_color(EntityId entity_handle, v4 color);
+void r_set_entity_color(EntityId entity_handle, v4 color);
+
+void r_push_mesh(EntityId id, MeshId mesh, MaterialId material);
 
 void r_debug_line(v3 a, v3 b, v4 color);
 void r_debug_line_persistent(v3 a, v3 b, v4 color);

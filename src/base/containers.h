@@ -430,7 +430,7 @@ template<typename T, typename Handle> u32 pool_clear(Dpool<T, Handle>& p) {
   p.max_idx = 0;
   MemZeroArray(p.data, p.max_idx);
   Loop (i, p.max_idx) {
-    ++p.generations;
+    ++p.generations[i];
   }
 }
 template<typename T, typename Handle> b32 pool_is_valid_slot(Dpool<T, Handle>& p, Handle h) {
@@ -516,7 +516,7 @@ template<typename T, i32 N, typename Handle> void pool_remove(PoolLinkList<T, N,
     p.last = n.prev;
   }
 }
-template<typename T, i32 N, typename Handle> Handle pool_get_handler(PoolLinkList<T, N, Handle>& p, u32 idx) {
+template<typename T, i32 N, typename Handle> Handle pool_get_slot(PoolLinkList<T, N, Handle>& p, u32 idx) {
   Handle res = {idx, p.generations[idx]};
   return res;
 }
@@ -525,7 +525,7 @@ template<typename T, i32 N, typename Handle> void pool_clear(PoolLinkList<T, N, 
   p.max_idx = 0;
   MemZeroArray(p.data, p.max_idx);
   Loop (i, p.max_idx) {
-    ++p.generations;
+    ++p.generations[i];
   }
 }
 template<typename T, i32 N, typename Handle> b32 pool_is_valid_slot(PoolLinkList<T, N, Handle>& p, Handle h) {

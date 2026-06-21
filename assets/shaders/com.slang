@@ -27,8 +27,6 @@ typedef float4x4 mat4;
 v4 operator*(mat4 mat, v4 vec) { return mul(mat, vec); }
 mat4 operator*(mat4 a, mat4 b) { return mul(a, b); }
 
-global const u32 MaxEntities = KB(4);
-global const u32 MaxStaticEntities = KB(4);
 global const u32 MaxMaterials = KB(1);
 global const u32 MaxLights = KB(1);
 
@@ -87,7 +85,6 @@ struct State {
   u32 point_light_count;
   u32 dir_light_count;
   u32 spot_light_count;
-  u32 entity_indices[MaxEntities+MaxStaticEntities];
 };
 
 struct VSInput {

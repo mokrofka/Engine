@@ -3,6 +3,8 @@
 #include "containers.h"
 #include "thread_ctx.h"
 
+const u32 ProfRecordHistoryNum = 120;
+
 enum ProfType {
   ProfType_Default,
   ProfType_Sleep,
@@ -57,34 +59,18 @@ struct ProfThread {
   Arena arena;
   AllocSegList gpa;
   Darray<ProfEvent> events[2];
-  Darray<ProfAnchor> recorded_anchors[120];
+  Darray<ProfAnchor> recorded_anchors[ProfRecordHistoryNum];
   Darray<ProfAnchor> launch_anchors;
   Darray<ProfAnchor> long_anchors;
 };
 
-enum ProfTabActive {
-  ProfileTabActive_Root,
-  ProfileTabActive_Frames,
-  ProfileTabActive_Time,
-  ProfileTabActive_LaunchTime,
-  ProfileTabActive_Memory,
-};
-
 struct ProfState {
   ProfFrameTime current_frame_time;
-  ProfFrameTime frames_times[120];
+  ProfFrameTime frames_times[ProfRecordHistoryNum];
   ProfFrameTime launch_time;
   ProfThread prof_threads[THREAD_COUNT+1];
   u32 current_buf;
-
-  f32 frame_avg_time;
-  f32 frame_min_time;
-  f32 frame_max_time;
-
   b32 paused;
-
-  ProfTabActive active_tab;
-  ProfTabActive future_active_tab;
 };
 
 void prof_init(Allocator arena);
