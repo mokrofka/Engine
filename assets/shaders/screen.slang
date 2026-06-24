@@ -2,14 +2,14 @@
 
 global v2 positions[] = {
   {-1.0, -1.0},
-  { 3.0, -1.0},
   {-1.0,  3.0},
+  { 3.0, -1.0},
 };
 
 global v2 tex_coords[] = {
-  { 0.0,  0.0},
-  { 2.0,  0.0},
-  { 0.0, -2.0} // flip y-coord since I have fliped y-coord in viewport
+  {0.0, 0.0},
+  {0.0, 2.0},
+  {2.0, 0.0}
 };
 
 VS_Entry VSOutput vs_main(VSInput in) {

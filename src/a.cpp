@@ -423,3 +423,27 @@ struct Texture {
 void foo() {
   
 }
+
+struct Writer {
+  u8* base;
+  u64 cursor;
+};
+
+u64 write(Writer* w, Slice<u8> data) {
+  MemCopy(w->base + w->cursor, data.data, data.size);
+  u64 res = w->cursor;
+  w->cursor += data.size;
+  return res;
+}
+
+void mem_copy_push(void* dst, Slice<Slice<u8>> slices) {
+  u64 offset = 0;
+  Loop (i, slices.count) {
+    u64 size = slice_size(slices[i]);
+    MemCopy(Offset(dst, size), slices[i].data, size);
+    offset += size;
+  }
+}
+
+
+

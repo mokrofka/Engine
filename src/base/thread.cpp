@@ -23,7 +23,7 @@ struct ThreadPool {
 
 global ThreadPool thread_pool;
 
-TaskId thread_task_push(Task t, b32 async) {
+TaskId thread_task_push(Task t) {
   ThreadPool& g = thread_pool;
   TaskQueue& q = thread_pool.queue;
   LockScope(q.mutex);
@@ -31,7 +31,6 @@ TaskId thread_task_push(Task t, b32 async) {
     os_cond_var_wait(q.cond_not_full, q.mutex);
   }
   os_cond_var_signal(q.cond_not_empty);
-  t.async = async;
   if (!t.async) {
     t.counter_id = pool_push(g.counters, (u32)1);
   }

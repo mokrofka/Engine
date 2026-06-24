@@ -14,7 +14,7 @@ struct Task {
   b32 async;
 };
 
-TaskId thread_task_push(Task t, b32 async = false);
+TaskId thread_task_push(Task t);
 void thread_pool_init(u32 num_threads);
 void thread_wait_task(TaskId task_id);
 void thread_wait_for();

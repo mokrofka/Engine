@@ -405,7 +405,10 @@ void array_bit_clear(ArrayBit* bits, u64 idx);
 b32 array_bit_get(ArrayBit* bits, u64 idx);
 
 struct Region {
-  u64 offset;
+  union {
+    u64 base;
+    u64 offset;
+  };
   union {
     u64 size;
     u64 count;

@@ -137,27 +137,18 @@ void debug_game() {
   if (win.open) {
     debug_window_apply_state(win);
     ImGui::Begin("Game");
-
-    ImGui::ColorEdit4("color picker", g.color.v, ImGuiColorEditFlags_Float);
-    local f32 f = 0;
-    local i32 i = 0;
-    ImGui::SliderFloat("sliderf32", &f, -20, 20);
-    ImGui::SliderInt("slideri32", &i, -20, 20);
-    f = wrap_f32(-10, f, 10);
-    i = wrap_i32(-10, i, 10);
-
     if (ImGui::IsWindowHovered()) {
       if (key_pressed(Key_V)) {
         debug_window_toggle_fullscreen(win);
       }
     }
 
-    v3 pos = cam.pos;
     ImGui::Text("entities: %u", g.entities_count);
-    ImGui::Text("Camera: x: %.2f y: %.2f z: %.2f", pos.x, pos.y, pos.z);
     ImGui::DragFloat("speed", &cam.speed, 1);
     {
+      ImGui::Text("Camera:");
       imgui_text(push_str_copy(scratch, dumb_struct(scratch, slice(members_of_Camera), &g.cam)));
+      ImGui::Separator();
     }
     {
       Entity& e = get_entity(g.axis_attached_to_cam_id);

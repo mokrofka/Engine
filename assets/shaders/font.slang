@@ -2,13 +2,16 @@
 
 VS_Entry VSOutput vs_main(VSInput in) {
   VSOutput o;
-  o.pos = g.projection_view * v4(in.pos, 1);
+  o.pos = v4(in.pos, 1);
   o.color = in.color;
+  o.uv = in.uv;
   return o;
 }
 
 FS_Entry v4 fs_main(VSOutput in) {
-  v4 color = in.color;
+  f32 r = textures[push.drawcall_offset].Sample(samplers[1], in.uv).r;
+  if (r < 0.1) discard;
+  v4 color = r * in.color;
   return color;
 }
 

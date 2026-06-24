@@ -544,7 +544,7 @@ String str_chop(String str, u64 amt) {
 String push_str_cat(Allocator arena, String s1, String s2) {
   String str;
   str.size = s1.size + s2.size;
-  str.str = push_array(arena, u8, str.size + 1); // for C-str
+  str.str = push_array(arena, u8, str.size + 1);
   MemCopy(str.str, s1.str, s1.size);
   MemCopy(str.str + s1.size, s2.str, s2.size);
   str.str[str.size] = 0;
@@ -554,7 +554,7 @@ String push_str_cat(Allocator arena, String s1, String s2) {
 String push_str_copy(Allocator arena, String s) {
   String str;
   str.size = s.size;
-  str.str = push_array(arena, u8, str.size + 1); // for C-str
+  str.str = push_array(arena, u8, str.size + 1);
   MemCopy(str.str, s.str, s.size);
   str.str[str.size] = 0;
   return str;
@@ -695,27 +695,59 @@ f64 f64_from_str(String str) {
   f64 factor = 0.1;
   b32 negative = false;
   i32 j = 0;
-  // handle optional sign
-  if (str.size > 0) {
+
+  // Sign
+  if (j < str.size) {
     if (str.str[j] == '-') {
       negative = true;
       j++;
-    }
-  }
-  for (; j < str.size; ++j) {
-    u8 ch = str.str[j];
-    if (ch == '.') {
+    } else if (str.str[j] == '+') {
       ++j;
-      break;
     }
-    x = x * 10 + (ch - '0'); // integer part
   }
+
+  // Integer part
   for (; j < str.size; ++j) {
     u8 ch = str.str[j];
-    frac += (ch - '0') * factor; // fractional part
-    factor *= 0.1;
+    if (ch == '.' || ch == 'e' || ch == 'E')
+      break;
+    x = x * 10 + (ch - '0');
+  }
+
+  // Fractional part
+  if (j < str.size && str.str[j] == '.') {
+    ++j;
+    for (; j < str.size; ++j) {
+      u8 ch = str.str[j];
+      if (ch == 'e' || ch == 'E')
+        break;
+      frac += (ch - '0') * factor;
+      factor *= 0.1;
+    }
   }
   x += frac;
+
+  // Exponent
+  if (j < str.size && (str.str[j] == 'e' || str.str[j] == 'E')) {
+    ++j;
+    b32 exp_negative = false;
+    if (j < str.size) {
+      if (str.str[j] == '-') {
+        exp_negative = true;
+        ++j;
+      } else if (str.str[j] == '+') {
+        ++j;
+      }
+    }
+    i32 exp = 0;
+    for (; j < str.size; ++j) {
+      exp = exp * 10 + (str.str[j] - '0');
+    }
+    if (exp_negative)
+      exp = -exp;
+    x *= Pow(10.0, exp);
+  }
+
   if (negative)
     x = -x;
   return x;

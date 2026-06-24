@@ -80,6 +80,9 @@ union v3u {
   v3u(u32 x_, u32 y_, u32 z_);
 };
 
+u64 hash(v3u v);
+b32 equal(v3u a, v3u b);
+
 union v3b {
   struct {
     b32 x;

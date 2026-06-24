@@ -10,6 +10,8 @@ v2u::v2u(u32 x_, u32 y_) { x = x_, y = y_; }
 v2b::v2b(b32 x_, b32 y_) { x = x_, y = y_; }
 v3::v3(f32 x_, f32 y_, f32 z_) { x = x_, y = y_, z = z_; }
 v3u::v3u(u32 x_, u32 y_, u32 z_) { x = x_, y = y_, z = z_; }
+u64 hash(v3u v) { return hash(v.x)+hash(v.y)+hash(v.z); }
+b32 equal(v3u a, v3u b) { return a == b;};
 v3b::v3b(b32 x_, b32 y_, b32 z_) { x = x_, y = y_, z = z_; }
 v4::v4(f32 x_, f32 y_, f32 z_, f32 w_) { x = x_, y = y_, z = z_, w = w_; }
 

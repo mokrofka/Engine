@@ -2,7 +2,6 @@
 #include "lib.h"
 #include "tokenizer.h"
 #include "meta.h"
-#include "generated.h"
 
 // TODO:
 // dummy assets/null 
@@ -59,10 +58,6 @@ const v4 ColorCollision  = v4(0.86, 0.33, 0.33, 1);
 const u32 MaxEntities = KB(4);
 
 MakeId(OpaqueId)
-MakeId(TextureId)
-MakeId(MaterialId)
-MakeId(MeshId)
-MakeId(CubemapId)
 MakeId(EntityId)
 MakeId(StaticEntityId)
 
@@ -74,8 +69,6 @@ struct Vertex {
 };
 u64 hash(Vertex vert);
 b32 equal(Vertex a, Vertex b);
-struct DebugDrawLine { Vertex vert[2]; };
-struct DebugDrawRect { Vertex vert[6]; };
 
 enum LightType {
   LightType_Point,
@@ -92,6 +85,12 @@ struct Light {
   f32 radius;
   f32 cone_angle;
   b32 cast_shadow;
+};
+
+struct Texture {
+  u32 width;
+  u32 height;
+  u8* data;
 };
 
 struct TextureDesc {
@@ -149,7 +148,7 @@ f32 get_dt();
 f32 get_time();
 
 MeshDesc load_obj(Allocator arena, String name);
-MeshDesc load_gltf(Allocator arena, String name);
+MeshDesc load_gltf(Allocator arena, String path, b32 is_glb);
 
 ////////////////////////////////////////////////////////////////////////
 // @Assets
@@ -161,7 +160,9 @@ MeshDesc load_gltf(Allocator arena, String name);
   X(Grid) \
   X(Axis) \
   X(Sphere) \
-  X(CubeGlft)
+  X(CubeGlft) \
+  X(GreeMan) \
+  X(Barrack) \
 
 enum MeshEnum {
 #define X(name) Glue(Mesh_, name),
@@ -173,6 +174,7 @@ enum MeshEnum {
 #define TEXTURE_LIST \
   X(Orange) \
   X(Container) \
+  X(Barrack) \
 
 enum TextureEnum {
 #define X(name) Glue(Texture_, name),
@@ -187,6 +189,7 @@ enum TextureEnum {
   X(Axis) \
   X(Line) \
   X(Screen) \
+  X(Barrack) \
 
 enum MaterialEnum {
 #define X(name) Glue(Material_, name),
@@ -194,13 +197,6 @@ enum MaterialEnum {
 #undef X
   Material_COUNT,
 };
-
-MeshId mesh_get(MeshEnum id);
-void mesh_set(MeshEnum id, MeshId mesh_handle);
-MaterialId material_get(MaterialEnum id);
-MeshId mesh_load(String name);
-CubemapId cubemap_load(String name);
-void assets_load();
 
 ////////////////////////////////////////////////////////////////////////
 // @Json
@@ -379,7 +375,8 @@ Introspect struct Camera {
   f32 speed;
 };
 
-enum EntityFlags {
+typedef u32 EntityFlags;
+enum {
   EntityFlag_Referenced = 1,
   EntityFlag_NotRender,
 };
@@ -397,8 +394,9 @@ Introspect struct Entity {
   v3 scale;
   Rng3 aabb;
   v3 vel;
-  MeshId mesh_id;
-  MaterialId material_id;
+  R_Mesh mesh_id;
+  R_Material material_id;
+  v4 color;
 };
 
 Entity& get_entity(EntityId id);
@@ -419,7 +417,6 @@ struct GameState {
   EntityId monkey_id;
   EntityId rotating_cube_id;
   Map<String, EntityId, 32> find_entity;
-  EntityId referenced_entities[0];
 
   v3 a;
   v3 b;
@@ -431,7 +428,7 @@ struct GameState {
 };
 
 EntityId e_alloc_bare();
-EntityId e_alloc(MeshId mesh_id, MaterialId material_id, EntityThing thing = {});
+EntityId e_alloc(R_Mesh mesh_id, R_Material material_id, EntityThing thing = {});
 EntityId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing = {});
 void e_free(EntityId e_id);
 void game_init();
@@ -456,18 +453,18 @@ struct GlobalState {
   mat4 view;
   mat4 projection;
 
-  MeshId meshes_ids[Mesh_COUNT];
-  TextureId textures_ids[Texture_COUNT];
-  MaterialId materials_ids[Material_COUNT];
+  R_Mesh meshes_ids[Mesh_COUNT];
+  R_Texture textures_ids[Texture_COUNT];
+  R_Material materials_ids[Material_COUNT];
 
   String asset_dir;
   String shader_dir;
   String shader_compiled_dir;
   String models_dir;
   String textures_dir;
-  Map<String, TextureId, MaxTextures> str_to_texture_id;
-  Map<String, MeshId, MaxMeshes> str_to_mesh_id;
-  Map<String, MaterialId, MaxMaterials> str_to_material_id;
+  Map<String, R_Texture, MaxTextures> str_to_texture_id;
+  Map<String, R_Mesh, MaxMeshes> str_to_mesh_id;
+  Map<String, R_Material, MaxMaterials> str_to_material_id;
   Array<String, MaxTextures> texture_id_to_str;
   Array<String, MaxMeshes> mesh_id_to_str;
   Array<String, MaxMaterials> material_id_to_str;
@@ -482,4 +479,9 @@ struct GlobalState {
 
 extern GlobalState* st;
 
+#include "generated.h"
 
+R_Mesh mesh_get(MeshEnum id);
+void mesh_set(MeshEnum mesh_enum, R_Mesh id);
+R_Material material_get(MaterialEnum id);
+void assets_load();

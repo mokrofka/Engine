@@ -44,6 +44,11 @@ template<typename T, i32 N, typename ... Args> void array_push(Array<T, N>& arr,
     array_push(arr, x);
   }
 }
+template<typename T, i32 N> void array_push_elems(Array<T, N>& arr, Slice<T> elems) {
+  Assert(arr.count + elems.count <= arr.cap);
+  MemCopyArray(arr.data + arr.count, elems.data, elems.count);
+  arr.count += elems.count;
+}
 template<typename T, i32 N> void array_swap_remove(Array<T, N>& arr, u32 idx) {
   Assert(idx < arr.count);
   arr.data[idx] = arr.data[--arr.count];
@@ -664,6 +669,56 @@ template<typename T, typename Handle> b32 pool_is_valid_slot(DpoolLinkList<T, Ha
   return true;
 }
 
+////////////////////////////////////////////////////////////////////////
+// Queue
+
+template<typename T, i32 N>
+struct Queue {
+  static constexpr u32 cap = N;
+  u32 count;
+  u32 first;
+  T data[N];
+};
+
+template<typename T, i32 N> void queue_push(Queue<T, N>& q, T elem) {
+  Assert(q.count < q.cap);
+  u32 idx = (q.first + q.count++) % q.cap;
+  q.data[idx] = elem;
+}
+
+template<typename T, i32 N> void queue_push_front(Queue<T, N>& q, T elem) {
+  Assert(q.count < q.cap);
+  q.first = (q.first + q.cap - 1) % q.cap;
+  q.data[q.first] = elem;
+  ++q.count;
+}
+
+template<typename T, i32 N> T queue_pop(Queue<T, N>& q) {
+  Assert(q.count > 0);
+  T res = q.data[q.first];
+  q.first = (q.first + 1) % q.cap;
+  --q.count;
+  return res;
+}
+
+template<typename T, i32 N> T queue_pop_back(Queue<T, N>& q) {
+  Assert(q.count > 0);
+  --q.count;
+  u32 idx = (q.first + q.count) % q.cap;
+  T res = q.data[idx];
+  return res;
+}
+
+template<typename T, i32 N> T queue_back(Queue<T, N>& q) {
+  Assert(q.count);
+  u32 idx = (q.first + q.count - 1) % q.cap;
+  return q.data[idx];
+}
+
+template<typename T, i32 N> T queue_front(Queue<T, N>& q) {
+  Assert(q.count);
+  return q.data[q.first];
+}
 
 ////////////////////////////////////////////////////////////////////////
 // SparseSet

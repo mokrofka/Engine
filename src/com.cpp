@@ -5,10 +5,6 @@
 #include "test.cpp"
 #include "tokenizer.cpp"
 #include "debug.cpp"
-#include "generated.cpp"
-
-#include "stb_image.h"
-#include "stb_truetype.h"
 
 ////////////////////////////////////////////////////////////////////////
 // @Common
@@ -64,9 +60,9 @@ Vertex cube_vertices[] = {
 };
 
 Vertex triangle_vertices[] = {
-  {.pos = v3( 0.0,   0.5, 0), .uv = v2(0.5, 1), .color = v4(1,0,0,1)},
-  {.pos = v3(-0.5,  -0.5, 0), .uv = v2(0.0, 0), .color = v4(0,1,0,1)},
-  {.pos = v3( 0.5,  -0.5, 0), .uv = v2(1.0, 0), .color = v4(0,0,1,1)},
+  {.pos = v3( 0.0,   0.5, 0), .uv = v2(0.5, 0), .color = v4(1,0,0,1)},
+  {.pos = v3(-0.5,  -0.5, 0), .uv = v2(0.0, 1), .color = v4(0,1,0,1)},
+  {.pos = v3( 0.5,  -0.5, 0), .uv = v2(1.0, 1), .color = v4(0,0,1,1)},
 };
 
 Vertex axis_vertices[] = {
@@ -148,76 +144,113 @@ Transform get_entity_transform(EntityId id) {
   return res;
 }
 
+struct WordLexer {
+  String str;
+  u32 cursor;
+};
+
+WordLexer word_lexer_make(String str) {
+  WordLexer res = {
+    .str = str,
+  };
+  return res;
+}
+
+String word_lexer_next(WordLexer& l) {
+  while (l.cursor < l.str.size && char_is_ws(l.str.str[l.cursor])) {
+    ++l.cursor;
+  }
+  u32 word_base = l.cursor;
+  while (l.cursor < l.str.size && !char_is_ws(l.str.str[l.cursor])) {
+    ++l.cursor;
+  }
+  String res = str_make(l.str.str + word_base, l.cursor - word_base);
+  return res;
+}
+
 MeshDesc load_obj(Allocator arena, String name) {
   Scratch scratch(arena);
   var positions = darray_make<v3>(scratch);
   var normals = darray_make<v3>(scratch);
   var uvs = darray_make<v2>(scratch);
   var indexes = darray_make<v3u>(scratch);
-  Slice buf = os_file_path_read_all(scratch, name);
-  Lexer lexer = lexer_init(str_make(buf));
-  String word;
-  while ((word = lexer_next_token(&lexer)).size) {
-    // vert
-    if (str_match(word, "v")) {
-      v3 v = {};
-      for (f32& e : v.v) {
-        e = f32_from_str(lexer_next_token(&lexer));
-      }
-      // Info("v %f, %f, %f", v.x, v.y, v.z);
-      array_push(positions, v);
-    }
-    // norm
-    else if (str_match(word, "vn")) {
-      v3 v = {};
-      for (f32& e : v.v) {
-        e = f32_from_str(lexer_next_token(&lexer));
-      }
-      // Info("vn %f, %f, %f", v.x, v.y, v.z);
-      array_push(normals, v);
-    }
-    // uv
-    else if (str_match(word, "vt")) {
-      v2 v = {};
-      for (f32& e : v.v) {
-        e = f32_from_str(lexer_next_token(&lexer));
-      }
-      // Info("vt %f, %f", v.x, v.y);
-      array_push(uvs, v);
-    }
-    // indexes
-    else if (str_match(word, "f")) {
+
+  // String str = R"(
+  //   v  -4.4   14 4.1
+  //   v   1.4  -14 4.1
+  //   vt -4.4   14
+  //   vt  1.4  -14
+  //   vn -4.4   14 4.1
+  //   vn  1.4  -14 4.1
+  //   f 10/4/1 1/2/3 11/22/33
+  //   f 20/2/2 91/42/13 141/22/33
+  // )";
+  WordLexer l = word_lexer_make(os_file_path_read_all_str(scratch, name));
+  for (String word = {}; (word = word_lexer_next(l)).size;) {
+    // Info("%s", word);
+    if (word.str[0] == 'v' && word.str[1] == ' ') {
+      v3 pos = {
+        f32_from_str(word_lexer_next(l)),
+        f32_from_str(word_lexer_next(l)),
+        f32_from_str(word_lexer_next(l)),
+      };
+      array_push(positions, pos);
+      // Info("%f %f %f", pos.x, pos.y, pos.z);
+    } else if (word.str[0] == 'v' && word.str[1] == 'n') {
+      v3 norm = {
+        f32_from_str(word_lexer_next(l)),
+        f32_from_str(word_lexer_next(l)),
+        f32_from_str(word_lexer_next(l)),
+      };
+      array_push(normals, norm);
+      // Info("%f %f %f", norm.x, norm.y, norm.z);
+    } else if (word.str[0] == 'v' && word.str[1] == 't') {
+      v2 uv = {
+        f32_from_str(word_lexer_next(l)),
+        f32_from_str(word_lexer_next(l)),
+      };
+      array_push(uvs, uv);
+      // Info("%f %f", uv.x, uv.y);
+    } else if (word.str[0] == 'f' && word.str[1] == ' ') {
       Loop (i, 3) {
         v3u raw = {};
-        for (u32& e : raw.v) {
-          e = u32_from_str(lexer_next_integer(&lexer)) - 1;
+        String word = word_lexer_next(l);
+        u32 cursor = 0;
+        String r = {};
+        Loop (i, 3) {
+          u32 num_base = cursor;
+          while (cursor < word.size && char_is_digit(word.str[cursor])) {
+            ++cursor;
+          }
+          r = str_make(word.str+num_base, cursor - num_base);
+          raw.v[i] = u64_from_str(r) - 1;
+          ++cursor;
         }
+        // Info("%u %u %u", raw.x, raw.y, raw.z);
         v3u v = {raw.x, raw.z, raw.y};
-        // Info("%i, %i, %i", v.x, v.y, v.z);
         array_push(indexes, v);
       }
     }
   }
+
   var vertices = darray_make<Vertex>(arena);
   var final_indices = darray_make<u32>(arena);
-  var map = map_make<Vertex, u32>(scratch);
+  var map = map_make<v3u, u32>(scratch);
   Loop (i, indexes.count) {
     v3u idx = indexes[i];
-    Vertex vertex = {
-      .pos = positions[idx.x],
-      .norm = normals[idx.y],
-      .uv = uvs[idx.z],
-    };
-    Result vert_index_r = map_get(map, vertex);
-    if (vert_index_r.err) {
+    Result r = map_get(map, idx);
+    if (r.err) {
+      Vertex v = {
+        positions[idx.x],
+        normals[idx.y],
+        uvs[idx.z],
+      };
       u32 new_index = vertices.count;
-      array_push(vertices, vertex);
+      array_push(vertices, v);
       array_push(final_indices, new_index);
-      map_set(map, vertex, new_index);
-    }
-    u32 vert_index = vert_index_r;
-    if (!vert_index_r.err) {
-      array_push(final_indices, vert_index);
+      map_set(map, idx, new_index);
+    } else {
+      array_push(final_indices, (u32)r);
     }
   }
   MeshDesc mesh = {
@@ -395,15 +428,15 @@ global String materials_strs[] = {
 #undef X
 };
 
-MeshId mesh_get(MeshEnum mesh_enum) { return st->meshes_ids[mesh_enum]; }
-void mesh_set(MeshEnum mesh_enum, MeshId id) { 
+R_Mesh mesh_get(MeshEnum mesh_enum) { return st->meshes_ids[mesh_enum]; }
+void mesh_set(MeshEnum mesh_enum, R_Mesh id) { 
   GlobalState& g = *st;
   g.meshes_ids[mesh_enum] = id;
   String str = push_str_copy(g.arena, meshes_strs[mesh_enum]);
   map_set(g.str_to_mesh_id, str, id);
   g.mesh_id_to_str[id.idx] = str;
 }
-MaterialId material_get(MaterialEnum id) { return st->materials_ids[id]; }
+R_Material material_get(MaterialEnum id) { return st->materials_ids[id]; }
 
 constexpr MaterialProps material_default_props() {
   MaterialProps props = {
@@ -413,54 +446,6 @@ constexpr MaterialProps material_default_props() {
     .shininess = 1,
   };
   return props;
-}
-
-MeshId mesh_load(String name) {
-  GlobalState& g = *st;
-  Scratch scratch;
-  String filepath = push_strf(scratch, "%s/%s", g.models_dir, name);
-  String format = str_skip_last_dot(name);
-  MeshDesc mesh = {};
-  if (str_match(format, "glb")) {
-    mesh = load_gltf(scratch, filepath, true);
-  } else if (str_match(format, "gltf")) {
-    mesh = load_gltf(scratch, filepath, false);
-  } else if (str_match(format, "obj")) {
-    mesh = load_obj(scratch, filepath);
-  } else {
-    InvalidPath;
-  }
-  MeshId res = r_mesh_load(mesh);
-  return res;
-}
-
-TextureId texture_load(String name) {
-  GlobalState& g = *st;
-  Scratch scratch;
-  String filepath = push_strf(scratch, "%s/%s", g.textures_dir, name);
-  TextureDesc texture = image_load(filepath);
-  TextureId res = r_texture_load(texture);
-  return res;
-}
-
-CubemapId cubemap_load(String name) {
-  GlobalState& g = *st;
-  Scratch scratch;
-  String sides[] = {
-    "right", "left",
-    "top", "bottom",
-    "front", "back",
-  };
-  String texture_name = push_strf(scratch, "%s/%s%s", name, sides[0], String(".png"));
-  String filepath = push_strf(scratch, "%s/%s", g.textures_dir, texture_name);
-  TextureDesc texture = image_load(filepath);
-  LoopRange(i, 1, ArrayCount(sides)) {
-    texture_name = push_strf(scratch, "%s/%s%s", name, sides[i], String(".png"));
-    filepath = push_strf(scratch, "%s/%s", g.textures_dir, texture_name);
-    texture.cube[i] = image_load(filepath).data;
-  }
-  r_cubemap_load(texture);
-  return {};
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -908,33 +893,37 @@ String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, 
         dstr_push(string, push_strf(scratch, "%s %f\n", member.name, *(f32*)member_ptr));
       } break;
       case MetaType_v2: {
-        v2 v = *((v2*)member_ptr);
+        v2 v = *(v2*)member_ptr;
         dstr_push(string, push_strf(scratch, "%s %f %f\n", member.name, v.x, v.y));
       } break;
       case MetaType_v3: {
-        v3 v = *((v3*)member_ptr);
+        v3 v = *(v3*)member_ptr;
         dstr_push(string, push_strf(scratch, "%s %f %f %f\n", member.name, v.x, v.y, v.z));
       } break;
+      case MetaType_v4: {
+        v4 v = *(v4*)member_ptr;
+        dstr_push(string, push_strf(scratch, "%s %f %f %f %f\n", member.name, v.x, v.y, v.z, v.w));
+      } break;
       case MetaType_Rng3: {
-        Rng3 v = *((Rng3*)member_ptr);
+        Rng3 v = *(Rng3*)member_ptr;
         dstr_push(string, push_strf(scratch, "%s %f %f %f %f %f %f\n", member.name, v.min.x,v.min.y,v.min.z, v.max.x,v.max.y,v.max.z));
       } break;
-      case MetaType_GpuMeshId: {
-        MeshId v = *((MeshId*)member_ptr);
+      case MetaType_MeshId: {
+        R_Mesh v = *(R_Mesh*)member_ptr;
         dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->mesh_id_to_str[v.idx]));
       } break;
-      case MetaType_GpuMaterialId: {
-        MaterialId v = *((MaterialId*)member_ptr);
+      case MetaType_MaterialId: {
+        R_Material v = *(R_Material*)member_ptr;
         dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->material_id_to_str[v.idx]));
       } break;
       case MetaType_String: {
         if (FlagHas(flags, EntityFlag_Referenced)) {
-          String v = *((String*)member_ptr);
+          String v = *(String*)member_ptr;
           dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, v));
         }
       } break;
       case MetaType_EntityFlags: {
-        EntityFlags v = *((EntityFlags*)member_ptr);
+        EntityFlags v = *(EntityFlags*)member_ptr;
         dstr_push(string, push_strf(scratch, "%s %u\n", member.name, v));
       } break;
     }
@@ -955,50 +944,53 @@ void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser
         }
       }
     }
+    u8* mem = Offset(ptr, member.offset);
     switch (member.type) {
       default:{} break;
       case MetaType_u32: {
         Token tok = tok_advance(p);
-        // *(u32*)Offset(ptr, member.offset) 
-        *OffsetAs(ptr, u32, member.offset) = u32_from_str(tok.str);
+        *(u32*)mem = u32_from_str(tok.str);
       } break;
       case MetaType_i32: {
-        *(i32*)Offset(ptr, member.offset) = parse_i32(p);
+        *(u32*)mem = parse_i32(p);
       } break;
       case MetaType_b32: {
         Token tok = tok_advance(p);
-        *(u32*)Offset(ptr, member.offset) = u32_from_str(tok.str);
+        *(u32*)mem = u32_from_str(tok.str);
       } break;
       case MetaType_f32: {
-        *(f32*)Offset(ptr, member.offset) = parse_f32(p);
+        *(f32*)mem = parse_f32(p);
       } break;
       case MetaType_v2: {
-        *(v2*)Offset(ptr, member.offset) = v2(parse_f32(p), parse_f32(p));
+        *(v2*)mem = v2(parse_f32(p), parse_f32(p));
       } break;
       case MetaType_v3: {
-        *(v3*)Offset(ptr, member.offset) = v3(parse_f32(p), parse_f32(p), parse_f32(p));
+        *(v3*)mem = v3(parse_f32(p), parse_f32(p), parse_f32(p));
+      } break;
+      case MetaType_v4: {
+        *(v4*)mem = v4(parse_f32(p), parse_f32(p), parse_f32(p), parse_f32(p));
       } break;
       case MetaType_Rng3: {
-        *(Rng3*)Offset(ptr, member.offset) = Rng3(v3(parse_f32(p), parse_f32(p), parse_f32(p)), v3(parse_f32(p), parse_f32(p), parse_f32(p)));
+        *(Rng3*)mem = Rng3(v3(parse_f32(p), parse_f32(p), parse_f32(p)), v3(parse_f32(p), parse_f32(p), parse_f32(p)));
       } break;
-      case MetaType_GpuMeshId: {
+      case MetaType_MeshId: {
         Token tok = tok_require(p, TokenType_String);
         Result mesh = map_get(st->str_to_mesh_id, tok.str);
         Assert(!mesh.err);
-        *(MeshId*)Offset(ptr, member.offset) = mesh;
+        *(R_Mesh*)mem = mesh;
       } break;
-      case MetaType_GpuMaterialId: {
+      case MetaType_MaterialId: {
         Token tok = tok_require(p, TokenType_String);
         Result material = map_get(st->str_to_material_id, tok.str);
         Assert(!material.err);
-        *(MaterialId*)Offset(ptr, member.offset) = material;
+        *(R_Material*)mem = material;
       } break;
       case MetaType_String: {
         Token tok = tok_require(p, TokenType_String);
-        *(String*)Offset(ptr, member.offset) = push_str_copy(st->arena, tok.str);
+        *(String*)mem = push_str_copy(st->arena, tok.str);
       } break;
       case MetaType_EntityFlags: {
-        *(EntityFlags*)Offset(ptr, member.offset) = (EntityFlags)parse_u32(p);
+        *(EntityFlags*)mem = parse_u32(p);
       } break;
     }
   }
@@ -1086,7 +1078,7 @@ void watch_update() {
 ////////////////////////////////////////////////////////////////////////
 // @State
 
-void foo() {
+void foo_js() {
   String d = R"(
   {
     "name": "cube",
@@ -1188,7 +1180,7 @@ void foo() {
 
 void com_init() {
   Scratch scratch;
-  foo();
+  foo_js();
 
   GlobalState& g = *st;
   estimate_cpu_frequency();
@@ -1209,13 +1201,12 @@ void com_init() {
     g.models_dir = push_str_cat(g.arena, g.asset_dir, "/models");
     g.textures_dir = push_str_cat(g.arena, g.asset_dir, "/textures");
     g.watch.arena = g.arena;
-    watch_directory_add(g.shader_dir, WatchOp_RecompileShader);
-    watch_directory_add(g.shader_compiled_dir, WatchOp_ShaderReload);
     r_shaders_compile(scratch);
-
     r_init();
     debug_init();
     game_init();
+    watch_directory_add(g.shader_dir, WatchOp_RecompileShader);
+    watch_directory_add(g.shader_compiled_dir, WatchOp_ShaderReload);
   }
   prof_launch_end();
 }
@@ -1228,7 +1219,7 @@ void com_update() {
   {
     ProfBlock("push jobs");
     Loop (i, 2) {
-      thread_task_push({.func = [](void* ctx) {os_sleep_ms(rand_u32()%2);}}, true);
+      thread_task_push({.async = true, .func = [](void* ctx) {os_sleep_ms(rand_u32()%2);}});
     }
     TaskId id0 = thread_task_push({.func = [](void* ctx) { os_sleep_ms(2); }});
     TaskId id1 = thread_task_push({.func = [](void* ctx) { os_sleep_ms(2); }});
@@ -1430,8 +1421,12 @@ EntityId e_alloc_bare() {
   ++g.entities_count;
   return e_id;
 }
+void e_init(EntityId e_id) {
+  Entity& e = get_entity(e_id);
+  r_set_entity_color(e_id, e.color);
+}
 
-EntityId e_alloc(MeshId mesh_id, MaterialId material_id, EntityThing thing) {
+EntityId e_alloc(R_Mesh mesh_id, R_Material material_id, EntityThing thing) {
   GameState& g = st->game;
   Entity e = {
     .name = thing.name,
@@ -1440,6 +1435,7 @@ EntityId e_alloc(MeshId mesh_id, MaterialId material_id, EntityThing thing) {
     .mesh_id = mesh_id,
     .material_id = material_id,
     .aabb = Rng3(v3_splat(-1), v3_splat(1)),
+    .color = ColorWhite,
   };
   EntityId e_id = pool_push(g.entities, e);
   ++g.entities_count;
@@ -1576,8 +1572,9 @@ void scene_init() {
   }
   {
     EntityId grid_id = e_alloc(Mesh_Grid, Material_Line);
-    r_set_entity_color(grid_id, v4_splat(0.6));
     Entity& grid = get_entity(grid_id);
+    grid.color = v4_splat(0.6);
+    e_init(grid_id);
     grid.pos = v3(0,0,-5);
   }
   {
@@ -1590,8 +1587,7 @@ void scene_init() {
     cube.pos = v3_rand_rng(-v3_splat(range), v3_splat(range));
   }
 #if 1
-  // Loop (i, 128) {
-  Loop (i, MaxEntities - KB(1)) {
+  Loop (i, 10) {
     // Handle<StaticEntity> e = entity_static_create(Mesh_Cube, Material_Orange);
     // u32 range = KB(1);
     // e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
@@ -1607,7 +1603,8 @@ void scene_init() {
     };
     EntityId e_id = e_alloc(meshes[rand_rng_u32(0, ArrayCount(meshes)-1)], materials[rand_rng_u32(0, ArrayCount(materials)-1)]);
     // array_push(g.static_cubes, e_id);
-    u32 range = KB(1);
+    // u32 range = KB(1);
+    u32 range = 100;
     Entity& e = get_entity(e_id);
     e.pos = v3_rand_rng(-v3_splat(range), v3_splat(range));
     // v3 dir = v3_rand_rng(v3_scale(-1), v3_scale(1));
@@ -1678,9 +1675,14 @@ void scene_init() {
   }
 
   {
-    EntityId e_id = e_alloc(Mesh_CubeGlft, Material_Container);
+    EntityId e_id = e_alloc(Mesh_Barrack, Material_Barrack);
     Entity& e = get_entity(e_id);
     e.pos = v3(0,3,3);
+  }
+  {
+    // EntityId e_id = e_alloc(Mesh_GreeMan, Material_Container);
+    // Entity& e = get_entity(e_id);
+    // e.pos = v3(-3,3,3);
   }
 }
 
@@ -1806,6 +1808,9 @@ void scene_update() {
     Entity& e = pool_get(g.entities, e_id);
     r_push_mesh(e_id, e.mesh_id, e.material_id);
   }
+  {
+    // r_debug_grid(v3(0, 20, 0), 10, 10, ColorGrey);
+  }
 }
 
 void game_save_state() {
@@ -1818,6 +1823,12 @@ void game_save_state() {
   dstr_push(data, "}\n");
 
   {
+    Entity e = get_entity(g.e);
+    dstr_push(data, "e {\n");
+    dstr_push(data, dumb_struct(scratch, slice(members_of_Entity), &e));
+    dstr_push(data, "}\n");
+  }
+  {
     var& p = g.entities;
     for EachNodePool(i, p) {
       Entity& e = p.data[i].elem;
@@ -1825,15 +1836,6 @@ void game_save_state() {
       dstr_push(data, dumb_struct(scratch, slice(members_of_Entity), &e, e.flags));
       dstr_push(data, "}\n");
     }
-  }
-  {
-    // var& p = g.static_entities;
-    // for EachNodePool(i, p) {
-    //   StaticEntity& e = p.data[i].elem;
-    //   dstr_push(data, "StaticEntity {\n");
-    //   dstr_push(data, dumb_struct(scratch, slice(members_of_StaticEntity), &e));
-    //   dstr_push(data, "}\n");
-    // }
   }
 
   OS_Handle file = os_file_open(push_strf(scratch, "%s/saved", os_get_current_directory(), String("saved")), OS_AccessFlag_Write | OS_AccessFlag_Trunc);
@@ -1855,13 +1857,6 @@ void game_load_state() {
       e_free(e_id);
     }
   }
-  {
-    // var& p = g.static_entities;
-    // for EachNodePool(i, p) {
-    //   StaticEntityId e_id = pool_get_handler(p, i);
-    //   e_static_free(e_id);
-    // }
-  }
 
   while (!tok_is_end(p)) {
     Token tok = tok_advance(p);
@@ -1874,6 +1869,7 @@ void game_load_state() {
           EntityId e_id = e_alloc_bare();
           Entity& e = get_entity(e_id);
           dumb_struct_load(slice(members_of_Entity), &e, &p);
+          e_init(e_id);
           if (FlagHas(e.flags, EntityFlag_Referenced)) {
             if (str_match("monkey", e.name)) {
               g.monkey_id = e_id;
@@ -1883,14 +1879,13 @@ void game_load_state() {
               g.rotating_cube_id = e_id;
             } 
           }
-        } 
-        // else if (str_match(tok.str, "StaticEntity")) {
-        //   StaticEntity entity = {};
-        //   dumb_struct_load(slice(members_of_StaticEntity), &entity, &p);
-        //   StaticEntityId e_id = e_static_alloc(entity.mesh_id, entity.material_id);
-        //   StaticEntity&e = get_static_entity(e_id);
-        //   e = entity;
-        // }
+        } else if (str_match(tok.str, "e")) {
+          EntityId e_id = e_alloc_bare();
+          Entity& e = get_entity(e_id);
+          dumb_struct_load(slice(members_of_Entity), &e, &p);
+          e_init(e_id);
+          g.e = e_id;
+        }
       }
     }
   }
@@ -1910,31 +1905,33 @@ void game_init() {
   // g.static_cubes = darray_make<StaticEntityId>(g.gpa);
 
   MeshDesc triangle_mesh = {.vertices = slice(triangle_vertices)};
-  mesh_set(Mesh_Triangle, r_mesh_load(triangle_mesh));
+  mesh_set(Mesh_Triangle, r_mesh_make(triangle_mesh));
   MeshDesc grid_mesh = grid_generate(scratch, 100, 1);
-  mesh_set(Mesh_Grid, r_mesh_load(grid_mesh));
+  mesh_set(Mesh_Grid, r_mesh_make(grid_mesh));
   MeshDesc axis_mesh = {.vertices = slice(axis_vertices)};
-  mesh_set(Mesh_Axis, r_mesh_load(axis_mesh));
+  mesh_set(Mesh_Axis, r_mesh_make(axis_mesh));
   MeshDesc sphere = sphere_generate(scratch);
-  mesh_set(Mesh_Sphere, r_mesh_load(sphere));
+  mesh_set(Mesh_Sphere, r_mesh_make(sphere));
 
-  cubemap_load("night_cubemap");
+  r_texture_cube_load("night_cubemap");
 
   {
     GlobalState& g = *st;
     var m_load = [&](MeshEnum enum_name, String name) {
-      MeshId id = mesh_load(name);
+      R_Mesh id = r_mesh_load(name);
       g.meshes_ids[enum_name] = id;
       String str = push_str_copy(g.arena, name);
       map_set(g.str_to_mesh_id, str, id);
       g.mesh_id_to_str[id.idx] = str;
     };
-    m_load(Mesh_Cube, "cube.glb");
+    m_load(Mesh_Cube, "cube_ok_uv.glb");
     m_load(Mesh_MonkeyGlb, "monkey.glb");
     m_load(Mesh_CubeGlft, "cube.gltf");
+    m_load(Mesh_Barrack, "castle.obj");
+    // m_load(Mesh_GreeMan, "greenman.glb");
   
     var t_load = [&](TextureEnum enum_name, String name) {
-      TextureId id = texture_load(name); \
+      R_Texture id = r_texture_load(name); \
       g.textures_ids[enum_name] = id;
       String str = push_str_copy(g.arena, name);
       map_set(g.str_to_texture_id, str, id);
@@ -1942,9 +1939,10 @@ void game_init() {
     };
     t_load(Texture_Orange, "orange_lines_512.png");
     t_load(Texture_Container, "container.jpg");
+    t_load(Texture_Barrack, "castle_diffuse.png");
   
     var mat_load = [&](MaterialEnum enum_name, MaterialDesc desc) {
-      MaterialId id = r_material_make(desc);
+      R_Material id = r_material_make(desc);
       g.materials_ids[enum_name] = id;
       String str = push_str_copy(g.arena, materials_strs[enum_name]);
       map_set(g.str_to_material_id, str, id);
@@ -1994,10 +1992,20 @@ void game_init() {
       },
       .props = material_default_props(),
     });
+    mat_load(Material_Barrack, {
+      .shader_name = "e_texture",
+      .pipeline_desc = {
+        .depth = {
+          .compare = Gfx_CompareOp_Less,
+          .write_enabled = true,
+        }
+      },
+      .props = material_default_props(),
+      .texture = "castle_diffuse.png",
+    });
   }
 
   scene_init();
-
 
   // camera_init();
   // g.cube0 = e_alloc(Mesh_Cube, Material_Container);
@@ -2013,12 +2021,12 @@ void game_init() {
   // grid.pos() = v3(0,0,-5);
 
   // Loop (i, KB(10)) {
-  //   MeshId meshes[] = {
+  //   R_Mesh meshes[] = {
   //     // Mesh_MonkeyGlb,
   //     // Mesh_Triangle,
   //     Mesh_Cube,
   //   };
-  //   MaterialId materials[] = {
+  //   R_Material materials[] = {
   //     Material_Orange,
   //     // Material_Container,
   //     // Material_Screen,

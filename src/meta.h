@@ -7,10 +7,11 @@ enum MetaType {
   MetaType_f32,
   MetaType_v2,
   MetaType_v3,
+  MetaType_v4,
   MetaType_Rng2,
   MetaType_Rng3,
-  MetaType_GpuMeshId,
-  MetaType_GpuMaterialId,
+  MetaType_MeshId,
+  MetaType_MaterialId,
   MetaType_RenderId,
   MetaType_String,
   MetaType_EntityFlags
