@@ -7,8 +7,7 @@ VS_Entry VSOutput vs_main(VSInput in) {
 
   o.pos = g.projection_view * e.model * v4(in.pos, 1.0);
   v4 pos = v4(in.pos, 1);
-  o.uv = in_uv(in.uv);
-  // o.uv = in.uv;
+  o.uv = in.uv;
   o.entity_id = entity_id;
   return o;
 }

@@ -244,8 +244,8 @@ R_Mesh r_mesh_load(String name) {
 R_Mesh r_mesh_load_async(String name) {
   Scratch scratch;
   var& g = st->r;
-  String filepath = push_strf(scratch, "%s/%s", st->models_dir, name);
-  String format = str_skip_last_dot(name);
+  // String filepath = push_strf(scratch, "%s/%s", st->models_dir, name);
+  // String format = str_skip_last_dot(name);
   R_Mesh res = pool_push(g.meshes, {});
   // struct Ctx {
     
@@ -747,10 +747,9 @@ void r_end() {
       // Font
       {
         gfx_apply_viewport(rng2_make(v2_zero(), v2_of_v2u(os_get_window_size())));
-        #if 1
         v4 color = ColorWhite;
         R_FontData& font = pool_get(g.fonts, g.my_font);
-        String str = "hello";
+        String str = "so cool!";
         f32 pen_x = 100;
         f32 pen_y = 1000;
         Loop (i, str.size) {
@@ -797,9 +796,8 @@ void r_end() {
           array_clear(g.draw_rects_texture);
         }
 
-
         {
-          gfx_apply_viewport(rng2_make(v2_zero(), v2_of_v2u(os_get_window_size())));
+          gfx_apply_viewport(rng2_make(v2_zero(), v2_of_v2u(os_get_window_size())), false);
           v3 min = v2_to_v3(v2_remap_01_to_11(v2(200, 200), v2_of_v2u(os_get_window_size())), 0);
           v3 max = v2_to_v3(v2_remap_01_to_11(v2(500, 500), v2_of_v2u(os_get_window_size())), 0);
           Vertex vert[] = {
@@ -818,7 +816,6 @@ void r_end() {
           gfx_draw(vert_base, 6);
         }
 
-        #endif
       }
 
     }

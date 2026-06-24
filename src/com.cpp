@@ -460,7 +460,12 @@ JsParser js_parse_make(Allocator arena, String str) {
 }
 
 u8 js_peek(JsParser* p) {
+  if (p->cursor >= p->str.size) return 0;
   return p->str.str[p->cursor];
+}
+
+b32 js_at_end(JsParser* p) {
+  return p->cursor >= p->str.size;
 }
 
 void js_advance(JsParser* p) {
@@ -477,9 +482,10 @@ String js_parse_str(JsParser* p) {
   Assert(js_peek(p) == '\"');
   js_advance(p);
   u32 start = p->cursor;
-  while (js_peek(p) != '\"') {
+  while (js_peek(p) != '\"' && !js_at_end(p)) {
     js_advance(p);
   }
+  Assert(js_peek(p) == '\"'); 
   String res = str_substr(p->str, Rng1u(start, p->cursor));
   js_advance(p);
   return res;
@@ -487,9 +493,32 @@ String js_parse_str(JsParser* p) {
 
 f64 js_parse_number(JsParser* p) {
   u32 start = p->cursor;
-  while (char_is_number_cont(js_peek(p))) {
+  // while (char_is_number_cont(js_peek(p))) {
+  //   js_advance(p);
+  // }
+
+  if (js_peek(p) == '-')
     js_advance(p);
+
+  while (char_is_digit(js_peek(p)))
+    js_advance(p);
+
+  if (js_peek(p) == '.') {
+    js_advance(p);
+    while (char_is_digit(js_peek(p)))
+      js_advance(p);
   }
+
+  if (js_peek(p) == 'e' || js_peek(p) == 'E') {
+    js_advance(p);
+
+    if (js_peek(p) == '+' || js_peek(p) == '-')
+      js_advance(p);
+
+    while (char_is_digit(js_peek(p)))
+      js_advance(p);
+  }
+
   String str = str_substr(p->str, Rng1u(start, p->cursor));
   f64 res = f64_from_str(str);
   return res;
@@ -498,45 +527,11 @@ f64 js_parse_number(JsParser* p) {
 JsVal js_parse(JsParser* p) {
   js_skip_ws(p);
   switch (js_peek(p)) {
-    default: {
-      f64 num = js_parse_number(p);
-      JsVal res = {
-        .type = JsType_Number,
-        .number = num
-      };
-      return res;
-    } break;
-    case '\"': {
-      String str = js_parse_str(p);
-      JsVal res = {
-        .type = JsType_Str,
-        .str = str,
-      };
-      return res;
-    } break;
-    case 't': {
-      p->cursor += 4;
-      JsVal res = {
-        .type = JsType_Bool,
-        .boolean = true,
-      };
-      return res;
-    } break;
-    case 'f': {
-      p->cursor += 5;
-      JsVal res = {
-        .type = JsType_Bool,
-        .boolean = false,
-      };
-      return res;
-    } break;
-    case 'n': {
-      p->cursor += 4;
-      JsVal res = {
-        .type = JsType_Null,
-      };
-      return res;
-    } break;
+    default:   return { .type = JsType_Number, .number = js_parse_number(p) };
+    case '\"': return { .type = JsType_Str, .str = js_parse_str(p), };
+    case 't': p->cursor += 4; return { .type = JsType_Bool, .boolean = true, };
+    case 'f': p->cursor += 5; return { .type = JsType_Bool, .boolean = false, };
+    case 'n': p->cursor += 4; return { .type = JsType_Null, };
     case '[': {
       js_advance(p);
       var arr = darray_make<JsVal*>(p->arena);
@@ -548,6 +543,14 @@ JsVal js_parse(JsParser* p) {
         }
         JsVal* val = push_struct(p->arena, JsVal);
         *val = js_parse(p);
+        switch (val->type) {
+          case JsType_Null: Info("null"); break;
+          case JsType_Bool: Info("bool: %u", val->boolean); break;
+          case JsType_Number: Info("num: %f", val->number); break;
+          case JsType_Str: Info("str: %s", val->str); break;
+          case JsType_Array: Info("array"); break;
+          case JsType_Obj:  Info("obj"); break;
+        }
         array_push(arr, val);
         js_skip_ws(p);
         if (js_peek(p) == ',') {
@@ -576,6 +579,14 @@ JsVal js_parse(JsParser* p) {
         
         JsVal* val = push_struct(p->arena, JsVal);
         *val = js_parse(p);
+        switch (val->type) {
+          case JsType_Null: Info("null"); break;
+          case JsType_Bool: Info("bool: %u", val->boolean); break;
+          case JsType_Number: Info("num: %f", val->number); break;
+          case JsType_Str: Info("str: %s", val->str); break;
+          case JsType_Array: Info("array"); break;
+          case JsType_Obj:  Info("obj"); break;
+        }
         array_push(fields, {.key = key, .val = val});
         js_skip_ws(p);
         if (js_peek(p) == ',') {
@@ -1215,7 +1226,6 @@ void com_update() {
   // GlobalState& g = *st;
   ArrayZero(st->input.consumed);
   debug_update();
-
   {
     ProfBlock("push jobs");
     Loop (i, 2) {
@@ -1675,14 +1685,14 @@ void scene_init() {
   }
 
   {
-    EntityId e_id = e_alloc(Mesh_Barrack, Material_Barrack);
+    EntityId e_id = e_alloc(Mesh_Cube, Material_Orange);
     Entity& e = get_entity(e_id);
     e.pos = v3(0,3,3);
   }
   {
-    // EntityId e_id = e_alloc(Mesh_GreeMan, Material_Container);
-    // Entity& e = get_entity(e_id);
-    // e.pos = v3(-3,3,3);
+    EntityId e_id = e_alloc(Mesh_Barrack, Material_Barrack);
+    Entity& e = get_entity(e_id);
+    e.pos = v3(-3,3,-33);
   }
 }
 
@@ -1927,7 +1937,8 @@ void game_init() {
     m_load(Mesh_Cube, "cube_ok_uv.glb");
     m_load(Mesh_MonkeyGlb, "monkey.glb");
     m_load(Mesh_CubeGlft, "cube.gltf");
-    m_load(Mesh_Barrack, "castle.obj");
+    m_load(Mesh_Barrack, "castle.gltf");
+    // m_load(Mesh_Barrack, "castle.obj");
     // m_load(Mesh_GreeMan, "greenman.glb");
   
     var t_load = [&](TextureEnum enum_name, String name) {
