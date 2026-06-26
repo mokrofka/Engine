@@ -274,8 +274,8 @@ void os_gfx_init() {
   X11State& g = gfx_st;
   g.arena = arena_make_named("gfx arena");
   g.gpa = alloc_seglist_make(g.arena);
-  g.input_events = darray_make<OS_InputEvent>(g.gpa);
-  g.xcb_events = darray_make<xcb_generic_event_t*>(g.gpa);
+  g.input_events = array_make(OS_InputEvent, g.gpa);
+  g.xcb_events = array_make(xcb_generic_event_t*, g.gpa);
 
   i32 screen_number;
   g.connection = xcb_connect(null, &screen_number);

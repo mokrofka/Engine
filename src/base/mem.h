@@ -46,6 +46,7 @@ template<typename T> Slice<T> slice_clone(Allocator alloc, Slice<T> slice) {
   return {data, slice.count};
 }
 #define push_slice(a, T, c) Slice(push_array(a, T, c), c)
+#define push_slice_zero(a, T, c) Slice(push_array_zero(a, T, c), c)
 #define push_buffer_slice(a, z) Slice(push_buffer(a, z), z)
 
 ////////////////////////////////////////////////////////////////////////

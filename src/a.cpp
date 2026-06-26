@@ -445,5 +445,51 @@ void mem_copy_push(void* dst, Slice<Slice<u8>> slices) {
   }
 }
 
+a.h {
+  struct A {
+    B_T;
+  };
+  void a_do0();
+  void a_do1();
+}
+
+a.c {
+  void a_do0() {}
+  void a_do1() {}
+}
+
+b.h {
+  struct B {
+    A_T;
+  };
+  void b_do0();
+  void b_do1();
+}
+
+b.c {
+  void b_do0() {}
+  void b_do1() {}
+}
+
+com.h {
+  struct A_T {
+  };
+  struct B_T {
+  };
+  #include "a.h"
+  #include "b.h"
+  struct Com {
+  };
+  void com();
+}
+
+inc.c {
+  #include "file0.h"
+  #include "file1.h"
+  #include "file2.h"
+  #include "file0.c"
+  #include "file1.c"
+  #include "file2.c"
+}
 
 

@@ -1,5 +1,16 @@
 #pragma once
 
+enum ScrollType {
+  ScrollType_Default,
+  ScrollType_PowClamp,
+};
+
+struct ScrollState {
+  v2 offset;
+  v2 scale;
+  f32 scale_level;
+};
+
 struct DebugWindow {
   v2 pos;
   v2 size;
@@ -23,6 +34,7 @@ struct ProfColors {
   v4 work;
   v4 sleep;
   v4 job;
+  v4 async;
   v4 selected;
   v4 hovered;
   v4 border;

@@ -7,7 +7,7 @@ global String tokens_str_names[] = {
 };
 
 Slice<Token> tokens_from_str(Allocator arena, String string) {
-  var tokens = darray_make<Token>(arena);
+  var tokens = array_make(Token, arena);
   u32 off = 0;
   u8* str = string.str;
   u32 column = 1;

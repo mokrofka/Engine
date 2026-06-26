@@ -107,6 +107,7 @@ void debug_init() {
     .work = ColorGreyDark,
     .sleep = ColorGreenUi,
     .job = ColorOrangeUi,
+    .async = ColorBlueUi,
     .current_frame = ColorGrey3,
     .frame_ok = ColorGreen,
     .frame_warn = ColorYellow,
@@ -174,6 +175,7 @@ void debug_game() {
 }
 
 void debug_prof_view() {
+  ProfFunc;
   Scratch scratch;
   DebugState& debug = st->debug;
   ProfState& prof = prof_get();
@@ -249,7 +251,7 @@ void debug_prof_view() {
 
         var draw_frame_graph = [&](Slice<Slice<ProfAnchor>> slices, ProfFrameTime time, f32 width_off, ScrollState scroll_state, b32 wrap = false) {
           Scratch scratch;
-          var items = darray_make<UI_Item>(scratch);
+          var items = array_make(UI_Item, scratch);
           Loop (i, slices.count) {
             var anchors = slices[i];
 
@@ -345,6 +347,10 @@ void debug_prof_view() {
                     color = colors.job;
                     str = "job";
                   } break;
+                  case ProfType_Async: {
+                    color = colors.async;
+                    str = "async";
+                  } break;
                 }
                 imgui_draw_rect_filled(draw, rect, color);
                 imgui_draw_rect(draw, rect, ColorGreyLight);
@@ -400,7 +406,7 @@ void debug_prof_view() {
             imgui_draw_text(draw, debug.font, thread_name_text_size, text_pos, ColorWhite, str);
           }
           {
-            Loop (i, THREAD_COUNT) {
+            Loop (i, Thread_NumWorkers) {
               thread_height_offset += thread_height;
               String str = push_strf(scratch, "Worker %i", i);
               v2 text_pos = v2(0, thread_height_offset + text_off_above) + cursor_pos;
@@ -627,7 +633,7 @@ void debug_prof_view() {
               AllocatorInfo* info;
               u32 mem_level;
             };
-            var items = darray_make<UI_Item>(scratch);
+            var items = array_make(UI_Item, scratch);
             AllocatorInfoList infos = get_allocators_info();
             var infos_sorted = sort_list_insert(scratch, infos.first, [](var a, var b) { return a->pos > b->pos; });
             f64 mem_usage = 0;
@@ -690,7 +696,7 @@ void debug_prof_view() {
                   AllocatorInfo* node;
                   u32 depth;
                 };
-                var stack = darray_make<StackEntry>(scratch);
+                var stack = array_make(StackEntry, scratch);
                 Slice sorted_children = sort_list_insert(scratch, info.first, [](var a, var b) { return a->pos > b->pos; });
                 ReverseLoop (i, sorted_children.count) {
                   array_push(stack, {sorted_children[i], 1});

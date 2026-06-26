@@ -1,5 +1,3 @@
-#include "com.h"
-
 ////////////////////////////////////////////////////////////////////////
 // Test
 
@@ -182,7 +180,7 @@ intern void test_object_pool() {
     u32 a;
     u32 b;
   };
-  var pool = dpool_make<A, OpaqueId>(scratch);
+  var pool = pool_make(A, OpaqueId, scratch);
   Array<A, TEST_SAMPLES> values = {};
   Array<OpaqueId, TEST_SAMPLES> handlers = {};
 
@@ -227,7 +225,7 @@ intern void test_object_pool_linklist() {
     u32 a;
     u32 b;
   };
-  var pool = dpool_linklist_make<A, OpaqueId>(scratch);
+  var pool = pool_linklist_make(A, OpaqueId, scratch);
   Array<A, TEST_SAMPLES> values = {};
   Array<OpaqueId, TEST_SAMPLES> handlers = {};
 
@@ -285,7 +283,7 @@ intern void test_handle_darray() {
     u32 a;
     u32 b;
   };
-  var arr = darray_handler_make<A, OpaqueId>(scratch);
+  var arr = array_handler_make(A, OpaqueId, scratch);
   Array<A, TEST_SAMPLES> values = {};
   Array<OpaqueId, TEST_SAMPLES> handlers = {};
 

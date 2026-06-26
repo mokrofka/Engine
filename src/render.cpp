@@ -1,5 +1,3 @@
-#include "com.h"
-
 #include "stb_image.h"
 #include "stb_truetype.h"
 
@@ -19,15 +17,15 @@ b32 r_shader_is_null(R_Mesh shd)     { return shd.idx == 0; }
 R_EntityBatch r_entity_batch_make(Allocator alloc, Gfx_Pipeline pip) {
   R_EntityBatch res = {
     .pip = pip,
-    .pushed_meshes = darray_make<R_MeshPush>(alloc),
-    .pushed_meshes_unindexed = darray_make<R_MeshPush>(alloc),
+    .pushed_meshes = array_make(R_MeshPush, alloc),
+    .pushed_meshes_unindexed = array_make(R_MeshPush, alloc),
   };
   return res;
 }
 
 R_ShaderModuleEntry r_shader_module_entry_make(Allocator alloc) {
   R_ShaderModuleEntry res = {
-    .track_pipelines = darray_make<Gfx_Pipeline>(alloc),
+    .track_pipelines = array_make(Gfx_Pipeline, alloc),
   };
   return res;
 }
@@ -422,7 +420,7 @@ void r_shaders_compile(Allocator arena) {
     String shader_name;
     OS_Handle pid;
   };
-  var files = darray_make<File>(scratch);
+  var files = array_make(File, scratch);
   Slice infos = os_file_iter_directory(scratch, shader_dir, OS_FileIterFlag_SkipFolders);
   Loop (i, infos.count) {
     String name = infos[i].name;
@@ -446,7 +444,7 @@ void r_shaders_compile(Allocator arena) {
   ///////////////////////////////////
   // Compilation
   R_State& g = st->r;
-  var file_names = darray_make<String>(arena);
+  var file_names = array_make(String, arena);
   g.shader_module_compilation_pids = push_slice(st->arena, OS_Handle, files.count);
   g.shaders_to_compile = push_slice(st->arena, String, files.count);
   Loop (i, files.count) {
@@ -558,7 +556,7 @@ void r_init() {
     gfx_bind_make({.binding = Bindings::Materials});
     g.gpu_global_buf = gfx_buffer_make(sizeof(R_GlobalStateGPU), Gfx_MemType_Cpu);
     g.gpu_entities_buf = gfx_buffer_make((MaxEntities) * sizeof(R_EntityGPU), Gfx_MemType_Cpu);
-    g.gpu_materials_buf = gfx_buffer_make(MaxMaterials * sizeof(R_MaterialGPU), Gfx_MemType_Cpu);
+    g.gpu_materials_buf = gfx_buffer_make(R_MaxMaterials * sizeof(R_MaterialGPU), Gfx_MemType_Cpu);
 
     g.gpu_entities = (R_EntityGPU*)gfx_buffer_base_ptr(g.gpu_entities_buf);
     g.gpu_global = (R_GlobalStateGPU*)gfx_buffer_base_ptr(g.gpu_global_buf);

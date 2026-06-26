@@ -63,7 +63,7 @@ i32 main(i32 args_count, char* args[]) {
     b32 comp;
     OS_Handle pid;
   };
-  var compiled_shaders = darray_make<Shader>(scratch);
+  var compiled_shaders = array_make(Shader, scratch);
   {
     OS_FileIter* it = os_file_iter_begin(scratch, shader_dir, OS_FileIterFlag_SkipFolders);
     for (OS_FileInfo info = {}; os_file_iter_next(scratch, it, &info);) {

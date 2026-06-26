@@ -1,7 +1,3 @@
-#include "com.h"
-
-////////////////////////////////////////////////////////////////////////
-// @Vulkan
 
 #if OS_WINDOW
   typedef void* HINSTANCE;
@@ -664,9 +660,6 @@ void vk_init_stencil_attachment_info(VkRenderingAttachmentInfo* info, Gfx_Stenci
   info->clearValue.depthStencil.stencil = action.clear_value;
 }
 
-////////////////////////////////////////////////////////////////////////
-// @Misc
-
 VkSemaphore vk_get_cur_image_available_semaphore() { return st->gfx.image_available_semaphores[st->gfx.current_frame_idx]; }
 VkSemaphore vk_get_cur_render_complete_semaphore() { return st->gfx.render_complete_semaphores[st->gfx.current_image_idx]; }
 VkCommandBuffer vk_get_cur_cmd()                       { return st->gfx.cmds_render[st->gfx.current_frame_idx]; }
@@ -720,9 +713,6 @@ void vk_push_constants(VK_PushConstant constants) {
 //   };
 //   g.WaitSemaphores(vkdevice, &waitInfo, UINT64_MAX);
 // }
-
-////////////////////////////////////////////////////////////////////////
-// @Cmd
 
 VkCommandBuffer vk_cmd_alloc(VkCommandPool pool) {
   VkCommandBufferAllocateInfo allocate_info = {
@@ -795,9 +785,6 @@ void vk_cmd_end_free(VkCommandBuffer cmd) {
   gfx_idle();
   vk_cmd_free(g.device.cmd_pool, cmd);
 }
-
-////////////////////////////////////////////////////////////////////////
-// @Buffer
 
 VK_Memory vk_mem_make(Gfx_MemType type, u64 size) {
   Gfx_State& g = st->gfx;
@@ -1155,8 +1142,8 @@ intern void vk_instance_init() {
     .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
     .apiVersion = VK_API_VERSION_1_4
   };
-  var required_validation_layer_names = darray_make<const char*>(scratch);
-  var required_extensions = darray_make<const char*>(scratch);
+  var required_validation_layer_names = array_make(const char*, scratch);
+  var required_extensions = array_make(const char*, scratch);
   const char* VK1_SURFACE_NAME = "VK_KHR_xcb_surface";
   array_push(required_extensions, VK_KHR_SURFACE_EXTENSION_NAME, VK1_SURFACE_NAME);
 

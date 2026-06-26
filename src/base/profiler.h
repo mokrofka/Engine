@@ -2,6 +2,7 @@
 #include "base.h"
 #include "containers.h"
 #include "thread_ctx.h"
+#include "thread.h"
 
 const u32 ProfRecordHistoryNum = 120;
 
@@ -9,6 +10,7 @@ enum ProfType {
   ProfType_Default,
   ProfType_Sleep,
   ProfType_Worker,
+  ProfType_Async,
 };
 
 struct ProfAnchor {
@@ -68,7 +70,7 @@ struct ProfState {
   ProfFrameTime current_frame_time;
   ProfFrameTime frames_times[ProfRecordHistoryNum];
   ProfFrameTime launch_time;
-  ProfThread prof_threads[THREAD_COUNT+1];
+  ProfThread prof_threads[Thread_NumWorkers+1];
   u32 current_buf;
   b32 paused;
 };

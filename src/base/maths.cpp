@@ -1040,5 +1040,3 @@ void layout_next(Rng2Cursor& c, f32 h) {
   c.pos.y += h;
 }
 
-
-

@@ -1,10 +1,10 @@
 
-const u32 MaxMaterials  = 32;
-const u32 MaxLights     = 32;
-const u32 MaxMeshes     = 32;
-const u32 MaxTextures   = 32;
-const u32 MaxFonts      = 32;
-const u32 MaxDebugLines = KB(1);
+const u32 R_MaxMaterials  = 32;
+const u32 R_MaxLights     = 32;
+const u32 R_MaxMeshes     = 32;
+const u32 R_MaxTextures   = 32;
+const u32 R_MaxFonts      = 32;
+const u32 R_MaxDebugLines = KB(1);
 
 struct R_KeyToShaderPipeline { String name; Gfx_PipelineDesc pipeline_desc; };
 u64 hash(R_KeyToShaderPipeline x);
@@ -24,6 +24,34 @@ b32 r_mesh_is_null(R_Mesh mesh);
 b32 r_material_is_null(R_Mesh m);
 b32 r_font_is_null(R_Mesh f);
 b32 r_shader_is_null(R_Mesh shd);
+
+struct MaterialProps {
+  v3 ambient;
+  v3 diffuse;
+  v3 specular;
+  f32 shininess;
+};
+
+struct Vertex {
+  v3 pos;
+  v3 norm;
+  v2 uv;
+  v4 color;
+};
+
+struct Texture {
+  u32 width;
+  u32 height;
+  u8* data;
+};
+
+struct MeshDesc {
+  Slice<Vertex> vertices;
+  Slice<u32> indices;
+  f32 bounds_min;
+  f32 bounds_max;
+  f32 bounds_rad;
+};
 
 struct MaterialDesc {
   String shader_name;
@@ -210,14 +238,14 @@ struct R_State {
   Array<R_ShaderModuleEntry, Gfx_MaxShaders> modules;
   Map<String, u32, Gfx_MaxShaders> shader_to_module_idx;
   Map<R_KeyToShaderPipeline, Gfx_Pipeline, Gfx_MaxPipelines> shader_to_pipeline;
-  Pool<R_MaterialData, MaxMaterials, R_Material> materials;
+  Pool<R_MaterialData, R_MaxMaterials, R_Material> materials;
   Array<R_EntityBatch, Gfx_MaxShaders> entity_batches;
   Map<u32, u32, Gfx_MaxPipelines> pip_idx_to_entity_batch_idx;
 
-  Pool<Gfx_Mesh, MaxMeshes, R_Mesh> meshes;
-  Pool<R_TextureData, MaxTextures, R_Texture> textures;
-  Pool<R_MeshData, MaxMeshes, R_Mesh> new_meshes;
-  Pool<R_FontData, MaxFonts, R_Font> fonts;
+  Pool<Gfx_Mesh, R_MaxMeshes, R_Mesh> meshes;
+  Pool<R_TextureData, R_MaxTextures, R_Texture> textures;
+  Pool<R_MeshData, R_MaxMeshes, R_Mesh> new_meshes;
+  Pool<R_FontData, R_MaxFonts, R_Font> fonts;
 
   
 
@@ -238,10 +266,10 @@ struct R_State {
 
   Gfx_Buffer vert_buffer_each_frame;
   RingBuffer vert_ring_buffer;
-  Array<Vertex, MaxDebugLines> draw_lines;
-  Array<Vertex, MaxDebugLines> draw_lines_persistent;
-  Array<Vertex, MaxDebugLines> draw_rects;
-  Array<Vertex, MaxDebugLines> draw_rects_texture;
+  Array<Vertex, R_MaxDebugLines> draw_lines;
+  Array<Vertex, R_MaxDebugLines> draw_lines_persistent;
+  Array<Vertex, R_MaxDebugLines> draw_rects;
+  Array<Vertex, R_MaxDebugLines> draw_rects_texture;
   u64 draw_base_lines;
   u64 draw_base_persistent_lines;
   u64 draw_base_rects;

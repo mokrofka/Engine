@@ -9,12 +9,12 @@ void prof_init(Allocator arena) {
     String str = push_strf(arena, "profiler_st thread %u arena", i);
     prof_thread.arena = arena_make_named(str);
     prof_thread.gpa = alloc_seglist_make(prof_thread.arena);
-    prof_thread.events[0] = darray_make<ProfEvent>(prof_thread.gpa);
-    prof_thread.events[1] = darray_make<ProfEvent>(prof_thread.gpa);
-    prof_thread.long_anchors = darray_make<ProfAnchor>(prof_thread.gpa);
-    prof_thread.launch_anchors = darray_make<ProfAnchor>(prof_thread.gpa);
+    prof_thread.events[0] = array_make(ProfEvent, prof_thread.gpa);
+    prof_thread.events[1] = array_make(ProfEvent, prof_thread.gpa);
+    prof_thread.long_anchors = array_make(ProfAnchor, prof_thread.gpa);
+    prof_thread.launch_anchors = array_make(ProfAnchor, prof_thread.gpa);
     for EachElement(j, g.frames_times) {
-      prof_thread.recorded_anchors[j] = darray_make<ProfAnchor>(prof_thread.gpa);
+      prof_thread.recorded_anchors[j] = array_make(ProfAnchor, prof_thread.gpa);
     }
   }
 }
@@ -76,9 +76,9 @@ void prof_end(u32 current_frame) {
 
   for EachElement(j, g.prof_threads) {
     ProfThread& prof_thread = g.prof_threads[j];
-    var anchors = darray_make<ProfAnchor>(scratch);
+    var anchors = array_make(ProfAnchor, scratch);
     u32 depth = 0;
-    var stack = darray_make<u32>(scratch);
+    var stack = array_make(u32, scratch);
 
     ///////////////////////////////////
     // Process events
@@ -183,9 +183,9 @@ void prof_launch_end() {
 
   for EachElement(j, g.prof_threads) {
     ProfThread& prof_thread = g.prof_threads[j];
-    var anchors = darray_make<ProfAnchor>(scratch);
+    var anchors = array_make(ProfAnchor, scratch);
     u32 depth = 0;
-    var stack = darray_make<u32>(scratch);
+    var stack = array_make(u32, scratch);
 
     ///////////////////////////////////
     // Process events

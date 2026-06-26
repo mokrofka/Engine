@@ -2,10 +2,22 @@
 #include "thread_ctx.h"
 #include "profiler.h"
 
-struct TaskQueue {
-  Task* tasks;
-  RingBuffer ring;
+struct WaitGroupSlot {
   u32 count;
+  u32 gen;
+};
+
+struct ThreadPool {
+  Arena arena;
+  Thread threads[Thread_NumWorkers];
+
+  Queue<Task, Thread_MaxTasks> tasks[TaskPriority_COUNT];
+  WaitGroupSlot wg_slots[Thread_MaxCounters];
+  u32 wg_alloc_idx;
+
+  u8 ctx_buffer[KB(4)];
+  u32 ctx_cursor;
+
   u32 remaining_tasks;
   Mutex mutex;
   CondVar cond_not_empty;
@@ -13,130 +25,194 @@ struct TaskQueue {
   CondVar finished;
 };
 
-struct ThreadPool {
-  Arena arena;
-  Thread threads[16];
-  u32 num_threads;
-  TaskQueue queue;
-  Pool<u32, MAX_TASKS, CounterId> counters;
-};
-
 global ThreadPool thread_pool;
 
-TaskId thread_task_push(Task t) {
+WaitGroup thread_wg_make(u32 count) {
   ThreadPool& g = thread_pool;
-  TaskQueue& q = thread_pool.queue;
-  LockScope(q.mutex);
-  while (q.count == MAX_TASKS) {
-    os_cond_var_wait(q.cond_not_full, q.mutex);
-  }
-  os_cond_var_signal(q.cond_not_empty);
-  if (!t.async) {
-    t.counter_id = pool_push(g.counters, (u32)1);
-  }
-  ring_write_struct(q.ring, &t);
-  ++q.count;
-  ++q.remaining_tasks;
-  TaskId res = {t.counter_id};
-  return res;
+  u32 idx = atomic_inc(&g.wg_alloc_idx) % Thread_MaxCounters;
+  WaitGroupSlot& slot = g.wg_slots[idx];
+  slot.gen++;
+  slot.count = count;
+  return WaitGroup(idx, slot.gen);
 }
 
-intern Task thread_task_pop() {
-  TaskQueue& q = thread_pool.queue;
-  LockScope(q.mutex);
-  while (q.count == 0) {
-    ProfBlock("sleep", ProfType_Sleep);
-    os_cond_var_wait(q.cond_not_empty, q.mutex);
+void thread_wg_add(WaitGroup wg, u32 n) {
+  ThreadPool& g = thread_pool;
+  Assert(g.wg_slots[wg.idx].gen == wg.gen);
+  atomic_add(&g.wg_slots[wg.idx].count, n);
+}
+
+intern void thread_wg_done(WaitGroup wg) {
+  if (wg.idx == 0 && wg.gen == 0) return;
+  ThreadPool& g = thread_pool;
+  atomic_dec(&g.wg_slots[wg.idx].count);
+}
+
+b32 thread_wg_done_check(WaitGroup wg) {
+  ThreadPool& g = thread_pool;
+  return atomic_load(&g.wg_slots[wg.idx].count) == 0;
+}
+
+WaitGroup thread_push(TaskDesc desc) {
+  var& g = thread_pool;
+  WaitGroup wg = thread_wg_make(1);
+  Task t = {
+    .fn = desc.fn,
+    .ctx = desc.ctx,
+    .wg = wg,
+    .priority = desc.priority,
+  };
+  LockScope(g.mutex);
+  while (g.tasks[desc.priority].count == Thread_MaxTasks) {
+    os_cond_var_wait(g.cond_not_full, g.mutex);
   }
-  if (q.count == MAX_TASKS) {
-    os_cond_var_signal(q.cond_not_full);
+  if (g.tasks[desc.priority].count <= Thread_NumWorkers) {
+    os_cond_var_signal(g.cond_not_empty);
+  }
+  queue_push(g.tasks[desc.priority], t);
+  ++g.remaining_tasks;
+  return wg;
+}
+
+WaitGroup thread_push_batch(Slice<TaskDesc> tasks) {
+  ThreadPool& g = thread_pool;
+  WaitGroup wg = thread_wg_make(tasks.count);
+  LockScope(g.mutex);
+  while (g.tasks[TaskPriority_High].count+tasks.count >= Thread_MaxTasks || g.tasks[TaskPriority_Low].count+tasks.count >= Thread_MaxTasks) {
+    os_cond_var_wait(g.cond_not_full, g.mutex);
+  }
+  if (i32(g.tasks[TaskPriority_High].count-tasks.count) <= i32(Thread_NumWorkers) || i32(g.tasks[TaskPriority_Low].count-tasks.count) <= i32(Thread_NumWorkers)) {
+    os_cond_var_broadcast(g.cond_not_empty);
+  }
+  Loop (i, tasks.count) {
+    Task t = {
+      .fn = tasks[i].fn,
+      .ctx = tasks[i].ctx,
+      .wg = wg,
+      .priority = tasks[i].priority,
+    };
+    queue_push(g.tasks[tasks[i].priority], t);
+  }
+  g.remaining_tasks += tasks.count;
+  return wg;
+}
+
+// void thread_parallel_for(u32 count, u32 chunk_size, void* ctx, ParallelForFn fn) {
+//   Scratch scratch;
+//   if (count == 0) return;
+//   u32 task_count = CeilIntDiv(count, chunk_size);
+//   WaitGroup wg = thread_wg_make(task_count);
+//   Task* tasks = push_array(scratch, Task, task_count);
+//   Loop (i, task_count) {
+//     Task t = {
+//       .fn = parallel_for_worker,
+//       .ctx = &pf_ctx,
+//       .wg = wg,
+//       .priority = TaskPriority_Normal,
+//     };
+//   }
+// }
+
+intern Result<Task> thread_pop() {
+  var& g = thread_pool;
+  LockScope(g.mutex);
+  while (g.tasks[TaskPriority_High].count == 0 && g.tasks[TaskPriority_Low].count == 0) {
+    ProfBlock("sleep", ProfType_Sleep);
+    os_cond_var_wait(g.cond_not_empty, g.mutex);
+  }
+  if (g.tasks[TaskPriority_High].count == Thread_MaxTasks && g.tasks[TaskPriority_Low].count == Thread_MaxTasks) {
+    os_cond_var_signal(g.cond_not_full);
   }
   Task t = {};
-  ring_read_struct(q.ring, &t);
-  --q.count;
+  if (g.tasks[TaskPriority_High].count) {
+    t = queue_pop(g.tasks[TaskPriority_High]);
+  } else {
+    t = queue_pop(g.tasks[TaskPriority_Low]);
+  }
   return t;
 }
 
-intern Result<Task> thread_task_try_pop() {
-  TaskQueue& q = thread_pool.queue;
-  LockScope(q.mutex);
-  if (q.count == 0) {
+intern Result<Task> thread_try_pop() {
+  var& g = thread_pool;
+  LockScope(g.mutex);
+  if (g.tasks[TaskPriority_High].count == 0 && g.tasks[TaskPriority_Low].count == 0) {
     return Err();
   }
-  if (q.count == MAX_TASKS) {
-    os_cond_var_signal(q.cond_not_full);
+  if (g.tasks[TaskPriority_High].count == Thread_MaxTasks && g.tasks[TaskPriority_Low].count == Thread_MaxTasks) {
+    os_cond_var_signal(g.cond_not_full);
   }
-  Task t;
-  ring_read_struct(q.ring, &t);
-  --q.count;
+  Task t = {};
+  if (g.tasks[TaskPriority_High].count) {
+    t = queue_pop(g.tasks[TaskPriority_High]);
+  } else {
+    t = queue_pop(g.tasks[TaskPriority_Low]);
+  }
   return t;
 }
 
 intern void thread_worker(void* ctx) {
-  ThreadPool& g = thread_pool;
-  TaskQueue& q = thread_pool.queue;
+  var& g = thread_pool;
   tctx_init();
   while (true) {
-    Task t = thread_task_pop();
-    ProfBlock("working", ProfType_Worker);
-    t.func(t.ctx);
-    if (!t.async) {
-      atomic_sub(&pool_get(g.counters, t.counter_id), 1);
-    }
-    LockScope(q.mutex);
-    --q.remaining_tasks;
-    if (q.remaining_tasks == 0) {
-      os_cond_var_signal(q.finished);
+    Task t = thread_pop();
+    ProfBlock("working", t.priority == TaskPriority_High ? ProfType_Worker : ProfType_Async);
+    t.fn(t.ctx);
+    thread_wg_done(t.wg);
+    if (atomic_dec(&g.remaining_tasks) == 1) {
+      os_cond_var_signal(g.finished);
     }
   }
 }
 
-void thread_pool_init(u32 num_threads) {
+void thread_wg_wait(WaitGroup wg) {
   ProfFunc;
-  ThreadPool& g = thread_pool;
+  var& g = thread_pool;
+  while (!thread_wg_done_check(wg)) {
+    Result<Task> res = thread_try_pop();
+    if (res.err) {
+      os_sleep_ms(1);
+      continue;
+    }
+    Task t = res;
+    ProfBlock("Working", ProfType_Worker);
+    t.fn(t.ctx);
+    thread_wg_done(t.wg);
+    if (atomic_dec(&g.remaining_tasks) == 1) {
+      os_cond_var_signal(g.finished);
+    }
+  }
+}
+
+void thread_wait_remanings() {
+  var& g = thread_pool;
+  LockScope(g.mutex);
+  if (g.remaining_tasks > 0) {
+    os_cond_var_wait(g.finished, g.mutex);
+  }
+}
+
+u8* _thread_push_ctx(u64 size, u64 align) {
+  var& g = thread_pool;
+  g.ctx_cursor = AlignUp(g.ctx_cursor, align) % sizeof(g.ctx_buffer);
+  if (g.ctx_cursor+size > sizeof(g.ctx_buffer)) {
+    g.ctx_cursor = 0;
+  }
+  u8* res = &g.ctx_buffer[g.ctx_cursor];
+  g.ctx_cursor += size;
+  MemZero(res, size);
+  return res;
+}
+
+void thread_pool_init() {
+  ProfFunc;
+  var& g = thread_pool;
   g.arena = arena_make();
-  g.num_threads = num_threads;
-  TaskQueue& q = g.queue;
-  q.tasks = push_array(g.arena, Task, MAX_TASKS);
-  q.ring = ring_make(q.tasks, MAX_TASKS * sizeof(Task));
-  q.mutex = os_mutex_alloc();
-  q.cond_not_empty = os_cond_var_alloc();
-  q.cond_not_full = os_cond_var_alloc();
-  q.finished = os_cond_var_alloc();
-  Loop (i, num_threads) {
+  g.mutex = os_mutex_alloc();
+  g.cond_not_empty = os_cond_var_alloc();
+  g.cond_not_full = os_cond_var_alloc();
+  g.finished = os_cond_var_alloc();
+  Loop (i, Thread_NumWorkers) {
     g.threads[i] = os_thread_launch(thread_worker, null);
   }
 }
 
-void thread_wait_task(TaskId task_id) {
-  ProfFunc;
-  ThreadPool& g = thread_pool;
-  TaskQueue& q = thread_pool.queue;
-  while (atomic_load(&pool_get(g.counters, task_id.counter_id)) > 0) {
-    Result t_r = thread_task_try_pop();
-    if (t_r.err) {
-      os_sleep_ms(1);
-      continue;
-    }
-    Task t = t_r;
-    ProfBlock("Working", ProfType_Worker);
-    t.func(t.ctx);
-    if (!t.async) {
-      atomic_sub(&pool_get(g.counters, t.counter_id), 1);
-    }
-    LockScope(q.mutex);
-    --q.remaining_tasks;
-    if (q.remaining_tasks == 0) {
-      os_cond_var_signal(q.finished);
-    }
-  }
-  pool_remove(g.counters, task_id.counter_id);
-}
-
-void thread_wait_for() {
-  TaskQueue& q = thread_pool.queue;
-  LockScope(q.mutex);
-  if (q.remaining_tasks > 0) {
-    os_cond_var_wait(q.finished, q.mutex);
-  }
-}

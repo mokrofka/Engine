@@ -2,7 +2,6 @@
 #include "base.h"
 #include "logger.h"
 #include "mem.h"
-#include "maths.h"
 
 const u32 INDEX_BITS = 22;
 const u32 INDEX_MASK = (1u << INDEX_BITS) - 1;
@@ -85,7 +84,8 @@ struct Darray {
 template<typename T> Slice<T> slice(Darray<T>& arr) {
   return {arr.data, arr.count};
 }
-template<typename T> Darray<T> darray_make(Allocator alloc) {
+#define array_make(T, alloc) _array_make<T>(alloc)
+template<typename T> Darray<T> _array_make(Allocator alloc) {
   Darray<T> res = {
     .alloc = alloc,
   };
@@ -238,7 +238,8 @@ struct DarrayHandler {
   u32* generations;
 };
 
-template<typename T, typename Handle> DarrayHandler<T, Handle> darray_handler_make(Allocator alloc) {
+#define array_handler_make(T, H, alloc) _array_handler_make<T, H>(alloc)
+template<typename T, typename Handle> DarrayHandler<T, Handle> _array_handler_make(Allocator alloc) {
   DarrayHandler<T, Handle> res = {
     .alloc = alloc,
   };
@@ -376,7 +377,8 @@ struct Dpool {
   u32* generations;
 };
 
-template<typename T, typename Handle> Dpool<T, Handle> dpool_make(Allocator alloc) {
+#define pool_make(T, H, alloc) _pool_make<T, H>(alloc)
+template<typename T, typename Handle> Dpool<T, Handle> _pool_make(Allocator alloc) {
   Dpool<T, Handle> res = {
     .alloc = alloc,
   };
@@ -566,7 +568,8 @@ struct DpoolLinkList {
   u32* generations;
 };
 
-template<typename T, typename Handle> DpoolLinkList<T, Handle> dpool_linklist_make(Allocator alloc) {
+#define pool_linklist_make(T, H, alloc) _pool_linklist_make<T, H>(alloc)
+template<typename T, typename Handle> DpoolLinkList<T, Handle> _pool_linklist_make(Allocator alloc) {
   DpoolLinkList<T, Handle> res = {
     .alloc = alloc,
   };
@@ -977,7 +980,8 @@ struct Dmap {
   MapSlot* is_occupied;
 };
 
-template<typename Key, typename T> Dmap<Key, T> map_make(Allocator alloc) {
+#define map_make(K, V, alloc) _map_make<K, V>(alloc)
+template<typename Key, typename T> Dmap<Key, T> _map_make(Allocator alloc) {
   Dmap<Key, T> res = {
     .alloc = alloc,
   };
@@ -1153,7 +1157,7 @@ void sort_radix(Allocator alloc, Slice<SortEntry> arr);
 // List sort
 
 template<typename T, typename Cmp> Slice<T> sort_list_insert(Allocator arena, T first, Cmp cmp) {
-  var sorted_arr = darray_make<T>(arena);
+  var sorted_arr = array_make(T, arena);
   for (T it = first; it != 0; it = it->next) {
     array_push(sorted_arr, it);
   }

@@ -448,7 +448,7 @@ Slice<String> os_watch_check(Allocator arena, OS_Watch watch) {
   if (read_size == -1) {
     return {};
   }
-  var strs = darray_make<String>(arena);
+  var strs = array_make(String, arena);
   int offset = 0;
   while (offset < read_size) {
     struct inotify_event* event = (struct inotify_event*)&buf[offset];
@@ -513,7 +513,7 @@ void os_file_iter_end(OS_FileIter *iter) {
 }
 
 Slice<OS_FileInfo> os_file_iter_directory(Allocator arena, String path, OS_FileIterFlags flags) {
-  var file_pathes = darray_make<OS_FileInfo>(arena);
+  var file_pathes = array_make(OS_FileInfo, arena);
   OS_FileIter* it = os_file_iter_begin(arena, path, flags);
   for (OS_FileInfo info = {}; os_file_iter_next(arena, it, &info);) {
     array_push(file_pathes, info);

@@ -609,9 +609,6 @@ String vk_result_str(VkResult result);
 void vk_surface_create();
 void vk_swapchain_create();
 
-////////////////////////////////////////////////////////////////////////
-// @Misc
-
 VkSemaphore vk_get_cur_image_available_semaphore();
 VkSemaphore vk_get_cur_render_complete_semaphore();
 VkCommandBuffer vk_get_cur_cmd();
@@ -622,9 +619,6 @@ void vk_push_constants(VK_PushConstant constants);
 // VK_Semaphore vk_semaphore_make(u64 initial_counter = 0);
 // void vk_semaphore_wait(VK_Semaphore semaphore, u64 counter);
 
-////////////////////////////////////////////////////////////////////////
-// @Cmd
-
 VkCommandBuffer vk_cmd_alloc(VkCommandPool pool);
 void vk_cmd_free(VkCommandPool pool, VkCommandBuffer cmd);
 void vk_cmd_begin(VkCommandBuffer cmd);
@@ -633,9 +627,6 @@ void vk_cmd_submit(VkCommandBuffer cmd);
 void vk_cmd_end_submit(VkCommandBuffer cmd);
 VkCommandBuffer vk_cmd_alloc_begin();
 void vk_cmd_end_free(VkCommandBuffer cmd);
-
-////////////////////////////////////////////////////////////////////////
-// @Buffer
 
 VK_Memory vk_mem_make(Gfx_MemType type, u64 size);
 VK_Buffer vk_buffer_make(u64 size, Gfx_MemType type = Gfx_MemType_Gpu);

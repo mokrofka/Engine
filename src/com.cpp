@@ -6,6 +6,14 @@
 #include "tokenizer.cpp"
 #include "debug.cpp"
 
+TimeScope::TimeScope() {
+  tsc_start = cpu_timer_now();
+}
+TimeScope::~TimeScope() {
+  u64 elapsed = cpu_timer_now() - tsc_start;
+  Info("%fms", tsc_to_ms(elapsed));
+}
+
 ////////////////////////////////////////////////////////////////////////
 // @Common
 
@@ -170,10 +178,10 @@ String word_lexer_next(WordLexer& l) {
 
 MeshDesc load_obj(Allocator arena, String name) {
   Scratch scratch(arena);
-  var positions = darray_make<v3>(scratch);
-  var normals = darray_make<v3>(scratch);
-  var uvs = darray_make<v2>(scratch);
-  var indexes = darray_make<v3u>(scratch);
+  var positions = array_make(v3, scratch);
+  var normals = array_make(v3, scratch);
+  var uvs = array_make(v2, scratch);
+  var indexes = array_make(v3u, scratch);
 
   // String str = R"(
   //   v  -4.4   14 4.1
@@ -233,9 +241,9 @@ MeshDesc load_obj(Allocator arena, String name) {
     }
   }
 
-  var vertices = darray_make<Vertex>(arena);
-  var final_indices = darray_make<u32>(arena);
-  var map = map_make<v3u, u32>(scratch);
+  var vertices = array_make(Vertex, arena);
+  var final_indices = array_make(u32, arena);
+  var map = map_make(v3u, u32, scratch);
   Loop (i, indexes.count) {
     v3u idx = indexes[i];
     Result r = map_get(map, idx);
@@ -534,7 +542,7 @@ JsVal js_parse(JsParser* p) {
     case 'n': p->cursor += 4; return { .type = JsType_Null, };
     case '[': {
       js_advance(p);
-      var arr = darray_make<JsVal*>(p->arena);
+      var arr = array_make(JsVal*, p->arena);
       while (true) {
         js_skip_ws(p);
         if (js_peek(p) == ']') {
@@ -565,7 +573,7 @@ JsVal js_parse(JsParser* p) {
     } break;
     case '{': {
       js_advance(p);
-      var fields = darray_make<JsField>(p->arena);
+      var fields = array_make(JsField, p->arena);
       while (true) {
         js_skip_ws(p);
         if (js_peek(p) == '}') {
@@ -772,116 +780,6 @@ void scroll_state_update(ScrollState& s, ScrollType type) {
     s.offset.x += scroll_h * sensity;
   }
 }
-
-// void ui_begin() {
-//   UI_State& g = g_st->ui;
-//   g.last_hot = g.hot;
-//   g.hot = 0;
-// }
-
-// void ui_end() {
-//   UI_State g = g_st->ui;
-//   if (os_is_key_released(MouseKey_Left)) {
-//     g.active = 0;
-//   }
-// }
-
-// void ui_push_box(String str) {
-//   UI_State& g = g_st->ui;
-
-//   UI_Box& parent = g.boxes[g.boxes_count];
-//   ++g.boxes_count;
-
-//   u64 hash_idx = hash(str);
-//   UI_Box box = {
-//     .pos = v2(parent.pos + parent.size),
-//     .size = {100 + parent.size.x, 100 + parent.pos.y},
-//     .hash = (hash(hash_idx, parent.hash))
-//   };
-//   g.boxes[g.boxes_count] = box;
-
-//   ui_button(box.hash, box.pos, box.pos+box.size);
-// }
-
-// void ui_pop_box() {
-//   UI_State& g = g_st->ui;
-//   if (g.boxes_count > 0) {
-//     --g.boxes_count;
-//   }
-// }
-
-// b32 ui_begin_window(u32 id, v2 size) {
-//   UI_State& g = g_st->ui;
-//   v2& pos = g.windows[id].pos;
-//   v2 mouse = os_get_mouse_pos();
-//   Rng2 title_rect(pos, v2(pos.x + size.x, pos.y + 20));
-
-//   b32 hovered = contains_2f32(title_rect, mouse);
-//   if (hovered) {
-//     g.hot = id;
-//   }
-
-//   // PRESS → start dragging
-//   if (g.last_hot == id && os_is_key_pressed(MouseKey_Left)) {
-//     g.active = id;
-//     g.active_window = id;
-
-//     // store offset
-//     g.drag_offset = v2(mouse.x - pos.x, mouse.y - pos.y);
-//   }
-
-//   // DRAG
-//   if (g.active == id && os_is_key_down(MouseKey_Left)) {
-//     pos.x = mouse.x - g.drag_offset.x;
-//     pos.y = mouse.y - g.drag_offset.y;
-//   }
-
-//   // RELEASE
-//   if (g.active == id && os_is_key_released(MouseKey_Left)) {
-//     g.active = 0;
-//   }
-
-//   //  Draw window body
-//   vk_draw_quad(pos, v2(pos.x + size.x, pos.y + size.y), v3(0.2f,0.2f,0.2f));
-
-//   //  Draw title bar
-//   v3 title_color = v3(0.3f,0.3f,0.3f);
-//   if (g.hot == id) title_color = v3(0.4f,0.4f,0.4f);
-//   if (g.active == id) title_color = v3(0.2f,0.2f,0.2f);
-
-//   title_rect = {pos, v2(pos.x + size.x, pos.y + 20)};
-//   vk_draw_quad(title_rect.min, title_rect.max, title_color);
-
-//   return true;
-// }
-
-// b32 ui_button(u32 id, v2 min, v2 max) {
-//   UI_State& g = g_st->ui;
-//   b32 hovered = contains_2f32({min, max}, os_get_mouse_pos());
-//   if (hovered) {
-//     g.hot = id;
-//   }
-
-//   if (g.last_hot == id && os_is_key_pressed(MouseKey_Left)) {
-//     g.active = id;
-//   }
-
-//   b32 clicked = 0;
-//   if (g.active == id && os_is_key_released(MouseKey_Left)) {
-//     if (g.hot == id) {
-//       clicked = true;
-//     }
-//     g.active = 0;
-//   }
-
-//   v3 color = {0.6f, 0.6f, 0.6f};
-//   if (g.hot == id) color = v3(0.8f, 0.8f, 0.8f);
-//   if (g.active == id) color = v3(0.4f, 0.4f, 0.4f);
-
-//   vk_draw_quad(min, max, color);
-//   return clicked;
-// }
-
 
 String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, EntityFlags flags) {
   Scratch scratch(arena);
@@ -1202,7 +1100,7 @@ void com_init() {
 
   {
     ProfBlock("init");
-    thread_pool_init(THREAD_COUNT);
+    thread_pool_init();
     test();
 
     g.gpa = alloc_seglist_make(g.arena);
@@ -1228,17 +1126,54 @@ void com_update() {
   debug_update();
   {
     ProfBlock("push jobs");
-    Loop (i, 2) {
-      thread_task_push({.async = true, .func = [](void* ctx) {os_sleep_ms(rand_u32()%2);}});
-    }
-    TaskId id0 = thread_task_push({.func = [](void* ctx) { os_sleep_ms(2); }});
-    TaskId id1 = thread_task_push({.func = [](void* ctx) { os_sleep_ms(2); }});
-    TaskId id2 = thread_task_push({.func = [](void* ctx) { os_sleep_ms(2); }});
-    TaskId id3 = thread_task_push({.func = [](void* ctx) { os_sleep_ms(2); }});
-    thread_wait_task(id0);
-    thread_wait_task(id1);
-    thread_wait_task(id2);
-    thread_wait_task(id3);
+    // Loop (i, 12) {
+    //   thread_push({.fn = [](void* ctx) {os_sleep_ms(rand_u32()%4);}, .priority = TaskPriority_Low});
+    // }
+    // WaitGroup id0 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
+    // WaitGroup id1 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
+    // WaitGroup id2 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
+    // WaitGroup id3 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
+
+    // TaskDesc tasks[] = {
+    //   {.fn = [](void* ctx) { os_sleep_ms(2); }},
+    //   {.fn = [](void* ctx) { os_sleep_ms(2); }},
+    //   {.fn = [](void* ctx) { os_sleep_ms(2); }},
+    //   {.fn = [](void* ctx) { os_sleep_ms(2); }},
+    // };
+    // WaitGroup batch = thread_push_batch(slice(tasks));
+
+    // thread_wg_wait(id0);
+    // thread_wg_wait(id1);
+    // thread_wg_wait(id2);
+    // thread_wg_wait(id3);
+    // thread_wg_wait(batch);
+
+    // struct Ctx {
+    //   u32 i;
+    // };
+    // var& ctx = thread_push_ctx(Ctx);
+    // ctx.i = 1;
+    // thread_push({.ctx = &ctx, .fn = [](void* ctx) {
+    //   Ctx* data = (Ctx*)ctx;
+    //   Info("%i", data->i);
+    //   os_sleep_ms(1);
+    // }});
+
+    // Scratch scratch;
+    // u64 size = KB(1);
+    // var s = push_slice(scratch, u32, size);
+    // Loop (i, size) {
+    //   s[i] = 1;
+    // }
+    // thread_parallel_for(s, [](Slice<u32> s) {
+      // u32 sum = 0;
+      // Loop (i, s.count) {
+      //   sum += s[i];
+      // }
+      // Info("%i", sum);
+      // os_sleep_ms(1);
+    // });
+    // u32 a = 1;
   }
 }
 
@@ -1306,7 +1241,7 @@ if (data->ctx == null) {
   os_exit(0);
 
   hotreload:
-  thread_wait_for();
+  thread_wait_remanings();
 }
 
 void gfx_api_design_foo() {
@@ -1760,6 +1695,17 @@ void scene_update() {
     e.pos = v3_rand_rng(-v3_splat(range), v3_splat(range));
     array_push(g.moving_cubes, e_id);
   }
+  // thread_parallel_for(KB(1), slice(g.moving_cubes), [](Slice<EntityId> entities) {
+  //   Loop (i, entities.count) {
+  //     Entity& e = get_entity(entities[i]);
+  //     e.pos += e.vel * get_dt();
+  //     v3 center = {0, 0, 0};
+  //     v3 dir = e.pos - center;
+  //     v3 tangent = v3_norm(v3{-dir.z, 0, dir.x});
+  //     e.vel += tangent * 2.0f * get_dt();
+  //     e.vel += -dir * 0.5f * get_dt();
+  //   }
+  // });
   Loop (i, g.moving_cubes.count) {
     Entity& e = get_entity(g.moving_cubes[i]);
     e.pos += e.vel * get_dt();
@@ -1911,8 +1857,8 @@ void game_init() {
   g.gpa = alloc_seglist_make(g.arena, "game gpa");
   g.timer = timer_make(1);
 
-  g.moving_cubes = darray_make<EntityId>(g.gpa);
-  // g.static_cubes = darray_make<StaticEntityId>(g.gpa);
+  g.moving_cubes = array_make(EntityId, g.gpa);
+  // g.static_cubes = array_make<StaticEntityId>(g.gpa);
 
   MeshDesc triangle_mesh = {.vertices = slice(triangle_vertices)};
   mesh_set(Mesh_Triangle, r_mesh_make(triangle_mesh));

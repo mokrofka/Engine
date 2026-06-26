@@ -360,6 +360,7 @@ struct Result {
     E e;
   };
   b32 err;
+  Result() = default;
   Result(T val) : v(val), err(false) {}
   Result(_Unexpected<E> err_) {
     v = {};
@@ -385,7 +386,6 @@ struct Result {
 
 const u32 DEFAULT_CAPACITY = 8;
 const u32 DEFAULT_RESIZE_FACTOR = 2;
-const u32 THREAD_COUNT = 2;
 
 #define Introspect
 
