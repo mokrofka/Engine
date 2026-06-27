@@ -46,7 +46,7 @@ global MemState mem_st;
 AllocatorInfo* allocator_info_alloc() {
   AllocatorInfo* info = mem_st.free;
   if (info) {
-    SLLStackPop(mem_st.free);
+    sll_stack_pop(mem_st.free);
   } else {
     info = &mem_st.infos[mem_st.count_alloc++];
   }
@@ -55,8 +55,9 @@ AllocatorInfo* allocator_info_alloc() {
 }
 
 void allocator_info_free(AllocatorInfo* info) {
-  SLLStackPush(mem_st.free, info);
-  DLLRemove(mem_st.list.first, mem_st.list.last, info);
+  sll_stack_push(mem_st.free, info);
+  dll_remove(mem_st.list.first, mem_st.list.last, info);
+  dll_list_remove(mem_st.list, info);
   mem_st.list.count--;
 }
 
@@ -64,7 +65,7 @@ void allocator_inherit(Allocator parent_, Allocator child_) {
   AllocatorInfo* parent = *(AllocatorInfo**)(parent_.ctx);
   AllocatorInfo* child = *(AllocatorInfo**)(child_.ctx) = allocator_info_alloc();
   child->parent = parent;
-  DLLPushBack(parent->first, parent->last, child);
+  dll_push_back(parent->first, parent->last, child);
   ++parent->first_count;
 }
 
@@ -101,7 +102,7 @@ Arena arena_make_(String name) {
   };
 #if MEM_TRACK
   AllocatorInfo* info = allocator_info_alloc();
-  DLLPushBack(mem_st.list.first, mem_st.list.last, info);
+  dll_push_back(mem_st.list.first, mem_st.list.last, info);
   mem_st.list.count++;
   info->type = AllocatorType_Arena;
   str_copy(info->name, name);
@@ -114,7 +115,7 @@ Arena arena_make_(String name) {
 void arena_free(Arena* arena) {
   os_release(arena->base, arena->cap);
 #if MEM_TRACK
-  DLLRemove(mem_st.list.first, mem_st.list.last, arena->info);
+  dll_remove(mem_st.list.first, mem_st.list.last, arena->info);
   --mem_st.list.count;
 #endif
 }
@@ -617,6 +618,46 @@ u8* mem_realloc_soa(Allocator alloc, u32 old_count, u32 new_count, Slice<SoA_Fie
   mem_free(alloc, old_ptr);
   return buf;
 }
+
+u8* mem_alloc_soa_zero(Allocator alloc, u32 count, Slice<SoA_Field> fields) {
+  u64 mem_offset = 0;
+  u64 offsets[10] = {};
+  Loop (i, fields.count) {
+    mem_offset = AlignUp(mem_offset, fields[i].align);
+    offsets[i] = mem_offset;
+    mem_offset += fields[i].elem_size * count;
+  }
+  u64 alloc_size = mem_offset;
+  u8* buf = mem_alloc_zero(alloc, alloc_size, fields[0].align);
+  Loop (i, fields.count) {
+    void* new_ptr = Offset(buf, offsets[i]);
+    *(fields[i].dst_ptr) = new_ptr;
+  }
+  return buf;
+}
+
+u8* mem_realloc_soa_zero(Allocator alloc, u32 old_count, u32 new_count, Slice<SoA_Field> fields) {
+  void* old_ptr = *fields[0].dst_ptr;
+  u64 mem_offset = 0;
+  u64 offsets[10] = {};
+  Loop (i, fields.count) {
+    mem_offset = AlignUp(mem_offset, fields[i].align);
+    offsets[i] = mem_offset;
+    mem_offset += fields[i].elem_size * new_count;
+  }
+  u64 new_size = mem_offset;
+  u8* buf = mem_alloc_zero(alloc, new_size, fields[0].align);
+  Loop (i, fields.count) {
+    void* old_ptr = *(fields[i].dst_ptr);
+    void* new_ptr = Offset(buf, offsets[i]);
+    u64 old_ptr_size = fields[i].elem_size * old_count;
+    MemCopy(new_ptr, old_ptr, old_ptr_size);
+    *(fields[i].dst_ptr) = new_ptr;
+  }
+  mem_free(alloc, old_ptr);
+  return buf;
+}
+
 
 u8* offset_ptr_push(void*& offset, u64 size, u64 align) {
   u8* result = PtrAlignUp(offset, align);

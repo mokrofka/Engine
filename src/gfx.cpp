@@ -1235,7 +1235,7 @@ intern void vk_instance_init() {
             "(Warning - This VUID has now been reported 10 times, which is the duplicate_message_limit value, this will be the last time reporting it).",
             "vkCreateGraphicsPipelines(): pCreateInfos[0] (SPIR-V Interface) [EntryPoint \"vs_main\", VK_SHADER_STAGE_VERTEX_BIT] has an Output value declared at Location",
           };
-          for EachElement(i, skip_warnings) {
+          LoopElement (i, skip_warnings) {
             String skip = skip_warnings[i];
             String warn = callback_data->pMessage;
             if (warn.size >= skip.size) {
@@ -1559,7 +1559,7 @@ void vk_texture_generate_mipmaps(VK_Image image) {
   };
   i32 width = image.width;
   i32 height = image.height;
-  LoopRange(i, 1, image.mipmaps_count) {
+  LoopOff(i, 1, image.mipmaps_count) {
     barrier.subresourceRange.baseMipLevel = i - 1;
 
     // DST -> SRC
@@ -1845,6 +1845,9 @@ Gfx_Image gfx_image_make(Gfx_ImageDesc desc) {
     if (desc.mipmaps) {
       vk_texture_generate_mipmaps(image);
       image.cur_access = VK_Access_Texture | VK_Access_FragmentShader;
+    }
+    else {
+      vk_image_barrier(cmd, &image, VK_Access_Texture);
     }
     vk_cmd_end_submit(cmd);
   }
@@ -2134,6 +2137,126 @@ void gfx_image_update(Gfx_Image img, u8* data) {
     vk_texture_generate_mipmaps(image);
   }
   vk_cmd_end_submit(cmd);
+}
+
+void gfx_image_update(Gfx_Image img, Gfx_ImageDesc desc) {
+  var& g = st->gfx;
+  VK_Image& vkimg = pool_get(g.images, img);
+  if (vkimg.width == desc.width && vkimg.height == desc.height) {
+    gfx_image_update(img, desc.data);
+    return;
+  }
+  g.DestroyImage(vkdevice, vkimg.h, g.allocator);
+
+  gfx_image_desc_defaults(&desc);
+  vkimg.width = desc.width;
+  vkimg.height = desc.height;
+  if (desc.mipmaps) {
+    vkimg.mipmaps_count = Floor(Log2(Max(vkimg.width, vkimg.height))) + 1;
+  }
+  VkImageCreateInfo image_info = {
+    .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+    .flags = vk_image_create_flags(desc.type),
+    .imageType = vk_image_type(desc.type),
+    .format = vk_format(desc.pixel_format),
+    .extent = {desc.width, desc.height},
+    .mipLevels = vkimg.mipmaps_count,
+    .samples = (VkSampleCountFlagBits)desc.sample_count,
+    .tiling = VK_IMAGE_TILING_OPTIMAL,
+    .usage = vk_image_usage(desc.usage),
+    .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+    .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+  };
+  if (desc.type == Gfx_ImageType_3D) {
+    image_info.extent.depth = desc.slices_count;
+    image_info.arrayLayers = 1;
+  } else {
+    image_info.extent.depth = 1;
+    image_info.arrayLayers = desc.slices_count;
+  }
+  VK_CHECK(g.CreateImage(vkdevice, &image_info, g.allocator, &vkimg.h));
+  VkMemoryRequirements requirements;
+  g.GetImageMemoryRequirements(vkdevice, vkimg.h, &requirements);
+
+  VkMemoryAllocateInfo alloc_info = {
+    .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+    .allocationSize = requirements.size,
+    .memoryTypeIndex = g.device.gpu_type_idx,
+  };
+  VK_CHECK(g.AllocateMemory(vkdevice, &alloc_info, g.allocator, &vkimg.memory));
+
+  MemFormatSize s = mem_format_size(requirements.size);
+  Info("image created: %f %s", s.size, s.format);
+  VK_CHECK(g.BindImageMemory(vkdevice, vkimg.h, vkimg.memory, 0));
+
+  if (desc.data) {
+    if (desc.type == Gfx_ImageType_Cube) {
+      u64 size = desc.width * desc.height * gfx_pixelformat_bytesize(desc.pixel_format);
+      Loop (i, 6) {
+        MemCopy(Offset(gfx_buffer_base_ptr(st->gfx.stage_buffer), size * i), desc.cube[i], size);
+      }
+    } else {
+      MemCopy(gfx_buffer_base_ptr(g.stage_buffer), desc.data, desc.width * desc.height * gfx_pixelformat_bytesize(desc.pixel_format));
+    }
+    VkCommandBuffer cmd = g.cmds_upload[0];
+    vk_cmd_begin(cmd);
+    vk_image_barrier(cmd, &vkimg, VK_Access_TransferDst);
+    vk_image_upload(cmd, vkimg);
+    if (desc.mipmaps) {
+      vk_texture_generate_mipmaps(vkimg);
+      vkimg.cur_access = VK_Access_Texture | VK_Access_FragmentShader;
+    }
+    else {
+      vk_image_barrier(cmd, &vkimg, VK_Access_Texture);
+    }
+    vk_cmd_end_submit(cmd);
+  }
+}
+
+void gfx_view_update(Gfx_View view, Gfx_ViewDesc desc) {
+  var& g = st->gfx;
+  VK_View& vkview = pool_get(g.views, view);
+  g.DestroyImageView(vkdevice, pool_get(g.views, view).h, g.allocator);
+  VK_Image img = pool_get(g.images, vkview.ref);
+
+  vkview.mip_level_count = _Def(desc.texture.mip_level_count, img.mipmaps_count - desc.texture.mip_level);
+  switch (img.type) {
+    InvalidDefaultCase;
+    case Gfx_ImageType_2D:    vkview.slice_count = 1; break;
+    case Gfx_ImageType_Cube:  vkview.slice_count = 6; break;
+    case Gfx_ImageType_3D:    vkview.slice_count = 1; break;
+    case Gfx_ImageType_Array: vkview.slice_count = _Def(desc.texture.slice_count, img.slices_count - vkview.slice);
+  }
+
+  VkImageViewCreateInfo view_info = {
+    .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+    .image = img.h,
+    .viewType = vkview.type == Gfx_ViewType_Texture ? vk_texture_image_view_type(img.type) : vk_attachment_image_view_type(img.type),
+    .format = vk_format(img.pixel_format),
+    .subresourceRange = {
+      .aspectMask = vk_aspect_mask(img.pixel_format),
+      .baseMipLevel = vkview.mip_level,
+      .levelCount = vkview.mip_level_count,
+      .baseArrayLayer = vkview.slice,
+      .layerCount = vkview.slice_count,
+    },
+  };
+  VK_CHECK(g.CreateImageView(vkdevice, &view_info, g.allocator, &vkview.h));
+
+  VkDescriptorImageInfo descriptor_image_info = {
+    .imageView = vkview.h,
+    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+  };
+  VkWriteDescriptorSet texture_descriptor = {
+    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+    .dstSet = g.descriptor_sets,
+    .dstBinding = (img.type == Gfx_ImageType_2D || img.type == Gfx_ImageType_Array) ? Bindings::Textures : Bindings::CubeTextures,
+    .dstArrayElement = view.idx,
+    .descriptorCount = 1,
+    .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+    .pImageInfo = &descriptor_image_info,
+  };
+  g.UpdateDescriptorSets(vkdevice, 1, &texture_descriptor, 0, null);
 }
 
 void gfx_buffer_update(Gfx_Buffer buf, u64 offset, Slice<u8> data) {

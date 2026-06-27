@@ -162,13 +162,72 @@ R_Texture r_texture_load(String name) {
   return res;
 }
 
+R_Texture r_texture_load_async(String name) {
+  var& g = st->r;
+  R_Texture res = pool_push(g.textures, {});
+  R_TextureData& data = pool_get(g.textures, res);
+  // R_TextureData dummy_data = pool_get(g.textures, g.dummy_texture);
+  // data = dummy_data;
+
+  {
+    Scratch scratch;
+    u32 pixels[] = {1,0,1,0};
+    data.width = 2;
+    data.height = 2;
+    LockScope(g.async_stage_mutex);
+    data.image = gfx_image_make({
+      .width = 2,
+      .height = 2,
+      .data = (u8*)pixels,
+    }),
+    data.view = gfx_view_make({.texture = {.image = data.image}});
+  }
+
+  struct Ctx {
+    String name;
+    R_Texture tex;
+  };
+  var& ctx = thread_push_ctx(Ctx);
+  ctx = {
+    .name = name,
+    .tex = res,
+  };
+  thread_push({.ctx = &ctx, .fn = [](void* ctx) {
+    var& g = st->r;
+    Ctx* data = (Ctx*)ctx;
+    Texture texture = r_image_load(data->name);
+    {
+      LockScope(g.async_stage_mutex);
+      R_TextureData& img_data = pool_get(g.textures, data->tex);
+      gfx_image_update(img_data.image, {
+        .width = texture.width,
+        .height = texture.height,
+        .data = texture.data, 
+        .mipmaps = true,
+      });
+      gfx_view_update(img_data.view, {.texture.image = img_data.image});
+    }
+    // R_TextureData tex = {};
+    // LockScope(g.async_stage_mutex);
+    // tex.image = gfx_image_make({
+    //   .width = texture.width,
+    //   .height = texture.height,
+    //   .data = texture.data,
+    //   .mipmaps = true,
+    // }),
+    // tex.view = gfx_view_make({.texture = {.image = tex.image}});
+    // pool_get(g.textures, data->tex) = tex;
+  }});
+  return res;
+}
+
 R_Texture r_texture_make(Texture tex) {
   var& g = st->r;
   R_TextureData texture = {};
   texture.image = gfx_image_make({
-    .width = texture.width,
-    .height = texture.height,
-    .data = texture.data,
+    .width = tex.width,
+    .height = tex.height,
+    .data = tex.data,
   }),
   texture.view = gfx_view_make({.texture = {.image = texture.image}});
   R_Texture res = pool_push(g.textures, texture);
@@ -183,7 +242,7 @@ R_Texture r_texture_cube_load(String dir) {
     "front", "back",
   };
   TextureDesc texture = {};
-  for EachElement(i, sides) {
+  LoopElement (i, sides) {
     String name = push_strf(scratch, "%s/%s%s", dir, sides[i], String(".png"));
     Texture tex = r_image_load(name);
     texture.cube[i] = tex.data;
@@ -242,24 +301,54 @@ R_Mesh r_mesh_load(String name) {
 R_Mesh r_mesh_load_async(String name) {
   Scratch scratch;
   var& g = st->r;
-  // String filepath = push_strf(scratch, "%s/%s", st->models_dir, name);
-  // String format = str_skip_last_dot(name);
   R_Mesh res = pool_push(g.meshes, {});
-  // struct Ctx {
-    
-  // };
-  // thread_task_push({.async = true, .func = [](void* ctx) {
-  //   MeshDesc mesh = {};
-  //   if (str_match(format, "glb")) {
-  //     mesh = load_gltf(scratch, filepath, true);
-  //   } else if (str_match(format, "gltf")) {
-  //     mesh = load_gltf(scratch, filepath, false);
-  //   } else if (str_match(format, "obj")) {
-  //     mesh = load_obj(scratch, filepath);
-  //   } else {
-  //     InvalidPath;
-  //   }
-  // }});
+  struct Ctx {
+    String name;
+    R_Mesh mesh;
+  };
+  var& ctx = thread_push_ctx(Ctx);
+  ctx = {
+    .name = name,
+    .mesh = res,
+  };
+  thread_push({.ctx = &ctx, .fn = [](void* ctx) {
+    Scratch scratch;
+    var& g = st->r;
+    Ctx* data = (Ctx*)ctx;
+    String name = data->name;
+    String filepath = push_strf(scratch, "%s/%s", st->models_dir, name);
+    String format = str_skip_last_dot(name);
+    MeshDesc desc = {};
+    if (str_match(format, "glb")) {
+      desc = load_gltf(scratch, filepath, true);
+    } else if (str_match(format, "gltf")) {
+      desc = load_gltf(scratch, filepath, false);
+    } else if (str_match(format, "obj")) {
+      desc = load_obj(scratch, filepath);
+    } else {
+      InvalidPath;
+    }
+
+    {
+      LockScope(g.async_stage_mutex);
+      u64 offset = r_arena_buffer_push(&g.vert_arena, slice_size(desc.vertices));
+      u32 base_vert = (gfx_buffer_base(g.vert_arena.buf) + offset) / sizeof(Vertex);
+      gfx_buffer_update(g.vert_arena.buf, offset, slice_to_bytes(desc.vertices));
+      u32 base_index = 0;
+      if (desc.indices.count) {
+        u64 offset = r_arena_buffer_push(&g.vert_arena, slice_size(desc.vertices));
+        base_index = (gfx_buffer_base(g.index_arena.buf) + offset) / sizeof(u32);
+        gfx_buffer_update(g.index_arena.buf, offset, slice_to_bytes(desc.indices));
+      }
+      Gfx_Mesh mesh = {
+        .vert_count = (u32)desc.vertices.count,
+        .base_vert = base_vert,
+        .index_count = (u32)desc.indices.count,
+        .base_index = base_index,
+      };
+      pool_get(g.meshes, data->mesh) = mesh;
+    }
+  }});
   return res;
 }
 
@@ -508,7 +597,7 @@ R_Font r_font_load(String path, f32 size) {
   R_Texture texture_id = pool_push(g.textures, texture);
 
   R_FontData font = {.texture = texture_id};
-  for EachElement(i, font.glyphs) {
+  LoopElement (i, font.glyphs) {
     stbtt_bakedchar bakedchar = characters_info[i];
     R_Glyph glyph = {
       .x0 = bakedchar.x0,
@@ -533,6 +622,7 @@ void r_init() {
   g.arena = arena;
   g.gpa = alloc_seglist_make(g.arena, "vk gpa");
   g.scale = 1;
+  g.async_stage_mutex = os_mutex_alloc();
 
   gfx_init({.cpu_mem_size = MB(100), .gpu_mem_size = MB(10), .image_mem_size = MB(10)});
 
@@ -577,6 +667,25 @@ void r_init() {
   {
     ProfBlock("Waiting for compiling shaders");
     r_shaders_compile_join();
+  }
+
+  ///////////////////////////////////
+  // Dummy
+  {
+    u32 width = 128;
+    u32 height = 128;
+    u32* pixels = push_array(scratch, u32, width*height);
+    MemSet(pixels, 255, width*height*4);
+    // Loop (y, height) {
+    //   Loop (x, width) {
+    //   }
+    // }
+    Texture tex = {
+      .data = (u8*)pixels,
+      .width = width,
+      .height = height,
+    };
+    g.dummy_texture = r_texture_make(tex);
   }
 
   ///////////////////////////////////

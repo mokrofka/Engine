@@ -227,15 +227,18 @@ b32 is_nan_f32(f32 x);
 #define Glue(A,B)      _Glue(A,B)
 #define Transmute(T, x) (*(T*)&(x))
 
-#define Loop(it, c)                  for (i32 it = 0; it < c; ++it)
-#define ReverseLoop(i, count)        for (i32 i = count - 1; i >= 0; --i)
-#define LoopRange(i, li, hi)         for (i32 i = (li); i < (hi); ++i)
-#define EachElement(it, array)       (i32 it = 0; it < ArrayCount(array); ++it)
-#define EachEnumVal(type, it)        (type it = (type)0; it < type##_COUNT; it = (type)(it+1))
-#define EachNonZeroEnumVal(type, it) (type it = (type)1; it < type##_COUNT; it = (type)(it+1))
-#define EachInRange(it, range)       (u64 it = (range).min; it < (range).max; ++it)
-#define EachNode(it, T, first)       (T* it = first; it != 0; it = it->next)
-#define EachNodePool(it, p)          (i32 it = p.first; it != 0; it = p.data[it].next) 
+#define Loop(it, c)                      for (i32 it = 0; it < c; ++it)
+#define LoopReverse(it, count)           for (i32 it = (count) - 1; it >= 0; --it)
+#define LoopOff(it, li, hi)              for (i32 it = (li); it < (hi); ++it)
+#define LoopElement(it, array)           for (i32 it = 0; it < ArrayCount(array); ++it)
+#define LoopEnum(it, type)               for (type it = (type)0; it < type##_COUNT; it = (type)(it+1))
+#define LoopEnumNonZero(it, type)        for (type it = (type)1; it < type##_COUNT; it = (type)(it+1))
+#define LoopRange(it, range)             for (i32 it = (range).min; it < (range).max; ++it)
+#define LoopNode(it, first)              for (var* it = first; it != 0; it = it->next)
+#define LoopNodeReverse(it, last)        for (var* it = last; it != 0; it = it->prev)
+#define LoopINode(it, first, arr)        for (u32 it = first; it != 0; it = (arr)[it].next)
+#define LoopINodeReverse(it, last, arr)  for (u32 it = last; it != 0; it = (arr)[it].prev)
+#define LoopHNode(it, first, arr)        for (var it = first; it.idx != 0; it = (arr)[it.idx].elem.next)
 
 ////////////////////////////////////////////////////////////////////////
 // Asserts
@@ -250,7 +253,7 @@ void DebugTrap();
 #define UnusedVariable(x)   (void)x
 
 #if BUILD_DEBUG
-  #define Assert(x) if (!(x)) { DebugTrap(); }
+  #define Assert(x) ((x) ? (void)0 : DebugTrap())
   #define AssertMsg(x, message, ...) if (!(x)) { _log_output(LogLevel_Error, message, ##__VA_ARGS__); DebugTrap(); }
 #else
   #define Assert(x)
@@ -279,54 +282,171 @@ void DebugTrap();
 #define atomic_cond_exchange(x, v, c) ({ u32 _new = (c); __atomic_compare_exchange_n((x), (&_new), (v), 0, AtomicSeqCst, AtomicSeqCst); _new; })
 
 ////////////////////////////////////////////////////////////////////////
-// Link list
+// Doulby Linked List
+#define DLL_push_back(first, last, n, next, prev)     \
+  ((n)->prev = (last),                                \
+   (n)->next = null,                                  \
+   ((last) ? ((last)->next = (n)) : ((first) = (n))), \
+   (last) = (n))
 
-#define _DLLInsert(f, l, p, n, next, prev) \
-  {                                        \
-    if (f == null) {                       \
-      f = l = n;                           \
-      n->next = null;                      \
-      n->prev = null;                      \
-    } else if (p == null) {                \
-      n->next = f;                         \
-      f->prev = n;                         \
-      f = n;                               \
-      n->prev = null;                      \
-    } else if (p == l) {                   \
-      l->next = n;                         \
-      n->prev = l;                         \
-      l = n;                               \
-      n->next = null;                      \
-    } else {                               \
-      p->next->prev = n;                   \
-      n->next = p->next;                   \
-      p->next = n;                         \
-      n->prev = p;                         \
-    }                                      \
-  }
+#define DLL_push_front(first, last, n, next, prev)     \
+  ((n)->next = (first),                                \
+   (n)->prev = null,                                   \
+   ((first) ? ((first)->prev = (n)) : ((last) = (n))), \
+   (first) = (n))
 
-#define DLLRemove(f, l, n)                \
-  {                                       \
-    if (n == f) f = n->next;              \
-    if (n == l) l = n->prev;              \
-    if (n->prev) n->prev->next = n->next; \
-    if (n->next) n->next->prev = n->prev; \
-    n->next = n->prev = null;             \
-  }
+#define DLL_remove(first, last, n, next, prev) \
+  (((n)->prev ? ((n)->prev->next = (n)->next)  \
+              : ((first) = (n)->next)),        \
+   ((n)->next ? ((n)->next->prev = (n)->prev)  \
+              : ((last) = (n)->prev)))
 
-#define DLLPushBack(f,l,n) _DLLInsert(f,l,l,n,next,prev)
-#define DLLPushFront(f,l,n) _DLLInsert(l,f,f,n,prev,next)
-#define DLLInsert(f,l,p,n) _DLLInsert(f,l,p,n,next,prev)
+#define DLL_pop_back(first, last, n, next, prev)  \
+  (((n) = (last)),                                \
+    ((n) ? (                                      \
+      ((last) = (n)->prev),                       \
+      ((last) ? ((last)->next = null)             \
+              : ((first) = null)),                \
+      DebugDo((n)->next = null, (n)->prev = null) \
+    ) : 0))
 
-#define SLLQueuePush(f,l,n) (f == null) ? \
-                            (f = l = n, n->next = null) : \
-                            (l->next = n, l = n, n->next = null)
-#define SLLQueuePop(f,l,next) (f == l) ? \
-                              (f = null), (l = null) : \
-                              (f = f->next)
+#define DLL_pop_front(first, last, n, next, prev) \
+  (((n) = (first)),                               \
+    ((n) ? (                                      \
+      ((first) = (n)->next),                      \
+      ((first) ? ((first)->prev = null)           \
+               : ((last) = null)),                \
+      DebugDo((n)->next = null, (n)->prev = null) \
+    ) : 0))
 
-#define SLLStackPush(f, n) (n->next = f, f = n)
-#define SLLStackPop(f) (f = f->next)
+////////////////////////////////////////////////////////////////////////
+// Singly Linked List
+#define SLL_stack_push(first, n, next) \
+  ((n)->next = (first), (first) = (n))
+
+#define SLL_stack_pop(first, next) \
+  ((first) = (first)->next)
+
+#define SLL_queue_push(first, last, n, next)          \
+  ((n)->next = null,                                  \
+   ((last) ? ((last)->next = (n)) : ((first) = (n))), \
+   (last) = (n))
+
+#define SLL_queue_pop(first, last, next)           \
+  (((first) == (last)) ? ((first) = (last) = null) \
+                       : ((first) = (first)->next))
+
+#define dll_push_back(first, last, n)  DLL_push_back(first, last, n, next, prev)
+#define dll_push_front(first, last, n) DLL_push_front(first, last, n, next, prev)
+#define dll_remove(first, last, n)     DLL_remove(first, last, n, next, prev)
+#define dll_pop_back(first, last, n)   DLL_pop_back(first, last, n, next, prev)
+#define dll_pop_front(first, last, n)  DLL_pop_front(first, last, n, next, prev)
+
+#define dll_list_push_back(list, n)  DLL_push_back(list.first, list.last, n, next, prev)
+#define dll_list_push_front(list, n) DLL_push_front(list.first, list.last, n, next, prev)
+#define dll_list_remove(list, n)     DLL_remove(list.first, list.last, n, next, prev)
+#define dll_list_pop_back(list, n)   DLL_pop_back(list.first, list.last, n, next, prev)
+#define dll_list_pop_front(list, n)  DLL_pop_front(list.first, list.last, n, next, prev)
+
+#define sll_stack_push(first, n)       SLL_stack_push(first, n, next)
+#define sll_stack_pop(first)           SLL_stack_pop(first, next)
+#define sll_queue_push(first, last, n) SLL_queue_push(first, last, n, next)
+#define sll_queue_pop(first, lsat, n)  SLL_queue_pop(first, last, next)
+
+#define sll_list_queue_push(list, n) SLL_queue_push(list.first, list.last, n, next)
+#define sll_list_queue_pop(list)     SLL_queue_pop(list.first, list.last, next)
+
+////////////////////////////////////////////////////////////////////////
+// Indexed Doubly Linked List
+// index = 0 is null
+#define IDLL_push_back(arr, first, last, n, next, prev)   \
+  ((arr)[n].prev = (last),                                \
+   (arr)[n].next = 0,                                     \
+   ((last) ? ((arr)[last].next = (n)) : ((first) = (n))), \
+   (last) = (n))
+
+#define IDLL_push_front(arr, first, last, n, next, prev) \
+  ((arr)[n].next = (first),                                    \
+   (arr)[n].prev = 0,                                          \
+   ((first) ? ((arr)[first].prev = (n)) : ((last) = (n))),     \
+   (first) = (n))
+
+#define IDLL_remove(arr, first, last, n, next, prev)            \
+  (((arr)[n].prev ? ((arr)[(arr)[n].prev].next = (arr)[n].next) \
+                  : ((first) = (arr)[n].next)),                 \
+   ((arr)[n].next ? ((arr)[(arr)[n].next].prev = (arr)[n].prev) \
+                  : ((last) = (arr)[n].prev)))
+
+#define IDLL_pop_back(arr, first, last, n, next, prev)  \
+  (((n) = (last)),                                      \
+    ((n) ? (                                            \
+      ((last) = (arr)[n].prev),                         \
+      ((last) ? ((arr)[last].next = 0) : ((first) = 0)) \
+    ) : 0))
+
+#define IDLL_pop_front(arr, first, last, n, next, prev)  \
+  (((n) = (first)),                                      \
+    ((n) ? (                                             \
+      ((first) = (arr)[n].next),                         \
+      ((first) ? ((arr)[first].prev = 0) : ((last) = 0)) \
+    ) : 0))
+
+////////////////////////////////////////////////////////////////////////
+// Indexed Singly Linked List
+#define ISLL_stack_push(arr, first, n, next) \
+  ((arr)[n].next = (first), (first) = (n))
+
+#define ISLL_stack_pop(arr, first, next) \
+  ((first) = (arr)[first].next)
+
+#define ISLL_queue_push(arr, first, last, n, next)        \
+  ((arr)[n].next = 0,                                     \
+   ((last) ? ((arr)[last].next = (n)) : ((first) = (n))), \
+   (last) = (n))
+
+#define ISLL_queue_pop(arr, first, last, next) \
+  (((first) == (last)) ? ((first) = (last) = 0)      \
+                       : ((first) = (arr)[first].next))
+
+#define idll_push_back(arr, first, last, n)  IDLL_push_back(arr, first, last, n, next, prev)
+#define idll_push_front(arr, first, last, n) IDLL_push_front(arr, first, last, n, next, prev)
+#define idll_remove(arr, first, last, n)     IDLL_remove(arr, first, last, n, next, prev)
+#define idll_pop_back(arr, first, last, n)   IDLL_pop_back(arr, first, last, n, next, prev)
+#define idll_pop_front(arr, first, last, n)  IDLL_pop_front(arr, first, last, n, next, prev)
+
+#define idll_list_push_back(arr, list, n)  IDLL_push_back(arr, list.first, list.last, n, next, prev)
+#define idll_list_push_front(arr, list, n) IDLL_push_front(arr, list.first, list.last, n, next, prev)
+#define idll_list_remove(arr, list, n)     IDLL_remove(arr, list.first, list.last, n, next, prev)
+#define idll_list_pop_back(arr, list, n)   IDLL_pop_back(arr, list.first, list.last, n, next, prev)
+#define idll_list_pop_front(arr, list, n)  IDLL_pop_front(arr, list.first, list.last, n, next, prev)
+
+#define isll_stack_push(arr, first, n)       ISLL_stack_push(arr, first, n, next)
+#define isll_stack_pop(arr, first)           ISLL_stack_pop(arr, first, next)
+#define isll_queue_push(arr, first, last, n) ISLL_queue_push(arr, first, last, n, next)
+#define isll_queue_pop(arr, first, last)     ISLL_queue_pop(arr, first, last, next)
+
+#define isll_list_queue_push(arr, list, n)   ISLL_queue_push(arr, list.first, list.last, n, next)
+#define isll_list_queue_pop(arr, list)       ISLL_queue_pop(arr, list.first, list.last, next)
+
+////////////////////////////////////////////////////////////////////////
+// Handler Linked List
+#define HDLL_push_back(arr, first, last, n, next, prev)           \
+  ((arr)[n.idx].elem.prev = (last),                                    \
+   (arr)[n.idx].elem.next = {},                                        \
+   ((last.idx) ? ((arr)[last.idx].elem.next = (n)) : ((first) = (n))), \
+   (last) = (n))
+
+#define HDLL_remove(arr, first, last, n, next, prev)                                                    \
+  (((arr)[n.idx].elem.prev.idx ? ((arr)[(arr)[n.idx].elem.prev.idx].elem.next = (arr)[n.idx].elem.next) \
+                               : ((first) = (arr)[n.idx].elem.next)),                                   \
+   ((arr)[n.idx].elem.next.idx ? ((arr)[(arr)[n.idx].elem.next.idx].elem.prev = (arr)[n.idx].elem.prev) \
+                               : ((last) = (arr)[n.idx].elem.prev)))
+
+#define hdll_push_back(arr, first, last, n)  HDLL_push_back(arr, first, last, n, next, prev)
+#define hdll_remove(arr, first, last, n)     HDLL_remove(arr, first, last, n, next, prev)
+
+#define hdll_list_push_back(arr, list, n)  HDLL_push_back(arr, list.first, list.last, n, next, prev)
+#define hdll_list_remove(arr, list, n)     HDLL_remove(arr, list.first, list.last, n, next, prev)
 
 ////////////////////////////////////////////////////////////////////////
 // Defer

@@ -247,8 +247,6 @@ struct R_State {
   Pool<R_MeshData, R_MaxMeshes, R_Mesh> new_meshes;
   Pool<R_FontData, R_MaxFonts, R_Font> fonts;
 
-  
-
   Gfx_Pipeline triangle_pip;
   Gfx_Pipeline screen_pip;
   Gfx_Pipeline cubemap_pip;
@@ -276,6 +274,9 @@ struct R_State {
   u64 draw_base_rects_texture;
 
   Queue<R_AsyncMesh, 12> async_mesh;
+  Mutex async_stage_mutex;
+  R_Texture dummy_texture;
+  R_Texture dummy_mesh;
 
   Gfx_Buffer gpu_global_buf;
   Gfx_Buffer gpu_entities_buf;
@@ -296,6 +297,7 @@ mat4& get_mat();
 u32 r_texture_get_descriptor_idx(R_Texture id);
 Texture r_image_load(String name);
 R_Texture r_texture_load(String name);
+R_Texture r_texture_load_async(String name);
 R_Texture r_texture_make(Texture tex);
 R_Texture r_texture_cube_load(String dir);
 void r_texture_update(R_Texture t, u8* data);

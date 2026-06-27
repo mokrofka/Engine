@@ -97,22 +97,6 @@ WaitGroup thread_push_batch(Slice<TaskDesc> tasks) {
   return wg;
 }
 
-// void thread_parallel_for(u32 count, u32 chunk_size, void* ctx, ParallelForFn fn) {
-//   Scratch scratch;
-//   if (count == 0) return;
-//   u32 task_count = CeilIntDiv(count, chunk_size);
-//   WaitGroup wg = thread_wg_make(task_count);
-//   Task* tasks = push_array(scratch, Task, task_count);
-//   Loop (i, task_count) {
-//     Task t = {
-//       .fn = parallel_for_worker,
-//       .ctx = &pf_ctx,
-//       .wg = wg,
-//       .priority = TaskPriority_Normal,
-//     };
-//   }
-// }
-
 intern Result<Task> thread_pop() {
   var& g = thread_pool;
   LockScope(g.mutex);

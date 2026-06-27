@@ -244,7 +244,7 @@ intern void test_object_pool_linklist() {
   rand_shuffle(slice(indices));
 
   u32 i = 0;
-  for EachNodePool(it, pool) {
+  LoopINode (it, pool.first, pool.data) {
     A elem = pool.data[it].elem;
     AssertAlways(elem.a == values[i].a && elem.a == values[i].a);
     ++i;
@@ -267,7 +267,7 @@ intern void test_object_pool_linklist() {
   Loop(i, TEST_SAMPLES) array_push(indices, i);
   rand_shuffle(slice(indices));
   i = 0;
-  for EachNodePool(it, pool) {
+  LoopINode (it, pool.first, pool.data) {
     A elem = pool.data[it].elem;
     AssertAlways(elem.a == values[i].a && elem.a == values[i].a);
     ++i;
@@ -694,45 +694,45 @@ void test_link_list() {
   Thing* last = null;
 
   #if 0
-  SLLStackPush(head, thing1);
-  SLLStackPush(head, thing2);
-  SLLStackPush(head, thing3);
+  sll_stack_push(head, thing1);
+  sll_stack_push(head, thing2);
+  sll_stack_push(head, thing3);
 
   for EachNode(it, Thing, head) {
     Info("%i", it->data);
   }
 
-  SLLStackPop(head);
-  SLLStackPop(head);
+  sll_stack_pop(head);
+  sll_stack_pop(head);
   for EachNode(it, Thing, head) {
     Info("%i", it->data);
   }
   #endif
 
   #if 0
-  SLLQueuePush(first, last, thing);
-  SLLQueuePush(first, last, thing1);
-  SLLQueuePush(first, last, thing2);
-  SLLQueuePush(first, last, thing3);
+  sll_queue_push(first, last, thing);
+  sll_queue_push(first, last, thing1);
+  sll_queue_push(first, last, thing2);
+  sll_queue_push(first, last, thing3);
 
   for EachNode (it, Thing, first) {
     Info("%i", it->data);
   }
   #endif
 
-  DLLPushBack(first, last, thing);
-  DLLPushBack(first, last, thing1);
-  DLLPushBack(first, last, thing2);
-  DLLPushBack(first, last, thing3);
+  dll_push_back(first, last, thing);
+  dll_push_back(first, last, thing1);
+  dll_push_back(first, last, thing2);
+  dll_push_back(first, last, thing3);
 
-  DLLPushFront(first, last, thing4);
-  DLLPushFront(first, last, thing5);
-  DLLPushFront(first, last, thing6);
-  DLLPushFront(first, last, thing7);
+  dll_push_front(first, last, thing4);
+  dll_push_front(first, last, thing5);
+  dll_push_front(first, last, thing6);
+  dll_push_front(first, last, thing7);
 
-  DLLRemove(first, last, thing5);
+  dll_remove(first, last, thing5);
 
-  for EachNode (it, Thing, first) {
+  LoopNode (it, first) {
     Info("%i", it->data);
   }
 
@@ -751,7 +751,7 @@ void test_sort() {
     Info("insert");
     i32 arr[] = {0, -4, -3, 7, 3};
     sort_insert(slice(arr), [](var a, var b) { return a < b; });
-    for EachElement(i, arr) {
+    LoopElement (i, arr) {
       print("%i ", arr[i]);
     }
     print("\n");
@@ -760,7 +760,7 @@ void test_sort() {
     Info("quick");
     i32 arr[] = {0, -4, -3, 7, 3};
     sort_quick(slice(arr), [](var a, var b) { return a < b;});
-    for EachElement(i, arr) {
+    LoopElement (i, arr) {
       print("%i ", arr[i]);
     }
     print("\n");
@@ -770,7 +770,7 @@ void test_sort() {
     Info("merge");
     i32 arr[] = {0, -4, -3, 7, 3};
     sort_merge(scratch, slice(arr), [](var a, var b) { return a < b;});
-    for EachElement(i, arr) {
+    LoopElement (i, arr) {
       print("%i ", arr[i]);
     }
     print("\n");
@@ -780,11 +780,11 @@ void test_sort() {
     Info("radix");
     i32 arr[] = {0, -4, -3, 7, 3};
     Slice<SortEntry> entries = push_slice(scratch, SortEntry, ArrayCount(arr));
-    for EachElement(i, arr) {
+    LoopElement (i, arr) {
       entries[i] = {sort_i32_key_to_u32(arr[i]), (u32)i};
     }
     sort_radix(scratch, entries);
-    for EachElement(i, arr) {
+    LoopElement (i, arr) {
       print("%i ", arr[entries[i].idx]);
     }
     print("\n");
@@ -792,7 +792,7 @@ void test_sort() {
 
   u32 counts[] = {32, 64, 128, 512, KB(1), KB(10), KB(100), MB(1)};
   Slice<u32> arrs[ArrayCount(counts)];
-  for EachElement(i, counts) {
+  LoopElement (i, counts) {
     arrs[i] = push_slice(scratch, u32, counts[i]);
     Loop (j, counts[i]) {
       arrs[i][j] = rand_i32();
@@ -801,7 +801,7 @@ void test_sort() {
   print("\n/////////////////\n");
   Info("\nQuick test:");
   Loop (i, 2) {
-    for EachElement(i, counts) {
+    LoopElement (i, counts) {
       Info("Count %i", counts[i]);
       rand_shuffle(arrs[i]);
       {
@@ -812,7 +812,7 @@ void test_sort() {
   }
   Info("\nmerge test:");
   Loop (i, 2) {
-    for EachElement(i, counts) {
+    LoopElement (i, counts) {
       Scratch scratch;
       Info("Count %i", counts[i]);
       rand_shuffle(arrs[i]);
@@ -824,7 +824,7 @@ void test_sort() {
   }
   Info("\nradix test:");
   Loop (i, 2) {
-    for EachElement(i, counts) {
+    LoopElement (i, counts) {
       Scratch scratch;
       Info("Count %i", counts[i]);
       rand_shuffle(arrs[i]);

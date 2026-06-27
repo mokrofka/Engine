@@ -236,6 +236,11 @@ struct EntityThing {
 };
 
 Introspect struct Entity {
+  EntityId parent;
+  EntityId next;
+  EntityId prev;
+  EntityId first;
+  EntityId last;
   String name;
   EntityFlags flags;
   v3 pos;
@@ -271,6 +276,7 @@ struct GameState {
   EntityId e;
   f32 t;
   v4 color;
+  EntityId my;
 };
 
 struct GlobalState {

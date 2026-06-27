@@ -201,7 +201,7 @@ template<typename T, i32 N, typename Handle> T& array_handler_get(ArrayHandler<T
   return a.data[idx];
 }
 template<typename T, i32 N, typename Handle> Handle array_handler_push(ArrayHandler<T, N, Handle>& a, T elem) {
-  Assert(a.count < a.cap)
+  Assert(a.count < a.cap);
   u32 idx = a.count++;
   a.sparse[idx] = idx;
   a.dense[idx] = idx;
@@ -309,11 +309,13 @@ struct Pool {
   u32 head;
   static constexpr i32 cap = N;
   u32 max_idx;
-  union {
-    T elem;
-    u32 next_free;
-  }data[N];
-  u32 generations[N];
+  struct {
+    union {
+      T elem;
+      u32 next_free;
+    };
+    u32 gen;
+  } data[N];
 };
 
 template<typename T, i32 N, typename Handle> T& pool_get(Pool<T, N, Handle>& p, Handle h) {
@@ -328,7 +330,7 @@ template<typename T, i32 N, typename Handle> Handle pool_push_empty(Pool<T, N, H
     idx = ++p.max_idx;
     Assert(idx < p.cap);
   }
-  Handle res = {idx, p.generations[idx]};
+  Handle res = {idx, p.data[idx].gen};
   return res;
 }
 template<typename T, i32 N, typename Handle> Handle pool_push(Pool<T, N, Handle>& p, T a) {
@@ -338,7 +340,7 @@ template<typename T, i32 N, typename Handle> Handle pool_push(Pool<T, N, Handle>
 }
 template<typename T, i32 N, typename Handle> void pool_remove(Pool<T, N, Handle>& p, Handle h) {
   Assert(pool_is_valid_slot(p, h));
-  ++p.generations[h.idx];
+  ++p.data[h.idx].gen;
   p.data[h.idx].next_free = p.head;
   p.head = h.idx;
 }
@@ -346,15 +348,12 @@ template<typename T, i32 N, typename Handle> u32 pool_clear(Pool<T, N, Handle>& 
   p.head = 0;
   p.max_idx = 0;
   ArrayZero(p.data);
-  Loop (i, p.max_idx) {
-    ++p.generations;
-  }
 }
 template<typename T, i32 N, typename Handle> b32 pool_is_valid_slot(Pool<T, N, Handle>& p, Handle h) {
   if (h.idx <= 0 || h.idx > p.max_idx) {
     return false;
   }
-  if (p.generations[h.idx] != h.gen) {
+  if (p.data[h.idx].gen != h.gen) {
     return false;
   }
   return true;
@@ -370,11 +369,13 @@ struct Dpool {
   u32 cap;
   u32 max_idx;
   Allocator alloc;
-  union {
-    T elem;
-    u32 next_free;
+  struct  {
+    union {
+      T elem;
+      u32 next_free;
+    };
+    u32 gen;
   } *data;
-  u32* generations;
 };
 
 #define pool_make(T, H, alloc) _pool_make<T, H>(alloc)
@@ -393,19 +394,15 @@ template<typename T, typename Handle> void pool_grow(Dpool<T, Handle>& p) {
     u32 cap_old = p.cap;
     p.cap *= DEFAULT_RESIZE_FACTOR;
     SoA_Field fields[] = {
-      SoA_push_field(p.generations),
       SoA_push_field(p.data),
     };
-    mem_realloc_soa(p.alloc, cap_old, p.cap, slice(fields));
-    MemZeroArray(p.generations + cap_old, p.cap - cap_old);
+    mem_realloc_soa_zero(p.alloc, cap_old, p.cap, slice(fields));
   } else {
     p.cap = DEFAULT_CAPACITY;
     SoA_Field fields[] = {
-      SoA_push_field(p.generations),
       SoA_push_field(p.data),
     };
-    mem_alloc_soa(p.alloc, p.cap, slice(fields));
-    MemZeroArray(p.generations, p.cap);
+    mem_alloc_soa_zero(p.alloc, p.cap, slice(fields));
   }
 }
 template<typename T, typename Handle> Handle pool_push_empty(Dpool<T, Handle>& p) {
@@ -418,7 +415,7 @@ template<typename T, typename Handle> Handle pool_push_empty(Dpool<T, Handle>& p
       pool_grow(p);
     }
   }
-  Handle res = {idx, p.generations[idx]};
+  Handle res = {idx, p.data[idx].gen};
   return res;
 }
 template<typename T, typename Handle> Handle pool_push(Dpool<T, Handle>& p, T a) {
@@ -428,7 +425,7 @@ template<typename T, typename Handle> Handle pool_push(Dpool<T, Handle>& p, T a)
 }
 template<typename T, typename Handle> void pool_remove(Dpool<T, Handle>& p, Handle h) {
   pool_is_valid_slot(p, h);
-  ++p.generations[h.idx];
+  ++p.data[h.idx].gen;
   p.data[h.idx].next_free = p.head;
   p.head = h.idx;
 }
@@ -436,15 +433,12 @@ template<typename T, typename Handle> u32 pool_clear(Dpool<T, Handle>& p) {
   p.head = 0;
   p.max_idx = 0;
   MemZeroArray(p.data, p.max_idx);
-  Loop (i, p.max_idx) {
-    ++p.generations[i];
-  }
 }
 template<typename T, typename Handle> b32 pool_is_valid_slot(Dpool<T, Handle>& p, Handle h) {
   if (h.idx <= 0 || h.idx > p.max_idx) {
     return false;
   }
-  if (p.generations[h.idx] != h.gen) {
+  if (p.data[h.idx].gen != h.gen) {
     return false;
   }
   return true;
@@ -468,8 +462,8 @@ struct PoolLinkList {
     };
     u32 next;
     u32 prev;
+    u32 gen;
   } data[N];
-  u32 generations[N];
 };
 
 template<typename T, i32 N, typename Handle> T& pool_get(PoolLinkList<T, N, Handle>& p, Handle h) {
@@ -484,19 +478,8 @@ template<typename T, i32 N, typename Handle> Handle pool_push(PoolLinkList<T, N,
     idx = ++p.max_idx;
     Assert(idx < p.cap);
   }
-
-  // add to link list
-  var& n = p.data[idx];
-  n.prev = p.last;
-  n.next = 0;
-  if (p.last != 0) {
-    p.data[p.last].next = idx;
-  } else {
-    p.first = idx;
-  }
-  p.last = idx;
-
-  Handle res = {idx, p.generations[idx]};
+  idll_list_push_back(p.data, p, idx);
+  Handle res = {idx, p.data[idx].gen};
   return res;
 }
 template<typename T, i32 N, typename Handle> Handle pool_push(PoolLinkList<T, N, Handle>& p, T a) {
@@ -506,40 +489,25 @@ template<typename T, i32 N, typename Handle> Handle pool_push(PoolLinkList<T, N,
 }
 template<typename T, i32 N, typename Handle> void pool_remove(PoolLinkList<T, N, Handle>& p, Handle h) {
   Assert(pool_is_valid_slot(p, h));
-  ++p.generations[h.idx];
+  ++p.data[h.idx].gen;
   p.data[h.idx].next_free = p.head;
   p.head = h.idx;
-
-  // remove from link list
-  var& n = p.data[h.idx];
-  if(n.prev != 0) {
-    p.data[n.prev].next = n.next;
-  } else {
-    p.first = n.next;
-  }
-  if(n.next != 0) {
-    p.data[n.next].prev = n.prev;
-  } else {
-    p.last = n.prev;
-  }
+  idll_list_remove(p.data, p, h.idx);
 }
-template<typename T, i32 N, typename Handle> Handle pool_get_slot(PoolLinkList<T, N, Handle>& p, u32 idx) {
-  Handle res = {idx, p.generations[idx]};
+template<typename T, i32 N, typename Handle> Handle pool_get_handle(PoolLinkList<T, N, Handle>& p, u32 idx) {
+  Handle res = {idx, p.data[idx].gen};
   return res;
 }
 template<typename T, i32 N, typename Handle> void pool_clear(PoolLinkList<T, N, Handle>& p) {
   p.head = 0;
   p.max_idx = 0;
   MemZeroArray(p.data, p.max_idx);
-  Loop (i, p.max_idx) {
-    ++p.generations[i];
-  }
 }
 template<typename T, i32 N, typename Handle> b32 pool_is_valid_slot(PoolLinkList<T, N, Handle>& p, Handle h) {
   if (h.idx <= 0 || h.idx > p.max_idx) {
     return false;
   }
-  if (p.generations[h.idx] != h.gen) {
+  if (p.data[h.idx].gen != h.gen) {
     return false;
   }
   return true;
@@ -564,8 +532,8 @@ struct DpoolLinkList {
     };
     u32 next;
     u32 prev;
+    u32 gen;
   } *data;
-  u32* generations;
 };
 
 #define pool_linklist_make(T, H, alloc) _pool_linklist_make<T, H>(alloc)
@@ -584,21 +552,15 @@ template<typename T, typename Handle> void pool_grow(DpoolLinkList<T, Handle>& p
     u32 cap_old = p.cap;
     p.cap *= DEFAULT_RESIZE_FACTOR;
     SoA_Field fields[] = {
-      SoA_push_field(p.generations),
       SoA_push_field(p.data),
     };
-    mem_realloc_soa(p.alloc, cap_old, p.cap, slice(fields));
-    MemZeroArray(p.generations + cap_old, p.cap - cap_old);
-    MemZeroArray(p.data + cap_old, p.cap - cap_old);
+    mem_realloc_soa_zero(p.alloc, cap_old, p.cap, slice(fields));
   } else {
     p.cap = DEFAULT_CAPACITY;
     SoA_Field fields[] = {
-      SoA_push_field(p.generations),
       SoA_push_field(p.data),
     };
-    mem_alloc_soa(p.alloc, p.cap, slice(fields));
-    MemZeroArray(p.generations, p.cap);
-    MemZeroArray(p.data, p.cap);
+    mem_alloc_soa_zero(p.alloc, p.cap, slice(fields));
   }
 }
 template<typename T, typename Handle> Handle pool_push(DpoolLinkList<T, Handle>& p) {
@@ -611,19 +573,8 @@ template<typename T, typename Handle> Handle pool_push(DpoolLinkList<T, Handle>&
       pool_grow(p);
     }
   }
-
-  // add to link list
-  var& n = p.data[idx];
-  n.prev = p.last;
-  n.next = 0;
-  if (p.last != 0) {
-    p.data[p.last].next = idx;
-  } else {
-    p.first = idx;
-  }
-  p.last = idx;
-
-  Handle res = {idx, p.generations[idx]};
+  idll_list_push_back(p.data, p, idx);
+  Handle res = {idx, p.data[idx].gen};
   return res;
 }
 template<typename T, typename Handle> Handle pool_push(DpoolLinkList<T, Handle>& p, T a) {
@@ -633,40 +584,25 @@ template<typename T, typename Handle> Handle pool_push(DpoolLinkList<T, Handle>&
 }
 template<typename T, typename Handle> void pool_remove(DpoolLinkList<T, Handle>& p, Handle h) {
   pool_is_valid_slot(p, h);
-  ++p.generations[h.idx];
+  ++p.data[h.idx].gen;
   p.data[h.idx].next_free = p.head;
   p.head = h.idx;
-
-  // remove from link list
-  var& n = p.data[h.idx];
-  if(n.prev != 0) {
-    p.data[n.prev].next = n.next;
-  } else {
-    p.first = n.next;
-  }
-  if(n.next != 0) {
-    p.data[n.next].prev = n.prev;
-  } else {
-    p.last = n.prev;
-  }
+  idll_list_remove(p.data, p, h.idx);
 }
 template<typename T, typename Handle> Handle pool_get_handler(DpoolLinkList<T, Handle>& p, u32 idx) {
-  Handle res = {idx, p.generations[idx]};
+  Handle res = {idx, p.data[idx].gen};
   return res;
 }
 template<typename T, typename Handle> void pool_clear(DpoolLinkList<T, Handle>& p) {
   p.head = 0;
   p.max_idx = 0;
   MemZeroArray(p.data, p.max_idx);
-  Loop (i, p.max_idx) {
-    ++p.generations;
-  }
 }
 template<typename T, typename Handle> b32 pool_is_valid_slot(DpoolLinkList<T, Handle>& p, Handle h) {
   if (h.idx <= 0 || h.idx > p.max_idx) {
     return false;
   }
-  if (p.generations[h.idx] != h.gen) {
+  if (p.data[h.idx].gen != h.gen) {
     return false;
   }
   return true;

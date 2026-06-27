@@ -96,7 +96,7 @@ OS_LNX_Entity* os_lnx_entity_alloc(OS_LNX_EntityType type) {
   OS_LNX_Entity* entity = 0;
   entity = os_st.entity_free;
   if (entity) {
-    SLLStackPop(os_st.entity_free);
+    sll_stack_pop(os_st.entity_free);
   } else {
     entity = push_struct(os_st.arena, OS_LNX_Entity);
   }
@@ -105,7 +105,7 @@ OS_LNX_Entity* os_lnx_entity_alloc(OS_LNX_EntityType type) {
 }
 
 void os_lnx_entity_release(OS_LNX_Entity* entity) {
-  SLLStackPush(os_st.entity_free, entity);
+  sll_stack_push(os_st.entity_free, entity);
 }
 
 String os_get_current_filepath()     { return os_st.binary_filepath; }
@@ -531,7 +531,7 @@ OS_Handle os_process_launch(StringList list) {
   char** argv = push_array(scratch, char*, list.node_count + 1);
   argv[list.node_count] = null;
   u32 i = 0;
-  for EachNode(n, StringNode, list.first) {
+  LoopNode (n, list.first) {
     argv[i++] = (char*)n->string.str;
   }
   pid_t pid = 0;

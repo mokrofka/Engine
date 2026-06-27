@@ -586,14 +586,14 @@ String push_strf(Allocator arena, String fmt, ...) {
 // String List Construction Functions
 
 StringNode* str_list_push_node(StringList* list, StringNode* node) {
-  SLLQueuePush(list->first, list->last, node);
+  sll_queue_push(list->first, list->last, node);
   list->node_count += 1;
   list->total_size += node->string.size;
   return node;
 }
 
 StringNode* str_list_push_node_set_string(StringList* list, StringNode* node, String string) {
-  SLLQueuePush(list->first, list->last, node);
+  sll_queue_push(list->first, list->last, node);
   list->node_count += 1;
   list->total_size += string.size;
   node->string = string;

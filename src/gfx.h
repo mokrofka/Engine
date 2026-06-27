@@ -852,6 +852,8 @@ Gfx_ImageDesc gfx_query_image_desc(Gfx_Image img);
 void gfx_shader_update(Gfx_Shader shd, Gfx_ShaderDesc desc);
 void gfx_pipeline_update(Gfx_Pipeline pip, Gfx_PipelineDesc desc);
 void gfx_image_update(Gfx_Image img, u8* data);
+void gfx_image_update(Gfx_Image img, Gfx_ImageDesc desc);
+void gfx_view_update(Gfx_View view, Gfx_ViewDesc desc);
 void gfx_buffer_update(Gfx_Buffer buf, u64 offset, Slice<u8> data);
 
 void gfx_image_destroy(Gfx_Image img);

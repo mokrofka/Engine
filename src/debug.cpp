@@ -185,7 +185,7 @@ void debug_prof_view() {
   u64 tsc_elapsed_sum = 0;
   u64 tsc_elapsed_max = 0;
   u64 tsc_elapsed_min = U32_MAX;
-  for EachElement(i, prof.frames_times) {
+  LoopElement (i, prof.frames_times) {
     ProfFrameTime frame = prof.frames_times[i];
     u64 elapsed = frame.tsc_end - frame.tsc_start;
     tsc_elapsed_sum += elapsed;
@@ -480,7 +480,7 @@ void debug_prof_view() {
             draw_threads(scroll_state);
             u32 idx = (st->current_frame-1) % ArrayCount(prof.frames_times);
             Slice<ProfAnchor> slices[ArrayCount(prof.prof_threads)] = {};
-            for EachElement(i, prof.prof_threads) {
+            LoopElement (i, prof.prof_threads) {
               slices[i] = slice(prof.prof_threads[i].recorded_anchors[idx]);
             }
             ProfFrameTime time = prof.frames_times[idx];
@@ -558,9 +558,9 @@ void debug_prof_view() {
 
             ///////////////////////////////////
             // Draw graph per thread
-            for EachElement(j, prof.frames_times) {
+            LoopElement (j, prof.frames_times) {
               Slice<ProfAnchor> slices[ArrayCount(prof.prof_threads)] = {};
-              for EachElement(i, prof.prof_threads) {
+              LoopElement (i, prof.prof_threads) {
                 slices[i] = slice(prof.prof_threads[i].recorded_anchors[j]);
               }
               ProfFrameTime time = prof.frames_times[j];
@@ -608,7 +608,7 @@ void debug_prof_view() {
             draw_threads(scroll_state);
 
             Slice<ProfAnchor> slices[ArrayCount(prof.prof_threads)] = {};
-            for EachElement(i, prof.prof_threads) {
+            LoopElement (i, prof.prof_threads) {
               slices[i] = slice(prof.prof_threads[i].launch_anchors);
             }
             ProfFrameTime time = prof.launch_time;
@@ -663,7 +663,7 @@ void debug_prof_view() {
     
                 //  Mem level
                 u32 mem_level = 0;
-                for EachElement(i, mem_levels) {
+                LoopElement (i, mem_levels) {
                   if (info.pos < mem_levels[i]) {
                     mem_level = i;
                     break;
@@ -698,7 +698,7 @@ void debug_prof_view() {
                 };
                 var stack = array_make(StackEntry, scratch);
                 Slice sorted_children = sort_list_insert(scratch, info.first, [](var a, var b) { return a->pos > b->pos; });
-                ReverseLoop (i, sorted_children.count) {
+                LoopReverse (i, sorted_children.count) {
                   array_push(stack, {sorted_children[i], 1});
                 }
                 while (stack.count) {
@@ -719,7 +719,7 @@ void debug_prof_view() {
                   if (child->first) {
                     ++depth;
                     Slice sorted_children = sort_list_insert(scratch, child->first, [](var a, var b) { return a->pos > b->pos; });
-                    ReverseLoop (i, sorted_children.count) {
+                    LoopReverse (i, sorted_children.count) {
                       array_push(stack, {sorted_children[i], entry.depth + 1});
                     }
                   }

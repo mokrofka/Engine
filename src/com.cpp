@@ -551,14 +551,14 @@ JsVal js_parse(JsParser* p) {
         }
         JsVal* val = push_struct(p->arena, JsVal);
         *val = js_parse(p);
-        switch (val->type) {
-          case JsType_Null: Info("null"); break;
-          case JsType_Bool: Info("bool: %u", val->boolean); break;
-          case JsType_Number: Info("num: %f", val->number); break;
-          case JsType_Str: Info("str: %s", val->str); break;
-          case JsType_Array: Info("array"); break;
-          case JsType_Obj:  Info("obj"); break;
-        }
+        // switch (val->type) {
+        //   case JsType_Null: Info("null"); break;
+        //   case JsType_Bool: Info("bool: %u", val->boolean); break;
+        //   case JsType_Number: Info("num: %f", val->number); break;
+        //   case JsType_Str: Info("str: %s", val->str); break;
+        //   case JsType_Array: Info("array"); break;
+        //   case JsType_Obj:  Info("obj"); break;
+        // }
         array_push(arr, val);
         js_skip_ws(p);
         if (js_peek(p) == ',') {
@@ -587,14 +587,14 @@ JsVal js_parse(JsParser* p) {
         
         JsVal* val = push_struct(p->arena, JsVal);
         *val = js_parse(p);
-        switch (val->type) {
-          case JsType_Null: Info("null"); break;
-          case JsType_Bool: Info("bool: %u", val->boolean); break;
-          case JsType_Number: Info("num: %f", val->number); break;
-          case JsType_Str: Info("str: %s", val->str); break;
-          case JsType_Array: Info("array"); break;
-          case JsType_Obj:  Info("obj"); break;
-        }
+        // switch (val->type) {
+        //   case JsType_Null: Info("null"); break;
+        //   case JsType_Bool: Info("bool: %u", val->boolean); break;
+        //   case JsType_Number: Info("num: %f", val->number); break;
+        //   case JsType_Str: Info("str: %s", val->str); break;
+        //   case JsType_Array: Info("array"); break;
+        //   case JsType_Obj:  Info("obj"); break;
+        // }
         array_push(fields, {.key = key, .val = val});
         js_skip_ws(p);
         if (js_peek(p) == ',') {
@@ -1089,8 +1089,37 @@ void foo_js() {
 
 void com_init() {
   Scratch scratch;
-  foo_js();
 
+  MakeId(A_ID)
+  struct A {
+    A_ID next;
+    A_ID prev;
+  };
+  A_ID first = {};
+  A arr[128];
+  for (u32 i = first.idx; i; i = arr[i].next.idx) {
+  }
+  {
+    struct List {
+      A_ID first;
+      A_ID last;
+    } list = {};
+    A_ID thing = {};
+    // hdll_push_back(arr, list.first, list.last, thing);
+  }
+
+  // LoopHNode (i, first, arr) {
+  //   A* d = &arr[i.idx];
+  // }
+  {
+    struct List {
+      u32 first;
+      u32 last;
+    };
+
+  }
+
+  foo_js();
   GlobalState& g = *st;
   estimate_cpu_frequency();
   global_allocator_init();
@@ -1126,27 +1155,27 @@ void com_update() {
   debug_update();
   {
     ProfBlock("push jobs");
-    // Loop (i, 12) {
-    //   thread_push({.fn = [](void* ctx) {os_sleep_ms(rand_u32()%4);}, .priority = TaskPriority_Low});
-    // }
-    // WaitGroup id0 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
-    // WaitGroup id1 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
-    // WaitGroup id2 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
-    // WaitGroup id3 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
+    Loop (i, 2) {
+      thread_push({.fn = [](void* ctx) {os_sleep_ms(rand_u32()%4);}, .priority = TaskPriority_Low});
+    }
+    WaitGroup id0 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
+    WaitGroup id1 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
+    WaitGroup id2 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
+    WaitGroup id3 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
 
-    // TaskDesc tasks[] = {
-    //   {.fn = [](void* ctx) { os_sleep_ms(2); }},
-    //   {.fn = [](void* ctx) { os_sleep_ms(2); }},
-    //   {.fn = [](void* ctx) { os_sleep_ms(2); }},
-    //   {.fn = [](void* ctx) { os_sleep_ms(2); }},
-    // };
-    // WaitGroup batch = thread_push_batch(slice(tasks));
+    TaskDesc tasks[] = {
+      {.fn = [](void* ctx) { os_sleep_ms(2); }},
+      {.fn = [](void* ctx) { os_sleep_ms(2); }},
+      {.fn = [](void* ctx) { os_sleep_ms(2); }},
+      {.fn = [](void* ctx) { os_sleep_ms(2); }},
+    };
+    WaitGroup batch = thread_push_batch(slice(tasks));
 
-    // thread_wg_wait(id0);
-    // thread_wg_wait(id1);
-    // thread_wg_wait(id2);
-    // thread_wg_wait(id3);
-    // thread_wg_wait(batch);
+    thread_wg_wait(id0);
+    thread_wg_wait(id1);
+    thread_wg_wait(id2);
+    thread_wg_wait(id3);
+    thread_wg_wait(batch);
 
     // struct Ctx {
     //   u32 i;
@@ -1629,6 +1658,20 @@ void scene_init() {
     Entity& e = get_entity(e_id);
     e.pos = v3(-3,3,-33);
   }
+  {
+    EntityId e_id = e_alloc(Mesh_Cube, Material_Container);
+    g.my = e_id;
+    Entity& e = get_entity(e_id);
+    e.pos = v3(3,3,0);
+    Loop (i, 4) {
+      EntityId child_id = e_alloc(Mesh_Cube, Material_Container);
+      hdll_list_push_back(g.entities.data, e, child_id);
+      Loop (i, 4) {
+        EntityId new_child_id = e_alloc(Mesh_Cube, Material_Container);
+        hdll_list_push_back(g.entities.data, get_entity(child_id), new_child_id);
+      }
+    }
+  }
 }
 
 void scene_deinit() {
@@ -1759,13 +1802,34 @@ void scene_update() {
 
   r_draw_rect(Rng2(v2(0,0), v2(100,100)), ColorWhite);
 
-  for EachNodePool(i, g.entities) {
-    EntityId e_id = pool_get_slot(g.entities, i);
+  LoopINode (i, g.entities.first, g.entities.data) {
+    EntityId e_id = pool_get_handle(g.entities, i);
+    Entity& e = pool_get(g.entities, e_id);
+    r_push_mesh(e_id, e.mesh_id, e.material_id);
+  }
+  LoopINode (i, g.entities.first, g.entities.data) {
+    EntityId e_id = pool_get_handle(g.entities, i);
     Entity& e = pool_get(g.entities, e_id);
     r_push_mesh(e_id, e.mesh_id, e.material_id);
   }
   {
     // r_debug_grid(v3(0, 20, 0), 10, 10, ColorGrey);
+  }
+
+  {
+    var& my = get_entity(g.my);
+    my.pos.z += get_dt() * 1;
+    u32 i = 1;
+    LoopHNode (it, my.first, g.entities.data) {
+      var& child = get_entity(it);
+      child.pos = my.pos + v3(0,3,0)*i++;
+      u32 j = 1;
+      LoopHNode (i, child.first, g.entities.data) {
+        var& new_child = get_entity(i);
+        new_child.pos = child.pos + v3(3,0,0)*j;
+        ++j;
+      }
+    }
   }
 }
 
@@ -1786,7 +1850,7 @@ void game_save_state() {
   }
   {
     var& p = g.entities;
-    for EachNodePool(i, p) {
+    LoopINode (i, g.entities.first, g.entities.data) {
       Entity& e = p.data[i].elem;
       dstr_push(data, "Entity {\n");
       dstr_push(data, dumb_struct(scratch, slice(members_of_Entity), &e, e.flags));
@@ -1808,8 +1872,8 @@ void game_load_state() {
 
   {
     var& p = g.entities;
-    for EachNodePool(i, p) {
-      EntityId e_id = pool_get_slot(p, i);
+    LoopINode (i, g.entities.first, g.entities.data) {
+      EntityId e_id = pool_get_handle(p, i);
       e_free(e_id);
     }
   }
@@ -1874,7 +1938,8 @@ void game_init() {
   {
     GlobalState& g = *st;
     var m_load = [&](MeshEnum enum_name, String name) {
-      R_Mesh id = r_mesh_load(name);
+      // R_Mesh id = r_mesh_load(name);
+      R_Mesh id = r_mesh_load_async(name);
       g.meshes_ids[enum_name] = id;
       String str = push_str_copy(g.arena, name);
       map_set(g.str_to_mesh_id, str, id);
@@ -1888,7 +1953,7 @@ void game_init() {
     // m_load(Mesh_GreeMan, "greenman.glb");
   
     var t_load = [&](TextureEnum enum_name, String name) {
-      R_Texture id = r_texture_load(name); \
+      R_Texture id = r_texture_load(name);
       g.textures_ids[enum_name] = id;
       String str = push_str_copy(g.arena, name);
       map_set(g.str_to_texture_id, str, id);

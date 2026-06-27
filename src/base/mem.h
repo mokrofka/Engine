@@ -212,6 +212,8 @@ struct SoA_Field {
 
 u8* mem_alloc_soa(Allocator alloc, u32 count, Slice<SoA_Field> fields);
 u8* mem_realloc_soa(Allocator alloc, u32 old_count, u32 new_count, Slice<SoA_Field> fields);
+u8* mem_alloc_soa_zero(Allocator alloc, u32 count, Slice<SoA_Field> fields);
+u8* mem_realloc_soa_zero(Allocator alloc, u32 old_count, u32 new_count, Slice<SoA_Field> fields);
 
 u8* offset_ptr_push(void*& offset, u64 size, u64 align = 1);
 #define offset_ptr_push_struct(a, T)  (T*)offset_ptr_push(a, sizeof(T), alignof(T))

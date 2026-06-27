@@ -50,7 +50,6 @@ u8* _thread_push_ctx(u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
 #define thread_push_ctx(T) *(T*)_thread_push_ctx(sizeof(T), alignof(T))
 void thread_pool_init();
 
-// void thread_parallel_for(u32 count, u32 chunk_size, void* ctx, ParallelForFn fn);
 template<typename T, typename F> void thread_parallel_for(u32 chunk_size, Slice<T> s, F fn) {
   if (s.count == 0) return;
   Scratch scratch;

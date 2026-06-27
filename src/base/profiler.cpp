@@ -4,7 +4,7 @@ global ProfState profiler_st;
 
 void prof_init(Allocator arena) {
   ProfState& g = profiler_st;
-  for EachElement (i, g.prof_threads) {
+  LoopElement (i, g.prof_threads) {
     ProfThread& prof_thread = g.prof_threads[i];
     String str = push_strf(arena, "profiler_st thread %u arena", i);
     prof_thread.arena = arena_make_named(str);
@@ -13,7 +13,7 @@ void prof_init(Allocator arena) {
     prof_thread.events[1] = array_make(ProfEvent, prof_thread.gpa);
     prof_thread.long_anchors = array_make(ProfAnchor, prof_thread.gpa);
     prof_thread.launch_anchors = array_make(ProfAnchor, prof_thread.gpa);
-    for EachElement(j, g.frames_times) {
+    LoopElement (j, g.frames_times) {
       prof_thread.recorded_anchors[j] = array_make(ProfAnchor, prof_thread.gpa);
     }
   }
@@ -53,7 +53,7 @@ _ProfBlock::~_ProfBlock() {
 void prof_begin(u32 current_frame) {
   ProfState& g = profiler_st;
   ProfFrameTime& frame_time = g.current_frame_time;
-  for EachElement(i, g.prof_threads) {
+  LoopElement (i, g.prof_threads) {
     ProfThread& prof_thread = g.prof_threads[i];
     array_clear(prof_thread.events[g.current_buf]);
   }
@@ -74,7 +74,7 @@ void prof_end(u32 current_frame) {
 
   u32 read_buf = atomic_xor(&g.current_buf, 1);
 
-  for EachElement(j, g.prof_threads) {
+  LoopElement (j, g.prof_threads) {
     ProfThread& prof_thread = g.prof_threads[j];
     var anchors = array_make(ProfAnchor, scratch);
     u32 depth = 0;
@@ -181,7 +181,7 @@ void prof_launch_end() {
   frame_time.tsc_end = cpu_timer_now();
   g.launch_time = frame_time;
 
-  for EachElement(j, g.prof_threads) {
+  LoopElement (j, g.prof_threads) {
     ProfThread& prof_thread = g.prof_threads[j];
     var anchors = array_make(ProfAnchor, scratch);
     u32 depth = 0;

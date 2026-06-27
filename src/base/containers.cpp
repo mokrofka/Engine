@@ -199,7 +199,7 @@ void sort_radix(Allocator alloc, Slice<SortEntry> arr) {
 
     // 2) prefix sum (positions)
     u32 sum = 0;
-    for EachElement (i, counts) {
+    LoopElement (i, counts) {
       u32 c = counts[i];
       counts[i] = sum;
       sum += c;
