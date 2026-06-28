@@ -85,9 +85,12 @@ struct OS_LNX_Entity {
 struct OS_State {
   Arena arena;
   OS_LNX_Entity* entity_free;
+  Array<OS_LNX_Entity, 10> mutexes;
   String binary_filepath;
   String binary_directory;
   String binary_name;
+  u64 mem_commited;
+  u64 mem_address_space_reserve;
 };
 
 global OS_State os_st;
@@ -108,12 +111,14 @@ void os_lnx_entity_release(OS_LNX_Entity* entity) {
   sll_stack_push(os_st.entity_free, entity);
 }
 
-String os_get_current_filepath()     { return os_st.binary_filepath; }
-String os_get_current_directory()    { return os_st.binary_directory; }
-String os_get_current_binary_name()  { return os_st.binary_name; }
+String os_cur_filepath()     { return os_st.binary_filepath; }
+String os_cur_directory()    { return os_st.binary_directory; }
+String os_cur_binary_name()  { return os_st.binary_name; }
+u64 os_commited_size()       { return os_st.mem_commited; }
+u64 os_reserved_size()       { return os_st.mem_address_space_reserve; }
 
 void os_init(String name) {
-  os_st.arena = arena_make_named("os arena");
+  os_st.arena = arena_make("os arena");
   os_st.binary_filepath = name;
   os_st.binary_directory = str_chop_last_slash(name);
   os_st.binary_name = str_skip_last_slash(name);
@@ -177,8 +182,8 @@ String os_get_environment(String name) {
 //////////////////////////////////////////////////////////////////////////
 // Memory
 
-u8*  os_reserve(u64 size)                  { return (u8*)mmap(null, size, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0); }
-b32  os_commit(void* ptr, u64 size)        { return mprotect(ptr, size, PROT_READ | PROT_WRITE); }
+u8*  os_reserve(u64 size)                  { atomic_add(&os_st.mem_address_space_reserve, size); return (u8*)mmap(null, size, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0); }
+b32  os_commit(void* ptr, u64 size)        { atomic_add(&os_st.mem_commited, size); return mprotect(ptr, size, PROT_READ | PROT_WRITE);}
 void os_decommit(void* ptr, u64 size)      { mprotect(ptr, size, PROT_NONE);}
 void os_release(void* ptr, u64 size)       { munmap(ptr, size);}
 
@@ -579,6 +584,14 @@ void os_thread_detach(Thread handle) {
 
 ///////////////////////////////////
 // Sync primitives
+
+Mutex os_mutex_make() {
+  OS_LNX_Entity entity = {};
+  pthread_mutex_init(&entity.mutex, null);
+  array_push(os_st.mutexes, entity);
+  Mutex handle = {(u64)&os_st.mutexes[os_st.mutexes.count-1]};
+  return handle;
+}
 
 Mutex os_mutex_alloc() {
   OS_LNX_Entity* entity = os_lnx_entity_alloc(OS_LNX_EntityType_Mutex);

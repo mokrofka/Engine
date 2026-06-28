@@ -2534,13 +2534,13 @@ void gfx_draw_indexed(u32 base_index, u32 index_count, u32 base_vert, u32 instan
 void gfx_draw_indirect(Gfx_IndirectDrawcall drawcall) {
   Gfx_State& g = st->gfx;
   Buffer buf = pool_get(g.buffers, g.drawcall_buf);
-  st->gfx.CmdDrawIndirect(vk_get_cur_cmd(), g.cpu_buf.h, buf.base + drawcall.base*sizeof(VK_Drawcall), drawcall.count, sizeof(VK_Drawcall));
+  st->gfx.CmdDrawIndirect(vk_get_cur_cmd(), g.cpu_buf.h, buf.base + drawcall.base*sizeof(VK_IndirectDrawCall), drawcall.count, sizeof(VK_IndirectDrawCall));
 }
 
 void gfx_draw_indexed_indirect(Gfx_IndirectDrawcall drawcall) {
   Gfx_State& g = st->gfx;
   Buffer buf = pool_get(g.buffers, g.drawcall_buf);
-  st->gfx.CmdDrawIndexedIndirect(vk_get_cur_cmd(), g.cpu_buf.h, buf.base + drawcall.base*sizeof(VK_Drawcall), drawcall.count, sizeof(VK_Drawcall));
+  st->gfx.CmdDrawIndexedIndirect(vk_get_cur_cmd(), g.cpu_buf.h, buf.base + drawcall.base*sizeof(VK_IndirectDrawCall), drawcall.count, sizeof(VK_IndirectDrawCall));
 }
 
 void gfx_draw_mesh(Gfx_Mesh mesh) {
@@ -2562,7 +2562,7 @@ Gfx_IndirectDrawcall gfx_indirect_end(u32 base) {
   return res;
 }
 void gfx_draw_mesh_indirect(Gfx_Mesh mesh, u32 id, u32 instance_count) {
-  VK_Drawcall info = {};
+  VK_IndirectDrawCall info = {};
   if (mesh.index_count) {
     info.index_draw_command = {
       .indexCount = mesh.index_count,
@@ -2580,7 +2580,7 @@ void gfx_draw_mesh_indirect(Gfx_Mesh mesh, u32 id, u32 instance_count) {
     };
   }
   info.base_instance = id;
-  VK_Drawcall* drawcalls = (VK_Drawcall*)gfx_buffer_base_ptr(st->gfx.drawcall_buf);
+  VK_IndirectDrawCall* drawcalls = (VK_IndirectDrawCall*)gfx_buffer_base_ptr(st->gfx.drawcall_buf);
   drawcalls[st->gfx.drawcall_cursor++] = info;
 }
 
@@ -2710,7 +2710,7 @@ void gfx_init(Gfx_Environment environment) {
   Gfx_State& g = st->gfx;
   Gfx_State& vk = st->gfx;
   g.environment = environment;
-  g.arena = arena_make_named("gfx arena");
+  g.arena = arena_make("gfx arena");
 
 #if VulkanUseAllocator
   g._allocator = vk_allocator_create();
@@ -2822,7 +2822,7 @@ void gfx_init(Gfx_Environment environment) {
     g.CreateDescriptorPool(vkdevice, &pool_info, g.allocator, &g.descriptor_pool);
   }
 
-  u32 drawcall_mem = MaxEntities * sizeof(VK_Drawcall);
+  u32 drawcall_mem = MaxEntities * sizeof(VK_IndirectDrawCall);
   g.gpu_mem = vk_mem_make(Gfx_MemType_Gpu, environment.gpu_mem_size + environment.image_mem_size);
   g.cpu_mem = vk_mem_make(Gfx_MemType_Cpu, environment.cpu_mem_size);
   g.gpu_buf = vk_buffer_make(environment.gpu_mem_size);

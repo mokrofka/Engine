@@ -21,7 +21,7 @@ struct Clipboard {
 
 struct X11State {
   Arena arena;
-  AllocSegList gpa;
+  Alloc gpa;
   xcb_connection_t* connection;
   xcb_screen_t* screen;
   xcb_window_t window;
@@ -272,8 +272,8 @@ u32 os_key_to_character(Key key, OS_Modifiers modifiers) {
 
 void os_gfx_init() {
   X11State& g = gfx_st;
-  g.arena = arena_make_named("gfx arena");
-  g.gpa = alloc_seglist_make(g.arena);
+  g.arena = arena_make("gfx arena");
+  g.gpa = alloc_make(g.arena);
   g.input_events = array_make(OS_InputEvent, g.gpa);
   g.xcb_events = array_make(xcb_generic_event_t*, g.gpa);
 

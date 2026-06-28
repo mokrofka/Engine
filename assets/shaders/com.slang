@@ -75,6 +75,12 @@ struct DrawCallInfo {
   u32 entity_inst_offset;
 };
 
+struct R_DrawCallCtx {
+  mat4 model;
+  v4 color;
+  u32 tex;
+};
+
 struct State {
   mat4 projection_view;
   mat4 projection;
@@ -124,6 +130,7 @@ VkBind(Bindings.Materials) StructuredBuffer<Material> materials;
 VkBind(Bindings.PointLights) StructuredBuffer<PointLight> point_lights;
 VkBind(Bindings.DirLights) StructuredBuffer<DirLight> dir_lights;
 VkBind(Bindings.SpotLights) StructuredBuffer<SpotLight> spot_lights;
+VkBind(Bindings.DrawCtx) StructuredBuffer<R_DrawCallCtx> drawcalls_ctx;
 
 v2 in_uv(v2 uv) { return v2(uv.x, -uv.y); }
 

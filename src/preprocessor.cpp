@@ -5,8 +5,8 @@ i32 main(i32 count, char* args[]) {
   tctx_init();
   os_init(args[0]);
   Scratch scratch;
-  OS_Handle file = os_file_open(push_strf(scratch, "%s/../src/generated.h", os_get_current_directory()), OS_AccessFlag_Write | OS_AccessFlag_Trunc);
-  Slice buf = os_file_path_read_all(scratch, push_strf(scratch, "%s/../src/com.h", os_get_current_directory()));
+  OS_Handle file = os_file_open(push_strf(scratch, "%s/../src/generated.h", os_cur_directory()), OS_AccessFlag_Write | OS_AccessFlag_Trunc);
+  Slice buf = os_file_path_read_all(scratch, push_strf(scratch, "%s/../src/com.h", os_cur_directory()));
   Slice tokens = tokens_from_str(scratch, str_make(buf));
   Parser p = parser_make(tokens);
   var string = dstr_make(scratch);

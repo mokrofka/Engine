@@ -3,6 +3,7 @@
 shared_function void common_main(HotReloadData* data);
 
 i32 main(i32 count, char* args[]) {
+  mem_track_init();
   tctx_init();
   os_init(args[0]);
 
@@ -15,7 +16,7 @@ i32 main(i32 count, char* args[]) {
   } st = {};
 
 #if HOTRELOAD_BUILD
-  String current_dir = os_get_current_directory();
+  String current_dir = os_cur_directory();
   st.lib_filepath = push_str_cat(scratch, current_dir, "/libgame.so");
   st.state.lib = st.lib_filepath;
   st.lib = os_lib_open(st.lib_filepath);

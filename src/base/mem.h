@@ -7,10 +7,10 @@ const u32 MEM_DEFAULT_ALIGNMENT = sizeof(void*);
 
 enum AllocatorType {
   AllocatorType_None,
-  AllocatorType_Global,
+  // AllocatorType_Global,
   AllocatorType_Arena,
   AllocatorType_ArenaList,
-  AllocatorType_SegList,
+  AllocatorType_Alloc,
 };
 
 struct Allocator {
@@ -25,9 +25,9 @@ u8*  mem_alloc(Allocator alloc, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
 u8*  mem_alloc_zero(Allocator alloc, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
 u8*  mem_realloc(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 align = MEM_DEFAULT_ALIGNMENT);
 u8*  mem_realloc_zero(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 align = MEM_DEFAULT_ALIGNMENT);
-void mem_free(Allocator alloc, void* ptr);
+void mem_free(Allocator alloc, void* ptr, u64 size);
 
-template<typename T> T* mem_realloc_array(Allocator a, T* ptr, u32 old_c, u32 c)      { return (T*)mem_realloc(a, ptr,      sizeof(T)*old_c, sizeof(T)*c, alignof(T)); }
+template<typename T> T* mem_realloc_array(Allocator a, T* ptr, u32 old_c, u32 c)      { return (T*)mem_realloc(a, ptr, sizeof(T)*old_c, sizeof(T)*c, alignof(T)); }
 template<typename T> T* mem_realloc_array_zero(Allocator a, T* ptr, u32 old_c, u32 c) { return (T*)mem_realloc_zero(a, ptr, sizeof(T)*old_c, sizeof(T)*c, alignof(T)); }
 
 #define push_buffer(a, z, ...)           mem_alloc(a,      z, ##__VA_ARGS__)
@@ -53,23 +53,25 @@ template<typename T> Slice<T> slice_clone(Allocator alloc, Slice<T> slice) {
 // Mem track
 
 struct AllocatorInfo {
-  AllocatorType type;
   AllocatorInfo* first;
   AllocatorInfo* last;
   AllocatorInfo* next;
   AllocatorInfo* prev;
   AllocatorInfo* parent;
-  u32 first_count;
-  u64 exclusive_pos;
+  u32 child_count;
+
+  String64 name;
+  AllocatorType type;
+  u32 thread_idx;
+
   u64 pos;
-  u64 cmt;
+  u64 exclusive_pos;
   u64 cap;
   u64 res;
   u64 allocs;
   u64 frees;
   u64 current_allocs;
   u64 allocs_per_frame;
-  String64 name;
 };
 
 struct AllocatorInfoList {
@@ -78,12 +80,8 @@ struct AllocatorInfoList {
   u32 count;
 };
 
-AllocatorInfoList get_allocators_info();
-
-////////////////////////////////////////////////////////////////////////
-// Global allocator
-
-void global_allocator_init();
+AllocatorInfoList mem_track_info();
+void mem_track_init();
 
 ////////////////////////////////////////////////////////////////////////
 // Arena (page allocator)
@@ -102,7 +100,7 @@ struct Arena {
 #define arena_make(...) arena_make_(__func__)
 Arena arena_make_named(String name);
 Arena arena_make_(String name);
-void  arena_free(Arena* arena);
+void  arena_destroy(Arena* arena);
 void  arena_clear(Arena* arena);
 
 struct Temp {
@@ -147,16 +145,21 @@ void alloc_arena_list_clear(ArenaList& arena);
 ////////////////////////////////////////////////////////////////////////
 // Segregated pow2 list
 
-struct AllocSegList {
+struct MemNode {
+  MemNode* next;
+};
+
+struct Alloc {
 #if MEM_TRACK
   AllocatorInfo* info;
 #endif
   Allocator alloc;
-  u8* pools[32];
+  MemNode pools[32];
   operator Allocator();
 };
 
-AllocSegList alloc_seglist_make(Allocator alloc, String name = {});
+Alloc alloc_make(Allocator alloc);
+void alloc_destroy(Allocator alloc);
 
 ////////////////////////////////////////////////////////////////////////
 // tlsf TODO: implement
@@ -210,6 +213,7 @@ struct SoA_Field {
 };
 #define SoA_push_field(ptr) {(void**)(&ptr), sizeof(*ptr), alignof(*ptr)}
 
+u64 mem_soa_size(u32 count, Slice<SoA_Field> fields);
 u8* mem_alloc_soa(Allocator alloc, u32 count, Slice<SoA_Field> fields);
 u8* mem_realloc_soa(Allocator alloc, u32 old_count, u32 new_count, Slice<SoA_Field> fields);
 u8* mem_alloc_soa_zero(Allocator alloc, u32 count, Slice<SoA_Field> fields);

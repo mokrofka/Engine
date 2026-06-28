@@ -8,7 +8,7 @@ void prof_init(Allocator arena) {
     ProfThread& prof_thread = g.prof_threads[i];
     String str = push_strf(arena, "profiler_st thread %u arena", i);
     prof_thread.arena = arena_make_named(str);
-    prof_thread.gpa = alloc_seglist_make(prof_thread.arena);
+    prof_thread.gpa = alloc_make(prof_thread.arena);
     prof_thread.events[0] = array_make(ProfEvent, prof_thread.gpa);
     prof_thread.events[1] = array_make(ProfEvent, prof_thread.gpa);
     prof_thread.long_anchors = array_make(ProfAnchor, prof_thread.gpa);
@@ -165,7 +165,7 @@ ProfFrame prof_get_prev_frame(u32 current_frame) {
 
 ProfThread& prof_get_prof_thread() {
   ProfState& g = profiler_st;
-  return g.prof_threads[tctx_get_id()];
+  return g.prof_threads[tctx_get_idx()];
 }
 
 void prof_launch_begin() {

@@ -597,7 +597,7 @@ struct VK_DescriptorWriter {
   u32 writes_count;
 };
 
-struct VK_Drawcall {
+struct VK_IndirectDrawCall {
   union {
     VkDrawIndirectCommand draw_command;
     VkDrawIndexedIndirectCommand index_draw_command;

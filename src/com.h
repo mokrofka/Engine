@@ -19,6 +19,8 @@
 // introspection
 // font rendering
 // editor
+// fill a buffer each frame
+// seglist alloc looks broken
 
 const u32 MaxEntities = KB(4);
 
@@ -245,17 +247,18 @@ Introspect struct Entity {
   EntityFlags flags;
   v3 pos;
   v3 rot;
+  v4 quat;
   v3 scale;
   Rng3 aabb;
   v3 vel;
-  R_Mesh mesh_id;
-  R_Material material_id;
+  R_Mesh mesh;
+  R_Material mat;
   v4 color;
 };
 
 struct GameState {
   Arena arena;
-  AllocSegList gpa;
+  Alloc gpa;
   Camera cam;
   b32 fps_camera;
   Timer timer;
@@ -281,7 +284,7 @@ struct GameState {
 
 struct GlobalState {
   Arena arena;
-  AllocSegList gpa;
+  Alloc gpa;
   f32 dt;
   f32 time;
   u32 current_frame;

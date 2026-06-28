@@ -2,4 +2,4 @@
 #include "mem.h"
 
 void tctx_init();
-u32 tctx_get_id();
+u32 tctx_get_idx();

@@ -76,9 +76,11 @@ u64 cpu_timer_now();
 u64 cpu_frequency();
 void estimate_cpu_frequency();
 
-String os_get_current_filepath();
-String os_get_current_directory();
-String os_get_current_binary_name();
+String os_cur_filepath();
+String os_cur_directory();
+String os_cur_binary_name();
+u64 os_commited_size();
+u64 os_reserved_size();
 
 void os_init(String name);
 void os_exit(i32 exit_code);
@@ -154,6 +156,7 @@ void os_thread_detach(Thread handle);
 
 ///////////////////////////////////
 // Sync primitives
+Mutex os_mutex_make();
 Mutex os_mutex_alloc();
 void  os_mutex_release(Mutex mutex);
 void  os_mutex_lock(Mutex mutex);

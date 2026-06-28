@@ -1090,39 +1090,37 @@ void foo_js() {
 void com_init() {
   Scratch scratch;
 
-  MakeId(A_ID)
-  struct A {
-    A_ID next;
-    A_ID prev;
-  };
-  A_ID first = {};
-  A arr[128];
-  for (u32 i = first.idx; i; i = arr[i].next.idx) {
-  }
-  {
-    struct List {
-      A_ID first;
-      A_ID last;
-    } list = {};
-    A_ID thing = {};
-    // hdll_push_back(arr, list.first, list.last, thing);
-  }
+  // MakeId(A_ID)
+  // struct A {
+  //   A_ID next;
+  //   A_ID prev;
+  // };
+  // A_ID first = {};
+  // A arr[128];
+  // for (u32 i = first.idx; i; i = arr[i].next.idx) {
+  // }
+  // {
+  //   struct List {
+  //     A_ID first;
+  //     A_ID last;
+  //   } list = {};
+  //   A_ID thing = {};
+  //   // hdll_push_back(arr, list.first, list.last, thing);
+  // }
 
   // LoopHNode (i, first, arr) {
   //   A* d = &arr[i.idx];
   // }
-  {
-    struct List {
-      u32 first;
-      u32 last;
-    };
-
-  }
+  // {
+  //   struct List {
+  //     u32 first;
+  //     u32 last;
+  //   };
+  // }
 
   foo_js();
   GlobalState& g = *st;
   estimate_cpu_frequency();
-  global_allocator_init();
   os_gfx_init();
   prof_init(g.arena);
   prof_launch_begin();
@@ -1132,8 +1130,8 @@ void com_init() {
     thread_pool_init();
     test();
 
-    g.gpa = alloc_seglist_make(g.arena);
-    g.asset_dir = push_strf(g.arena, "%s/%s", os_get_current_directory(), String("../assets"));
+    g.gpa = alloc_make(g.arena);
+    g.asset_dir = push_strf(g.arena, "%s/%s", os_cur_directory(), String("../assets"));
     g.shader_dir = push_str_cat(g.arena, g.asset_dir, "/shaders");
     g.shader_compiled_dir = push_str_cat(g.arena, g.shader_dir, "/compiled");
     g.models_dir = push_str_cat(g.arena, g.asset_dir, "/models");
@@ -1209,7 +1207,7 @@ void com_update() {
 shared_function void common_main(HotReloadData* data) {
   Scratch scratch;
 if (data->ctx == null) {
-    Arena arena = arena_make_named("common arena");
+    Arena arena = arena_make("common arena");
     data->ctx = push_struct_zero(arena, GlobalState);
     st = (GlobalState*)data->ctx;
     st->arena = arena;
@@ -1395,10 +1393,6 @@ EntityId e_alloc_bare() {
   ++g.entities_count;
   return e_id;
 }
-void e_init(EntityId e_id) {
-  Entity& e = get_entity(e_id);
-  r_set_entity_color(e_id, e.color);
-}
 
 EntityId e_alloc(R_Mesh mesh_id, R_Material material_id, EntityThing thing) {
   GameState& g = st->game;
@@ -1406,8 +1400,8 @@ EntityId e_alloc(R_Mesh mesh_id, R_Material material_id, EntityThing thing) {
     .name = thing.name,
     .flags = thing.flags,
     .scale = v3_one(),
-    .mesh_id = mesh_id,
-    .material_id = material_id,
+    .mesh = mesh_id,
+    .mat = material_id,
     .aabb = Rng3(v3_splat(-1), v3_splat(1)),
     .color = ColorWhite,
   };
@@ -1548,7 +1542,6 @@ void scene_init() {
     EntityId grid_id = e_alloc(Mesh_Grid, Material_Line);
     Entity& grid = get_entity(grid_id);
     grid.color = v4_splat(0.6);
-    e_init(grid_id);
     grid.pos = v3(0,0,-5);
   }
   {
@@ -1802,15 +1795,16 @@ void scene_update() {
 
   r_draw_rect(Rng2(v2(0,0), v2(100,100)), ColorWhite);
 
+  // Loop (i, 9) {
+  //   r_push_mesh(g.e, e.mesh, e.mat);
+  //   r_draw_mesh(st->meshes_ids[Mesh_Triangle], e.mat, e.pos);
+  // }
+
   LoopINode (i, g.entities.first, g.entities.data) {
     EntityId e_id = pool_get_handle(g.entities, i);
-    Entity& e = pool_get(g.entities, e_id);
-    r_push_mesh(e_id, e.mesh_id, e.material_id);
-  }
-  LoopINode (i, g.entities.first, g.entities.data) {
-    EntityId e_id = pool_get_handle(g.entities, i);
-    Entity& e = pool_get(g.entities, e_id);
-    r_push_mesh(e_id, e.mesh_id, e.material_id);
+    // Entity& e = pool_get(g.entities, e_id);
+    // r_draw_mesh(e.mesh, e.mat, e.pos);
+    r_draw_entity(e_id);
   }
   {
     // r_debug_grid(v3(0, 20, 0), 10, 10, ColorGrey);
@@ -1831,6 +1825,7 @@ void scene_update() {
       }
     }
   }
+  
 }
 
 void game_save_state() {
@@ -1858,7 +1853,7 @@ void game_save_state() {
     }
   }
 
-  OS_Handle file = os_file_open(push_strf(scratch, "%s/saved", os_get_current_directory(), String("saved")), OS_AccessFlag_Write | OS_AccessFlag_Trunc);
+  OS_Handle file = os_file_open(push_strf(scratch, "%s/saved", os_cur_directory(), String("saved")), OS_AccessFlag_Write | OS_AccessFlag_Trunc);
   os_file_write(file, dstr_slice(data));
   os_file_close(file);
 }
@@ -1866,7 +1861,7 @@ void game_save_state() {
 void game_load_state() {
   GameState& g = st->game;
   Scratch scratch;
-  Slice data = os_file_path_read_all(scratch, push_strf(scratch, "%s/saved", os_get_current_directory(), String("saved")));
+  Slice data = os_file_path_read_all(scratch, push_strf(scratch, "%s/saved", os_cur_directory(), String("saved")));
   Slice tokens = tokens_from_str(scratch, str_make(data.data, data.size));
   Parser p = parser_make(tokens);
 
@@ -1889,7 +1884,6 @@ void game_load_state() {
           EntityId e_id = e_alloc_bare();
           Entity& e = get_entity(e_id);
           dumb_struct_load(slice(members_of_Entity), &e, &p);
-          e_init(e_id);
           if (FlagHas(e.flags, EntityFlag_Referenced)) {
             if (str_match("monkey", e.name)) {
               g.monkey_id = e_id;
@@ -1903,7 +1897,6 @@ void game_load_state() {
           EntityId e_id = e_alloc_bare();
           Entity& e = get_entity(e_id);
           dumb_struct_load(slice(members_of_Entity), &e, &p);
-          e_init(e_id);
           g.e = e_id;
         }
       }
@@ -1917,12 +1910,11 @@ void game_init() {
   pos = {};
   GameState& g = st->game;
   Scratch scratch;
-  g.arena = arena_make_named("game arena");
-  g.gpa = alloc_seglist_make(g.arena, "game gpa");
+  g.arena = arena_make("game arena");
+  g.gpa = alloc_make(g.arena);
   g.timer = timer_make(1);
 
   g.moving_cubes = array_make(EntityId, g.gpa);
-  // g.static_cubes = array_make<StaticEntityId>(g.gpa);
 
   MeshDesc triangle_mesh = {.vertices = slice(triangle_vertices)};
   mesh_set(Mesh_Triangle, r_mesh_make(triangle_mesh));

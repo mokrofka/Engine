@@ -159,9 +159,9 @@ void id_pool_free(IdPool& p, u32 h) {
 }
 void id_pool_destroy(IdPool& p) {
   if (p.ids) { 
-    mem_free(p.alloc, p.ids);
+    // mem_free(p.alloc, p.ids);
 #if BUILD_DEBUG
-    mem_free(p.alloc, p.generations);
+    // mem_free(p.alloc, p.generations);
 #endif
   }
 }

@@ -59,7 +59,7 @@ struct ProfFrame {
 
 struct ProfThread {
   Arena arena;
-  AllocSegList gpa;
+  Alloc gpa;
   Darray<ProfEvent> events[2];
   Darray<ProfAnchor> recorded_anchors[ProfRecordHistoryNum];
   Darray<ProfAnchor> launch_anchors;

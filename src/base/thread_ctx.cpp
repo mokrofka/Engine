@@ -9,7 +9,7 @@ struct TCTX {
 global thread_local TCTX tctx;
 global u32 _next_thread_id;
 
-u32 tctx_get_id() {
+u32 tctx_get_idx() {
   return tctx.id;
 }
 

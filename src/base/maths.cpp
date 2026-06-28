@@ -140,6 +140,7 @@ f32 remap(f32 x, Rng1 old, Rng1 new_) { return remap(x, old.min, old.max, new_.m
 f32 remap_clamped(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max) {
   return remap(Clamp(old_min, x, old_max), old_min, old_max, new_min, new_max);
 }
+f32 approach(f32 current, f32 target, f32 step) { return current < target ? Min(current + step, target) : Max(current - step, target); }
 
 ////////////////////////////////////////////////////////////////////////
 // Vector2

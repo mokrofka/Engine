@@ -634,12 +634,12 @@ void debug_prof_view() {
               u32 mem_level;
             };
             var items = array_make(UI_Item, scratch);
-            AllocatorInfoList infos = get_allocators_info();
+            AllocatorInfoList infos = mem_track_info();
             var infos_sorted = sort_list_insert(scratch, infos.first, [](var a, var b) { return a->pos > b->pos; });
             f64 mem_usage = 0;
             Loop (i, infos_sorted.count) {
               AllocatorInfo* x = infos_sorted[i];
-              mem_usage += x->cmt;
+              mem_usage += x->cap;
             }
             f32 mem_levels[] = {KB(1), KB(10), KB(100), MB(1), MB(10), MB(100), GB(1)};
 
@@ -747,7 +747,12 @@ void debug_prof_view() {
               switch (item.type) {
                 case UI_ItemType_MemUsage: {
                   MemFormatSize mem_fmt = mem_format_size(mem_usage);
-                  String mem_usage_str = push_strf(scratch, "mem usage: %.2f%s", mem_fmt.size, mem_fmt.format);
+                  MemFormatSize os_commited_fmt = mem_format_size(os_commited_size());
+                  MemFormatSize os_address_reserved_fmt = mem_format_size(os_reserved_size());
+                  String mem_usage_str = push_strf(scratch, "os commited: %.2f%s, address reserved %.2f%s, mem usage: %.2f%s", 
+                    os_commited_fmt.size, os_commited_fmt.format,
+                    os_address_reserved_fmt.size, os_address_reserved_fmt.format,
+                    mem_fmt.size, mem_fmt.format);
                   imgui_draw_text(draw, cursor_pos, ColorWhite, mem_usage_str);
                 } break;
                 case UI_ItemType_MemLevel: {
@@ -778,7 +783,7 @@ void debug_prof_view() {
 
                   MemFormatSize pos = mem_format_size(info.pos);
                   MemFormatSize pos_exclusive = mem_format_size(info.exclusive_pos);
-                  MemFormatSize cmt = mem_format_size(info.cmt);
+                  MemFormatSize cmt = mem_format_size(info.cap);
 
                   String name_str = push_strf(scratch, "%s", info.name);
                   String mem_str = push_strf(scratch, "%.2f%s pos, %.2f%s cmt", pos.size, pos.format, cmt.size, cmt.format);

@@ -14,11 +14,11 @@ b32 r_material_is_null(R_Mesh m)     { return m.idx == 0; }
 b32 r_font_is_null(R_Mesh f)         { return f.idx == 0; }
 b32 r_shader_is_null(R_Mesh shd)     { return shd.idx == 0; }
 
-R_EntityBatch r_entity_batch_make(Allocator alloc, Gfx_Pipeline pip) {
-  R_EntityBatch res = {
+R_DrawBatch r_draw_batch_make(Allocator alloc, Gfx_Pipeline pip) {
+  R_DrawBatch res = {
     .pip = pip,
-    .pushed_meshes = array_make(R_MeshPush, alloc),
-    .pushed_meshes_unindexed = array_make(R_MeshPush, alloc),
+    .draws = array_make(R_DrawCallData, alloc),
+    .draws_unindexed = array_make(R_DrawCallData, alloc),
   };
   return res;
 }
@@ -389,14 +389,14 @@ R_Material r_material_make(MaterialDesc desc) {
   Gfx_Pipeline pip = pip_r;
   var batch_idx_r = map_get(g.pip_idx_to_entity_batch_idx, pip.idx);
   if (batch_idx_r.err) {
-    u32 batch_idx = array_push(g.entity_batches, r_entity_batch_make(g.gpa, pip));
+    u32 batch_idx = array_push(g.entity_batches, r_draw_batch_make(g.gpa, pip));
     map_set(g.pip_idx_to_entity_batch_idx, pip.idx, batch_idx);
     batch_idx_r = batch_idx;
   }
   u32 batch_idx = batch_idx_r;
   R_Texture texture_id = map_get(st->str_to_texture_id, desc.texture);
   u32 texture_descriptor_idx = 0;
-  if (pool_is_valid_slot(g.textures, texture_id)) {
+  if (pool_is_valid_handle(g.textures, texture_id)) {
     texture_descriptor_idx = r_texture_get_descriptor_idx(texture_id);
   }
   R_MaterialData mat = {
@@ -459,7 +459,7 @@ Gfx_Pipeline r_pipeline_make(String name, Gfx_PipelineDesc desc) {
 
 void r_shaders_compile(Allocator arena) {
   Scratch scratch(arena);
-  String cur_dir = os_get_current_directory();
+  String cur_dir = os_cur_directory();
   String shader_dir = st->shader_dir;
   String compiled_shader_dir = st->shader_compiled_dir;
   String saved_time_stamps = push_strf(scratch, "%s/%s", cur_dir, String("saved_time_stamps_for_shad"));
@@ -617,10 +617,11 @@ R_Font r_font_load(String path, f32 size) {
 void r_init() {
   ProfFunc;
   Scratch scratch;
-  Arena arena = arena_make_named("render arena");
+  Arena arena = arena_make("render arena");
   R_State& g = st->r;
   g.arena = arena;
-  g.gpa = alloc_seglist_make(g.arena, "vk gpa");
+  // g.gpa = alloc_make(g.arena, "vk gpa");
+  g.gpa = alloc_make(g.arena);
   g.scale = 1;
   g.async_stage_mutex = os_mutex_alloc();
 
@@ -644,19 +645,24 @@ void r_init() {
     gfx_bind_make({.binding = Bindings::State});
     gfx_bind_make({.binding = Bindings::Entities});
     gfx_bind_make({.binding = Bindings::Materials});
+    gfx_bind_make({.binding = Bindings::DrawCtx});
     g.gpu_global_buf = gfx_buffer_make(sizeof(R_GlobalStateGPU), Gfx_MemType_Cpu);
     g.gpu_entities_buf = gfx_buffer_make((MaxEntities) * sizeof(R_EntityGPU), Gfx_MemType_Cpu);
     g.gpu_materials_buf = gfx_buffer_make(R_MaxMaterials * sizeof(R_MaterialGPU), Gfx_MemType_Cpu);
+    g.gpu_drawcall_ctx_buf = gfx_buffer_make(MaxEntities * sizeof(R_DrawCallDataGPU), Gfx_MemType_Cpu);
 
     g.gpu_entities = (R_EntityGPU*)gfx_buffer_base_ptr(g.gpu_entities_buf);
     g.gpu_global = (R_GlobalStateGPU*)gfx_buffer_base_ptr(g.gpu_global_buf);
     g.gpu_materials = (R_MaterialGPU*)gfx_buffer_base_ptr(g.gpu_materials_buf);
     g.gpu_entities_indices = g.gpu_global->entity_indices;
+    g.gpu_drawcall = (R_DrawCallDataGPU*)gfx_buffer_base_ptr(g.gpu_drawcall_ctx_buf);
+
     gfx_instance_set_indices(g.gpu_entities_indices);
 
     gfx_bind_buffer(g.gpu_global_buf, Bindings::State);
     gfx_bind_buffer(g.gpu_entities_buf, Bindings::Entities);
     gfx_bind_buffer(g.gpu_materials_buf, Bindings::Materials);
+    gfx_bind_buffer(g.gpu_drawcall_ctx_buf, Bindings::DrawCtx);
     gfx_flush();
   }
 
@@ -775,11 +781,12 @@ void r_end() {
       shader_st.projection = st->projection;
       shader_st.view = st->view;
 
+      u32 drawcall_count = 0;
       Loop (i, g.entity_batches.count) {
-        R_EntityBatch& batch = g.entity_batches[i];
+        R_DrawBatch& batch = g.entity_batches[i];
         gfx_pipeline_bind(batch.pip);
 
-        var make_draw = [&](Gfx_IndirectDrawcall draw, b32 indexed = true) {
+        var make_draw = [&](Gfx_IndirectDrawcall draw, b32 indexed) {
           if (draw.count) {
             vk_push_constants({.drawcall_base = draw.base});
             if (indexed) {
@@ -789,36 +796,30 @@ void r_end() {
             }
           }
         };
-
-        {
+        var process_push = [&](R_DrawCallData push) {
+          mat4 model = mat4_translate(push.pos) * quat_to_mat4(push.rot) * mat4_scale(push.scale);
+          g.gpu_drawcall[drawcall_count] = {
+            .model = model,
+            .tex = pool_get(g.materials, push.mat).texture_descriptor_idx,
+            .color = push.color,
+          };
+        };
+        var emit_batch = [&](Slice<R_DrawCallData> pushes, b32 indexed) {
           u32 base = gfx_indirect_begin();
-          Loop (i, batch.pushed_meshes.count) {
-            R_MeshPush push = batch.pushed_meshes[i];
-            u32 idx = push.id.idx;
-            g.gpu_entities[idx].model = mat4_transform(get_entity_transform(push.id));
-            g.gpu_entities[idx].material_idx = get_entity(push.id).material_id.idx;
-            Gfx_Mesh mesh = pool_get(g.meshes, push.mesh);
-            gfx_draw_mesh_indirect(mesh, idx);
+          Loop (i, pushes.count) {
+            R_DrawCallData draw = pushes[i];
+            process_push(draw);
+            Gfx_Mesh mesh = pool_get(g.meshes, draw.mesh);
+            gfx_draw_mesh_indirect(mesh, drawcall_count++);
           }
-          Gfx_IndirectDrawcall drawcall = gfx_indirect_end(base);
-          make_draw(drawcall);
-        }
-        {
-          u32 base = gfx_indirect_begin();
-          Loop (i, batch.pushed_meshes_unindexed.count) {
-            R_MeshPush push = batch.pushed_meshes_unindexed[i];
-            u32 idx = push.id.idx;
-            g.gpu_entities[idx].model = mat4_transform(get_entity_transform(push.id));
-            g.gpu_entities[idx].material_idx = get_entity(push.id).material_id.idx;
-            Gfx_Mesh mesh = pool_get(g.meshes, push.mesh);
-            gfx_draw_mesh_indirect(mesh, idx);
-          }
-          Gfx_IndirectDrawcall drawcall = gfx_indirect_end(base);
-          make_draw(drawcall, false);
-        }
+          Gfx_IndirectDrawcall draw = gfx_indirect_end(base);
+          make_draw(draw, indexed);
+        };
+        emit_batch(slice(batch.draws), true);
+        emit_batch(slice(batch.draws_unindexed), false);
 
-        array_clear(batch.pushed_meshes);
-        array_clear(batch.pushed_meshes_unindexed);
+        array_clear(batch.draws);
+        array_clear(batch.draws_unindexed);
       }
 
       // Hello world
@@ -904,23 +905,23 @@ void r_end() {
         }
 
         {
-          gfx_apply_viewport(rng2_make(v2_zero(), v2_of_v2u(os_get_window_size())), false);
-          v3 min = v2_to_v3(v2_remap_01_to_11(v2(200, 200), v2_of_v2u(os_get_window_size())), 0);
-          v3 max = v2_to_v3(v2_remap_01_to_11(v2(500, 500), v2_of_v2u(os_get_window_size())), 0);
-          Vertex vert[] = {
-            {.pos = min,                 .uv = v2(0,0), .color = color},
-            {.pos = v3(min.x, max.y, 0), .uv = v2(0,1), .color = color},
-            {.pos = v3(max.x, min.y, 0), .uv = v2(1,0), .color = color},
-            {.pos = max,                 .uv = v2(1,1), .color = color},
-            {.pos = v3(max.x, min.y, 0), .uv = v2(1,0), .color = color},
-            {.pos = v3(min.x, max.y, 0), .uv = v2(0,1), .color = color},
-          };
-          u64 base = gfx_buffer_base(g.vert_buffer_each_frame);
-          u32 vert_base = (base + ring_write_nowrap_array(g.vert_ring_buffer, vert, ArrayCount(vert))) / sizeof(Vertex);
+          // gfx_apply_viewport(rng2_make(v2_zero(), v2_of_v2u(os_get_window_size())), false);
+          // v3 min = v2_to_v3(v2_remap_01_to_11(v2(200, 200), v2_of_v2u(os_get_window_size())), 0);
+          // v3 max = v2_to_v3(v2_remap_01_to_11(v2(500, 500), v2_of_v2u(os_get_window_size())), 0);
+          // Vertex vert[] = {
+          //   {.pos = min,                 .uv = v2(0,0), .color = color},
+          //   {.pos = v3(min.x, max.y, 0), .uv = v2(0,1), .color = color},
+          //   {.pos = v3(max.x, min.y, 0), .uv = v2(1,0), .color = color},
+          //   {.pos = max,                 .uv = v2(1,1), .color = color},
+          //   {.pos = v3(max.x, min.y, 0), .uv = v2(1,0), .color = color},
+          //   {.pos = v3(min.x, max.y, 0), .uv = v2(0,1), .color = color},
+          // };
+          // u64 base = gfx_buffer_base(g.vert_buffer_each_frame);
+          // u32 vert_base = (base + ring_write_nowrap_array(g.vert_ring_buffer, vert, ArrayCount(vert))) / sizeof(Vertex);
 
-          u32 idx = pool_get(g.textures, st->textures_ids[Texture_Orange]).view.idx;
-          vk_push_constants({.image_index = idx});
-          gfx_draw(vert_base, 6);
+          // u32 idx = pool_get(g.textures, st->textures_ids[Texture_Orange]).view.idx;
+          // vk_push_constants({.image_index = idx});
+          // gfx_draw(vert_base, 6);
         }
 
       }
@@ -945,17 +946,56 @@ void r_end() {
   gfx_end();
 }
 
-void r_set_entity_color(EntityId entity_id, v4 color) {
-  st->r.gpu_entities[entity_id.idx].color = color;
+void r_draw_mesh(R_Mesh mesh, R_Material mat, v3 pos) {
+  var& g = st->r;
+  R_DrawCallData cmd = {
+    .pos = pos,
+    .scale = v3_splat(1),
+    .rot = quat_identity(),
+    .mesh = mesh,
+    .mat = mat,
+  };
+  u32 batch_idx = pool_get(g.materials, mat).entity_batch_idx;
+  if (pool_get(g.meshes, mesh).index_count) {
+    array_push(g.entity_batches[batch_idx].draws, cmd);
+  } else {
+    array_push(g.entity_batches[batch_idx].draws_unindexed, cmd);
+  }
 }
 
-void r_push_mesh(EntityId id, R_Mesh mesh, R_Material material) {
-  R_State& g = st->r;
-  u32 batch_idx = pool_get(g.materials, material).entity_batch_idx;
+void r_draw_mesh_trs(R_Mesh mesh, R_Material mat, v3 pos, v4 rot, v3 scale) {
+  var& g = st->r;
+  R_DrawCallData cmd = {
+    .pos = pos,
+    .scale = scale,
+    .rot = rot,
+    .mesh = mesh,
+    .mat = mat,
+  };
+  u32 batch_idx = pool_get(g.materials, mat).entity_batch_idx;
   if (pool_get(g.meshes, mesh).index_count) {
-    array_push(g.entity_batches[batch_idx].pushed_meshes, {id, mesh, material});
+    array_push(g.entity_batches[batch_idx].draws, cmd);
   } else {
-    array_push(g.entity_batches[batch_idx].pushed_meshes_unindexed, {id, mesh, material});
+    array_push(g.entity_batches[batch_idx].draws_unindexed, cmd);
+  }
+}
+
+void r_draw_entity(EntityId id) {
+  var& g = st->r;
+  Entity& e = get_entity(id);
+  R_DrawCallData cmd = {
+    .pos = e.pos,
+    .scale = e.scale,
+    .rot = e.quat,
+    .color = e.color,
+    .mesh = e.mesh,
+    .mat = e.mat,
+  };
+  u32 batch_idx = pool_get(g.materials, e.mat).entity_batch_idx;
+  if (pool_get(g.meshes, e.mesh).index_count) {
+    array_push(g.entity_batches[batch_idx].draws, cmd);
+  } else {
+    array_push(g.entity_batches[batch_idx].draws_unindexed, cmd);
   }
 }
 

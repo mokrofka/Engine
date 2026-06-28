@@ -491,3 +491,4 @@ template<typename T, typename L, typename H> void list_push_front(T* p,  L* list
   }
   list->first = n;
 }
+

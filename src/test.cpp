@@ -8,33 +8,37 @@ const u32 TEST_SAMPLES = 100;
 global i32 test_alignments[] = { 8, 16, 32, 64 };
 
 intern void test_global_alloc() {
-  Array<u8*, TEST_SAMPLES> arr = {};
-  Allocator alloc = {.type = AllocatorType_Global};
+  // struct Mem {
+  //   u8* data;
+  //   u64 size;
+  // };
+  // Array<Mem, TEST_SAMPLES> arr = {};
+  // Allocator alloc = {.type = AllocatorType_Global};
 
-  Loop (i, TEST_SAMPLES) {
-    u64 size = rand_rng_u32(8, KB(1));
-    u64 align = ArrayRand(test_alignments);
-    array_push(arr, mem_alloc(alloc, size, align));
-    MemZero(arr[i], size);
-  }
-  Array<u32, TEST_SAMPLES> indices = {};
-  Loop(i, TEST_SAMPLES) array_push(indices, i);
-  rand_shuffle(slice(indices));
-  Loop (i, TEST_SAMPLES) {
-    mem_free(alloc, arr[indices[i]]);
-  }
+  // Loop (i, TEST_SAMPLES) {
+  //   u64 size = rand_rng_u32(8, KB(1));
+  //   u64 align = ArrayRand(test_alignments);
+  //   array_push(arr, {mem_alloc(alloc, size, align), size});
+  //   MemZero(arr[i].data, size);
+  // }
+  // Array<u32, TEST_SAMPLES> indices = {};
+  // Loop(i, TEST_SAMPLES) array_push(indices, i);
+  // rand_shuffle(slice(indices));
+  // Loop (i, TEST_SAMPLES) {
+  //   mem_free(alloc, arr[indices[i]].data, arr[indices[i]].size);
+  // }
 
-  array_clear(arr);
-  Loop (i, TEST_SAMPLES) {
-    u64 size = rand_rng_u32(8, KB(1));
-    u64 align = ArrayRand(test_alignments);
-    array_push(arr, mem_alloc(alloc, size, align));
-    MemZero(arr[i], size);
-  }
-  rand_shuffle(slice(indices));
-  Loop (i, TEST_SAMPLES) {
-    mem_free(alloc, arr[indices[i]]);
-  }
+  // array_clear(arr);
+  // Loop (i, TEST_SAMPLES) {
+  //   u64 size = rand_rng_u32(8, KB(1));
+  //   u64 align = ArrayRand(test_alignments);
+  //   array_push(arr, {mem_alloc(alloc, size, align), size});
+  //   MemZero(arr[i].data, size);
+  // }
+  // rand_shuffle(slice(indices));
+  // Loop (i, TEST_SAMPLES) {
+  //   mem_free(alloc, arr[indices[i]].data, arr[indices[i]].size);
+  // }
 }
 
 intern void test_arena_alloc() {
@@ -58,7 +62,7 @@ intern void test_arena_alloc() {
       AssertAlways(buf[j] == value);
     }
   }
-  arena_free(&arena);
+  arena_destroy(&arena);
 }
 
 intern void test_arena_list_alloc() {
@@ -107,36 +111,42 @@ intern void test_arena_list_alloc() {
 
 intern void test_seglist_alloc() {
   Arena arena = arena_make();
-  AllocSegList alloc = alloc_seglist_make(arena);
-  Array<u8*, TEST_SAMPLES> arr = {};
+  Alloc alloc = alloc_make(arena);
+  defer(alloc_destroy(alloc));
+
+  struct Mem {
+    u8* data;
+    u64 size;
+  };
+  Array<Mem, TEST_SAMPLES> arr = {};
 
   Loop (i, TEST_SAMPLES) {
     u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
-    array_push(arr, mem_alloc(alloc, size, align));
-    MemZero(arr[i], size);
+    array_push(arr, {mem_alloc(alloc, size, align), size});
+    MemZero(arr[i].data, size);
   }
   Array<u32, TEST_SAMPLES> indices = {};
   Loop(i, TEST_SAMPLES) array_push(indices, i);
   rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
-    mem_free(alloc, arr[indices[i]]);
+    mem_free(alloc, arr[indices[i]].data, arr[indices[i]].size);
   }
 
   array_clear(arr);
   Loop (i, TEST_SAMPLES) {
     u64 size = rand_rng_u32(8, KB(1));
     u64 align = ArrayRand(test_alignments);
-    array_push(arr, mem_alloc(alloc, size, align));
-    MemZero(arr[i], size);
+    array_push(arr, {mem_alloc(alloc, size, align), size});
+    MemZero(arr[i].data, size);
   }
   array_clear(indices);
   Loop(i, TEST_SAMPLES) array_push(indices, i);
   rand_shuffle(slice(indices));
   Loop (i, TEST_SAMPLES) {
-    mem_free(alloc, arr[indices[i]]);
+    mem_free(alloc, arr[indices[i]].data, arr[indices[i]].size);
   }
-  arena_free(&arena);
+  arena_destroy(&arena);
 }
 
 intern void test_gpu_seglist_alloc() {
@@ -841,10 +851,49 @@ void test_sort() {
   }
 }
 
+void test_alloc() {
+  Scratch scratch;
+  Alloc alloc = alloc_make(scratch);
+  defer(alloc_destroy(alloc));
+  struct AllocCtx {
+    u8* data;
+    u64 size;
+  };
+  Array<AllocCtx, TEST_SAMPLES> arr = {};
+
+  Loop (i, TEST_SAMPLES) {
+    u64 size = rand_rng_u32(8, KB(1));
+    u64 align = ArrayRand(test_alignments);
+    array_push(arr, {mem_alloc(alloc, size, align), size});
+    MemZero(arr[i].data, size);
+  }
+  Array<u32, TEST_SAMPLES> indices = {};
+  Loop(i, TEST_SAMPLES) array_push(indices, i);
+  rand_shuffle(slice(indices));
+  Loop (i, TEST_SAMPLES) {
+    mem_free(alloc, arr[indices[i]].data, arr[indices[i]].size);
+  }
+
+  array_clear(arr);
+  Loop (i, TEST_SAMPLES) {
+    u64 size = rand_rng_u32(8, KB(1));
+    u64 align = ArrayRand(test_alignments);
+    array_push(arr, {mem_alloc(alloc, size, align), size});
+    MemZero(arr[i].data, size);
+  }
+  array_clear(indices);
+  Loop(i, TEST_SAMPLES) array_push(indices, i);
+  rand_shuffle(slice(indices));
+  Loop (i, TEST_SAMPLES) {
+    mem_free(alloc, arr[indices[i]].data, arr[indices[i]].size);
+  }
+}
+
 void test() {
   ProfFunc;
   // test_sort();
   // os_exit(0);
+  test_alloc();
   test_global_alloc();
   test_arena_alloc();
   test_arena_list_alloc();

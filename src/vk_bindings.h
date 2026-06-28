@@ -10,4 +10,5 @@ enum Bindings {
   PointLights,
   DirLights,
   SpotLights,
+  DrawCtx,
 };

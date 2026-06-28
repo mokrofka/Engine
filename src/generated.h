@@ -14,7 +14,7 @@ MemberDefinition members_of_Entity[] = {
   {MetaType_v3, "scale", OffsetOf(Entity,scale)},
   {MetaType_Rng3, "aabb", OffsetOf(Entity,aabb)},
   {MetaType_v3, "vel", OffsetOf(Entity,vel)},
-  {MetaType_MeshId, "mesh_id", OffsetOf(Entity,mesh_id)},
-  {MetaType_MaterialId, "material_id", OffsetOf(Entity,material_id)},
+  {MetaType_MeshId, "mesh_id", OffsetOf(Entity,mesh)},
+  {MetaType_MaterialId, "material_id", OffsetOf(Entity,mat)},
   {MetaType_v4, "color", OffsetOf(Entity,color)},
 };

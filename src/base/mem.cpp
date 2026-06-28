@@ -24,41 +24,123 @@ const u32 ARENA_DEFAULT_COMMIT_SIZE  = KB(4);
 const u32 ARENA_LIST_BLOCK_SIZE      = KB(64);
 
 ////////////////////////////////////////////////////////////////////////
-// Global allocator
+// Mem track
+
+#if MEM_TRACK
+
+const u32 MaxAllocators = 128;
 
 struct MemState {
   Arena arena;
-  AllocSegList seglist;
+  Mutex mutex;
+  AllocatorInfoList roots;
 
-#if MEM_TRACK
   AllocatorInfo* free;
   AllocatorInfoList list;
-  AllocatorInfo infos[128];
+  Array<AllocatorInfo, MaxAllocators> infos;
   u32 count_alloc;
-#endif
 };
 
-global MemState mem_st;
+global MemState mem_track;
 
-////////////////////////////////////////////////////////////////////////
-// Mem track
+void mem_track_init() {
+  mem_track.mutex = os_mutex_make();
+}
+
+AllocatorInfo* mem_track_get_info(Allocator alloc) {
+  switch (alloc.type) {
+    default: return null;
+    case AllocatorType_Arena: return ((Arena*)alloc.ctx)->info;
+    case AllocatorType_Alloc: return ((Alloc*)alloc.ctx)->info;
+  }
+}
+
+AllocatorInfo* mem_track_register(Allocator parent_alloc, AllocatorType type, String name) {
+  AllocatorInfo* info = mem_track.free;
+  AllocatorInfo* parent = mem_track_get_info(parent_alloc);
+  if (info) {
+    sll_stack_pop(mem_track.free);
+  } else {
+    info = &mem_track.infos[mem_track.count_alloc++];
+  }
+  MemZeroStruct(info);
+  
+  info->type = type;
+  info->thread_idx = tctx_get_idx();
+  str_copy(info->name, name);
+  info->parent = parent;
+
+  LockScope(mem_track.mutex);
+  if (parent) {
+    dll_push_back(parent->first, parent->last, info);
+    ++parent->child_count;
+  } else {
+    dll_push_back(mem_track.roots.first, mem_track.roots.last, info);
+    ++mem_track.roots.count;
+  }
+  return info;
+}
+
+void mem_track_unregister(Allocator alloc) {
+  AllocatorInfo* info = mem_track_get_info(alloc);
+  LockScope(mem_track.mutex);
+  if (info->parent) {
+    dll_remove(info->parent->first, info->parent->last, info);
+    --info->parent->child_count;
+  } else {
+    dll_remove(mem_track.roots.first, mem_track.roots.last, info);
+    --mem_track.roots.count;
+  }
+}
+
+void mem_track_on_alloc(AllocatorInfo* info, u64 size) {
+  atomic_add(&info->pos, size);
+  atomic_add(&info->exclusive_pos, size);
+  atomic_inc(&info->allocs);
+  atomic_inc(&info->current_allocs);
+  if (info->parent) {
+    atomic_add(&info->parent->pos, size);
+  }
+}
+
+void mem_track_on_free(AllocatorInfo* info, u64 size) {
+  atomic_sub(&info->pos, size);
+  atomic_sub(&info->exclusive_pos, size);
+  atomic_inc(&info->frees);
+  atomic_dec(&info->current_allocs);
+  if (info->parent) {
+    atomic_sub(&info->parent->pos, size);
+  }
+}
+
+void mem_track_on_commit(AllocatorInfo* info, u64 size) {
+  atomic_add(&info->cap, size);
+}
+
+AllocatorInfoList mem_track_info() {
+  return mem_track.roots;
+}
+
+#else
+void mem_track_init() {}
+#endif
 
 AllocatorInfo* allocator_info_alloc() {
-  AllocatorInfo* info = mem_st.free;
+  AllocatorInfo* info = mem_track.free;
   if (info) {
-    sll_stack_pop(mem_st.free);
+    sll_stack_pop(mem_track.free);
   } else {
-    info = &mem_st.infos[mem_st.count_alloc++];
+    info = &mem_track.infos[mem_track.count_alloc++];
   }
   MemZeroStruct(info);
   return info;
 }
 
 void allocator_info_free(AllocatorInfo* info) {
-  sll_stack_push(mem_st.free, info);
-  dll_remove(mem_st.list.first, mem_st.list.last, info);
-  dll_list_remove(mem_st.list, info);
-  mem_st.list.count--;
+  sll_stack_push(mem_track.free, info);
+  dll_remove(mem_track.list.first, mem_track.list.last, info);
+  dll_list_remove(mem_track.list, info);
+  mem_track.list.count--;
 }
 
 void allocator_inherit(Allocator parent_, Allocator child_) {
@@ -66,23 +148,8 @@ void allocator_inherit(Allocator parent_, Allocator child_) {
   AllocatorInfo* child = *(AllocatorInfo**)(child_.ctx) = allocator_info_alloc();
   child->parent = parent;
   dll_push_back(parent->first, parent->last, child);
-  ++parent->first_count;
+  ++parent->child_count;
 }
-
-AllocatorInfoList get_allocators_info() {
-  return mem_st.list;
-}
-
-void global_allocator_init() {
-  mem_st.arena = arena_make_named("global allocator's parent");
-  mem_st.seglist = alloc_seglist_make(mem_st.arena, "global allocator");
-}
-
-intern u8* global_alloc(u64 size, u64 align)                                     { return mem_alloc(mem_st.seglist, size, align); }
-intern u8* global_alloc_zero(u64 size, u64 align)                                { return mem_alloc_zero(mem_st.seglist, size, align); }
-intern u8* global_realloc(void* ptr, u64 old_size, u64 new_size, u64 align)      { return mem_realloc(mem_st.seglist, ptr, old_size, new_size, align); }
-intern u8* global_realloc_zero(void* ptr, u64 old_size, u64 new_size, u64 align) { return mem_realloc_zero(mem_st.seglist, ptr, old_size, new_size, align); }
-intern void global_free(void* ptr)                                               { mem_free(mem_st.seglist, ptr); }
 
 ////////////////////////////////////////////////////////////////////////
 // Arena
@@ -101,22 +168,16 @@ Arena arena_make_(String name) {
     .cap = reserve_size,
   };
 #if MEM_TRACK
-  AllocatorInfo* info = allocator_info_alloc();
-  dll_push_back(mem_st.list.first, mem_st.list.last, info);
-  mem_st.list.count++;
-  info->type = AllocatorType_Arena;
-  str_copy(info->name, name);
-  info->res = reserve_size;
-  result.info = info;
+  result.info = mem_track_register({}, AllocatorType_Arena, name);
 #endif
   return result;
 }
 
-void arena_free(Arena* arena) {
+void arena_destroy(Arena* arena) {
   os_release(arena->base, arena->cap);
 #if MEM_TRACK
-  dll_remove(mem_st.list.first, mem_st.list.last, arena->info);
-  --mem_st.list.count;
+  // TODO: traverse tree
+  mem_track_unregister(*arena);
 #endif
 }
 
@@ -124,6 +185,7 @@ void arena_clear(Arena* arena) {
   arena->pos = 0;
   AsanPoisonMemRegion(arena->base, arena->cmt);
 #if MEM_TRACK
+  // TODO: traverse tree
 #endif
 };
 
@@ -137,18 +199,17 @@ intern u8* arena_alloc(Arena* arena, u64 size, u64 align) {
     MemGuardDealloc(Offset(arena->base, arena->cmt), commit_size);
     AsanPoisonMemRegion(Offset(arena->base, arena->cmt), commit_size);
     arena->cmt += commit_size;
+
+#if MEM_TRACK
+    mem_track_on_commit(arena->info, commit_size);
+#endif
   }
   AsanUnpoisonMemRegion(Offset(arena->base, arena->pos), size + pad);
   MemGuardAlloc(Offset(arena->base, arena->pos), size + pad);
   u8* result = Offset(arena->base, pos);
   arena->pos = pos + size;
 #if MEM_TRACK
-  AllocatorInfo* info = arena->info;
-  info->pos = arena->pos;
-  info->exclusive_pos += size;
-  info->cmt = arena->cmt;
-  info->cap = arena->cap;
-  ++info->allocs;
+  mem_track_on_alloc(arena->info, size);
 #endif
   return result;
 }
@@ -267,151 +328,122 @@ intern u8* arena_list_realloc_zero(ArenaList* arena, void* ptr, u64 old_size, u6
 ////////////////////////////////////////////////////////////////////////
 // Segregated pow2 list
 
-struct PoolFreeNode {
-  PoolFreeNode* next;
-};
-
-struct MemPoolPow2 {
-  PoolFreeNode* head;
-};
-
-struct SegListHeader {
-#if MEM_GUARD
-  u64 size;
-  u32 guard;
+struct AllocHeader {
+#if BUILD_DEBUG
+  u32 head_guard;
+  u32 size;
 #endif
-  u32 pad;
+  u32 off;
 };
 
-AllocSegList::operator Allocator() { return {.type = AllocatorType_SegList, .ctx = this}; }
+Alloc::operator Allocator() { return {.type = AllocatorType_Alloc, .ctx = this};}
 
-AllocSegList alloc_seglist_make(Allocator alloc, String name) {
-  AllocSegList res = {}; res.alloc = alloc;
+Alloc alloc_make(Allocator alloc) {
+  Alloc res = {
+    .alloc = alloc,
+  };
 #if MEM_TRACK
-  allocator_inherit(alloc, res);
-  res.info->type = AllocatorType_SegList;
-  str_copy(res.info->name, name);
+  res.info = mem_track_register(alloc, AllocatorType_Alloc, {});
 #endif
   return res;
 }
 
-// NOTE: memory: header + pad -> u8* memory -> u32 tail_guard
-intern u8* seglist_alloc(AllocSegList* alloc, u64 size, u64 align) {
-  Assert(size > 0);
-#if MEM_GUARD
-  u64 alloc_size = sizeof(void*) + sizeof(SegListHeader) + align + size + sizeof(u32);
-  u64 pow2_size = next_pow2(alloc_size);
-  u64 pool_idx = ctz(pow2_size) - ctz(8);
-  MemPoolPow2& p = *(MemPoolPow2*)&alloc->pools[pool_idx];
-  if (p.head == null) {
-    // u8* buf = mem_alloc(alloc->alloc, sizeof(u32) + pow2_size); // NOTE: I don't remember for what sizeof(u32) here is
-    u8* buf = mem_alloc(alloc->alloc, pow2_size);
-    *(u32*)buf = pool_idx;
-    u8* result_no_aligned = Offset(buf+sizeof(u32)+sizeof(void*), sizeof(SegListHeader));
-    u8* result = (u8*)AlignUp(((u64)result_no_aligned), align);
-    SegListHeader* header = (SegListHeader*)OffsetBack(result, sizeof(SegListHeader));
-    *header = {
-      .size = size,
-      .guard = MEM_ALLOC_HEADER_GUARD,
-      .pad = (u32)PtrDiff(result, buf),
-    };
-    u32* tail = (u32*)Offset(result, size);
-    *tail = MEM_ALLOC_TAIL_GUARD;
-    MemGuardDealloc(Offset(result, size+sizeof(u32)), pow2_size - alloc_size);
-    AsanPoisonMemRegion(Offset(result, size+sizeof(u32)), pow2_size - alloc_size);
-#if MEM_TRACK
-    AllocatorInfo* info = alloc->info;
-    info->pos += pow2_size;
-    info->cap += pow2_size;
-    info->parent->exclusive_pos -= pow2_size;
-    ++info->allocs;
-    ++info->current_allocs;
-#endif
-    return result;
-  }
-  PoolFreeNode* alloc_buff = p.head;
-  p.head = p.head->next;
-  AsanUnpoisonMemRegion(alloc_buff, alloc_size);
-  u8* result_no_aligned = Offset(Offset(alloc_buff,sizeof(void*)), sizeof(SegListHeader));
-  u8* result = (u8*)AlignUp(((u64)result_no_aligned), align);
-  SegListHeader* header = (SegListHeader*)OffsetBack(result, sizeof(SegListHeader));
-  *header = {
-    .size = size,
-    .guard = MEM_ALLOC_HEADER_GUARD,
-    .pad = (u32)PtrDiff(result, OffsetBack(alloc_buff, sizeof(u32))),
-  };
-  u32* tail = (u32*)Offset(result, size);
-  *tail = MEM_ALLOC_TAIL_GUARD;
-  MemGuardAlloc(result, size);
-#if MEM_TRACK
-  AllocatorInfo* info = alloc->info;
-  info->pos += pow2_size;
-  ++info->allocs;
-  ++info->current_allocs;
-#endif
-  return result;
-#else
-  // size = size + alignment;
-  // u64 pow2_size = next_pow2(size);
-  // u64 pool_index = ctz64(pow2_size) - ctz64(8);
-  // MemPoolPow2& p = allocator.pools[pool_index];
-  // if (p.head == null) {
-  //   u8* result = push_buffer(allocator.arena, pow2_size, alignment);
-  //   *(u32*)result = pool_index;
-  //   u32* index = (u32*)OffsetBack(result, sizeof(u32));
-  //   *index = pool_index;
-  //   return result;
-  // }
-  // PoolFreeNode* result = p.head;
-  // p.head = p.head->next;
-#endif
-};
+void alloc_destroy(Allocator alloc) {
+  mem_track_unregister(alloc);
+}
 
-intern u8* seglist_alloc_zero(AllocSegList* alloc, u64 size, u64 align) {
-  u8* result = seglist_alloc(alloc, size, align);
+u8* intern_alloc(Alloc* alloc, u64 size) {
+  Assert(size > 7);
+  u64 pow2_size = next_pow2(size);
+  u64 pool_idx = ctz(pow2_size) - ctz(8);
+  MemNode* p = alloc->pools[pool_idx].next;
+  if (p == null) {
+    u8* buf = mem_alloc(alloc->alloc, pow2_size);
+#if MEM_TRACK
+    mem_track_on_commit(alloc->info, pow2_size);
+    mem_track_on_alloc(alloc->info, pow2_size);
+#endif
+    return buf;
+  }
+  sll_stack_pop(alloc->pools[pool_idx].next);
+  AsanUnpoisonMemRegion(p, pow2_size);
+  MemGuardAlloc(p, pow2_size);
+#if MEM_TRACK
+  mem_track_on_alloc(alloc->info, size);
+#endif
+  return (u8*)p;
+}
+
+void intern_free(Alloc* alloc, void* ptr, u64 size) {
+  Assert(size > 7);
+  u64 pow2_size = next_pow2(size);
+  u64 pool_idx = ctz(pow2_size) - ctz(8);
+  MemNode* p = (MemNode*)ptr;
+  sll_stack_push(alloc->pools[pool_idx].next, p);
+  MemGuardDealloc(Offset(p, sizeof(void*)), pow2_size - sizeof(void*));
+  AsanPoisonMemRegion(Offset(p, sizeof(void*)), pow2_size - sizeof(void*));
+#if MEM_TRACK
+  mem_track_on_free(alloc->info, size);
+#endif
+}
+
+// mem block: align_pad -> header -> mem
+u8* intern_alloc_align(Alloc* alloc, u64 size, u64 align) {
+  u64 alloc_size = align+sizeof(AllocHeader)+size;
+  u8* raw = intern_alloc(alloc, alloc_size);
+  u8* user = PtrAlignUp(raw+sizeof(AllocHeader), align);
+  AllocHeader* h = OffsetBackStruct(user, AllocHeader);
+  h->off = user - raw;
+  return user;
+}
+
+void intern_free_align(Alloc* alloc, void*ptr, u64 size) {
+  AllocHeader* h = OffsetBackStruct(ptr, AllocHeader);
+  u8* raw = OffsetBack(ptr, h->off);
+  u64 raw_size = size + PtrDiff(ptr, raw);
+  intern_free(alloc, raw, raw_size);
+}
+
+// mem block: align_pad -> header -> mem -> u32 tail guard
+u8* alloc_alloc(Alloc* alloc, u64 size, u64 align) {
+  u64 alloc_size = size + sizeof(u32);
+  u8* res = intern_alloc_align(alloc, alloc_size, align);
+  AllocHeader* h = OffsetBackStruct(res, AllocHeader);
+  h->head_guard = MEM_ALLOC_HEADER_GUARD;
+  h->size = size;
+  *OffsetAs(res, u32, size) = MEM_ALLOC_TAIL_GUARD;
+  return res;
+}
+
+u8* alloc_alloc_zero(Alloc* alloc, u64 size, u64 align)  {
+  u8* result = alloc_alloc(alloc, size, align);
   MemZero(result, size);
   return result;
 }
 
-intern void seglist_free(AllocSegList* alloc, void* ptr) {
-  Assert(ptr);
-#if MEM_GUARD
-  SegListHeader* header = (SegListHeader*)OffsetBack(ptr, sizeof(SegListHeader));
-  Assert(header->guard == MEM_ALLOC_HEADER_GUARD);
-  header->guard = MEM_DEALLOC_HEADER_GUARD;
-  u32* tail = OffsetAs(ptr, u32, header->size);
+void alloc_free(Alloc* alloc, void* ptr, u64 size) {
+  AllocHeader* h = OffsetBackStruct(ptr, AllocHeader);
+  Assert(h->head_guard == MEM_ALLOC_HEADER_GUARD);
+  Assert(h->size == size);
+  u32* tail = OffsetAs(ptr, u32, size);
   Assert(*tail == MEM_ALLOC_TAIL_GUARD);
-  u32* pool_idx = (u32*)OffsetBack(ptr, header->pad);
-  MemPoolPow2& p = *(MemPoolPow2*)&alloc->pools[*pool_idx];
-  MemGuardDealloc(ptr, header->size+sizeof(u32));
-  AsanPoisonMemRegion(ptr, header->size+sizeof(u32));
-  PoolFreeNode* node = (PoolFreeNode*)Offset(pool_idx, sizeof(u32));
-	node->next = p.head;
-	p.head = node;
-
-#if MEM_TRACK
-  AllocatorInfo* info = alloc->info;
-  u64 pow2_size = 8 << *pool_idx;;
-  info->pos -= pow2_size;
-  ++info->frees;
-  --info->current_allocs;
-#endif
-#endif
+  h->head_guard = MEM_DEALLOC_HEADER_GUARD;
+  intern_free_align(alloc, ptr, size + sizeof(u32));
 }
 
-intern u8* seglist_realloc(AllocSegList* alloc, void* ptr, u64 old_size, u64 new_size, u64 align) {
-  u8* result = seglist_alloc(alloc, new_size, align);
-  MemCopy(result, ptr, old_size);
-  seglist_free(alloc, ptr);
-  return result;
+u8* alloc_realloc(Alloc* alloc, void* ptr, u64 old_size, u64 new_size, u64 align) {
+  u8* res = alloc_alloc(alloc, new_size, align);
+  MemCopy(res, ptr, old_size);
+  alloc_free(alloc, ptr, old_size);
+  return res;
 }
 
-intern u8* seglist_realloc_zero(AllocSegList* alloc, void* ptr, u64 old_size, u64 new_size, u64 align) {
-  u8* result = seglist_alloc(alloc, new_size, align);
-  MemCopy(result, ptr, old_size);
-  MemZero(Offset(result, old_size), new_size - old_size);
-  seglist_free(alloc, ptr);
-  return result;
+u8* alloc_realloc_zero(Alloc* alloc, void* ptr, u64 old_size, u64 new_size, u64 align) {
+  u8* res = alloc_alloc(alloc, new_size, align);
+  MemCopy(res, ptr, old_size);
+  MemZero(Offset(res, old_size), new_size - old_size);
+  alloc_free(alloc, ptr, old_size);
+  return res;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -487,46 +519,46 @@ intern u8* seglist_realloc_zero(AllocSegList* alloc, void* ptr, u64 old_size, u6
 u8* mem_alloc(Allocator alloc, u64 size, u64 align) {
   switch (alloc.type) {
     case AllocatorType_None: InvalidPath;
-    case AllocatorType_Global:    return global_alloc(size, align);
+    // case AllocatorType_Global:    return global_alloc(size, align);
     case AllocatorType_Arena:     return arena_alloc((Arena*)alloc.ctx, size, align);
     case AllocatorType_ArenaList: return arena_list_alloc((ArenaList*)alloc.ctx, size, align);
-    case AllocatorType_SegList:   return seglist_alloc((AllocSegList*)alloc.ctx, size, align);
+    case AllocatorType_Alloc:     return alloc_alloc((Alloc*)alloc.ctx, size, align);
   }
 }
 u8* mem_alloc_zero(Allocator alloc, u64 size, u64 align) {
   switch (alloc.type) {
     case AllocatorType_None: InvalidPath;
-    case AllocatorType_Global:    return global_alloc_zero(size, align);
+    // case AllocatorType_Global:    return global_alloc_zero(size, align);
     case AllocatorType_Arena:     return arena_alloc_zero((Arena*)alloc.ctx, size, align);
     case AllocatorType_ArenaList: return arena_list_alloc((ArenaList*)alloc.ctx, size, align);
-    case AllocatorType_SegList:   return seglist_alloc_zero((AllocSegList*)alloc.ctx, size, align);
+    case AllocatorType_Alloc:     return alloc_alloc_zero((Alloc*)alloc.ctx, size, align);
   }
 }
 u8* mem_realloc(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 align) {
   switch (alloc.type) {
     case AllocatorType_None: InvalidPath;
-    case AllocatorType_Global:    return global_realloc(ptr, old_size, new_size, align);
+    // case AllocatorType_Global:    return global_realloc(ptr, old_size, new_size, align);
     case AllocatorType_Arena:     return arena_realloc((Arena*)alloc.ctx, ptr, old_size, new_size, align);
     case AllocatorType_ArenaList: return arena_list_realloc((ArenaList*)alloc.ctx, ptr, old_size, new_size, align);
-    case AllocatorType_SegList:   return seglist_realloc((AllocSegList*)alloc.ctx, ptr, old_size, new_size, align);
+    case AllocatorType_Alloc:     return alloc_realloc((Alloc*)alloc.ctx, ptr, old_size, new_size, align);
   }
 }
 u8* mem_realloc_zero(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 align) {
   switch (alloc.type) {
     case AllocatorType_None: InvalidPath;
-    case AllocatorType_Global:    return global_realloc_zero(ptr, old_size, new_size, align);
+    // case AllocatorType_Global:    return global_realloc_zero(ptr, old_size, new_size, align);
     case AllocatorType_Arena:     return arena_realloc_zero((Arena*)alloc.ctx, ptr, old_size, new_size, align);
     case AllocatorType_ArenaList: return arena_list_realloc_zero((ArenaList*)alloc.ctx, ptr, old_size, new_size, align);
-    case AllocatorType_SegList:   return seglist_realloc_zero((AllocSegList*)alloc.ctx, ptr, old_size, new_size, align);
+    case AllocatorType_Alloc:     return alloc_realloc_zero((Alloc*)alloc.ctx, ptr, old_size, new_size, align);
   }
 }
-void mem_free(Allocator alloc, void* ptr) {
+void mem_free(Allocator alloc, void* ptr, u64 size) {
   switch (alloc.type) {
     case AllocatorType_None: InvalidPath;
-    case AllocatorType_Global:    return global_free(ptr);
+    // case AllocatorType_Global:    return global_free(ptr, size);
     case AllocatorType_Arena:     return;
     case AllocatorType_ArenaList: return;
-    case AllocatorType_SegList:   return seglist_free((AllocSegList*)alloc.ctx, ptr);
+    case AllocatorType_Alloc:     return alloc_free((Alloc*)alloc.ctx, ptr, size);
   }
 }
 
@@ -580,84 +612,78 @@ u64 gpu_alloc_seglist_get(GpuAllocSegList& a, GpuMemId h) {
 ////////////////////////////////////////////////////////////////////////
 // Utils
 
-u8* mem_alloc_soa(Allocator alloc, u32 count, Slice<SoA_Field> fields) {
-  u64 mem_offset = 0;
-  u64 offsets[10] = {};
+struct SoALayout {
+  u64 size;
+  u64 offsets[8];
+};
+
+u64 mem_soa_size(u32 count, Slice<SoA_Field> fields) {
+  u64 off = 0;
   Loop (i, fields.count) {
-    mem_offset = AlignUp(mem_offset, fields[i].align);
-    offsets[i] = mem_offset;
-    mem_offset += fields[i].elem_size * count;
+    SoA_Field field = fields[i];
+    offset_push(off, field.elem_size*count, field.align);
   }
-  u64 alloc_size = mem_offset;
-  u8* buf = mem_alloc(alloc, alloc_size, fields[0].align);
+  return off;
+}
+
+SoALayout mem_soa_layout(u32 count, Slice<SoA_Field> fields) {
+  SoALayout res = {};
   Loop (i, fields.count) {
-    void* new_ptr = Offset(buf, offsets[i]);
-    *(fields[i].dst_ptr) = new_ptr;
+    SoA_Field field = fields[i];
+    res.offsets[i] = offset_push(res.size, field.elem_size*count, field.align);
+  }
+  return res;
+}
+
+u8* mem_alloc_soa(Allocator alloc, u32 count, Slice<SoA_Field> fields) {
+  SoALayout layout = mem_soa_layout(count, fields);
+  u8* buf = mem_alloc(alloc, layout.size, fields[0].align);
+  Loop (i, fields.count) {
+    *(fields[i].dst_ptr) = Offset(buf, layout.offsets[i]);
   }
   return buf;
 }
 
 u8* mem_realloc_soa(Allocator alloc, u32 old_count, u32 new_count, Slice<SoA_Field> fields) {
   void* old_ptr = *fields[0].dst_ptr;
-  u64 mem_offset = 0;
-  u64 offsets[10] = {};
-  Loop (i, fields.count) {
-    mem_offset = AlignUp(mem_offset, fields[i].align);
-    offsets[i] = mem_offset;
-    mem_offset += fields[i].elem_size * new_count;
-  }
-  u64 new_size = mem_offset;
-  u8* buf = mem_alloc(alloc, new_size, fields[0].align);
+  SoALayout layout = mem_soa_layout(new_count, fields);
+  u8* buf = mem_alloc(alloc, layout.size, fields[0].align);
   Loop (i, fields.count) {
     void* old_ptr = *(fields[i].dst_ptr);
-    void* new_ptr = Offset(buf, offsets[i]);
+    void* new_ptr = Offset(buf, layout.offsets[i]);
     u64 old_ptr_size = fields[i].elem_size * old_count;
     MemCopy(new_ptr, old_ptr, old_ptr_size);
     *(fields[i].dst_ptr) = new_ptr;
   }
-  mem_free(alloc, old_ptr);
+  mem_free(alloc, old_ptr, mem_soa_size(old_count, fields));
   return buf;
 }
 
 u8* mem_alloc_soa_zero(Allocator alloc, u32 count, Slice<SoA_Field> fields) {
-  u64 mem_offset = 0;
-  u64 offsets[10] = {};
+  SoALayout layout = mem_soa_layout(count, fields);
+  u8* buf = mem_alloc_zero(alloc, layout.size, fields[0].align);
   Loop (i, fields.count) {
-    mem_offset = AlignUp(mem_offset, fields[i].align);
-    offsets[i] = mem_offset;
-    mem_offset += fields[i].elem_size * count;
-  }
-  u64 alloc_size = mem_offset;
-  u8* buf = mem_alloc_zero(alloc, alloc_size, fields[0].align);
-  Loop (i, fields.count) {
-    void* new_ptr = Offset(buf, offsets[i]);
-    *(fields[i].dst_ptr) = new_ptr;
+    *(fields[i].dst_ptr) = Offset(buf, layout.offsets[i]);
   }
   return buf;
 }
 
 u8* mem_realloc_soa_zero(Allocator alloc, u32 old_count, u32 new_count, Slice<SoA_Field> fields) {
   void* old_ptr = *fields[0].dst_ptr;
-  u64 mem_offset = 0;
-  u64 offsets[10] = {};
-  Loop (i, fields.count) {
-    mem_offset = AlignUp(mem_offset, fields[i].align);
-    offsets[i] = mem_offset;
-    mem_offset += fields[i].elem_size * new_count;
-  }
-  u64 new_size = mem_offset;
-  u8* buf = mem_alloc_zero(alloc, new_size, fields[0].align);
+  SoALayout layout = mem_soa_layout(new_count, fields);
+  u8* buf = mem_alloc_zero(alloc, layout.size, fields[0].align);
+  u64 old_size = mem_soa_size(old_count, fields);
+  MemZero(Offset(buf, old_size), layout.size - old_size);
   Loop (i, fields.count) {
     void* old_ptr = *(fields[i].dst_ptr);
-    void* new_ptr = Offset(buf, offsets[i]);
+    void* new_ptr = Offset(buf, layout.offsets[i]);
     u64 old_ptr_size = fields[i].elem_size * old_count;
     MemCopy(new_ptr, old_ptr, old_ptr_size);
     *(fields[i].dst_ptr) = new_ptr;
   }
-  mem_free(alloc, old_ptr);
+  mem_free(alloc, old_ptr, old_size);
   return buf;
 }
-
 
 u8* offset_ptr_push(void*& offset, u64 size, u64 align) {
   u8* result = PtrAlignUp(offset, align);

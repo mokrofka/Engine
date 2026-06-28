@@ -101,6 +101,12 @@ struct R_FontData {
 ///////////////////////////////////
 // Gpu memory layout
 
+struct R_DrawCallDataGPU {
+  alignas(16) mat4 model;
+  alignas(16) v4 color;
+  u32 tex;
+};
+
 struct R_EntityGPU {
   alignas(16) mat4 model;
   alignas(16) v4 color;
@@ -154,15 +160,25 @@ struct R_MeshPush {
   EntityId id;
   R_Mesh mesh;
   R_Material material;
+  u8 b[32];
 };
 
-struct R_EntityBatch {
+struct R_DrawCallData {
+  v3 pos;
+  v4 rot;
+  v3 scale;
+  v4 color;
+  R_Mesh mesh;
+  R_Material mat;
+};
+
+struct R_DrawBatch {
   Gfx_Pipeline pip;
-  Darray<R_MeshPush> pushed_meshes;
-  Darray<R_MeshPush> pushed_meshes_unindexed;
+  Darray<R_DrawCallData> draws;
+  Darray<R_DrawCallData> draws_unindexed;
 };
 
-R_EntityBatch r_entity_batch_make(Allocator alloc, Gfx_Pipeline pip);
+R_DrawBatch r_draw_batch_make(Allocator alloc, Gfx_Pipeline pip);
 
 struct R_ShaderModuleEntry {
   Gfx_Shader shd;
@@ -230,7 +246,8 @@ struct R_AsyncMesh {
 
 struct R_State {
   Arena arena;
-  AllocSegList gpa;
+  // Alloc gpa;
+  Alloc gpa;
   
   f32 scale;
   f32 old_scale;
@@ -239,7 +256,7 @@ struct R_State {
   Map<String, u32, Gfx_MaxShaders> shader_to_module_idx;
   Map<R_KeyToShaderPipeline, Gfx_Pipeline, Gfx_MaxPipelines> shader_to_pipeline;
   Pool<R_MaterialData, R_MaxMaterials, R_Material> materials;
-  Array<R_EntityBatch, Gfx_MaxShaders> entity_batches;
+  Array<R_DrawBatch, Gfx_MaxShaders> entity_batches;
   Map<u32, u32, Gfx_MaxPipelines> pip_idx_to_entity_batch_idx;
 
   Pool<Gfx_Mesh, R_MaxMeshes, R_Mesh> meshes;
@@ -282,10 +299,12 @@ struct R_State {
   Gfx_Buffer gpu_entities_buf;
   Gfx_Buffer gpu_entities_indices_buf;
   Gfx_Buffer gpu_materials_buf;
+  Gfx_Buffer gpu_drawcall_ctx_buf;
   R_GlobalStateGPU* gpu_global;
   R_EntityGPU* gpu_entities;
   u32* gpu_entities_indices;
   R_MaterialGPU* gpu_materials;
+  R_DrawCallDataGPU* gpu_drawcall;
 
   Slice<OS_Handle> shader_module_compilation_pids;
   Slice<String> shaders_to_compile;
@@ -327,8 +346,9 @@ void r_shutdown();
 void r_begin();
 void r_end();
 
-void r_set_entity_color(EntityId entity_handle, v4 color);
-void r_push_mesh(EntityId id, R_Mesh mesh, R_Material material);
+void r_draw_mesh(R_Mesh mesh, R_Material mat, v3 pos);
+void r_draw_mesh_trs(R_Mesh mesh, R_Material mat, v3 pos, v4 rot, v3 scale);
+void r_draw_entity(EntityId id);
 
 void r_debug_line(v3 a, v3 b, v4 color);
 void r_debug_line_persistent(v3 a, v3 b, v4 color);
