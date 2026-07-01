@@ -1,0 +1,15 @@
+#ifndef NO_IMPORT_LIB
+import com;
+#endif
+
+#define global static
+
+#define KB(n) ((n) << 10)
+#define MB(n) ((n) << 20)
+
+#define Loop(it, c) for (i32 it = 0; it < c; ++it)
+
+#define VS_Entry [shader("vertex")]
+#define FS_Entry [shader("fragment")]
+#define CS_Entry [shader("compute")]
+

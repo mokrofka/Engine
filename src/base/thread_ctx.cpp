@@ -1,0 +1,48 @@
+#include "thread_ctx.h"
+
+struct TCTX {
+  Arena arenas[2];
+  u32 id;
+  b32 role;
+};
+
+global thread_local TCTX tctx;
+global u32 _next_thread_id;
+
+u32 tctx_get_idx() {
+  return tctx.id;
+}
+
+void tctx_init() {
+  tctx.arenas[0] = arena_make();
+  tctx.arenas[1] = arena_make();
+  tctx.id = atomic_inc(&_next_thread_id);
+}
+
+intern Temp tctx_get_scratch() {
+  Arena* arena = &tctx.arenas[0];
+  return temp_begin(arena);
+}
+
+intern Temp tctx_get_scratch_conflict(Allocator conflict) {
+  Arena* arena_conflict = (Arena*)conflict.ctx;
+  Arena* arena_result = {};
+  for (Arena& arena : tctx.arenas) {
+    b32 is_conflicting_arena = false;
+    if (arena.base == arena_conflict->base) {
+      is_conflicting_arena = true;
+    }
+    if (!is_conflicting_arena) {
+      arena_result = &arena;
+      break;
+    }
+  }
+  return temp_begin(arena_result);
+}
+
+Scratch::operator Allocator()        { return {.type = AllocatorType_Arena, .ctx = temp.arena}; }
+Scratch::Scratch()                   { temp = tctx_get_scratch(); }
+Scratch::Scratch(Allocator conflict) { temp = tctx_get_scratch_conflict(conflict); }
+Scratch::~Scratch()                  { temp_end(temp); }
+
+
