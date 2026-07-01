@@ -143,6 +143,10 @@ void debug_game() {
         debug_window_toggle_fullscreen(win);
       }
     }
+    ImGui::DragFloat("x rot", &g.euler.x, 1);
+    ImGui::DragFloat("y rot", &g.euler.y, 1);
+    ImGui::DragFloat("z rot", &g.euler.z, 1);
+    ImGui::DragFloat3("point", g.point.v, 0.1);
 
     ImGui::Text("entities: %u", g.entities_count);
     ImGui::DragFloat("speed", &cam.speed, 1);

@@ -2,11 +2,15 @@
 
 VS_Entry VSOutput vs_main(VSInput in) {
   VSOutput o;
-  mat4 view = g.view;
-  view[0][3] = 0;
+  mat4 view = st().view;
+  view[0][3] = 0; //
   view[1][3] = 0;
   view[2][3] = 0;
-  v4 pos = g.projection * view * v4(in.pos, 1);
+
+  // view[3][0] = 0; //
+  // view[3][1] = 0;
+  // view[3][2] = 0;
+  v4 pos = st().projection * view * v4(in.pos, 1);
   o.pos = v4(pos.xy, pos.w, pos.w);
   o.color = v4(in.pos, 1);
   return o;

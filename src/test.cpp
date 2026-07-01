@@ -62,7 +62,7 @@ intern void test_arena_alloc() {
       AssertAlways(buf[j] == value);
     }
   }
-  arena_destroy(&arena);
+  arena_destroy(arena);
 }
 
 intern void test_arena_list_alloc() {
@@ -146,7 +146,7 @@ intern void test_seglist_alloc() {
   Loop (i, TEST_SAMPLES) {
     mem_free(alloc, arr[indices[i]].data, arr[indices[i]].size);
   }
-  arena_destroy(&arena);
+  arena_destroy(arena);
 }
 
 intern void test_gpu_seglist_alloc() {

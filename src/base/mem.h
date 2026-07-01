@@ -100,8 +100,8 @@ struct Arena {
 #define arena_make(...) arena_make_(__func__)
 Arena arena_make_named(String name);
 Arena arena_make_(String name);
-void  arena_destroy(Arena* arena);
-void  arena_clear(Arena* arena);
+void  arena_destroy(Arena& arena);
+void  arena_clear(Arena& arena);
 
 struct Temp {
   Arena* arena;

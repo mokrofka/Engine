@@ -164,24 +164,9 @@ R_Texture r_texture_load(String name) {
 
 R_Texture r_texture_load_async(String name) {
   var& g = st->r;
-  R_Texture res = pool_push(g.textures, {});
-  R_TextureData& data = pool_get(g.textures, res);
-  // R_TextureData dummy_data = pool_get(g.textures, g.dummy_texture);
-  // data = dummy_data;
 
-  {
-    Scratch scratch;
-    u32 pixels[] = {1,0,1,0};
-    data.width = 2;
-    data.height = 2;
-    LockScope(g.async_stage_mutex);
-    data.image = gfx_image_make({
-      .width = 2,
-      .height = 2,
-      .data = (u8*)pixels,
-    }),
-    data.view = gfx_view_make({.texture = {.image = data.image}});
-  }
+  R_TextureData tex = pool_get(g.textures, g.dummy_texture);
+  R_Texture res = pool_push(g.textures, tex);
 
   struct Ctx {
     String name;
@@ -196,27 +181,15 @@ R_Texture r_texture_load_async(String name) {
     var& g = st->r;
     Ctx* data = (Ctx*)ctx;
     Texture texture = r_image_load(data->name);
-    {
-      LockScope(g.async_stage_mutex);
-      R_TextureData& img_data = pool_get(g.textures, data->tex);
-      gfx_image_update(img_data.image, {
-        .width = texture.width,
-        .height = texture.height,
-        .data = texture.data, 
-        .mipmaps = true,
-      });
-      gfx_view_update(img_data.view, {.texture.image = img_data.image});
-    }
-    // R_TextureData tex = {};
-    // LockScope(g.async_stage_mutex);
-    // tex.image = gfx_image_make({
-    //   .width = texture.width,
-    //   .height = texture.height,
-    //   .data = texture.data,
-    //   .mipmaps = true,
-    // }),
-    // tex.view = gfx_view_make({.texture = {.image = tex.image}});
-    // pool_get(g.textures, data->tex) = tex;
+    LockScope(g.async_stage_mutex);
+    R_TextureData& img_data = pool_get(g.textures, data->tex);
+    img_data.image = gfx_image_make({
+      .width = texture.width,
+      .height = texture.height,
+      .data = texture.data,
+      .mipmaps = true,
+    }),
+    img_data.view = gfx_view_make({.texture = {.image = img_data.image}});
   }});
   return res;
 }
@@ -395,14 +368,13 @@ R_Material r_material_make(MaterialDesc desc) {
   }
   u32 batch_idx = batch_idx_r;
   R_Texture texture_id = map_get(st->str_to_texture_id, desc.texture);
-  u32 texture_descriptor_idx = 0;
-  if (pool_is_valid_handle(g.textures, texture_id)) {
-    texture_descriptor_idx = r_texture_get_descriptor_idx(texture_id);
+  if (!pool_is_valid_handle(g.textures, texture_id)) {
+    texture_id = g.dummy_texture;
   }
   R_MaterialData mat = {
     .desc = desc,
     .entity_batch_idx = batch_idx,
-    .texture_descriptor_idx = texture_descriptor_idx,
+    .tex = texture_id,
   };
   R_Material res = pool_push(g.materials, mat);
   g.gpu_materials[res.idx] = {
@@ -410,7 +382,7 @@ R_Material r_material_make(MaterialDesc desc) {
     .diffuse = desc.props.diffuse,
     .specular = desc.props.specular,
     .shininess = desc.props.shininess, 
-    .texture_idx = texture_descriptor_idx,
+    .tex = r_texture_get_descriptor_idx(texture_id),
   };
   return res;
 }
@@ -543,6 +515,7 @@ void r_shaders_compile(Allocator arena) {
     str_list_push(scratch, &list, f.file_path);
     str_list_push(scratch, &list, "-target");
     str_list_push(scratch, &list, "spirv");
+    str_list_push(scratch, &list, "-O0");
     str_list_push(scratch, &list, "-g");
     str_list_push(scratch, &list, "-o");
     str_list_push(scratch, &list, f.compiled_file_path);
@@ -564,15 +537,11 @@ void r_shaders_compile_join() {
   }
 }
 
-R_Font r_font_load(String path, f32 size) {
+R_Font r_font_load(String name, f32 size) {
   Scratch scratch;
   var& g = st->r;
+  String path = push_strf(scratch, "%s/%s/%s", st->asset_dir, String("fonts"), name);
   Slice data = os_file_path_read_all(scratch, path);
-  // stbtt_fontinfo info;
-  // if (!stbtt_InitFont(&info, data.data, 0)) {
-  //   InvalidPath;
-  // }
-  // stbtt_FindGlyphIndex(&info, 'A');
 
   u32 width = 512;
   u32 height = 512;
@@ -729,7 +698,7 @@ void r_init() {
   g.ui_pip = r_pipeline_make("ui", {});
   g.font_pip = r_pipeline_make("font", {});
 
-  g.my_font = r_font_load(push_strf(scratch, "%s/%s", st->asset_dir, String("fonts/arial.ttf")), 32);
+  g.my_font = r_font_load("arial.ttf", 32);
   Info("Renderer initialized");
 }
 
@@ -765,6 +734,28 @@ void r_end() {
     g.draw_base_rects /= sizeof(Vertex);
   }
 
+  {
+    R_GlobalStateGPU& gpu_st = *g.gpu_global;
+    gpu_st.projection_view = st->projection * st->view;
+    gpu_st.projection = st->projection;
+    gpu_st.view = st->view;
+    gpu_st.ambient_color = st->ambient_color;
+
+    u32 idx = 0;
+    LoopINode (i, g.materials.first, g.materials.data) {
+      var& mat = g.materials.data[i].elem;
+      mat.idx = idx;
+      MaterialProps props = mat.desc.props;
+      g.gpu_materials[idx++] = {
+        .ambient = props.ambient,
+        .diffuse = props.diffuse,
+        .specular = props.specular,
+        .shininess = props.shininess,
+        .tex = pool_get(g.textures, mat.tex).view.idx,
+      };
+    }
+  }
+
   ///////////////////////////////////
   // World
   {
@@ -775,11 +766,6 @@ void r_end() {
 
       gfx_bind_vert();
       gfx_bind_index();
-
-      R_GlobalStateGPU& shader_st = *g.gpu_global;
-      shader_st.projection_view = st->projection * st->view;
-      shader_st.projection = st->projection;
-      shader_st.view = st->view;
 
       u32 drawcall_count = 0;
       Loop (i, g.entity_batches.count) {
@@ -797,11 +783,13 @@ void r_end() {
           }
         };
         var process_push = [&](R_DrawCallData push) {
-          mat4 model = mat4_translate(push.pos) * quat_to_mat4(push.rot) * mat4_scale(push.scale);
+          // mat4 model = mat4_translate(push.pos) * quat_to_mat4(push.rot) * mat4_scale(push.scale);
+          mat4 model = mat4_translate(push.pos) * mat4_from_quat(push.rot) * mat4_scale(push.scale);
+          var mat = pool_get(g.materials, push.mat);
           g.gpu_drawcall[drawcall_count] = {
             .model = model,
-            .tex = pool_get(g.materials, push.mat).texture_descriptor_idx,
             .color = push.color,
+            .mat = mat.idx,
           };
         };
         var emit_batch = [&](Slice<R_DrawCallData> pushes, b32 indexed) {
@@ -823,8 +811,8 @@ void r_end() {
       }
 
       // Hello world
-      gfx_pipeline_bind(g.triangle_pip);
-      gfx_draw(0, 3);
+      // gfx_pipeline_bind(g.triangle_pip);
+      // gfx_draw(0, 3);
 
       // Debug drawing
       gfx_bind_vert(Gfx_MemType_Cpu);
@@ -855,42 +843,44 @@ void r_end() {
       // Font
       {
         gfx_apply_viewport(rng2_make(v2_zero(), v2_of_v2u(os_get_window_size())));
-        v4 color = ColorWhite;
-        R_FontData& font = pool_get(g.fonts, g.my_font);
-        String str = "so cool!";
-        f32 pen_x = 100;
-        f32 pen_y = 1000;
-        Loop (i, str.size) {
-          u8 c = str.str[i];
-          R_Glyph& glyph = font.glyphs[c - 32];
-
-          // screen pos
-          f32 y0 = pen_y + glyph.yoff;
-          f32 x0 = pen_x + glyph.xoff;
-          f32 x1 = x0 + (glyph.x1 - glyph.x0);
-          f32 y1 = y0 + (glyph.y1 - glyph.y0);
-
-          // advance cursor
-          pen_x += glyph.xadvance;
-
-          // uv
-          f32 u0 = glyph.x0 / (f32)512;
-          f32 v0 = glyph.y0 / (f32)512;
-          f32 u1 = glyph.x1 / (f32)512;
-          f32 v1 = glyph.y1 / (f32)512;
-
-          v3 min = v2_to_v3(v2_remap_01_to_11(v2(x0, y0), v2_of_v2u(os_get_window_size())), 0);
-          v3 max = v2_to_v3(v2_remap_01_to_11(v2(x1, y1), v2_of_v2u(os_get_window_size())), 0);
-          Vertex vert[] = {
-            {.pos = min,                 .uv = v2(u0,v0), .color = color},
-            {.pos = v3(min.x, max.y, 0), .uv = v2(u0,v1), .color = color},
-            {.pos = max,                 .uv = v2(u1,v1), .color = color},
-            {.pos = max,                 .uv = v2(u1,v1), .color = color},
-            {.pos = v3(max.x, min.y, 0), .uv = v2(u1,v0), .color = color},
-            {.pos = min,                 .uv = v2(u0,v0), .color = color},
-          };
-          array_push_elems(g.draw_rects_texture, slice(vert));
+        Loop (i, g.text_draws.count) {
+          R_DrawText text = g.text_draws[i];
+          R_FontData& font = pool_get(g.fonts, g.my_font);
+          v2 pos = text.pos;
+          Loop (i, text.str.size) {
+            u8 c = text.str.str[i];
+            R_Glyph& glyph = font.glyphs[c - 32];
+  
+            // screen pos
+            f32 y0 = pos.y + glyph.yoff;
+            f32 x0 = pos.x + glyph.xoff;
+            f32 x1 = x0 + (glyph.x1 - glyph.x0);
+            f32 y1 = y0 + (glyph.y1 - glyph.y0);
+  
+            // advance cursor
+            pos.x += glyph.xadvance;
+  
+            // uv
+            f32 u0 = glyph.x0 / (f32)512;
+            f32 v0 = glyph.y0 / (f32)512;
+            f32 u1 = glyph.x1 / (f32)512;
+            f32 v1 = glyph.y1 / (f32)512;
+  
+            v3 min = v2_to_v3(v2_remap_01_to_11(v2(x0, y0), v2_of_v2u(os_get_window_size())), 0);
+            v3 max = v2_to_v3(v2_remap_01_to_11(v2(x1, y1), v2_of_v2u(os_get_window_size())), 0);
+            v4 color = text.color;
+            Vertex vert[] = {
+              {.pos = min,                 .uv = v2(u0,v0), .color = color},
+              {.pos = v3(min.x, max.y, 0), .uv = v2(u0,v1), .color = color},
+              {.pos = max,                 .uv = v2(u1,v1), .color = color},
+              {.pos = max,                 .uv = v2(u1,v1), .color = color},
+              {.pos = v3(max.x, min.y, 0), .uv = v2(u1,v0), .color = color},
+              {.pos = min,                 .uv = v2(u0,v0), .color = color},
+            };
+            array_push_elems(g.draw_rects_texture, slice(vert));
+          }
         }
+        array_clear(g.text_draws);
 
         u64 base = gfx_buffer_base(g.vert_buffer_each_frame);
         g.draw_base_rects_texture = (base + ring_write_nowrap_array(g.vert_ring_buffer, g.draw_rects_texture.data, g.draw_rects_texture.count)) / sizeof(Vertex);
@@ -902,26 +892,6 @@ void r_end() {
           vk_push_constants({.image_index = t.view.idx});
           gfx_draw(g.draw_base_rects_texture, g.draw_rects_texture.count);
           array_clear(g.draw_rects_texture);
-        }
-
-        {
-          // gfx_apply_viewport(rng2_make(v2_zero(), v2_of_v2u(os_get_window_size())), false);
-          // v3 min = v2_to_v3(v2_remap_01_to_11(v2(200, 200), v2_of_v2u(os_get_window_size())), 0);
-          // v3 max = v2_to_v3(v2_remap_01_to_11(v2(500, 500), v2_of_v2u(os_get_window_size())), 0);
-          // Vertex vert[] = {
-          //   {.pos = min,                 .uv = v2(0,0), .color = color},
-          //   {.pos = v3(min.x, max.y, 0), .uv = v2(0,1), .color = color},
-          //   {.pos = v3(max.x, min.y, 0), .uv = v2(1,0), .color = color},
-          //   {.pos = max,                 .uv = v2(1,1), .color = color},
-          //   {.pos = v3(max.x, min.y, 0), .uv = v2(1,0), .color = color},
-          //   {.pos = v3(min.x, max.y, 0), .uv = v2(0,1), .color = color},
-          // };
-          // u64 base = gfx_buffer_base(g.vert_buffer_each_frame);
-          // u32 vert_base = (base + ring_write_nowrap_array(g.vert_ring_buffer, vert, ArrayCount(vert))) / sizeof(Vertex);
-
-          // u32 idx = pool_get(g.textures, st->textures_ids[Texture_Orange]).view.idx;
-          // vk_push_constants({.image_index = idx});
-          // gfx_draw(vert_base, 6);
         }
 
       }
@@ -986,7 +956,7 @@ void r_draw_entity(EntityId id) {
   R_DrawCallData cmd = {
     .pos = e.pos,
     .scale = e.scale,
-    .rot = e.quat,
+    .rot = e.rot,
     .color = e.color,
     .mesh = e.mesh,
     .mat = e.mat,
@@ -999,7 +969,7 @@ void r_draw_entity(EntityId id) {
   }
 }
 
-void r_debug_line(v3 a, v3 b, v4 color) {
+void r_draw_line(v3 a, v3 b, v4 color) {
   Vertex vert[] = {
     {.pos = a, .color = color},
     {.pos = b, .color = color},
@@ -1007,7 +977,7 @@ void r_debug_line(v3 a, v3 b, v4 color) {
   array_push_elems(st->r.draw_lines, slice(vert));
 }
 
-void r_debug_line_persistent(v3 a, v3 b, v4 color) {
+void r_draw_line_persistent(v3 a, v3 b, v4 color) {
   Vertex vert[] = {
     {.pos = a, .color = color},
     {.pos = b, .color = color},
@@ -1015,7 +985,7 @@ void r_debug_line_persistent(v3 a, v3 b, v4 color) {
   array_push_elems(st->r.draw_lines_persistent, slice(vert));
 }
 
-void r_debug_grid(v3 center, u32 slices, f32 spacing, v4 color) {
+void r_draw_grid(v3 center, u32 slices, f32 spacing, v4 color) {
   var& lines = st->r.draw_lines;
 
   f32 half = slices * spacing * 0.5f;
@@ -1033,7 +1003,7 @@ void r_debug_grid(v3 center, u32 slices, f32 spacing, v4 color) {
   }
 }
 
-void r_debug_cuboid(Rng3 rng, v4 color) {
+void r_draw_cuboid(Rng3 rng, v4 color) {
   v3 p000 = {rng.min.x, rng.min.y, rng.min.z};
   v3 p001 = {rng.min.x, rng.min.y, rng.max.z};
   v3 p010 = {rng.min.x, rng.max.y, rng.min.z};
@@ -1044,22 +1014,22 @@ void r_debug_cuboid(Rng3 rng, v4 color) {
   v3 p110 = {rng.max.x, rng.max.y, rng.min.z};
   v3 p111 = {rng.max.x, rng.max.y, rng.max.z};
 
-  r_debug_line(p000, p001, color);
-  r_debug_line(p000, p010, color);
-  r_debug_line(p000, p100, color);
+  r_draw_line(p000, p001, color);
+  r_draw_line(p000, p010, color);
+  r_draw_line(p000, p100, color);
 
-  r_debug_line(p111, p110, color);
-  r_debug_line(p111, p101, color);
-  r_debug_line(p111, p011, color);
+  r_draw_line(p111, p110, color);
+  r_draw_line(p111, p101, color);
+  r_draw_line(p111, p011, color);
 
-  r_debug_line(p001, p011, color);
-  r_debug_line(p001, p101, color);
+  r_draw_line(p001, p011, color);
+  r_draw_line(p001, p101, color);
 
-  r_debug_line(p010, p011, color);
-  r_debug_line(p010, p110, color);
+  r_draw_line(p010, p011, color);
+  r_draw_line(p010, p110, color);
 
-  r_debug_line(p100, p101, color);
-  r_debug_line(p100, p110, color);
+  r_draw_line(p100, p101, color);
+  r_draw_line(p100, p110, color);
 }
 
 void r_draw_rect(Rng2 rect, v4 color) {
@@ -1077,6 +1047,15 @@ void r_draw_rect(Rng2 rect, v4 color) {
     {.pos = v2_to_v3(rect.min, 0), .color = color},
   };
   array_push_elems(st->r.draw_rects, slice(vert));
+}
+
+void r_draw_text(v2 pos, String str, v4 color) {
+  var& g = st->r;
+  array_push(g.text_draws, {
+    .str = push_str_copy(st->frame_arena, str),
+    .pos = pos,
+    .color = color,
+  });
 }
 
 ////////////////////////////////////////////////////////////////////////

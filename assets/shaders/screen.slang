@@ -20,7 +20,7 @@ VS_Entry VSOutput vs_main(VSInput in) {
 }
 
 FS_Entry v4 fs_main(VSOutput in) {
-  v4 color = textures[push.drawcall_offset].Sample(samplers[1], in.uv);
+  v4 color = textures[push.drawcall_base].Sample(samplers[1], in.uv);
   return color;
 }
 

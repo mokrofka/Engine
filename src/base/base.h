@@ -196,6 +196,7 @@ b32 FlagIsSubset(u64 x, u64 f);
 #define ClampBot(x, a)         (Max((x), (a)))
 #define Clamp(a, x, b)         (((x) < (a)) ? (a) : ((x) > (b)) ? (b) : (x))
 #define Clamp01(x)             Clamp(0, (x), 1)
+#define Clamp11(x)             Clamp(-1, (x), 1)
 #define ReverseClamp(a, x, b)  (((x) < (a)) ? (b) : ((b) < (x)) ? (a) : (x))
 #define Square(x)              ((x) * (x))
 #define Cube(x)                ((x) * (x) * (x))

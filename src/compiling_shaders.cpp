@@ -3,6 +3,7 @@
 #define Debug(...)
 
 i32 main(i32 args_count, char* args[]) {
+  mem_track_init();
   os_init(args[0]);
   tctx_init();
   u64 start = os_now_ns();

@@ -1,8 +1,8 @@
 #include "maths.h"
 #include "os/os_core.h"
 
-f32 degtorad(f32 degrees) { return degrees * PI / 180.0f; }
-f32 radtodeg(f32 radians) { return radians * 180.0f / PI; }
+f32 deg2rad(f32 degrees) { return degrees * PI / 180.0f; }
+f32 rad2deg(f32 radians) { return radians * 180.0f / PI; }
 
 v2::v2(f32 x_, f32 y_) { x = x_, y = y_; }
 v2i::v2i(i32 x_, i32 y_) { x = x_, y = y_; }
@@ -36,8 +36,8 @@ f32 Log2(f32 x)                        { return __builtin_log2f(x); }
 f32 Log10(f32 x)                       { return __builtin_log10f(x); }
 void SinCos(f32 rad, f32* s, f32* c) { __builtin_sincosf(rad, s, c); }
 
-f32 SinD(f32 x)                { return Sin(degtorad(x)); }
-f32 CosD(f32 x)                { return Cos(degtorad(x)); }
+f32 SinD(f32 x)                { return Sin(deg2rad(x)); }
+f32 CosD(f32 x)                { return Cos(deg2rad(x)); }
 
 ////////////////////////////////////////////////////////////////////////
 // Color
@@ -113,12 +113,15 @@ f32 rand_f32_11()                     { return rand_f32_01()*2.0f - 1.0f; }
 f32 rand_f32()                        { return rand_f32_01()*2*U16_MAX - U16_MAX; }
 f32 rand_rng_f32(f32 min, f32 max)    { return rand_f32_01()*(max - min) + min ; }
 b32 rand_b32()                        { return rand_u32() % 2; }
-void rand_set_seed()                      { _seed = cpu_timer_now(); }
+void rand_set_seed()                  { _seed = cpu_timer_now(); }
 u32 rand_get_seed()                   { return _seed; }
 
 ////////////////////////////////////////////////////////////////////////
 // Misc
 
+f32 safe_divn(f32 a, f32 b, f32 n) { return b == 0 ? n : a/b; }
+f32 safe_div0(f32 a, f32 b)        { return safe_divn(a,b,0); }
+f32 safe_div1(f32 a, f32 b)        { return safe_divn(a,b,1); }
 i32 wrap_i32(i32 min, i32 x, i32 max) {
   i32 res = (x - min) % (max - min);
   return res + min;
@@ -128,6 +131,7 @@ f32 wrap_f32(f32 min, f32 x, f32 max) {
   return res;
 }
 f32 Lerp(f32 a, f32 t, f32 b)      { return (1 - t)*a + t*b; }
+f32 LerpClamp(f32 a, f32 t, f32 b) { return Lerp(a, Clamp01(t), b); }
 f32 Unlerp(f32 a, f32 x, f32 b)    { return (x - a) / (b - a); }
 f64 Unlerpf64(f64 a, f64 x, f64 b) { return (x - a) / (b - a); }
 f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max) {
@@ -211,8 +215,8 @@ f32 v2_line_angle(v2 start, v2 end)             { v2 dir = end - start; return A
 v2  v2_rotate_90(v2 v)                          { return v2(-v.y, v.x); }
 v2  v2_rotate_negative_90(v2 v)                 { return v2(v.y, -v.x); }
 v2  v2_rotate(v2 v, f32 sine, f32 cosine)       { return v2(v.x*cosine - v.y*sine, v.x*sine + v.y*cosine); }
-v2  v2_rotate(v2 v, f32 rad)                    { f32 s; f32 c; SinCos(rad, &s, &c); return v2_rotate(v, s, c);}
-v2  v2_rotate_relative(v2 v, v2 pivot, f32 rad) { return v2_rotate(v - pivot, rad) + pivot; }
+v2  v2_rotate(v2 v, f32 rad)                    { f32 s, c; SinCos(rad, &s, &c); return v2_rotate(v, s, c);}
+v2  v2_rotate_around(v2 v, v2 pivot, f32 rad)   { return v2_rotate(v - pivot, rad) + pivot; }
 
 v2 v2_step_to(v2 v, v2 target, f32 step) {
   v2 d = target - v;
@@ -316,6 +320,11 @@ v3  v3_pos_of_mat4(mat4 mat)        { return v3_of_v4(mat.w); };
 v3  v3_rotate_x(v3 v, f32 rad)      { v2 r = v2_rotate(v2(v.y, v.z), rad); return v3(v.x, r.v[0], r.v[1]); }
 v3  v3_rotate_y(v3 v, f32 rad)      { v2 r = v2_rotate(v2(v.x, v.z), rad); return v3(r.v[0], v.y, r.v[1]); }
 v3  v3_rotate_z(v3 v, f32 rad)      { v2 r = v2_rotate(v2(v.x, v.y), rad); return v3(r.v[0], r.v[1], v.z); }
+v3 v3_rotate_around_pivot(v3 pos, v3 pivot, v4 q) {
+  v3 l = pos - pivot;
+  v3 rotated = quat_rotate(q, l);
+  return pivot + rotated;
+}
 
 v3 v3_barycentric(v3 v, v3 a, v3 b, v3 c) {
   v3 v0 = b-a;
@@ -409,21 +418,24 @@ v4  v4_hadamard(v4 a, v4 b)        { return v4(a.x*b.x, a.y*b.y, a.z*b.z, a.w*b.
 // Quatornion
 
 v4 quat_identity()      { return v4(0, 0, 0, 1); }
+v3 quat_forward(v4 q) { return quat_rotate(q, v3_forward()); }
+v3 quat_right(v4 q)   { return quat_rotate(q, v3_right());   }
+v3 quat_up(v4 q)      { return quat_rotate(q, v3_up());      }
+
 v4 quat_norm(v4 q)      { return v4_norm(q); }
 v4 quat_conjugate(v4 q) { return v4(-q.x, -q.y, -q.z, q.w); }
 v4 quat_inverse(v4 q)   { return quat_norm(quat_conjugate(q)); }
 
 v4 quat_axis_angle(v3 axis, f32 rad) {
   axis = v3_norm(axis);
-  f32 s;
-  f32 c;
+  f32 s, c;
   SinCos(rad / 2, &s, &c);
   v4 res = {axis.x*s, axis.y*s, axis.z*s, c};
   return res;
 }
 
 v3 quat_rotate(v4 q, v3 v) {
-  v3 u = v3(q.x, q.y, q.z);
+  v3 u = v3_of_v4(q);
   f32 s = q.w;
   v3 t = 2 * v3_cross(u, v);
   // result = v + s*t + cross(u, t)
@@ -445,33 +457,23 @@ v4 quat_mul(v4 a, v4 b) {
   return res;
 }
 
-mat3 quat_to_mat3(v4 q) {
-  mat3 res;
-  res.v[0][0] = 1.0f - 2.0f * (Square(q.y) + Square(q.z));
-  res.v[0][1] = 2.0f * (q.x*q.y - q.w*q.z);
-  res.v[0][2] = 2.0f * (q.x*q.z + q.w*q.y);
-  res.v[1][0] = 2.0f * (q.x*q.y + q.w*q.z);
-  res.v[1][1] = 1.0f - 2.0f * (Square(q.x) + Square(q.z));
-  res.v[1][2] = 2.0f * (q.y*q.z - q.w*q.x);
-  res.v[2][0] = 2.0f * (q.x*q.z - q.w*q.y);
-  res.v[2][1] = 2.0f * (q.y*q.z + q.w*q.x);
-  res.v[2][2] = 1.0f - 2.0f * (Square(q.x) + Square(q.y));
-  return res;
+f32 quat_angle(v4 a, v4 b) {
+  f32 d = Abs(v4_dot(a,b));
+  d = Clamp11(d);
+  return Acos(d) * 2.0f;
 }
 
-mat4 quat_to_mat4(v4 q) {
-  mat3 r = quat_to_mat3(q);
-  mat4 res = mat4_identity();
-  res.v[0][0] = r.v[0][0];
-  res.v[0][1] = r.v[0][1];
-  res.v[0][2] = r.v[0][2];
-  res.v[1][0] = r.v[1][0];
-  res.v[1][1] = r.v[1][1];
-  res.v[1][2] = r.v[1][2];
-  res.v[2][0] = r.v[2][0];
-  res.v[2][1] = r.v[2][1];
-  res.v[2][2] = r.v[2][2];
-  return res;
+mat4 mat4_from_quat(v4 q) {
+  f32 x=q.x, y=q.y, z=q.z, w=q.w;
+  f32 xx=x*x, yy=y*y, zz=z*z;
+  f32 xy=x*y, xz=x*z, yz=y*z;
+  f32 wx=w*x, wy=w*y, wz=w*z;
+  mat4 m = {};
+  m.v[0][0]=1-2*(yy+zz); m.v[0][1]=2*(xy+wz);   m.v[0][2]=2*(xz-wy);    m.v[0][3]=0; // column 0
+  m.v[1][0]=2*(xy-wz);   m.v[1][1]=1-2*(xx+zz); m.v[1][2]=2*(yz+wx);    m.v[1][3]=0; // column 1
+  m.v[2][0]=2*(xz+wy);   m.v[2][1]=2*(yz-wx);   m.v[2][2]=1-2*(xx+yy);  m.v[2][3]=0; // column 2
+  m.v[3][0]=0;           m.v[3][1]=0;           m.v[3][2]=0;            m.v[3][3]=1; // column 3
+  return m;
 }
 
 v4 quat_slerp(v4 a, f32 t, v4 b) {
@@ -517,6 +519,21 @@ v4 quat_nlerp(v4 a, f32 t, v4 b) {
   return res;
 }
 
+v4 quat_rotate_towards(v4 a, v4 b, f32 max_rad) {
+  f32 d = v4_dot(a, b);
+  if (d < 0.f) {
+    b.x = -b.x;
+    b.y = -b.y;
+    b.z = -b.z;
+    b.w = -b.w;
+    d = -d;
+  }
+  if (d > 0.9995f) return b;
+  f32 angle = Acos(d) * 2.f;
+  f32 t = (max_rad >= angle) ? 1.f : max_rad / angle;
+  return quat_slerp(a, t, b);
+}
+
 v4 quat_from_to(v3 a, v3 b) {
   a = v3_norm(a);
   b = v3_norm(b);
@@ -548,6 +565,44 @@ v4 quat_from_euler(v3 e) {
   v4 qz = v4(0, 0, sz, cz);
   v4 res = quat_mul(qy, quat_mul(qx, qz));
   return quat_norm(res);
+}
+
+v4 quat_look_rotation(v3 dir, v3 up) {
+  v3 f = v3_norm(dir);
+  v3 r = v3_norm(v3_cross(up, f));
+  v3 u = v3_cross(f, r);
+  /* Build rotation matrix columns then convert to quaternion */
+  f32 m00=r.x, m01=r.y, m02=r.z;
+  f32 m10=u.x, m11=u.y, m12=u.z;
+  f32 m20=f.x, m21=f.y, m22=f.z;
+  f32 tr = m00+m11+m22;
+  v4 q = {};
+  if (tr > 0.f) {
+    f32 s = 0.5f / Sqrt(tr+1.f);
+    q.x = (m12 - m21) * s;
+    q.y = (m20 - m02) * s;
+    q.z = (m01 - m10) * s;
+    q.w = 0.25f / s;
+  } else if (m00 > m11 && m00 > m22) {
+    f32 s = 2.f * Sqrt(1.f + m00 - m11 - m22);
+    q.x = 0.25f * s;
+    q.y = (m01 + m10) / s;
+    q.z = (m20 + m02) / s;
+    q.w = (m12 - m21) / s;
+  } else if (m11 > m22) {
+    f32 s = 2.f * Sqrt(1.f + m11 - m00 - m22);
+    q.x = (m01 + m10) / s;
+    q.y = 0.25f * s;
+    q.z = (m12 + m21) / s;
+    q.w = (m20 - m02) / s;
+  } else {
+    f32 s = 2.f * Sqrt(1.f + m22 - m00 - m11);
+    q.x = (m20 + m02) / s;
+    q.y = (m12 + m21) / s;
+    q.z = 0.25f * s;
+    q.w = (m01 - m10) / s;
+  }
+  return quat_norm(q);
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -792,8 +847,8 @@ mat4 mat4_rotate_around_axis(v3 axis, f32 rad) {
   return res;
 }
 
-mat4 mat4_transform(v3 pos, v3 rot, v3 scale) {
-  mat4 res = mat4_translate(pos) * mat4_rotate_xyz(rot) * mat4_scale(scale);
+mat4 mat4_transform(v3 pos, v4 rot, v3 scale) {
+  mat4 res = mat4_translate(pos) * mat4_from_quat(rot) * mat4_scale(scale);
   return res;
 }
 mat4 mat4_transform(Transform trans) {
@@ -926,10 +981,6 @@ Ray ray_from_screen(v2 screen_pos, v2u viewport_rect, v3 origin, mat4 view, mat4
   v3 world_coord = v3_of_v4(view * eye_coord);
   world_coord = v3_norm(world_coord);
   return ray_make(origin, world_coord);
-}
-v2 world_to_screen(v3 pos, v3 camera_pos, mat4 view, mat4 projection) {
-
-  return {};
 }
 
 ////////////////////////////////////////////////////////////////////////

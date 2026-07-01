@@ -18,9 +18,6 @@
 // glb loader
 // introspection
 // font rendering
-// editor
-// fill a buffer each frame
-// seglist alloc looks broken
 
 const u32 MaxEntities = KB(4);
 
@@ -245,10 +242,14 @@ Introspect struct Entity {
   EntityId last;
   String name;
   EntityFlags flags;
-  v3 pos;
-  v3 rot;
-  v4 quat;
-  v3 scale;
+  union {
+    Transform trans;
+    struct {
+      v3 pos;
+      v4 rot;
+      v3 scale;
+    };
+  };
   Rng3 aabb;
   v3 vel;
   R_Mesh mesh;
@@ -260,6 +261,7 @@ struct GameState {
   Arena arena;
   Alloc gpa;
   Camera cam;
+  R_Camera r_cam;
   b32 fps_camera;
   Timer timer;
 
@@ -272,6 +274,7 @@ struct GameState {
   EntityId rotating_cube_id;
   Map<String, EntityId, 32> find_entity;
 
+  R_Font font;
   v3 a;
   v3 b;
   v2 a_v2;
@@ -280,10 +283,14 @@ struct GameState {
   f32 t;
   v4 color;
   EntityId my;
+  EntityId thing;
+  v3 euler;
+  v3 point;
 };
 
 struct GlobalState {
   Arena arena;
+  Arena frame_arena;
   Alloc gpa;
   f32 dt;
   f32 time;
@@ -291,6 +298,7 @@ struct GlobalState {
   b32 should_hotreload;
   mat4 view;
   mat4 projection;
+  v4 ambient_color;
 
   R_Mesh meshes_ids[Mesh_COUNT];
   R_Texture textures_ids[Texture_COUNT];

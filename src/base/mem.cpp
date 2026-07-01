@@ -122,34 +122,9 @@ AllocatorInfoList mem_track_info() {
 }
 
 #else
+AllocatorInfoList mem_track_info() { return {}; }
 void mem_track_init() {}
 #endif
-
-AllocatorInfo* allocator_info_alloc() {
-  AllocatorInfo* info = mem_track.free;
-  if (info) {
-    sll_stack_pop(mem_track.free);
-  } else {
-    info = &mem_track.infos[mem_track.count_alloc++];
-  }
-  MemZeroStruct(info);
-  return info;
-}
-
-void allocator_info_free(AllocatorInfo* info) {
-  sll_stack_push(mem_track.free, info);
-  dll_remove(mem_track.list.first, mem_track.list.last, info);
-  dll_list_remove(mem_track.list, info);
-  mem_track.list.count--;
-}
-
-void allocator_inherit(Allocator parent_, Allocator child_) {
-  AllocatorInfo* parent = *(AllocatorInfo**)(parent_.ctx);
-  AllocatorInfo* child = *(AllocatorInfo**)(child_.ctx) = allocator_info_alloc();
-  child->parent = parent;
-  dll_push_back(parent->first, parent->last, child);
-  ++parent->child_count;
-}
 
 ////////////////////////////////////////////////////////////////////////
 // Arena
@@ -173,17 +148,17 @@ Arena arena_make_(String name) {
   return result;
 }
 
-void arena_destroy(Arena* arena) {
-  os_release(arena->base, arena->cap);
+void arena_destroy(Arena& arena) {
+  os_release(arena.base, arena.cap);
 #if MEM_TRACK
   // TODO: traverse tree
-  mem_track_unregister(*arena);
+  mem_track_unregister(arena);
 #endif
 }
 
-void arena_clear(Arena* arena) { 
-  arena->pos = 0;
-  AsanPoisonMemRegion(arena->base, arena->cmt);
+void arena_clear(Arena& arena) { 
+  arena.pos = 0;
+  AsanPoisonMemRegion(arena.base, arena.cmt);
 #if MEM_TRACK
   // TODO: traverse tree
 #endif
@@ -349,7 +324,9 @@ Alloc alloc_make(Allocator alloc) {
 }
 
 void alloc_destroy(Allocator alloc) {
+#if MEM_TRACK
   mem_track_unregister(alloc);
+#endif
 }
 
 u8* intern_alloc(Alloc* alloc, u64 size) {

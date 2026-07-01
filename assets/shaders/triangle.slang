@@ -9,7 +9,7 @@ static v3 triangle[] = {
 VS_Entry VSOutput vs_main(VSInput in) {
   VSOutput o;
   v4 pos = v4(triangle[in.vert_id], 1);
-  o.pos = g.projection_view * g.mat * pos;
+  o.pos = st().projection_view * st().mat * pos;
   return o;
 }
 

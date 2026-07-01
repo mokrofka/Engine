@@ -142,16 +142,6 @@ Entity& get_entity(EntityId id) {
   return pool_get(st->game.entities, id);
 }
 
-Transform get_entity_transform(EntityId id) {
-  Entity& e = get_entity(id);
-  Transform res = {
-    .pos = e.pos,
-    .rot = e.rot,
-    .scale = e.scale,
-  };
-  return res;
-}
-
 struct WordLexer {
   String str;
   u32 cursor;
@@ -1131,6 +1121,7 @@ void com_init() {
     test();
 
     g.gpa = alloc_make(g.arena);
+    g.frame_arena = arena_make();
     g.asset_dir = push_strf(g.arena, "%s/%s", os_cur_directory(), String("../assets"));
     g.shader_dir = push_str_cat(g.arena, g.asset_dir, "/shaders");
     g.shader_compiled_dir = push_str_cat(g.arena, g.shader_dir, "/compiled");
@@ -1214,7 +1205,7 @@ if (data->ctx == null) {
     {
       u64 start = cpu_timer_now();
       com_init();
-      Info("init time: %fms", tsc_to_ms(cpu_timer_now() - start));
+      Debug("init time: %fms", tsc_to_ms(cpu_timer_now() - start));
     }
 #if HOTRELOAD_BUILD
     watch_add(data->lib, WatchOp_NotifyHotreload);
@@ -1260,6 +1251,7 @@ if (data->ctx == null) {
     }
     prof_end(g.current_frame);
     ++g.current_frame;
+    arena_clear(st->frame_arena);
   }
 
   // deinit
@@ -1399,6 +1391,8 @@ EntityId e_alloc(R_Mesh mesh_id, R_Material material_id, EntityThing thing) {
   Entity e = {
     .name = thing.name,
     .flags = thing.flags,
+    .pos = v3_zero(),
+    .rot = quat_identity(),
     .scale = v3_one(),
     .mesh = mesh_id,
     .mat = material_id,
@@ -1453,22 +1447,28 @@ void camera_update() {
   v2 win_size = v2_of_v2u(os_get_window_size());
   mat4& projection = st->projection;
   mat4& view = st->view;
-  projection = mat4_perspective(degtorad(cam.fov), win_size.x / win_size.y, 0.1f, 10000.0f);
+  projection = mat4_perspective(deg2rad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
 
   // Camera rotation
   {
     f32 rotation_speed = 180.0f * get_dt();
+    f32 rot_x_dt = 0;
+    f32 rot_y_dt = 0;
     if (os_key_is_down(Key_A)) {
       cam.yaw += -rotation_speed;
+      rot_x_dt += -rotation_speed;
     }
     if (os_key_is_down(Key_D)) {
       cam.yaw += rotation_speed;
+      rot_x_dt += rotation_speed;
     }
     if (os_key_is_down(Key_R)) {
       cam.pitch += rotation_speed;
+      rot_y_dt += rotation_speed;
     }
     if (os_key_is_down(Key_F)) {
       cam.pitch += -rotation_speed;
+      rot_y_dt += -rotation_speed;
     }
     if (g.fps_camera) {
       f32 rot_speed = 10;
@@ -1532,11 +1532,12 @@ void scene_init() {
   g.rotating_cube_id = e_alloc(Mesh_Cube, Material_Orange, {"rotating_cube", EntityFlag_Referenced});
   g.monkey_id = e_alloc(Mesh_MonkeyGlb, Material_Container, {"monkey", EntityFlag_Referenced});
   Entity& monkey = get_entity(g.monkey_id);
+  monkey.pos.x = 10;
   monkey.aabb = Rng3(v3_splat(-1.2), v3_splat(1.2));
   {
     EntityId triangle_id = e_alloc(Mesh_Triangle, Material_Orange);
     Entity& triangle = get_entity(triangle_id);
-    triangle.pos = v3_splat(3);
+    triangle.pos = v3_splat(6);
   }
   {
     EntityId grid_id = e_alloc(Mesh_Grid, Material_Line);
@@ -1548,10 +1549,10 @@ void scene_init() {
     g.axis_attached_to_cam_id = e_alloc(Mesh_Axis, Material_Axis, {"axis_attached_to_cam", EntityFlag_Referenced});
   }
   Loop (i, 3) {
-    EntityId cube_id = e_alloc(Mesh_Cube, Material_Orange);
-    u32 range = 10;
-    Entity& cube = get_entity(cube_id);
-    cube.pos = v3_rand_rng(-v3_splat(range), v3_splat(range));
+    // EntityId cube_id = e_alloc(Mesh_Cube, Material_Orange);
+    // u32 range = 10;
+    // Entity& cube = get_entity(cube_id);
+    // cube.pos = v3_rand_rng(-v3_splat(range), v3_splat(range));
   }
 #if 1
   Loop (i, 10) {
@@ -1633,8 +1634,8 @@ void scene_init() {
   }
 
   {
-    v4 quat = quat_axis_angle(v3(1,0,0), degtorad(90));
-    v4 quat1 = quat_axis_angle(v3(1,0,0), degtorad(90));
+    v4 quat = quat_axis_angle(v3(1,0,0), deg2rad(90));
+    v4 quat1 = quat_axis_angle(v3(1,0,0), deg2rad(90));
     quat = quat_mul(quat, quat1);
     v3 v = v3(0, 1, 0);
     v = quat_rotate(quat, v);
@@ -1642,9 +1643,9 @@ void scene_init() {
   }
 
   {
-    EntityId e_id = e_alloc(Mesh_Cube, Material_Orange);
-    Entity& e = get_entity(e_id);
-    e.pos = v3(0,3,3);
+    // EntityId e_id = e_alloc(Mesh_Cube, Material_Orange);
+    // Entity& e = get_entity(e_id);
+    // e.pos = v3(0,3,3);
   }
   {
     EntityId e_id = e_alloc(Mesh_Barrack, Material_Barrack);
@@ -1655,7 +1656,7 @@ void scene_init() {
     EntityId e_id = e_alloc(Mesh_Cube, Material_Container);
     g.my = e_id;
     Entity& e = get_entity(e_id);
-    e.pos = v3(3,3,0);
+    e.pos = v3(3,3,10);
     Loop (i, 4) {
       EntityId child_id = e_alloc(Mesh_Cube, Material_Container);
       hdll_list_push_back(g.entities.data, e, child_id);
@@ -1665,11 +1666,30 @@ void scene_init() {
       }
     }
   }
+  {
+    g.thing = e_alloc(Mesh_MonkeyGlb, Material_Container);
+    g.point = v3_splat(1);
+  }
 }
 
 void scene_deinit() {
   GameState& g = st->game;
   pool_clear(g.entities);
+}
+
+v3 transform_forward(Transform t) { return quat_rotate(t.rot, v3_forward()); }
+v3 transform_right(Transform t) { return quat_rotate(t.rot, v3_right()); }
+v3 transform_up(Transform t) { return quat_rotate(t.rot, v3_up()); }
+Transform transform_indentity() {
+  Transform res = {
+    .pos = v3_zero(),
+    .rot = quat_identity(),
+    .scale = v3_splat(1),
+  };
+  return res;
+}
+void transform_translate_local(Transform& t, v3 delta) {
+  t.pos += quat_rotate(t.rot, delta);
 }
 
 void scene_update() {
@@ -1678,17 +1698,15 @@ void scene_update() {
   if (os_mouse_is_button_pressed(MouseButton_Left)) {
     // select_obj();
     // v3 dir = ray_from_screen();
-    Ray ray = ray_from_screen(os_mouse_get_pos(), os_get_window_size(), g.cam.pos, st->view, st->projection);
-    r_debug_line_persistent(ray.pos - v3(0,0.1,0), g.cam.pos + ray.dir*100, ColorWhite);
+    // Ray ray = ray_from_screen(os_mouse_get_pos(), os_get_window_size(), g.cam.pos, st->view, st->projection);
+    // r_draw_line_persistent(ray.pos - v3(0,0.1,0), g.cam.pos + ray.dir*100, ColorWhite);
     // v3 max = st->cam.pos + v3_one();
     // v3 min = st->cam.pos - v3_one();
   }
   // moving cube and monkey
   {
-    EntityId cube_id = g.rotating_cube_id;
-    EntityId monkey_id = g.monkey_id;
-    Entity& cube = get_entity(cube_id);
-    Entity& monkey = get_entity(monkey_id);
+    Entity& cube = get_entity(g.rotating_cube_id);
+    Entity& monkey = get_entity(g.monkey_id);
     monkey.pos.x += 0.1 * get_dt();
     cube.pos.x = monkey.pos.x + Sin(get_time()) * 4;
     cube.pos.z = monkey.pos.z + Cos(get_time()) * 4;
@@ -1696,7 +1714,7 @@ void scene_update() {
   }
   {
     Entity& e = get_entity(g.monkey_id);
-    r_debug_cuboid(rng3_shift(e.aabb, e.pos), ColorWhite);
+    r_draw_cuboid(rng3_shift(e.aabb, e.pos), ColorWhite);
   }
   {
     mat4& view = st->view;
@@ -1780,7 +1798,7 @@ void scene_update() {
   // e.pos = v3_rotate_z(e.pos, degtorad(20) * get_dt());
   // e.pos = v3_rotate_y(e.pos, degtorad(20) * get_dt());
   // e.pos = v3_rotate_z(e.pos, degtorad(20) * get_dt());
-  e.pos = v3_rotate_around_axis(e.pos, v3(1,1,1), degtorad(60)*get_dt());
+  e.pos = v3_rotate_around_axis(e.pos, v3(1,1,1), deg2rad(60)*get_dt());
 
   {
     if (os_key_is_pressed(Key_U)) {
@@ -1800,14 +1818,47 @@ void scene_update() {
   //   r_draw_mesh(st->meshes_ids[Mesh_Triangle], e.mat, e.pos);
   // }
 
-  LoopINode (i, g.entities.first, g.entities.data) {
-    EntityId e_id = pool_get_handle(g.entities, i);
-    // Entity& e = pool_get(g.entities, e_id);
-    // r_draw_mesh(e.mesh, e.mat, e.pos);
-    r_draw_entity(e_id);
-  }
   {
     // r_debug_grid(v3(0, 20, 0), 10, 10, ColorGrey);
+  }
+
+  {
+    Entity& e = get_entity(g.thing);
+    v4 dt = quat_axis_angle(v3_up(), 0.1 * get_dt());
+    // v4 dt = quat_axis_angle(v3_right(), 1 * get_dt());
+    // v4 dt = quat_axis_angle(v3_right(), 0.1 * get_dt());
+    // e.rot = quat_mul(e.rot, dt);
+    // e.rot = quat_identity();
+    // e.rot = quat_mul(dt, e.rot);
+    // e.rot = quat_mul(dt, e.rot);
+    r_draw_line(v3_zero(), g.point*3, ColorWhite);
+    // e.rot = quat_look_rotation(g.point, v3_up());
+    // r_draw_cuboid(rng3_shift(Rng3(v3_splat(-1), v3_splat(1)), g.point), ColorWhite);
+    // e.rot = quat_identity();
+    // e.rot = quat_from_euler(v3(deg2rad(g.euler.x), deg2rad(g.euler.y), deg2rad(g.euler.z)));
+    // v4 dt = quat_axis_angle(v3_up(), get_dt());
+    // e.rot = quat_mul(e.rot, quat_look_rotation(e.pos, v3_up()));
+    v3 point = v3(3,0,0);
+    r_draw_mesh_trs(mesh_get(Mesh_Cube), material_get(Material_Orange), point, quat_identity(), v3_splat(0.1));
+    r_draw_mesh_trs(mesh_get(Mesh_Cube), material_get(Material_Orange), g.point, quat_identity(), v3_splat(0.1));
+    e.pos = v3_rotate_around_pivot(e.pos, g.point, dt);
+    // e.rot = quat_look_rotation(g.point - e.pos, v3_up());
+    // e.rot = quat_identity();
+    // e.rot = quat_mul(e.rot, dt);
+    // e.pos = v3_step_to(e.pos, v3_zero(), 10 * get_dt());
+    // e.rot = quat_identity();
+    e.rot = quat_look_rotation(v3_forward(), v3_up());
+    e.rot = quat_identity();
+
+    // v4 v;
+    // mat4 mat;
+    // v4 a = mat * v; // collumn based
+    // v4 a = v * mat; // row based
+
+    r_draw_line(e.pos, e.pos + quat_right(e.rot)*2, ColorRed);
+    r_draw_line(e.pos, e.pos + quat_up(e.rot)*2, ColorGreen);
+    r_draw_line(e.pos, e.pos + quat_forward(e.rot)*2, ColorBlue);
+    r_draw_mesh_trs(mesh_get(Mesh_Cube), material_get(Material_Orange), e.pos, quat_identity(), v3_splat(0.1));
   }
 
   {
@@ -1826,6 +1877,15 @@ void scene_update() {
     }
   }
   
+  LoopINode (i, g.entities.first, g.entities.data) {
+    EntityId e_id = pool_get_handle(g.entities, i);
+    // Entity& e = pool_get(g.entities, e_id);
+    // r_draw_mesh(e.mesh, e.mat, e.pos);
+    r_draw_entity(e_id);
+  }
+
+  r_draw_text(v2(100, 100), "hello", ColorWhite);
+  r_draw_text(v2(200, 100), "my friend", ColorWhite);
 }
 
 void game_save_state() {
@@ -1915,6 +1975,7 @@ void game_init() {
   g.timer = timer_make(1);
 
   g.moving_cubes = array_make(EntityId, g.gpa);
+  g.font = r_font_load("arial.ttf", 32);
 
   MeshDesc triangle_mesh = {.vertices = slice(triangle_vertices)};
   mesh_set(Mesh_Triangle, r_mesh_make(triangle_mesh));
@@ -1925,7 +1986,10 @@ void game_init() {
   MeshDesc sphere = sphere_generate(scratch);
   mesh_set(Mesh_Sphere, r_mesh_make(sphere));
 
-  r_texture_cube_load("night_cubemap");
+  {
+    ProfBlock("cube");
+    r_texture_cube_load("night_cubemap");
+  }
 
   {
     GlobalState& g = *st;
@@ -1945,7 +2009,8 @@ void game_init() {
     // m_load(Mesh_GreeMan, "greenman.glb");
   
     var t_load = [&](TextureEnum enum_name, String name) {
-      R_Texture id = r_texture_load(name);
+      // R_Texture id = r_texture_load(name);
+      R_Texture id = r_texture_load_async(name);
       g.textures_ids[enum_name] = id;
       String str = push_str_copy(g.arena, name);
       map_set(g.str_to_texture_id, str, id);
