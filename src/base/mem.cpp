@@ -1,7 +1,4 @@
-#include "mem.h"
-#include "maths.h"
-#include "os/os_core.h"
-#include "containers.h"
+#include "base_impl.h"
 
 const u32 MEM_ALLOC_HEADER_GUARD   = 0xA110C8;
 const u32 MEM_DEALLOC_HEADER_GUARD = 0xDE1E7E;

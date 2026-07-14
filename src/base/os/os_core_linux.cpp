@@ -1,12 +1,12 @@
-#include "lib.h"
-#include <errno.h>
-#include <string.h>
+#include "../base_impl.h"
 
 #if OS_LINUX
 
 #include <dirent.h>
 #include <dlfcn.h>
 #include <fcntl.h>
+#include <pthread.h>
+#include <semaphore.h>
 #include <spawn.h>
 #include <stdlib.h>
 #include <sys/inotify.h>
@@ -18,8 +18,6 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
-#include <pthread.h>
-#include <semaphore.h>
 
 _LockScope::_LockScope(Mutex mutex_) {
   mutex = mutex_;

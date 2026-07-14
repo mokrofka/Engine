@@ -394,17 +394,6 @@ MeshDesc load_gltf(Allocator arena, String path, b32 is_glb) {
   return mesh;
 }
 
-TextureDesc image_load(String filepath) {
-  Scratch scratch;
-  u32 required_channel_count = 4;
-  u32 channel_count;
-  Slice buf = os_file_path_read_all(scratch, filepath);
-  TextureDesc res = {};
-  res.data = stbi_load_from_memory(buf.data, buf.count, (i32*)&res.width, (i32*)&res.height, (i32*)&channel_count, required_channel_count);
-  Assert(res.data);
-  return res;
-}
-
 ////////////////////////////////////////////////////////////////////////
 // @Assets
 
@@ -2145,3 +2134,4 @@ void game_update() {
   }
   scene_update();
 }
+

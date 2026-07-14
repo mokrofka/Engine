@@ -1,5 +1,4 @@
-#include "maths.h"
-#include "os/os_core.h"
+#include "base_impl.h"
 
 f32 deg2rad(f32 degrees) { return degrees * PI / 180.0f; }
 f32 rad2deg(f32 radians) { return radians * 180.0f / PI; }

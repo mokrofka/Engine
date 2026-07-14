@@ -1,3 +1,6 @@
+#pragma once
+#include "types.h"
+#include "gfx.h"
 
 const u32 R_MaxMaterials  = 32;
 const u32 R_MaxLights     = 32;
@@ -378,10 +381,5 @@ void imgui_init();
 void imgui_begin_frame();
 void imgui_end_frame();
 
-
-#define IM_VEC2_CLASS_EXTRA                               \
-        constexpr ImVec2(const v2& f) : x(f.x), y(f.y) {} \
-        operator v2() const { return v2(x,y); }
-#include "imgui/imgui.h"
 
 

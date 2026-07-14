@@ -1,3 +1,5 @@
+#pragma once
+#include "lib.h"
 
 enum MetaType {
   MetaType_Null,

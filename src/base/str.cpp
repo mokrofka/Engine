@@ -1,5 +1,4 @@
-#include "str.h"
-#include "logger.h"
+#include "base_impl.h"
 
 String str_make(u8* str, u64 size) {
   String res = {};

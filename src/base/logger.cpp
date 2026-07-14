@@ -1,6 +1,4 @@
-#include "logger.h"
-#include "thread_ctx.h"
-#include "os/os_core.h"
+#include "base_impl.h"
 
 void _log_output(LogLevel level, String fmt, ...) {
   Scratch scratch;

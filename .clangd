@@ -1,8 +1,9 @@
 Diagnostics:
-    UnusedIncludes: None
+  UnusedIncludes: None
 
 CompileFlags:
   Add:
-    - -include com.h
     - -Wno-gnu-alignof-expression
-    - -ferror-limit=1000
+
+Index:
+  StandardLibrary: false

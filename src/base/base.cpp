@@ -1,4 +1,4 @@
-#include "base.h"
+#include "base_impl.h"
 
 ////////////////////////////////////////////////////////////////////////
 // Basic
@@ -76,8 +76,6 @@ u32 prev_pow2(u32 n) {
 	n |= n >> 16;
 	return n - (n >> 1);
 }
-b32 is_finite_f32(f32 x) { return (Transmute(u32, x) & 0x7F800000) != 0x7F800000; }
-b32 is_nan_f32(f32 x)    { u32 bits = Transmute(u32, x); return ((bits & 0x7F800000) == 0x7F800000) && ((bits & 0x007FFFFF) != 0); }
 
 ////////////////////////////////////////////////////////////////////////
 // Asserts
