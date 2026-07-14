@@ -7,7 +7,6 @@ const u32 MEM_DEFAULT_ALIGNMENT = sizeof(void*);
 
 enum AllocatorType {
   AllocatorType_None,
-  // AllocatorType_Global,
   AllocatorType_Arena,
   AllocatorType_ArenaList,
   AllocatorType_Alloc,

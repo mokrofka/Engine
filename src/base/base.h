@@ -211,8 +211,10 @@ u64 RoundDown(u64 x, u64 a);
 u64 Compose64Bit(u64 a, u64 b);
 u32 next_pow2(u32 v);
 u32 prev_pow2(u32 n);
-b32 is_finite_f32(f32 x);
-b32 is_nan_f32(f32 x);
+
+#define is_finite_f32(x) __builtin_isfinite((x))
+#define is_nan_f32(x)    __builtin_isnan((x))
+#define is_inf_f32(x)    __builtin_isinf((x))
 
 ////////////////////////////////////////////////////////////////////////
 // Shenanigans

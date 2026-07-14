@@ -171,4 +171,3 @@ f32 Unlerp(f32 a, f32 x, f32 b)    { return (x - a) / (b - a); }
 f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max) {
   return new_min + (((x - old_min) * (new_max - new_min)) / (old_max - old_min));
 }
-

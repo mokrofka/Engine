@@ -1,4 +1,4 @@
-#include "debug.h"
+#include "com.h"
 
 Rng2 debug_window_get_rect(DebugWindow win) {
   if (win.fullscreen) {

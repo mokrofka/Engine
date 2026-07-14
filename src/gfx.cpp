@@ -1,3 +1,4 @@
+#include "com.h"
 
 #if OS_WINDOW
   typedef void* HINSTANCE;

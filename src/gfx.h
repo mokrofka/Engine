@@ -1,3 +1,5 @@
+#pragma once
+#include "types.h"
 
 MakeId(Gfx_Image)
 MakeId(Gfx_Sampler)

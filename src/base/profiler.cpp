@@ -1,4 +1,4 @@
-#include "profiler.h"
+#include "base_impl.h"
 
 global ProfState profiler_st;
 

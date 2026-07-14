@@ -1,6 +1,5 @@
 #pragma once
 #include "os/os_core.h"
-#include "containers.h"
 
 const u32 Thread_MaxTasks = 1024;
 const u32 Thread_MaxCounters = 1024;
