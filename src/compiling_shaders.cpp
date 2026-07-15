@@ -85,15 +85,9 @@ i32 main(i32 args_count, char* args[]) {
   Loop (i, compiled_shaders.count) {
     Shader& x = compiled_shaders[i];
     Debug("%s", x.shader_path);
-    StringList list = {};
-    str_list_push(scratch, &list, "slangc");
-    str_list_push(scratch, &list, x.shader_path);
-    str_list_push(scratch, &list, "-target");
-    str_list_push(scratch, &list, "spirv");
-    str_list_push(scratch, &list, "-g");
-    str_list_push(scratch, &list, "-o");
-    str_list_push(scratch, &list, x.compiled_shader_path);
-    x.pid = os_process_launch(list);
+    var arr = array_make(String, scratch);
+    array_push(arr, S("slangc"), x.shader_path, S("-target"), S("spirv"), S("-g"), S("-o"), x.compiled_shader_path);
+    x.pid = os_process_launch(slice(arr));
   }
 
   Loop (i, compiled_shaders.count) {

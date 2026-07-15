@@ -512,14 +512,14 @@ void r_shaders_compile(Allocator arena) {
   Loop (i, files.count) {
     File& f = files[i];
     StringList list = {};
-    str_list_push(scratch, &list, "slangc");
-    str_list_push(scratch, &list, f.file_path);
-    str_list_push(scratch, &list, "-target");
-    str_list_push(scratch, &list, "spirv");
-    str_list_push(scratch, &list, "-O0");
-    str_list_push(scratch, &list, "-g");
-    str_list_push(scratch, &list, "-o");
-    str_list_push(scratch, &list, f.compiled_file_path);
+    str_list_push(scratch, list, "slangc");
+    str_list_push(scratch, list, f.file_path);
+    str_list_push(scratch, list, "-target");
+    str_list_push(scratch, list, "spirv");
+    str_list_push(scratch, list, "-O0");
+    str_list_push(scratch, list, "-g");
+    str_list_push(scratch, list, "-o");
+    str_list_push(scratch, list, f.compiled_file_path);
     g.shader_module_compilation_pids[i] = os_process_launch(list);
     Debug("%s", f.file_path);
     array_push(file_names, f.shader_name);

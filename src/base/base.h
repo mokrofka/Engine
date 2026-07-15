@@ -194,7 +194,7 @@ b32 FlagIsSubset(u64 x, u64 f);
 #define Min3(a, b, c)          (Min(Min((a),(b)), (c)))
 #define ClampTop(x, a)         (Min((x), (a)))
 #define ClampBot(x, a)         (Max((x), (a)))
-#define Clamp(a, x, b)         (((x) < (a)) ? (a) : ((x) > (b)) ? (b) : (x))
+#define Clamp(a, x, b)         Min(Max(a, x), b)
 #define Clamp01(x)             Clamp(0, (x), 1)
 #define Clamp11(x)             Clamp(-1, (x), 1)
 #define ReverseClamp(a, x, b)  (((x) < (a)) ? (b) : ((b) < (x)) ? (a) : (x))
@@ -212,9 +212,9 @@ u64 Compose64Bit(u64 a, u64 b);
 u32 next_pow2(u32 v);
 u32 prev_pow2(u32 n);
 
-#define is_finite_f32(x) __builtin_isfinite((x))
-#define is_nan_f32(x)    __builtin_isnan((x))
-#define is_inf_f32(x)    __builtin_isinf((x))
+#define is_finite(x) __builtin_isfinite((x))
+#define is_nan(x)    __builtin_isnan((x))
+#define is_inf(x)    __builtin_isinf((x))
 
 ////////////////////////////////////////////////////////////////////////
 // Shenanigans

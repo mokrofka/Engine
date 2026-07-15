@@ -22,11 +22,6 @@ Dstring dstr_make(Allocator alloc);
 void dstr_push(Dstring& arr, String str);
 void dstr_clear(Dstring& arr);
 
-struct StringArray {
-  String* v;
-  u64 count;
-};
-
 struct StringNode {
   StringNode* next;
   String string;
@@ -40,6 +35,20 @@ struct StringList {
 };
 
 u64 cstr_length(const void* c);
+
+u32 u32_length(u32 x);
+u32 u64_length(u64 x);
+u32 u32_write(u8* dest, u32 x);
+u32 u64_write(u8* dest, u64 x);
+u32 i32_length(i32 x);
+u32 i64_length(i64 x);
+u32 i32_write(u8* dest, i32 x);
+u32 i64_write(u8* dest, i64 x);
+u32 f32_length(f32 x, u32 precision);
+u32 f64_length(f64 x, u32 precision);
+u32 f32_write(u8* dest, f32 value, u32 precision);
+u32 f64_write(u8* dest, f64 value, u32 precision);
+void u64_hex_write(u8* dest, u64 value);
 
 ////////////////////////////////////////////////////////////////////////
 // Character Classification & Conversion Functions
@@ -60,6 +69,8 @@ b32 char_is_number_cont(u8 c);
 ////////////////////////////////////////////////////////////////////////
 // String Constructors
 
+#define S(str) str_make((u8*)str, sizeof(str))
+
 String str_range(u8* first, u8* one_past_last);
 String str_cstr_capped(const void* String, const void* cap);
 
@@ -74,7 +85,7 @@ String lower_from_str(Allocator arena, String string);
 
 b32 str_match(String str0, String str1);
 b32 str_matchi(String str0, String str1);
-u64 str_find_needle(String string, u64 start_pos, String needle);
+u64 str_find_needle(String string, String needle);
 b32 str_ends_with(String string, String end);
 b32 equal(String a, String b);
 
@@ -98,9 +109,9 @@ String push_strf(Allocator arena, String fmt, ...);
 ////////////////////////////////////////////////////////////////////////
 // String List Construction Functions
 
-StringNode* str_list_push_node(StringList* list, StringNode* node);
-StringNode* str_list_push(Allocator arena, StringList* list, String string);
-StringNode* str_list_pushf(Allocator arena, StringList* list, String fmt, ...);
+StringNode* str_list_push_node(StringList&, StringNode* node);
+StringNode* str_list_push(Allocator arena, StringList& list, String string);
+StringNode* str_list_pushf(Allocator arena, StringList& list, String fmt, ...);
 
 ////////////////////////////////////////////////////////////////////////
 // String utils
@@ -109,7 +120,7 @@ void str_copy(String64& dest, String str);
 String str_next_word(String line, u32& start);
 // String str_read_line(Range* range);
 String str_trim(String string);
-i32 str_index_of(String str, u8 c);
+i32 str_index_of_char(String str, u8 c);
 
 ////////////////////////////////////////////////////////////////////////
 // String <=> Integer Conversions
@@ -125,20 +136,23 @@ f32 f32_from_str(String str);
 ////////////////////////////////////////////////////////////////////////
 // String Path Helpers
 
-// one/two/three -> one/two/
-String str_chop_past_last_slash(String string);
-
 // one/two/three -> one/two
-String str_chop_last_slash(String string);
+String str_chop_last_slash(String s);
+
+// one/two/three -> one/two/
+String str_chop_past_last_slash(String s);
+
+// one/two/three -> two/three
+String str_skip_slash(String s);
 
 // one/two/three -> three
-String str_skip_last_slash(String string);
+String str_skip_last_slash(String s);
 
 // name.fmt -> name
-String str_chop_last_dot(String string);
+String str_chop_last_dot(String s);
 
 // name.fmt -> fmt
-String str_skip_last_dot(String string);
+String str_skip_last_dot(String s);
 
 ////////////////////////////////////////////////////////////////////////
 // Wchar stuff

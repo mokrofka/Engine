@@ -52,126 +52,61 @@ void dstr_clear(Dstring&arr) {
 Dstring::operator String() { return str_make(str, size); }
 String64::operator String() { return str_make(str, size); }
 
-intern u32 u32_length(u32 v) {
-  if (v < 10) return 1;
-  if (v < 100) return 2;
-  if (v < 1000) return 3;
-  if (v < 10000) return 4;
-  if (v < 100000) return 5;
-  if (v < 1000000) return 6;
-  if (v < 10000000) return 7;
-  if (v < 100000000) return 8;
-  if (v < 1000000000) return 9;
-  return 10;
-}
+read_only u64 pow10[] = {
+  1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000,
+  1000000000ull, 10000000000ull, 100000000000ull, 1000000000000ull,
+  10000000000000ull, 100000000000000ull, 1000000000000000ull,
+  10000000000000000ull, 100000000000000000ull, 1000000000000000000ull,
+  10000000000000000000ull
+};
 
-intern u32 u64_length(u64 v) {
-  if (v < 10) return 1;
-  if (v < 100) return 2;
-  if (v < 1000) return 3;
-  if (v < 10000) return 4;
-  if (v < 100000) return 5;
-  if (v < 1000000) return 6;
-  if (v < 10000000) return 7;
-  if (v < 100000000) return 8;
-  if (v < 1000000000) return 9;
-  if (v < 10000000000) return 10;
-  if (v < 100000000000) return 11;
-  if (v < 1000000000000) return 12;
-  if (v < 10000000000000) return 13;
-  if (v < 100000000000000) return 14;
-  if (v < 1000000000000000) return 15;
-  if (v < 10000000000000000) return 16;
-  if (v < 100000000000000000) return 17;
-  if (v < 1000000000000000000) return 18;
-  if (v < 10000000000000000000ull) return 19;
-  return 20;
+u32 u64_length(u64 x) {
+  u32 n = 1;
+  while (n < 20 && x >= pow10[n]) n++;
+  return n;
 }
+u32 u32_length(u32 x) { return u64_length(x); }
 
-intern u32 u32_write(u8* dest, u32 value) {
-  u32 length = u32_length(value);
+u32 u64_write(u8* dest, u64 x) {
+  u32 length = u64_length(x);
   u32 i = length;
   do {
-    dest[--i] = '0' + (value % 10);
-    value /= 10;
-  } while (value);
+    dest[--i] = '0' + (x % 10);
+    x /= 10;
+  } while (x);
   return length;
 }
+u32 u32_write(u8* dest, u32 x) { return u64_write(dest, x); }
 
-intern u32 u64_write(u8* dest, u64 value) {
-  u32 length = u64_length(value);
-  u32 i = length;
-  do {
-    dest[--i] = '0' + (value % 10);
-    value /= 10;
-  } while (value);
-  return length;
-}
-
-intern u32 i32_length(i32 v) {
-  if (v < 0)
-    return 1+u32_length(-v);
+u32 i64_length(i64 x) {
+  if (x < 0)
+    return 1+u64_length(-x);
   else
-    return u32_length(v);
+    return u64_length(x);
 }
+u32 i32_length(i32 x) { return i64_length(x); }
 
-intern u32 i64_length(i64 v) {
-  if (v < 0)
-    return 1+u64_length(-v);
-  else
-    return u64_length(v);
-}
-
-intern u32 i32_write(u8* dest, i32 value) {
-  if (value < 0) {
+u32 i64_write(u8* dest, i64 x) {
+  if (x < 0) {
     dest[0] = '-';
-    return 1 + u32_write(dest+1, -value);
+    return 1 + u64_write(dest+1, -x);
   }
   else {
-    return u32_write(dest, value);
+    return u64_write(dest, x);
   }
 }
+u32 i32_write(u8* dest, i32 x) { return i64_write(dest, x); }
 
-intern u32 i64_write(u8* dest, i64 value) {
-  if (value < 0) {
-    dest[0] = '-';
-    return 1 + u64_write(dest+1, -value);
-  }
-  else {
-    return u64_write(dest, value);
-  }
-}
-
-intern u32 f32_length(f32 value, u32 precision) {
+u32 f64_length(f64 x, u32 precision) {
   u32 len = 0;
-  if (value < 0.0f) {
+  if (x < 0.0f) {
     ++len;
-    value = -value;
+    x = -x;
   }
   
   // Process the integer part
-  u32 integer_part = value;
-  value -= integer_part; // Remove the integer part
-  len += u32_length(integer_part);
-
-  // Process the fractional part
-  if (precision > 0) {
-    ++len; // for '.'
-    len += precision;
-  }
-  return len;
-}
-
-intern u32 f64_length(f64 value, u32 precision) {
-  u32 len = 0;
-  if (value < 0.0f) {
-    ++len;
-    value = -value;
-  }
-  
-  // Process the integer part
-  u64 integer_part = value;
-  value -= integer_part; // Remove the integer part
+  u64 integer_part = x;
+  x -= integer_part; // Remove the integer part
   len += u64_length(integer_part);
 
   // Process the fractional part
@@ -181,45 +116,18 @@ intern u32 f64_length(f64 value, u32 precision) {
   }
   return len;
 }
+u32 f32_length(f32 x, u32 precision) { return f64_length(x, precision); }
 
-intern u32 f32_write(u8* dest, f32 value, u32 precision) {
+u32 f64_write(u8* dest, f64 x, u32 precision) {
   u32 len = 0;
-  if (value < 0.0f) {
+  if (x < 0.0f) {
     dest[len++] = '-';
-    value = -value;
+    x = -x;
   }
 
   // Process the integer part
-  u32 integer_part = (u32)value;
-  value -= integer_part; // Remove the integer part
-  len += u32_write(dest + len, integer_part);
-
-  // Process the fractional part
-  if (precision > 0) {
-    dest[len++] = '.';
-    u32 multiplier = 1;
-    for (u32 i = 0; i < precision; ++i) multiplier *= 10;
-    u32 frac_part = (u32)(value * multiplier + 0.5); // rounding since possible 0.02 * multi = 1.999...
-    u32 frac_len = u32_length(frac_part);
-    u32 pad = (frac_len < precision) ? (precision - frac_len) : 0;
-    for (u32 i = 0; i < pad; ++i) {
-      dest[len++] = '0';
-    }
-    len += u32_write(dest + len, frac_part);
-  }
-  return len;
-}
-
-intern u32 f64_write(u8* dest, f64 value, u32 precision) {
-  u32 len = 0;
-  if (value < 0.0f) {
-    dest[len++] = '-';
-    value = -value;
-  }
-
-  // Process the integer part
-  u64 integer_part = value;
-  value -= integer_part; // Remove the integer part
+  u64 integer_part = x;
+  x -= integer_part; // Remove the integer part
   len += u64_write(dest + len, integer_part);
 
   // Process the fractional part
@@ -227,7 +135,7 @@ intern u32 f64_write(u8* dest, f64 value, u32 precision) {
     dest[len++] = '.';
     u64 multiplier = 1;
     for (u32 i = 0; i < precision; ++i) multiplier *= 10;
-    u64 frac_part = (u64)(value * multiplier + 0.5); // rounding since possible 0.02 * multi = 1.999...
+    u64 frac_part = (u64)(x * multiplier + 0.5); // rounding since possible 0.02 * multi = 1.999...
     u32 frac_len = u64_length(frac_part);
     u32 pad = (frac_len < precision) ? (precision - frac_len) : 0;
     for (u32 i = 0; i < pad; ++i) {
@@ -237,161 +145,120 @@ intern u32 f64_write(u8* dest, f64 value, u32 precision) {
   }
   return len;
 }
+u32 f32_write(u8* dest, f32 x, u32 precision) { return f64_write(dest, x, precision); }
 
 #define HEX_LENGTH 16
 global u8 HEX[] = "0123456789ABCDEF";
 
-intern u32 hex_u64_write(u8* dest, u64 value) {
-  u32 len = HEX_LENGTH;
-  for (i32 i = len - 1; i >= 0; --i) {
+void u64_hex_write(u8* dest, u64 value) {
+  LoopReverse(i, HEX_LENGTH) {
     dest[i] = HEX[value & 0xF];
     value >>= 4;
   }
-  return len;
 }
 
 ////////////////////////////////////////////////////////////////////////
 // Great sprintf
 
-intern u32 my_sprintf(u8* buf, String fmt, VaList argc) {
-  // Calculate length
-  if (buf == null) {
-    u32 length = 0;
-    for (u8* p = fmt.str; p < fmt.str+fmt.size; ++p) {
-      if (*p == '%') {
-        ++p; // skip '%'
-        switch (*p) {
-          case 'i': {
-            if (str_match(str_make(p+1, 2), "64")) {
-              p += 2; // skip "64"
-              i64 val = va_arg(argc, i64);
-              length += i64_length(val);
-            }
-            else {
-              i32 val = va_arg(argc, i32);
-              length += i32_length(val);
-            }
-          } break;
-          case 'u': {
-            if (str_match(str_make(p+1, 2), "64")) {
-              p += 2; // skip "64"
-              u64 val = va_arg(argc, u64);
-              length += u64_length(val);
-            }
-            else {
-              u32 val = va_arg(argc, u32);
-              length += u32_length(val);
-            }
-          } break;
-          case 'f': {
-            f64 val = va_arg(argc, f64); // f64 - because of compiler
-            #define DefaultFloatPrecision 6
-            length += f64_length(val, DefaultFloatPrecision);
-          } break;
-          case 's': {
-            String val = va_arg(argc, String);
-            length += val.size;
-          } break;
-          case 'c': {
-            i32 val = va_arg(argc, i32); // i32 - because of compiler
-            UnusedVariable(val);
-            length += 1;
-          } break;
-          case '.': {
-            ++p;                         // skip '.'
-            u32 precision = *p - '0';    // 'num' - '0'
-            ++p;                         // skip number
-            Assert(*p == 'f');
-            f64 val = va_arg(argc, f64); // f64 - because of compiler
-            length += f64_length(val, precision);
-          } break;
-          case 'p': {
-            va_arg(argc, void*);
-            length += HEX_LENGTH;
-          }; break;
-          case '%': {
-            length += 1;
-          }; break;
-        }
-      }
-      else {
-        ++length;
-      }
-    }
-    return length;
-  }
+struct Writer {
+  u8* buf;
+  u32 pos;
+};
 
-  // Write into buffer
-  u32 written = 0;
-  for (u8* p = fmt.str; p < fmt.str+fmt.size; ++p) {
-    if (*p == '%') {
-      ++p; // skip '%'
-      switch (*p) {
-        case 'i': {
-          if (str_match(str_make(p+1, 2), "64")) {
-            p += 2; // skip "64"
-            i64 val = va_arg(argc, i64);
-            u32 len = i64_write(buf + written, val);
-            written += len;
-          }
-          else {
-            i32 val = va_arg(argc, i32);
-            u32 len = i32_write(buf + written, val);
-            written += len;
-          }
-        } break;
-        case 'u': {
-          if (str_match(str_make(p+1, 2), "64")) {
-            p += 2; // skip "64"
-            u64 val = va_arg(argc, u64);
-            u32 len = u64_write(buf + written, val);
-            written += len;
-            break;
-          }
-          else {
-            u32 val = va_arg(argc, u32);
-            u32 len = u32_write(buf + written, val);
-            written += len;
-          }
-        } break;
-        case 'f': {
-          f64 val = va_arg(argc, f64); // f64 - because of compiler
-          u32 len = f64_write(buf + written, val, DefaultFloatPrecision);
-          written += len;
-        } break;
-        case 's': {
-          String val = va_arg(argc, String);
-          MemCopy(buf+written, val.str, val.size);
-          written += val.size;
-        } break;
-        case 'c': {
-          char val = va_arg(argc, i32); // i32 - because of compiler
-          buf[written] = val;
-          written += 1;
-        } break;
-        case '.': {
-          ++p;                      // skip '.'
-          u32 precision = *p - '0'; // 'num' - '0'
-          ++p;                      // skip number
-          f64 val = va_arg(argc, f64);
-          u32 len = f64_write(buf + written, val, precision);
-          written += len;
-        } break;
-        case 'p': {
+void w_bytes(Writer* w, u8* src, u32 len) {
+  if (w->buf) MemCopy(w->buf + w->pos, src, len);
+  w->pos += len;
+}
+
+void w_byte(Writer* w, u8 b) {
+  if (w->buf) w->buf[w->pos] = b;
+  w->pos += 1;
+}
+
+intern u32 my_sprintf(u8* buf, String fmt, VaList argc) {
+  Writer w = {buf, 0};
+  for (u8 *p = fmt.str, *end = p + fmt.size; p < end; ++p) {
+    if (*p != '%') { w_byte(&w, *p); continue; }
+    ++p; // skip '%'
+    switch (*p) {
+      case 'i': {
+        if (p + 2 < end && (p[1] == '6' && p[2] == '4')) {
+          p += 2;
+          i64 val = va_arg(argc, i64);
+          u8 tmp[32];
+          u32 len = i64_write(tmp, val);
+          w_bytes(&w, tmp, len);
+        } else {
+          i32 val = va_arg(argc, i32);
+          u8 tmp[32];
+          u32 len = i32_write(tmp, val);
+          w_bytes(&w, tmp, len);
+        }
+      } break;
+      case 'u': {
+        if (p + 2 < end && (p[1] == '6' && p[2] == '4')) {
+          p += 2;
           u64 val = va_arg(argc, u64);
-          u32 len = hex_u64_write(buf + written, val);
-          written += len;
-        }; break;
-        case '%': {
-          buf[written] = '%';
-          written += 1;
-        }; break;
-      }
-    } else {
-      buf[written++] = *p;
-    };
+          u8 tmp[32];
+          u32 len = u64_write(tmp, val);
+          w_bytes(&w, tmp, len);
+        } else {
+          u32 val = va_arg(argc, u32);
+          u8 tmp[32];
+          u32 len = u32_write(tmp, val);
+          w_bytes(&w, tmp, len);
+        }
+      } break;
+      case 'f': {
+        f64 val = va_arg(argc, f64);
+        if (is_inf(val)) {
+          String inf = "inf";
+          w_bytes(&w, inf.str, inf.size);
+        } else if (is_nan(val)) {
+          String nan = "nan";
+          w_bytes(&w, nan.str, nan.size);
+        } else {
+          u32 float_precision = 6;
+          u8 tmp[64];
+          u32 len = f64_write(tmp, val, float_precision);
+          w_bytes(&w, tmp, len);
+        }
+      } break;
+      case '.': {
+        u32 precision = *++p - '0';
+        ++p; // skip number, land on 'f'
+        f64 val = va_arg(argc, f64);
+        if (is_inf(val)) {
+          String inf = "inf";
+          w_bytes(&w, inf.str, inf.size);
+        } else if (is_nan(val)) {
+          String nan = "nan";
+          w_bytes(&w, nan.str, nan.size);
+        } else {
+          u8 tmp[64];
+          u32 len = f64_write(tmp, val, precision);
+          w_bytes(&w, tmp, len);
+        }
+      } break;
+      case 's': {
+        String val = va_arg(argc, String);
+        w_bytes(&w, val.str, val.size);
+      } break;
+      case 'c': {
+        w_byte(&w, (u8)va_arg(argc, i32));
+      } break;
+      case 'p': {
+        u64 val = va_arg(argc, u64);
+        u8 tmp[HEX_LENGTH];
+        u64_hex_write(tmp, val);
+        w_bytes(&w, tmp, HEX_LENGTH);
+      } break;
+      case '%': {
+        w_byte(&w, '%');
+      } break;
+    }
   }
-  return written;
+  return w.pos;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -469,28 +336,20 @@ b32 str_matchi(String str0, String str1) {
   return true;
 }
 
-u64 str_find_needle(String string, u64 start_pos, String needle) {
+u64 str_find_needle(String hay, String needle) {
+  if (needle.size == 0 || needle.size > hay.size) return hay.size;
   u8 first_char = needle.str[0];
   u8 last_char = needle.str[needle.size-1];
-  u8* p = string.str + start_pos;
-  u64 stop_offset = Max(string.size + 1, needle.size) - needle.size;
-  u8* stop_p = string.str + stop_offset;
-  if (needle.size > 0) {
-    for (;p < stop_p; ++p) {
-      if (*p == first_char) {
-        if (p[needle.size-1] == last_char) {
-          if (str_match(str_range(p, p+needle.size), needle)) {
-            break;
-          }
-        }
+  u8* p = hay.str;
+  u8* end = hay.str + hay.size - needle.size + 1;
+  for (;p < end; ++p) {
+    if (p[0] == first_char && p[needle.size-1] == last_char) {
+      if (str_match(str_range(p, p+needle.size), needle)) {
+        return u64(p - hay.str);
       }
     }
   }
-  u64 res = string.size;
-  if (p < stop_p) {
-    res = (u64)(p - string.str);
-  }
-  return res;
+  return hay.size;
 }
 
 b32 str_ends_with(String string, String end) {
@@ -560,17 +419,17 @@ String push_str_copy(Allocator arena, String s) {
 }
 
 String push_strfv(Allocator arena, String fmt, VaList args) {
-  VaList va_list_argc;
-  va_copy(va_list_argc, args); 
-  u32 need_bytes = my_sprintf(null, fmt, va_list_argc);
-  va_end(va_list_argc);
+  VaList tmp;
+  va_copy(tmp, args); 
+  u32 need_bytes = my_sprintf(null, fmt, tmp);
+  va_end(tmp);
   u8* buf = push_buffer(arena, need_bytes + 1);
-  va_copy(va_list_argc, args); 
-  u32 final_size = my_sprintf(buf, fmt, va_list_argc);
-  va_end(va_list_argc);
-  String result = str_make(buf, final_size);
-  result.str[result.size] = 0;
-  return result;
+  va_copy(tmp, args); 
+  u32 final_size = my_sprintf(buf, fmt, tmp);
+  va_end(tmp);
+  String res = str_make(buf, final_size);
+  res.str[res.size] = 0;
+  return res;
 }
 
 String push_strf(Allocator arena, String fmt, ...) {
@@ -584,28 +443,28 @@ String push_strf(Allocator arena, String fmt, ...) {
 ////////////////////////////////////////////////////////////////////////
 // String List Construction Functions
 
-StringNode* str_list_push_node(StringList* list, StringNode* node) {
-  sll_queue_push(list->first, list->last, node);
-  list->node_count += 1;
-  list->total_size += node->string.size;
+StringNode* str_list_push_node(StringList& list, StringNode* node) {
+  sll_list_queue_push(list, node);
+  list.node_count += 1;
+  list.total_size += node->string.size;
   return node;
 }
 
-StringNode* str_list_push_node_set_string(StringList* list, StringNode* node, String string) {
-  sll_queue_push(list->first, list->last, node);
-  list->node_count += 1;
-  list->total_size += string.size;
+StringNode* str_list_push_node_set_string(StringList& list, StringNode* node, String string) {
+  sll_list_queue_push(list, node);
+  list.node_count += 1;
+  list.total_size += string.size;
   node->string = string;
   return node;
 }
 
-StringNode* str_list_push(Allocator arena, StringList* list, String string) {
+StringNode* str_list_push(Allocator arena, StringList& list, String string) {
   StringNode* node = push_struct(arena, StringNode);
   str_list_push_node_set_string(list, node, string);
   return node;
 }
 
-StringNode* str_list_pushf(Allocator arena, StringList* list, String fmt, ...) {
+StringNode* str_list_pushf(Allocator arena, StringList& list, String fmt, ...) {
   VaList args;
   va_start(args, fmt);
   String string = push_strfv(arena, fmt, args);
@@ -633,24 +492,14 @@ String str_next_word(String line, u32& start) {
   return str_make(line.str + token_start, start - token_start);
 }
 
-String str_trim(String string) {
-  String result;
-  u8* s = string.str;
-  while (char_is_space(*s)) {
-    ++s;
-  }
-  result.str = s;
-  if (*s) {
-    u8* e = string.str + string.size;
-    while (char_is_space(*(e-1))) {
-      --e;
-    }
-    result.size = e - result.str;
-  }
-  return result;
+String str_trim(String str) {
+  u8 *s = str.str, *e = s + str.size;
+  while (s < e && char_is_space(*s)) ++s;
+  while (e > s && char_is_space(*(e - 1))) --e;
+  return str_make(s, u32(e - s));
 }
 
-i32 str_index_of(String string, u8 c) {
+i32 str_index_of_char(String string, u8 c) {
   Loop (i, string.size) {
     if (string.str[i] == c) {
       return i;
@@ -759,94 +608,73 @@ f32 f32_from_str(String str) { return f64_from_str(str); };
 ////////////////////////////////////////////////////////////////////////
 // String Path Helpers
 
-String str_chop_past_last_slash(String string){
-  if (string.size > 0) {
-    u8* ptr = string.str + string.size - 1;
-    for (; ptr >= string.str; --ptr) {
-      if (*ptr == '/' || *ptr == '\\') {
-        break;
-      }
-    }
-    if (ptr >= string.str) {
-      string.size = (u32)(ptr - string.str) + 1;
-    } else {
-      string.size = 0;
-    }
+u8* str_find_last_slash(String s) {
+  u8* p = s.str + s.size - 1;
+  for (; p >= s.str; --p) {
+    if (char_is_slash(*p)) return p;
   }
-  return string;
+  return s.str - 1;
 }
 
-String str_skip_slash(String string) {
-  u8* ptr = string.str + string.size - 1;
-  for (; ptr >= string.str; --ptr) {
-    if (*ptr == '/' || *ptr == '\\') {
-      break;
-    }
-  }
-  if (ptr >= string.str) {
-    string.size = (u32)(ptr - string.str);
-  } else {
-    string.size = 0;
-  }
-  return string;
+String str_chop_last_slash(String s) {
+  u8* p = str_find_last_slash(s);
+  if (p >= s.str) s.size = u32(p - s.str);
+  return s;
 }
 
-String str_chop_last_slash(String string) {
-  u8* ptr = string.str + string.size - 1;
-  for (; ptr >= string.str; --ptr) {
-    if (*ptr == '/' || *ptr == '\\') {
-      break;
-    }
-  }
-  if (ptr >= string.str) {
-    string.size = (u32)(ptr - string.str);
-  } else {
-    string.size = 0;
-  }
-  return string;
+String str_chop_past_last_slash(String s) {
+  u8* p = str_find_last_slash(s);
+  if (p >= s.str) s.size = u32(p - s.str) + 1;
+  return s;
 }
 
-String str_skip_last_slash(String string) {
-  u8* ptr = string.str + string.size - 1;
-  for (; ptr >= string.str; --ptr) {
-    if (*ptr == '/' || *ptr == '\\') {
-      break;
+String str_skip_slash(String s) {
+  u8* p = s.str;
+  for (; p < s.str+s.size; ++p) {
+    if (char_is_slash(*p)) {
+      ++p;
+      return str_make(p, u32(s.str + s.size - p));
     }
   }
-  if (ptr >= string.str) {
-    ptr += 1;
-    string.size = (u32)(string.str + string.size - ptr);
-    string.str = ptr;
-  }
-  return string;
+  return s;
 }
 
-String str_chop_last_dot(String string) {
-  String result = string;
-  u32 p = string.size;
+String str_skip_last_slash(String s) {
+  u8* p = str_find_last_slash(s);
+  if (p >= s.str) {
+    p += 1;
+    s.size = (u32)(s.str + s.size - p);
+    s.str = p;
+  }
+  return s;
+}
+
+String str_chop_last_dot(String s) {
+  String res = s;
+  u32 p = s.size;
   for (; p > 0;) {
     p -= 1;
-    if (string.str[p] == '.') {
-      result = str_prefix(string, p);
+    if (s.str[p] == '.') {
+      res = str_prefix(s, p);
       break;
     }
   }
-  return result;
+  return res;
 }
 
-String str_skip_last_dot(String string) {
-  u8* ptr = string.str + string.size - 1;
-  for (; ptr >= string.str; --ptr) {
+String str_skip_last_dot(String s) {
+  u8* ptr = s.str + s.size - 1;
+  for (; ptr >= s.str; --ptr) {
     if (*ptr == '.') {
       break;
     }
   }
-  if (ptr >= string.str) {
+  if (ptr >= s.str) {
     ptr += 1;
-    string.size = (u32)(string.str + string.size - ptr);
-    string.str = ptr;
+    s.size = (u32)(s.str + s.size - ptr);
+    s.str = ptr;
   }
-  return string;
+  return s;
 }
 
 ////////////////////////////////////////////////////////////////////////
