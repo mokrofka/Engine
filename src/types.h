@@ -60,15 +60,6 @@ struct Light {
   b32 cast_shadow;
 };
 
-struct TextureDesc {
-  u32 width;
-  u32 height;
-  union {
-    u8* data;
-    u8* cube[6];
-  };
-};
-
 struct Timer {
   f32 interval;
   f32 acc;

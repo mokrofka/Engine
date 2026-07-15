@@ -13,3 +13,5 @@ import com;
 #define FS_Entry [shader("fragment")]
 #define CS_Entry [shader("compute")]
 
+#define st state[0]
+

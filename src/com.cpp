@@ -2815,36 +2815,36 @@ void foo_js() {
 void com_init() {
   Scratch scratch;
 
-  var arr = array_make(String, scratch);
-  array_push(arr, S("slangc"), S("hello"), S("-target"), S("spriv"), S("-g"), S("-o"));
+  // var arr = array_make(String, scratch);
+  // array_push(arr, S("slangc"), S("hello"), S("-target"), S("spriv"), S("-g"), S("-o"));
 
-  String hay = "some sentence I have here";
-  String needle = "I";
-  Info("%s", str_make(hay.str + str_find_needle(hay, needle), needle.size));
-  Info("%s", str_chop_last_slash("hello"));
-  Info("%s", str_skip_last_slash("hello/my/sir"));
-  Info("%s", str_skip_slash("hello/my/sir"));
-  f32 x = 1.0/0;
-  if (is_inf(x)) {
-    Info("inf %f", x);
-    printf("%f\n", x);
-  }
-  x = 1.0;
-  printf("%f", x);
-  printf("%f", x);
-  printf("%.1f", x);
-  fflush(stdout);
-  Info("%.1f", x);
-  if (is_finite(x)) {
-    Info("finite %f", x);
-    printf("%f\n", x);
-  }
-  x = 0.0 / 0.0;
-  if (is_nan(x)) {
-    Info("nan %f", x);
-    printf("%f\n", x);
-  }
-  Info("%p", &x);
+  // String hay = "some sentence I have here";
+  // String needle = "I";
+  // Info("%s", str_make(hay.str + str_find_needle(hay, needle), needle.size));
+  // Info("%s", str_chop_last_slash("hello"));
+  // Info("%s", str_skip_last_slash("hello/my/sir"));
+  // Info("%s", str_skip_slash("hello/my/sir"));
+  // f32 x = 1.0/0;
+  // if (is_inf(x)) {
+  //   Info("inf %f", x);
+  //   printf("%f\n", x);
+  // }
+  // x = 1.0;
+  // printf("%f", x);
+  // printf("%f", x);
+  // printf("%.1f", x);
+  // fflush(stdout);
+  // Info("%.1f", x);
+  // if (is_finite(x)) {
+  //   Info("finite %f", x);
+  //   printf("%f\n", x);
+  // }
+  // x = 0.0 / 0.0;
+  // if (is_nan(x)) {
+  //   Info("nan %f", x);
+  //   printf("%f\n", x);
+  // }
+  // Info("%p", &x);
   // MakeId(A_ID)
   // struct A {
   //   A_ID next;
@@ -3753,7 +3753,9 @@ void game_init() {
 
   {
     ProfBlock("cube");
-    r_texture_cube_load("night_cubemap");
+    // R_Texture cubemap = r_texture_cube_load("night_cubemap");
+    R_Texture cubemap = r_texture_cube_load_async("night_cubemap");
+    r_set_cubemap(cubemap);
   }
 
   {

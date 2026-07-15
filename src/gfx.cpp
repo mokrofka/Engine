@@ -1939,7 +1939,7 @@ Gfx_View gfx_view_make(Gfx_ViewDesc desc) {
   };
   VK_CHECK(g.CreateImageView(vkdevice, &view_info, g.allocator, &view.h));
 
-  Gfx_View res = {pool_push(g.views, view)};
+  Gfx_View res = {pool_push(img.type == Gfx_ImageType_Cube ? g.cubemap_views : g.views, view)};
   VkDescriptorImageInfo descriptor_image_info = {
     .imageView = view.h,
     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -1948,7 +1948,7 @@ Gfx_View gfx_view_make(Gfx_ViewDesc desc) {
     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
     .dstSet = g.descriptor_sets,
     .dstBinding = (img.type == Gfx_ImageType_2D || img.type == Gfx_ImageType_Array) ? Bindings::Textures : Bindings::CubeTextures,
-    .dstArrayElement = img.type == Gfx_ImageType_Cube ? g.cube_idx++ : res.idx,
+    .dstArrayElement = res.idx,
     .descriptorCount = 1,
     .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
     .pImageInfo = &descriptor_image_info,

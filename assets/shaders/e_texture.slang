@@ -3,7 +3,7 @@
 VS_Entry VSOutput vs_main(VSInput in) {
   VSOutput o;
   DrawCallData data = get_data(in.draw_id);
-  o.pos = st().projection_view * data.model * v4(in.pos, 1.0);
+  o.pos = st.projection_view * data.model * v4(in.pos, 1.0);
   o.uv = in.uv;
   o.id = get_id(in.draw_id);
   return o;
