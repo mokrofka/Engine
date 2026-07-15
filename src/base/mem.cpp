@@ -154,11 +154,12 @@ void arena_destroy(Arena& arena) {
 }
 
 void arena_clear(Arena& arena) { 
-  arena.pos = 0;
   AsanPoisonMemRegion(arena.base, arena.cmt);
 #if MEM_TRACK
+  mem_track_on_free(arena.info, arena.pos);
   // TODO: traverse tree
 #endif
+  arena.pos = 0;
 };
 
 intern u8* arena_alloc(Arena* arena, u64 size, u64 align) {

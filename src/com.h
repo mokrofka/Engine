@@ -17,6 +17,7 @@
 // glb loader
 // introspection
 // font rendering
+// async cubemap
 
 #include "types.h"
 #include "gfx.h"

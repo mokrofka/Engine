@@ -692,6 +692,7 @@ struct Gfx_State {
   Pool<VK_Pipeline, Gfx_MaxPipelines, Gfx_Pipeline> pipelines;
   Pool<VK_Image, Gfx_MaxImages, Gfx_Image> images;
   Pool<VK_View, Gfx_MaxViews, Gfx_View> views;
+  Pool<VK_View, Gfx_MaxViews, Gfx_View> cubemap_views;
   Pool<VK_Sampler, Gfx_MaxSamplers, Gfx_Sampler> samplers;
 
   u32 cube_idx;

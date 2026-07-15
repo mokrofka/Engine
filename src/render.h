@@ -6,6 +6,7 @@ const u32 R_MaxMaterials  = 32;
 const u32 R_MaxLights     = 32;
 const u32 R_MaxMeshes     = 32;
 const u32 R_MaxTextures   = 32;
+const u32 R_MaxCubemaps   = 32;
 const u32 R_MaxFonts      = 32;
 const u32 R_MaxDebugLines = KB(1);
 const u32 R_MaxTextDraws  = 32;
@@ -14,7 +15,7 @@ struct R_KeyToShaderPipeline { String name; Gfx_PipelineDesc pipeline_desc; };
 u64 hash(R_KeyToShaderPipeline x);
 b32 equal(R_KeyToShaderPipeline a, R_KeyToShaderPipeline b);
 
-#include "vk_bindings.h"
+#include "vk_bindings.slang"
 
 MakeId(R_Texture)
 MakeId(R_Mesh)
@@ -46,7 +47,10 @@ struct Vertex {
 struct Texture {
   u32 width;
   u32 height;
-  u8* data;
+  union {
+    u8* data;
+    u8* cube[6];
+  };
 };
 
 struct MeshDesc {
@@ -313,14 +317,16 @@ struct R_State {
   Queue<R_AsyncMesh, 12> async_mesh;
   Mutex async_stage_mutex;
   R_Texture dummy_texture;
+  R_Texture dummy_cubemap;
   R_Texture dummy_mesh;
+  R_Texture cur_cubemap;
 
   Gfx_Buffer gpu_global_buf;
   Gfx_Buffer gpu_entities_buf;
   Gfx_Buffer gpu_entities_indices_buf;
   Gfx_Buffer gpu_materials_buf;
   Gfx_Buffer gpu_drawcall_ctx_buf;
-  R_GlobalStateGPU* gpu_global;
+  GpuState* gpu_state;
   R_EntityGPU* gpu_entities;
   u32* gpu_entities_indices;
   R_MaterialGPU* gpu_materials;
@@ -338,7 +344,10 @@ Texture r_image_load(String name);
 R_Texture r_texture_load(String name);
 R_Texture r_texture_load_async(String name);
 R_Texture r_texture_make(Texture tex);
+R_Texture r_texture_cube_make(Texture tex);
 R_Texture r_texture_cube_load(String dir);
+R_Texture r_texture_cube_load_async(String dir);
+void r_set_cubemap(R_Texture cubemap);
 void r_texture_update(R_Texture t, u8* data);
 void r_texture_readback(R_Texture t, u8* dst);
 void r_texture_destroy(R_Texture t);

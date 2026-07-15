@@ -25,6 +25,7 @@ typedef float3x3 mat3;
 typedef float4x4 mat4;
 
 #define VkBind(idx) [[vk::binding(idx, 0)]]
+#define alignas(x)
 
 v4 operator*(mat4 mat, v4 vec) { return mul(mat, vec); }
 mat4 operator*(mat4 a, mat4 b) { return mul(a, b); }
@@ -83,17 +84,17 @@ struct DrawCallData {
   u32 mat;
 };
 
-struct State {
-  mat4 projection_view;
-  mat4 projection;
-  mat4 view;
-  mat4 mat;
-  v4 ambient_color;
-  f32 time;
-  u32 point_light_count;
-  u32 dir_light_count;
-  u32 spot_light_count;
-};
+// struct State {
+//   mat4 projection_view;
+//   mat4 projection;
+//   mat4 view;
+//   mat4 mat;
+//   v4 ambient_color;
+//   f32 time;
+//   u32 point_light_count;
+//   u32 dir_light_count;
+//   u32 spot_light_count;
+// };
 
 struct VSInput {
   v3 pos;
@@ -120,12 +121,12 @@ struct PushConstants {
 [[vk::push_constant]]
 PushConstants push;
 
-#include "../../src/vk_bindings.h"
+#include "../../src/vk_bindings.slang"
 
-VkBind(Bindings.State) StructuredBuffer<State> state;
+VkBind(Bindings.State) StructuredBuffer<GpuState> state;
 VkBind(Bindings.Textures) Texture2D textures[];
 VkBind(Bindings.Samplers) SamplerState samplers[];
-VkBind(Bindings.CubeTextures) TextureCube cube_texture;
+VkBind(Bindings.CubeTextures) TextureCube cube_texture[];
 VkBind(Bindings.Drawinfo) StructuredBuffer<IndirectDrawCall> drawinfo;
 VkBind(Bindings.Entities) StructuredBuffer<Entity> entities;
 VkBind(Bindings.Materials) StructuredBuffer<Material> materials;
@@ -143,10 +144,6 @@ u32 get_id(u32 draw_id) {
 }
 
 v2 flip_uv_y(v2 uv) { return v2(uv.x, -uv.y); }
-
-State st() {
-  return state[0];
-}
 
 f32 Max(f32 a, f32 b)                 { return a > b ? a : b; }
 f32 Min(f32 a, f32 b)                 { return a < b ? a : b; }
