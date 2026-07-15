@@ -528,14 +528,13 @@ Slice<OS_FileInfo> os_file_iter_directory(Allocator arena, String path, OS_FileI
 ////////////////////////////////////////////////////////////////////////
 // Processes
 
-OS_Handle os_process_launch(StringList list) {
+OS_Handle os_process_launch(Slice<String> arr) {
   Scratch scratch;
   OS_Handle handle = {};
-  char** argv = push_array(scratch, char*, list.node_count + 1);
-  argv[list.node_count] = null;
-  u32 i = 0;
-  LoopNode (n, list.first) {
-    argv[i++] = (char*)n->string.str;
+  char** argv = push_array(scratch, char*, arr.count + 1);
+  argv[arr.count] = null;
+  Loop (i, arr.count) {
+    argv[i] = (char*)arr[i].str;
   }
   pid_t pid = 0;
   int spawn_code = posix_spawnp(&pid, argv[0], null, null, argv, null);
@@ -543,6 +542,16 @@ OS_Handle os_process_launch(StringList list) {
     handle.v = spawn_code;
   }
   return handle;
+}
+
+OS_Handle os_process_launch(StringList list) {
+  Scratch scratch;
+  var arr = push_slice(scratch, String, list.node_count);
+  u32 i = 0;
+  LoopNode (it, list.first) {
+    arr[i++] = it->string;
+  }
+  return os_process_launch(arr);
 }
 
 i32 os_process_join(OS_Handle handle) {

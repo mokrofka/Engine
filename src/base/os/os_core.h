@@ -145,6 +145,7 @@ Slice<OS_FileInfo> os_file_iter_directory(Allocator arena, String path, OS_FileI
 
 ///////////////////////////////////
 // Processes
+OS_Handle os_process_launch(Slice<String> arr);
 OS_Handle os_process_launch(StringList list);
 i32       os_process_join(OS_Handle handle);
 

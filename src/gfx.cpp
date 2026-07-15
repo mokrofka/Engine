@@ -2709,7 +2709,6 @@ void gfx_idle() {
 
 void gfx_init(Gfx_Environment environment) {
   Gfx_State& g = st->gfx;
-  Gfx_State& vk = st->gfx;
   g.environment = environment;
   g.arena = arena_make("gfx arena");
 
@@ -2731,47 +2730,47 @@ void gfx_init(Gfx_Environment environment) {
   ///////////////////////////////////
   // Device stuff
   {
-    vk.GetDeviceQueue(vkdevice, vk.device.graphics_queue_family_idx, 0, &vk.device.graphics_queue);
-    vk.GetDeviceQueue(vkdevice, vk.device.transfer_queue_family_idx, 0, &vk.device.transfer_queue);
-    vk.GetDeviceQueue(vkdevice, vk.device.compute_queue_family_idx, 0, &vk.device.compute_queue);
+    g.GetDeviceQueue(vkdevice, g.device.graphics_queue_family_idx, 0, &g.device.graphics_queue);
+    g.GetDeviceQueue(vkdevice, g.device.transfer_queue_family_idx, 0, &g.device.transfer_queue);
+    g.GetDeviceQueue(vkdevice, g.device.compute_queue_family_idx, 0, &g.device.compute_queue);
     Info("Queues obtained");
     VkCommandPoolCreateInfo graphics_pool_create_info = {
       .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
       .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-      .queueFamilyIndex = vk.device.graphics_queue_family_idx,
+      .queueFamilyIndex = g.device.graphics_queue_family_idx,
     };
-    VK_CHECK(vk.CreateCommandPool(vkdevice, &graphics_pool_create_info, vk.allocator, &vk.device.cmd_pool));
+    VK_CHECK(g.CreateCommandPool(vkdevice, &graphics_pool_create_info, g.allocator, &g.device.cmd_pool));
     Info("Graphics command pool created");
-    vk.images_in_flight = vk.device.surface_capabilities.minImageCount;
-    vk.frames_in_flight = vk.images_in_flight - 1;
+    g.images_in_flight = g.device.surface_capabilities.minImageCount;
+    g.frames_in_flight = g.images_in_flight - 1;
     // Choose a image format
-    vk.swapchain.format = vk.device.surface_formats[0];
-    Loop (i, vk.device.surface_format_count) {
-      VkSurfaceFormatKHR format = vk.device.surface_formats[i];
+    g.swapchain.format = g.device.surface_formats[0];
+    Loop (i, g.device.surface_format_count) {
+      VkSurfaceFormatKHR format = g.device.surface_formats[i];
       if (format.format == VK_FORMAT_B8G8R8A8_UNORM && // darker
       // if (format.format == VK_FORMAT_B8G8R8A8_SRGB &&
           format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) 
       {
-        vk.swapchain.format = format;
+        g.swapchain.format = format;
         break;
       }
     }
     // Choose present mode
     VkPresentModeKHR present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
-    Loop (i, vk.device.present_mode_count) {
-      VkPresentModeKHR mode = vk.device.present_modes[i];
+    Loop (i, g.device.present_mode_count) {
+      VkPresentModeKHR mode = g.device.present_modes[i];
       if (mode == VK_PRESENT_MODE_FIFO_KHR) {
         present_mode = mode;
         break;
       }
     }
-    vk.swapchain.present_mode = present_mode;
+    g.swapchain.present_mode = present_mode;
     vk_swapchain_create();
     Info("Swapchain created");
-    Loop (i, vk.frames_in_flight) {
-      vk.cmds_render[i] = vk_cmd_alloc(vk.device.cmd_pool);
-      vk.cmds_frames_upload[i] = vk_cmd_alloc(vk.device.cmd_pool);
-      vk.cmds_upload[i] = vk_cmd_alloc(vk.device.cmd_pool);
+    Loop (i, g.frames_in_flight) {
+      g.cmds_render[i] = vk_cmd_alloc(g.device.cmd_pool);
+      g.cmds_frames_upload[i] = vk_cmd_alloc(g.device.cmd_pool);
+      g.cmds_upload[i] = vk_cmd_alloc(g.device.cmd_pool);
     }
     Info("Command buffers created");
   }
