@@ -1,9 +1,8 @@
 {
-  // hell
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run game",
+      "name": "Run",
       "type": "lldb-dap",
       "request": "launch",
       "program": "${workspaceFolder}/bin/exe",
@@ -25,6 +24,15 @@
       "request": "launch",
       "program": "${workspaceFolder}/bin/preprocessor",
       "cwd": "${workspaceFolder}/bin",
+      "console": "internalConsole",
+    },
+    {
+      "name": "Build and Run",
+      "type": "lldb-dap",
+      "request": "launch",
+      "program": "${workspaceFolder}/bin/exe",
+      "cwd": "${workspaceFolder}/bin",
+      "preLaunchTask": "Build",
       "console": "internalConsole",
     }
   ]

@@ -61,6 +61,7 @@ struct OS_Watch{
 typedef void ThreadEntryPointFn(void* p);
 struct Thread { u64 v; };
 struct Mutex { u64 v; };
+struct RWMutex { u64 v; };
 struct CondVar { u64 v; };
 struct Semaphore { u64 v; };
 struct Barrier { u64 v; };
@@ -145,37 +146,44 @@ Slice<OS_FileInfo> os_file_iter_directory(Allocator arena, String path, OS_FileI
 
 ///////////////////////////////////
 // Processes
-OS_Handle os_process_launch(Slice<String> arr);
-OS_Handle os_process_launch(StringList list);
+OS_Handle os_process_make(Slice<String> arr);
+OS_Handle os_process_make(StringList list);
 i32       os_process_join(OS_Handle handle);
 
 ///////////////////////////////////
 // Threads
-Thread os_thread_launch(ThreadEntryPointFn* func, void *ptr);
+Thread os_thread_make(ThreadEntryPointFn* func, void* ptr);
 b32 os_thread_join(Thread handle);
 void os_thread_detach(Thread handle);
 
 ///////////////////////////////////
 // Sync primitives
 Mutex os_mutex_make();
-Mutex os_mutex_alloc();
-void  os_mutex_release(Mutex mutex);
+void  os_mutex_destroy(Mutex mutex);
 void  os_mutex_lock(Mutex mutex);
 void  os_mutex_unlock(Mutex mutex);
+b32   os_mutex_try_lock(Mutex mutex); // returns 1 on success
 
-CondVar os_cond_var_alloc();
-void    os_cond_var_release(CondVar cv);
+RWMutex os_rw_mutex_make();
+void os_rw_mutex_destroy(RWMutex mutex);
+void os_rw_mutex_read_lock(RWMutex mutex);
+void os_rw_mutex_write_lock(RWMutex mutex);
+void os_rw_mutex_unlock(RWMutex mutex);
+
+CondVar os_cond_var_make();
+void    os_cond_var_destroy(CondVar cv);
 void    os_cond_var_wait(CondVar cv, Mutex mutex);
-void    os_cond_var_signal(CondVar cv);
-void    os_cond_var_broadcast(CondVar cv);
+void    os_cond_var_wake_one(CondVar cv);
+void    os_cond_var_wake_all(CondVar cv);
 
-Semaphore os_semaphore_alloc(u32 count);
-void      os_semaphore_release(Semaphore semaphore);
+Semaphore os_semaphore_make(u32 count);
+void      os_semaphore_destroy(Semaphore semaphore);
 void      os_semaphore_take(Semaphore semaphore);
+b32       os_semaphore_try_take(Semaphore semaphore); // returns 1 on success
 void      os_semaphore_drop(Semaphore semaphore);
 
-Barrier   os_barrier_alloc(u32 count);
-void      os_barrier_release(Barrier barrier);
+Barrier   os_barrier_make(u32 count);
+void      os_barrier_destroy(Barrier barrier);
 void      os_barrier_wait(Barrier barrier);
 
 ////////////////////////////////////////////////////////////////////////

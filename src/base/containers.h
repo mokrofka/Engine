@@ -23,6 +23,8 @@ struct Array {
     Assert(idx < cap);
     return data[idx];
   }
+  T* begin() { return data; }
+  T* end()   { return data + count; }
 };
 
 template<typename T, i32 N> Slice<T> slice(Array<T, N>& arr) {
@@ -65,6 +67,7 @@ template<typename T, i32 N> b32 array_exists(Array<T, N>& arr, T a, b32(*fn)(T a
   }
   return false;
 }
+template<typename T, i32 N> T array_empty(Array<T, N>& arr) { return arr.count == 0; }
 
 ///////////////////////////////////
 // Darray
@@ -180,6 +183,7 @@ template<typename T> b32 array_exists_at(Darray<T>& arr, T a, u32* out_idx, b32(
   }
   return false;
 }
+template<typename T> T array_empty(Darray<T>& arr) { return arr.count == 0; }
 
 ////////////////////////////////////////////////////////////////////////
 // ArrayHandler
@@ -589,7 +593,7 @@ template<typename T, typename Handle> void pool_remove(DpoolLinkList<T, Handle>&
   p.head = h.idx;
   idll_list_remove(p.data, p, h.idx);
 }
-template<typename T, typename Handle> Handle pool_get_handler(DpoolLinkList<T, Handle>& p, u32 idx) {
+template<typename T, typename Handle> Handle pool_get_handle(DpoolLinkList<T, Handle>& p, u32 idx) {
   Handle res = {idx, p.data[idx].gen};
   return res;
 }

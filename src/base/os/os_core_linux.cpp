@@ -58,10 +58,11 @@ struct OS_LNX_FileIter {
 };
 
 enum OS_LNX_EntityType {
-  OS_LNX_EntityType_Thread,
-  OS_LNX_EntityType_Mutex,
-  OS_LNX_EntityType_Semaphore,
-  OS_LNX_EntityType_Barrier,
+  LNX_EntityType_Thread,
+  LNX_EntityType_Mutex,
+  LNX_EntityType_MutexRW,
+  LNX_EntityType_Semaphore,
+  LNX_EntityType_Barrier,
 };
 
 struct OS_LNX_Entity {
@@ -74,6 +75,7 @@ struct OS_LNX_Entity {
       void* ptr;
     } thread;
     pthread_mutex_t mutex;
+    pthread_rwlock_t rwmutex;
     pthread_cond_t cv;
     sem_t semaphore;
     pthread_barrier_t barrier;
@@ -83,7 +85,7 @@ struct OS_LNX_Entity {
 struct OS_State {
   Arena arena;
   OS_LNX_Entity* entity_free;
-  Array<OS_LNX_Entity, 10> mutexes;
+  Array<OS_LNX_Entity, 128> entities;
   String binary_filepath;
   String binary_directory;
   String binary_name;
@@ -99,7 +101,8 @@ OS_LNX_Entity* os_lnx_entity_alloc(OS_LNX_EntityType type) {
   if (entity) {
     sll_stack_pop(os_st.entity_free);
   } else {
-    entity = push_struct(os_st.arena, OS_LNX_Entity);
+    entity = &os_st.entities[os_st.entities.count];
+    array_push(os_st.entities, {});
   }
   entity->type = type;
   return entity;
@@ -528,7 +531,7 @@ Slice<OS_FileInfo> os_file_iter_directory(Allocator arena, String path, OS_FileI
 ////////////////////////////////////////////////////////////////////////
 // Processes
 
-OS_Handle os_process_launch(Slice<String> arr) {
+OS_Handle os_process_make(Slice<String> arr) {
   Scratch scratch;
   OS_Handle handle = {};
   char** argv = push_array(scratch, char*, arr.count + 1);
@@ -544,14 +547,14 @@ OS_Handle os_process_launch(Slice<String> arr) {
   return handle;
 }
 
-OS_Handle os_process_launch(StringList list) {
+OS_Handle os_process_make(StringList list) {
   Scratch scratch;
   var arr = push_slice(scratch, String, list.node_count);
   u32 i = 0;
   LoopNode (it, list.first) {
     arr[i++] = it->string;
   }
-  return os_process_launch(arr);
+  return os_process_make(arr);
 }
 
 i32 os_process_join(OS_Handle handle) {
@@ -570,8 +573,8 @@ void* os_thread_entry(void* ctx) {
   return null;
 }
 
-Thread os_thread_launch(ThreadEntryPointFn* func, void* ptr) {
-  OS_LNX_Entity* entity = os_lnx_entity_alloc(OS_LNX_EntityType_Thread);
+Thread os_thread_make(ThreadEntryPointFn* func, void* ptr) {
+  OS_LNX_Entity* entity = os_lnx_entity_alloc(LNX_EntityType_Thread);
   entity->thread.func = func;
   entity->thread.ptr = ptr;
   pthread_create(&entity->thread.handle, null, os_thread_entry, entity);
@@ -593,21 +596,13 @@ void os_thread_detach(Thread handle) {
 // Sync primitives
 
 Mutex os_mutex_make() {
-  OS_LNX_Entity entity = {};
-  pthread_mutex_init(&entity.mutex, null);
-  array_push(os_st.mutexes, entity);
-  Mutex handle = {(u64)&os_st.mutexes[os_st.mutexes.count-1]};
-  return handle;
-}
-
-Mutex os_mutex_alloc() {
-  OS_LNX_Entity* entity = os_lnx_entity_alloc(OS_LNX_EntityType_Mutex);
+  OS_LNX_Entity* entity = os_lnx_entity_alloc(LNX_EntityType_Mutex);
   pthread_mutex_init(&entity->mutex, null);
   Mutex handle = {(u64)entity};
   return handle;
 }
 
-void os_mutex_release(Mutex mutex) {
+void os_mutex_destroy(Mutex mutex) {
   OS_LNX_Entity* entity = (OS_LNX_Entity*)mutex.v;
   pthread_mutex_destroy(&entity->mutex);
   os_lnx_entity_release(entity);
@@ -623,14 +618,47 @@ void os_mutex_unlock(Mutex mutex) {
   pthread_mutex_unlock(&entity->mutex);
 }
 
-CondVar os_cond_var_alloc() {
-  OS_LNX_Entity* entity = os_lnx_entity_alloc(OS_LNX_EntityType_Mutex);
+b32 os_mutex_try_lock(Mutex mutex) {
+  OS_LNX_Entity* entity = (OS_LNX_Entity*)mutex.v;
+  int res = pthread_mutex_trylock(&entity->mutex);
+  return res == 0;
+}
+
+RWMutex os_rw_mutex_make() {
+  OS_LNX_Entity* entity = os_lnx_entity_alloc(LNX_EntityType_Mutex);
+  pthread_rwlock_init(&entity->rwmutex, null);
+  RWMutex handle = {(u64)entity};
+  return handle;
+}
+
+void os_rw_mutex_destroy(RWMutex mutex) {
+  OS_LNX_Entity* entity = (OS_LNX_Entity*)mutex.v;
+  pthread_rwlock_destroy(&entity->rwmutex);
+}
+
+void os_rw_mutex_read_lock(RWMutex mutex) {
+  OS_LNX_Entity* entity = (OS_LNX_Entity*)mutex.v;
+  pthread_rwlock_rdlock(&entity->rwmutex);
+}
+
+void os_rw_mutex_write_lock(RWMutex mutex) {
+  OS_LNX_Entity* entity = (OS_LNX_Entity*)mutex.v;
+  pthread_rwlock_wrlock(&entity->rwmutex);
+}
+
+void os_rw_mutex_unlock(RWMutex mutex) {
+  OS_LNX_Entity* entity = (OS_LNX_Entity*)mutex.v;
+  pthread_rwlock_unlock(&entity->rwmutex);
+}
+
+CondVar os_cond_var_make() {
+  OS_LNX_Entity* entity = os_lnx_entity_alloc(LNX_EntityType_Mutex);
   pthread_cond_init(&entity->cv, null);
   CondVar handle = {(u64)entity};
   return handle;
 }
 
-void os_cond_var_release(CondVar cv) {
+void os_cond_var_destroy(CondVar cv) {
   OS_LNX_Entity *entity = (OS_LNX_Entity*)cv.v;
   pthread_cond_destroy(&entity->cv);
 }
@@ -641,24 +669,24 @@ void os_cond_var_wait(CondVar cv, Mutex mutex) {
   pthread_cond_wait(&cv_entity->cv, &mutex_entity->mutex);
 }
 
-void os_cond_var_signal(CondVar cv) {
+void os_cond_var_wake_one(CondVar cv) {
   OS_LNX_Entity* cv_entity = (OS_LNX_Entity*)cv.v;
   pthread_cond_signal(&cv_entity->cv);
 }
 
-void os_cond_var_broadcast(CondVar cv) {
+void os_cond_var_wake_all(CondVar cv) {
   OS_LNX_Entity* cv_entity = (OS_LNX_Entity*)cv.v;
   pthread_cond_broadcast(&cv_entity->cv);
 }
 
-Semaphore os_semaphore_alloc(u32 count) {
-  OS_LNX_Entity* s_entity = os_lnx_entity_alloc(OS_LNX_EntityType_Semaphore);
+Semaphore os_semaphore_make(u32 count) {
+  OS_LNX_Entity* s_entity = os_lnx_entity_alloc(LNX_EntityType_Semaphore);
   sem_init(&s_entity->semaphore, 0, count);
   Semaphore handle = {(u64)s_entity};
   return handle;
 }
 
-void os_semaphore_release(Semaphore semaphore) {
+void os_semaphore_destroy(Semaphore semaphore) {
   OS_LNX_Entity* entity = (OS_LNX_Entity*)semaphore.v;
   sem_destroy(&entity->semaphore);
 }
@@ -668,19 +696,25 @@ void os_semaphore_take(Semaphore semaphore) {
   sem_wait(&entity->semaphore);
 }
 
+b32 os_semaphore_try_take(Semaphore semaphore) {
+  OS_LNX_Entity* entity = (OS_LNX_Entity*)semaphore.v;
+  int res = sem_trywait(&entity->semaphore);
+  return res == 0;
+}
+
 void os_semaphore_drop(Semaphore semaphore) {
   OS_LNX_Entity* s_entity = (OS_LNX_Entity*)semaphore.v;
   sem_post(&s_entity->semaphore);
 }
 
-Barrier os_barrier_alloc(u64 count) {
-  OS_LNX_Entity* entity = os_lnx_entity_alloc(OS_LNX_EntityType_Barrier);
+Barrier os_barrier_make(u64 count) {
+  OS_LNX_Entity* entity = os_lnx_entity_alloc(LNX_EntityType_Barrier);
   pthread_barrier_init(&entity->barrier, null, count);
   Barrier handle = {(u64)entity};
   return handle;
 }
 
-void os_barrier_release(Barrier barrier) {
+void os_barrier_destroy(Barrier barrier) {
   OS_LNX_Entity* entity = (OS_LNX_Entity*)barrier.v;
   pthread_barrier_destroy(&entity->barrier);
 }

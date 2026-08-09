@@ -1,6 +1,6 @@
 #include "lib.h"
 
-shared_function void common_main(HotReloadData* data);
+shared_function void update_main(HotReloadData* data);
 
 i32 main(i32 count, char* args[]) {
   mem_track_init();
@@ -20,9 +20,9 @@ i32 main(i32 count, char* args[]) {
   st.lib_filepath = push_str_cat(scratch, current_dir, "/libgame.so");
   st.state.lib = st.lib_filepath;
   st.lib = os_lib_open(st.lib_filepath);
-  Assign(st.update, os_lib_get_proc(st.lib, "common_main"));
+  Assign(st.update, os_lib_get_proc(st.lib, "update_main"));
 #else
-  st.update = common_main;
+  st.update = update_main;
 #endif
 
   while (true) {
@@ -30,7 +30,7 @@ i32 main(i32 count, char* args[]) {
     os_lib_close(st.lib);
     os_sleep_ms(10);
     st.lib = os_lib_open(st.lib_filepath);
-    Assign(st.update, os_lib_get_proc(st.lib, "common_main"));
+    Assign(st.update, os_lib_get_proc(st.lib, "update_main"));
   }
 }
 

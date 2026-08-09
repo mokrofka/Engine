@@ -96,6 +96,8 @@ struct DrawCallData {
 //   u32 spot_light_count;
 // };
 
+///////////////////////////////////
+// 3D
 struct VSInput {
   v3 pos;
   v3 norm;
@@ -114,6 +116,24 @@ struct VSOutput {
   u32 id;
 };
 
+///////////////////////////////////
+// UI rect
+struct UI_Rect {
+  v2 dst_p0;
+  v2 dst_p1;
+  v2 src_p0;
+  v2 src_p1;
+  u32 texture;
+  v4 color;
+};
+
+struct UI_VSOutput {
+  v4 vert : SV_Position;
+  v2 uv;
+  v4 color;
+  u32 texture;
+};
+
 struct PushConstants {
   u32 drawcall_base;
 }
@@ -123,17 +143,19 @@ PushConstants push;
 
 #include "../../src/vk_bindings.slang"
 
-VkBind(Bindings.State) StructuredBuffer<GpuState> state;
-VkBind(Bindings.Textures) Texture2D textures[];
-VkBind(Bindings.Samplers) SamplerState samplers[];
-VkBind(Bindings.CubeTextures) TextureCube cube_texture[];
-VkBind(Bindings.Drawinfo) StructuredBuffer<IndirectDrawCall> drawinfo;
-VkBind(Bindings.Entities) StructuredBuffer<Entity> entities;
-VkBind(Bindings.Materials) StructuredBuffer<Material> materials;
-VkBind(Bindings.PointLights) StructuredBuffer<PointLight> point_lights;
-VkBind(Bindings.DirLights) StructuredBuffer<DirLight> dir_lights;
-VkBind(Bindings.SpotLights) StructuredBuffer<SpotLight> spot_lights;
-VkBind(Bindings.DrawCtx) StructuredBuffer<DrawCallData> drawcalls_data;
+VkBind(Bindings.Textures)       Texture2D textures[];
+VkBind(Bindings.Samplers)       SamplerState samplers[];
+VkBind(Bindings.CubeTextures)   TextureCube cube_texture[];
+VkBind(Bindings.State)          StructuredBuffer<GpuState> state;
+VkBind(Bindings.Drawinfo)       StructuredBuffer<IndirectDrawCall> drawinfo;
+VkBind(Bindings.Entities)       StructuredBuffer<Entity> entities;
+VkBind(Bindings.Materials)      StructuredBuffer<Material> materials;
+VkBind(Bindings.PointLights)    StructuredBuffer<PointLight> point_lights;
+VkBind(Bindings.DirLights)      StructuredBuffer<DirLight> dir_lights;
+VkBind(Bindings.SpotLights)     StructuredBuffer<SpotLight> spot_lights;
+VkBind(Bindings.DrawCtx)        StructuredBuffer<DrawCallData> drawcalls_data;
+VkBind(Bindings.SoftwareRender) StructuredBuffer<u32> software_render;
+VkBind(Bindings.UI_RectBinding) StructuredBuffer<UI_Rect> ui_rects;
 
 DrawCallData get_data(u32 draw_id) {
   return drawcalls_data[push.drawcall_base + draw_id];
@@ -168,3 +190,14 @@ f32 Unlerp(f32 a, f32 x, f32 b)    { return (x - a) / (b - a); }
 f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max) {
   return new_min + (((x - old_min) * (new_max - new_min)) / (old_max - old_min));
 }
+
+v4 v4_hadamard(v4 a, v4 b) { return v4(a.x*b.x, a.y*b.y, a.z*b.z, a.w*b.w); }
+
+v4 rgba_from_u32(u32 hex) {
+  v4 result = v4(((hex & 0xff000000) >> 24) / 255.f,
+                 ((hex & 0x00ff0000) >> 16) / 255.f,
+                 ((hex & 0x0000ff00) >> 8)  / 255.f,
+                 ((hex & 0x000000ff) >> 0)  / 255.f);
+  return result;
+}
+

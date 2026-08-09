@@ -65,7 +65,7 @@ WaitGroup thread_push(TaskDesc desc) {
     os_cond_var_wait(g.cond_not_full, g.mutex);
   }
   if (g.tasks[desc.priority].count <= Thread_NumWorkers) {
-    os_cond_var_signal(g.cond_not_empty);
+    os_cond_var_wake_one(g.cond_not_empty);
   }
   queue_push(g.tasks[desc.priority], t);
   ++g.remaining_tasks;
@@ -80,7 +80,7 @@ WaitGroup thread_push_batch(Slice<TaskDesc> tasks) {
     os_cond_var_wait(g.cond_not_full, g.mutex);
   }
   if (i32(g.tasks[TaskPriority_High].count-tasks.count) <= i32(Thread_NumWorkers) || i32(g.tasks[TaskPriority_Low].count-tasks.count) <= i32(Thread_NumWorkers)) {
-    os_cond_var_broadcast(g.cond_not_empty);
+    os_cond_var_wake_all(g.cond_not_empty);
   }
   Loop (i, tasks.count) {
     Task t = {
@@ -95,7 +95,7 @@ WaitGroup thread_push_batch(Slice<TaskDesc> tasks) {
   return wg;
 }
 
-intern Result<Task> thread_pop() {
+intern Task thread_pop() {
   var& g = thread_pool;
   LockScope(g.mutex);
   while (g.tasks[TaskPriority_High].count == 0 && g.tasks[TaskPriority_Low].count == 0) {
@@ -103,7 +103,7 @@ intern Result<Task> thread_pop() {
     os_cond_var_wait(g.cond_not_empty, g.mutex);
   }
   if (g.tasks[TaskPriority_High].count == Thread_MaxTasks && g.tasks[TaskPriority_Low].count == Thread_MaxTasks) {
-    os_cond_var_signal(g.cond_not_full);
+    os_cond_var_wake_one(g.cond_not_full);
   }
   Task t = {};
   if (g.tasks[TaskPriority_High].count) {
@@ -121,7 +121,7 @@ intern Result<Task> thread_try_pop() {
     return Err();
   }
   if (g.tasks[TaskPriority_High].count == Thread_MaxTasks && g.tasks[TaskPriority_Low].count == Thread_MaxTasks) {
-    os_cond_var_signal(g.cond_not_full);
+    os_cond_var_wake_one(g.cond_not_full);
   }
   Task t = {};
   if (g.tasks[TaskPriority_High].count) {
@@ -141,7 +141,7 @@ intern void thread_worker(void* ctx) {
     t.fn(t.ctx);
     thread_wg_done(t.wg);
     if (atomic_dec(&g.remaining_tasks) == 1) {
-      os_cond_var_signal(g.finished);
+      os_cond_var_wake_one(g.finished);
     }
   }
 }
@@ -150,7 +150,7 @@ void thread_wg_wait(WaitGroup wg) {
   ProfFunc;
   var& g = thread_pool;
   while (!thread_wg_done_check(wg)) {
-    Result<Task> res = thread_try_pop();
+    var res = thread_try_pop();
     if (res.err) {
       os_sleep_ms(1);
       continue;
@@ -160,7 +160,7 @@ void thread_wg_wait(WaitGroup wg) {
     t.fn(t.ctx);
     thread_wg_done(t.wg);
     if (atomic_dec(&g.remaining_tasks) == 1) {
-      os_cond_var_signal(g.finished);
+      os_cond_var_wake_one(g.finished);
     }
   }
 }
@@ -189,12 +189,12 @@ void thread_pool_init() {
   ProfFunc;
   var& g = thread_pool;
   g.arena = arena_make();
-  g.mutex = os_mutex_alloc();
-  g.cond_not_empty = os_cond_var_alloc();
-  g.cond_not_full = os_cond_var_alloc();
-  g.finished = os_cond_var_alloc();
+  g.mutex = os_mutex_make();
+  g.cond_not_empty = os_cond_var_make();
+  g.cond_not_full = os_cond_var_make();
+  g.finished = os_cond_var_make();
   Loop (i, Thread_NumWorkers) {
-    g.threads[i] = os_thread_launch(thread_worker, null);
+    g.threads[i] = os_thread_make(thread_worker, null);
   }
 }
 

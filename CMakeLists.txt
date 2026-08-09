@@ -29,7 +29,7 @@ project(Engine)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO "${binary_dir}")
 
 # Compiler
-  add_compile_options(-Wno-gnu-alignof-expression -Wunused-variable -Wno-unused-const-variable -Wuninitialized -Wno-c99-designator -fno-exceptions -fno-rtti)
+  add_compile_options(-Wunused-variable -Wuninitialized -Wno-unused-const-variable -Wno-gnu-alignof-expression -Wno-c99-designator -fno-exceptions -fno-rtti -mavx)
   message("Compiler: ${CMAKE_CXX_COMPILER_ID}")
 
 # Sanitizer
@@ -45,8 +45,7 @@ project(Engine)
 # Build
   if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_definitions(BUILD_DEBUG=1)
-  elseif (CMAKE_BUILD_TYPE STREQUAL "Release" OR
-          CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+  elseif (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     add_compile_options(-flto -ffast-math)
   endif()
   message("Build: ${CMAKE_BUILD_TYPE}")
@@ -121,13 +120,13 @@ project(Engine)
     endif()
   endif()
 
-add_executable(compiling_shaders 
-  src/base/base_impl.cpp
-  src/compiling_shaders.cpp
-)
-target_link_libraries(compiling_shaders ${X11_libs})
-add_executable(preprocessor 
-  src/base/base_impl.cpp
-  src/preprocessor.cpp
-)
-target_link_libraries(preprocessor ${X11_libs})
+# add_executable(compiling_shaders 
+#   src/base/base_impl.cpp
+#   src/compiling_shaders.cpp
+# )
+# target_link_libraries(compiling_shaders ${X11_libs})
+# add_executable(preprocessor 
+#   src/base/base_impl.cpp
+#   src/preprocessor.cpp
+# )
+# target_link_libraries(preprocessor ${X11_libs})
