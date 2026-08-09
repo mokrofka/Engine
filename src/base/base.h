@@ -174,6 +174,7 @@ u32 ctz(u64 val);
 u32 count_bits_set(u64 val);
 u32 most_significant_bitu32(u32 size);
 u64 most_significant_bitu64(u64 size);
+u32 remove_lowest_bit(u64 v);
 
 #define Bit(x) (1 << (x))
 b32 BitHas(u64 x, u64 pos);
@@ -215,12 +216,13 @@ u32 prev_pow2(u32 n);
 #define is_finite(x) __builtin_isfinite((x))
 #define is_nan(x)    __builtin_isnan((x))
 #define is_inf(x)    __builtin_isinf((x))
+#define Restrict __restrict
 
 ////////////////////////////////////////////////////////////////////////
 // Shenanigans
 
 #define ArrayCount(x)   (sizeof((x)) / sizeof((x)[0]))
-#define ArrayRand(arr)  arr[rand_rng_u32(0, ArrayCount(arr)-1)]
+#define ArrayRand(arr)  arr[rand_u32_rng(0, ArrayCount(arr)-1)]
 #define ArrayZero(arr)  MemZeroArray((arr), ArrayCount((arr)))
 #define ArrayCopy(d, s) MemCopyArray((d), (s), ArrayCount((d)))
 #define Assign(a,b)    (*((u8**)(&(a))) = (u8*)(b))
@@ -229,6 +231,7 @@ u32 prev_pow2(u32 n);
 #define _Glue(A,B)     A##B
 #define Glue(A,B)      _Glue(A,B)
 #define Transmute(T, x) (*(T*)&(x))
+#define Scope(...)     ({__VA_ARGS__})
 
 #define Loop(it, c)                      for (i32 it = 0; it < c; ++it)
 #define LoopReverse(it, count)           for (i32 it = (count) - 1; it >= 0; --it)
@@ -243,6 +246,8 @@ u32 prev_pow2(u32 n);
 #define LoopINodeReverse(it, last, arr)  for (u32 it = last; it != 0; it = (arr)[it].prev)
 #define LoopHNode(it, first, arr)        for (var it = first; it.idx != 0; it = (arr)[it.idx].elem.next)
 
+#define LoopLinkPool(it, pool)           for (u32 it = pool.first; it != 0; it = (pool.data)[it].next)
+
 ////////////////////////////////////////////////////////////////////////
 // Asserts
 
@@ -253,7 +258,7 @@ void DebugTrap();
 #define InvalidDefaultCase  default: {InvalidPath;}
 #define NotImplemented      Assert(!"Not Implemented!")
 #define AssertAlways(x)     if (!(x)) { Trap(); }
-#define UnusedVariable(x)   (void)x
+#define NoOp(x)   (void)x
 
 #if BUILD_DEBUG
   #define Assert(x) ((x) ? (void)0 : DebugTrap())
@@ -280,9 +285,9 @@ void DebugTrap();
 #define atomic_or(x, v)                   __atomic_fetch_or((x), (v), AtomicSeqCst)
 #define atomic_and(x, v)                  __atomic_fetch_and((x), (v), AtomicSeqCst)
 #define atomic_xor(x, v)                  __atomic_fetch_xor((x), (v), AtomicSeqCst)
-#define atomic_exchange(x, v)             __atomic_exchange_n((x), (v), AtomicSeqCst)
-#define atomic_cmp_exchange(x, expect, v) __atomic_compare_exchange_n((x), (expect), (new), 0, AtomicSeqCst, AtomicSeqCst)
-#define atomic_cond_exchange(x, v, c) ({ u32 _new = (c); __atomic_compare_exchange_n((x), (&_new), (v), 0, AtomicSeqCst, AtomicSeqCst); _new; })
+#define atomic_swap(x, v)                 __atomic_exchange_n((x), (v), AtomicSeqCst)
+#define atomic_cmp_swap(x, expect, v)     __atomic_compare_exchange_n((x), (expect), (v), 0, AtomicSeqCst, AtomicSeqCst)
+#define atomic_cond_swap(x, expect, v) ({ u32 _new = (expect); atomic_cmp_exchange(((x), (&_new), (v))); _new; })
 
 ////////////////////////////////////////////////////////////////////////
 // Doulby Linked List
@@ -309,8 +314,7 @@ void DebugTrap();
     ((n) ? (                                      \
       ((last) = (n)->prev),                       \
       ((last) ? ((last)->next = null)             \
-              : ((first) = null)),                \
-      DebugDo((n)->next = null, (n)->prev = null) \
+              : ((first) = null))                 \
     ) : 0))
 
 #define DLL_pop_front(first, last, n, next, prev) \
@@ -318,8 +322,7 @@ void DebugTrap();
     ((n) ? (                                      \
       ((first) = (n)->next),                      \
       ((first) ? ((first)->prev = null)           \
-               : ((last) = null)),                \
-      DebugDo((n)->next = null, (n)->prev = null) \
+               : ((last) = null))                 \
     ) : 0))
 
 ////////////////////////////////////////////////////////////////////////
@@ -469,39 +472,38 @@ struct _Defer {
 template <typename E = b32>
 struct _Unexpected {
   E e;
+  operator E() const { return e; }
 };
-
-template <typename E = b32>
-_Unexpected<E> Err(E err = {}) {
-  return {err};
-}
-
+template <typename E = b32> _Unexpected<E> Err(E err = {}) { return {err}; }
 template<typename T, typename E = b32>
 struct Result {
   union {
     T v;
-    E e;
+    E error;
   };
   b32 err;
   Result() = default;
   Result(T val) : v(val), err(false) {}
   Result(_Unexpected<E> err_) {
     v = {};
-    e = err_.e;
+    error = err_.e;
     err = true;
   }
-  template<typename U> Result(_Unexpected<U> u) : e(E(u.e)), err(true) {}
+  template<typename U> Result(_Unexpected<U> u) : error(E(u.e)), err(true) {}
   operator T() const { return v; }
-  T& operator*()     { return v; }
-  T* operator->()    { return &v; }
-  E  error()         { Assert(!err); return e; }
 };
 
-#define Try(expr)                       \
-  ({                                    \
-    var _r = (expr);                    \
-    if (_r.err) return Err(_r.error()); \
-    *_r;                                \
+#define Try(expr)                         \
+  ({                                      \
+    if (expr.err) return Err(expr.error); \
+    expr.v;                               \
+  })
+
+#define OrElse(expr, or)   \
+  ({                       \
+    var r = expr.v;        \
+    if (expr.err) r = or ; \
+    r;                     \
   })
 
 ////////////////////////////////////////////////////////////////////////
@@ -518,14 +520,15 @@ const u32 DEFAULT_RESIZE_FACTOR = 2;
     u32 gen;      \
   };
 
-struct ArrayBit {
+struct BitSet {
   u64* words;
   u64 bit_count;
 };
 
-void array_bit_set(ArrayBit* bits, u64 idx);
-void array_bit_clear(ArrayBit* bits, u64 idx);
-b32 array_bit_get(ArrayBit* bits, u64 idx);
+void bitset_set(BitSet& bits, u64 idx);
+void bitset_clear(BitSet& bits, u64 idx);
+b32 bitset_get(BitSet& bits, u64 idx);
+u64 bitset_word_count(BitSet& bits);
 
 struct Region {
   union {
@@ -555,7 +558,7 @@ u64 ring_read(RingBuffer& ring, void* dst, u64 dst_size);
 
 u64 ring_write_nowrap(RingBuffer& ring, void* src, u64 src_size, u64 align = 0);
 u64 ring_read_nowrap(RingBuffer& ring, void* dst, u64 read_size);
-#define ring_write_nowrap_struct(ring, ptr) ring_write_nowrap((ring), (ptr), sizeof(*(ptr)), alingof(*(ptr)))
+#define ring_write_nowrap_struct(ring, ptr) ring_write_nowrap((ring), (ptr), sizeof(*(ptr)), alignof(*(ptr)))
 #define ring_read_nowrap_struct(ring, ptr) ring_read_nowrap((ring), (ptr), sizeof(*(ptr)))
 #define ring_write_nowrap_array(ring, ptr, c) ring_write_nowrap((ring), (ptr), (c) * sizeof(*(ptr)), alignof(*(ptr)))
 #define ring_read_nowrap_array(ring, ptr, c) ring_read_nowrap((ring), (ptr), (c) * sizeof(*(ptr)))
@@ -607,5 +610,93 @@ struct HotReloadData {
   String lib;
 };
 
+////////////////////////////////////////////////////////////////////////
+// RandyGaul Coroutine
 
+#define CoroutineMaxDepth 8
+#define CoroutineCaseOffset (1024 * 1024)
+#define CoroutineStackSize (512)
+
+struct Coroutine {
+  f32 elapsed;
+  u32 flag;
+  u32 index;
+  u32 line[CoroutineMaxDepth];
+  u32 stack_pointer;
+  u8 stack[CoroutineStackSize];
+};
+
+u8* Restrict _coroutine_var(Coroutine* co, u32 size);
+#define co_var(co, T) *(T*)_coroutine_var(co, sizeof(T))
+
+#define co_begin(co)          do { co->flag = 0; switch (co->line[co->index]) { default: 
+#define co_case(co, name)     case __LINE__: name: co->line[co->index] = __LINE__;
+#define co_wait(co, time, dt) do { case __LINE__: co->line[co->index] = __LINE__; co->elapsed += dt; do { if (co->elapsed < time) { co->flag = 1; goto __co_end; } else { co->elapsed = 0; } } while (0); } while (0)
+#define co_exit(co)           do { co->flag = 1; goto __co_end; } while (0)
+#define co_yield(co)          do { co->line[co->index] = __LINE__; co_exit(co); case __LINE__:; } while (0)
+#define co_call(co, ...)      co->flag = 0; case __LINE__: Assert(co->index < CoroutineMaxDepth); co->line[co->index++] = __LINE__; __VA_ARGS__; co->index--; do { if (co->flag) { goto __co_end; } else { case __LINE__ + CoroutineCaseOffset: co->line[co->index] = __LINE__ + CoroutineCaseOffset; } } while (0)
+#define co_end(co)            } co->line[co->index] = 0; __co_end:; co->stack_pointer = 0; } while (0)
+
+////////////////////////////////////////////////////////////////////////
+// Simd
+
+#include <smmintrin.h>
+
+// typedef float __m128 __attribute__((__vector_size__(16), __aligned__(16)));
+
+union f32x4 {
+  __m128 p;
+  f32 v[4];
+};
+
+f32x4 simd_load(void* p);
+void simd_store(f32x4 x, void* p);
+f32x4 simd_splat(f32 x);
+f32x4 simd_make(f32 x, f32 y, f32 z, f32 w);
+f32x4 simd_zero();
+
+f32x4 operator+(f32x4 a, f32x4 b);
+f32x4 operator-(f32x4 a, f32x4 b);
+f32x4 operator-(f32x4 a);
+f32x4 operator*(f32x4 a, f32x4 b);
+f32x4 operator/(f32x4 a, f32x4 b);
+f32x4 operator^(f32x4 a, f32x4 b);
+f32x4 operator&(f32x4 a, f32x4 b);
+f32x4 operator|(f32x4 a, f32x4 b);
+
+f32x4 operator<(f32x4 a, f32x4 b);
+f32x4 operator<=(f32x4 a, f32x4 b);
+f32x4 operator>(f32x4 a, f32x4 b);
+f32x4 operator>=(f32x4 a, f32x4 b);
+f32x4 operator==(f32x4 a, f32x4 b);
+f32x4 operator!=(f32x4 a, f32x4 b);
+
+f32x4& operator+=(f32x4& a, f32x4 b);
+f32x4& operator-=(f32x4& a, f32x4 b);
+f32x4& operator*=(f32x4& a, f32x4 b);
+f32x4& operator/=(f32x4& a, f32x4 b);
+f32x4& operator^=(f32x4& a, f32x4 b);
+f32x4& operator&=(f32x4& a, f32x4 b);
+f32x4& operator|=(f32x4& a, f32x4 b);
+
+f32x4 simd_min(f32x4 a, f32x4 b);
+f32x4 simd_max(f32x4 a, f32x4 b);
+f32x4 simd_andnot(f32x4 a, f32x4 b);
+f32x4 simd_sqrt(f32x4 a);
+f32x4 simd_blend(f32x4 a, f32x4 m, f32x4 b);
+f32x4 simd_floor(f32x4 a);
+u32 simd_movemask(f32x4 a);
+f32x4 simd_unpacklo(f32x4 a, f32x4 b);
+f32x4 simd_unpackhi(f32x4 a, f32x4 b);
+f32x4 simd_movelh(f32x4 a, f32x4 b);
+f32x4 simd_movehl(f32x4 a, f32x4 b);
+
+f32x4 simd_abs(f32x4 a);
+f32x4 simd_sign_bit(f32x4 a);
+f32x4 simd_sign_of(f32x4 a);
+f32x4 simd_clamp(f32x4 a, f32x4 x, f32x4 b);
+f32x4 simd_clamp01(f32x4 x);
+
+#define SimdShuffle(a, b, c, d) (((d) << 6) | ((c) << 4) | ((b) << 2) | (a))
+#define simd_shuffle(a, b, imm) f32x4(_mm_shuffle_ps(a.p, b.p, imm))
 

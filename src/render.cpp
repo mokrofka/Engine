@@ -413,11 +413,11 @@ void r_mesh_destroy(R_Mesh mesh) {
 R_Material r_material_make(MaterialDesc desc) {
   R_State& g = st->r;
   R_KeyToShaderPipeline key = {desc.shader_name, desc.pipeline_desc};
-  var pip_r = map_get(g.shader_to_pipeline, key);
-  if (pip_r.err) {
-    pip_r = r_pipeline_make(desc.shader_name, desc.pipeline_desc);
+  var pip_res = map_get(g.shader_to_pipeline, key);
+  if (pip_res.err) {
+    pip_res = r_pipeline_make(desc.shader_name, desc.pipeline_desc);
   }
-  Gfx_Pipeline pip = pip_r;
+  Gfx_Pipeline pip = pip_res;
   var batch_idx_r = map_get(g.pip_idx_to_entity_batch_idx, pip.idx);
   if (batch_idx_r.err) {
     u32 batch_idx = array_push(g.entity_batches, r_draw_batch_make(g.gpa, pip));
@@ -454,7 +454,7 @@ void r_shader_reload(String name) {
   Scratch scratch;
   R_State& g = st->r;
   Info("reload '%s' shader", name);
-  Result module_idx = map_get(g.shader_to_module_idx, name);
+  var module_idx = map_get(g.shader_to_module_idx, name);
   Assert(!module_idx.err);
   R_ShaderModuleEntry entry = g.modules[module_idx];
   String shader = os_file_path_read_all_str(scratch, push_strf(scratch, "%s/%s.spv", st->shader_compiled_dir, name));
@@ -469,7 +469,7 @@ Gfx_Pipeline r_pipeline_make(String name, Gfx_PipelineDesc desc) {
   Scratch scratch;
   R_State& g = st->r;
   R_KeyToShaderPipeline key = {name, desc};
-  Result module_idx_r = map_get(g.shader_to_module_idx, name);
+  var module_idx_r = map_get(g.shader_to_module_idx, name);
   if (module_idx_r.err) {
     R_ShaderModuleEntry entry = r_shader_module_entry_make(g.gpa);
     String shader = os_file_path_read_all_str(scratch, push_strf(scratch, "%s/%s.spv", st->shader_compiled_dir, name));
@@ -570,7 +570,7 @@ void r_shaders_compile(Allocator arena) {
     File& f = files[i];
     var arr = array_make(String, scratch);
     array_push(arr, S("slangc"), f.file_path, S("-target"), S("spirv"), S("-O0"), S("-g"), S("-o"), f.compiled_file_path);
-    g.shader_module_compilation_pids[i] = os_process_launch(slice(arr));
+    g.shader_module_compilation_pids[i] = os_process_make(slice(arr));
     Debug("%s", f.file_path);
     array_push(file_names, f.shader_name);
   }
@@ -643,7 +643,7 @@ void r_init() {
   // g.gpa = alloc_make(g.arena, "vk gpa");
   g.gpa = alloc_make(g.arena);
   g.scale = 1;
-  g.async_stage_mutex = os_mutex_alloc();
+  g.async_stage_mutex = os_mutex_make();
 
   gfx_init({.cpu_mem_size = MB(100), .gpu_mem_size = MB(10), .image_mem_size = MB(10)});
 
@@ -662,30 +662,43 @@ void r_init() {
     gfx_bind_make({.type = Gfx_BindType_Image, .binding = Bindings::Textures, .count = Gfx_MaxImages});
     gfx_bind_make({.type = Gfx_BindType_Sampler, .binding = Bindings::Samplers, .count = Gfx_MaxSamplers});
     gfx_bind_make({.type = Gfx_BindType_Image, .binding = Bindings::CubeTextures, .count = Gfx_MaxCubeTextures});
-    gfx_bind_make({.binding = Bindings::State});
-    gfx_bind_make({.binding = Bindings::Entities});
-    gfx_bind_make({.binding = Bindings::Materials});
-    gfx_bind_make({.binding = Bindings::DrawCtx});
-    g.gpu_global_buf = gfx_buffer_make(sizeof(GpuState), Gfx_MemType_Cpu);
-    g.gpu_entities_buf = gfx_buffer_make((MaxEntities) * sizeof(R_EntityGPU), Gfx_MemType_Cpu);
-    g.gpu_materials_buf = gfx_buffer_make(R_MaxMaterials * sizeof(R_MaterialGPU), Gfx_MemType_Cpu);
-    g.gpu_drawcall_ctx_buf = gfx_buffer_make(MaxEntities * sizeof(R_DrawCallDataGPU), Gfx_MemType_Cpu);
-
-    g.gpu_entities = (R_EntityGPU*)gfx_buffer_base_ptr(g.gpu_entities_buf);
-    g.gpu_state = (GpuState*)gfx_buffer_base_ptr(g.gpu_global_buf);
-    g.gpu_materials = (R_MaterialGPU*)gfx_buffer_base_ptr(g.gpu_materials_buf);
-    g.gpu_drawcall = (R_DrawCallDataGPU*)gfx_buffer_base_ptr(g.gpu_drawcall_ctx_buf);
-
-    // gfx_instance_set_indices(g.gpu_entities_indices);
-
-    gfx_bind_buffer(g.gpu_global_buf, Bindings::State);
-    gfx_bind_buffer(g.gpu_entities_buf, Bindings::Entities);
-    gfx_bind_buffer(g.gpu_materials_buf, Bindings::Materials);
-    gfx_bind_buffer(g.gpu_drawcall_ctx_buf, Bindings::DrawCtx);
+    Gfx_BufferDesc buffers[] = {
+      {
+        .binding = Bindings::State,
+        .size = sizeof(GpuState),
+        .cpu_ptr = (void**)&g.gpu_state,
+      },
+      {
+        .binding = Bindings::Entities,
+        .size = sizeof(R_EntityGPU) * MaxEntities,
+        .cpu_ptr = (void**)&g.gpu_entities,
+      },
+      {
+        .binding = Bindings::Materials,
+        .size = sizeof(R_MaterialGPU) * R_MaxMaterials,
+        .cpu_ptr = (void**)&g.gpu_materials,
+      },
+      {
+        .binding = Bindings::DrawCtx,
+        .size = sizeof(R_DrawCallDataGPU) * MaxEntities,
+        .cpu_ptr = (void**)&g.gpu_drawcall,
+      },
+      {
+        .binding = Bindings::SoftwareRender,
+        .size = ({v2u size = os_screen_size(); size.x * size.y * sizeof(u32);}),
+        .cpu_ptr = (void**)&g.gpu_software_render,
+      },
+      {
+        .binding = Bindings::UI_RectBinding,
+        .size = sizeof(UI_rect) * MaxEntities,
+        .cpu_ptr = (void**)&g.gpu_ui_rect,
+      }
+    };
+    gfx_make_buffers(slice(buffers));
     gfx_flush();
   }
 
-  v2u win_size = os_get_window_size();
+  v2u win_size = os_window_size();
   g.world_rt = r_render_target_make(R_RenderTargetUsage_Color | R_RenderTargetUsage_Resolve | R_RenderTargetUsage_Depth, win_size);
   g.com_sampler = gfx_sampler_make({});
 
@@ -751,15 +764,22 @@ void r_init() {
   g.screen_pip = r_pipeline_make("screen", {
     .sample_count = 1,
   });
+  g.software_render_pip = r_pipeline_make("software_render", {
+    .sample_count = 1,
+  });
   g.cubemap_pip = r_pipeline_make("cubemap", {
     .depth = {
       .compare = Gfx_CompareOp_LessEqual,
     },
   });
   g.ui_pip = r_pipeline_make("ui", {});
+  g.ui_rect_pip = r_pipeline_make("ui_rect", {
+    .primitive_type = Gfx_PrimitiveType_TriangleStrip,
+  });
   g.font_pip = r_pipeline_make("font", {});
 
   g.my_font = r_font_load("arial.ttf", 32);
+  g.point_dir = v2(Cos(rand_f32()), Sin(rand_f32()));
   Info("Renderer initialized");
 }
 
@@ -777,22 +797,63 @@ void r_end() {
   R_State& g = st->r;
   gfx_begin();
 
+  g.gpu_state->res.x = os_window_size().x;
+  g.gpu_state->res.y = os_window_size().y;
+  // g.gpu_state->win_width = os_get_window_size().x;
+  g.point.x += 1;
+ if (g.point.x < 0 || g.point.x >= os_window_size().x) {
+    g.point_dir.x = -g.point_dir.x;
+  }
+  if (g.point_dir.y < 0 || g.point_dir.y >= os_window_size().y) {
+    g.point_dir.y = -g.point_dir.y;
+  }
+
+  // g.point += g.point_dir * get_dt();
+
+  MemZeroArray(g.gpu_software_render, ({v2u size = os_window_size(); size.x*size.y;}));
+  u32 size = 16;
+  Loop (y, size) {
+    Loop (x, size) {
+      g.gpu_software_render[(u32)((g.point.y + y) * os_window_size().x + (g.point.x + x))] = u32_from_rgba(v4(1,1,1,1));
+    }
+  }
+  g.gpu_software_render[(u32)(g.point.y * os_window_size().x + g.point.x)] = u32_from_rgba(v4(1,1,1,1));
+
+  // Loop (i, 40000) {
+  //   g.gpu_software_render[i] = u32_from_rgba(v4(1,1,0,0));
+  // }
+
   // Resize?
   if (st->gfx.swapchain_resized || g.old_scale != g.scale) {
     g.old_scale = g.scale;
     gfx_idle();
-    v2u win_size = os_get_window_size();
+    v2u win_size = os_window_size();
     r_render_target_recreate(&g.world_rt, win_size);
   }
 
   {
-    u64 base = gfx_buffer_base(g.vert_buffer_each_frame);
-    g.draw_base_lines = base + ring_write_nowrap_array(g.vert_ring_buffer, g.draw_lines.data, g.draw_lines.count);
-    g.draw_base_persistent_lines = base + ring_write_nowrap_array(g.vert_ring_buffer, g.draw_lines_persistent.data, g.draw_lines_persistent.count);
-    g.draw_base_rects = base + ring_write_nowrap_array(g.vert_ring_buffer, g.draw_rects.data, g.draw_rects.count);
-    g.draw_base_lines /= sizeof(Vertex);
-    g.draw_base_persistent_lines /= sizeof(Vertex);
-    g.draw_base_rects /= sizeof(Vertex);
+    // u64 base = gfx_buffer_base(g.vert_buffer_each_frame);
+    // g.draw_base_lines = (base + ring_write_nowrap_array(g.vert_ring_buffer, g.draw_lines.data, g.draw_lines.count)) / sizeof(Vertex);
+    // g.draw_base_persistent_lines = (base + ring_write_nowrap_array(g.vert_ring_buffer, g.draw_lines_persistent.data, g.draw_lines_persistent.count)) / sizeof(Vertex);
+    // g.draw_base_rects = (base + ring_write_nowrap_array(g.vert_ring_buffer, g.draw_rects.data, g.draw_rects.count)) / sizeof(Vertex);
+    // g.draw_base_quad = (base + ring_write_nowrap_array(g.vert_ring_buffer, g.draw_quads.data, g.draw_quads.count)) / sizeof(Vertex);
+
+    var vert = [](void* data, u64 size, u64 round) {
+      var& g = st->r;
+      u64 base = gfx_buffer_base(g.vert_buffer_each_frame);
+      // g.vert_ring_buffer.write_pos = RoundUp(g.vert_ring_buffer.write_pos, round);
+      return (base + ring_write_nowrap(g.vert_ring_buffer, data, size, 4)) / round;
+    };
+    g.draw_base_lines = vert(g.draw_lines.data, slice_size(slice(g.draw_lines)), sizeof(Vertex));
+    g.draw_base_persistent_lines = vert(g.draw_lines_persistent.data, slice_size(slice(g.draw_lines_persistent)), sizeof(Vertex));
+    g.draw_base_rects = vert(g.draw_rects.data, slice_size(slice(g.draw_rects)), sizeof(Vertex));
+    g.draw_base_rects_texture = vert(g.draw_rects_texture.data, slice_size(slice(g.draw_rects_texture)), sizeof(Vertex));
+
+    // UI_Vertex v;
+    // ring_write_nowrap_array(g.vert_ring_buffer, &v, 1);
+    // var* arr = push_array(scratch, Vertex, 10);
+    // g.draw_base_quad = (base + ring_write_nowrap_array(g.vert_ring_buffer, arr, 10)) / sizeof(Vertex);
+    // g.draw_base_quad = (base + ring_write_nowrap_array(g.vert_ring_buffer, arr, 10)) / sizeof(Vertex);
   }
 
   {
@@ -824,8 +885,8 @@ void r_end() {
   {
     gfx_pass_begin({.attachments = r_render_target_to_attachments(g.world_rt)});
     {
-      gfx_apply_viewport(rng2_make(v2_zero(), v2_of_v2u(os_get_window_size())), true);
-      gfx_apply_scissor(rng2_make(v2_zero(), v2_of_v2u(os_get_window_size())));
+      gfx_apply_viewport(rng2_make(v2_zero(), v2_of_v2u(os_window_size())), true);
+      gfx_apply_scissor(rng2_make(v2_zero(), v2_of_v2u(os_window_size())));
 
       gfx_bind_vert();
       gfx_bind_index();
@@ -895,17 +956,25 @@ void r_end() {
       Gfx_Mesh mesh = pool_get(g.meshes, mesh_get(Mesh_Cube));
       gfx_draw_mesh(mesh);
 
+      gfx_apply_viewport(rng2_make(v2_zero(), v2_of_v2u(os_window_size())));
       // Rect drawing
       gfx_bind_vert(Gfx_MemType_Cpu);
       if (g.draw_rects.count > 0) {
         gfx_pipeline_bind(g.ui_pip);
-        // gfx_draw(g.draw_base_rects, g.draw_rects.count);
+        gfx_draw(g.draw_base_rects, g.draw_rects.count);
         array_clear(g.draw_rects);
+      }
+
+      // Quad drawing
+      if (g.draw_quads.count > 0) {
+        MemCopyArray(g.gpu_ui_rect, g.draw_quads.data, g.draw_quads.count);
+        gfx_pipeline_bind(g.ui_rect_pip);
+        gfx_draw(0, g.draw_quads.count*4, g.draw_quads.count);
+        array_clear(g.draw_quads);
       }
 
       // Font
       {
-        gfx_apply_viewport(rng2_make(v2_zero(), v2_of_v2u(os_get_window_size())));
         Loop (i, g.text_draws.count) {
           R_DrawText text = g.text_draws[i];
           R_FontData& font = pool_get(g.fonts, g.my_font);
@@ -929,8 +998,8 @@ void r_end() {
             f32 u1 = glyph.x1 / (f32)512;
             f32 v1 = glyph.y1 / (f32)512;
   
-            v3 min = v2_to_v3(v2_remap_01_to_11(v2(x0, y0), v2_of_v2u(os_get_window_size())), 0);
-            v3 max = v2_to_v3(v2_remap_01_to_11(v2(x1, y1), v2_of_v2u(os_get_window_size())), 0);
+            v3 min = v2_to_v3(v2_remap_01_to_11(v2(x0, y0), v2_of_v2u(os_window_size())), 0);
+            v3 max = v2_to_v3(v2_remap_01_to_11(v2(x1, y1), v2_of_v2u(os_window_size())), 0);
             v4 color = text.color;
             Vertex vert[] = {
               {.pos = min,                 .uv = v2(u0,v0), .color = color},
@@ -967,11 +1036,13 @@ void r_end() {
   // Swapchain
   gfx_pass_begin({});
   {
-    gfx_apply_viewport(rng2_make(v2_zero(), v2_of_v2u(os_get_window_size())));
-    gfx_apply_scissor(rng2_make(v2_zero(), v2_of_v2u(os_get_window_size())));
+    gfx_apply_viewport(rng2_make(v2_zero(), v2_of_v2u(os_window_size())));
+    gfx_apply_scissor(rng2_make(v2_zero(), v2_of_v2u(os_window_size())));
     gfx_pipeline_bind(g.screen_pip);
     VK_PushConstant push = {g.world_rt.resolve.views[st->gfx.current_image_idx].idx};
     vk_push_constants(push);
+    gfx_draw(0, 3);
+    gfx_pipeline_bind(g.software_render_pip);
     gfx_draw(0, 3);
     imgui_end_frame();
   }
@@ -1096,20 +1167,30 @@ void r_draw_cuboid(Rng3 rng, v4 color) {
 }
 
 void r_draw_rect(Rng2 rect, v4 color) {
-  v2 size = v2_of_v2u(os_get_window_size());
-  rect.min = v2_remap_01_to_11(rect.min, size);
-  rect.min.y = -rect.min.y;
-  rect.max = v2_remap_01_to_11(rect.max, size);
-  rect.max.y = -rect.max.y;
-  Vertex vert[] = {
-    {.pos = v2_to_v3(rect.min, 0), .color = color},
-    {.pos = v2_to_v3(v2(rect.min.x, rect.max.y), 0), .color = color},
-    {.pos = v2_to_v3(rect.max, 0), .color = color},
-    {.pos = v2_to_v3(rect.max, 0), .color = color},
-    {.pos = v2_to_v3(v2(rect.max.x, rect.min.y), 0), .color = color},
-    {.pos = v2_to_v3(rect.min, 0), .color = color},
+  var& g = st->r;
+  UI_rect vert = {
+    .dst_p0 = rect.min,
+    .dst_p1 = rect.max,
+    // .texture = r_texture_get_descriptor_idx(st->textures_ids[Texture_Orange]),
+    .src_p0 = v2_splat(0),
+    .src_p1 = v2_splat(500),
+    .color = color,
   };
-  array_push_elems(st->r.draw_rects, slice(vert));
+  array_push(g.draw_quads, vert);
+}
+
+void r_draw_rect_outline(Rng2 rect, u32 thickness, v4 color) {
+  // Top
+  r_draw_rect(rng2_make(rect.min, v2(rng2_dim(rect).x, thickness)), color);
+
+  // Bottom
+  r_draw_rect(rng2_make(v2(rect.min.x, rect.max.y - thickness), v2(rng2_dim(rect).x, thickness)), color);
+
+  // Left
+  r_draw_rect(rng2_make(rect.min, v2(thickness, rng2_dim(rect).y)), color);
+
+  // Right
+  r_draw_rect(rng2_make(v2(rect.max.x - thickness, rect.min.y), v2(thickness, rng2_dim(rect).y)), color);
 }
 
 void r_draw_text(v2 pos, String str, v4 color) {
@@ -1247,7 +1328,7 @@ Timer _timer_type_repeat_delay = {.interval = 1.0f/6};
 void imgui_impl_new_frame() {
   ImGuiIO& io = ImGui::GetIO();
   io.DeltaTime = get_dt();
-  v2u win_size = os_get_window_size();
+  v2u win_size = os_window_size();
   io.DisplaySize = ImVec2(win_size.x, win_size.y);
   Slice<OS_InputEvent> events = os_get_input_events();
   if (last_key_event.is_pressed) {

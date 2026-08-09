@@ -4,6 +4,7 @@
 
 enum Key {
   // Control keys
+  Key_Null,
   Key_Backspace = 1,
   Key_Enter,
   Key_Tab,
@@ -154,9 +155,13 @@ void os_gfx_shutdown();
 // Window related
 void   os_pump_messages();
 b32    os_window_should_close();
-void   os_close_window();
-v2u    os_get_window_size();
-v2u    os_get_screen_size();
+void   os_window_close();
+v2u    os_window_size();
+u32    os_window_width();
+u32    os_window_height();
+v2u    os_screen_size();
+u32    os_screen_width();
+u32    os_screen_height();
 void   os_get_gfx_handlers(void* out);
 void   os_clipboard_text_set(String str);
 String os_clipboard_text_get();
@@ -183,16 +188,18 @@ b32 os_key_was_up(Key key);
 b32 os_key_is_pressed(Key key);
 b32 os_key_is_released(Key key);
 
+OS_Modifiers os_key_modifiers();
+
 b32 os_mouse_is_button_down(MouseButton button);
 b32 os_mouse_is_button_up(MouseButton button);
 b32 os_mouse_was_button_down(MouseButton button);
 b32 os_mouse_was_button_up(MouseButton button);
 b32 os_mouse_is_button_pressed(MouseButton button);
 b32 os_mouse_is_button_released(MouseButton button);
-v2  os_mouse_get_pos();
-f32 os_mouse_get_wheel();
-f32 os_mouse_get_wheel_horizontal();
-v2  os_mouse_get_delta();
+v2  os_mouse_pos();
+f32 os_mouse_wheel();
+f32 os_mouse_wheel_horizontal();
+v2  os_mouse_dt();
 void os_mouse_set_pos(v2i pos); // works only when cursor is hidden
 
 const char* imgui_platform_get_clipboard_text(struct ImGuiContext* ctx);

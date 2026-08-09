@@ -22,6 +22,7 @@ union v2 {
   };
   f32 v[2];
   v2() = default;
+  v2(f32 s):x(s),y(s){};
   v2(f32 x_, f32 y_);
 };
 
@@ -66,7 +67,9 @@ union v3 {
   };
   f32 v[3];
   v3() = default;
+  v3(f32 s):x(s),y(s),z(s){};
   v3(f32 x_, f32 y_, f32 z_);
+  v2 xy();
 };
 
 union v3u {
@@ -247,19 +250,19 @@ u64 hash(String str, u64 seed = 0);
 u32 xorshift32(u32* seed);
 
 NO_DEBUG u32 rand_u32();
-NO_DEBUG u32 rand_rng_u32(u32 min, u32 max);
+NO_DEBUG u32 rand_u32_rng(u32 min, u32 max);
 NO_DEBUG i32 rand_i32();
-NO_DEBUG i32 rand_rng_i32(i32 min, i32 max);
+NO_DEBUG i32 rand_i32_rng(i32 min, i32 max);
 NO_DEBUG f32 rand_f32_01();
 NO_DEBUG f32 rand_f32_11();
 NO_DEBUG f32 rand_f32();
-NO_DEBUG f32 rand_rng_f32(f32 min, f32 max);
+NO_DEBUG f32 rand_f32_rng(f32 min, f32 max);
 NO_DEBUG b32 rand_b32();
 NO_DEBUG void rand_set_seed();
 NO_DEBUG u32 rand_get_seed();
 template<typename T> void rand_shuffle(Slice<T> data) {
   Loop (i, data.count) {
-    u32 j = rand_rng_u32(i, data.count - 1);
+    u32 j = rand_u32_rng(i, data.count - 1);
     Swap(data[i], data[j]);
   }
 }
@@ -278,6 +281,7 @@ f32 Unlerp(f32 a, f32 x, f32 b);
 f64 Unlerpf64(f64 a, f64 x, f64 b);
 f32 norm(f32 min, f32 x, f32 max);
 f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
+f32 remap(f32 x, f32 old_max, f32 new_max);
 f64 remapf64(f64 x, f64 old_min, f64 old_max, f64 new_min, f64 new_max);
 f32 remap_clamped(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
 f32 approach(f32 current, f32 target, f32 increase);

@@ -8,6 +8,7 @@ v2i::v2i(i32 x_, i32 y_) { x = x_, y = y_; }
 v2u::v2u(u32 x_, u32 y_) { x = x_, y = y_; }
 v2b::v2b(b32 x_, b32 y_) { x = x_, y = y_; }
 v3::v3(f32 x_, f32 y_, f32 z_) { x = x_, y = y_, z = z_; }
+v2 v3::xy() { return v2(x,y); }
 v3u::v3u(u32 x_, u32 y_, u32 z_) { x = x_, y = y_, z = z_; }
 u64 hash(v3u v) { return hash(v.x)+hash(v.y)+hash(v.z); }
 b32 equal(v3u a, v3u b) { return a == b;};
@@ -104,13 +105,13 @@ u32 xorshift32(u32* seed) {
 
 global thread_local u32 _seed = 0x95123512;
 u32 rand_u32()                        { return xorshift32(&_seed); }
-u32 rand_rng_u32(u32 min, u32 max)    { return (rand_u32() % (max - min + 1)) + min; }
+u32 rand_u32_rng(u32 min, u32 max)    { return (rand_u32() % (max - min + 1)) + min; }
 i32 rand_i32()                        { return rand_u32(); }
-i32 rand_rng_i32(i32 min, i32 max)    { return (i32)(rand_u32() % (u32)(max - min + 1)) + min; }
+i32 rand_i32_rng(i32 min, i32 max)    { return (i32)(rand_u32() % (u32)(max - min + 1)) + min; }
 f32 rand_f32_01()                     { return rand_u32() / (f32)U32_MAX; }
 f32 rand_f32_11()                     { return rand_f32_01()*2.0f - 1.0f; }
 f32 rand_f32()                        { return rand_f32_01()*2*U16_MAX - U16_MAX; }
-f32 rand_rng_f32(f32 min, f32 max)    { return rand_f32_01()*(max - min) + min ; }
+f32 rand_f32_rng(f32 min, f32 max)    { return rand_f32_01()*(max - min) + min ; }
 b32 rand_b32()                        { return rand_u32() % 2; }
 void rand_set_seed()                  { _seed = cpu_timer_now(); }
 u32 rand_get_seed()                   { return _seed; }
@@ -133,13 +134,10 @@ f32 Lerp(f32 a, f32 t, f32 b)      { return (1 - t)*a + t*b; }
 f32 LerpClamp(f32 a, f32 t, f32 b) { return Lerp(a, Clamp01(t), b); }
 f32 Unlerp(f32 a, f32 x, f32 b)    { return (x - a) / (b - a); }
 f64 Unlerpf64(f64 a, f64 x, f64 b) { return (x - a) / (b - a); }
-f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max) {
-  return new_min + (((x - old_min) * (new_max - new_min)) / (old_max - old_min));
-}
-f64 remapf64(f64 x, f64 old_min, f64 old_max, f64 new_min, f64 new_max) {
-  return new_min + (((x - old_min) * (new_max - new_min)) / (old_max - old_min));
-}
-f32 remap(f32 x, Rng1 old, Rng1 new_) { return remap(x, old.min, old.max, new_.min, new_.max);}
+f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max)    { return (x - old_min) / (old_max - old_min) * (new_max - new_min) + new_min; }
+f32 remap(f32 x, f32 old_max, f32 new_max)                              { return x / old_max * new_max; }
+f64 remapf64(f64 x, f64 old_min, f64 old_max, f64 new_min, f64 new_max) { return (x - old_min) / (old_max - old_min) * (new_max - new_min) + new_min; }
+f32 remap(f32 x, Rng1 old, Rng1 new_)                                   { return remap(x, old.min, old.max, new_.min, new_.max);}
 f32 remap_clamped(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max) {
   return remap(Clamp(old_min, x, old_max), old_min, old_max, new_min, new_max);
 }
@@ -189,7 +187,7 @@ b32 v2_greater_any(v2 a, v2 b)      { return a.x>b.x || a.y>b.y; }
 b32 v2_less_any(v2 a, v2 b)         { return a.x<b.x || a.y<b.y; }
 v2  v2_clamp(v2 min, v2 v, v2 max)  { return v2(Clamp(min.x, v.x, max.x), Clamp(min.y, v.y, max.y)); }
 v2  v2_sign(v2 v)                   { return v2(Sign(v.x), Sign(v.y)) ; }
-v2  v2_rand_rng(v2 a, v2 b)         { return v2(rand_rng_f32(a.x, b.x), rand_rng_f32(a.y, b.y)); }
+v2  v2_rand_rng(v2 a, v2 b)         { return v2(rand_f32_rng(a.x, b.x), rand_f32_rng(a.y, b.y)); }
 
 f32 v2_length(v2 v)                             { return Sqrt(v2_length_sqr(v)); }
 f32 v2_length_sqr(v2 v)                         { return Square(v.x) + Square(v.y); }
@@ -276,7 +274,7 @@ b32 v3_greater_any(v3 a, v3 b)      { return a.x>b.x || a.y>b.y || a.z>b.z; }
 b32 v3_less_any(v3 a, v3 b)         { return a.x<b.x || a.y<b.y || a.z<b.z; }
 v3  v3_clamp(v3 min, v3 v, v3 max)  { return v3(Clamp(min.x, v.x, max.x), Clamp(min.y, v.y, max.y), Clamp(min.z, v.z, max.z)); }
 v3  v3_sign(v3 v)                   { return v3(Sign(v.x), Sign(v.y), Sign(v.z)); }
-v3  v3_rand_rng(v3 a, v3 b)         { return v3(rand_rng_f32(a.x, b.x), rand_rng_f32(a.y, b.y), rand_rng_f32(a.z, b.z)); }
+v3  v3_rand_rng(v3 a, v3 b)         { return v3(rand_f32_rng(a.x, b.x), rand_f32_rng(a.y, b.y), rand_f32_rng(a.z, b.z)); }
 
 f32 v3_length(v3 v)                  { return Sqrt(v3_length_sqr(v)); }
 f32 v3_length_sqr(v3 v)              { return Square(v.x) + Square(v.y) + Square(v.z); }

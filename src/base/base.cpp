@@ -34,11 +34,14 @@ b32 PtrMatch(void* a, void* b)      { return (u8*)a == (u8*)b; }
 ////////////////////////////////////////////////////////////////////////
 // Bits
 
-u32 clz(u64 val)                      { return __builtin_clzll(val); }
-u32 ctz(u64 val)                      { return __builtin_ctzll(val); }
-u32 count_bits_set(u64 val)           { return __builtin_popcountll(val); }
-u32 most_significant_bitu32(u32 size) { return 31 - clz(size); }
-u64 most_significant_bitu64(u64 size) { return 63 - clz(size); }
+u32 clz(u64 v)                     { return __builtin_clzll(v); }
+u32 ctz(u64 v)                     { return __builtin_ctzll(v); }
+u32 count_bits_set(u64 v)          { return __builtin_popcountll(v); }
+u32 most_significant_bitu32(u32 v) { return 31 - clz(v); }
+u64 most_significant_bitu64(u64 v) { return 63 - clz(v); }
+u32 remove_lowest_bit(u64 v)       { return v & (v - 1);}
+u32 remove_highest_bitu32(u32 v)   { return v ^ (1u << most_significant_bitu32(v)); }
+u64 remove_highest_bitu64(u64 v)   { return v ^ (1u << most_significant_bitu64(v)); }
 
 b32 BitHas(u64 x, u64 pos)       { return x & (1 << pos); }
 u64 FlagSet(u64 x, u64 f)        { return x | f; }
@@ -86,15 +89,10 @@ void DebugTrap() { __builtin_debugtrap(); }
 ////////////////////////////////////////////////////////////////////////
 // Types
 
-void array_bit_set(ArrayBit* bits, u64 idx) {
-  bits->words[idx >> 6] |= 1ull << (idx & 63);
-}
-void array_bit_clear(ArrayBit* bits, u64 idx) {
-  bits->words[idx >> 6] &= ~(1ull << (idx & 63));
-}
-b32 array_bit_get(ArrayBit* bits, u64 idx) {
-  return (bits->words[idx >> 6] >> (idx & 63)) & 1;
-}
+void bitset_set(BitSet& bits, u64 idx)   { bits.words[idx >> 6] |= Bit(idx & 63); }
+void bitset_clear(BitSet& bits, u64 idx) { bits.words[idx >> 6] &= ~Bit(idx & 63); }
+b32 bitset_get(BitSet& bits, u64 idx)    { return (bits.words[idx >> 6] >> (idx & 63)) & 1; }
+u64 bitset_word_count(BitSet& bits)      { return (bits.bit_count + 63) / 64; }
 
 RingBuffer ring_make(void* base, u64 size) {
   RingBuffer res = {
@@ -157,3 +155,72 @@ u64 ring_read_nowrap(RingBuffer& ring, void* dst, u64 dst_size) {
   ring.read_pos += dst_size;
   return offset;
 }
+
+////////////////////////////////////////////////////////////////////////
+// Coroutine
+
+u8* Restrict _coroutine_var(Coroutine* co, u32 size) {
+  Assert(co->stack_pointer + size < CoroutineStackSize);
+  u8* res = co->stack + co->stack_pointer;
+  co->stack_pointer += size;
+  return res;
+}
+
+////////////////////////////////////////////////////////////////////////
+// Simd
+
+f32x4 simd_load(void* p)                    { return {_mm_loadu_ps((f32*)p)}; }
+void simd_store(f32x4 x, void* p)           { _mm_storeu_ps((f32*)p, x.p); }
+f32x4 simd_splat(f32 x)                     { return {_mm_set1_ps(x)}; }
+f32x4 simd_make(f32 x, f32 y, f32 z, f32 w) { return {_mm_setr_ps(x,y,z,w)}; }
+f32x4 simd_zero()                           { return {.p = _mm_setzero_ps()}; }
+
+f32x4 operator+(f32x4 a, f32x4 b) { return {_mm_add_ps(a.p, b.p)}; }
+f32x4 operator-(f32x4 a, f32x4 b) { return {_mm_sub_ps(a.p, b.p)}; }
+f32x4 operator-(f32x4 a)          { return {simd_zero() - a}; }
+f32x4 operator*(f32x4 a, f32x4 b) { return {_mm_mul_ps(a.p, b.p)}; }
+f32x4 operator/(f32x4 a, f32x4 b) { return {_mm_div_ps(a.p, b.p)}; }
+f32x4 operator^(f32x4 a, f32x4 b) { return {_mm_xor_ps(a.p, b.p)}; }
+f32x4 operator&(f32x4 a, f32x4 b) { return {_mm_and_ps(a.p, b.p)}; }
+f32x4 operator|(f32x4 a, f32x4 b) { return {_mm_or_ps(a.p, b.p)}; }
+
+f32x4 operator<(f32x4 a, f32x4 b)  { return {_mm_cmplt_ps(a.p, b.p)}; }
+f32x4 operator<=(f32x4 a, f32x4 b) { return {_mm_cmple_ps(a.p, b.p)}; }
+f32x4 operator>(f32x4 a, f32x4 b)  { return {_mm_cmpgt_ps(a.p, b.p)}; }
+f32x4 operator>=(f32x4 a, f32x4 b) { return {_mm_cmpge_ps(a.p, b.p)}; }
+f32x4 operator==(f32x4 a, f32x4 b) { return {_mm_cmpeq_ps(a.p, b.p)}; }
+f32x4 operator!=(f32x4 a, f32x4 b) { return {_mm_cmpneq_ps(a.p, b.p)}; }
+
+f32x4& operator+=(f32x4& a, f32x4 b) { a = a + b; return a; }
+f32x4& operator-=(f32x4& a, f32x4 b) { a = a - b; return a; }
+f32x4& operator*=(f32x4& a, f32x4 b) { a = a * b; return a; }
+f32x4& operator/=(f32x4& a, f32x4 b) { a = a / b; return a; }
+f32x4& operator^=(f32x4& a, f32x4 b) { a = a ^ b; return a; }
+f32x4& operator&=(f32x4& a, f32x4 b) { a = a & b; return a; }
+f32x4& operator|=(f32x4& a, f32x4 b) { a = a | b; return a; }
+
+f32x4 simd_min(f32x4 a, f32x4 b)            { return {_mm_min_ps(a.p, b.p)}; }
+f32x4 simd_max(f32x4 a, f32x4 b)            { return {_mm_max_ps(a.p, b.p)}; }
+f32x4 simd_andnot(f32x4 a, f32x4 b)         { return {_mm_andnot_ps(a.p, b.p)}; };
+f32x4 simd_sqrt(f32x4 a)                    { return {_mm_sqrt_ps(a.p)}; }
+f32x4 simd_blend(f32x4 a, f32x4 m, f32x4 b) { return {_mm_blendv_ps(a.p,m.p,b.p)}; }
+f32x4 simd_floor(f32x4 a)                   { return {_mm_floor_ps(a.p)}; }
+u32 simd_movemask(f32x4 a)                  { return _mm_movemask_ps(a.p); }
+f32x4 simd_unpacklo(f32x4 a, f32x4 b)       { return {_mm_unpacklo_ps(a.p, b.p)}; }
+f32x4 simd_unpackhi(f32x4 a, f32x4 b)       { return {_mm_unpackhi_ps(a.p, b.p)}; }
+f32x4 simd_movelh(f32x4 a, f32x4 b)         { return {_mm_movelh_ps(a.p, b.p)}; }
+f32x4 simd_movehl(f32x4 a, f32x4 b)         { return {_mm_movehl_ps(a.p, b.p)}; }
+
+f32x4 simd_cast_itof(f32x4 a) { return {_mm_castsi128_ps(a.p)}; }
+f32x4 simd_cast_ftoi(f32x4 a) { return {_mm_castps_si128(a.p)}; }
+
+const f32x4 f32x4SignMask = simd_cast_itof(f32x4(_mm_set1_epi32(U32_MAX-1)));
+
+f32x4 simd_abs(f32x4 a)                     { return simd_andnot(f32x4(f32x4SignMask), a); }
+f32x4 simd_sign_bit(f32x4 a)                { return a & f32x4(f32x4SignMask); };
+f32x4 simd_sign_of(f32x4 a)                 { return simd_splat(1) | simd_sign_bit(a); };
+f32x4 simd_clamp(f32x4 a, f32x4 x, f32x4 b) { return simd_min(simd_max(a, x), b); }
+f32x4 simd_clamp01(f32x4 x)                 { return simd_clamp(simd_zero(), x, simd_splat(1)); }
+
+
+

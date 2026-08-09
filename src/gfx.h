@@ -55,6 +55,7 @@ enum Gfx_PrimitiveType {
   Gfx_PrimitiveType_Point,
   Gfx_PrimitiveType_Line,
   Gfx_PrimitiveType_Triangle,
+  Gfx_PrimitiveType_TriangleStrip,
 };
 
 enum Gfx_Filter {
@@ -176,6 +177,18 @@ enum Gfx_StoreAction {
   Gfx_StoreAction_Default,
   Gfx_StoreAction_Store,
   Gfx_StoreAction_DontCare,
+};
+
+enum Gfx_VertFormat {
+  Gfx_VertFormat_v2,
+  Gfx_VertFormat_v3,
+  Gfx_VertFormat_v4,
+};
+
+enum Gfx_VertLayout {
+  Gfx_VertLayout_Default,
+  Gfx_VertLayout_3D,
+  Gfx_VertLayout_UI,
 };
 
 struct Gfx_ColorAttachmentAction {
@@ -357,17 +370,13 @@ struct Gfx_PipelineDesc {
   u32 sample_count;
   v4 blend_color;
   b32 alpha_to_coverage_enabled;
+  Gfx_VertLayout vert_layout;
 };
 
 enum Gfx_MemType {
   Gfx_MemType_Default,
   Gfx_MemType_Cpu,
   Gfx_MemType_Gpu,
-};
-
-struct Gfx_BufferDesc {
-  Gfx_MemType type;
-  u64 size;
 };
 
 enum Gfx_BindType {
@@ -398,6 +407,14 @@ struct Gfx_Mesh {
 struct Gfx_Task {
   void (*on_complete)(void*);
   void* user_data;
+};
+
+struct Gfx_BufferDesc {
+  u32 binding;
+  u64 size;
+  Gfx_MemType mem_type;
+  void** cpu_ptr;
+  Gfx_Buffer* out_buffer;
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -477,7 +494,7 @@ struct VK_BufferRegion {
   VK_Access cur_access;
 };
 
-struct Buffer {
+struct Gfx_BufferData {
   Gfx_MemType type;
   u64 base;
   u64 size;
@@ -543,6 +560,7 @@ struct VK_Pipeline {
   u32 sample_count;
   v4 blend_color;
   b32 alpha_to_coverage_enabled;
+  Gfx_VertLayout vert_layout;
 };
 
 struct VK_Device {
@@ -678,6 +696,8 @@ struct Gfx_State {
 
   VK_Buffer gpu_buf;
   VK_Buffer cpu_buf;
+  u64 gpu_buf_address;
+  u64 cpu_buf_address;
 
   v2u size;
   b32 swapchain_resized;
@@ -687,7 +707,7 @@ struct Gfx_State {
   u32 current_frame_idx;
   u32 current_frame_idx_plus_one;
 
-  Pool<Buffer, Gfx_MaxBuffers, Gfx_Buffer> buffers;
+  Pool<Gfx_BufferData, Gfx_MaxBuffers, Gfx_Buffer> buffers;
   Pool<VK_Shader, Gfx_MaxShaders, Gfx_Shader> shaders;
   Pool<VK_Pipeline, Gfx_MaxPipelines, Gfx_Pipeline> pipelines;
   Pool<VK_Image, Gfx_MaxImages, Gfx_Image> images;
@@ -753,6 +773,7 @@ struct Gfx_State {
     X(DestroyImageView) \
     X(GetImageMemoryRequirements) \
     X(GetBufferMemoryRequirements) \
+    X(GetBufferDeviceAddress) \
     X(AllocateMemory) \
     X(FreeMemory) \
     X(AllocateCommandBuffers) \
@@ -890,6 +911,7 @@ void gfx_pipeline_bind(Gfx_Pipeline pip);
 void gfx_bind_vert(Gfx_MemType type = Gfx_MemType_Gpu);
 void gfx_bind_index(Gfx_MemType type = Gfx_MemType_Gpu);
 void gfx_bind_buffer(Gfx_Buffer buf, u32 binding);
+void gfx_make_buffers(Slice<Gfx_BufferDesc> descs);
 void gfx_flush();
 
 void gfx_idle();

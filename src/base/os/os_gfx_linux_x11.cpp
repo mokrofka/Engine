@@ -584,9 +584,13 @@ void os_pump_messages() {
 }
 
 b32 os_window_should_close() { return gfx_st.should_close; }
-void os_close_window()       { gfx_st.should_close = true; }
-v2u os_get_window_size()     { return v2u(gfx_st.win_width, gfx_st.win_height); }
-v2u os_get_screen_size()     { return v2u(gfx_st.screen_width, gfx_st.screen_height); }
+void os_window_close()       { gfx_st.should_close = true; }
+v2u os_window_size()         { return v2u(gfx_st.win_width, gfx_st.win_height); }
+u32 os_window_width()        { return gfx_st.win_width; }
+u32 os_window_height()       { return gfx_st.win_height; }
+v2u os_screen_size()         { return v2u(gfx_st.screen_width, gfx_st.screen_height); }
+u32 os_screen_width()        { return gfx_st.screen_width; }
+u32 os_screen_height()       { return gfx_st.screen_height; }
 void os_get_gfx_handlers(void* out) {
   struct Surface {
     xcb_connection_t* connection;
@@ -742,16 +746,18 @@ b32 os_key_was_up(Key key)                          { return gfx_st.input.keyboa
 b32 os_key_is_pressed(Key key)                      { return os_key_is_down(key) && os_key_was_up(key); }
 b32 os_key_is_released(Key key)                     { return os_key_is_up(key) && os_key_was_down(key); }
 
+OS_Modifiers os_key_modifiers() { return gfx_st.modifiers; }
+
 b32 os_mouse_is_button_down(MouseButton button)     { return gfx_st.input.mouse_current.buttons[button] == true; }
 b32 os_mouse_is_button_up(MouseButton button)       { return gfx_st.input.mouse_current.buttons[button] == false; }
 b32 os_mouse_was_button_down(MouseButton button)    { return gfx_st.input.mouse_previous.buttons[button] == true; }
 b32 os_mouse_was_button_up(MouseButton button)      { return gfx_st.input.mouse_previous.buttons[button] == false; }
 b32 os_mouse_is_button_pressed(MouseButton button)  { return os_mouse_is_button_down(button) && os_mouse_was_button_up(button); }
 b32 os_mouse_is_button_released(MouseButton button) { return os_mouse_is_button_up(button) && os_mouse_was_button_down(button); }
-v2  os_mouse_get_pos()                              { return v2(gfx_st.input.mouse_current.x, gfx_st.input.mouse_current.y); }
-f32 os_mouse_get_wheel()                            { return gfx_st.input.wheel; }
-f32 os_mouse_get_wheel_horizontal()                 { return gfx_st.input.wheel_horizontal; }
-v2  os_mouse_get_delta()                            { return v2(gfx_st.input.mouse_x_delta, gfx_st.input.mouse_y_delta); }
+v2  os_mouse_pos()                              { return v2(gfx_st.input.mouse_current.x, gfx_st.input.mouse_current.y); }
+f32 os_mouse_wheel()                            { return gfx_st.input.wheel; }
+f32 os_mouse_wheel_horizontal()                 { return gfx_st.input.wheel_horizontal; }
+v2  os_mouse_dt()                            { return v2(gfx_st.input.mouse_x_delta, gfx_st.input.mouse_y_delta); }
 void os_mouse_set_pos(v2i pos) {
   X11State& g = gfx_st;
   xcb_warp_pointer(g.connection, XCB_NONE, g.window, 0, 0, 0, 0, pos.x, pos.y);

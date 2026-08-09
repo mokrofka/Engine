@@ -24,12 +24,6 @@ MakeId(R_Font)
 MakeId(R_Shader)
 MakeId(R_Light)
 
-b32 r_texture_is_null(R_Texture tex);
-b32 r_mesh_is_null(R_Mesh mesh);
-b32 r_material_is_null(R_Mesh m);
-b32 r_font_is_null(R_Mesh f);
-b32 r_shader_is_null(R_Mesh shd);
-
 struct MaterialProps {
   v3 ambient;
   v3 diffuse;
@@ -42,6 +36,15 @@ struct Vertex {
   v3 norm;
   v2 uv;
   v4 color;
+};
+
+struct UI_rect {
+  v2 dst_p0;
+  v2 dst_p1;
+  v2 src_p0;
+  v2 src_p1;
+  u32 texture;
+  alignas(16) v4 color;
 };
 
 struct Texture {
@@ -185,24 +188,16 @@ struct R_DrawBatch {
   Darray<R_DrawCallData> draws_unindexed;
 };
 
-R_DrawBatch r_draw_batch_make(Allocator alloc, Gfx_Pipeline pip);
-
 struct R_ShaderModuleEntry {
   Gfx_Shader shd;
   Darray<Gfx_Pipeline> track_pipelines;
 };
-
-R_ShaderModuleEntry r_shader_module_entry_make(Allocator alloc);
 
 struct R_ArenaBuffer {
   Gfx_Buffer buf;
   u64 pos;
   u64 cap;
 };
-
-R_ArenaBuffer r_arena_buffer_make(u64 size, Gfx_MemType type = Gfx_MemType_Gpu);
-R_ArenaBuffer r_arena_buffer_make_round(u64 size, u64 round, Gfx_MemType type = Gfx_MemType_Gpu);
-u64 r_arena_buffer_push(R_ArenaBuffer* buf, u64 size);
 
 enum R_AttachmentType {
   R_AttachmentType_Default,
@@ -222,10 +217,6 @@ struct R_AttachmentDesc {
   v2u size;
 };
 
-R_Attachment r_attachment_make(R_AttachmentDesc desc);
-void r_attachment_destroy(R_Attachment attachment);
-void r_attachment_recreate(R_Attachment* attachment, v2u size);
-
 typedef u32 R_RenderTargetUsage;
 enum {
   R_RenderTargetUsage_Default = 0,
@@ -240,11 +231,6 @@ struct R_RenderTarget {
   R_Attachment resolve;
   R_Attachment depth;
 };
-
-R_RenderTarget r_render_target_make(R_RenderTargetUsage usage, v2u size);
-void r_render_target_destroy(R_RenderTarget rt);
-void r_render_target_recreate(R_RenderTarget* rt, v2u size);
-Gfx_Attachments r_render_target_to_attachments(R_RenderTarget rt);
 
 struct R_AsyncMesh {
   R_Mesh mesh;
@@ -268,6 +254,11 @@ struct R_Camera {
   f32 ortho_size;
 };
 
+struct R_Quad {
+  Rng2 rect;
+  v4 color;
+};
+
 struct R_State {
   Arena arena;
   Alloc gpa;
@@ -289,9 +280,11 @@ struct R_State {
 
   Gfx_Pipeline triangle_pip;
   Gfx_Pipeline screen_pip;
+  Gfx_Pipeline software_render_pip;
   Gfx_Pipeline cubemap_pip;
   Gfx_Pipeline debug_line_pip;
   Gfx_Pipeline ui_pip;
+  Gfx_Pipeline ui_rect_pip;
   Gfx_Pipeline font_pip;
   Gfx_Sampler com_sampler;
 
@@ -308,6 +301,7 @@ struct R_State {
   Array<Vertex, R_MaxDebugLines> draw_lines;
   Array<Vertex, R_MaxDebugLines> draw_lines_persistent;
   Array<Vertex, R_MaxDebugLines> draw_rects;
+  Array<UI_rect, R_MaxDebugLines> draw_quads;
   Array<Vertex, R_MaxDebugLines> draw_rects_texture;
   u64 draw_base_lines;
   u64 draw_base_persistent_lines;
@@ -321,20 +315,47 @@ struct R_State {
   R_Texture dummy_mesh;
   R_Texture cur_cubemap;
 
-  Gfx_Buffer gpu_global_buf;
+  v2 point;
+  v2 point_dir;
+
+  Gfx_Buffer gpu_state_buf;
   Gfx_Buffer gpu_entities_buf;
   Gfx_Buffer gpu_entities_indices_buf;
   Gfx_Buffer gpu_materials_buf;
-  Gfx_Buffer gpu_drawcall_ctx_buf;
+  Gfx_Buffer gpu_drawcall_buf;
+  Gfx_Buffer gpu_software_render_buf;
+  Gfx_Buffer gpu_ui_rect_buf;
+
   GpuState* gpu_state;
   R_EntityGPU* gpu_entities;
   u32* gpu_entities_indices;
   R_MaterialGPU* gpu_materials;
   R_DrawCallDataGPU* gpu_drawcall;
+  u32* gpu_software_render;
+  UI_rect* gpu_ui_rect;
 
   Slice<OS_Handle> shader_module_compilation_pids;
   Slice<String> shaders_to_compile;
 };
+
+b32 r_texture_is_null(R_Texture tex);
+b32 r_mesh_is_null(R_Mesh mesh);
+b32 r_material_is_null(R_Mesh m);
+b32 r_font_is_null(R_Mesh f);
+b32 r_shader_is_null(R_Mesh shd);
+
+R_DrawBatch r_draw_batch_make(Allocator alloc, Gfx_Pipeline pip);
+R_ShaderModuleEntry r_shader_module_entry_make(Allocator alloc);
+R_ArenaBuffer r_arena_buffer_make(u64 size, Gfx_MemType type = Gfx_MemType_Gpu);
+R_ArenaBuffer r_arena_buffer_make_round(u64 size, u64 round, Gfx_MemType type = Gfx_MemType_Gpu);
+u64 r_arena_buffer_push(R_ArenaBuffer* buf, u64 size);
+R_Attachment r_attachment_make(R_AttachmentDesc desc);
+void r_attachment_destroy(R_Attachment attachment);
+void r_attachment_recreate(R_Attachment* attachment, v2u size);
+R_RenderTarget r_render_target_make(R_RenderTargetUsage usage, v2u size);
+void r_render_target_destroy(R_RenderTarget rt);
+void r_render_target_recreate(R_RenderTarget* rt, v2u size);
+Gfx_Attachments r_render_target_to_attachments(R_RenderTarget rt);
 
 v4& get_pos();
 mat4& get_mat();
@@ -384,6 +405,7 @@ void r_draw_line_persistent(v3 a, v3 b, v4 color);
 void r_draw_grid(v3 center, u32 slices, f32 spacing, v4 color);
 void r_draw_cuboid(Rng3 rng, v4 color);
 void r_draw_rect(Rng2 rect, v4 color);
+void r_draw_rect_outline(Rng2 rect, u32 thickness, v4 color);
 void r_draw_text(v2 pos, String str, v4 color);
 
 void imgui_init();

@@ -1,27 +1,20 @@
 #pragma once
 #include "lib.h"
 #include "tokenizer.h"
-
-// TODO:
-// dummy assets/null 
-// obj mouse selection
-// UI
-// memory visualisation thread safe, and gpu memory
-// thread graph visualisation
-// sample profiler
-// make wayland backend work
-// fix static non indexed - doesn't render
-// console
-// thread safe allocator
-// async
-// glb loader
-// introspection
-// font rendering
-// async cubemap
-
 #include "types.h"
 #include "gfx.h"
 #include "render.h"
+
+// TODO:
+// dummy assets/null 
+// UI
+// memory visualisation thread safe, and gpu memory
+// thread graph visualisation
+// make wayland backend work
+// console
+// thread safe allocator
+// glb loader
+// obj mouse selection
 
 enum MetaType {
   MetaType_Null,
@@ -66,8 +59,6 @@ struct DebugWindow {
   b32 open;
   ImGuiWindowFlags flags;
 };
-
-Rng2 debug_window_get_rect(DebugWindow win);
 
 enum ProfTabActive {
   ProfileTabActive_Root,
@@ -120,26 +111,6 @@ struct DebugState {
 struct ImGui_DrawList {
   ImDrawList* draw;
 };
-
-ImGui_DrawList imgui_get_window_drawlist();
-void imgui_draw_rect(ImGui_DrawList draw, Rng2 rect, v4 col, f32 rounding = 0, ImDrawFlags flags = 0, f32 thickness = 1);
-void imgui_draw_rect_filled(ImGui_DrawList draw, Rng2 rect, v4 col, f32 rounding = 0, ImDrawFlags flags = 0);
-void imgui_draw_push_clip_rect(ImGui_DrawList draw, Rng2 rect);
-void imgui_draw_pop_clip_rect(ImGui_DrawList draw);
-void imgui_draw_line(ImGui_DrawList draw, v2 p0, v2 p1, v4 col, f32 thickness = 1);
-void imgui_draw_text(ImGui_DrawList draw, v2 pos, v4 col, String fmt, ...);
-void imgui_draw_text(ImGui_DrawList draw, ImFont* font, f32 font_size, v2 pos, v4 col, String fmt, ...);
-void imgui_text(String fmt, ...);
-v2 imgui_calc_text_size(String str);
-void imgui_begin_tab_item(String str);
-
-void debug_window_apply_state(DebugWindow& win);
-void debug_window_track_state(DebugWindow& win);
-void debug_window_toggle_fullscreen(DebugWindow& win);
-void debug_init();
-void debug_update();
-void debug_game();
-void debug_prof_view();
 
 enum JsType {
   JsType_Null,
@@ -307,36 +278,45 @@ Introspect struct Entity {
   v4 color;
 };
 
-struct GameState {
-  Arena arena;
-  Alloc gpa;
-  Camera cam;
-  R_Camera r_cam;
-  b32 fps_camera;
-  Timer timer;
+struct UI_State {
+  u32 hotitem;
+  u32 activeitem;
+  b32 mouse_down;
 
-  u32 entities_count;
-  PoolLinkList<Entity, MaxEntities, EntityId> entities;
-
-  Darray<EntityId> moving_cubes;
-  EntityId axis_attached_to_cam_id;
-  EntityId monkey_id;
-  EntityId rotating_cube_id;
-  Map<String, EntityId, 32> find_entity;
-
-  R_Font font;
-  v3 a;
-  v3 b;
-  v2 a_v2;
-  v2 b_v2;
-  EntityId e;
-  f32 t;
-  v4 color;
-  EntityId my;
-  EntityId thing;
-  v3 euler;
-  v3 point;
+  u32 kbditem;
+  u32 last_widget;
+  b32 tab;
+  b32 enter;
+  b32 up;
+  b32 down;
 };
+
+#include "ui.h"
+
+typedef u32 ThingState;
+enum {
+  ThingState_OnFire = Bit(0),
+  ThingState_Flying = Bit(1),
+  ThingState_Poisoned = Bit(2),
+};
+
+MakeId(ThingId);
+struct Thing {
+  Thing* first;
+  Thing* last;
+  Thing* next;
+  Thing* prev;
+  Thing* parent;
+  i32 data;
+  ThingState state;
+  f32 health;
+  v2 pos;
+  OpaqueId enemy_list;
+  OpaqueId ally_list;
+  OpaqueId neutral_list;
+};
+
+Thing& get_thing(ThingId id);
 
 struct GlobalState {
   Arena arena;
@@ -367,14 +347,73 @@ struct GlobalState {
   Array<String, R_MaxMaterials> material_id_to_str;
 
   WatchState watch;
-  GameState game;
   InputState input;
   R_State r;
   Gfx_State gfx;
   DebugState debug;
+  UI_State ui;
+  UI_State0* ui0;
+
+  Camera cam;
+  R_Camera r_cam;
+  b32 fps_camera;
+  Timer timer;
+
+  u32 entities_count;
+  PoolLinkList<Entity, MaxEntities, EntityId> entities;
+  PoolLinkList<Thing, MaxEntities, ThingId> things;
+
+  Darray<EntityId> moving_cubes;
+  EntityId axis_attached_to_cam_id;
+  EntityId monkey_id;
+  EntityId rotating_cube_id;
+  Map<String, EntityId, 32> find_entity;
+
+  R_Font font;
+  v3 a;
+  v3 b;
+  v2 a_v2;
+  v2 b_v2;
+  EntityId e;
+  f32 t;
+  v4 color;
+  EntityId my;
+  EntityId thing;
+  v3 euler;
+  v3 point;
+  EntityId obj;
+
+  Coroutine co;
 };
 
 extern GlobalState* st;
+
+void ui_draw_rect(Rng2 rect, v4 color);
+b32 ui_button(u32 id, v2 pos);
+b32 ui_slider(u32 id, v2 pos, i32 max, i32& v);
+void ui_begin();
+void ui_end();
+
+ImGui_DrawList imgui_get_window_drawlist();
+void imgui_draw_rect(ImGui_DrawList draw, Rng2 rect, v4 col, f32 rounding = 0, ImDrawFlags flags = 0, f32 thickness = 1);
+void imgui_draw_rect_filled(ImGui_DrawList draw, Rng2 rect, v4 col, f32 rounding = 0, ImDrawFlags flags = 0);
+void imgui_draw_push_clip_rect(ImGui_DrawList draw, Rng2 rect);
+void imgui_draw_pop_clip_rect(ImGui_DrawList draw);
+void imgui_draw_line(ImGui_DrawList draw, v2 p0, v2 p1, v4 col, f32 thickness = 1);
+void imgui_draw_text(ImGui_DrawList draw, v2 pos, v4 col, String fmt, ...);
+void imgui_draw_text(ImGui_DrawList draw, ImFont* font, f32 font_size, v2 pos, v4 col, String fmt, ...);
+void imgui_text(String fmt, ...);
+v2 imgui_calc_text_size(String str);
+void imgui_begin_tab_item(String str);
+
+Rng2 debug_window_get_rect(DebugWindow win);
+void debug_window_apply_state(DebugWindow& win);
+void debug_window_track_state(DebugWindow& win);
+void debug_window_toggle_fullscreen(DebugWindow& win);
+void debug_init();
+void debug_update();
+void debug_game();
+void debug_prof_view();
 
 void test();
 
@@ -431,7 +470,7 @@ EntityId e_alloc(R_Mesh mesh_id, R_Material material_id, EntityThing thing = {})
 EntityId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing = {});
 void e_free(EntityId e_id);
 void game_init();
-void game_update();
+void update_game();
 void game_view();
 void game_save_state();
 void game_load_state();
