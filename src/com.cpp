@@ -3447,7 +3447,7 @@ ThingId e_alloc(R_Mesh mesh_id, R_Material material_id, EntityThing thing) {
     .flags = thing.flags,
     .pos = v3(),
     .rot = quat_identity(),
-    .scale = v3(),
+    .scale = v3(1),
     .mesh = mesh_id,
     .mat = material_id,
     .aabb = Rng3(v3(-1), v3(1)),
@@ -3465,7 +3465,7 @@ ThingId make_thing(ThingDesc desc) {
   var& g = *st;
   Thing e = {
     .pos = desc.pos,
-    .rot = desc.rot,
+    .rot = quat_identity(),
     .scale = v3(1),
     .mesh = get_mesh(desc.mesh),
     .mat = get_material(desc.mat),
