@@ -167,7 +167,7 @@ struct R_GlobalStateGPU {
 };
 
 struct R_MeshPush {
-  EntityId id;
+  ThingId id;
   R_Mesh mesh;
   R_Material material;
   u8 b[32];
@@ -398,7 +398,7 @@ void r_end();
 
 void r_draw_mesh(R_Mesh mesh, R_Material mat, v3 pos);
 void r_draw_mesh_trs(R_Mesh mesh, R_Material mat, v3 pos, v4 rot, v3 scale);
-void r_draw_entity(EntityId id);
+void r_draw_entity(ThingId id);
 
 void r_draw_line(v3 a, v3 b, v4 color);
 void r_draw_line_persistent(v3 a, v3 b, v4 color);

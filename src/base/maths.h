@@ -23,7 +23,7 @@ union v2 {
   f32 v[2];
   v2() = default;
   v2(f32 s):x(s),y(s){};
-  v2(f32 x_, f32 y_);
+  v2(f32 x, f32 y):x(x),y(y){}
 };
 
 union v2i {
@@ -33,7 +33,7 @@ union v2i {
   };
   i32 v[2];
   v2i() = default;
-  v2i(i32 x_, i32 y_);
+  v2i(i32 x, i32 y):x(x),y(y){}
 };
 
 union v2u {
@@ -43,7 +43,7 @@ union v2u {
   };
   u32 v[2];
   v2u() = default;
-  v2u(u32 x_, u32 y_);
+  v2u(u32 x, u32 y):x(x),y(y){}
 };
 
 union v2b {
@@ -53,7 +53,7 @@ union v2b {
   };
   b32 v[2];
   v2b() = default;
-  v2b(b32 x_, b32 y_);
+  v2b(b32 x, b32 y):x(x),y(y){}
 };
 
 ///////////////////////////////////
@@ -68,8 +68,8 @@ union v3 {
   f32 v[3];
   v3() = default;
   v3(f32 s):x(s),y(s),z(s){};
-  v3(f32 x_, f32 y_, f32 z_);
-  v2 xy();
+  v3(f32 x, f32 y, f32 z):x(x),y(y),z(z){}
+  v2 xy() { return v2(x,y); };
 };
 
 union v3u {
@@ -80,7 +80,7 @@ union v3u {
   };
   u32 v[3];
   v3u() = default;
-  v3u(u32 x_, u32 y_, u32 z_);
+  v3u(u32 x, u32 y, u32 z):x(x),y(y),z(z){}
 };
 
 u64 hash(v3u v);
@@ -94,7 +94,7 @@ union v3b {
   };
   b32 v[3];
   v3b() = default;
-  v3b(b32 x_, b32 y_, b32 z_);
+  v3b(b32 x, b32 y, b32 z):x(x),y(y),z(z){}
 };
 
 ///////////////////////////////////
@@ -109,21 +109,20 @@ union v4 {
   };
   f32 v[4];
   v4() = default;
-  v4(f32 x_, f32 y_, f32 z_, f32 w_);
+  v4(f32 s):x(s),y(s),z(s){};
+  v4(f32 x, f32 y, f32 z, f32 w):x(x),y(y),z(z),w(w){}
 };
 
-union mat3 {
+struct mat3x2 {
+  f32 v[3][2];
+};
+
+struct mat3 {
   f32 v[3][3];
 };
 
-union mat4 {
+struct mat4 {
   f32 v[4][4];
-  struct {
-    v4 x;
-    v4 y;
-    v4 z;
-    v4 w;
-  };
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -167,7 +166,7 @@ union Rng2 {
     f32 y1;
   };
   Rng2() = default;
-  Rng2(v2 min_, v2 max_);
+  Rng2(v2 min, v2 max):min(min),max(max){}
 };
 
 ///////////////////////////////////
@@ -187,7 +186,7 @@ union Rng3 {
     f32 z1;
   };
   Rng3() = default;
-  Rng3(v3 min_, v3 max_);
+  Rng3(v3 min, v3 max):min(min),max(max){}
 };
 
 ///////////////////////////////////
@@ -257,6 +256,8 @@ NO_DEBUG f32 rand_f32_01();
 NO_DEBUG f32 rand_f32_11();
 NO_DEBUG f32 rand_f32();
 NO_DEBUG f32 rand_f32_rng(f32 min, f32 max);
+NO_DEBUG f32 rand_f32_centered(f32 base, f32 radius);
+NO_DEBUG f32 rand_f32_signed(f32 magnitude);
 NO_DEBUG b32 rand_b32();
 NO_DEBUG void rand_set_seed();
 NO_DEBUG u32 rand_get_seed();
@@ -269,6 +270,8 @@ template<typename T> void rand_shuffle(Slice<T> data) {
 
 ////////////////////////////////////////////////////////////////////////
 // Misc
+
+i32 ipow(i32 base, u32 exponent);
 
 f32 safe_divn(f32 a, f32 b, f32 n);
 f32 safe_div0(f32 a, f32 b);
@@ -284,7 +287,7 @@ f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
 f32 remap(f32 x, f32 old_max, f32 new_max);
 f64 remapf64(f64 x, f64 old_min, f64 old_max, f64 new_min, f64 new_max);
 f32 remap_clamped(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
-f32 approach(f32 current, f32 target, f32 increase);
+f32 approach(f32 current, f32 target, f32 step);
 
 ////////////////////////////////////////////////////////////////////////
 // Vector2
@@ -305,31 +308,27 @@ NO_DEBUG v2  operator-(v2 v);
 NO_DEBUG b32 operator==(v2u a, v2u b);
 NO_DEBUG b32 operator!=(v2u a, v2u b);
 
+NO_DEBUG v2i v2i_of_v2(v2 v);
 NO_DEBUG v2  v2_of_v3(v3 v);
 NO_DEBUG v2  v2_of_v4(v4 v);
 NO_DEBUG v3  v2_to_v3(v2 v, f32 a);
 NO_DEBUG v4  v2_to_v4(v2 v, f32 a, f32 b);
 NO_DEBUG v2  v2_of_v2i(v2i v);
 NO_DEBUG v2  v2_of_v2u(v2u v);
-NO_DEBUG v2i v2i_of_v2(v2 v);
 NO_DEBUG v2  v2_up();
 NO_DEBUG v2  v2_down();
 NO_DEBUG v2  v2_left();
 NO_DEBUG v2  v2_right();
-NO_DEBUG v2  v2_zero();
-NO_DEBUG v2  v2_one();
-NO_DEBUG v2  v2_splat(f32 x);
-NO_DEBUG v2  v2_add_scalar(v2 v, f32 x);
-NO_DEBUG v2  v2_subtract_scalar(v2 v, f32 x);
+NO_DEBUG v2  v2_abs(v2 v);
 NO_DEBUG v2  v2_min(v2 a, v2 b);
 NO_DEBUG v2  v2_max(v2 a, v2 b);
+NO_DEBUG v2  v2_clamp(v2 min, v2 v, v2 max);
+NO_DEBUG v2  v2_sign(v2 v);
 NO_DEBUG v2  v2_invert(v2 v);
 NO_DEBUG v2b v2_greater(v2 a, v2 b);
 NO_DEBUG v2b v2_less(v2 a, v2 b);
 NO_DEBUG b32 v2_greater_any(v2 a, v2 b);
 NO_DEBUG b32 v2_less_any(v2 a, v2 b);
-NO_DEBUG v2  v2_clamp(v2 min, v2 v, v2 max);
-NO_DEBUG v2  v2_sign(v2 v);
 NO_DEBUG v2  v2_rand_rng(v2 a, v2 b);
 
 NO_DEBUG f32 v2_length(v2 v);
@@ -348,8 +347,9 @@ NO_DEBUG f32 v2_length_projection(v2 a, v2 b);
 NO_DEBUG v2  v2_reject(v2 a, v2 b);
 NO_DEBUG v2  v2_reflect(v2 v, v2 normal);
 NO_DEBUG f32 v2_angle(v2 a, v2 b);
+NO_DEBUG f32 v2_angle(v2 v);
 
-v2 v2_step_to(v2 v, v2 target, f32 step);
+v2 v2_approach(v2 current, v2 target, f32 step);
 v2 v2_clamp_length(f32 min, v2 v, f32 max);
 
 NO_DEBUG v2  v2_flip_y(v2 v);
@@ -387,20 +387,16 @@ NO_DEBUG v3  v3_left();
 NO_DEBUG v3  v3_right();
 NO_DEBUG v3  v3_forward();
 NO_DEBUG v3  v3_back();
-NO_DEBUG v3  v3_zero();
-NO_DEBUG v3  v3_one();
-NO_DEBUG v3  v3_splat(f32 x);
-NO_DEBUG v3  v3_add_scalar(v3 v, f32 x);
-NO_DEBUG v3  v3_subtract_scalar(v3 v, f32 x);
+NO_DEBUG v3  v3_abs(v3 v);
 NO_DEBUG v3  v3_min(v3 a, v3 b);
 NO_DEBUG v3  v3_max(v3 a, v3 b);
+NO_DEBUG v3  v3_clamp(v3 min, v3 v, v3 max);
+NO_DEBUG v3  v3_sign(v3 v);
 NO_DEBUG v3  v3_invert(v3 v);
 NO_DEBUG v3b v3_greater(v3 a, v3 b);
 NO_DEBUG v3b v3_less(v3 a, v3 b);
 NO_DEBUG b32 v3_greater_any(v3 a, v3 b);
 NO_DEBUG b32 v3_less_any(v3 a, v3 b);
-NO_DEBUG v3  v3_clamp(v3 min, v3 v, v3 max);
-NO_DEBUG v3  v3_sign(v3 v);
 NO_DEBUG v3  v3_rand_rng(v3 a, v3 b);
 
 NO_DEBUG f32 v3_length(v3 v);
@@ -421,7 +417,7 @@ NO_DEBUG v3  v3_reject_on_unit(v3 a, v3 b);
 NO_DEBUG v3  v3_reflect(v3 v, v3 normal);
 NO_DEBUG f32 v3_angle(v3 a, v3 b);
 
-v3 v3_step_to(v3 v, v3 target, f32 step);
+v3 v3_approach(v3 current, v3 target, f32 step);
 v3 v3_clamp_length(f32 min, v3 v, f32 max);
 
 NO_DEBUG v3  v3_pos_of_mat4(mat4 mat);
@@ -452,10 +448,8 @@ NO_DEBUG v4  operator-(v4 v);
 
 NO_DEBUG v4  v4_zero();
 NO_DEBUG v4  v4_one();
+NO_DEBUG v4  v4_abs(v4 v);
 NO_DEBUG v4  v4_set_w(v4 v, f32 w);
-NO_DEBUG v4  v4_splat(f32 x);
-NO_DEBUG v4  v4_add_scalar(v4 v, f32 x);
-NO_DEBUG v4  v4_subtract_scalar(v4 v, f32 x);
 NO_DEBUG v4  v4_min(v4 a, v4 b);
 NO_DEBUG v4  v4_max(v4 a, v4 b);
 NO_DEBUG v4  v4_invert(v4 v);
@@ -496,6 +490,10 @@ v4 quat_look_rotation(v3 dir, v3 up);
 ////////////////////////////////////////////////////////////////////////
 // Matrix3
 
+mat3x2 operator*(mat3x2 a, mat3x2 b);
+mat3x2& operator*=(mat3x2 a, mat3x2 b);
+v2 operator*(mat3x2 a, v2 b);
+
 mat3 operator*(mat3 a, mat3 b);
 mat3& operator*=(mat3& a, mat3 b);
 v3 operator*(mat3 mat, v3 vec);
@@ -509,7 +507,7 @@ mat3 mat3_scale(v2 scale);
 
 mat4 operator*(mat4 a, mat4 b);
 mat4& operator*=(mat4& a, mat4 b);
-v4 operator*(mat4 mat, v4 vec);
+v4 operator*(mat4 mat, v4 v);
 
 v3 mat4_forward(mat4 matrix);
 v3 mat4_backward(mat4 matrix);
@@ -531,7 +529,7 @@ mat4 mat4_transform(v3 pos, v4 rot, v3 scale);
 mat4 mat4_transform(Transform trans);
 mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far);
 mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far);
-mat4 mat4_look_at(v3 pos, v3 dir, v3 up);
+mat4 mat4_look_at(v3 pos, v3 target, v3 up = v3_up());
 mat4 mat4_transpose(mat4 matrix);
 mat4 mat4_inverse(mat4 matrix);
 mat4 mat4_from_quat(v4 q);
@@ -634,4 +632,47 @@ struct Rng2Cursor {
 
 Rng2 layout_row(Rng2Cursor& c, Rng1 x, f32 h);
 void layout_next(Rng2Cursor& c, f32 h);
+
+////////////////////////////////////////////////////////////////////////
+// Ease
+
+f32 ease_quad_in(f32 t);
+f32 ease_quad_out(f32 t);
+f32 ease_quad_in_out(f32 t);
+
+f32 ease_cube_in(f32 t);
+f32 ease_cube_out(f32 t);
+f32 ease_cube_in_out(f32 t);
+
+f32 ease_quart_in(f32 t);
+f32 ease_quart_out(f32 t);
+f32 ease_quart_in_out(f32 t);
+
+f32 ease_quint_in(f32 t);
+f32 ease_quint_out(f32 t);
+f32 ease_quint_in_out(f32 t);
+
+f32 ease_sin_in(f32 t);
+f32 ease_sin_out(f32 t);
+f32 ease_sin_in_out(f32 t);
+
+f32 ease_circ_in(f32 t);
+f32 ease_circ_out(f32 t);
+f32 ease_circ_in_out(f32 t);
+
+f32 ease_exp_in(f32 t);
+f32 ease_exp_out(f32 t);
+f32 ease_exp_in_out(f32 t);
+
+f32 ease_elastic_in(f32 t);
+f32 ease_elastic_out(f32 t);
+f32 ease_elastic_in_out(f32 t);
+
+f32 ease_back_in(f32 t);
+f32 ease_back_out(f32 t);
+f32 ease_back_in_out(f32 t);
+
+f32 ease_bounce_in(f32 t);
+f32 ease_bounce_out(f32 t);
+f32 ease_bounce_in_out(f32 t);
 

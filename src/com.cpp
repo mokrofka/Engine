@@ -676,73 +676,73 @@ intern void profiler_test() {
 
 // }
 
-void test_link_list() {
-  Scratch scratch;
-  Thing* thing = push_struct_zero(scratch, Thing);
-  Thing* thing1 = push_struct_zero(scratch, Thing);
-  Thing* thing2 = push_struct_zero(scratch, Thing);
-  Thing* thing3 = push_struct_zero(scratch, Thing);
-  Thing* thing4 = push_struct_zero(scratch, Thing);
-  Thing* thing5 = push_struct_zero(scratch, Thing);
-  Thing* thing6 = push_struct_zero(scratch, Thing);
-  Thing* thing7 = push_struct_zero(scratch, Thing);
+// void test_link_list() {
+//   Scratch scratch;
+//   Thing* thing = push_struct_zero(scratch, Thing);
+//   Thing* thing1 = push_struct_zero(scratch, Thing);
+//   Thing* thing2 = push_struct_zero(scratch, Thing);
+//   Thing* thing3 = push_struct_zero(scratch, Thing);
+//   Thing* thing4 = push_struct_zero(scratch, Thing);
+//   Thing* thing5 = push_struct_zero(scratch, Thing);
+//   Thing* thing6 = push_struct_zero(scratch, Thing);
+//   Thing* thing7 = push_struct_zero(scratch, Thing);
 
-  thing->data = 0;
-  thing1->data = 1;
-  thing2->data = 2;
-  thing3->data = 3;
-  thing4->data = 4;
-  thing5->data = 5;
-  thing6->data = 6;
-  thing7->data = 7;
+//   thing->data = 0;
+//   thing1->data = 1;
+//   thing2->data = 2;
+//   thing3->data = 3;
+//   thing4->data = 4;
+//   thing5->data = 5;
+//   thing6->data = 6;
+//   thing7->data = 7;
 
-  Thing* first = null;
-  Thing* last = null;
+//   Thing* first = null;
+//   Thing* last = null;
 
-  #if 0
-  sll_stack_push(head, thing1);
-  sll_stack_push(head, thing2);
-  sll_stack_push(head, thing3);
+//   #if 0
+//   sll_stack_push(head, thing1);
+//   sll_stack_push(head, thing2);
+//   sll_stack_push(head, thing3);
 
-  for EachNode(it, Thing, head) {
-    Info("%i", it->data);
-  }
+//   for EachNode(it, Thing, head) {
+//     Info("%i", it->data);
+//   }
 
-  sll_stack_pop(head);
-  sll_stack_pop(head);
-  for EachNode(it, Thing, head) {
-    Info("%i", it->data);
-  }
-  #endif
+//   sll_stack_pop(head);
+//   sll_stack_pop(head);
+//   for EachNode(it, Thing, head) {
+//     Info("%i", it->data);
+//   }
+//   #endif
 
-  #if 0
-  sll_queue_push(first, last, thing);
-  sll_queue_push(first, last, thing1);
-  sll_queue_push(first, last, thing2);
-  sll_queue_push(first, last, thing3);
+//   #if 0
+//   sll_queue_push(first, last, thing);
+//   sll_queue_push(first, last, thing1);
+//   sll_queue_push(first, last, thing2);
+//   sll_queue_push(first, last, thing3);
 
-  for EachNode (it, Thing, first) {
-    Info("%i", it->data);
-  }
-  #endif
+//   for EachNode (it, Thing, first) {
+//     Info("%i", it->data);
+//   }
+//   #endif
 
-  dll_push_back(first, last, thing);
-  dll_push_back(first, last, thing1);
-  dll_push_back(first, last, thing2);
-  dll_push_back(first, last, thing3);
+//   dll_push_back(first, last, thing);
+//   dll_push_back(first, last, thing1);
+//   dll_push_back(first, last, thing2);
+//   dll_push_back(first, last, thing3);
 
-  dll_push_front(first, last, thing4);
-  dll_push_front(first, last, thing5);
-  dll_push_front(first, last, thing6);
-  dll_push_front(first, last, thing7);
+//   dll_push_front(first, last, thing4);
+//   dll_push_front(first, last, thing5);
+//   dll_push_front(first, last, thing6);
+//   dll_push_front(first, last, thing7);
 
-  dll_remove(first, last, thing5);
+//   dll_remove(first, last, thing5);
 
-  LoopNode (it, first) {
-    Info("%i", it->data);
-  }
+//   LoopNode (it, first) {
+//     Info("%i", it->data);
+//   }
 
-}
+// }
 
 ////////////////////////////////////////////////////////////////////////
 // sort
@@ -907,7 +907,7 @@ TimeScope::~TimeScope() {
 
 Rng2 debug_window_get_rect(DebugWindow win) {
   if (win.fullscreen) {
-    return rng2_make(v2_zero(), v2_of_v2u(os_window_size()));
+    return rng2_make(v2(), v2_of_v2u(os_window_size()));
   } else {
     return rng2_make(win.pos, win.size);
   }
@@ -918,6 +918,14 @@ Rng2 debug_window_get_rect(DebugWindow win) {
 #else
   #define GEN_ID (__LINE__)
 #endif
+
+ThingDesc default_thing_desc() {
+  ThingDesc res = {
+    .scale = v3(1),
+    .rot = quat_identity(),
+  };
+  return res;
+}
 
 void ui_draw_rect(Rng2 rect, v4 color) {
   r_draw_rect(rect, color);
@@ -983,7 +991,7 @@ b32 ui_slider(u32 id, v2 pos, i32 max, i32& value) {
 
   i32 ypos = remap(value, max, track_height - knob_size - padding);
 
-  if (rng2_contains(rng2_make(pos+v2_splat(padding), v2(knob_size,track_height-padding)), os_mouse_pos())) {
+  if (rng2_contains(rng2_make(pos+v2(padding), v2(knob_size,track_height-padding)), os_mouse_pos())) {
     g.hotitem = id;
     if (g.activeitem == 0 && g.mouse_down) {
       g.activeitem = id;
@@ -999,9 +1007,9 @@ b32 ui_slider(u32 id, v2 pos, i32 max, i32& value) {
 
   ui_draw_rect(rng2_make(pos, v2(knob_size*2,track_height)), rgba_from_u32(0x777777));
   if (g.activeitem == id || g.hotitem == id) {
-    ui_draw_rect(rng2_make(pos + v2_splat(padding) + v2(0,ypos), v2_splat(knob_size)), ColorWhite);
+    ui_draw_rect(rng2_make(pos + v2(padding) + v2(0,ypos), v2(knob_size)), ColorWhite);
   } else {
-    ui_draw_rect(rng2_make(pos + v2_splat(padding) + v2(0,ypos), v2_splat(knob_size)), rgba_from_u32(0xaaaaaa));
+    ui_draw_rect(rng2_make(pos + v2(padding) + v2(0,ypos), v2(knob_size)), rgba_from_u32(0xaaaaaa));
   }
 
   if (g.kbditem == id) {;
@@ -1215,7 +1223,7 @@ void debug_game() {
       ImGui::Separator();
     }
     {
-      Entity& e = get_entity(g.axis_attached_to_cam_id);
+      Thing& e = get_thing(g.axis_attached_to_cam_id);
       imgui_text(push_str_copy(scratch, dumb_struct(scratch, slice(members_of_Entity), &e, e.flags)));
     }
 
@@ -1227,8 +1235,8 @@ void debug_game() {
     }
     if (ImGui::Button("clear moving cubes")) {
       Loop (i, g.moving_cubes.count) {
-        EntityId e =  g.moving_cubes[i];
-        e_free(e);
+        ThingId e =  g.moving_cubes[i];
+        destroy_thing(e);
       }
       array_clear(g.moving_cubes);
     }
@@ -1574,7 +1582,7 @@ void debug_prof_view() {
                 ImGui::EndTooltip();
                 if (os_mouse_is_button_pressed(MouseButton_Left)) {
                   prof_win.frames_scroll_state.offset.x = -width_size * i;
-                  prof_win.frames_scroll_state.scale = v2_splat(1);
+                  prof_win.frames_scroll_state.scale = v2(1);
                 }
               }
               if (i == st->current_frame % ArrayCount(prof.frames_times)) {
@@ -1959,11 +1967,11 @@ Vertex triangle_vertices[] = {
 };
 
 Vertex axis_vertices[] = {
-  {.pos = v3_zero(), .color = v4(1,0,0,1)},
+  {.pos = v3(),      .color = v4(1,0,0,1)},
   {.pos = v3(1,0,0), .color = v4(1,0,0,1)},
-  {.pos = v3_zero(), .color = v4(0,1,0,1)},
+  {.pos = v3(),      .color = v4(0,1,0,1)},
   {.pos = v3(0,1,0), .color = v4(0,1,0,1)},
-  {.pos = v3_zero(), .color = v4(0,0,1,1)},
+  {.pos = v3(),      .color = v4(0,0,1,1)},
   {.pos = v3(0,0,1), .color = v4(0,0,1,1)},
 };
 
@@ -2022,8 +2030,58 @@ f64 tsc_to_ms(u64 tsc) {
 
 f32 get_dt() { return st->dt; }
 f32 get_time() { return st->time; }
-Entity& get_entity(EntityId id) { return pool_get(st->entities, id); }
-Thing& get_thing(ThingId id) { return pool_get(st->things, id); }
+b32 time_on_interval(f64 time, f32 delta, f32 interval, f32 offset) {
+	u32 last = (time - offset - delta) / interval;
+	u32 next = (time - offset) / interval;
+	return last < next;
+}
+b32 time_on_interval(f32 interval, f32 offset) {
+  return time_on_interval(get_time(), get_dt(), interval, offset);
+}
+u32 time_interval_steps(f64 time, f32 delta, f32 interval, f32 offset) {
+  u32 last = (time - offset - delta) / interval;
+  u32 next = (time - offset) / interval;
+  return next - last;
+}
+f64 time_next_interval(f64 time, f32 interval, f32 offset) {
+  u32 next = (time - offset) / interval + 1;
+  return offset + next * interval;
+}
+f64 time_interval_progress(f64 time, f32 interval, f32 offset) {
+  f64 t = time - offset;
+  f64 into = t - Floor(t / interval) * interval;
+  return into / interval;
+}
+f32 time_ping_pong(f64 time, f32 duration) {
+  f32 t = Mod(time, duration * 2);
+  return (t < duration) ? (t / duration) : (2 - t / duration);
+}
+b32 time_on_time(f64 time, f64 timestamp) { 
+  return time >= timestamp && (time - get_dt()) < timestamp;
+}
+b32 time_on_between_interval(f64 time, f32 interval, f32 offset) {
+  return Mod(time - offset, interval*2) >= interval;
+}
+b32 time_on_between_interval(f32 interval, f32 offset) {
+  return time_on_between_interval(get_time(), interval, offset);
+}
+f32 time_sine_wave(f64 time, f32 period, f32 amplitude = 1.0f) {
+  return Sin(time / period * 2.0f * PI) * amplitude;
+}
+f32 time_percent(f64 start, f64 duration) {
+  return (get_time() - start) / duration;
+}
+f32 time_percent_clamped(f64 start, f64 duration) {
+  return Clamp(0.0f, (get_time() - start) / duration, 1.0f);
+}
+f32 time_lerp_delta(f32 current, f32 target, f32 rate, f32 delta) {
+  return target + (current - target) * Exp(-rate * delta);
+}
+b32 time_on_frame_interval(u32 frame, u32 n, u32 offset = 0) {
+  return (frame + offset) % n == 0;
+}
+
+Thing& get_thing(ThingId id) { return pool_get(st->entities, id); }
 
 struct WordLexer {
   String str;
@@ -2298,7 +2356,7 @@ global String materials_strs[] = {
 #undef X
 };
 
-R_Mesh mesh_get(MeshEnum mesh_enum) { return st->meshes_ids[mesh_enum]; }
+R_Mesh get_mesh(MeshEnum mesh_enum) { return st->meshes_ids[mesh_enum]; }
 void mesh_set(MeshEnum mesh_enum, R_Mesh id) { 
   GlobalState& g = *st;
   g.meshes_ids[mesh_enum] = id;
@@ -2306,13 +2364,13 @@ void mesh_set(MeshEnum mesh_enum, R_Mesh id) {
   map_set(g.str_to_mesh_id, str, id);
   g.mesh_id_to_str[id.idx] = str;
 }
-R_Material material_get(MaterialEnum id) { return st->materials_ids[id]; }
+R_Material get_material(MaterialEnum id) { return st->materials_ids[id]; }
 
 constexpr MaterialProps material_default_props() {
   MaterialProps props = {
-    .ambient = v3_splat(1),
-    .diffuse = v3_splat(1),
-    .specular = v3_splat(1),
+    .ambient = v3(1),
+    .diffuse = v3(1),
+    .specular = v3(1),
     .shininess = 1,
   };
   return props;
@@ -2584,7 +2642,7 @@ void key_consume(Key key) {
 ScrollState scroll_state_make(f32 scale) {
   ScrollState res = {
     .scale_level = scale,
-    .scale = v2_splat(scale),
+    .scale = v2(scale),
   };
   return res;
 }
@@ -2602,7 +2660,7 @@ void scroll_state_update(ScrollState& s, ScrollType type) {
           v2 world = (mouse - s.offset) / s.scale_level;
           s.scale_level *= zoom;
           s.offset = mouse - world * s.scale_level;
-          s.scale = v2_splat(s.scale_level);
+          s.scale = v2(s.scale_level);
         } break;
         case ScrollType_PowClamp: {
           v2 world = {
@@ -2983,6 +3041,7 @@ void co_test(Coroutine* co, f32 dt) {
 
 void init() {
   Scratch scratch;
+  
   struct Vec {
     f32 a,b;
   };
@@ -3004,7 +3063,7 @@ void init() {
     Info("%i", a.a0);
   }
   // Vec v = {1};
-  // v2 p = v2_splat(Scope(f32 x = os_window_size().x; x * 2;));
+  // v2 p = v2(Scope(f32 x = os_window_size().x; x * 2;));
 
   f32x4 a = {
     1,2,3,4
@@ -3099,7 +3158,7 @@ void init() {
   foo_js();
   GlobalState& g = *st;
 
-  estimate_cpu_frequency();
+  cpu_find_frequency();
   os_gfx_init();
   prof_init(g.arena);
   prof_launch_begin();
@@ -3211,22 +3270,25 @@ if (data->ctx == null) {
   ui_set_current_state(g.ui0);
 
   u64 target_fps = Billion(1) / 60;
-  u64 last_time = os_now_ns();
+  u64 prev_ns = os_now_ns();
 
   while (!os_window_should_close()) {
-    co_test(&g.co, get_dt());
+    // co_test(&g.co, get_dt());
     if (st->should_hotreload) {
       goto hotreload;
+    }
+    if (time_on_interval(get_time(), get_dt(), 0.1, 0)) {
+      Info("ye");
     }
 
     prof_begin(g.current_frame);
     {
       ProfBlock("frame");
       os_pump_messages();
-      u64 start_time = os_now_ns();
-      g.dt = f64(start_time - last_time) / Billion(1);
+      u64 now_ns = os_now_ns();
+      g.dt = f64(now_ns - prev_ns) / Billion(1);
       g.time += g.dt;
-      last_time = start_time;
+      prev_ns = now_ns;
       r_begin();
       // ui_begin();
       update_com();
@@ -3235,7 +3297,7 @@ if (data->ctx == null) {
       r_end();
       watch_update();
 
-      u64 frame_duration = os_now_ns() - start_time;
+      u64 frame_duration = os_now_ns() - now_ns;
       if (frame_duration < target_fps) {
         u64 sleep_time = target_fps - frame_duration;
         ProfBlock("main sleep", ProfType_Sleep);
@@ -3371,48 +3433,64 @@ MeshDesc grid_generate(Allocator arena, u32 size, f32 step) {
 //   return true;
 // };
 
-EntityId e_alloc_bare() {
+ThingId e_alloc_bare() {
   var& g = *st;
-  EntityId e_id = pool_push(g.entities, {});
+  ThingId e_id = pool_push(g.entities, {});
   ++g.entities_count;
   return e_id;
 }
 
-EntityId e_alloc(R_Mesh mesh_id, R_Material material_id, EntityThing thing) {
+ThingId e_alloc(R_Mesh mesh_id, R_Material material_id, EntityThing thing) {
   var& g = *st;
-  Entity e = {
+  Thing e = {
     .name = thing.name,
     .flags = thing.flags,
-    .pos = v3_zero(),
+    .pos = v3(),
     .rot = quat_identity(),
-    .scale = v3_one(),
+    .scale = v3(),
     .mesh = mesh_id,
     .mat = material_id,
-    .aabb = Rng3(v3_splat(-1), v3_splat(1)),
+    .aabb = Rng3(v3(-1), v3(1)),
     .color = ColorWhite,
   };
-  EntityId e_id = pool_push(g.entities, e);
+  ThingId e_id = pool_push(g.entities, e);
   ++g.entities_count;
   return e_id;
 }
-EntityId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing) {
-  return e_alloc(mesh_get(mesh_id), material_get(material_id), thing);
+ThingId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing) {
+  return e_alloc(get_mesh(mesh_id), get_material(material_id), thing);
 }
 
-void e_free(EntityId e_id) {
+ThingId make_thing(ThingDesc desc) {
   var& g = *st;
-  pool_remove(g.entities, e_id);
+  Thing e = {
+    .pos = desc.pos,
+    .rot = desc.rot,
+    .scale = v3(1),
+    .mesh = get_mesh(desc.mesh),
+    .mat = get_material(desc.mat),
+    .aabb = Rng3(v3(-1), v3(1)),
+    .color = ColorWhite,
+  };
+  ThingId id = pool_push(g.entities, e);
+  ++g.entities_count;
+  return id;
+}
+
+void destroy_thing(ThingId id) {
+  var& g = *st;
+  pool_remove(g.entities, id);
   --g.entities_count;
 }
 
 void select_obj() {
   var& g = *st;
   v3 dir = ray_from_screen(os_mouse_pos(), os_window_size(), g.cam.pos, st->view, st->projection).dir;
-  EntityId e_id = e_alloc(Mesh_Cube, Material_Orange);
-  Entity& e = get_entity(e_id);
+  ThingId e_id = e_alloc(Mesh_Cube, Material_Orange);
+  Thing& e = get_thing(e_id);
   // e.pos() = st->cam.pos + v3_norm(mat4_forward(st->cam.view));
   e.pos = g.cam.pos;
-  e.scale = v3_splat(0.3);
+  e.scale = v3(0.3);
   e.vel = dir * 4;
 }
 
@@ -3501,7 +3579,7 @@ void camera_update() {
     if (os_key_is_down(Key_LAlt)) {
       speed *= 0.1;
     }
-    if (velocity != v3_zero()) {
+    if (velocity != v3()) {
       velocity = v3_norm(velocity);
       cam.pos += velocity * speed * get_dt();
     }
@@ -3514,27 +3592,27 @@ void camera_update() {
     SinD(cam.pitch),
     SinD(cam.yaw) * CosD(cam.pitch)
   };
-  view = mat4_look_at(cam.pos, cam.dir, v3_up());
+  view = mat4_look_at(cam.pos, cam.pos + cam.dir);
 }
 
-void scene_init() {
+void init_scene() {
   Scratch scratch;
   var& g = *st;
   camera_init();
   g.rotating_cube_id = e_alloc(Mesh_Cube, Material_Orange, {"rotating_cube", EntityFlag_Referenced});
   g.monkey_id = e_alloc(Mesh_MonkeyGlb, Material_Container, {"monkey", EntityFlag_Referenced});
-  Entity& monkey = get_entity(g.monkey_id);
+  Thing& monkey = get_thing(g.monkey_id);
   monkey.pos.x = 10;
-  monkey.aabb = Rng3(v3_splat(-1.2), v3_splat(1.2));
+  monkey.aabb = Rng3(v3(-1.2), v3(1.2));
   {
-    EntityId triangle_id = e_alloc(Mesh_Triangle, Material_Orange);
-    Entity& triangle = get_entity(triangle_id);
-    triangle.pos = v3_splat(6);
+    ThingId triangle_id = e_alloc(Mesh_Triangle, Material_Orange);
+    Thing& triangle = get_thing(triangle_id);
+    triangle.pos = v3(6);
   }
   {
-    EntityId grid_id = e_alloc(Mesh_Grid, Material_Line);
-    Entity& grid = get_entity(grid_id);
-    grid.color = v4_splat(0.6);
+    ThingId grid_id = e_alloc(Mesh_Grid, Material_Line);
+    Thing& grid = get_thing(grid_id);
+    grid.color = v4(0.6);
     grid.pos = v3(0,0,-5);
   }
   {
@@ -3544,7 +3622,7 @@ void scene_init() {
     // EntityId cube_id = e_alloc(Mesh_Cube, Material_Orange);
     // u32 range = 10;
     // Entity& cube = get_entity(cube_id);
-    // cube.pos = v3_rand_rng(-v3_splat(range), v3_splat(range));
+    // cube.pos = v3_rand_rng(-v3(range), v3(range));
   }
 #if 1
   Loop (i, 10) {
@@ -3561,20 +3639,20 @@ void scene_init() {
       // Material_Container,
       // Material_Screen,
     };
-    EntityId e_id = e_alloc(meshes[rand_u32_rng(0, ArrayCount(meshes)-1)], materials[rand_u32_rng(0, ArrayCount(materials)-1)]);
+    ThingId e_id = e_alloc(meshes[rand_u32_rng(0, ArrayCount(meshes)-1)], materials[rand_u32_rng(0, ArrayCount(materials)-1)]);
     // array_push(g.static_cubes, e_id);
     // u32 range = KB(1);
     u32 range = 100;
-    Entity& e = get_entity(e_id);
-    e.pos = v3_rand_rng(-v3_splat(range), v3_splat(range));
+    Thing& e = get_thing(e_id);
+    e.pos = v3_rand_rng(-v3(range), v3(range));
     // v3 dir = v3_rand_rng(v3_scale(-1), v3_scale(1));
     // e.pos() = v3_norm(dir) * range;
   }
 #endif
 
   {
-    EntityId sphere_id = e_alloc(Mesh_Sphere, Material_Container);
-    Entity& sphere = get_entity(sphere_id);
+    ThingId sphere_id = e_alloc(Mesh_Sphere, Material_Container);
+    Thing& sphere = get_thing(sphere_id);
     sphere.pos = v3(0,0,-10);
   }
   {
@@ -3592,10 +3670,10 @@ void scene_init() {
     // Loop (i, KB(400)) {
     // Loop (i, MB(1)-KB(1)) {
     Loop (i, 0) {
-      EntityId e_id = e_alloc(Mesh_Cube, Material_Container);
+      ThingId e_id = e_alloc(Mesh_Cube, Material_Container);
       u32 range = KB(1);
-      Entity& e = get_entity(e_id);
-      e.pos = v3_rand_rng(-v3_splat(range), v3_splat(range));
+      Thing& e = get_thing(e_id);
+      e.pos = v3_rand_rng(-v3(range), v3(range));
       array_push(g.moving_cubes, e_id);
     }
   }
@@ -3611,17 +3689,17 @@ void scene_init() {
       Material_Container,
       // Material_Screen,
     };
-    EntityId e_id = e_alloc(meshes[rand_u32_rng(0, ArrayCount(meshes)-1)], materials[rand_u32_rng(0, ArrayCount(materials)-1)]);
+    ThingId e_id = e_alloc(meshes[rand_u32_rng(0, ArrayCount(meshes)-1)], materials[rand_u32_rng(0, ArrayCount(materials)-1)]);
     u32 range = 100;
-    Entity& e = get_entity(e_id);
-    e.pos = v3_rand_rng(-v3_splat(range), v3_splat(range));
+    Thing& e = get_thing(e_id);
+    e.pos = v3_rand_rng(-v3(range), v3(range));
     array_push(g.moving_cubes, e_id);
   }
   {
     g.a = v3(-10, 0, 0);
     g.b = v3(0, 10, 0);
     g.e = e_alloc(Mesh_Cube, Material_Container);
-    Entity& e = get_entity(g.e);
+    Thing& e = get_thing(g.e);
     e.pos = v3(10, 10, 20);
   }
 
@@ -3640,35 +3718,42 @@ void scene_init() {
     // e.pos = v3(0,3,3);
   }
   {
-    EntityId e_id = e_alloc(Mesh_Barrack, Material_Barrack);
-    Entity& e = get_entity(e_id);
+    ThingId e_id = e_alloc(Mesh_Barrack, Material_Barrack);
+    Thing& e = get_thing(e_id);
     e.pos = v3(-3,3,-33);
   }
   {
-    EntityId e_id = e_alloc(Mesh_Cube, Material_Container);
+    ThingId e_id = e_alloc(Mesh_Cube, Material_Container);
     g.my = e_id;
-    Entity& e = get_entity(e_id);
+    Thing& e = get_thing(e_id);
     e.pos = v3(3,3,10);
     Loop (i, 4) {
-      EntityId child_id = e_alloc(Mesh_Cube, Material_Container);
+      ThingId child_id = e_alloc(Mesh_Cube, Material_Container);
       hdll_list_push_back(g.entities.data, e, child_id);
       Loop (i, 4) {
-        EntityId new_child_id = e_alloc(Mesh_Cube, Material_Container);
-        hdll_list_push_back(g.entities.data, get_entity(child_id), new_child_id);
+        ThingId new_child_id = e_alloc(Mesh_Cube, Material_Container);
+        hdll_list_push_back(g.entities.data, get_thing(child_id), new_child_id);
       }
     }
   }
   {
     g.thing = e_alloc(Mesh_MonkeyGlb, Material_Container);
-    g.point = v3_splat(1);
+    g.point = v3(1);
   }
 
   {
-    g.obj = e_alloc(Mesh_Cube, Material_Container);
+    // var desc = default_thing_desc();
+    // desc.pos = v3(1);
+    // desc.scale = v3(3);
+    var desc = THING_DESC(
+      .pos = v3(1),
+    );
+    g.t_id = make_thing(desc);
+    // g.t_id = make_thing(THING_DESC(.pos = v3(1,1,1), .scale = v3(3)));
   }
 }
 
-void scene_deinit() {
+void deinit_scene() {
   var& g = *st;
   pool_clear(g.entities);
 }
@@ -3678,9 +3763,9 @@ v3 transform_right(Transform t) { return quat_rotate(t.rot, v3_right()); }
 v3 transform_up(Transform t) { return quat_rotate(t.rot, v3_up()); }
 Transform transform_indentity() {
   Transform res = {
-    .pos = v3_zero(),
+    .pos = v3(),
     .rot = quat_identity(),
-    .scale = v3_splat(1),
+    .scale = v3(1),
   };
   return res;
 }
@@ -3688,7 +3773,7 @@ void transform_translate_local(Transform& t, v3 delta) {
   t.pos += quat_rotate(t.rot, delta);
 }
 
-void scene_update() {
+void update_scene() {
   Scratch scratch;
   var& g = *st;
   if (os_mouse_is_button_pressed(MouseButton_Left)) {
@@ -3701,15 +3786,15 @@ void scene_update() {
   }
   // moving cube and monkey
   {
-    Entity& cube = get_entity(g.rotating_cube_id);
-    Entity& monkey = get_entity(g.monkey_id);
+    Thing& cube = get_thing(g.rotating_cube_id);
+    Thing& monkey = get_thing(g.monkey_id);
     monkey.pos.x += 0.1 * get_dt();
-    cube.pos.x = monkey.pos.x + Sin(get_time()) * 4;
-    cube.pos.z = monkey.pos.z + Cos(get_time()) * 4;
-    cube.pos.y = monkey.pos.z + Cos(get_time()) * 4;
+    cube.pos.x = monkey.pos.x + Sin(get_dt()) * 4;
+    cube.pos.z = monkey.pos.z + Cos(get_dt()) * 4;
+    cube.pos.y = monkey.pos.z + Cos(get_dt()) * 4;
   }
   {
-    Entity& e = get_entity(g.monkey_id);
+    Thing& e = get_thing(g.monkey_id);
     r_draw_cuboid(rng3_shift(e.aabb, e.pos), ColorWhite);
   }
   {
@@ -3720,9 +3805,9 @@ void scene_update() {
     f32 dist = 1.0f;
     f32 xoff = 0.3f;
     f32 yoff = 0.3f;
-    Entity& axis = get_entity(g.axis_attached_to_cam_id);
+    Thing& axis = get_thing(g.axis_attached_to_cam_id);
     axis.pos = g.cam.pos + forward*dist + right*xoff + up*yoff;
-    axis.scale = v3_splat(0.1);
+    axis.scale = v3(0.1);
     // axis.scale = v3_scale(1.1);
   }
 
@@ -3739,10 +3824,10 @@ void scene_update() {
       // Material_Container,
       // Material_Screen,
     };
-    EntityId e_id = e_alloc(meshes[rand_u32_rng(0, ArrayCount(meshes)-1)], materials[rand_u32_rng(0, ArrayCount(materials)-1)]);
-    Entity& e = get_entity(e_id);
+    ThingId e_id = e_alloc(meshes[rand_u32_rng(0, ArrayCount(meshes)-1)], materials[rand_u32_rng(0, ArrayCount(materials)-1)]);
+    Thing& e = get_thing(e_id);
     u32 range = 100;
-    e.pos = v3_rand_rng(-v3_splat(range), v3_splat(range));
+    e.pos = v3_rand_rng(-v3(range), v3(range));
     array_push(g.moving_cubes, e_id);
   }
   // thread_parallel_for(KB(1), slice(g.moving_cubes), [](Slice<EntityId> entities) {
@@ -3757,7 +3842,7 @@ void scene_update() {
   //   }
   // });
   Loop (i, g.moving_cubes.count) {
-    Entity& e = get_entity(g.moving_cubes[i]);
+    Thing& e = get_thing(g.moving_cubes[i]);
     e.pos += e.vel * get_dt();
     v3 center = {0, 0, 0};
     v3 dir = e.pos - center;
@@ -3779,7 +3864,7 @@ void scene_update() {
   mat4& mat = get_mat();
   mat = mat4_translate(v3_of_v4(pos));
 
-  Entity& e = get_entity(g.e);
+  Thing& e = get_thing(g.e);
   // e.pos = v3_lerp(g.a, g.t, g.b);
   // f32 angle = Acos(v3_dot(v3_norm(g.a), v3_norm(g.b)));
 
@@ -3819,7 +3904,7 @@ void scene_update() {
   }
 
   {
-    Entity& e = get_entity(g.thing);
+    Thing& e = get_thing(g.thing);
     v4 dt = quat_axis_angle(v3_up(), 0.1 * get_dt());
     // v4 dt = quat_axis_angle(v3_right(), 1 * get_dt());
     // v4 dt = quat_axis_angle(v3_right(), 0.1 * get_dt());
@@ -3827,21 +3912,21 @@ void scene_update() {
     // e.rot = quat_identity();
     // e.rot = quat_mul(dt, e.rot);
     // e.rot = quat_mul(dt, e.rot);
-    r_draw_line(v3_zero(), g.point*3, ColorWhite);
+    r_draw_line(v3(), g.point*3, ColorWhite);
     // e.rot = quat_look_rotation(g.point, v3_up());
-    // r_draw_cuboid(rng3_shift(Rng3(v3_splat(-1), v3_splat(1)), g.point), ColorWhite);
+    // r_draw_cuboid(rng3_shift(Rng3(v3(-1), v3(1)), g.point), ColorWhite);
     // e.rot = quat_identity();
     // e.rot = quat_from_euler(v3(deg2rad(g.euler.x), deg2rad(g.euler.y), deg2rad(g.euler.z)));
     // v4 dt = quat_axis_angle(v3_up(), get_dt());
     // e.rot = quat_mul(e.rot, quat_look_rotation(e.pos, v3_up()));
     v3 point = v3(3,0,0);
-    r_draw_mesh_trs(mesh_get(Mesh_Cube), material_get(Material_Orange), point, quat_identity(), v3_splat(0.1));
-    r_draw_mesh_trs(mesh_get(Mesh_Cube), material_get(Material_Orange), g.point, quat_identity(), v3_splat(0.1));
+    r_draw_mesh_trs(get_mesh(Mesh_Cube), get_material(Material_Orange), point, quat_identity(), v3(0.1));
+    r_draw_mesh_trs(get_mesh(Mesh_Cube), get_material(Material_Orange), g.point, quat_identity(), v3(0.1));
     e.pos = v3_rotate_around_pivot(e.pos, g.point, dt);
     // e.rot = quat_look_rotation(g.point - e.pos, v3_up());
     // e.rot = quat_identity();
     // e.rot = quat_mul(e.rot, dt);
-    // e.pos = v3_step_to(e.pos, v3_zero(), 10 * get_dt());
+    // e.pos = v3_step_to(e.pos, v3(), 10 * get_dt());
     // e.rot = quat_identity();
     e.rot = quat_look_rotation(v3_forward(), v3_up());
     e.rot = quat_identity();
@@ -3854,19 +3939,19 @@ void scene_update() {
     r_draw_line(e.pos, e.pos + quat_right(e.rot)*2, ColorRed);
     r_draw_line(e.pos, e.pos + quat_up(e.rot)*2, ColorGreen);
     r_draw_line(e.pos, e.pos + quat_forward(e.rot)*2, ColorBlue);
-    r_draw_mesh_trs(mesh_get(Mesh_Cube), material_get(Material_Orange), e.pos, quat_identity(), v3_splat(0.1));
+    r_draw_mesh_trs(get_mesh(Mesh_Cube), get_material(Material_Orange), e.pos, quat_identity(), v3(0.1));
   }
 
   {
-    var& my = get_entity(g.my);
+    var& my = get_thing(g.my);
     my.pos.z += get_dt() * 1;
     u32 i = 1;
     LoopHNode (it, my.first, g.entities.data) {
-      var& child = get_entity(it);
+      var& child = get_thing(it);
       child.pos = my.pos + v3(0,3,0)*i++;
       u32 j = 1;
       LoopHNode (i, child.first, g.entities.data) {
-        var& new_child = get_entity(i);
+        var& new_child = get_thing(i);
         new_child.pos = child.pos + v3(3,0,0)*j;
         ++j;
       }
@@ -3874,7 +3959,7 @@ void scene_update() {
   }
   
   LoopINode (i, g.entities.first, g.entities.data) {
-    EntityId e_id = pool_get_handle(g.entities, i);
+    ThingId e_id = pool_get_handle(g.entities, i);
     // Entity& e = pool_get(g.entities, e_id);
     // r_draw_mesh(e.mesh, e.mat, e.pos);
     r_draw_entity(e_id);
@@ -3885,8 +3970,8 @@ void scene_update() {
 
 
   {
-    Entity& e = get_entity(g.obj);
-    e.rot = quat_axis_angle(v3(0,1,0), deg2rad(get_time()*10));
+    // Thing& e = get_thing(g.obj);
+    // e.rot = quat_axis_angle(v3(0,1,0), deg2rad(get_time()*10));
   }
 
   // ui_draw_rect(rng2_make(v2(100,100), v2(100,100)), ColorRed);
@@ -3895,11 +3980,11 @@ void scene_update() {
   // ui_begin();
 
   // local v4 bgcolor = ColorBlack;
-  // ui_draw_rect(rng2_make(v2_splat(300), v2_splat(300)), bgcolor);
+  // ui_draw_rect(rng2_make(v2(300), v2(300)), bgcolor);
   // ui_button(GEN_ID, v2(50,50));
   // ui_button(GEN_ID, v2(150,50));
   // if (ui_button(GEN_ID, v2(50,150))) {
-  //   bgcolor = v3_to_v4(v3_rand_rng(v3_splat(0), v3_splat(1)), rand_f32_01());
+  //   bgcolor = v3_to_v4(v3_rand_rng(v3(0), v3(1)), rand_f32_01());
   // }
   // if (ui_button(GEN_ID, v2(150,150))) {
   //   os_exit(0);
@@ -3985,8 +4070,18 @@ void scene_update() {
   }
 
   {
-    // r_draw_quad(rng2_make(v2_splat(400), v2(400,400)), ColorCyan);
-    r_draw_rect(rng2_make(v2_splat(100), v2_splat(100)), ColorWhite);
+    // r_draw_quad(rng2_make(v2(400), v2(400,400)), ColorCyan);
+    r_draw_rect(rng2_make(v2(100), v2(100)), ColorWhite);
+  }
+
+  {
+    var& thing = get_thing(g.t_id);
+    f32 t = time_ping_pong(get_time(), 2);
+    t = ease_sin_in_out(t);
+    // thing.pos.x = Lerp(-10, t, 10);
+    // thing.rot = quat_axis_angle(v3(1), get_time());
+    // thing.pos = quat_rotate(quat_axis_angle(v3_up(), get_time()), v3(10,10,10));
+    thing.pos = v3_rotate_around_pivot(thing.pos, v3(1), quat_axis_angle(v3(1), get_time()));
   }
   
 }
@@ -4001,7 +4096,7 @@ void game_save_state() {
   dstr_push(data, "}\n");
 
   {
-    Entity e = get_entity(g.e);
+    Thing e = get_thing(g.e);
     dstr_push(data, "e {\n");
     dstr_push(data, dumb_struct(scratch, slice(members_of_Entity), &e));
     dstr_push(data, "}\n");
@@ -4009,7 +4104,7 @@ void game_save_state() {
   {
     var& p = g.entities;
     LoopINode (i, g.entities.first, g.entities.data) {
-      Entity& e = p.data[i].elem;
+      Thing& e = p.data[i].elem;
       dstr_push(data, "Entity {\n");
       dstr_push(data, dumb_struct(scratch, slice(members_of_Entity), &e, e.flags));
       dstr_push(data, "}\n");
@@ -4031,8 +4126,8 @@ void game_load_state() {
   {
     var& p = g.entities;
     LoopINode (i, g.entities.first, g.entities.data) {
-      EntityId e_id = pool_get_handle(p, i);
-      e_free(e_id);
+      ThingId e_id = pool_get_handle(p, i);
+      destroy_thing(e_id);
     }
   }
 
@@ -4044,8 +4139,8 @@ void game_load_state() {
         if (str_match(tok.str, "Camera")) {
           dumb_struct_load(slice(members_of_Camera), &g.cam, &p);
         } else if (str_match(tok.str, "Entity")) {
-          EntityId e_id = e_alloc_bare();
-          Entity& e = get_entity(e_id);
+          ThingId e_id = e_alloc_bare();
+          Thing& e = get_thing(e_id);
           dumb_struct_load(slice(members_of_Entity), &e, &p);
           if (FlagHas(e.flags, EntityFlag_Referenced)) {
             if (str_match("monkey", e.name)) {
@@ -4057,8 +4152,8 @@ void game_load_state() {
             } 
           }
         } else if (str_match(tok.str, "e")) {
-          EntityId e_id = e_alloc_bare();
-          Entity& e = get_entity(e_id);
+          ThingId e_id = e_alloc_bare();
+          Thing& e = get_thing(e_id);
           dumb_struct_load(slice(members_of_Entity), &e, &p);
           g.e = e_id;
         }
@@ -4077,7 +4172,7 @@ void game_init() {
   g.gpa = alloc_make(g.arena);
   g.timer = timer_make(1);
 
-  g.moving_cubes = array_make(EntityId, g.gpa);
+  g.moving_cubes = array_make(ThingId, g.gpa);
   g.font = r_font_load("arial.ttf", 32);
 
   MeshDesc triangle_mesh = {.vertices = slice(triangle_vertices)};
@@ -4192,7 +4287,7 @@ void game_init() {
     });
   }
 
-  scene_init();
+  init_scene();
 
   // camera_init();
   // g.cube0 = e_alloc(Mesh_Cube, Material_Container);
@@ -4231,145 +4326,168 @@ void game_init() {
 #define MaxQuery 1024
 
 struct Query {
-  Array<ThingId, MaxQuery> on_fire;
-  Array<ThingId, MaxQuery> flying;
-  Array<ThingId, MaxQuery> poisoned;
+  // Array<ThingId, MaxQuery> on_fire;
+  // Array<ThingId, MaxQuery> flying;
+  // Array<ThingId, MaxQuery> poisoned;
 
-  PoolLinkList<ThingId, MaxQuery, OpaqueId> enemy_list;
-  PoolLinkList<ThingId, MaxQuery, OpaqueId> ally_list;
-  PoolLinkList<ThingId, MaxQuery, OpaqueId> neutral_list;
+  // PoolLinkList<ThingId, MaxQuery, OpaqueId> enemy_list;
+  // PoolLinkList<ThingId, MaxQuery, OpaqueId> ally_list;
+  // PoolLinkList<ThingId, MaxQuery, OpaqueId> neutral_list;
 };
 
-Query query;
+// Query query;
 
-OpaqueId add_to_enemy(ThingId id) { return pool_push(query.enemy_list, id); }
-OpaqueId add_to_allies(ThingId id) { return pool_push(query.ally_list, id); }
-OpaqueId add_to_neutrals(ThingId id) { return pool_push(query.neutral_list, id); }
+// OpaqueId add_to_enemy(ThingId id) { return pool_push(query.enemy_list, id); }
+// OpaqueId add_to_allies(ThingId id) { return pool_push(query.ally_list, id); }
+// OpaqueId add_to_neutrals(ThingId id) { return pool_push(query.neutral_list, id); }
 
-ThingId make_thing() {
-  Thing t = {};
-  ThingId id = pool_push(st->things, t);
-  return id;
-}
+// ThingId make_thing() {
+//   Thing t = {};
+//   ThingId id = pool_push(st->things, t);
+//   return id;
+// }
 
-void make_kind_enemy(ThingId id) { get_thing(id).enemy_list = pool_push(query.enemy_list, id); }
-void make_kind_ally(ThingId id) { get_thing(id).ally_list = pool_push(query.ally_list, id); }
-void make_kind_(ThingId id) { get_thing(id).neutral_list = pool_push(query.neutral_list, id); }
+// void make_kind_enemy(ThingId id) { get_thing(id).enemy_list = pool_push(query.enemy_list, id); }
+// void make_kind_ally(ThingId id) { get_thing(id).ally_list = pool_push(query.ally_list, id); }
+// void make_kind_(ThingId id) { get_thing(id).neutral_list = pool_push(query.neutral_list, id); }
 
-ThingId make_enemy() {
-  ThingId t_id = make_thing();
-  get_thing(t_id).enemy_list = pool_push(query.enemy_list, t_id);
-  return t_id;
-}
+// ThingId make_enemy() {
+//   ThingId t_id = make_thing();
+//   get_thing(t_id).enemy_list = pool_push(query.enemy_list, t_id);
+//   return t_id;
+// }
 
-ThingId make_ally() {
-  ThingId t_id = make_thing();
-  get_thing(t_id).ally_list = pool_push(query.enemy_list, t_id);
-  return t_id;
-}
+// ThingId make_ally() {
+//   ThingId t_id = make_thing();
+//   get_thing(t_id).ally_list = pool_push(query.enemy_list, t_id);
+//   return t_id;
+// }
 
-ThingId make_neutral() {
-  ThingId t_id = make_thing();
-  get_thing(t_id).neutral_list = pool_push(query.enemy_list, t_id);
-  return t_id;
-}
+// ThingId make_neutral() {
+//   ThingId t_id = make_thing();
+//   get_thing(t_id).neutral_list = pool_push(query.enemy_list, t_id);
+//   return t_id;
+// }
 
-void destroy_thing(ThingId id) {
-  var& g = *st;
-  Thing& t = pool_get(g.things, id);
-  if (t.enemy_list.idx) pool_remove(query.enemy_list, t.enemy_list);
-  if (t.ally_list.idx) pool_remove(query.ally_list, t.ally_list);
-  if (t.neutral_list.idx) pool_remove(query.neutral_list, t.neutral_list);
-  pool_remove(st->things, id);
-}
+// void destroy_thing(ThingId id) {
+//   var& g = *st;
+//   Thing& t = pool_get(g.things, id);
+//   if (t.enemy_list.idx) pool_remove(query.enemy_list, t.enemy_list);
+//   if (t.ally_list.idx) pool_remove(query.ally_list, t.ally_list);
+//   if (t.neutral_list.idx) pool_remove(query.neutral_list, t.neutral_list);
+//   pool_remove(st->things, id);
+// }
 
-struct BitsetQuery {
-  BitSet* bits;
+// struct BitsetIterator {
+//   BitSet* bits;
+//   u64 word_i;
+//   u64 word;
+//   u64 index;
+//   ThingId operator*() { return pool_get_handle(st->things, index); }
+//   BitsetIterator& operator++() {
+//     word = remove_lowest_bit(word);
+//     if (word == 0) {
+//       ++word_i;
+//       while (word_i < bitset_word_count(*bits)) {
+//         word = bits->words[word_i];
+//         if (word)
+//           break;
+//         ++word_i;
+//       }
+//     }
+//     if (word) {
+//       index = word_i * 64 + ctz(word);
+//     }
+//     return *this;
+//   }
+//   b32 operator!=(BitsetIterator& other) { return word_i != other.word_i || word != other.word; }
+// };
+// struct BitsetQuery {
+//   BitSet* bits;
+//   BitsetIterator begin() {
+//     BitsetIterator res = {.bits = bits};
+//     return res;
+//   }
+//   BitsetIterator end() {
+//     BitsetIterator res = {
+//       .bits = bits,
+//       .word_i = bitset_word_count(*bits),
+//     };
+//     return res;
+//   }
+// };
 
-  struct Iterator {
-    BitSet* bits;
+// BitsetQuery do_query(BitSet* bits) { return {.bits = bits}; }
 
-    u64 word_i;
-    u64 word;
-    u64 index;
+// struct BitIter{
+//   BitSet* bits;
+//   u64 word_i;
+//   u64 word;
+// };
 
-    ThingId operator*() {
-      return pool_get_handle(st->things, index);
-    }
+// BitIter bit_iter_begin(BitSet* bits) {
+//   BitIter res = {
+//     .bits = bits,
+//   };
+//   return res;
+// }
 
-    Iterator& operator++() {
-      remove_lowest_bit(word);
-
-      if (word == 0) {
-        ++word_i;
-
-        while (word_i < bitset_word_count(*bits)) {
-          word = bits->words[word_i];
-
-          if (word)
-            break;
-
-          ++word_i;
-        }
-      }
-
-      if (word)
-        index = word_i * 64 + ctz(word);
-
-      return *this;
-    }
-
-    bool operator!=(const Iterator& other) const {
-      return word_i != other.word_i || word != other.word;
-    }
-  };
-
-  Iterator begin();
-  Iterator end();
-};
-
-BitsetQuery do_query(BitSet* bits) {
-  return {
-    .bits = bits,
-  };
-}
+// b32 bit_iter_next(BitIter* it, ThingId* out) {
+//   while (it->word == 0) {
+//     if (it->word_i >= bitset_word_count(*it->bits))
+//       return false;
+//     it->word = it->bits->words[it->word_i];
+//     ++it->word_i;
+//   }
+//   u64 bit = ctz(it->word);
+//   u64 word_i = it->word_i - 1;
+//   u64 idx = word_i * 64 + bit;
+//   it->word = remove_lowest_bit(it->word);
+//   *out = pool_get_handle(st->things, idx);
+//   return true;
+// }
 
 void update_some() {
-  LoopLinkPool(it, query.enemy_list) {
-    Thing& t = get_thing(query.enemy_list.data[it].elem);
-  }
-  LoopLinkPool(it, query.ally_list) {
-    Thing& t = get_thing(query.ally_list.data[it].elem);
-  }
-  LoopLinkPool(it, query.neutral_list) {
-    Thing& t = get_thing(query.neutral_list.data[it].elem);
-  }
+  // LoopLinkPool(it, query.enemy_list) {
+  //   Thing& t = get_thing(query.enemy_list.data[it].elem);
+  // }
+  // LoopLinkPool(it, query.ally_list) {
+  //   Thing& t = get_thing(query.ally_list.data[it].elem);
+  // }
+  // LoopLinkPool(it, query.neutral_list) {
+  //   Thing& t = get_thing(query.neutral_list.data[it].elem);
+  // }
 
-  Scratch scratch;
-  BitSet bits = {
-    .bit_count = MaxEntities,
-    .words = push_array(scratch, u64, MaxEntities / 64),
-  };
+  // Scratch scratch;
+  // BitSet bits = {
+  //   .bit_count = MaxEntities,
+  //   .words = push_array(scratch, u64, MaxEntities / 64),
+  // };
   
-  // C iteratores?
-  for (u64 word_i = 0; bitset_word_count(bits); ++word_i) {
-    u64 word = bits.words[word_i];
+  // // C iteratores?
+  // for (u64 word_i = 0; bitset_word_count(bits); ++word_i) {
+  //   u64 word = bits.words[word_i];
 
-    while (word) {
-      u64 bit = ctz(word);
-      u64 idx = word_i * 64 + bit;
+  //   while (word) {
+  //     u64 bit = ctz(word);
+  //     u64 idx = word_i * 64 + bit;
 
-      ThingId id = pool_get_handle(st->things, idx);
-      Thing& thing = get_thing(id);
-      // ...
+  //     ThingId id = pool_get_handle(st->things, idx);
+  //     Thing& thing = get_thing(id);
+  //     // ...
 
-      remove_lowest_bit(word);
-    }
-  }
+  //     word = remove_lowest_bit(word);
+  //   }
+  // }
 
-  for (ThingId id : do_query(&bits)) {
-    Thing& t = get_thing(id);
-  }
+  // for (var id : do_query(&bits)) {
+  //   Thing& t = get_thing(id);
+  // }
+
+  // var iter = bit_iter_begin(&bits);
+  // for (ThingId id = {}; bit_iter_next(&iter, &id);) {
+  //   Thing& t = get_thing(id);
+  // }
 }
 
 
@@ -4384,58 +4502,76 @@ void update_some() {
 //   }
 // }
 
-struct Status_Def {
-  u32 flag;
-  Array<ThingId, MaxQuery> *bucket;
-};
+// struct Status_Def {
+//   u32 flag;
+//   Array<ThingId, MaxQuery> *bucket;
+// };
 
-Status_Def g_status_defs[] = {
-  {ThingState_OnFire, &query.on_fire},
-  {ThingState_Poisoned, &query.poisoned},
-  {ThingState_Flying, &query.flying},
-};
+// Status_Def g_status_defs[] = {
+//   {ThingState_OnFire, &query.on_fire},
+//   {ThingState_Poisoned, &query.poisoned},
+//   {ThingState_Flying, &query.flying},
+// };
 
 void gather_query() {
-  for (auto& def : g_status_defs)
-    array_clear(*def.bucket);
+  // X x = {};
+  // while (next_x(&x)) {
+  //   Info("%i");
+  // }
 
-  LoopLinkPool(i, st->things) {
-    Thing& t = st->things.data[i].elem;
-    ThingId id = pool_get_handle(st->things, i);
-    for (auto& def : g_status_defs)
-      if (FlagHas(t.state, def.flag))
-        array_push(*def.bucket, id);
-  }
+  // Scratch scratch;
+  // BitSet bits = {
+  //   .bit_count = MaxEntities,
+  //   .words = push_array(scratch, u64, MaxEntities / 64),
+  // };
+  // bitset_set(bits, 1);
+  // bitset_set(bits, 3);
+  // bitset_set(bits, 30);
+  // for (var id : do_query(&bits)) {
+  //   Thing& t = get_thing(id);
+  //   Info("%i", id.idx);
+  // }
+
+  // for (auto& def : g_status_defs)
+  //   array_clear(*def.bucket);
+
+  // LoopLinkPool(i, st->things) {
+  //   Thing& t = st->things.data[i].elem;
+  //   ThingId id = pool_get_handle(st->things, i);
+  //   for (auto& def : g_status_defs)
+  //     if (FlagHas(t.state, def.flag))
+  //       array_push(*def.bucket, id);
+  // }
 }
 
-#define PoisonDamage 10
-#define FireDamage 30
-#define GravityForce 3
+// #define PoisonDamage 10
+// #define FireDamage 30
+// #define GravityForce 3
 void update_stuff() {
-  var& g = *st;
-  for (var& id : query.poisoned) {
-    if (!pool_is_valid_handle(g.things, id)) continue;
-    var& t = get_thing(id);
-    if (t.health >= PoisonDamage) {
-      t.health -= PoisonDamage;
-    }
-  }
-  for (var& id : query.on_fire) {
-    if (!pool_is_valid_handle(g.things, id)) continue;
-    var& t = get_thing(id);
-    if (t.health >= FireDamage) {
-      t.health -= FireDamage;
-    }
-  }
-  for (var& id : query.flying) {
-    if (!pool_is_valid_handle(g.things, id)) continue;
-    var& t = get_thing(id);
-    t.pos.y -= GravityForce;
-  }
+  // var& g = *st;
+  // for (var& id : query.poisoned) {
+  //   if (!pool_is_valid_handle(g.things, id)) continue;
+  //   var& t = get_thing(id);
+  //   if (t.health >= PoisonDamage) {
+  //     t.health -= PoisonDamage;
+  //   }
+  // }
+  // for (var& id : query.on_fire) {
+  //   if (!pool_is_valid_handle(g.things, id)) continue;
+  //   var& t = get_thing(id);
+  //   if (t.health >= FireDamage) {
+  //     t.health -= FireDamage;
+  //   }
+  // }
+  // for (var& id : query.flying) {
+  //   if (!pool_is_valid_handle(g.things, id)) continue;
+  //   var& t = get_thing(id);
+  //   t.pos.y -= GravityForce;
+  // }
 
-  LoopLinkPool(it, query.enemy_list) {
-    ThingId id = query.enemy_list.data[it].elem;
-  }
+  // LoopLinkPool(it, query.enemy_list) {
+  //   ThingId id = query.enemy_list.data[it].elem;
+  // }
 
 }
 
@@ -4446,7 +4582,7 @@ void update_game() {
   gather_query();
 
   {
-    Entity& e = get_entity(g.monkey_id);
+    Thing& e = get_thing(g.monkey_id);
     e.pos.x += get_dt() * 1;
     e.pos.y += get_dt() * 0.5;
   }
@@ -4463,12 +4599,12 @@ void update_game() {
   Scratch scratch;
   camera_update();
   if (os_key_is_down(Key_T)) {
-    scene_deinit();
-    scene_init();
+    deinit_scene();
+    init_scene();
   }
   if (os_key_is_down(Key_Escape)) {
     os_window_close();
   }
-  scene_update();
+  update_scene();
 }
 
