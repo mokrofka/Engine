@@ -7,7 +7,7 @@
 #include "imgui/imgui.h"
 
 MakeId(OpaqueId)
-MakeId(EntityId)
+MakeId(ThingId)
 
 const u32 MaxEntities = KB(4);
 

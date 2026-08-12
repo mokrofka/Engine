@@ -885,8 +885,8 @@ void r_end() {
   {
     gfx_pass_begin({.attachments = r_render_target_to_attachments(g.world_rt)});
     {
-      gfx_apply_viewport(rng2_make(v2_zero(), v2_of_v2u(os_window_size())), true);
-      gfx_apply_scissor(rng2_make(v2_zero(), v2_of_v2u(os_window_size())));
+      gfx_apply_viewport(rng2_make(v2(), v2_of_v2u(os_window_size())), true);
+      gfx_apply_scissor(rng2_make(v2(), v2_of_v2u(os_window_size())));
 
       gfx_bind_vert();
       gfx_bind_index();
@@ -953,10 +953,10 @@ void r_end() {
       // Cube map
       gfx_pipeline_bind(g.cubemap_pip);
       gfx_bind_vert();
-      Gfx_Mesh mesh = pool_get(g.meshes, mesh_get(Mesh_Cube));
+      Gfx_Mesh mesh = pool_get(g.meshes, get_mesh(Mesh_Cube));
       gfx_draw_mesh(mesh);
 
-      gfx_apply_viewport(rng2_make(v2_zero(), v2_of_v2u(os_window_size())));
+      gfx_apply_viewport(rng2_make(v2(), v2_of_v2u(os_window_size())));
       // Rect drawing
       gfx_bind_vert(Gfx_MemType_Cpu);
       if (g.draw_rects.count > 0) {
@@ -1036,8 +1036,8 @@ void r_end() {
   // Swapchain
   gfx_pass_begin({});
   {
-    gfx_apply_viewport(rng2_make(v2_zero(), v2_of_v2u(os_window_size())));
-    gfx_apply_scissor(rng2_make(v2_zero(), v2_of_v2u(os_window_size())));
+    gfx_apply_viewport(rng2_make(v2(), v2_of_v2u(os_window_size())));
+    gfx_apply_scissor(rng2_make(v2(), v2_of_v2u(os_window_size())));
     gfx_pipeline_bind(g.screen_pip);
     VK_PushConstant push = {g.world_rt.resolve.views[st->gfx.current_image_idx].idx};
     vk_push_constants(push);
@@ -1054,7 +1054,7 @@ void r_draw_mesh(R_Mesh mesh, R_Material mat, v3 pos) {
   var& g = st->r;
   R_DrawCallData cmd = {
     .pos = pos,
-    .scale = v3_splat(1),
+    .scale = v3(1),
     .rot = quat_identity(),
     .mesh = mesh,
     .mat = mat,
@@ -1084,9 +1084,9 @@ void r_draw_mesh_trs(R_Mesh mesh, R_Material mat, v3 pos, v4 rot, v3 scale) {
   }
 }
 
-void r_draw_entity(EntityId id) {
+void r_draw_entity(ThingId id) {
   var& g = st->r;
-  Entity& e = get_entity(id);
+  Thing& e = get_thing(id);
   R_DrawCallData cmd = {
     .pos = e.pos,
     .scale = e.scale,
@@ -1172,8 +1172,8 @@ void r_draw_rect(Rng2 rect, v4 color) {
     .dst_p0 = rect.min,
     .dst_p1 = rect.max,
     // .texture = r_texture_get_descriptor_idx(st->textures_ids[Texture_Orange]),
-    .src_p0 = v2_splat(0),
-    .src_p1 = v2_splat(500),
+    .src_p0 = v2(0),
+    .src_p1 = v2(500),
     .color = color,
   };
   array_push(g.draw_quads, vert);

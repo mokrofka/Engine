@@ -75,7 +75,7 @@ struct _LockScope {
 
 u64 cpu_timer_now();
 u64 cpu_frequency();
-void estimate_cpu_frequency();
+void cpu_find_frequency();
 
 String os_cur_filepath();
 String os_cur_directory();

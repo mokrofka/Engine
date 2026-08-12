@@ -255,12 +255,27 @@ struct EntityThing {
   EntityFlags flags;
 };
 
-Introspect struct Entity {
-  EntityId parent;
-  EntityId next;
-  EntityId prev;
-  EntityId first;
-  EntityId last;
+#define THING_DESC(...) \
+  ((ThingDesc){       \
+      .rot = quat_identity(), \
+      .scale = v3(1), \
+      __VA_ARGS__      \
+  })
+
+struct ThingDesc {
+  v3 pos;
+  v4 rot;
+  v3 scale;
+  MeshEnum mesh;
+  MaterialEnum mat;
+};
+
+Introspect struct Thing {
+  ThingId parent;
+  ThingId next;
+  ThingId prev;
+  ThingId first;
+  ThingId last;
   String name;
   EntityFlags flags;
   union {
@@ -276,6 +291,7 @@ Introspect struct Entity {
   R_Mesh mesh;
   R_Material mat;
   v4 color;
+  f32 elapsed;
 };
 
 struct UI_State {
@@ -300,30 +316,12 @@ enum {
   ThingState_Poisoned = Bit(2),
 };
 
-MakeId(ThingId);
-struct Thing {
-  Thing* first;
-  Thing* last;
-  Thing* next;
-  Thing* prev;
-  Thing* parent;
-  i32 data;
-  ThingState state;
-  f32 health;
-  v2 pos;
-  OpaqueId enemy_list;
-  OpaqueId ally_list;
-  OpaqueId neutral_list;
-};
-
-Thing& get_thing(ThingId id);
-
 struct GlobalState {
   Arena arena;
   Arena frame_arena;
   Alloc gpa;
   f32 dt;
-  f32 time;
+  f64 time;
   u32 current_frame;
   b32 should_hotreload;
   mat4 view;
@@ -360,33 +358,35 @@ struct GlobalState {
   Timer timer;
 
   u32 entities_count;
-  PoolLinkList<Entity, MaxEntities, EntityId> entities;
-  PoolLinkList<Thing, MaxEntities, ThingId> things;
+  PoolLinkList<Thing, MaxEntities, ThingId> entities;
+  // PoolLinkList<Thing, MaxEntities, ThingId> things;
 
-  Darray<EntityId> moving_cubes;
-  EntityId axis_attached_to_cam_id;
-  EntityId monkey_id;
-  EntityId rotating_cube_id;
-  Map<String, EntityId, 32> find_entity;
+  Darray<ThingId> moving_cubes;
+  ThingId axis_attached_to_cam_id;
+  ThingId monkey_id;
+  ThingId rotating_cube_id;
+  Map<String, ThingId, 32> find_entity;
 
   R_Font font;
   v3 a;
   v3 b;
   v2 a_v2;
   v2 b_v2;
-  EntityId e;
+  ThingId e;
   f32 t;
   v4 color;
-  EntityId my;
-  EntityId thing;
+  ThingId my;
+  ThingId thing;
   v3 euler;
   v3 point;
-  EntityId obj;
+  ThingId t_id;
 
   Coroutine co;
 };
 
 extern GlobalState* st;
+
+ThingDesc default_thing_desc();
 
 void ui_draw_rect(Rng2 rect, v4 color);
 b32 ui_button(u32 id, v2 pos);
@@ -429,6 +429,9 @@ f64 tsc_to_ms(u64 tsc);
 
 f32 get_dt();
 f32 get_time();
+b32 time_on_interval(f64 time, f32 delta, f32 interval, f32 offset);
+b32 time_on_interval(f32 interval, f32 offset = 0);
+b32 time_on_time(f64 time, f64 timestamp);
 
 MeshDesc load_obj(Allocator arena, String name);
 MeshDesc load_gltf(Allocator arena, String path, b32 is_glb);
@@ -462,13 +465,14 @@ void watch_add(String watch_name, WatchOp op);
 void watch_directory_add(String watch_name, WatchOp op, OS_WatchFlags flags = OS_WatchFlag_Modify);
 void watch_update();
 
-Entity& get_entity(EntityId id);
-Transform get_entity_transform(EntityId id);
+Thing& get_thing(ThingId id);
+Transform get_entity_transform(ThingId id);
 
-EntityId e_alloc_bare();
-EntityId e_alloc(R_Mesh mesh_id, R_Material material_id, EntityThing thing = {});
-EntityId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing = {});
-void e_free(EntityId e_id);
+ThingId e_alloc_bare();
+ThingId e_alloc(R_Mesh mesh_id, R_Material material_id, EntityThing thing = {});
+ThingId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing = {});
+ThingId make_thing(ThingDesc desc);
+void destroy_thing(ThingId id);
 void game_init();
 void update_game();
 void game_view();
@@ -478,9 +482,9 @@ void game_load_state();
 String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, EntityFlags flags = {});
 void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser);
 
-R_Mesh mesh_get(MeshEnum id);
+R_Mesh get_mesh(MeshEnum id);
 void mesh_set(MeshEnum mesh_enum, R_Mesh id);
-R_Material material_get(MaterialEnum id);
+R_Material get_material(MaterialEnum id);
 void assets_load();
 
 
