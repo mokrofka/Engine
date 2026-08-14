@@ -417,8 +417,8 @@ void debug_prof_view();
 
 void test();
 
-u64 hash(Vertex vert);
-b32 equal(Vertex a, Vertex b);
+u64 hash(R_Vertex vert);
+b32 equal(R_Vertex a, R_Vertex b);
 
 Timer timer_make(f32 interval);
 b32 timer_update(Timer& t);
@@ -433,8 +433,8 @@ b32 time_on_interval(f64 time, f32 delta, f32 interval, f32 offset);
 b32 time_on_interval(f32 interval, f32 offset = 0);
 b32 time_on_time(f64 time, f64 timestamp);
 
-MeshDesc load_obj(Allocator arena, String name);
-MeshDesc load_gltf(Allocator arena, String path, b32 is_glb);
+R_MeshDesc load_obj(Allocator arena, String name);
+R_MeshDesc load_gltf(Allocator arena, String path, b32 is_glb);
 
 JsParser js_parse_make(Allocator arena, String str);
 u8 js_peek(JsParser* p);

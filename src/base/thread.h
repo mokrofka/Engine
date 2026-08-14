@@ -16,8 +16,8 @@ enum TaskPriority {
 typedef void TaskFn(void* ctx);
 
 struct TaskDesc {
-  TaskFn* fn;
   void* ctx;
+  TaskFn* fn;
   TaskPriority priority;
 };
 

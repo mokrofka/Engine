@@ -22,8 +22,9 @@ union v2 {
   };
   f32 v[2];
   v2() = default;
-  v2(f32 s):x(s),y(s){};
+  explicit v2(f32 s):x(s),y(s){};
   v2(f32 x, f32 y):x(x),y(y){}
+  v2(const union v2u& v);
 };
 
 union v2i {
@@ -67,7 +68,7 @@ union v3 {
   };
   f32 v[3];
   v3() = default;
-  v3(f32 s):x(s),y(s),z(s){};
+  explicit v3(f32 s):x(s),y(s),z(s){};
   v3(f32 x, f32 y, f32 z):x(x),y(y),z(z){}
   v2 xy() { return v2(x,y); };
 };
@@ -82,9 +83,6 @@ union v3u {
   v3u() = default;
   v3u(u32 x, u32 y, u32 z):x(x),y(y),z(z){}
 };
-
-u64 hash(v3u v);
-b32 equal(v3u a, v3u b);
 
 union v3b {
   struct {
@@ -109,7 +107,7 @@ union v4 {
   };
   f32 v[4];
   v4() = default;
-  v4(f32 s):x(s),y(s),z(s){};
+  explicit v4(f32 s):x(s),y(s),z(s){};
   v4(f32 x, f32 y, f32 z, f32 w):x(x),y(y),z(z),w(w){}
 };
 
@@ -121,15 +119,16 @@ struct mat3 {
   f32 v[3][3];
 };
 
+struct mat4x3 {
+  f32 v[4][3];
+};
+
 struct mat4 {
   f32 v[4][4];
 };
 
 ////////////////////////////////////////////////////////////////////////
 // Ranges
-
-///////////////////////////////////
-// dim1
 
 struct Rng1u {
   u32 min;
@@ -151,9 +150,6 @@ struct Rng1 {
   f32 max;
 };
 
-///////////////////////////////////
-// Dim2
-
 union Rng2 {
   struct {
     v2 min;
@@ -168,9 +164,6 @@ union Rng2 {
   Rng2() = default;
   Rng2(v2 min, v2 max):min(min),max(max){}
 };
-
-///////////////////////////////////
-// Dim3
 
 union Rng3 {
   struct {
@@ -188,9 +181,6 @@ union Rng3 {
   Rng3() = default;
   Rng3(v3 min, v3 max):min(min),max(max){}
 };
-
-///////////////////////////////////
-// Misc
 
 struct Transform {
   v3 pos;
@@ -222,7 +212,6 @@ NO_DEBUG f32 Exp(f32 x);
 NO_DEBUG f32 LogE(f32 x);
 NO_DEBUG f32 Log2(f32 x);
 NO_DEBUG f32 Log10(f32 x);
-
 NO_DEBUG void SinCos(f32 rad, f32* a, f32* b);
 
 NO_DEBUG f32 SinD(f32 x);
@@ -240,8 +229,8 @@ u32 u32_from_rgba(v4 rgba);
 u64 squirrel3(u64 x);
 u64 str_hash_FNV(String str);
 u64 hash_memory(void* data, u64 size);
-u64 hash(u64 x, u64 seed = 0);
-u64 hash(String str, u64 seed = 0);
+u64 hash(u64 x);
+u64 hash(String str);
 
 ////////////////////////////////////////////////////////////////////////
 // Random
@@ -337,7 +326,7 @@ NO_DEBUG v2  v2_norm(v2 v);
 NO_DEBUG f32 v2_distance(v2 a, v2 b);
 NO_DEBUG f32 v2_distance_sqr(v2 a, v2 b);
 NO_DEBUG f32 v2_dot(v2 a, v2 b);
-NO_DEBUG f32 v2_cross(v2 a, v2 b);  // if > 0 then a is at right
+NO_DEBUG f32 v2_cross(v2 a, v2 b);
 NO_DEBUG v2  v2_lerp(v2 a, f32 t, v2 b);
 NO_DEBUG v2  v2_hadamard(v2 a, v2 b);
 NO_DEBUG v2  v2_hadamard_div(v2 a, v2 b);
@@ -597,9 +586,7 @@ v2 rng2_clamp(Rng2 r, v2 x);
 
 Rng2 rng2_make(v2 min, v2 size);             
 Rng2 rng2_make_centered(v2 pos, v2 halfdim); 
-Rng2 rng2_scale_centered(Rng2 r, f32 scale); 
 Rng2 rng2_scale_centered(Rng2 r, v2 scale);  
-Rng2 rng2_scale(Rng2 r, f32 scale);          
 Rng2 rng2_scale(Rng2 r, v2 scale);           
 
 Rng2 rng2_subrng_x(Rng2 r, Rng1 x);
@@ -676,3 +663,5 @@ f32 ease_bounce_in(f32 t);
 f32 ease_bounce_out(f32 t);
 f32 ease_bounce_in_out(f32 t);
 
+u64 hash(v3u v);
+b32 equal(v3u a, v3u b);
