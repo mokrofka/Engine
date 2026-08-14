@@ -8,6 +8,8 @@
 
 ///////////////////////////////////
 // Allocators
+extern u32 GlobalInt;
+C_LINKAGE void global_info();
 
 const u32 TEST_SAMPLES = 100;
 global i32 test_alignments[] = { 8, 16, 32, 64 };
@@ -1215,6 +1217,8 @@ void debug_game() {
     ImGui::DragFloat("z rot", &g.euler.z, 1);
     ImGui::DragFloat3("point", g.point.v, 0.1);
 
+    var list = imgui_get_window_drawlist();
+    imgui_draw_rect_filled(list, rng2_make(v2(0), v2(100)), ColorWhite);
     ImGui::Text("entities: %u", g.entities_count);
     ImGui::DragFloat("speed", &cam.speed, 1);
     {
@@ -1805,7 +1809,7 @@ void debug_prof_view() {
               item.rect = rng2_shift(item.rect, scroll_state.offset);
             }
 
-            Rng2 rounding_edge = rng2_shift(rng2_scale(rng2_make(cursor_pos, avail_size), scroll_state.scale.x), scroll_state.offset);
+            Rng2 rounding_edge = rng2_shift(rng2_scale(rng2_make(cursor_pos, avail_size), v2(scroll_state.scale)), v2(scroll_state.offset));
             rounding_edge = rng2_pad(rounding_edge, 10);
             imgui_draw_rect(draw, rounding_edge, ColorGreyLight);
 
@@ -1910,7 +1914,7 @@ void debug_prof_view() {
   prof_win.active_tab = prof_win.future_active_tab;
 }
 
-Vertex cube_vertices[] = {
+R_Vertex cube_vertices[] = {
   // Front face (0, 0, 1)
   {.pos = v3(-1.00, -1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0.0f, 0.0f)},
   {.pos = v3( 1.00, -1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1.0f, 0.0f)},
@@ -1960,13 +1964,13 @@ Vertex cube_vertices[] = {
   {.pos = v3(-1.00,  1.00,  1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
 };
 
-Vertex triangle_vertices[] = {
+R_Vertex triangle_vertices[] = {
   {.pos = v3( 0.0,   0.5, 0), .uv = v2(0.5, 0), .color = v4(1,0,0,1)},
   {.pos = v3(-0.5,  -0.5, 0), .uv = v2(0.0, 1), .color = v4(0,1,0,1)},
   {.pos = v3( 0.5,  -0.5, 0), .uv = v2(1.0, 1), .color = v4(0,0,1,1)},
 };
 
-Vertex axis_vertices[] = {
+R_Vertex axis_vertices[] = {
   {.pos = v3(),      .color = v4(1,0,0,1)},
   {.pos = v3(1,0,0), .color = v4(1,0,0,1)},
   {.pos = v3(),      .color = v4(0,1,0,1)},
@@ -1975,8 +1979,8 @@ Vertex axis_vertices[] = {
   {.pos = v3(0,0,1), .color = v4(0,0,1,1)},
 };
 
-u64 hash(Vertex x) { return hash_memory(&x, sizeof(x)); }
-b32 equal(Vertex a, Vertex b) { return MemMatchStruct(&a, &b); }
+u64 hash(R_Vertex x) { return hash_memory(&x, sizeof(x)); }
+b32 equal(R_Vertex a, R_Vertex b) { return MemMatchStruct(&a, &b); }
 
 Extern GlobalState* st;
 
@@ -2107,7 +2111,7 @@ String word_lexer_next(WordLexer& l) {
   return res;
 }
 
-MeshDesc load_obj(Allocator arena, String name) {
+R_MeshDesc load_obj(Allocator arena, String name) {
   Scratch scratch(arena);
   var positions = array_make(v3, scratch);
   var normals = array_make(v3, scratch);
@@ -2172,14 +2176,14 @@ MeshDesc load_obj(Allocator arena, String name) {
     }
   }
 
-  var vertices = array_make(Vertex, arena);
+  var vertices = array_make(R_Vertex, arena);
   var final_indices = array_make(u32, arena);
   var map = map_make(v3u, u32, scratch);
   Loop (i, indexes.count) {
     v3u idx = indexes[i];
     var r = map_get(map, idx);
     if (r.err) {
-      Vertex v = {
+      R_Vertex v = {
         positions[idx.x],
         normals[idx.y],
         uvs[idx.z],
@@ -2192,7 +2196,7 @@ MeshDesc load_obj(Allocator arena, String name) {
       array_push(final_indices, (u32)r);
     }
   }
-  MeshDesc mesh = {
+  R_MeshDesc mesh = {
     .vertices = slice(vertices),
     .indices = slice(final_indices),
   };
@@ -2206,7 +2210,7 @@ MeshDesc load_obj(Allocator arena, String name) {
 #define Gltf_u32 5125
 #define Gltf_f32 5126
 
-MeshDesc load_gltf(Allocator arena, String path, b32 is_glb) {
+R_MeshDesc load_gltf(Allocator arena, String path, b32 is_glb) {
   Scratch scratch(arena);
 
   String json = {};
@@ -2316,7 +2320,7 @@ MeshDesc load_gltf(Allocator arena, String path, b32 is_glb) {
   Slice texcoord = slice_reinterpret<v2>(slice_n(data, gltf.texcoord_buffer_view.offset, gltf.texcoord_buffer_view.size));
   Slice indices_u16 = slice_reinterpret<u16>(slice_n(data, gltf.indices_buffer_view.offset, gltf.indices_buffer_view.size));
 
-  Slice vertices = push_slice(arena, Vertex, gltf.pos_accessor.count);
+  Slice vertices = push_slice(arena, R_Vertex, gltf.pos_accessor.count);
   Slice indices = push_slice(arena, u32, gltf.indices_accessor.count);
   Loop (i, indices.count) {
     indices[i] = indices_u16[i];
@@ -2328,7 +2332,7 @@ MeshDesc load_gltf(Allocator arena, String path, b32 is_glb) {
       .uv = texcoord[i],
     };
   }
-  MeshDesc mesh = {
+  R_MeshDesc mesh = {
     .vertices = vertices,
     .indices = indices,
   };
@@ -2357,6 +2361,7 @@ global String materials_strs[] = {
 };
 
 R_Mesh get_mesh(MeshEnum mesh_enum) { return st->meshes_ids[mesh_enum]; }
+R_Texture get_texture(TextureEnum tex_enum) { return st->textures_ids[tex_enum]; }
 void mesh_set(MeshEnum mesh_enum, R_Mesh id) { 
   GlobalState& g = *st;
   g.meshes_ids[mesh_enum] = id;
@@ -2366,8 +2371,8 @@ void mesh_set(MeshEnum mesh_enum, R_Mesh id) {
 }
 R_Material get_material(MaterialEnum id) { return st->materials_ids[id]; }
 
-constexpr MaterialProps material_default_props() {
-  MaterialProps props = {
+constexpr R_MaterialProps material_default_props() {
+  R_MaterialProps props = {
     .ambient = v3(1),
     .diffuse = v3(1),
     .specular = v3(1),
@@ -3040,6 +3045,8 @@ void co_test(Coroutine* co, f32 dt) {
 }
 
 void init() {
+  Info("%i", GlobalInt);
+  global_info();
   Scratch scratch;
   
   struct Vec {
@@ -3277,9 +3284,9 @@ if (data->ctx == null) {
     if (st->should_hotreload) {
       goto hotreload;
     }
-    if (time_on_interval(get_time(), get_dt(), 0.1, 0)) {
-      Info("ye");
-    }
+    // if (time_on_interval(get_time(), get_dt(), 0.1, 0)) {
+    //   Info("ye");
+    // }
 
     prof_begin(g.current_frame);
     {
@@ -3346,12 +3353,12 @@ void gfx_api_design_foo() {
 ////////////////////////////////////////////////////////////////////////
 // @Game
 
-MeshDesc sphere_generate(Allocator arena) {
+R_MeshDesc sphere_generate(Allocator arena) {
   u32 lat_steps = 10;
   u32 lon_steps = 10;
   u32 vert_count = lat_steps*lon_steps;
   u32 index_count = (lat_steps - 1) * lon_steps * 6;
-  var vertices = push_slice(arena, Vertex, vert_count);
+  var vertices = push_slice(arena, R_Vertex, vert_count);
   var indices = push_slice(arena, u32, index_count);
   f32 lat_step_angle = PI / lat_steps;
   f32 lon_step_angle = 2*PI / lon_steps;
@@ -3359,7 +3366,7 @@ MeshDesc sphere_generate(Allocator arena) {
     f32 lat_angle = -PI/2 + i*lat_step_angle;
     for (u32 j = 0; j < lon_steps; ++j) {
       f32 lon_angle = j * lon_step_angle;
-      Vertex vert = {
+      R_Vertex vert = {
         .pos.x = Cos(lat_angle) * Cos(lon_angle),
         .pos.y = Sin(lat_angle),
         .pos.z = Cos(lat_angle) * Sin(lon_angle),
@@ -3395,15 +3402,15 @@ MeshDesc sphere_generate(Allocator arena) {
   //   indices[k++] = north_pole_index;      // pole
   //   indices[k++] = idx(lat_steps - 2, next_j);
   // }
-  MeshDesc mesh = {
+  R_MeshDesc mesh = {
     .vertices = vertices,
     .indices = indices,
   };
   return mesh;
 }
 
-MeshDesc grid_generate(Allocator arena, u32 size, f32 step) {
-  var vertices = push_slice(arena, Vertex, size*4);
+R_MeshDesc grid_generate(Allocator arena, u32 size, f32 step) {
+  var vertices = push_slice(arena, R_Vertex, size*4);
   v3 pos_offset = v3(-(i32)size/2, 0, -(i32)size/2);
   for (i32 i = 0; i < size; ++i) {
     vertices[i*2].pos = pos_offset + v3(0, 0, i*step);
@@ -3414,7 +3421,7 @@ MeshDesc grid_generate(Allocator arena, u32 size, f32 step) {
     vertical_vertices[i*2].pos = pos_offset + v3(i*step, 0, 0);
     vertical_vertices[i*2+1].pos = pos_offset + v3(i*step, 0, size*step);
   }
-  MeshDesc mesh = {
+  R_MeshDesc mesh = {
     .vertices = vertices,
   };
   return mesh;
@@ -3746,7 +3753,7 @@ void init_scene() {
     // desc.pos = v3(1);
     // desc.scale = v3(3);
     var desc = THING_DESC(
-      .pos = v3(1),
+      .pos = v3(1,1,1),
     );
     g.t_id = make_thing(desc);
     // g.t_id = make_thing(THING_DESC(.pos = v3(1,1,1), .scale = v3(3)));
@@ -3852,17 +3859,6 @@ void update_scene() {
   }
 
   // vk_draw_rect(Rng2(v2(100,100), v2(200,200)), v3(1,1,1));
-  v4& pos = get_pos();
-  f32 speed = 1 * get_dt();
-  if (key_down(Key_A)) {
-    pos.x -= speed;
-  }
-  if (key_down(Key_D)) {
-    pos.x += speed;
-  }
-
-  mat4& mat = get_mat();
-  mat = mat4_translate(v3_of_v4(pos));
 
   Thing& e = get_thing(g.e);
   // e.pos = v3_lerp(g.a, g.t, g.b);
@@ -4071,7 +4067,9 @@ void update_scene() {
 
   {
     // r_draw_quad(rng2_make(v2(400), v2(400,400)), ColorCyan);
-    r_draw_rect(rng2_make(v2(100), v2(100)), ColorWhite);
+    r_draw_rect(rng2_make(v2(600), v2(100)), ColorWhite);
+    r_draw_texture(rng2_make(v2(800), v2(100)), get_texture(Texture_Orange));
+    r_draw_text(v2(200,200), "I'm a hobbit", ColorOrange);
   }
 
   {
@@ -4079,9 +4077,10 @@ void update_scene() {
     f32 t = time_ping_pong(get_time(), 2);
     t = ease_sin_in_out(t);
     // thing.pos.x = Lerp(-10, t, 10);
+    thing.pos = v3_rotate_x(thing.pos, get_dt());
     // thing.rot = quat_axis_angle(v3(1), get_time());
     // thing.pos = quat_rotate(quat_axis_angle(v3_up(), get_time()), v3(10,10,10));
-    thing.pos = v3_rotate_around_pivot(thing.pos, v3(1), quat_axis_angle(v3(1), get_time()));
+    // thing.pos = v3_rotate_around_pivot(thing.pos, v3(1), quat_axis_angle(v3(1), get_time()));
   }
   
 }
@@ -4164,8 +4163,6 @@ void game_load_state() {
 
 void game_init() {
   ProfFunc;
-  v4& pos = get_pos();
-  pos = {};
   var& g = *st;
   Scratch scratch;
   g.arena = arena_make("game arena");
@@ -4173,21 +4170,21 @@ void game_init() {
   g.timer = timer_make(1);
 
   g.moving_cubes = array_make(ThingId, g.gpa);
-  g.font = r_font_load("arial.ttf", 32);
+  // g.font = r_font_load("arial.ttf", 512);
 
-  MeshDesc triangle_mesh = {.vertices = slice(triangle_vertices)};
+  R_MeshDesc triangle_mesh = {.vertices = slice(triangle_vertices)};
   mesh_set(Mesh_Triangle, r_mesh_make(triangle_mesh));
-  MeshDesc grid_mesh = grid_generate(scratch, 100, 1);
+  R_MeshDesc grid_mesh = grid_generate(scratch, 100, 1);
   mesh_set(Mesh_Grid, r_mesh_make(grid_mesh));
-  MeshDesc axis_mesh = {.vertices = slice(axis_vertices)};
+  R_MeshDesc axis_mesh = {.vertices = slice(axis_vertices)};
   mesh_set(Mesh_Axis, r_mesh_make(axis_mesh));
-  MeshDesc sphere = sphere_generate(scratch);
+  R_MeshDesc sphere = sphere_generate(scratch);
   mesh_set(Mesh_Sphere, r_mesh_make(sphere));
 
   {
     ProfBlock("cube");
     // R_Texture cubemap = r_texture_cube_load("night_cubemap");
-    R_Texture cubemap = r_texture_cube_load_async("night_cubemap");
+    R_Texture cubemap = r_load_async_cubemap("night_cubemap");
     r_set_cubemap(cubemap);
   }
 
@@ -4213,7 +4210,7 @@ void game_init() {
 
     var t_load = [&](TextureEnum enum_name, String name) {
       // R_Texture id = r_texture_load(name);
-      R_Texture id = r_texture_load_async(name);
+      R_Texture id = r_load_async_texture(name);
       g.textures_ids[enum_name] = id;
       String str = push_str_copy(g.arena, name);
       map_set(g.str_to_texture_id, str, id);
@@ -4223,7 +4220,7 @@ void game_init() {
     t_load(Texture_Container, "container.jpg");
     t_load(Texture_Barrack, "castle_diffuse.png");
   
-    var mat_load = [&](MaterialEnum enum_name, MaterialDesc desc) {
+    var mat_load = [&](MaterialEnum enum_name, R_MaterialDesc desc) {
       R_Material id = r_material_make(desc);
       g.materials_ids[enum_name] = id;
       String str = push_str_copy(g.arena, materials_strs[enum_name]);
@@ -4231,7 +4228,7 @@ void game_init() {
       g.material_id_to_str[id.idx] = str;
     };
     mat_load(Material_Orange, {
-      .shader_name = "e_texture",
+      .shader = "e_texture",
       .pipeline_desc = {
         .depth = {
           .compare = Gfx_CompareOp_Less,
@@ -4239,10 +4236,10 @@ void game_init() {
         }
       },
       .props = material_default_props(),
-      .texture = "orange_lines_512.png",
+      .base_color = "orange_lines_512.png",
     });
     mat_load(Material_Container, {
-      .shader_name = "e_texture",
+      .shader = "e_texture",
       .pipeline_desc = {
         .depth = {
           .compare = Gfx_CompareOp_Less,
@@ -4250,10 +4247,10 @@ void game_init() {
         }
       },
       .props = material_default_props(),
-      .texture = "container.jpg",
+      .base_color = "container.jpg",
     });
     mat_load(Material_Axis, {
-      .shader_name = "e_vert_color",
+      .shader = "e_vert_color",
       .pipeline_desc = {
         .primitive_type = Gfx_PrimitiveType_Line,
         .depth = {
@@ -4264,7 +4261,7 @@ void game_init() {
       .props = material_default_props(),
     });
     mat_load(Material_Line, {
-      .shader_name = "e_color",
+      .shader = "e_color",
       .pipeline_desc = {
         .primitive_type = Gfx_PrimitiveType_Line,
         .depth = {
@@ -4275,7 +4272,7 @@ void game_init() {
       .props = material_default_props(),
     });
     mat_load(Material_Barrack, {
-      .shader_name = "e_texture",
+      .shader = "e_texture",
       .pipeline_desc = {
         .depth = {
           .compare = Gfx_CompareOp_Less,
@@ -4283,7 +4280,7 @@ void game_init() {
         }
       },
       .props = material_default_props(),
-      .texture = "castle_diffuse.png",
+      .base_color = "castle_diffuse.png",
     });
   }
 

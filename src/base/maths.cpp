@@ -1,10 +1,9 @@
 #include "base_impl.h"
 
+v2::v2(const v2u& v):x(v.x),y(v.y){}
+
 f32 deg2rad(f32 degrees) { return degrees * PI / 180.0f; }
 f32 rad2deg(f32 radians) { return radians * 180.0f / PI; }
-
-u64 hash(v3u v) { return hash(v.x)+hash(v.y)+hash(v.z); }
-b32 equal(v3u a, v3u b) { return a == b;};
 
 f32 Sin(f32 x)                         { return __builtin_sinf(x); }
 f32 Cos(f32 x)                         { return __builtin_cosf(x); }
@@ -22,10 +21,10 @@ f32 Exp(f32 x)                         { return __builtin_expf(x); }
 f32 LogE(f32 x)                        { return __builtin_logf(x); }
 f32 Log2(f32 x)                        { return __builtin_log2f(x); }
 f32 Log10(f32 x)                       { return __builtin_log10f(x); }
-void SinCos(f32 rad, f32* s, f32* c) { __builtin_sincosf(rad, s, c); }
+void SinCos(f32 rad, f32* s, f32* c)   { __builtin_sincosf(rad, s, c); }
 
-f32 SinD(f32 x)                { return Sin(deg2rad(x)); }
-f32 CosD(f32 x)                { return Cos(deg2rad(x)); }
+f32 SinD(f32 x) { return Sin(deg2rad(x)); }
+f32 CosD(f32 x) { return Cos(deg2rad(x)); }
 
 ////////////////////////////////////////////////////////////////////////
 // Color
@@ -77,8 +76,8 @@ u64 hash_memory(void* data, u64 size) {
   return h;
 }
 
-u64 hash(u64 x, u64 seed) { return squirrel3(x + seed); }
-u64 hash(String str, u64 seed) { return str_hash_FNV(str) + seed; }
+u64 hash(u64 x) { return squirrel3(x); }
+u64 hash(String str) { return str_hash_FNV(str); }
 
 ////////////////////////////////////////////////////////////////////////
 // Random
@@ -1022,9 +1021,7 @@ v2 rng2_clamp(Rng2 r, v2 x)         { return v2(Clamp(r.min.x, x.x, r.max.x), Cl
 
 Rng2 rng2_make(v2 min, v2 size)             { return Rng2(min, min+size); }
 Rng2 rng2_make_centered(v2 pos, v2 halfdim) { return Rng2(pos - halfdim, pos + halfdim); }
-Rng2 rng2_scale_centered(Rng2 r, f32 scale) { v2 halfdim = rng2_dim(r)/2; v2 c = rng2_center(r); return Rng2(c - halfdim*scale, c + halfdim*scale); }
 Rng2 rng2_scale_centered(Rng2 r, v2 scale)  { v2 halfdim = rng2_dim(r)/2; v2 c = rng2_center(r); return Rng2(c - v2_hadamard(halfdim, scale), c + v2_hadamard(halfdim, scale)); }
-Rng2 rng2_scale(Rng2 r, f32 scale)          { return Rng2(r.min*scale, r.max*scale); }
 Rng2 rng2_scale(Rng2 r, v2 scale)           { return Rng2(v2_hadamard(r.min, scale), v2_hadamard(r.max, scale)); }
 
 Rng2 rng2_subrng_x(Rng2 r, Rng1 sub)      { return Rng2(v2(r.min.x + sub.min, r.min.y), v2(r.min.x+sub.min + rng1_dim(sub), r.max.y)); }
@@ -1183,3 +1180,6 @@ f32 ease_bounce_in_out(f32 t) {
     return 0.5 * ease_bounce_out(t * 2 - 1) + 0.5;
   }
 }
+
+u64 hash(v3u v) { return hash(v.x)+hash(v.y)+hash(v.z); }
+b32 equal(v3u a, v3u b) { return a == b;};

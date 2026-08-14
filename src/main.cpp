@@ -1,6 +1,12 @@
 #include "lib.h"
+// #include "base/base_impl.cpp"
 
 shared_function void update_main(HotReloadData* data);
+
+C_LINKAGE void global_info() {
+  Info("hello from exe");
+}
+u32 GlobalInt = 1;
 
 i32 main(i32 count, char* args[]) {
   mem_track_init();

@@ -307,9 +307,9 @@ struct Gfx_SamplerDesc {
 
 struct Gfx_ShaderDesc {
   String shader;
-  b32 vert;
-  b32 frag;
-  b32 comp;
+  b32 vert : 1;
+  b32 frag : 1;
+  b32 comp : 1;
 };
 
 struct Gfx_StencilFaceState {
@@ -541,9 +541,9 @@ struct VK_Sampler {
 
 struct VK_Shader {
   VkShaderModule h;
-  b32 vert;
-  b32 frag;
-  b32 comp;
+  b32 vert : 1;
+  b32 frag : 1;
+  b32 comp : 1;
 };
 
 struct VK_Pipeline {
@@ -649,7 +649,7 @@ VkCommandBuffer vk_cmd_alloc_begin();
 void vk_cmd_end_free(VkCommandBuffer cmd);
 
 VK_Memory vk_mem_make(Gfx_MemType type, u64 size);
-VK_Buffer vk_buffer_make(u64 size, Gfx_MemType type = Gfx_MemType_Gpu);
+VK_Buffer vk_make_buffer(u64 size, Gfx_MemType type = Gfx_MemType_Gpu);
 void vk_bind_vert_buffer(VK_Buffer buffer);
 void vk_bind_index_buffer(VK_Buffer buffer);
 VK_Buffer* vk_choose_buffer(Gfx_Buffer buf);
@@ -861,33 +861,33 @@ struct Gfx_State {
 #undef X
 };
 
-Gfx_Shader gfx_shader_make(Gfx_ShaderDesc desc);
-Gfx_Pipeline gfx_pipeline_make(Gfx_PipelineDesc desc);
-Gfx_Image gfx_image_make(Gfx_ImageDesc desc);
-Gfx_View gfx_view_make(Gfx_ViewDesc desc);
-Gfx_Sampler gfx_sampler_make(Gfx_SamplerDesc desc);
-Gfx_Buffer gfx_buffer_make(u64 size, Gfx_MemType type = Gfx_MemType_Gpu, u64 align = 16);
-Gfx_Buffer gfx_buffer_make_round_base(u64 size, u64 round, Gfx_MemType type = Gfx_MemType_Gpu, u64 align = 16);
-void gfx_bind_make(Gfx_DescriptorDesc desc);
+Gfx_Shader gfx_make_shader(Gfx_ShaderDesc desc);
+Gfx_Pipeline gfx_make_pipeline(Gfx_PipelineDesc desc);
+Gfx_Image gfx_make_image(Gfx_ImageDesc desc);
+Gfx_View gfx_make_view(Gfx_ViewDesc desc);
+Gfx_Sampler gfx_make_sampler(Gfx_SamplerDesc desc);
+Gfx_Buffer gfx_make_buffer(u64 size, Gfx_MemType type = Gfx_MemType_Gpu, u64 align = 16);
+Gfx_Buffer gfx_make_buffer_round_base(u64 size, u64 round, Gfx_MemType type = Gfx_MemType_Gpu, u64 align = 16);
+void gfx_make_bind(Gfx_DescriptorDesc desc);
 
 Gfx_PipelineDesc gfx_query_pipeline_desc(Gfx_Pipeline pip);
 Gfx_ImageDesc gfx_query_image_desc(Gfx_Image img);
 
-void gfx_shader_update(Gfx_Shader shd, Gfx_ShaderDesc desc);
-void gfx_pipeline_update(Gfx_Pipeline pip, Gfx_PipelineDesc desc);
-void gfx_image_update(Gfx_Image img, u8* data);
-void gfx_image_update(Gfx_Image img, Gfx_ImageDesc desc);
-void gfx_view_update(Gfx_View view, Gfx_ViewDesc desc);
-void gfx_buffer_update(Gfx_Buffer buf, u64 offset, Slice<u8> data);
+void gfx_update_shader(Gfx_Shader shd, Gfx_ShaderDesc desc);
+void gfx_update_pipeline(Gfx_Pipeline pip, Gfx_PipelineDesc desc);
+void gfx_update_image(Gfx_Image img, u8* data);
+void gfx_update_image(Gfx_Image img, Gfx_ImageDesc desc);
+void gfx_update_view(Gfx_View view, Gfx_ViewDesc desc);
+void gfx_update_buffer(Gfx_Buffer buf, u64 offset, Slice<u8> data);
 
-void gfx_image_destroy(Gfx_Image img);
-void gfx_view_destroy(Gfx_View view);
-void gfx_shader_destroy(Gfx_Shader shd);
-void gfx_pipeline_destroy(Gfx_Pipeline pip);
+void gfx_destroy_image(Gfx_Image img);
+void gfx_destroy_view(Gfx_View view);
+void gfx_destroy_shader(Gfx_Shader shd);
+void gfx_destroy_pipeline(Gfx_Pipeline pip);
 
-void gfx_image_readback(Gfx_Image img, u8* dst);
-void gfx_pass_begin(Gfx_Pass pass);
-void gfx_pass_end();
+void gfx_readback_image(Gfx_Image img, u8* dst);
+void gfx_begin_pass(Gfx_Pass pass);
+void gfx_end_pass();
 void gfx_apply_viewport(Rng2 rect, b32 y_origin_at_bottom = false);
 void gfx_apply_scissor(Rng2 rect);
 void gfx_draw(u32 base_vert, u32 vert_count, u32 instance_count = 1, u32 base_instance = 0);
@@ -897,8 +897,8 @@ void gfx_draw_indexed_indirect(Gfx_IndirectDrawcall drawcall);
 void gfx_draw_mesh(Gfx_Mesh mesh);
 
 void gfx_draw_mesh_indirect(Gfx_Mesh mesh, u32 id, u32 instance_count = 1);
-u32  gfx_indirect_begin();
-Gfx_IndirectDrawcall gfx_indirect_end(u32 base);
+u32  gfx_begin_indirect();
+Gfx_IndirectDrawcall gfx_end_indirect(u32 base);
 
 void gfx_push_indirect_instanced(Gfx_Mesh mesh, u32 count);
 void gfx_instance_set_indices(u32* indices);
@@ -907,7 +907,7 @@ u32* gfx_indirect_indices();
 u8* gfx_buffer_base_ptr(Gfx_Buffer buf);
 u64 gfx_buffer_base(Gfx_Buffer buf);
 
-void gfx_pipeline_bind(Gfx_Pipeline pip);
+void gfx_bind_pipeline(Gfx_Pipeline pip);
 void gfx_bind_vert(Gfx_MemType type = Gfx_MemType_Gpu);
 void gfx_bind_index(Gfx_MemType type = Gfx_MemType_Gpu);
 void gfx_bind_buffer(Gfx_Buffer buf, u32 binding);

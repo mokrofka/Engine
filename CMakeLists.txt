@@ -39,7 +39,7 @@ project(Engine)
   endif()
 
 # Linker
-  add_link_options("-fuse-ld=lld")
+  add_link_options("-fuse-ld=lld" "-rdynamic")
   message("Linker path: ${CMAKE_LINKER}")
 
 # Build
@@ -77,6 +77,7 @@ project(Engine)
   else()
     add_link_options("-nostdlib++") # imgui depends on it
   endif()
+  
   
   add_executable(exe)
 

@@ -2,114 +2,6 @@
 #include "types.h"
 #include "gfx.h"
 
-const u32 R_MaxMaterials  = 32;
-const u32 R_MaxLights     = 32;
-const u32 R_MaxMeshes     = 32;
-const u32 R_MaxTextures   = 32;
-const u32 R_MaxCubemaps   = 32;
-const u32 R_MaxFonts      = 32;
-const u32 R_MaxDebugLines = KB(1);
-const u32 R_MaxTextDraws  = 32;
-
-struct R_KeyToShaderPipeline { String name; Gfx_PipelineDesc pipeline_desc; };
-u64 hash(R_KeyToShaderPipeline x);
-b32 equal(R_KeyToShaderPipeline a, R_KeyToShaderPipeline b);
-
-#include "vk_bindings.slang"
-
-MakeId(R_Texture)
-MakeId(R_Mesh)
-MakeId(R_Material)
-MakeId(R_Font)
-MakeId(R_Shader)
-MakeId(R_Light)
-
-struct MaterialProps {
-  v3 ambient;
-  v3 diffuse;
-  v3 specular;
-  f32 shininess;
-};
-
-struct Vertex {
-  v3 pos;
-  v3 norm;
-  v2 uv;
-  v4 color;
-};
-
-struct UI_rect {
-  v2 dst_p0;
-  v2 dst_p1;
-  v2 src_p0;
-  v2 src_p1;
-  u32 texture;
-  alignas(16) v4 color;
-};
-
-struct Texture {
-  u32 width;
-  u32 height;
-  union {
-    u8* data;
-    u8* cube[6];
-  };
-};
-
-struct MeshDesc {
-  Slice<Vertex> vertices;
-  Slice<u32> indices;
-  f32 bounds_min;
-  f32 bounds_max;
-  f32 bounds_rad;
-};
-
-struct MaterialDesc {
-  String shader_name;
-  Gfx_PipelineDesc pipeline_desc;
-  MaterialProps props;
-  String texture;
-};
-
-struct R_MaterialData {
-  MaterialDesc desc;
-  u32 entity_batch_idx;
-  R_Texture tex;
-  u32 idx;
-};
-
-struct R_TextureData {
-  u32 width;
-  u32 height;
-  union {
-    u8* data;
-    u8* cube[6];
-  };
-  Gfx_Image image;
-  Gfx_View view;
-};
-
-struct R_MeshData {
-  Slice<Vertex> vertices;
-  Slice<u32> indices;
-  f32 bounds_min;
-  f32 bounds_max;
-  f32 bounds_rad;
-  Gfx_Mesh mesh;
-};
-
-const u32 MaxGlyphCharacters = 96;
-
-struct R_Glyph {
-  i32 x0,y0,x1,y1;
-  f32 xoff, yoff,xadvance;
-};
-
-struct R_FontData {
-  R_Texture texture;
-  R_Glyph glyphs[MaxGlyphCharacters];
-};
-
 ///////////////////////////////////
 // Gpu memory layout
 
@@ -166,14 +58,121 @@ struct R_GlobalStateGPU {
   u32 entity_indices[MaxEntities];
 };
 
-struct R_MeshPush {
-  ThingId id;
-  R_Mesh mesh;
-  R_Material material;
-  u8 b[32];
+const u32 R_MaxMaterials  = 32;
+const u32 R_MaxLights     = 32;
+const u32 R_MaxMeshes     = 32;
+const u32 R_MaxTextures   = 32;
+const u32 R_MaxCubemaps   = 32;
+const u32 R_MaxFonts      = 32;
+const u32 R_MaxDebugLines = KB(1);
+const u32 R_MaxTextDraws  = 32;
+const u32 MaxGlyphCharacters = 96;
+
+struct R_ShaderDesc { String name; Gfx_PipelineDesc pipeline_desc; };
+u64 hash(R_ShaderDesc x);
+b32 equal(R_ShaderDesc a, R_ShaderDesc b);
+
+#include "vk_bindings.slang"
+
+MakeId(R_Texture)
+MakeId(R_Mesh)
+MakeId(R_Material)
+MakeId(R_Font)
+MakeId(R_Light)
+
+struct R_Vertex {
+  v3 pos;
+  v3 norm;
+  v2 uv;
+  v4 color;
 };
 
-struct R_DrawCallData {
+struct R_UI_Rect {
+  v2 dst_p0;
+  v2 dst_p1;
+  v2 src_p0;
+  v2 src_p1;
+  u32 texture;
+  alignas(16) v4 color;
+};
+
+struct R_TextureDesc {
+  u32 width;
+  u32 height;
+  u8* data;
+};
+
+struct R_TextureData {
+  u32 width;
+  u32 height;
+  u8* data;
+  Gfx_Image image;
+  Gfx_View view;
+};
+
+struct R_CubeMapDesc {
+  u32 width;
+  u32 height;
+  u8* cubes[6];
+};
+
+struct R_CubeMapData {
+  u32 width;
+  u32 height;
+  u8* cube[6];
+  Gfx_Image image;
+  Gfx_View view;
+};
+
+struct R_MeshDesc {
+  Slice<R_Vertex> vertices;
+  Slice<u32> indices;
+  f32 bounds_min;
+  f32 bounds_max;
+  f32 bounds_rad;
+};
+
+struct R_MeshData {
+  Slice<R_Vertex> vertices;
+  Slice<u32> indices;
+  f32 bounds_min;
+  f32 bounds_max;
+  f32 bounds_rad;
+  Gfx_Mesh mesh;
+};
+
+struct R_MaterialProps {
+  v3 ambient;
+  v3 diffuse;
+  v3 specular;
+  f32 shininess;
+};
+
+struct R_MaterialDesc {
+  String shader;
+  Gfx_PipelineDesc pipeline_desc;
+  R_MaterialProps props;
+  String base_color;
+};
+
+struct R_MaterialData {
+  R_MaterialDesc desc;
+  u32 entity_batch_idx;
+  R_Texture tex;
+  u32 idx;
+};
+
+struct R_Glyph {
+  i32 x0,y0,x1,y1;
+  f32 xoff, yoff,xadvance;
+};
+
+struct R_FontData {
+  R_Texture texture;
+  R_Glyph glyphs[MaxGlyphCharacters];
+};
+
+struct R_DrawCall {
   v3 pos;
   v4 rot;
   v3 scale;
@@ -184,13 +183,20 @@ struct R_DrawCallData {
 
 struct R_DrawBatch {
   Gfx_Pipeline pip;
-  Darray<R_DrawCallData> draws;
-  Darray<R_DrawCallData> draws_unindexed;
+  Darray<R_DrawCall> draws;
+  Darray<R_DrawCall> unindexed_draws;
 };
 
-struct R_ShaderModuleEntry {
+struct R_DrawText {
+  String str;
+  R_Font font;
+  v2 pos;
+  v4 color;
+};
+
+struct R_ShaderModuleWithPipelines {
   Gfx_Shader shd;
-  Darray<Gfx_Pipeline> track_pipelines;
+  Darray<Gfx_Pipeline> pipelines;
 };
 
 struct R_ArenaBuffer {
@@ -237,13 +243,6 @@ struct R_AsyncMesh {
   R_MeshData data;
 };
 
-struct R_DrawText {
-  String str;
-  R_Font font;
-  v2 pos;
-  v4 color;
-};
-
 struct R_Camera {
   v3 pos;
   v4 rot;
@@ -254,11 +253,6 @@ struct R_Camera {
   f32 ortho_size;
 };
 
-struct R_Quad {
-  Rng2 rect;
-  v4 color;
-};
-
 struct R_State {
   Arena arena;
   Alloc gpa;
@@ -266,12 +260,12 @@ struct R_State {
   f32 scale;
   f32 old_scale;
   
-  Array<R_ShaderModuleEntry, Gfx_MaxShaders> modules;
+  Array<R_ShaderModuleWithPipelines, Gfx_MaxShaders> shader_modules;
   Map<String, u32, Gfx_MaxShaders> shader_to_module_idx;
-  Map<R_KeyToShaderPipeline, Gfx_Pipeline, Gfx_MaxPipelines> shader_to_pipeline;
+  Map<R_ShaderDesc, Gfx_Pipeline, Gfx_MaxPipelines> shader_desc_to_pipeline;
+  Map<u32, u32, Gfx_MaxPipelines> pip_idx_to_entity_batch_idx;
   PoolLinkList<R_MaterialData, R_MaxMaterials, R_Material> materials;
   Array<R_DrawBatch, Gfx_MaxShaders> entity_batches;
-  Map<u32, u32, Gfx_MaxPipelines> pip_idx_to_entity_batch_idx;
 
   Pool<Gfx_Mesh, R_MaxMeshes, R_Mesh> meshes;
   Pool<R_TextureData, R_MaxTextures, R_Texture> textures;
@@ -298,11 +292,11 @@ struct R_State {
 
   Gfx_Buffer vert_buffer_each_frame;
   RingBuffer vert_ring_buffer;
-  Array<Vertex, R_MaxDebugLines> draw_lines;
-  Array<Vertex, R_MaxDebugLines> draw_lines_persistent;
-  Array<Vertex, R_MaxDebugLines> draw_rects;
-  Array<UI_rect, R_MaxDebugLines> draw_quads;
-  Array<Vertex, R_MaxDebugLines> draw_rects_texture;
+  Array<R_Vertex, R_MaxDebugLines> draw_lines;
+  Array<R_Vertex, R_MaxDebugLines> draw_lines_persistent;
+  Array<R_Vertex, R_MaxDebugLines> draw_rects;
+  Array<R_UI_Rect, R_MaxDebugLines> draw_quads;
+  Array<R_Vertex, R_MaxDebugLines> draw_rects_texture;
   u64 draw_base_lines;
   u64 draw_base_persistent_lines;
   u64 draw_base_rects;
@@ -332,7 +326,7 @@ struct R_State {
   R_MaterialGPU* gpu_materials;
   R_DrawCallDataGPU* gpu_drawcall;
   u32* gpu_software_render;
-  UI_rect* gpu_ui_rect;
+  R_UI_Rect* gpu_ui_rect;
 
   Slice<OS_Handle> shader_module_compilation_pids;
   Slice<String> shaders_to_compile;
@@ -344,30 +338,27 @@ b32 r_material_is_null(R_Mesh m);
 b32 r_font_is_null(R_Mesh f);
 b32 r_shader_is_null(R_Mesh shd);
 
-R_DrawBatch r_draw_batch_make(Allocator alloc, Gfx_Pipeline pip);
-R_ShaderModuleEntry r_shader_module_entry_make(Allocator alloc);
-R_ArenaBuffer r_arena_buffer_make(u64 size, Gfx_MemType type = Gfx_MemType_Gpu);
-R_ArenaBuffer r_arena_buffer_make_round(u64 size, u64 round, Gfx_MemType type = Gfx_MemType_Gpu);
-u64 r_arena_buffer_push(R_ArenaBuffer* buf, u64 size);
-R_Attachment r_attachment_make(R_AttachmentDesc desc);
-void r_attachment_destroy(R_Attachment attachment);
-void r_attachment_recreate(R_Attachment* attachment, v2u size);
-R_RenderTarget r_render_target_make(R_RenderTargetUsage usage, v2u size);
-void r_render_target_destroy(R_RenderTarget rt);
-void r_render_target_recreate(R_RenderTarget* rt, v2u size);
+R_DrawBatch r_make_draw_batch(Allocator alloc, Gfx_Pipeline pip);
+R_ShaderModuleWithPipelines r_make_shader_module_with_pipelines(Allocator alloc);
+R_ArenaBuffer r_make_arena_buffer(u64 size, Gfx_MemType type = Gfx_MemType_Gpu);
+R_ArenaBuffer r_make_round_arena_buffer(u64 size, u64 round, Gfx_MemType type = Gfx_MemType_Gpu);
+u64 r_push_arena_buffer(R_ArenaBuffer* buf, u64 size);
+R_Attachment r_make_attachment(R_AttachmentDesc desc);
+void r_destroy_attachment(R_Attachment attachment);
+void r_recreate_attachment(R_Attachment* attachment, v2u size);
+R_RenderTarget r_make_render_target(R_RenderTargetUsage usage, v2u size);
+void r_destroy_render_target(R_RenderTarget rt);
+void r_recreate_render_target(R_RenderTarget* rt, v2u size);
 Gfx_Attachments r_render_target_to_attachments(R_RenderTarget rt);
 
-v4& get_pos();
-mat4& get_mat();
-
 u32 r_texture_get_descriptor_idx(R_Texture id);
-Texture r_image_load(String name);
-R_Texture r_texture_load(String name);
-R_Texture r_texture_load_async(String name);
-R_Texture r_texture_make(Texture tex);
-R_Texture r_texture_cube_make(Texture tex);
-R_Texture r_texture_cube_load(String dir);
-R_Texture r_texture_cube_load_async(String dir);
+R_TextureDesc r_load_image(String name);
+R_Texture r_load_texture(String name);
+R_Texture r_load_async_texture(String name);
+R_Texture r_make_texture(R_TextureDesc tex);
+R_Texture r_make_cubemap(R_CubeMapDesc desc);
+R_Texture r_load_cubemap(String dir);
+R_Texture r_load_async_cubemap(String dir);
 void r_set_cubemap(R_Texture cubemap);
 void r_texture_update(R_Texture t, u8* data);
 void r_texture_readback(R_Texture t, u8* dst);
@@ -375,13 +366,13 @@ void r_texture_destroy(R_Texture t);
 
 R_Mesh r_mesh_load(String name);
 R_Mesh r_mesh_load_async(String name);
-R_Mesh r_mesh_make(MeshDesc desc);
-void r_mesh_update(R_Mesh mesh, MeshDesc desc);
+R_Mesh r_mesh_make(R_MeshDesc desc);
+void r_mesh_update(R_Mesh mesh, R_MeshDesc desc);
 void r_mesh_destroy(R_Mesh mesh);
 
 // TODO: primitives gen, drawing
 
-R_Material r_material_make(MaterialDesc desc);
+R_Material r_material_make(R_MaterialDesc desc);
 void r_material_destroy(R_Material mat);
 
 void r_shader_reload(String name);
@@ -389,7 +380,7 @@ Gfx_Pipeline r_pipeline_make(String name, Gfx_PipelineDesc desc);
 void r_shaders_compile(Allocator arena);
 void r_shaders_compile_join();
 
-R_Font r_font_load(String name, f32 size);
+R_Font r_font_load(String name, u32 size);
 
 void r_init();
 void r_shutdown();
@@ -405,6 +396,7 @@ void r_draw_line_persistent(v3 a, v3 b, v4 color);
 void r_draw_grid(v3 center, u32 slices, f32 spacing, v4 color);
 void r_draw_cuboid(Rng3 rng, v4 color);
 void r_draw_rect(Rng2 rect, v4 color);
+void r_draw_texture(Rng2 rect, R_Texture tex);
 void r_draw_rect_outline(Rng2 rect, u32 thickness, v4 color);
 void r_draw_text(v2 pos, String str, v4 color);
 

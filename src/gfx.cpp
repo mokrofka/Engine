@@ -827,7 +827,7 @@ VK_Memory vk_mem_make(Gfx_MemType type, u64 size) {
   return res;
 }
 
-VK_Buffer vk_buffer_make(u64 size, Gfx_MemType type) {
+VK_Buffer vk_make_buffer(u64 size, Gfx_MemType type) {
   Gfx_State& g = st->gfx;
   VkBufferUsageFlags buf_usage_flags = 0;
   buf_usage_flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
@@ -953,7 +953,7 @@ VkPipeline vk_pipeline_create(Gfx_PipelineDesc desc) {
   // Vertex input
   VkVertexInputBindingDescription binding_description = {
     .binding = 0,
-    .stride = sizeof(Vertex),
+    .stride = sizeof(R_Vertex),
     .inputRate = VK_VERTEX_INPUT_RATE_VERTEX
   };
 
@@ -966,19 +966,19 @@ VkPipeline vk_pipeline_create(Gfx_PipelineDesc desc) {
       attribute_desriptions_count = 4;
       attribute_desriptions[0] = {
         .format = vk_vert_format(Gfx_VertFormat_v3),
-        .offset = (u32)OffsetOf(Vertex, pos),
+        .offset = (u32)OffsetOf(R_Vertex, pos),
       };
       attribute_desriptions[1] = {
         .format = vk_vert_format(Gfx_VertFormat_v3),
-        .offset = (u32)OffsetOf(Vertex, norm),
+        .offset = (u32)OffsetOf(R_Vertex, norm),
       };
       attribute_desriptions[2] = {
         .format = vk_vert_format(Gfx_VertFormat_v2),
-        .offset = (u32)OffsetOf(Vertex, uv),
+        .offset = (u32)OffsetOf(R_Vertex, uv),
       };
       attribute_desriptions[3] = {
         .format = vk_vert_format(Gfx_VertFormat_v4),
-        .offset = (u32)OffsetOf(Vertex, color),
+        .offset = (u32)OffsetOf(R_Vertex, color),
       };
     } break;
   }
@@ -1771,7 +1771,7 @@ void gfx_pipeline_common_init(VK_Pipeline* pip, Gfx_PipelineDesc desc) {
   ArrayCopy(pip->colors, desc.colors);
 }
 
-Gfx_Shader gfx_shader_make(Gfx_ShaderDesc desc) {
+Gfx_Shader gfx_make_shader(Gfx_ShaderDesc desc) {
   Scratch scratch;
   Gfx_State& g = st->gfx;
   VK_Shader shader = {};
@@ -1787,7 +1787,7 @@ Gfx_Shader gfx_shader_make(Gfx_ShaderDesc desc) {
   return res;
 }
 
-Gfx_Pipeline gfx_pipeline_make(Gfx_PipelineDesc desc) {
+Gfx_Pipeline gfx_make_pipeline(Gfx_PipelineDesc desc) {
   Scratch scratch;
   Gfx_State& g = st->gfx;
   gfx_pipeline_desc_defaults(&desc);
@@ -1798,7 +1798,7 @@ Gfx_Pipeline gfx_pipeline_make(Gfx_PipelineDesc desc) {
   return res;
 }
 
-Gfx_Image gfx_image_make(Gfx_ImageDesc desc) {
+Gfx_Image gfx_make_image(Gfx_ImageDesc desc) {
   Gfx_State& g = st->gfx;
   gfx_image_desc_defaults(&desc);
   VK_Image image = {
@@ -1875,7 +1875,7 @@ Gfx_Image gfx_image_make(Gfx_ImageDesc desc) {
   return res;
 }
 
-Gfx_View gfx_view_make(Gfx_ViewDesc desc) {
+Gfx_View gfx_make_view(Gfx_ViewDesc desc) {
   Gfx_State& g = st->gfx;
   Gfx_ViewType type = Gfx_ViewType_Invalid;
   if (desc.texture.image.idx != Gfx_InvalidId) {
@@ -1977,7 +1977,7 @@ Gfx_View gfx_view_make(Gfx_ViewDesc desc) {
   return res;
 }
 
-Gfx_Sampler gfx_sampler_make(Gfx_SamplerDesc desc) {
+Gfx_Sampler gfx_make_sampler(Gfx_SamplerDesc desc) {
   Gfx_State& g = st->gfx;
   gfx_sampler_desc_defaults(&desc);
   VK_Sampler sampler = {
@@ -2030,19 +2030,18 @@ Gfx_Sampler gfx_sampler_make(Gfx_SamplerDesc desc) {
   return res;
 }
 
-Gfx_Buffer gfx_buffer_make(u64 size, Gfx_MemType type, u64 align) {
+Gfx_Buffer gfx_make_buffer(u64 size, Gfx_MemType type, u64 align) {
   Gfx_State& g = st->gfx;
-  VK_Buffer* buffer = null;
   u64 offset = 0;
   if (type == Gfx_MemType_Gpu) {
-    buffer = &g.gpu_buf;;
-    offset = offset_push(buffer->pos, size, align);
-    Assert(buffer->pos <= buffer->cap);
+    var& buffer = g.gpu_buf;
+    offset = offset_push(buffer.pos, size, align);
+    Assert(buffer.pos <= buffer.cap);
   }
   else if (type == Gfx_MemType_Cpu) {
-    buffer = &g.cpu_buf;
-    offset = offset_push(buffer->pos, size, align);
-    Assert(buffer->pos <= buffer->cap);
+    var& buffer= g.cpu_buf;
+    offset = offset_push(buffer.pos, size, align);
+    Assert(buffer.pos <= buffer.cap);
   }
   Gfx_BufferData buf = {
     .type = type,
@@ -2053,15 +2052,15 @@ Gfx_Buffer gfx_buffer_make(u64 size, Gfx_MemType type, u64 align) {
   return res;
 }
 
-Gfx_Buffer gfx_buffer_make_round_base(u64 size, u64 round, Gfx_MemType type, u64 align) {
+Gfx_Buffer gfx_make_buffer_round_base(u64 size, u64 round, Gfx_MemType type, u64 align) {
   Gfx_State& g = st->gfx;
-  Gfx_Buffer buf = gfx_buffer_make(size + round, type, align);
+  Gfx_Buffer buf = gfx_make_buffer(size + round, type, align);
   Gfx_BufferData& buffer = pool_get(g.buffers, buf);
   buffer.base = RoundUp(buffer.base, round);
   return buf;
 }
 
-void gfx_bind_make(Gfx_DescriptorDesc desc) {
+void gfx_make_bind(Gfx_DescriptorDesc desc) {
   Gfx_State& g = st->gfx;
   if (desc.count == 0) {
     desc.count = 1;
@@ -2129,15 +2128,15 @@ Gfx_ImageDesc gfx_query_image_desc(Gfx_Image img) {
   return res;
 }
 
-void gfx_shader_update(Gfx_Shader shd, Gfx_ShaderDesc desc) {
-  Gfx_State& g = st->gfx;
+void gfx_update_shader(Gfx_Shader shd, Gfx_ShaderDesc desc) {
+  var& g = st->gfx;
   VK_Shader& shader = pool_get(g.shaders, shd);
   gfx_idle();
   g.DestroyShaderModule(vkdevice, shader.h, g.allocator);
   shader.h = vk_shader_create(desc);
 }
 
-void gfx_pipeline_update(Gfx_Pipeline pip, Gfx_PipelineDesc desc) {
+void gfx_update_pipeline(Gfx_Pipeline pip, Gfx_PipelineDesc desc) {
   var& g = st->gfx;
   VK_Pipeline& pipeline = pool_get(g.pipelines, pip);
   g.DestroyPipeline(vkdevice, pipeline.h, g.allocator);
@@ -2145,7 +2144,7 @@ void gfx_pipeline_update(Gfx_Pipeline pip, Gfx_PipelineDesc desc) {
   pipeline.h = vk_pipeline_create(desc);
 }
 
-void gfx_image_update(Gfx_Image img, u8* data) {
+void gfx_update_image(Gfx_Image img, u8* data) {
   var& g = st->gfx;
   VK_Image& image = pool_get(g.images, img);
   Assert(image.type == Gfx_ImageType_2D);
@@ -2160,11 +2159,11 @@ void gfx_image_update(Gfx_Image img, u8* data) {
   vk_cmd_end_submit(cmd);
 }
 
-void gfx_image_update(Gfx_Image img, Gfx_ImageDesc desc) {
+void gfx_update_image(Gfx_Image img, Gfx_ImageDesc desc) {
   var& g = st->gfx;
   VK_Image& vkimg = pool_get(g.images, img);
   if (vkimg.width == desc.width && vkimg.height == desc.height) {
-    gfx_image_update(img, desc.data);
+    gfx_update_image(img, desc.data);
     return;
   }
   g.DestroyImage(vkdevice, vkimg.h, g.allocator);
@@ -2234,7 +2233,7 @@ void gfx_image_update(Gfx_Image img, Gfx_ImageDesc desc) {
   }
 }
 
-void gfx_view_update(Gfx_View view, Gfx_ViewDesc desc) {
+void gfx_update_view(Gfx_View view, Gfx_ViewDesc desc) {
   var& g = st->gfx;
   VK_View& vkview = pool_get(g.views, view);
   g.DestroyImageView(vkdevice, pool_get(g.views, view).h, g.allocator);
@@ -2280,7 +2279,7 @@ void gfx_view_update(Gfx_View view, Gfx_ViewDesc desc) {
   g.UpdateDescriptorSets(vkdevice, 1, &texture_descriptor, 0, null);
 }
 
-void gfx_buffer_update(Gfx_Buffer buf, u64 offset, Slice<u8> data) {
+void gfx_update_buffer(Gfx_Buffer buf, u64 offset, Slice<u8> data) {
   Gfx_State& g = st->gfx;
   Gfx_BufferData buffer = pool_get(g.buffers, buf);
   Assert(offset+data.size <= buffer.size);
@@ -2304,32 +2303,32 @@ void gfx_buffer_update(Gfx_Buffer buf, u64 offset, Slice<u8> data) {
   vk_cmd_end_submit(g.cmds_upload[0]);
 }
 
-void gfx_image_destroy(Gfx_Image img) {
+void gfx_destroy_image(Gfx_Image img) {
   Gfx_State& g = st->gfx;
   g.DestroyImage(vkdevice, pool_get(g.images, img).h, g.allocator);
   pool_remove(g.images, img);
 }
 
-void gfx_view_destroy(Gfx_View view) {
+void gfx_destroy_view(Gfx_View view) {
   Gfx_State& g = st->gfx;
   g.DestroyImageView(vkdevice, pool_get(g.views, view).h, g.allocator);
   pool_remove(g.views, view);
 }
 
-void gfx_shader_destroy(Gfx_Shader shd) {
+void gfx_destroy_shader(Gfx_Shader shd) {
   Gfx_State& g = st->gfx;
   g.DestroyShaderModule(vkdevice, pool_get(g.shaders, shd).h, g.allocator);
   pool_remove(g.shaders, shd);
 }
 
-void gfx_pipeline_destroy(Gfx_Pipeline pip) {
+void gfx_destroy_pipeline(Gfx_Pipeline pip) {
   Gfx_State& g = st->gfx;
   VK_Pipeline pipeline = pool_get(g.pipelines, pip);
   g.DestroyPipeline(vkdevice, pipeline.h, g.allocator);
   pool_remove(g.pipelines, pip);
 }
 
-void gfx_image_readback(Gfx_Image img, u8* dst) {
+void gfx_readback_image(Gfx_Image img, u8* dst) {
   var& g = st->gfx;
   VK_Image& image = pool_get(g.images, img);
   var cmd = g.cmds_upload[0];
@@ -2358,7 +2357,7 @@ void gfx_image_readback(Gfx_Image img, u8* dst) {
   MemCopy(dst, g.cpu_buf.base, image.width*image.height*4);
 }
 
-void gfx_pass_begin(Gfx_Pass pass) {
+void gfx_begin_pass(Gfx_Pass pass) {
   Gfx_State& g = st->gfx;
   gfx_pass_defaults(&pass);
   v2u win_size = os_window_size();
@@ -2467,7 +2466,7 @@ void gfx_pass_begin(Gfx_Pass pass) {
   g.CmdBeginRendering(vk_get_cur_cmd(), &render_info);
 }
 
-void gfx_pass_end() {
+void gfx_end_pass() {
   Gfx_State& g = st->gfx;
   g.CmdEndRendering(vk_get_cur_cmd());
 
@@ -2572,10 +2571,10 @@ void gfx_draw_mesh(Gfx_Mesh mesh) {
   }
 }
 
-u32 gfx_indirect_begin() {
+u32 gfx_begin_indirect() {
   return st->gfx.drawcall_cursor;
 }
-Gfx_IndirectDrawcall gfx_indirect_end(u32 base) {
+Gfx_IndirectDrawcall gfx_end_indirect(u32 base) {
   Gfx_IndirectDrawcall res = {
     .base = base,
     .count = st->gfx.drawcall_cursor - base,
@@ -2628,7 +2627,7 @@ u64 gfx_buffer_base(Gfx_Buffer buf) {
   return buffer.base;
 }
 
-void gfx_pipeline_bind(Gfx_Pipeline pip) {
+void gfx_bind_pipeline(Gfx_Pipeline pip) {
   Gfx_State& g = st->gfx;
   g.CmdBindPipeline(vk_get_cur_cmd(), VK_PIPELINE_BIND_POINT_GRAPHICS, pool_get(g.pipelines, pip).h);
 }
@@ -2675,8 +2674,8 @@ void gfx_bind_buffer(Gfx_Buffer buf, u32 binding) {
 void gfx_make_buffers(Slice<Gfx_BufferDesc> descs) {
   Loop (i, descs.count) {
     Gfx_BufferDesc desc = descs[i];
-    gfx_bind_make({.binding = desc.binding});
-    Gfx_Buffer buf = gfx_buffer_make(desc.size, desc.mem_type == Gfx_MemType_Default ? Gfx_MemType_Cpu : desc.mem_type);
+    gfx_make_bind({.binding = desc.binding});
+    Gfx_Buffer buf = gfx_make_buffer(desc.size, desc.mem_type == Gfx_MemType_Default ? Gfx_MemType_Cpu : desc.mem_type);
     if (desc.out_buffer) {
       *desc.out_buffer = buf;
     }
@@ -2858,8 +2857,8 @@ void gfx_init(Gfx_Environment environment) {
   u32 drawcall_mem = MaxEntities * sizeof(VK_IndirectDrawCall);
   g.gpu_mem = vk_mem_make(Gfx_MemType_Gpu, environment.gpu_mem_size + environment.image_mem_size);
   g.cpu_mem = vk_mem_make(Gfx_MemType_Cpu, environment.cpu_mem_size);
-  g.gpu_buf = vk_buffer_make(environment.gpu_mem_size);
-  g.cpu_buf = vk_buffer_make(environment.cpu_mem_size - drawcall_mem, Gfx_MemType_Cpu);
+  g.gpu_buf = vk_make_buffer(environment.gpu_mem_size);
+  g.cpu_buf = vk_make_buffer(environment.cpu_mem_size - drawcall_mem, Gfx_MemType_Cpu);
 
   VkBufferDeviceAddressInfoKHR gpu_address_info = {
     .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO_KHR,
@@ -2872,10 +2871,10 @@ void gfx_init(Gfx_Environment environment) {
   };
   g.cpu_buf_address = g.GetBufferDeviceAddress(vkdevice, &cpu_address_info);
 
-  g.drawcall_buf = gfx_buffer_make(drawcall_mem, Gfx_MemType_Cpu);
-  gfx_bind_make({.binding = Bindings::Drawinfo});
+  g.drawcall_buf = gfx_make_buffer(drawcall_mem, Gfx_MemType_Cpu);
+  gfx_make_bind({.binding = Bindings::Drawinfo});
   gfx_bind_buffer(g.drawcall_buf, Bindings::Drawinfo);
-  g.stage_buffer = gfx_buffer_make(MB(10), Gfx_MemType_Cpu);
+  g.stage_buffer = gfx_make_buffer(MB(10), Gfx_MemType_Cpu);
 
   // g.cube_idx = 1;
 }

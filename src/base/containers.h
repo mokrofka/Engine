@@ -67,7 +67,7 @@ template<typename T, i32 N> b32 array_exists(Array<T, N>& arr, T a, b32(*fn)(T a
   }
   return false;
 }
-template<typename T, i32 N> T array_empty(Array<T, N>& arr) { return arr.count == 0; }
+template<typename T, i32 N> b32 array_empty(Array<T, N>& arr) { return arr.count == 0; }
 
 ///////////////////////////////////
 // Darray
@@ -183,7 +183,7 @@ template<typename T> b32 array_exists_at(Darray<T>& arr, T a, u32* out_idx, b32(
   }
   return false;
 }
-template<typename T> T array_empty(Darray<T>& arr) { return arr.count == 0; }
+template<typename T> b32 array_empty(Darray<T>& arr) { return arr.count == 0; }
 
 ////////////////////////////////////////////////////////////////////////
 // ArrayHandler
@@ -850,16 +850,16 @@ enum MapSlot : u8 {
   MapSlot_Deleted
 };
 
-template<typename Key, typename T, i32 N>
+template<typename Key, typename V, i32 N>
 struct Map {
   u32 count;
   static constexpr u32 cap = N;
-  T data[N];
+  V data[N];
   Key keys[N];
   MapSlot is_occupied[N];
 };
 
-template<typename Key, typename T, i32 N> T* map_set(Map<Key, T, N>& m, Key key, T val) {
+template<typename Key, typename V, i32 N> V* map_set(Map<Key, V, N>& m, Key key, V val) {
   Assert(m.count < m.cap);
   u64 hash_idx = hash(key);
   u64 idx = ModPow2(hash_idx, m.cap);
@@ -873,7 +873,7 @@ template<typename Key, typename T, i32 N> T* map_set(Map<Key, T, N>& m, Key key,
   ++m.count;
   return &m.data[idx];
 }
-template<typename Key, typename T, i32 N> Result<T> map_get(Map<Key, T, N>& m, Key key) {
+template<typename Key, typename V, i32 N> Result<V> map_get(Map<Key, V, N>& m, Key key) {
   u64 hash_idx = hash(key);
   u64 idx = ModPow2(hash_idx, m.cap);
   Loop (i, m.cap) {
@@ -887,10 +887,10 @@ template<typename Key, typename T, i32 N> Result<T> map_get(Map<Key, T, N>& m, K
   }
   return Err();
 }
-template<typename Key, typename T, i32 N> void map_remove(Map<Key, T, N>& m, Key key) {
+template<typename Key, typename V, i32 N> void map_remove(Map<Key, V, N>& m, Key key) {
   u64 hash_idx = hash(key);
   u64 idx = ModPow2(hash_idx, m.cap);
-  while (m.is_occupied[idx] != MapSlot_Empty) {
+  Loop (i, m.cap) {
     if ((m.is_occupied[idx] == MapSlot_Occupied) && (equal(m.keys[idx] == key))) {
       m.is_occupied[idx] = MapSlot_Deleted;
       --m.count;
@@ -899,7 +899,7 @@ template<typename Key, typename T, i32 N> void map_remove(Map<Key, T, N>& m, Key
     idx = ModPow2(idx + 1, m.cap);
   }
 }
-template<typename Key, typename T, i32 N> void map_clear(Map<Key, T, N>& m, Key key) {
+template<typename Key, typename V, i32 N> void map_clear(Map<Key, V, N>& m, Key key) {
   m.count = 0;
   u8* start = (u8*)m.data;
   u8* end = Offset(m.is_occupied, m.cap * sizeof(MapSlot));
@@ -909,27 +909,27 @@ template<typename Key, typename T, i32 N> void map_clear(Map<Key, T, N>& m, Key 
 ///////////////////////////////////
 // Dmap
 
-template<typename Key, typename T>
+template<typename Key, typename V>
 struct Dmap {
   static constexpr f32 LF = 0.8;
   u32 count;
   u32 cap;
   Allocator alloc;
-  T* data;
+  V* data;
   Key* keys;
   MapSlot* is_occupied;
 };
 
 #define map_make(K, V, alloc) _map_make<K, V>(alloc)
-template<typename Key, typename T> Dmap<Key, T> _map_make(Allocator alloc) {
-  Dmap<Key, T> res = {
+template<typename Key, typename V> Dmap<Key, V> _map_make(Allocator alloc) {
+  Dmap<Key, V> res = {
     .alloc = alloc,
   };
   return res;
 }
-template<typename Key, typename T> void map_grow(Dmap<Key, T>& m) {
+template<typename Key, typename V> void map_grow(Dmap<Key, V>& m) {
   if (m.data) {
-    T* old_data = m.data;
+    V* old_data = m.data;
     Key* old_keys = m.keys;
     MapSlot* old_is_occupied = m.is_occupied;
     u32 old_cap = m.cap;
@@ -957,7 +957,7 @@ template<typename Key, typename T> void map_grow(Dmap<Key, T>& m) {
     mem_alloc_soa(m.alloc, m.cap, slice(fields));
   }
 }
-template<typename Key, typename T> T* map_set(Dmap<Key, T>& m, Key key, T val) {
+template<typename Key, typename V> V* map_set(Dmap<Key, V>& m, Key key, V val) {
   if (m.count >= m.cap*m.LF) { map_grow(m); }
   u64 hash_idx = hash(key);
   u64 idx = ModPow2(hash_idx, m.cap);
@@ -971,7 +971,7 @@ template<typename Key, typename T> T* map_set(Dmap<Key, T>& m, Key key, T val) {
   ++m.count;
   return &m.data[idx];
 }
-template<typename Key, typename T> Result<T> map_get(Dmap<Key, T>& m, Key key) {
+template<typename Key, typename V> Result<V> map_get(Dmap<Key, V>& m, Key key) {
   if (!m.data) return Err();
   u64 hash_idx = hash(key);
   u64 idx = ModPow2(hash_idx, m.cap);
@@ -986,10 +986,10 @@ template<typename Key, typename T> Result<T> map_get(Dmap<Key, T>& m, Key key) {
   }
   return Err();
 }
-template<typename Key, typename T> void map_remove(Dmap<Key, T>& m, Key key) {
+template<typename Key, typename V> void map_remove(Dmap<Key, V>& m, Key key) {
   u64 hash_idx = hash(key);
   u64 idx = ModPow2(hash_idx, m.cap);
-  while (m.is_occupied[idx] != MapSlot_Empty) {
+  Loop (i, m.cap) {
     if ((m.is_occupied[idx] == MapSlot_Occupied) && (equal(m.keys[idx] == key))) {
       m.is_occupied[idx] = MapSlot_Deleted;
       --m.count;
@@ -998,7 +998,7 @@ template<typename Key, typename T> void map_remove(Dmap<Key, T>& m, Key key) {
     idx = ModPow2(idx + 1, m.cap);
   }
 }
-template<typename Key, typename T> void map_clear(Dmap<Key, T>& m, Key key) {
+template<typename Key, typename V> void map_clear(Dmap<Key, V>& m, Key key) {
   m.count = 0;
   u8* start = (u8*)m.data;
   u8* end = Offset(m.is_occupied, m.cap * sizeof(MapSlot));
