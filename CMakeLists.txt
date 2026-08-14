@@ -59,12 +59,8 @@ project(Engine)
   include_directories(src)
   include_directories(vendor)
   
-  set(lib_source
-    src/base/base_impl.cpp
-    vendor/vendor_impl.cpp
-  )
   set(game_source src/com.cpp)
-  set(exe_source src/main.cpp)
+  set(exe_source src/main.cpp vendor/vendor_impl.cpp)
   set(X11_libs -lxcb -lxcb-xkb -lxcb-keysyms -lxcb-xinput)
 
   if (dev_build) # reduce build time in release build
@@ -77,36 +73,28 @@ project(Engine)
   else()
     add_link_options("-nostdlib++") # imgui depends on it
   endif()
-  
-  
+
   add_executable(exe)
 
 # Hotreload
   if (hotreload)
     add_compile_definitions(HOTRELOAD_BUILD=1)
 
-    # Lib
-    add_library(lib SHARED ${lib_source})
-    if (UNIX)
-      if (X11_use)
-        target_link_libraries(lib ${X11_libs})
-      endif()
-        target_link_libraries(lib wayland-client.so)
-    endif()
-
     # Game
     add_library(game SHARED ${game_source})
-    target_include_directories(game PRIVATE src/game)
-    target_link_libraries(game ${binary_dir}/liblib.so)
 
     # Exe
     target_sources(exe PRIVATE ${exe_source})
-    target_link_libraries(exe ${binary_dir}/liblib.so)
+    if (UNIX)
+      if (X11_use)
+        target_link_libraries(exe ${X11_libs})
+      endif()
+        target_link_libraries(exe wayland-client.so)
+    endif()
 
 # One Exe
   else()
     target_sources(exe PRIVATE
-      ${lib_source}
       ${game_source}
       ${exe_source}
     )

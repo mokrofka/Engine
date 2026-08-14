@@ -3046,6 +3046,8 @@ void co_test(Coroutine* co, f32 dt) {
 
 void init() {
   Info("%i", GlobalInt);
+
+
   global_info();
   Scratch scratch;
   

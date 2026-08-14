@@ -1,5 +1,5 @@
 #include "lib.h"
-// #include "base/base_impl.cpp"
+#include "base/base_impl.cpp"
 
 shared_function void update_main(HotReloadData* data);
 
@@ -39,6 +39,7 @@ i32 main(i32 count, char* args[]) {
     Assign(st.update, os_lib_get_proc(st.lib, "update_main"));
   }
 }
+
 
 
 
