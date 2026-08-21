@@ -202,6 +202,12 @@ struct TimeScope {
   ~TimeScope();
 };
 
+struct ImTimeScope {
+  u64 tsc_start;
+  ImTimeScope();
+  ~ImTimeScope();
+};
+
 struct Serealizer {
   u8* base;
   u32 offset;
@@ -241,7 +247,9 @@ Introspect struct Camera {
   f32 yaw;
   f32 pitch;
   f32 fov;
-  f32 speed;
+  // f32 speed;
+  v3 vel;
+  v3 accel;
 };
 
 typedef u32 EntityFlags;
@@ -255,19 +263,19 @@ struct EntityThing {
   EntityFlags flags;
 };
 
-#define THING_DESC(...) \
-  ((ThingDesc){       \
-      .rot = quat_identity(), \
-      .scale = v3(1), \
-      __VA_ARGS__      \
-  })
-
 struct ThingDesc {
   v3 pos;
   v4 rot;
   v3 scale;
   MeshEnum mesh;
   MaterialEnum mat;
+};
+
+typedef u32 ThingFlags;
+enum {
+  ThingFlag_1 = 1,
+  ThingFlag_2,
+  ThingFlag_3,
 };
 
 Introspect struct Thing {
@@ -278,6 +286,7 @@ Introspect struct Thing {
   ThingId last;
   String name;
   EntityFlags flags;
+  ThingFlags tflags;
   union {
     Transform trans;
     struct {
@@ -292,6 +301,14 @@ Introspect struct Thing {
   R_Material mat;
   v4 color;
   f32 elapsed;
+  u8 buf0[64];
+  f32 modify0;
+  u8 buf1[64];
+  f32 modify1;
+  u8 buf2[64];
+  f32 modify2;
+  u8 buf3[64];
+  f32 modify3;
 };
 
 struct UI_State {
@@ -337,12 +354,12 @@ struct GlobalState {
   String shader_compiled_dir;
   String models_dir;
   String textures_dir;
-  Map<String, R_Texture, R_MaxTextures> str_to_texture_id;
-  Map<String, R_Mesh, R_MaxMeshes> str_to_mesh_id;
-  Map<String, R_Material, R_MaxMaterials> str_to_material_id;
-  Array<String, R_MaxTextures> texture_id_to_str;
-  Array<String, R_MaxMeshes> mesh_id_to_str;
-  Array<String, R_MaxMaterials> material_id_to_str;
+  Map<String, R_Texture, R_MaxTextures> str_to_texture;
+  Map<String, R_Mesh, R_MaxMeshes> str_to_mesh;
+  Map<String, R_Material, R_MaxMaterials> str_to_material;
+  Array<String, R_MaxTextures> texture_to_str;
+  Array<String, R_MaxMeshes> mesh_to_str;
+  Array<String, R_MaxMaterials> material_to_str;
 
   WatchState watch;
   InputState input;
@@ -350,7 +367,7 @@ struct GlobalState {
   Gfx_State gfx;
   DebugState debug;
   UI_State ui;
-  UI_State0* ui0;
+  // UI_State0* ui0;
 
   Camera cam;
   R_Camera r_cam;
@@ -359,7 +376,11 @@ struct GlobalState {
 
   u32 entities_count;
   PoolLinkList<Thing, MaxEntities, ThingId> entities;
-  // PoolLinkList<Thing, MaxEntities, ThingId> things;
+  PoolLinkList<Thing, MaxEntities+1, ThingId> things;
+  BitSetS<MaxEntities> query0;
+  BitSetS<MaxEntities> query1;
+  BitSetS<MaxEntities> query2;
+  BitSetS<MaxEntities> query3;
 
   Darray<ThingId> moving_cubes;
   ThingId axis_attached_to_cam_id;

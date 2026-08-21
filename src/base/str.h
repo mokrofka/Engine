@@ -69,7 +69,7 @@ b32 char_is_number_cont(u8 c);
 ////////////////////////////////////////////////////////////////////////
 // String Constructors
 
-#define S(str) str_make((u8*)str, sizeof(str))
+#define S(str) str_make((u8*)str, sizeof(str)-1)
 
 String str_range(u8* first, u8* one_past_last);
 String str_cstr_capped(const void* String, const void* cap);

@@ -518,6 +518,25 @@ template<typename T, i32 N, typename Handle> b32 pool_is_valid_handle(PoolLinkLi
 }
 
 ///////////////////////////////////
+// Iter
+template <typename T, i32 N, typename Handle> struct PoolIter {
+  PoolLinkList<T, N, Handle>* pool;
+  u32 idx;
+  operator bool() const { return idx != 0; }
+  PoolIter& operator++() {
+    idx = pool->data[idx].next;
+    return *this;
+  }
+  T& operator*() {
+    return pool->data[idx].elem;
+  }
+  Handle handle() { return pool_get_handle(*pool, idx); }
+};
+template<typename T, i32 N, typename Handle> PoolIter<T,N,Handle> pool_begin(PoolLinkList<T,N,Handle>& pool) {
+  return {&pool, pool.first};
+}
+
+///////////////////////////////////
 // DpoolLinkList
 
 template<typename T, typename Handle>
@@ -610,6 +629,24 @@ template<typename T, typename Handle> b32 pool_is_valid_handle(DpoolLinkList<T, 
     return false;
   }
   return true;
+}
+
+///////////////////////////////////
+// Iter
+template <typename T, typename Handle> struct DpoolIter {
+  DpoolLinkList<T, Handle>* pool;
+  u32 idx;
+  operator bool() const { return idx != 0; }
+  DpoolIter& operator++() {
+    idx = pool->data[idx].next;
+    return *this;
+  }
+  T& operator*() {
+    return pool->data[idx].elem;
+  }
+};
+template<typename T, typename Handle> DpoolIter<T,Handle> pool_begin(DpoolLinkList<T,Handle>& pool) {
+  return {&pool, pool.first};
 }
 
 ////////////////////////////////////////////////////////////////////////

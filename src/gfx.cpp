@@ -1169,7 +1169,7 @@ intern void vk_instance_init() {
 
   // Validation layer
   array_push(required_validation_layer_names, "VK_LAYER_KHRONOS_validation");
-  Debug("%Required layers:");
+  Debug("Required layers:");
   Loop (i, required_validation_layer_names.count) {
     Debug(required_validation_layer_names[i]);
   }
@@ -1253,7 +1253,7 @@ intern void vk_instance_init() {
             "(Warning - This VUID has now been reported 10 times, which is the duplicate_message_limit value, this will be the last time reporting it).",
             "vkCreateGraphicsPipelines(): pCreateInfos[0] (SPIR-V Interface) [EntryPoint \"vs_main\", VK_SHADER_STAGE_VERTEX_BIT] has an Output value declared at Location",
           };
-          LoopElement (i, skip_warnings) {
+          LoopArray (i, skip_warnings) {
             String skip = skip_warnings[i];
             String warn = callback_data->pMessage;
             if (warn.size >= skip.size) {
@@ -1876,69 +1876,51 @@ Gfx_Image gfx_make_image(Gfx_ImageDesc desc) {
 }
 
 Gfx_View gfx_make_view(Gfx_ViewDesc desc) {
-  Gfx_State& g = st->gfx;
-  Gfx_ViewType type = Gfx_ViewType_Invalid;
-  if (desc.texture.image.idx != Gfx_InvalidId) {
-    type = Gfx_ViewType_Texture;
-  }
-  if (desc.color_attachment.image.idx != Gfx_InvalidId) {
-    Assert(type == Gfx_ViewType_Invalid);
-    type = Gfx_ViewType_ColorAttachment;
-  }
-  if (desc.resolve_attachment.image.idx != Gfx_InvalidId) {
-    Assert(type == Gfx_ViewType_Invalid);
-    type = Gfx_ViewType_ResolveAttachment;
-  }
-  if (desc.depth_stencil_attachment.image.idx != Gfx_InvalidId) {
-    Assert(type == Gfx_ViewType_Invalid);
-    type = Gfx_ViewType_DepthStencilAttachment;
-  }
-  Assert(type != Gfx_ViewType_Invalid);
-
-  VK_View view = {.type = type};
+  var& g = st->gfx;
+  VK_View view = {.type = desc.type};
   VK_Image img = {};
-  switch (type) {
+  switch (view.type) {
     InvalidDefaultCase;
     case Gfx_ViewType_Texture: {
-      Gfx_Image ref = desc.texture.image;
+      Gfx_Image ref = desc.image;
       img = pool_get(g.images, ref);
       view.ref = ref;
-      view.mip_level = desc.texture.mip_level;
-      view.mip_level_count = _Def(desc.texture.mip_level_count, img.mipmaps_count - desc.texture.mip_level);
-      view.slice = desc.texture.slice;
+      view.mip_level = desc.mip_level;
+      view.mip_level_count = _Def(desc.mip_level_count, img.mipmaps_count - desc.mip_level);
+      view.slice = desc.slice;
       switch (img.type) {
         InvalidDefaultCase;
         case Gfx_ImageType_2D:    view.slice_count = 1; break;
         case Gfx_ImageType_Cube:  view.slice_count = 6; break;
         case Gfx_ImageType_3D:    view.slice_count = 1; break;
-        case Gfx_ImageType_Array: view.slice_count = _Def(desc.texture.slice_count, img.slices_count - view.slice);
+        case Gfx_ImageType_Array: view.slice_count = _Def(desc.slice_count, img.slices_count - view.slice);
       }
     } break;
     case Gfx_ViewType_ColorAttachment: {
-      Gfx_Image ref = desc.color_attachment.image;
+      Gfx_Image ref = desc.image;
       img = pool_get(g.images, ref);
       view.ref = ref;
-      view.mip_level = desc.color_attachment.mip_level;
+      view.mip_level = desc.mip_level;
       view.mip_level_count = 1;
-      view.slice = desc.color_attachment.slice;
+      view.slice = desc.slice;
       view.slice_count = 1;
     } break;
     case Gfx_ViewType_ResolveAttachment: {
-      Gfx_Image ref = desc.resolve_attachment.image;
+      Gfx_Image ref = desc.image;
       img = pool_get(g.images, ref);
       view.ref = ref;
-      view.mip_level = desc.resolve_attachment.mip_level;
+      view.mip_level = desc.mip_level;
       view.mip_level_count = 1;
-      view.slice = desc.resolve_attachment.slice;
+      view.slice = desc.slice;
       view.slice_count = 1;
     } break;
     case Gfx_ViewType_DepthStencilAttachment: {
-      Gfx_Image ref = desc.depth_stencil_attachment.image;
+      Gfx_Image ref = desc.image;
       img = pool_get(g.images, ref);
       view.ref = ref;
-      view.mip_level = desc.depth_stencil_attachment.mip_level;
+      view.mip_level = desc.mip_level;
       view.mip_level_count = 1;
-      view.slice = desc.depth_stencil_attachment.slice;
+      view.slice = desc.slice;
       view.slice_count = 1;
     } break;
   }
@@ -2239,13 +2221,13 @@ void gfx_update_view(Gfx_View view, Gfx_ViewDesc desc) {
   g.DestroyImageView(vkdevice, pool_get(g.views, view).h, g.allocator);
   VK_Image img = pool_get(g.images, vkview.ref);
 
-  vkview.mip_level_count = _Def(desc.texture.mip_level_count, img.mipmaps_count - desc.texture.mip_level);
+  vkview.mip_level_count = _Def(desc.mip_level_count, img.mipmaps_count - desc.mip_level);
   switch (img.type) {
     InvalidDefaultCase;
     case Gfx_ImageType_2D:    vkview.slice_count = 1; break;
     case Gfx_ImageType_Cube:  vkview.slice_count = 6; break;
     case Gfx_ImageType_3D:    vkview.slice_count = 1; break;
-    case Gfx_ImageType_Array: vkview.slice_count = _Def(desc.texture.slice_count, img.slices_count - vkview.slice);
+    case Gfx_ImageType_Array: vkview.slice_count = _Def(desc.slice_count, img.slices_count - vkview.slice);
   }
 
   VkImageViewCreateInfo view_info = {

@@ -1,12 +1,6 @@
-#include "lib.h"
 #include "base/base_impl.cpp"
 
 shared_function void update_main(HotReloadData* data);
-
-C_LINKAGE void global_info() {
-  Info("hello from exe");
-}
-u32 GlobalInt = 1;
 
 i32 main(i32 count, char* args[]) {
   mem_track_init();
@@ -14,29 +8,24 @@ i32 main(i32 count, char* args[]) {
   os_init(args[0]);
 
   Scratch scratch;
-  struct App {
-    HotReloadData state;
-    void (*update)(HotReloadData* data);
-    OS_Handle lib;
-    String lib_filepath;
-  } st = {};
+  HotReloadData state = {};
+  void (*update)(HotReloadData* data) = {};
+  OS_Handle lib = {};
 
 #if HOTRELOAD_BUILD
-  String current_dir = os_cur_directory();
-  st.lib_filepath = push_str_cat(scratch, current_dir, "/libgame.so");
-  st.state.lib = st.lib_filepath;
-  st.lib = os_lib_open(st.lib_filepath);
-  Assign(st.update, os_lib_get_proc(st.lib, "update_main"));
+  state.lib_path = push_str_cat(scratch, os_cur_directory(), "/libgame.so");
+  lib = os_lib_open(state.lib_path);
+  Assign(update, os_lib_get_proc(lib, "update_main"));
 #else
-  st.update = update_main;
+  update = update_main;
 #endif
 
   while (true) {
-    st.update(&st.state);
-    os_lib_close(st.lib);
+    update(&state);
+    os_lib_close(lib);
     os_sleep_ms(10);
-    st.lib = os_lib_open(st.lib_filepath);
-    Assign(st.update, os_lib_get_proc(st.lib, "update_main"));
+    lib = os_lib_open(state.lib_path);
+    Assign(update, os_lib_get_proc(lib, "update_main"));
   }
 }
 

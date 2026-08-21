@@ -8,8 +8,8 @@ const u32 Thread_NumWorkers = 2;
 MakeId(WaitGroup);
 
 enum TaskPriority {
-  TaskPriority_High, // physics, gameplay-critical
-  TaskPriority_Low,    // background IO, asset streaming
+  TaskPriority_High,
+  TaskPriority_Low,
   TaskPriority_COUNT,
 };
 
@@ -41,6 +41,7 @@ struct ParallelForCtx {
 WaitGroup thread_wg_make(u32 count);
 
 WaitGroup thread_push(TaskDesc desc);
+WaitGroup thread_push(void* ctx, TaskFn* fn, TaskPriority prio = TaskPriority_High);
 WaitGroup thread_push_batch(Slice<TaskDesc> tasks);
 
 void thread_wg_wait(WaitGroup wg);

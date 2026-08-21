@@ -4,7 +4,7 @@ MemberDefinition members_of_Camera[] = {
   {MetaType_f32, "yaw", OffsetOf(Camera,yaw)},
   {MetaType_f32, "pitch", OffsetOf(Camera,pitch)},
   {MetaType_f32, "fov", OffsetOf(Camera,fov)},
-  {MetaType_f32, "speed", OffsetOf(Camera,speed)},
+  // {MetaType_f32, "speed", OffsetOf(Camera,speed)},
 };
 MemberDefinition members_of_Entity[] = {
   {MetaType_String, "name", OffsetOf(Thing,name)},

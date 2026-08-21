@@ -110,14 +110,14 @@ void      ui_arena_reset(UI_Arena *arena);
  * ------------------------------------------------------------------- */
 typedef struct UI_Vec2 { F32 x, y; } UI_Vec2;
 typedef struct UI_Vec4 { F32 x, y, z, w; } UI_Vec4; /* rgba, 0..1 */
-typedef struct UI_Rect { F32 x0, y0, x1, y1; } UI_Rect;
+typedef struct UI_Rect1 { F32 x0, y0, x1, y1; } UI_Rect1;
 
-static inline F32 ui_rect_width (UI_Rect r) { return r.x1 - r.x0; }
-static inline F32 ui_rect_height(UI_Rect r) { return r.y1 - r.y0; }
+static inline F32 ui_rect_width (UI_Rect1 r) { return r.x1 - r.x0; }
+static inline F32 ui_rect_height(UI_Rect1 r) { return r.y1 - r.y0; }
 static inline F32 ui_lerp  (F32 a, F32 b, F32 t) { return a + (b - a) * t; }
 static inline F32 ui_clamp (F32 v, F32 lo, F32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 static inline F32 ui_clamp01(F32 v) { return ui_clamp(v, 0.0f, 1.0f); }
-static inline B32 ui_point_in_rect(UI_Vec2 p, UI_Rect r) {
+static inline B32 ui_point_in_rect(UI_Vec2 p, UI_Rect1 r) {
     return p.x >= r.x0 && p.x < r.x1 && p.y >= r.y0 && p.y < r.y1;
 }
 
@@ -210,7 +210,7 @@ struct UI_Box {
      *     immediate-mode interaction possible --- */
     F32     computed_size[UI_Axis2_COUNT];
     F32     computed_rel_position[UI_Axis2_COUNT];
-    UI_Rect rect;
+    UI_Rect1 rect;
 
     /* --- persistent per-widget state, survives across frames --- */
     F32 hot_t;    /* 0..1 hover animation value    */
@@ -251,7 +251,7 @@ typedef enum UI_DrawCmdKind { UI_DrawCmd_Rect, UI_DrawCmd_Text } UI_DrawCmdKind;
 
 typedef struct UI_DrawCmd {
     UI_DrawCmdKind kind;
-    UI_Rect  rect;
+    UI_Rect1  rect;
     UI_Vec4  color;
     B32      filled;  /* rects only: filled quad vs 1px stroked outline */
     String8  text;     /* text only */
@@ -725,7 +725,7 @@ void ui_end_frame(void) {
     ui_layout_standalone(ui->root);
     ui_layout_upward(ui->root);
     ui_layout_downward(ui->root);
-    ui->root->rect = (UI_Rect){0, 0, ui->root->computed_size[UI_Axis2_X], ui->root->computed_size[UI_Axis2_Y]};
+    ui->root->rect = (UI_Rect1){0, 0, ui->root->computed_size[UI_Axis2_X], ui->root->computed_size[UI_Axis2_Y]};
     ui_layout_positions(ui->root);
 
     ui_build_draw_cmds(ui->root);
@@ -958,4 +958,4 @@ int ui_main(void) {
 }
 
 #undef S
-#define S(str) str_make((u8*)str, sizeof(str))
+#define S(str) str_make((u8*)str, sizeof(str)-1)

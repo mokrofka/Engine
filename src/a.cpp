@@ -74,15 +74,15 @@ void instanced_drawcall() {
   Gfx_Mesh mesh2 = {};
 
   u32 entities0[100];
-  LoopElement (i, entities0) {
+  LoopArray (i, entities0) {
     entities0[i] = i;
   }
   u32 entities1[100];
-  LoopElement (i, entities1) {
+  LoopArray (i, entities1) {
     entities1[i] = i + 100;
   }
   u32 entities2[100];
-  LoopElement (i, entities2) {
+  LoopArray (i, entities2) {
     entities2[i] = i + 200;
   }
 

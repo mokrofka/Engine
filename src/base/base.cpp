@@ -223,4 +223,191 @@ f32x4 simd_clamp(f32x4 a, f32x4 x, f32x4 b) { return simd_min(simd_max(a, x), b)
 f32x4 simd_clamp01(f32x4 x)                 { return simd_clamp(simd_zero(), x, simd_splat(1)); }
 
 
+// struct CoroCtx {
+//   void *stack_pointer;
+// };
 
+// struct Coro {
+//   CoroCtx ctx;
+//   Coro* caller;
+//   void (*fn)(void* arg);
+//   void* arg;
+//   void* stack_mem;
+//   size_t stack_size;
+//   int finished;
+// };
+
+// thread_local Coro  g_thread_ctx;
+// thread_local Coro *g_current;
+
+// __attribute__((naked)) void coro_return_to_caller(CoroCtx* from, CoroCtx* to) {
+//   asm volatile(R"(
+//     push %rbp
+//     push %rbx
+//     push %r12
+//     push %r13
+//     push %r14
+//     push %r15
+
+//     mov %rsp, (%rdi)
+//     mov (%rsi), %rsp
+
+//     pop %r15
+//     pop %r14
+//     pop %r13
+//     pop %r12
+//     pop %rbx
+//     pop %rbp
+
+//     ret
+//   )");
+// }
+
+// __attribute__((naked)) void coro_switch(CoroCtx* from, CoroCtx* to) {
+//   asm volatile(R"(
+//     push %rbp
+//     push %rbx
+//     push %r12
+//     push %r13
+//     push %r14
+//     push %r15
+
+//     mov %rsp, (%rdi)
+//     mov (%rsi), %rsp
+
+//     pop %r15
+//     pop %r14
+//     pop %r13
+//     pop %r12
+//     pop %rbx
+//     pop %rbp
+
+//     ret
+//   )");
+// }
+
+// [[noreturn]] __attribute__((naked)) void coro_trampoline() {
+//   asm volatile(R"(
+//     mov %r12, %rdi
+//     call coro_start
+//   )");
+// }
+
+// Coro *coro_make(void (*fn)(void *arg), void *arg, size_t stack_size) {
+//   Coro *co = (Coro*)calloc(1, sizeof(Coro));
+//   co->fn         = fn;
+//   co->arg        = arg;
+//   co->stack_size = stack_size;
+//   co->stack_mem  = malloc(stack_size);
+
+//   uint8_t *sp = (uint8_t *)co->stack_mem + stack_size;
+//   sp = (uint8_t *)((uintptr_t)sp & ~(uintptr_t)0xF); /* 16-byte align */
+
+//   /*
+//     * Hand-build a stack frame that looks exactly like what coro_switch()
+//     * would find if this coroutine had been running and just pushed its
+//     * six callee-saved registers. Laid out high -> low address, matching
+//     * push order rbp,rbx,r12,r13,r14,r15 (so pop order r15..rbp restores
+//     * correctly), with the trampoline's address sitting where `ret`
+//     * expects a return address:
+//     *
+//     *   [ coro_trampoline ]   <- "return address"
+//     *   [ rbp = 0         ]
+//     *   [ rbx = 0         ]
+//     *   [ r12 = co        ]   <- trampoline reads this as its argument
+//     *   [ r13 = 0         ]
+//     *   [ r14 = 0         ]
+//     *   [ r15 = 0         ]   <- co->ctx.rsp points here
+//     */
+//   sp -= sizeof(void *); *(void **)sp = (void *)coro_trampoline;
+//   sp -= sizeof(void *); *(void **)sp = NULL;       /* rbp */
+//   sp -= sizeof(void *); *(void **)sp = NULL;       /* rbx */
+//   sp -= sizeof(void *); *(void **)sp = (void *)co; /* r12 -> self */
+//   sp -= sizeof(void *); *(void **)sp = NULL;       /* r13 */
+//   sp -= sizeof(void *); *(void **)sp = NULL;       /* r14 */
+//   sp -= sizeof(void *); *(void **)sp = NULL;       /* r15 */
+
+//   co->ctx.stack_pointer = sp;
+//   return co;
+// }
+
+// void coro_restart(Coro *co) {
+//   co->finished = 0;
+
+//   uint8_t* sp = (uint8_t*)co->stack_mem + co->stack_size;
+
+//   sp = (uint8_t*)((uintptr_t)sp & ~(uintptr_t)0xF);
+
+//   sp -= sizeof(void *); *(void **)sp = (void *)coro_trampoline;
+//   sp -= sizeof(void *); *(void **)sp = NULL;       /* rbp */
+//   sp -= sizeof(void *); *(void **)sp = NULL;       /* rbx */
+//   sp -= sizeof(void *); *(void **)sp = (void *)co; /* r12 -> self */
+//   sp -= sizeof(void *); *(void **)sp = NULL;       /* r13 */
+//   sp -= sizeof(void *); *(void **)sp = NULL;       /* r14 */
+//   sp -= sizeof(void *); *(void **)sp = NULL;       /* r15 */
+
+//   co->ctx.stack_pointer = sp;
+// }
+
+// void coro_destroy(Coro *co) {
+//   if (!co) return;
+//   free(co->stack_mem);
+//   free(co);
+// }
+
+// Coro *coro_current(void) {
+//   if (!g_current) g_current = &g_thread_ctx;
+//   return g_current;
+// }
+
+// void coro_resume(Coro *co) {
+//   co->caller = coro_current();
+//   g_current  = co;
+//   coro_switch(&co->caller->ctx, &co->ctx);
+//   // Coro *prev = coro_current();
+
+//   //   co->caller = prev;
+//   //   g_current = co;
+
+//   //   coro_switch(&prev->ctx, &co->ctx);
+//   /* control returns here once `co` yields or finishes */
+// }
+
+// void coro_yield(void) {
+//   Coro* co = coro_current();
+//   g_current = co->caller;
+//   coro_switch(&co->ctx, &co->caller->ctx);
+//   /* control returns here once we're resumed again */
+// }
+
+// /* Called once, from coro_trampoline, the first time a coroutine runs. */
+// C_LINKAGE void coro_start(Coro *co) {
+//   co->fn(co->arg);
+//   g_current = co->caller;
+//   coro_switch(&co->ctx, &co->caller->ctx);
+//   AssertAlways(0);
+//   __builtin_unreachable(); /* a finished coroutine is never resumed again */
+// }
+
+// void example(void* ctx) {
+//   u32* i = (u32*)ctx;
+//   Loop (c, *i) {
+//     // Info("from coroutine %i", c);
+//     printf("example %i\n", *i);
+//     coro_yield();
+//   }
+//   u32 a = 1;
+// }
+
+// void foo() {
+//   u32 i = 2;
+//   Coro* c = coro_make(example, &i, KB(8));
+//   Info("start example");
+//   Loop(i, 10) {
+//     Info("From outside %i", i);
+//     coro_restart(c);
+//     coro_resume(c);
+//   }
+
+//   u32 a = 1;
+// }

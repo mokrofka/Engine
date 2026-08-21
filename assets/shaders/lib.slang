@@ -15,3 +15,5 @@ import com;
 
 #define st state[0]
 
+#define Bit(x) (1 << (x))
+
