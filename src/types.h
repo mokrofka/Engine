@@ -9,7 +9,7 @@
 MakeId(OpaqueId)
 MakeId(ThingId)
 
-const u32 MaxEntities = KB(4);
+const u32 MaxEntities = KB(1);
 
 const v4 ColorWhite       = v4(1,    1,    1,    1);
 const v4 ColorBlack       = v4(0,    0,    0,    1);

@@ -5,59 +5,6 @@
 ///////////////////////////////////
 // Gpu memory layout
 
-struct R_DrawCallDataGPU {
-  alignas(16) mat4 model;
-  alignas(16) v4 color;
-  u32 tex;
-  u32 mat;
-};
-
-struct R_EntityGPU {
-};
-
-struct R_MaterialGPU {
-  alignas(16) v3 ambient;
-  alignas(16) v3 diffuse;
-  alignas(16) v3 specular;
-  f32 shininess;
-  u32 tex;
-};
-
-struct R_PointLightGPU {
-  alignas(16) v3 color;
-  alignas(16) v3 pos;
-  f32 intensity;
-  f32 rad;
-};
-
-struct R_DirLightGPU {
-  alignas(16) v3 color;
-  alignas(16) v3 dir;
-  f32 intensity;
-};
-
-struct R_SpotLightGPU {
-  alignas(16) v3 color;
-  alignas(16) v3 pos;
-  alignas(16) v3 dir;
-  f32 intensity;
-  f32 inner_cutoff;
-  f32 outer_cutoff;
-};
-
-struct R_GlobalStateGPU {
-  alignas(16) mat4 projection_view;
-  alignas(16) mat4 projection;
-  alignas(16) mat4 view;
-  mat4 mat;
-  alignas(16) v4 ambient_color;
-  f32 time;
-  u32 point_light_count;
-  u32 dir_light_count;
-  u32 spot_light_count;
-  u32 entity_indices[MaxEntities];
-};
-
 const u32 R_MaxMaterials  = 32;
 const u32 R_MaxLights     = 32;
 const u32 R_MaxMeshes     = 32;
@@ -66,13 +13,13 @@ const u32 R_MaxCubemaps   = 32;
 const u32 R_MaxFonts      = 32;
 const u32 R_MaxDebugLines = KB(1);
 const u32 R_MaxTextDraws  = 32;
-const u32 MaxGlyphCharacters = 96;
+const u32 R_MaxGlyphCharacters = 96;
 
 struct R_ShaderDesc { String name; Gfx_PipelineDesc pipeline_desc; };
 u64 hash(R_ShaderDesc x);
 b32 equal(R_ShaderDesc a, R_ShaderDesc b);
 
-#include "vk_bindings.slang"
+#include "shader_header.h"
 
 MakeId(R_Texture)
 MakeId(R_Mesh)
@@ -93,13 +40,16 @@ struct R_UI_Rect {
   v2 src_p0;
   v2 src_p1;
   u32 texture;
-  alignas(16) v4 color;
+  v4 color;
+  u32 flags;
 };
 
 struct R_TextureDesc {
   u32 width;
   u32 height;
   u8* data;
+  Gfx_PixelFormat pixel_format;
+  b32 is_async;
 };
 
 struct R_TextureData {
@@ -163,13 +113,14 @@ struct R_MaterialData {
 };
 
 struct R_Glyph {
-  i32 x0,y0,x1,y1;
-  f32 xoff, yoff,xadvance;
+  Rng2u rect;
+  f32 xoff, yoff, xadvance;
 };
 
 struct R_FontData {
+  u32 font_height;
   R_Texture texture;
-  R_Glyph glyphs[MaxGlyphCharacters];
+  R_Glyph glyphs[R_MaxGlyphCharacters];
 };
 
 struct R_DrawCall {
@@ -225,7 +176,7 @@ struct R_AttachmentDesc {
 
 typedef u32 R_RenderTargetUsage;
 enum {
-  R_RenderTargetUsage_Default = 0,
+  R_RenderTargetUsage_Default,
   R_RenderTargetUsage_Color = Bit(0),
   R_RenderTargetUsage_Resolve = Bit(1),
   R_RenderTargetUsage_Depth = Bit(2),
@@ -282,8 +233,8 @@ struct R_State {
   Gfx_Pipeline font_pip;
   Gfx_Sampler com_sampler;
 
-  Array<R_DrawText, R_MaxTextDraws> text_draws;
   R_Font my_font;
+  R_Font raylib_font;
 
   R_RenderTarget world_rt;
 
@@ -294,13 +245,9 @@ struct R_State {
   RingBuffer vert_ring_buffer;
   Array<R_Vertex, R_MaxDebugLines> draw_lines;
   Array<R_Vertex, R_MaxDebugLines> draw_lines_persistent;
-  Array<R_Vertex, R_MaxDebugLines> draw_rects;
-  Array<R_UI_Rect, R_MaxDebugLines> draw_quads;
-  Array<R_Vertex, R_MaxDebugLines> draw_rects_texture;
+  Array<R_UI_Rect, R_MaxDebugLines> draw_rects;
   u64 draw_base_lines;
   u64 draw_base_persistent_lines;
-  u64 draw_base_rects;
-  u64 draw_base_rects_texture;
 
   Queue<R_AsyncMesh, 12> async_mesh;
   Mutex async_stage_mutex;
@@ -321,12 +268,12 @@ struct R_State {
   Gfx_Buffer gpu_ui_rect_buf;
 
   GpuState* gpu_state;
-  R_EntityGPU* gpu_entities;
+  GpuEntity* gpu_entities;
   u32* gpu_entities_indices;
-  R_MaterialGPU* gpu_materials;
-  R_DrawCallDataGPU* gpu_drawcall;
+  GpuMaterial* gpu_materials;
+  GpuDrawCall* gpu_drawcall;
   u32* gpu_software_render;
-  R_UI_Rect* gpu_ui_rect;
+  GpuUI_Rect* gpu_ui_rect;
 
   Slice<OS_Handle> shader_module_compilation_pids;
   Slice<String> shaders_to_compile;
@@ -364,11 +311,11 @@ void r_texture_update(R_Texture t, u8* data);
 void r_texture_readback(R_Texture t, u8* dst);
 void r_texture_destroy(R_Texture t);
 
-R_Mesh r_mesh_load(String name);
-R_Mesh r_mesh_load_async(String name);
-R_Mesh r_mesh_make(R_MeshDesc desc);
-void r_mesh_update(R_Mesh mesh, R_MeshDesc desc);
-void r_mesh_destroy(R_Mesh mesh);
+R_Mesh r_load_mesh(String name);
+R_Mesh r_load_async_mesh(String name);
+R_Mesh r_make_mesh(R_MeshDesc desc);
+void r_update_mesh(R_Mesh mesh, R_MeshDesc desc);
+void r_destroy_mesh(R_Mesh mesh);
 
 // TODO: primitives gen, drawing
 
@@ -380,7 +327,7 @@ Gfx_Pipeline r_pipeline_make(String name, Gfx_PipelineDesc desc);
 void r_shaders_compile(Allocator arena);
 void r_shaders_compile_join();
 
-R_Font r_font_load(String name, u32 size);
+R_Font r_load_font(String name, u32 size);
 
 void r_init();
 void r_shutdown();
@@ -398,7 +345,7 @@ void r_draw_cuboid(Rng3 rng, v4 color);
 void r_draw_rect(Rng2 rect, v4 color);
 void r_draw_texture(Rng2 rect, R_Texture tex);
 void r_draw_rect_outline(Rng2 rect, u32 thickness, v4 color);
-void r_draw_text(v2 pos, String str, v4 color);
+void r_draw_text_ext(R_Font font, v2 pos, String str, v4 color, u32 font_height);
 
 void imgui_init();
 void imgui_begin_frame();

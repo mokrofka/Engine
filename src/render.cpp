@@ -66,9 +66,9 @@ R_Attachment r_make_attachment(R_AttachmentDesc desc) {
     });
     switch (desc.type) {
       InvalidDefaultCase;
-      case R_AttachmentType_Color: res.views[i] = gfx_make_view({.color_attachment = {.image = res.images[i]}}); break;
-      case R_AttachmentType_Resolve: res.views[i] = gfx_make_view({.resolve_attachment = {.image = res.images[i]}}); break;
-      case R_AttachmentType_Depth: res.views[i] = gfx_make_view({.depth_stencil_attachment = {.image = res.images[i]}}); break;
+      case R_AttachmentType_Color: res.views[i] = gfx_make_view({.type = Gfx_ViewType_ColorAttachment, .image = res.images[i]}); break;
+      case R_AttachmentType_Resolve: res.views[i] = gfx_make_view({.type = Gfx_ViewType_ResolveAttachment, .image = res.images[i]}); break;
+      case R_AttachmentType_Depth: res.views[i] = gfx_make_view({.type = Gfx_ViewType_DepthStencilAttachment, .image = res.images[i]}); break;
     }
   }
   return res;
@@ -154,17 +154,15 @@ R_Texture r_load_texture(String name) {
     .data = texture.data,
     .mipmaps = true,
   }),
-  tex.view = gfx_make_view({.texture = {.image = tex.image}});
+  tex.view = gfx_make_view({.type = Gfx_ViewType_Texture, .image = tex.image});
   R_Texture res = pool_push(g.textures, tex);
   return res;
 }
 
 R_Texture r_load_async_texture(String name) {
   var& g = st->r;
-
   R_TextureData tex = pool_get(g.textures, g.dummy_texture);
   R_Texture res = pool_push(g.textures, tex);
-
   struct Ctx {
     String name;
     R_Texture tex;
@@ -174,12 +172,12 @@ R_Texture r_load_async_texture(String name) {
     .name = name,
     .tex = res,
   };
-  thread_push({.ctx = &ctx, .fn = [](void* ctx) {
+  thread_push(&ctx, [](void* in) {
+    Ctx& ctx = *(Ctx*)in;
     var& g = st->r;
-    Ctx* data = (Ctx*)ctx;
-    R_TextureDesc texture = r_load_image(data->name);
+    R_TextureDesc texture = r_load_image(ctx.name);
     LockScope(g.async_stage_mutex);
-    R_TextureData& img_data = pool_get(g.textures, data->tex);
+    R_TextureData& img_data = pool_get(g.textures, ctx.tex);
     img_data.width = texture.width;
     img_data.height = texture.height;
     img_data.image = gfx_make_image({
@@ -188,20 +186,25 @@ R_Texture r_load_async_texture(String name) {
       .data = texture.data,
       .mipmaps = true,
     }),
-    img_data.view = gfx_make_view({.texture = {.image = img_data.image}});
-  }});
+    img_data.view = gfx_make_view({Gfx_ViewType_Texture, img_data.image});
+  });
   return res;
 }
 
 R_Texture r_make_texture(R_TextureDesc tex) {
   var& g = st->r;
-  R_TextureData texture = {};
+  R_TextureData texture = {
+    .width = tex.width,
+    .height = tex.height,
+    .data = tex.data,
+  };
   texture.image = gfx_make_image({
     .width = tex.width,
     .height = tex.height,
     .data = tex.data,
+    .pixel_format = tex.pixel_format,
   }),
-  texture.view = gfx_make_view({.texture = {.image = texture.image}});
+  texture.view = gfx_make_view({Gfx_ViewType_Texture, texture.image});
   R_Texture res = pool_push(g.textures, texture);
   return res;
 }
@@ -215,7 +218,7 @@ R_Texture r_make_cubemap(R_CubeMapDesc desc) {
   };
   ArrayCopy(img_desc.cube, desc.cubes);
   Gfx_Image img = gfx_make_image(img_desc);
-  Gfx_View view = gfx_make_view({.texture = {.image = img}});
+  Gfx_View view = gfx_make_view({.type = Gfx_ViewType_Texture, .image = img});
   R_Texture res = pool_push(g.textures, {.image = img, .view = view});
   return res;
 }
@@ -228,7 +231,7 @@ R_Texture r_load_cubemap(String dir) {
     "front", "back",
   };
   R_CubeMapDesc cube = {};
-  LoopElement (i, sides) {
+  LoopArray (i, sides) {
     String name = push_strf(scratch, "%s/%s%s", dir, sides[i], S(".png"));
     R_TextureDesc tex = r_load_image(name);
     cube.cubes[i] = tex.data;
@@ -263,7 +266,7 @@ R_Texture r_load_async_cubemap(String dir) {
       "front", "back",
     };
     R_CubeMapDesc cube = {};
-    LoopElement (i, sides) {
+    LoopArray (i, sides) {
       String name = push_strf(scratch, "%s/%s%s", ctx.dir, sides[i], S(".png"));
       R_TextureDesc tex = r_load_image(name);
       cube.cubes[i] = tex.data;
@@ -279,7 +282,7 @@ R_Texture r_load_async_cubemap(String dir) {
     ArrayCopy(desc.cube, cube.cubes);
     R_TextureData& img_data = pool_get(g.textures, ctx.tex);
     img_data.image = gfx_make_image(desc);
-    img_data.view = gfx_make_view({.texture = {.image = img_data.image}});
+    img_data.view = gfx_make_view({.type = Gfx_ViewType_Texture, .image = img_data.image});
   }});
   return res;
 }
@@ -309,7 +312,7 @@ void r_texture_destroy(R_Texture t) {
   pool_remove(g.textures, t);
 }
 
-R_Mesh r_mesh_load(String name) {
+R_Mesh r_load_mesh(String name) {
   Scratch scratch;
   String filepath = push_strf(scratch, "%s/%s", st->models_dir, name);
   String format = str_skip_last_dot(name);
@@ -323,11 +326,11 @@ R_Mesh r_mesh_load(String name) {
   } else {
     InvalidPath;
   }
-  R_Mesh res = r_mesh_make(mesh);
+  R_Mesh res = r_make_mesh(mesh);
   return res;
 }
 
-R_Mesh r_mesh_load_async(String name) {
+R_Mesh r_load_async_mesh(String name) {
   Scratch scratch;
   var& g = st->r;
   R_Mesh res = pool_push(g.meshes, {});
@@ -340,7 +343,7 @@ R_Mesh r_mesh_load_async(String name) {
     .name = name,
     .mesh = res,
   };
-  thread_push({.ctx = &ctx, .fn = [](void* ctx) {
+  thread_push(&ctx, [](void* ctx) {
     Scratch scratch;
     var& g = st->r;
     Ctx* data = (Ctx*)ctx;
@@ -358,30 +361,28 @@ R_Mesh r_mesh_load_async(String name) {
       InvalidPath;
     }
 
-    {
-      LockScope(g.async_stage_mutex);
+    LockScope(g.async_stage_mutex);
+    u64 offset = r_push_arena_buffer(&g.vert_arena, slice_size(desc.vertices));
+    u32 base_vert = (gfx_buffer_base(g.vert_arena.buf) + offset) / sizeof(R_Vertex);
+    gfx_update_buffer(g.vert_arena.buf, offset, slice_to_bytes(desc.vertices));
+    u32 base_index = 0;
+    if (desc.indices.count) {
       u64 offset = r_push_arena_buffer(&g.vert_arena, slice_size(desc.vertices));
-      u32 base_vert = (gfx_buffer_base(g.vert_arena.buf) + offset) / sizeof(R_Vertex);
-      gfx_update_buffer(g.vert_arena.buf, offset, slice_to_bytes(desc.vertices));
-      u32 base_index = 0;
-      if (desc.indices.count) {
-        u64 offset = r_push_arena_buffer(&g.vert_arena, slice_size(desc.vertices));
-        base_index = (gfx_buffer_base(g.index_arena.buf) + offset) / sizeof(u32);
-        gfx_update_buffer(g.index_arena.buf, offset, slice_to_bytes(desc.indices));
-      }
-      Gfx_Mesh mesh = {
-        .vert_count = (u32)desc.vertices.count,
-        .base_vert = base_vert,
-        .index_count = (u32)desc.indices.count,
-        .base_index = base_index,
-      };
-      pool_get(g.meshes, data->mesh) = mesh;
+      base_index = (gfx_buffer_base(g.index_arena.buf) + offset) / sizeof(u32);
+      gfx_update_buffer(g.index_arena.buf, offset, slice_to_bytes(desc.indices));
     }
-  }});
+    Gfx_Mesh mesh = {
+      .vert_count = (u32)desc.vertices.count,
+      .base_vert = base_vert,
+      .index_count = (u32)desc.indices.count,
+      .base_index = base_index,
+    };
+    pool_get(g.meshes, data->mesh) = mesh;
+  });
   return res;
 }
 
-R_Mesh r_mesh_make(R_MeshDesc desc) {
+R_Mesh r_make_mesh(R_MeshDesc desc) {
   R_State& g = st->r;
   u64 offset = r_push_arena_buffer(&g.vert_arena, slice_size(desc.vertices));
   u32 base_vert = (gfx_buffer_base(g.vert_arena.buf) + offset) / sizeof(R_Vertex);
@@ -402,10 +403,10 @@ R_Mesh r_mesh_make(R_MeshDesc desc) {
   return res;
 }
 
-void r_mesh_update(R_Mesh mesh, R_MeshDesc desc) {
+void r_update_mesh(R_Mesh mesh, R_MeshDesc desc) {
 }
 
-void r_mesh_destroy(R_Mesh mesh) {
+void r_destroy_mesh(R_Mesh mesh) {
 }
 
 R_Material r_material_make(R_MaterialDesc desc) {
@@ -423,7 +424,7 @@ R_Material r_material_make(R_MaterialDesc desc) {
     batch_idx_r = batch_idx;
   }
   u32 batch_idx = batch_idx_r;
-  R_Texture texture_id = map_get(st->str_to_texture_id, desc.base_color);
+  R_Texture texture_id = map_get(st->str_to_texture, desc.base_color);
   if (!pool_is_valid_handle(g.textures, texture_id)) {
     texture_id = g.dummy_texture;
   }
@@ -586,47 +587,31 @@ void r_shaders_compile_join() {
   }
 }
 
-R_Font r_font_load(String name, u32 size) {
+R_Font r_load_font(String name, u32 font_height) {
   Scratch scratch;
   var& g = st->r;
-  String path = push_strf(scratch, "%s/%s/%s", st->asset_dir, String("fonts"), name);
+  String path = push_strf(scratch, "%s/%s/%s", st->asset_dir, S("fonts"), name);
   Slice data = os_file_path_read_all(scratch, path);
-
-  u32 width = 512;
-  u32 height = 512;
+  stbtt_bakedchar characters_info[96];
+  u32 pixels_size = 96 * Square(font_height);
+  u32 dim = Sqrt(pixels_size);
+  u32 width = RoundUp(dim, font_height);
+  u32 height = RoundUp(dim, font_height);
   u8* pixels = push_buffer(scratch, width*height);
-  u32 first_char = 32;
-  u32 characters_num = 96;
-  stbtt_bakedchar* characters_info = push_array(scratch, stbtt_bakedchar, characters_num);
-  stbtt_BakeFontBitmap(data.data, 0, size, pixels, width, height, first_char, characters_num, characters_info);
-
-  R_TextureData texture = {
-    .width = width,
-    .height = height,
-    .data = pixels,
-  };
-  texture.image = gfx_make_image({
-    .width = texture.width,
-    .height = texture.height,
-    .data = texture.data,
-    .pixel_format = Gfx_PixelFormat_R8,
-  }),
-  texture.view = gfx_make_view({.texture = {.image = texture.image}});
-  R_Texture texture_id = pool_push(g.textures, texture);
-
-  R_FontData font = {.texture = texture_id};
-  LoopElement (i, font.glyphs) {
+  stbtt_BakeFontBitmap(data.data, 0, font_height, pixels, width, height, 32, 96, characters_info);
+  R_Texture texture_id = r_make_texture({.width = width, .height = height, .data = pixels, .pixel_format = Gfx_PixelFormat_R8});
+  R_FontData font = {.font_height = font_height, .texture = texture_id};
+  LoopArray (i, font.glyphs) {
     stbtt_bakedchar bakedchar = characters_info[i];
-    R_Glyph glyph = {
-      .x0 = bakedchar.x0,
-      .y0 = bakedchar.y0,
-      .x1 = bakedchar.x1,
-      .y1 = bakedchar.y1,
+    font.glyphs[i] = {
+      .rect.x0 = bakedchar.x0,
+      .rect.y0 = bakedchar.y0,
+      .rect.x1 = bakedchar.x1,
+      .rect.y1 = bakedchar.y1,
       .xoff = bakedchar.xoff,
       .yoff = bakedchar.yoff,
       .xadvance = bakedchar.xadvance,
     };
-    font.glyphs[i] = glyph;
   }
   R_Font res = pool_push(g.fonts, font);
   return res;
@@ -668,17 +653,17 @@ void r_init() {
       },
       {
         .binding = Bindings::Entities,
-        .size = sizeof(R_EntityGPU) * MaxEntities,
+        .size = sizeof(GpuEntity) * MaxEntities,
         .cpu_ptr = (void**)&g.gpu_entities,
       },
       {
         .binding = Bindings::Materials,
-        .size = sizeof(R_MaterialGPU) * R_MaxMaterials,
+        .size = sizeof(GpuMaterial) * R_MaxMaterials,
         .cpu_ptr = (void**)&g.gpu_materials,
       },
       {
         .binding = Bindings::DrawCtx,
-        .size = sizeof(R_DrawCallDataGPU) * MaxEntities,
+        .size = sizeof(GpuDrawCall) * MaxEntities,
         .cpu_ptr = (void**)&g.gpu_drawcall,
       },
       {
@@ -775,7 +760,7 @@ void r_init() {
   });
   g.font_pip = r_pipeline_make("font", {});
 
-  g.my_font = r_font_load("arial.ttf", 32);
+  g.my_font = r_load_font("arial.ttf", 32);
   g.point_dir = v2(Cos(rand_f32()), Sin(rand_f32()));
   Info("Renderer initialized");
 }
@@ -807,14 +792,14 @@ void r_end() {
 
   // g.point += g.point_dir * get_dt();
 
-  MemZeroArray(g.gpu_software_render, ({v2u size = os_window_size(); size.x*size.y;}));
-  u32 size = 16;
-  Loop (y, size) {
-    Loop (x, size) {
-      g.gpu_software_render[(u32)((g.point.y + y) * os_window_size().x + (g.point.x + x))] = u32_from_rgba(v4(1,1,1,1));
-    }
-  }
-  g.gpu_software_render[(u32)(g.point.y * os_window_size().x + g.point.x)] = u32_from_rgba(v4(1,1,1,1));
+  // MemZeroArray(g.gpu_software_render, ({v2u size = os_window_size(); size.x*size.y;}));
+  // u32 size = 16;
+  // Loop (y, size) {
+  //   Loop (x, size) {
+  //     g.gpu_software_render[(u32)((g.point.y + y) * os_window_size().x + (g.point.x + x))] = u32_from_rgba(v4(1,1,1,1));
+  //   }
+  // }
+  // g.gpu_software_render[(u32)(g.point.y * os_window_size().x + g.point.x)] = u32_from_rgba(v4(0,0,0,0));
 
   // Loop (i, 40000) {
   //   g.gpu_software_render[i] = u32_from_rgba(v4(1,1,0,0));
@@ -843,8 +828,6 @@ void r_end() {
     };
     g.draw_base_lines = vert(g.draw_lines.data, slice_size(slice(g.draw_lines)), sizeof(R_Vertex));
     g.draw_base_persistent_lines = vert(g.draw_lines_persistent.data, slice_size(slice(g.draw_lines_persistent)), sizeof(R_Vertex));
-    g.draw_base_rects = vert(g.draw_rects.data, slice_size(slice(g.draw_rects)), sizeof(R_Vertex));
-    g.draw_base_rects_texture = vert(g.draw_rects_texture.data, slice_size(slice(g.draw_rects_texture)), sizeof(R_Vertex));
 
     // UI_Vertex v;
     // ring_write_nowrap_array(g.vert_ring_buffer, &v, 1);
@@ -861,8 +844,8 @@ void r_end() {
     gpu_st.ambient_color = st->ambient_color;
 
     u32 idx = 0;
-    LoopINode (i, g.materials.first, g.materials.data) {
-      var& mat = g.materials.data[i].elem;
+    LoopIter (it, pool_begin(g.materials)) {
+      var& mat = *it;
       mat.idx = idx;
       R_MaterialProps props = mat.desc.props;
       g.gpu_materials[idx++] = {
@@ -954,77 +937,25 @@ void r_end() {
       gfx_draw_mesh(mesh);
 
       gfx_apply_viewport(rng2_make(v2(), os_window_size()));
+
       // Rect drawing
-      gfx_bind_vert(Gfx_MemType_Cpu);
       if (!array_empty(g.draw_rects)) {
-        gfx_bind_pipeline(g.ui_pip);
-        gfx_draw(g.draw_base_rects, g.draw_rects.count);
+        LoopArr (i, g.draw_rects) {
+          var rect = g.draw_rects[i];
+          g.gpu_ui_rect[i] = {
+            .dst_p0 = rect.dst_p0,
+            .dst_p1 = rect.dst_p1,
+            .src_p0 = rect.src_p0,
+            .src_p1 = rect.src_p1,
+            .texture = rect.texture,
+            .color = rect.color,
+            .flags = rect.flags,
+          };
+        }
+        gfx_bind_pipeline(g.ui_rect_pip);
+        gfx_draw(0, g.draw_rects.count*4, g.draw_rects.count);
         array_clear(g.draw_rects);
       }
-
-      // Quad drawing
-      if (!array_empty(g.draw_quads)) {
-        MemCopyArray(g.gpu_ui_rect, g.draw_quads.data, g.draw_quads.count);
-        gfx_bind_pipeline(g.ui_rect_pip);
-        gfx_draw(0, g.draw_quads.count*4, g.draw_quads.count);
-        array_clear(g.draw_quads);
-      }
-
-      // Font
-      {
-        Loop (i, g.text_draws.count) {
-          R_DrawText text = g.text_draws[i];
-          R_FontData& font = pool_get(g.fonts, g.my_font);
-          v2 pos = text.pos;
-          Loop (i, text.str.size) {
-            u8 c = text.str.str[i];
-            R_Glyph& glyph = font.glyphs[c - 32];
-  
-            // screen pos
-            f32 y0 = pos.y + glyph.yoff;
-            f32 x0 = pos.x + glyph.xoff;
-            f32 x1 = x0 + (glyph.x1 - glyph.x0);
-            f32 y1 = y0 + (glyph.y1 - glyph.y0);
-  
-            // advance cursor
-            pos.x += glyph.xadvance;
-  
-            // uv
-            f32 u0 = glyph.x0 / (f32)512;
-            f32 v0 = glyph.y0 / (f32)512;
-            f32 u1 = glyph.x1 / (f32)512;
-            f32 v1 = glyph.y1 / (f32)512;
-  
-            v3 min = v2_to_v3(v2_remap_01_to_11(v2(x0, y0), v2_of_v2u(os_window_size())), 0);
-            v3 max = v2_to_v3(v2_remap_01_to_11(v2(x1, y1), v2_of_v2u(os_window_size())), 0);
-            v4 color = text.color;
-            R_Vertex vert[] = {
-              {.pos = min,                 .uv = v2(u0,v0), .color = color},
-              {.pos = v3(min.x, max.y, 0), .uv = v2(u0,v1), .color = color},
-              {.pos = max,                 .uv = v2(u1,v1), .color = color},
-              {.pos = max,                 .uv = v2(u1,v1), .color = color},
-              {.pos = v3(max.x, min.y, 0), .uv = v2(u1,v0), .color = color},
-              {.pos = min,                 .uv = v2(u0,v0), .color = color},
-            };
-            array_push_elems(g.draw_rects_texture, slice(vert));
-          }
-        }
-        array_clear(g.text_draws);
-
-        u64 base = gfx_buffer_base(g.vert_buffer_each_frame);
-        g.draw_base_rects_texture = (base + ring_write_nowrap_array(g.vert_ring_buffer, g.draw_rects_texture.data, g.draw_rects_texture.count)) / sizeof(R_Vertex);
-
-        if (g.draw_rects_texture.count > 0) {
-          gfx_bind_pipeline(g.font_pip);
-          R_FontData& f = pool_get(g.fonts, g.my_font);
-          R_TextureData& t = pool_get(g.textures, f.texture);
-          vk_push_constants({.image_index = t.view.idx});
-          gfx_draw(g.draw_base_rects_texture, g.draw_rects_texture.count);
-          array_clear(g.draw_rects_texture);
-        }
-
-      }
-
     }
     gfx_end_pass();
   }
@@ -1171,7 +1102,7 @@ void r_draw_rect(Rng2 rect, v4 color) {
     .src_p1 = v2(500),
     .color = color,
   };
-  array_push(g.draw_quads, vert);
+  array_push(g.draw_rects, vert);
 }
 
 void r_draw_texture(Rng2 rect, R_Texture tex) {
@@ -1185,7 +1116,7 @@ void r_draw_texture(Rng2 rect, R_Texture tex) {
     .src_p0 = v2(),
     .src_p1 = v2(t.width, t.height),
   };
-  array_push(g.draw_quads, vert);
+  array_push(g.draw_rects, vert);
 }
 
 void r_draw_rect_outline(Rng2 rect, u32 thickness, v4 color) {
@@ -1202,13 +1133,35 @@ void r_draw_rect_outline(Rng2 rect, u32 thickness, v4 color) {
   r_draw_rect(rng2_make(v2(rect.max.x - thickness, rect.min.y), v2(thickness, rng2_dim(rect).y)), color);
 }
 
-void r_draw_text(v2 pos, String str, v4 color) {
+void r_draw_text_ext(R_Font font, v2 pos, String str, v4 color, u32 font_height) {
   var& g = st->r;
-  array_push(g.text_draws, {
-    .str = push_str_copy(st->frame_arena, str),
-    .pos = pos,
-    .color = color,
-  });
+  var fo = pool_get(g.fonts, font);
+  v2 cursor = pos;
+  f32 scale = (f32)font_height / fo.font_height;
+  Loop (i, str.size) {
+    u8 c = str.str[i];
+    var glyph = fo.glyphs[c - 32];
+
+    // screen pos
+    f32 y0 = cursor.y + glyph.yoff * scale;
+    f32 x0 = cursor.x + glyph.xoff * scale;
+    f32 x1 = x0 + rng2u_width(glyph.rect) * scale;
+    f32 y1 = y0 + rng2u_height(glyph.rect) * scale;
+
+    // advance cursor
+    cursor.x += glyph.xadvance * scale;
+
+    R_UI_Rect rect = {
+      .dst_p0 = v2(x0,y0),
+      .dst_p1 = v2(x1,y1),
+      .src_p0 = glyph.rect.min,
+      .src_p1 = glyph.rect.max,
+      .texture = r_texture_get_descriptor_idx(fo.texture),
+      .color = color,
+      .flags = GpuUI_RectFlag_IsFont,
+    };
+    array_push(g.draw_rects, rect);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////

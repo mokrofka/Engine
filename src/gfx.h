@@ -269,26 +269,19 @@ struct Gfx_ImageDesc {
 };
 
 enum Gfx_ViewType {
-  Gfx_ViewType_Invalid,
-  Gfx_ViewType_Texture,
+  Gfx_ViewType_Texture = 1,
   Gfx_ViewType_ColorAttachment,
   Gfx_ViewType_ResolveAttachment,
   Gfx_ViewType_DepthStencilAttachment,
 };
 
-struct Gfx_ImageViewDesc {
+struct Gfx_ViewDesc {
+  Gfx_ViewType type;
   Gfx_Image image;
   u32 mip_level;
   u32 slice;
   u32 mip_level_count;
   u32 slice_count;
-};
-
-struct Gfx_ViewDesc {
-  Gfx_ImageViewDesc texture;
-  Gfx_ImageViewDesc color_attachment;
-  Gfx_ImageViewDesc resolve_attachment;
-  Gfx_ImageViewDesc depth_stencil_attachment;
 };
 
 struct Gfx_SamplerDesc {

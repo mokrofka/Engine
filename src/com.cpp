@@ -261,8 +261,8 @@ intern void test_object_pool_linklist() {
   rand_shuffle(slice(indices));
 
   u32 i = 0;
-  LoopINode (it, pool.first, pool.data) {
-    A elem = pool.data[it].elem;
+  LoopIter (it, pool_begin(pool)) {
+    A elem = *it;
     AssertAlways(elem.a == values[i].a && elem.a == values[i].a);
     ++i;
   }
@@ -284,8 +284,9 @@ intern void test_object_pool_linklist() {
   Loop(i, TEST_SAMPLES) array_push(indices, i);
   rand_shuffle(slice(indices));
   i = 0;
-  LoopINode (it, pool.first, pool.data) {
-    A elem = pool.data[it].elem;
+  
+  LoopIter (it, pool_begin(pool)) {
+    A elem = *it;
     AssertAlways(elem.a == values[i].a && elem.a == values[i].a);
     ++i;
   }
@@ -755,7 +756,7 @@ void test_sort() {
     Info("insert");
     i32 arr[] = {0, -4, -3, 7, 3};
     sort_insert(slice(arr), [](var a, var b) { return a < b; });
-    LoopElement (i, arr) {
+    LoopArray (i, arr) {
       print("%i ", arr[i]);
     }
     print("\n");
@@ -764,7 +765,7 @@ void test_sort() {
     Info("quick");
     i32 arr[] = {0, -4, -3, 7, 3};
     sort_quick(slice(arr), [](var a, var b) { return a < b;});
-    LoopElement (i, arr) {
+    LoopArray (i, arr) {
       print("%i ", arr[i]);
     }
     print("\n");
@@ -774,7 +775,7 @@ void test_sort() {
     Info("merge");
     i32 arr[] = {0, -4, -3, 7, 3};
     sort_merge(scratch, slice(arr), [](var a, var b) { return a < b;});
-    LoopElement (i, arr) {
+    LoopArray (i, arr) {
       print("%i ", arr[i]);
     }
     print("\n");
@@ -784,11 +785,11 @@ void test_sort() {
     Info("radix");
     i32 arr[] = {0, -4, -3, 7, 3};
     Slice<SortEntry> entries = push_slice(scratch, SortEntry, ArrayCount(arr));
-    LoopElement (i, arr) {
+    LoopArray (i, arr) {
       entries[i] = {sort_i32_key_to_u32(arr[i]), (u32)i};
     }
     sort_radix(scratch, entries);
-    LoopElement (i, arr) {
+    LoopArray (i, arr) {
       print("%i ", arr[entries[i].idx]);
     }
     print("\n");
@@ -796,7 +797,7 @@ void test_sort() {
 
   u32 counts[] = {32, 64, 128, 512, KB(1), KB(10), KB(100), MB(1)};
   Slice<u32> arrs[ArrayCount(counts)];
-  LoopElement (i, counts) {
+  LoopArray (i, counts) {
     arrs[i] = push_slice(scratch, u32, counts[i]);
     Loop (j, counts[i]) {
       arrs[i][j] = rand_i32();
@@ -805,7 +806,7 @@ void test_sort() {
   print("\n/////////////////\n");
   Info("\nQuick test:");
   Loop (i, 2) {
-    LoopElement (i, counts) {
+    LoopArray (i, counts) {
       Info("Count %i", counts[i]);
       rand_shuffle(arrs[i]);
       {
@@ -816,7 +817,7 @@ void test_sort() {
   }
   Info("\nmerge test:");
   Loop (i, 2) {
-    LoopElement (i, counts) {
+    LoopArray (i, counts) {
       Scratch scratch;
       Info("Count %i", counts[i]);
       rand_shuffle(arrs[i]);
@@ -828,7 +829,7 @@ void test_sort() {
   }
   Info("\nradix test:");
   Loop (i, 2) {
-    LoopElement (i, counts) {
+    LoopArray (i, counts) {
       Scratch scratch;
       Info("Count %i", counts[i]);
       rand_shuffle(arrs[i]);
@@ -905,6 +906,13 @@ TimeScope::TimeScope() {
 TimeScope::~TimeScope() {
   u64 elapsed = cpu_timer_now() - tsc_start;
   Info("%fms", tsc_to_ms(elapsed));
+}
+ImTimeScope::ImTimeScope() {
+  tsc_start = cpu_timer_now();
+}
+ImTimeScope::~ImTimeScope() {
+  u64 elapsed = cpu_timer_now() - tsc_start;
+  ImGui::Text("%fms", tsc_to_ms(elapsed));
 }
 
 Rng2 debug_window_get_rect(DebugWindow win) {
@@ -1203,7 +1211,6 @@ void debug_game() {
   Scratch scratch;
   var& g = *st;
   DebugWindow& win = st->debug.game_win;
-  Camera& cam = g.cam;
   if (win.open) {
     debug_window_apply_state(win);
     ImGui::Begin("Game");
@@ -1220,7 +1227,6 @@ void debug_game() {
     var list = imgui_get_window_drawlist();
     imgui_draw_rect_filled(list, rng2_make(v2(0), v2(100)), ColorWhite);
     ImGui::Text("entities: %u", g.entities_count);
-    ImGui::DragFloat("speed", &cam.speed, 1);
     {
       ImGui::Text("Camera:");
       imgui_text(push_str_copy(scratch, dumb_struct(scratch, slice(members_of_Camera), &g.cam)));
@@ -1260,7 +1266,7 @@ void debug_prof_view() {
   u64 tsc_elapsed_sum = 0;
   u64 tsc_elapsed_max = 0;
   u64 tsc_elapsed_min = U32_MAX;
-  LoopElement (i, prof.frames_times) {
+  LoopArray (i, prof.frames_times) {
     ProfFrameTime frame = prof.frames_times[i];
     u64 elapsed = frame.tsc_end - frame.tsc_start;
     tsc_elapsed_sum += elapsed;
@@ -1555,7 +1561,7 @@ void debug_prof_view() {
             draw_threads(scroll_state);
             u32 idx = (st->current_frame-1) % ArrayCount(prof.frames_times);
             Slice<ProfAnchor> slices[ArrayCount(prof.prof_threads)] = {};
-            LoopElement (i, prof.prof_threads) {
+            LoopArray (i, prof.prof_threads) {
               slices[i] = slice(prof.prof_threads[i].recorded_anchors[idx]);
             }
             ProfFrameTime time = prof.frames_times[idx];
@@ -1633,9 +1639,9 @@ void debug_prof_view() {
 
             ///////////////////////////////////
             // Draw graph per thread
-            LoopElement (j, prof.frames_times) {
+            LoopArray (j, prof.frames_times) {
               Slice<ProfAnchor> slices[ArrayCount(prof.prof_threads)] = {};
-              LoopElement (i, prof.prof_threads) {
+              LoopArray (i, prof.prof_threads) {
                 slices[i] = slice(prof.prof_threads[i].recorded_anchors[j]);
               }
               ProfFrameTime time = prof.frames_times[j];
@@ -1683,7 +1689,7 @@ void debug_prof_view() {
             draw_threads(scroll_state);
 
             Slice<ProfAnchor> slices[ArrayCount(prof.prof_threads)] = {};
-            LoopElement (i, prof.prof_threads) {
+            LoopArray (i, prof.prof_threads) {
               slices[i] = slice(prof.prof_threads[i].launch_anchors);
             }
             ProfFrameTime time = prof.launch_time;
@@ -1738,7 +1744,7 @@ void debug_prof_view() {
     
                 //  Mem level
                 u32 mem_level = 0;
-                LoopElement (i, mem_levels) {
+                LoopArray (i, mem_levels) {
                   if (info.pos < mem_levels[i]) {
                     mem_level = i;
                     break;
@@ -2366,8 +2372,8 @@ void mesh_set(MeshEnum mesh_enum, R_Mesh id) {
   GlobalState& g = *st;
   g.meshes_ids[mesh_enum] = id;
   String str = push_str_copy(g.arena, meshes_strs[mesh_enum]);
-  map_set(g.str_to_mesh_id, str, id);
-  g.mesh_id_to_str[id.idx] = str;
+  map_set(g.str_to_mesh, str, id);
+  g.mesh_to_str[id.idx] = str;
 }
 R_Material get_material(MaterialEnum id) { return st->materials_ids[id]; }
 
@@ -2744,11 +2750,11 @@ String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, 
       } break;
       case MetaType_MeshId: {
         R_Mesh v = *(R_Mesh*)member_ptr;
-        dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->mesh_id_to_str[v.idx]));
+        dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->mesh_to_str[v.idx]));
       } break;
       case MetaType_MaterialId: {
         R_Material v = *(R_Material*)member_ptr;
-        dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->material_id_to_str[v.idx]));
+        dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->material_to_str[v.idx]));
       } break;
       case MetaType_String: {
         if (FlagHas(flags, EntityFlag_Referenced)) {
@@ -2809,13 +2815,13 @@ void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser
       } break;
       case MetaType_MeshId: {
         Token tok = tok_require(p, TokenType_String);
-        var mesh = map_get(st->str_to_mesh_id, tok.str);
+        var mesh = map_get(st->str_to_mesh, tok.str);
         Assert(!mesh.err);
         *(R_Mesh*)mem = mesh;
       } break;
       case MetaType_MaterialId: {
         Token tok = tok_require(p, TokenType_String);
-        var material = map_get(st->str_to_material_id, tok.str);
+        var material = map_get(st->str_to_material, tok.str);
         Assert(!material.err);
         *(R_Material*)mem = material;
       } break;
@@ -2868,7 +2874,7 @@ void watch_update() {
         case WatchOp_NotifyHotreload: {
           st->should_hotreload = true;
         } break;
-        InvalidDefaultCase break;
+        InvalidDefaultCase;
       }
       x.modified = props.modified;
     }
@@ -2903,7 +2909,7 @@ void watch_update() {
           os_file_path_copy_mtime(shader_filepath, shader_compiled_filepath);
           r_shader_reload(shader_name);
         } break;
-        InvalidDefaultCase break;
+        InvalidDefaultCase;
       }
     }
   }
@@ -3044,13 +3050,16 @@ void co_test(Coroutine* co, f32 dt) {
   co_end(co);
 }
 
+struct Packed Packed2 {
+  u8 a;
+  u32 b;
+  u32 c;
+  u64 d;
+};
+
 void init() {
-  Info("%i", GlobalInt);
-
-
-  global_info();
   Scratch scratch;
-  
+
   struct Vec {
     f32 a,b;
   };
@@ -3192,7 +3201,7 @@ void init() {
     watch_directory_add(g.shader_dir, WatchOp_RecompileShader);
     watch_directory_add(g.shader_compiled_dir, WatchOp_ShaderReload);
 
-    g.ui0 = ui_init();
+    // g.ui0 = ui_init();
   }
   prof_launch_end();
 }
@@ -3258,8 +3267,7 @@ shared_function void update_main(HotReloadData* data) {
   Scratch scratch;
 if (data->ctx == null) {
     Arena arena = arena_make("common arena");
-    data->ctx = push_struct_zero(arena, GlobalState);
-    st = (GlobalState*)data->ctx;
+    data->ctx = st = push_struct_zero(arena, GlobalState);
     st->arena = arena;
     {
       u64 start = cpu_timer_now();
@@ -3267,7 +3275,7 @@ if (data->ctx == null) {
       Debug("init time: %fms", tsc_to_ms(cpu_timer_now() - start));
     }
 #if HOTRELOAD_BUILD
-    watch_add(data->lib, WatchOp_NotifyHotreload);
+    watch_add(data->lib_path, WatchOp_NotifyHotreload);
 #endif
   }
   if (!st) {
@@ -3275,8 +3283,8 @@ if (data->ctx == null) {
     st->should_hotreload = false;
   }
 
-  GlobalState& g = *st;
-  ui_set_current_state(g.ui0);
+  var& g = *st;
+  // ui_set_current_state(g.ui0);
 
   u64 target_fps = Billion(1) / 60;
   u64 prev_ns = os_now_ns();
@@ -3510,7 +3518,7 @@ void camera_init() {
     .pos = v3(0,0,5),
     .yaw = -90,
     .fov = 45,
-    .speed = 10,
+    // .speed = 10,
   };
   cam.dir = {
     CosD(cam.yaw) * CosD(cam.pitch),
@@ -3558,40 +3566,51 @@ void camera_update() {
 
   // Camera movement
   {
-    f32 speed = cam.speed*1;
-    v3 velocity = {};
+    cam.accel = {};
+    f32 speed = 320;
     if (os_key_is_down(Key_W)) {
       v3 forward = mat4_forward(view);
-      velocity += forward;
+      cam.accel += forward;
     }
     if (os_key_is_down(Key_S)) {
       v3 backward = mat4_backward(view);
-      velocity += backward;
+      cam.accel += backward;
     }
     if (os_key_is_down(Key_Q)) {
       v3 left = mat4_left(view);
-      velocity += left;
+      cam.accel += left;
     }
     if (os_key_is_down(Key_E)) {
       v3 right = mat4_right(view);
-      velocity += right;
+      cam.accel += right;
     }
     if (os_key_is_down(Key_Space)) {
-      velocity.y += 1.0f;
+      cam.accel.y += 1.0f;
     }
     if (os_key_is_down(Key_X)) {
-      velocity.y -= 1.0f;
+      cam.accel.y -= 1.0f;
     }
     if (os_key_is_down(Key_Shift)) {
-      speed *= 20;
+      speed *= 10;
     }
     if (os_key_is_down(Key_LAlt)) {
       speed *= 0.1;
     }
-    if (velocity != v3()) {
-      velocity = v3_norm(velocity);
-      cam.pos += velocity * speed * get_dt();
-    }
+    // velocity = v3_norm(velocity);
+    // cam.vel += accel * 10 * get_dt();
+    // cam.pos += cam.vel * get_dt();
+    // cam.pos = 0.5 * accel * Square(get_dt()) + cam.vel * get_dt() + cam.pos;
+    // cam.vel = accel * get_dt() * 10 + cam.vel;
+    // cam.pos += velocity * speed * get_dt();
+
+    f32 dt = get_dt();
+    // cam.pos += cam.vel*dt + 0.5*accel*Square(dt);
+    // cam.vel += accel*dt;
+    cam.vel += speed * cam.accel * dt;
+    cam.vel += -cam.vel * 8.0 * dt;
+    cam.pos += cam.vel * dt;
+    // cam.accel += -cam.vel * 0.4;
+
   }
   
   // Camera update
@@ -3754,11 +3773,44 @@ void init_scene() {
     // var desc = default_thing_desc();
     // desc.pos = v3(1);
     // desc.scale = v3(3);
-    var desc = THING_DESC(
-      .pos = v3(1,1,1),
-    );
+    var desc = default_thing_desc();
+    desc.pos = v3(1);
     g.t_id = make_thing(desc);
     // g.t_id = make_thing(THING_DESC(.pos = v3(1,1,1), .scale = v3(3)));
+  }
+
+  {
+    Loop (i, MaxEntities) {
+      var& t = pool_get(g.things, pool_push(g.things));
+      t.pos = v3(1*i,2*i,3*i);
+    }
+
+    g.query0.bit_count = MaxEntities / 64;
+    g.query1.bit_count = MaxEntities / 64;
+    g.query2.bit_count = MaxEntities / 64;
+    g.query3.bit_count = MaxEntities / 64;
+    Loop (i, MaxEntities) {
+    // bitset_set(g.query0, rand_u32_rng(1, MaxEntities));
+    }
+
+    Loop (i, KB(1)) {
+      u32 id = rand_u32_rng(1, MaxEntities);
+      bitset_set(g.query1, id);
+      var& t = pool_get(g.things, pool_get_handle(g.things, id));
+      FlagSet(t.tflags, ThingFlag_1);
+    }
+    Loop (i, KB(10)) {
+      u32 id = rand_u32_rng(1, MaxEntities);
+      bitset_set(g.query1, id);
+      var& t = pool_get(g.things, pool_get_handle(g.things, id));
+      FlagSet(t.tflags, ThingFlag_2);
+    }
+    Loop (i, MaxEntities) {
+      u32 id = rand_u32_rng(1, MaxEntities);
+      bitset_set(g.query1, id);
+      var& t = pool_get(g.things, pool_get_handle(g.things, id));
+      FlagSet(t.tflags, ThingFlag_3);
+    }
   }
 }
 
@@ -3780,6 +3832,57 @@ Transform transform_indentity() {
 }
 void transform_translate_local(Transform& t, v3 delta) {
   t.pos += quat_rotate(t.rot, delta);
+}
+
+// template<i32 N> struct BitIter {
+//   BitSetS<N>* bits;
+//   u64 word_i;
+//   u64 word;
+// };
+
+// TODO: relations of linked list, iterators, adding/removing, traversing ... separate pools for linked lists?
+template<i32 N> struct BitSetIter1 {
+  BitSetS<N>* bits;
+  u64 word_i;
+  u64 word;
+  operator bool() {
+    while (word == 0) {
+      if (word_i >= bitset_word_count(*bits))
+        return false;
+      word = bits->words[word_i];
+      ++word_i;
+    }
+    // u64 bit = ctz(word);
+    u64 word_i = word_i - 1;
+    // u64 idx = word_i * 64 + (64-bit);
+    word = remove_lowest_bit(word);
+    return true;
+  }
+  BitSetIter1& operator++() {}
+  // T& operator*() {
+  // }
+};
+
+template<i32 N> BitSetIter<N> bit_iter_begin(BitSetS<N>* bits) {
+  BitSetIter res = {
+    .bits = bits,
+  };
+  return res;
+}
+
+template<i32 N> b32 bit_iter_next(BitSetIter<N>* it, ThingId* out) {
+  while (it->word == 0) {
+    if (it->word_i >= bitset_word_count(*it->bits))
+      return false;
+    it->word = it->bits->words[it->word_i];
+    ++it->word_i;
+  }
+  u64 bit = ctz(it->word);
+  u64 word_i = it->word_i - 1;
+  u64 idx = word_i * 64 + (64-bit);
+  it->word = remove_lowest_bit(it->word);
+  *out = pool_get_handle(st->things, idx);
+  return true;
 }
 
 void update_scene() {
@@ -3956,8 +4059,8 @@ void update_scene() {
     }
   }
   
-  LoopINode (i, g.entities.first, g.entities.data) {
-    ThingId e_id = pool_get_handle(g.entities, i);
+  LoopIter (it, pool_begin(g.entities)) {
+    ThingId e_id = it.handle();
     // Entity& e = pool_get(g.entities, e_id);
     // r_draw_mesh(e.mesh, e.mat, e.pos);
     r_draw_entity(e_id);
@@ -3994,9 +4097,9 @@ void update_scene() {
   // ui_end();
 
   {
-    static B32 dark_mode = false;
-    static F32 volume = 0.3f;
-    S32 click_count = 0;
+    // static B32 dark_mode = false;
+    // static F32 volume = 0.3f;
+    // S32 click_count = 0;
 
     UI_Input input = {0};
     // input.mouse_pos = (UI_Vec2){ script[f].x, script[f].y };
@@ -4007,74 +4110,75 @@ void update_scene() {
     v2 mouse_pos = os_mouse_pos();
     input.mouse_pos = Transmute(UI_Vec2, mouse_pos);
 
-    ui_begin_frame(input, 800, 600);
-    {
-      // UI_Parent()
-      // ui_button(str8_lit("hello"));
-      // ui_button(str8_lit("hello"));
-      // ui_button(str8_lit("hello"));
-      // ui_button(str8_lit("hello"));
+    // ui_begin_frame(input, 800, 600);
+    // {
+    //   // UI_Parent()
+    //   // ui_button(str8_lit("hello"));
+    //   // ui_button(str8_lit("hello"));
+    //   // ui_button(str8_lit("hello"));
+    //   // ui_button(str8_lit("hello"));
 
-      UI_Parent(ui_panel_begin(str8_lit("panel1"), UI_Axis2_Y)) {
-        ui_label(str8_lit("label1"));
-      }
-      UI_Parent(ui_panel_begin(str8_lit("panel2"), UI_Axis2_Y)) {
-        ui_label(str8_lit("label2"));
-        UI_Parent(ui_panel_begin(str8_lit("panel3"), UI_Axis2_Y)) {
-          ui_label(str8_lit("label3"));
-        }
-      }
+    //   UI_Parent(ui_panel_begin(str8_lit("panel1"), UI_Axis2_Y)) {
+    //     ui_label(str8_lit("label1"));
+    //   }
+    //   UI_Parent(ui_panel_begin(str8_lit("panel2"), UI_Axis2_Y)) {
+    //     ui_label(str8_lit("label2"));
+    //     UI_Parent(ui_panel_begin(str8_lit("panel3"), UI_Axis2_Y)) {
+    //       ui_label(str8_lit("label3"));
+    //     }
+    //   }
 
-      /* ui_panel_begin_sized() pushes itself as the current parent;
-       * ui_panel_end() pops it. Fixed pixel width here (rather than
-       * ui_size_children) is what lets the Volume slider below use
-       * PercentOfParent safely -- see the note on ui_panel_begin(). */
-      ui_panel_begin_sized(str8_lit("main_panel##mp"), UI_Axis2_Y, ui_size_px(200, 1), ui_size_children(1));
-      {
-        ui_label(str8_lit("Settings"));
-        ui_spacer(ui_size_px(4, 1));
+    //   /* ui_panel_begin_sized() pushes itself as the current parent;
+    //    * ui_panel_end() pops it. Fixed pixel width here (rather than
+    //    * ui_size_children) is what lets the Volume slider below use
+    //    * PercentOfParent safely -- see the note on ui_panel_begin(). */
+    //   ui_panel_begin_sized(str8_lit("main_panel##mp"), UI_Axis2_Y, ui_size_px(200, 1), ui_size_children(1));
+    //   {
+    //     ui_label(str8_lit("Settings"));
+    //     ui_spacer(ui_size_px(4, 1));
 
-        UI_Signal btn = ui_button(str8_lit("Click me##btn1"));
-        if (btn.clicked) click_count++;
+    //     UI_Signal btn = ui_button(str8_lit("Click me##btn1"));
+    //     if (btn.clicked) click_count++;
 
-        ui_checkbox(str8_lit("Dark mode##dm"), &dark_mode);
+    //     ui_checkbox(str8_lit("Dark mode##dm"), &dark_mode);
 
-        ui_spacer(ui_size_px(4, 1));
-        ui_slider(str8_lit("Volume##vol"), &volume, 0.0f, 1.0f);
-      }
-      ui_panel_end();
-    }
-    ui_end_frame();
-    Loop (i, ui_state->draw_cmd_count) {
-      UI_DrawCmd cmd = ui_state->draw_cmds[i];
-      Rng2 rect = Transmute(Rng2, cmd.rect);
-      v4 color = Transmute(v4, cmd.color);
-      String str = Transmute(String, cmd.text.str);
-      switch (cmd.kind) {
-        case UI_DrawCmd_Rect: {
-          if (cmd.filled) {
-            ui_draw_rect(rect, color);
-          } else {
-            r_draw_rect_outline(rect, 2, color);
-          }
-        } break;
-        case UI_DrawCmd_Text: {
-          // u32 a = 1;
-          r_draw_text(v2(cmd.rect.x0, cmd.rect.y0), str, color);
-        } break;
-        default: break;
-      }
-    }
+    //     ui_spacer(ui_size_px(4, 1));
+    //     ui_slider(str8_lit("Volume##vol"), &volume, 0.0f, 1.0f);
+    //   }
+    //   ui_panel_end();
+    // }
+    // ui_end_frame();
+    // Loop (i, ui_state->draw_cmd_count) {
+    //   UI_DrawCmd cmd = ui_state->draw_cmds[i];
+    //   Rng2 rect = Transmute(Rng2, cmd.rect);
+    //   v4 color = Transmute(v4, cmd.color);
+    //   String str = Transmute(String, cmd.text.str);
+    //   switch (cmd.kind) {
+    //     case UI_DrawCmd_Rect: {
+    //       if (cmd.filled) {
+    //         ui_draw_rect(rect, color);
+    //       } else {
+    //         r_draw_rect_outline(rect, 2, color);
+    //       }
+    //     } break;
+    //     case UI_DrawCmd_Text: {
+    //       // u32 a = 1;
+    //       r_draw_text(v2(cmd.rect.x0, cmd.rect.y0), str, color);
+    //     } break;
+    //     default: break;
+    //   }
+    // }
   }
 
   {
     // r_draw_quad(rng2_make(v2(400), v2(400,400)), ColorCyan);
     r_draw_rect(rng2_make(v2(600), v2(100)), ColorWhite);
     r_draw_texture(rng2_make(v2(800), v2(100)), get_texture(Texture_Orange));
-    r_draw_text(v2(200,200), "I'm a hobbit", ColorOrange);
+    r_draw_text_ext(st->r.my_font, v2(300), "I'm a hobbit from Shire!", ColorOrange, 64);
   }
 
   {
+    
     var& thing = get_thing(g.t_id);
     f32 t = time_ping_pong(get_time(), 2);
     t = ease_sin_in_out(t);
@@ -4083,6 +4187,230 @@ void update_scene() {
     // thing.rot = quat_axis_angle(v3(1), get_time());
     // thing.pos = quat_rotate(quat_axis_angle(v3_up(), get_time()), v3(10,10,10));
     // thing.pos = v3_rotate_around_pivot(thing.pos, v3(1), quat_axis_angle(v3(1), get_time()));
+  }
+
+  {
+    ImGui::Begin("Profile");
+    // ImGui::Text("%i", 1);
+
+    {
+      ProfBlock("4 queries");
+      // ImTimeScope t;
+      u64 tsc_start = cpu_timer_now();
+      {
+        u64 tsc_start = cpu_timer_now();
+        var iter = bit_iter_begin(&g.query1);
+        for (ThingId id = {}; bit_iter_next(&iter, &id);) {
+          Thing& t = pool_get(g.things, (pool_get_handle(g.things, id.idx)));
+          t.modify1 = 1;
+        }
+        u64 elapsed = cpu_timer_now() - tsc_start;
+        local u64 show_elapsed;
+        if (time_on_interval(0.1)) {
+          show_elapsed = elapsed;
+        }
+        ImGui::Text("query1 1KB %fms", tsc_to_ms(show_elapsed));
+      }
+      {
+        u64 tsc_start = cpu_timer_now();
+        var iter = bit_iter_begin(&g.query2);
+        for (ThingId id = {}; bit_iter_next(&iter, &id);) {
+          Thing& t = pool_get(g.things, (pool_get_handle(g.things, id.idx)));
+          t.modify2 = 1;
+        }
+        u64 elapsed = cpu_timer_now() - tsc_start;
+        local u64 show_elapsed;
+        if (time_on_interval(0.1)) {
+          show_elapsed = elapsed;
+        }
+        ImGui::Text("query2 10KB %fms", tsc_to_ms(show_elapsed));
+      }
+      {
+        u64 tsc_start = cpu_timer_now();
+        var iter = bit_iter_begin(&g.query3);
+        for (ThingId id = {}; bit_iter_next(&iter, &id);) {
+          Thing& t = pool_get(g.things, (pool_get_handle(g.things, id.idx)));
+          t.modify3 = 1;
+        }
+        u64 elapsed = cpu_timer_now() - tsc_start;
+        local u64 show_elapsed;
+        if (time_on_interval(0.1)) {
+          show_elapsed = elapsed;
+        }
+        ImGui::Text("query3 100KB %fms", tsc_to_ms(show_elapsed));
+      }
+
+      u64 elapsed = cpu_timer_now() - tsc_start;
+      local u64 show_elapsed;
+      if (time_on_interval(0.1)) {
+        show_elapsed = elapsed;
+      }
+      ImGui::Text("%fms", tsc_to_ms(show_elapsed));
+      ImGui::Text("4 queries");
+    }
+    {
+      // ImTimeScope t;
+      ProfBlock("One query num0");
+      u64 tsc_start = cpu_timer_now();
+
+      var iter = bit_iter_begin(&g.query0);
+      for (ThingId id = {}; bit_iter_next(&iter, &id);) {
+        Thing& t = pool_get(g.things, (pool_get_handle(g.things, id.idx)));
+        t.modify0 = 1;
+      }
+
+      u64 elapsed = cpu_timer_now() - tsc_start;
+      local u64 show_elapsed;
+      if (time_on_interval(0.1)) {
+        show_elapsed = elapsed;
+      }
+      ImGui::Text("%fms", tsc_to_ms(show_elapsed));
+      ImGui::Text("one query");
+    }
+
+    // for (Iter it = iter_begin(); it; ++i) {
+    // }
+
+    // LoopIter (it, pool_begin(g.things)) {
+    //   var& t = *it;
+    //   Info("%f", t.pos.x);
+    //   Info("%f", t.pos.y);
+    //   Info("%f", t.pos.z);
+    // }
+
+    {
+      // ImTimeScope t;
+      ImGui::Text("linked list");
+      u64 tsc_start = cpu_timer_now();
+      {
+        u64 tsc_start = cpu_timer_now();
+
+        u64 elapsed = cpu_timer_now() - tsc_start;
+        local u64 show_elapsed;
+        if (time_on_interval(0.1)) {
+          show_elapsed = elapsed;
+        }
+        ImGui::Text("query0 0 %fms", tsc_to_ms(show_elapsed));
+      }
+      {
+        u64 tsc_start = cpu_timer_now();
+
+        LoopIter (it, pool_begin(g.things)) {
+          var& t = *it;
+          if (FlagHas(t.tflags, ThingFlag_1)) {
+            t.modify0 = 1;
+          }
+        }
+
+        u64 elapsed = cpu_timer_now() - tsc_start;
+        local u64 show_elapsed;
+        if (time_on_interval(0.1)) {
+          show_elapsed = elapsed;
+        }
+        ImGui::Text("query1 1KB %fms", tsc_to_ms(show_elapsed));
+      }
+      {
+        u64 tsc_start = cpu_timer_now();
+        LoopIter (it, pool_begin(g.things)) {
+          var& t = *it;
+          if (FlagHas(t.tflags, ThingFlag_2)) {
+            t.modify0 = 1;
+          }
+        }
+        u64 elapsed = cpu_timer_now() - tsc_start;
+        local u64 show_elapsed;
+        if (time_on_interval(0.1)) {
+          show_elapsed = elapsed;
+        }
+        ImGui::Text("query2 10KB %fms", tsc_to_ms(show_elapsed));
+      }
+      {
+        u64 tsc_start = cpu_timer_now();
+        LoopIter (it, pool_begin(g.things)) {
+          var& t = *it;
+          if (FlagHas(t.tflags, ThingFlag_3)) {
+            t.modify0 = 1;
+          }
+        }
+        u64 elapsed = cpu_timer_now() - tsc_start;
+        local u64 show_elapsed;
+        if (time_on_interval(0.1)) {
+          show_elapsed = elapsed;
+        }
+        ImGui::Text("query3 100KB %fms", tsc_to_ms(show_elapsed));
+      }
+
+      u64 elapsed = cpu_timer_now() - tsc_start;
+      local u64 show_elapsed;
+      if (time_on_interval(0.1)) {
+        show_elapsed = elapsed;
+      }
+      ImGui::Text("%fms", tsc_to_ms(show_elapsed));
+      ImGui::Text("4 queries");
+    }
+
+    {
+      // ImTimeScope t;
+      ImGui::Text("array style");
+      u64 tsc_start = cpu_timer_now();
+      {
+        u64 tsc_start = cpu_timer_now();
+
+        Loop (i, MaxEntities) {
+          var& t = g.things.data[i].elem;
+          if (FlagHas(t.tflags, ThingFlag_1)) {
+            t.modify0 = 1;
+          }
+        }
+
+        u64 elapsed = cpu_timer_now() - tsc_start;
+        local u64 show_elapsed;
+        if (time_on_interval(0.1)) {
+          show_elapsed = elapsed;
+        }
+        ImGui::Text("query1 1KB %fms", tsc_to_ms(show_elapsed));
+      }
+      {
+        u64 tsc_start = cpu_timer_now();
+        Loop (i, MaxEntities) {
+          var& t = g.things.data[i].elem;
+          if (FlagHas(t.tflags, ThingFlag_2)) {
+            t.modify0 = 1;
+          }
+        }
+        u64 elapsed = cpu_timer_now() - tsc_start;
+        local u64 show_elapsed;
+        if (time_on_interval(0.1)) {
+          show_elapsed = elapsed;
+        }
+        ImGui::Text("query2 10KB %fms", tsc_to_ms(show_elapsed));
+      }
+      {
+        u64 tsc_start = cpu_timer_now();
+        Loop (i, MaxEntities) {
+          var& t = g.things.data[i].elem;
+          if (FlagHas(t.tflags, ThingFlag_3)) {
+            t.modify0 = 1;
+          }
+        }
+        u64 elapsed = cpu_timer_now() - tsc_start;
+        local u64 show_elapsed;
+        if (time_on_interval(0.1)) {
+          show_elapsed = elapsed;
+        }
+        ImGui::Text("query3 100KB %fms", tsc_to_ms(show_elapsed));
+      }
+
+      u64 elapsed = cpu_timer_now() - tsc_start;
+      local u64 show_elapsed;
+      if (time_on_interval(0.1)) {
+        show_elapsed = elapsed;
+      }
+      ImGui::Text("%fms", tsc_to_ms(show_elapsed));
+      ImGui::Text("4 queries");
+    }
+
+    ImGui::End();
   }
   
 }
@@ -4103,9 +4431,8 @@ void game_save_state() {
     dstr_push(data, "}\n");
   }
   {
-    var& p = g.entities;
-    LoopINode (i, g.entities.first, g.entities.data) {
-      Thing& e = p.data[i].elem;
+    LoopIter (it, pool_begin(g.entities)) {
+      Thing& e = *it;
       dstr_push(data, "Entity {\n");
       dstr_push(data, dumb_struct(scratch, slice(members_of_Entity), &e, e.flags));
       dstr_push(data, "}\n");
@@ -4125,9 +4452,8 @@ void game_load_state() {
   Parser p = parser_make(tokens);
 
   {
-    var& p = g.entities;
-    LoopINode (i, g.entities.first, g.entities.data) {
-      ThingId e_id = pool_get_handle(p, i);
+    LoopIter (it, pool_begin(g.entities)) {
+      ThingId e_id = it.handle();
       destroy_thing(e_id);
     }
   }
@@ -4175,13 +4501,13 @@ void game_init() {
   // g.font = r_font_load("arial.ttf", 512);
 
   R_MeshDesc triangle_mesh = {.vertices = slice(triangle_vertices)};
-  mesh_set(Mesh_Triangle, r_mesh_make(triangle_mesh));
+  mesh_set(Mesh_Triangle, r_make_mesh(triangle_mesh));
   R_MeshDesc grid_mesh = grid_generate(scratch, 100, 1);
-  mesh_set(Mesh_Grid, r_mesh_make(grid_mesh));
+  mesh_set(Mesh_Grid, r_make_mesh(grid_mesh));
   R_MeshDesc axis_mesh = {.vertices = slice(axis_vertices)};
-  mesh_set(Mesh_Axis, r_mesh_make(axis_mesh));
+  mesh_set(Mesh_Axis, r_make_mesh(axis_mesh));
   R_MeshDesc sphere = sphere_generate(scratch);
-  mesh_set(Mesh_Sphere, r_mesh_make(sphere));
+  mesh_set(Mesh_Sphere, r_make_mesh(sphere));
 
   {
     ProfBlock("cube");
@@ -4192,44 +4518,41 @@ void game_init() {
 
   {
     GlobalState& g = *st;
-    var m_load = [&](MeshEnum enum_name, String name) {
+    var load_mesh = [&](MeshEnum enum_name, String name) {
       // R_Mesh id = r_mesh_load(name);
-      R_Mesh id = r_mesh_load_async(name);
+      R_Mesh id = r_load_async_mesh(name);
       g.meshes_ids[enum_name] = id;
       String str = push_str_copy(g.arena, name);
-      map_set(g.str_to_mesh_id, str, id);
-      g.mesh_id_to_str[id.idx] = str;
+      map_set(g.str_to_mesh, str, id);
+      g.mesh_to_str[id.idx] = str;
     };
-    m_load(Mesh_Cube, "cube_ok_uv.glb");
-    m_load(Mesh_MonkeyGlb, "monkey.glb");
-    m_load(Mesh_CubeGlft, "cube.gltf");
-    m_load(Mesh_Barrack, "castle.gltf");
+    load_mesh(Mesh_Cube, "cube_ok_uv.glb");
+    load_mesh(Mesh_MonkeyGlb, "monkey.glb");
+    load_mesh(Mesh_CubeGlft, "cube.gltf");
+    load_mesh(Mesh_Barrack, "castle.gltf");
     // m_load(Mesh_Barrack, "castle.obj");
     // m_load(Mesh_GreeMan, "greenman.glb");
-  
-    // .
-    Info("hello");
 
-    var t_load = [&](TextureEnum enum_name, String name) {
+    var load_tex = [&](TextureEnum enum_name, String name) {
       // R_Texture id = r_texture_load(name);
       R_Texture id = r_load_async_texture(name);
       g.textures_ids[enum_name] = id;
       String str = push_str_copy(g.arena, name);
-      map_set(g.str_to_texture_id, str, id);
-      g.texture_id_to_str[id.idx] = str;
+      map_set(g.str_to_texture, str, id);
+      g.texture_to_str[id.idx] = str;
     };
-    t_load(Texture_Orange, "orange_lines_512.png");
-    t_load(Texture_Container, "container.jpg");
-    t_load(Texture_Barrack, "castle_diffuse.png");
+    load_tex(Texture_Orange, "orange_lines_512.png");
+    load_tex(Texture_Container, "container.jpg");
+    load_tex(Texture_Barrack, "castle_diffuse.png");
   
-    var mat_load = [&](MaterialEnum enum_name, R_MaterialDesc desc) {
+    var load_mat = [&](MaterialEnum enum_name, R_MaterialDesc desc) {
       R_Material id = r_material_make(desc);
       g.materials_ids[enum_name] = id;
       String str = push_str_copy(g.arena, materials_strs[enum_name]);
-      map_set(g.str_to_material_id, str, id);
-      g.material_id_to_str[id.idx] = str;
+      map_set(g.str_to_material, str, id);
+      g.material_to_str[id.idx] = str;
     };
-    mat_load(Material_Orange, {
+    load_mat(Material_Orange, {
       .shader = "e_texture",
       .pipeline_desc = {
         .depth = {
@@ -4240,7 +4563,7 @@ void game_init() {
       .props = material_default_props(),
       .base_color = "orange_lines_512.png",
     });
-    mat_load(Material_Container, {
+    load_mat(Material_Container, {
       .shader = "e_texture",
       .pipeline_desc = {
         .depth = {
@@ -4251,7 +4574,7 @@ void game_init() {
       .props = material_default_props(),
       .base_color = "container.jpg",
     });
-    mat_load(Material_Axis, {
+    load_mat(Material_Axis, {
       .shader = "e_vert_color",
       .pipeline_desc = {
         .primitive_type = Gfx_PrimitiveType_Line,
@@ -4262,7 +4585,7 @@ void game_init() {
       },
       .props = material_default_props(),
     });
-    mat_load(Material_Line, {
+    load_mat(Material_Line, {
       .shader = "e_color",
       .pipeline_desc = {
         .primitive_type = Gfx_PrimitiveType_Line,
@@ -4273,7 +4596,7 @@ void game_init() {
       },
       .props = material_default_props(),
     });
-    mat_load(Material_Barrack, {
+    load_mat(Material_Barrack, {
       .shader = "e_texture",
       .pipeline_desc = {
         .depth = {
@@ -4417,34 +4740,6 @@ struct Query {
 // };
 
 // BitsetQuery do_query(BitSet* bits) { return {.bits = bits}; }
-
-// struct BitIter{
-//   BitSet* bits;
-//   u64 word_i;
-//   u64 word;
-// };
-
-// BitIter bit_iter_begin(BitSet* bits) {
-//   BitIter res = {
-//     .bits = bits,
-//   };
-//   return res;
-// }
-
-// b32 bit_iter_next(BitIter* it, ThingId* out) {
-//   while (it->word == 0) {
-//     if (it->word_i >= bitset_word_count(*it->bits))
-//       return false;
-//     it->word = it->bits->words[it->word_i];
-//     ++it->word_i;
-//   }
-//   u64 bit = ctz(it->word);
-//   u64 word_i = it->word_i - 1;
-//   u64 idx = word_i * 64 + bit;
-//   it->word = remove_lowest_bit(it->word);
-//   *out = pool_get_handle(st->things, idx);
-//   return true;
-// }
 
 void update_some() {
   // LoopLinkPool(it, query.enemy_list) {

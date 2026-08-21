@@ -381,6 +381,7 @@ void intern_free_align(Alloc* alloc, void*ptr, u64 size) {
 
 // mem block: align_pad -> header -> mem -> u32 tail guard
 u8* alloc_alloc(Alloc* alloc, u64 size, u64 align) {
+  #if BUILD_DEBUG
   u64 alloc_size = size + sizeof(u32);
   u8* res = intern_alloc_align(alloc, alloc_size, align);
   AllocHeader* h = OffsetBackStruct(res, AllocHeader);
@@ -388,6 +389,9 @@ u8* alloc_alloc(Alloc* alloc, u64 size, u64 align) {
   h->size = size;
   *OffsetAs(res, u32, size) = MEM_ALLOC_TAIL_GUARD;
   return res;
+  #else
+  return intern_alloc_align(alloc, size, align);
+  #endif
 }
 
 u8* alloc_alloc_zero(Alloc* alloc, u64 size, u64 align)  {
@@ -397,6 +401,7 @@ u8* alloc_alloc_zero(Alloc* alloc, u64 size, u64 align)  {
 }
 
 void alloc_free(Alloc* alloc, void* ptr, u64 size) {
+  #if BUILD_DEBUG
   AllocHeader* h = OffsetBackStruct(ptr, AllocHeader);
   Assert(h->head_guard == MEM_ALLOC_HEADER_GUARD);
   Assert(h->size == size);
@@ -404,6 +409,9 @@ void alloc_free(Alloc* alloc, void* ptr, u64 size) {
   Assert(*tail == MEM_ALLOC_TAIL_GUARD);
   h->head_guard = MEM_DEALLOC_HEADER_GUARD;
   intern_free_align(alloc, ptr, size + sizeof(u32));
+  #else
+  intern_free_align(alloc, ptr, size);
+  #endif
 }
 
 u8* alloc_realloc(Alloc* alloc, void* ptr, u64 old_size, u64 new_size, u64 align) {

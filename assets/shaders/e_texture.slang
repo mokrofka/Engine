@@ -11,7 +11,7 @@ VS_Entry VSOutput vs_main(VSInput in) {
 
 FS_Entry v4 fs_main(VSOutput in) {
   DrawCallData data = get_data(in.id);
-  u32 tex = materials[data.mat].texture;
+  u32 tex = materials[data.mat].tex;
   v4 color = textures[tex].Sample(samplers[1], in.uv);
   return color;
 }

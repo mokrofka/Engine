@@ -26,6 +26,7 @@ typedef float4x4 mat4;
 
 #define VkBind(idx) [[vk::binding(idx, 0)]]
 #define alignas(x)
+#define Glue(a, b) b
 
 v4 operator*(mat4 mat, v4 vec) { return mul(mat, vec); }
 mat4 operator*(mat4 a, mat4 b) { return mul(a, b); }
@@ -34,39 +35,6 @@ global const u32 MaxMaterials = KB(1);
 global const u32 MaxLights = KB(1);
 
 global const f32 PI = 3.14159265358f;
-
-struct Entity {
-};
-
-struct Material {
-  v3 ambient;
-  v3 diffuse;
-  v3 specular;
-  f32 shininess;
-  u32 texture;
-};
-
-struct PointLight {
-  v3 color;
-  v3 pos;
-  f32 intensity;
-  f32 rad;
-};
-
-struct DirLight {
-  v3 color;
-  v3 direction;
-  f32 intensity;
-};
-
-struct SpotLight {
-  v3 color;
-  v3 pos;
-  v3 direction;
-  f32 intensity;
-  f32 inner_cutoff; // Cosine of inner cone angle
-  f32 outer_cutoff; // Cosine of outer cone angle
-};
 
 struct IndirectDrawCall {
   u32 indexCount;
@@ -118,20 +86,13 @@ struct VSOutput {
 
 ///////////////////////////////////
 // UI rect
-struct UI_Rect {
-  v2 dst_p0;
-  v2 dst_p1;
-  v2 src_p0;
-  v2 src_p1;
-  u32 texture;
-  v4 color;
-};
 
 struct UI_VSOutput {
   v4 vert : SV_Position;
   v2 uv;
   v4 color;
   u32 texture;
+  u32 flags;
 };
 
 struct PushConstants {
@@ -141,7 +102,7 @@ struct PushConstants {
 [[vk::push_constant]]
 PushConstants push;
 
-#include "../../src/vk_bindings.slang"
+#include "../../src/shader_header.h"
 
 VkBind(Bindings.Textures)       Texture2D textures[];
 VkBind(Bindings.Samplers)       SamplerState samplers[];
@@ -164,6 +125,8 @@ DrawCallData get_data(u32 draw_id) {
 u32 get_id(u32 draw_id) {
   return push.drawcall_base + draw_id;
 }
+
+bool FlagHas(u64 x, u64 f) { return (x & f) == (f); }
 
 v2 flip_uv_y(v2 uv) { return v2(uv.x, -uv.y); }
 
@@ -194,10 +157,10 @@ f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max) {
 v4 v4_hadamard(v4 a, v4 b) { return v4(a.x*b.x, a.y*b.y, a.z*b.z, a.w*b.w); }
 
 v4 rgba_from_u32(u32 hex) {
-  v4 result = v4(((hex & 0xff000000) >> 24) / 255.f,
-                 ((hex & 0x00ff0000) >> 16) / 255.f,
-                 ((hex & 0x0000ff00) >> 8)  / 255.f,
-                 ((hex & 0x000000ff) >> 0)  / 255.f);
+  v4 result = v4(((hex >>  0) & 0xff) / 255.f,
+                 ((hex >>  8) & 0xff) / 255.f,
+                 ((hex >> 16) & 0xff) / 255.f,
+                 ((hex >> 24) & 0xff) / 255.f);
   return result;
 }
 

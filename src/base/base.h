@@ -62,6 +62,7 @@ typedef va_list VaList;
   #define INLINE   inline __attribute__((always_inline))
   #define NO_ASAN  __attribute__((no_sanitize("address")))
   #define read_only __attribute__((section(".rodata")))
+  #define Packed __attribute__((packed))
 #else
   #error Compiler not supported.
 #endif
@@ -213,10 +214,11 @@ u64 Compose64Bit(u64 a, u64 b);
 u32 next_pow2(u32 v);
 u32 prev_pow2(u32 n);
 
-#define is_finite(x) __builtin_isfinite((x))
-#define is_nan(x)    __builtin_isnan((x))
-#define is_inf(x)    __builtin_isinf((x))
-#define Restrict __restrict
+#define is_finite(x)  __builtin_isfinite((x))
+#define is_nan(x)     __builtin_isnan((x))
+#define is_inf(x)     __builtin_isinf((x))
+#define Restrict      __restrict
+#define Unreachable   __builtin_unreachable()
 
 ////////////////////////////////////////////////////////////////////////
 // Shenanigans
@@ -236,17 +238,16 @@ u32 prev_pow2(u32 n);
 #define Loop(it, c)                      for (i32 it = 0; it < c; ++it)
 #define LoopReverse(it, count)           for (i32 it = (count) - 1; it >= 0; --it)
 #define LoopOff(it, li, hi)              for (i32 it = (li); it < (hi); ++it)
-#define LoopElement(it, array)           for (i32 it = 0; it < ArrayCount(array); ++it)
+#define LoopArr(it, c)                   for (i32 it = 0; it < c.count; ++it)
+#define LoopArray(it, array)             for (i32 it = 0; it < ArrayCount(array); ++it)
 #define LoopEnum(it, type)               for (type it = (type)0; it < type##_COUNT; it = (type)(it+1))
 #define LoopEnumNonZero(it, type)        for (type it = (type)1; it < type##_COUNT; it = (type)(it+1))
 #define LoopRange(it, range)             for (i32 it = (range).min; it < (range).max; ++it)
 #define LoopNode(it, first)              for (var* it = first; it != 0; it = it->next)
 #define LoopNodeReverse(it, last)        for (var* it = last; it != 0; it = it->prev)
-#define LoopINode(it, first, arr)        for (u32 it = first; it != 0; it = (arr)[it].next)
-#define LoopINodeReverse(it, last, arr)  for (u32 it = last; it != 0; it = (arr)[it].prev)
 #define LoopHNode(it, first, arr)        for (var it = first; it.idx != 0; it = (arr)[it.idx].elem.next)
 
-#define LoopLinkPool(it, pool)           for (u32 it = pool.first; it != 0; it = (pool.data)[it].next)
+#define LoopIter(it, foo)                for (var it = foo; it; ++it)
 
 ////////////////////////////////////////////////////////////////////////
 // Asserts
@@ -254,15 +255,15 @@ u32 prev_pow2(u32 n);
 void Trap();
 void DebugTrap();
 
-#define InvalidPath         Assert(!"Invalid Path!")
+#define InvalidPath         (Assert(!"Invalid Path!"), Unreachable)
 #define InvalidDefaultCase  default: {InvalidPath;}
 #define NotImplemented      Assert(!"Not Implemented!")
-#define AssertAlways(x)     if (!(x)) { Trap(); }
-#define NoOp(x)   (void)x
+#define AssertAlways(x)     (x) ? NoOp(0) : Trap()
+#define NoOp(x) (void)(x)
 
 #if BUILD_DEBUG
-  #define Assert(x) ((x) ? (void)0 : DebugTrap())
-  #define AssertMsg(x, message, ...) if (!(x)) { _log_output(LogLevel_Error, message, ##__VA_ARGS__); DebugTrap(); }
+  #define Assert(x) (x) ? NoOp(0) : DebugTrap()
+  #define AssertMsg(x, message, ...) (x) ? NoOp(0) : (_log_output(LogLevel_Error, message, ##__VA_ARGS__), DebugTrap())
 #else
   #define Assert(x)
   #define AssertMsg(x, message, ...)
@@ -530,6 +531,22 @@ void bitset_clear(BitSet& bits, u64 idx);
 b32 bitset_get(BitSet& bits, u64 idx);
 u64 bitset_word_count(BitSet& bits);
 
+template<i32 N> struct BitSetS {
+  u64 words[N];
+  u64 bit_count;
+};
+
+template<i32 N> void bitset_set(BitSetS<N>& bits, u64 idx)   { bits.words[idx >> 6] |= Bit(idx & 63); }
+template<i32 N> void bitset_clear(BitSetS<N>& bits, u64 idx) { bits.words[idx >> 6] &= ~Bit(idx & 63); }
+template<i32 N> b32 bitset_get(BitSetS<N>& bits, u64 idx)    { return (bits.words[idx >> 6] >> (idx & 63)) & 1; }
+template<i32 N> u64 bitset_word_count(BitSetS<N>& bits)      { return (bits.bit_count + 63) / 64; }
+
+template<i32 N> struct BitSetIter {
+  BitSetS<N>* bits;
+  u64 word_i;
+  u64 word;
+};
+
 struct Region {
   union {
     u64 base;
@@ -607,11 +624,11 @@ struct String64 {
 
 struct HotReloadData {
   void* ctx;
-  String lib;
+  String lib_path;
 };
 
 ////////////////////////////////////////////////////////////////////////
-// RandyGaul Coroutine
+// RandyGaul stackless coroutine
 
 #define CoroutineMaxDepth 8
 #define CoroutineCaseOffset (1024 * 1024)
@@ -641,8 +658,6 @@ u8* Restrict _coroutine_var(Coroutine* co, u32 size);
 // Simd
 
 #include <smmintrin.h>
-
-// typedef float __m128 __attribute__((__vector_size__(16), __aligned__(16)));
 
 union f32x4 {
   __m128 p;
@@ -699,4 +714,5 @@ f32x4 simd_clamp01(f32x4 x);
 
 #define SimdShuffle(a, b, c, d) (((d) << 6) | ((c) << 4) | ((b) << 2) | (a))
 #define simd_shuffle(a, b, imm) f32x4(_mm_shuffle_ps(a.p, b.p, imm))
+
 

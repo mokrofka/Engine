@@ -26,22 +26,26 @@ void SinCos(f32 rad, f32* s, f32* c)   { __builtin_sincosf(rad, s, c); }
 f32 SinD(f32 x) { return Sin(deg2rad(x)); }
 f32 CosD(f32 x) { return Cos(deg2rad(x)); }
 
+f32 ceil_to(f32 x, f32 step)  { return Ceil(x / step) * step; }
+f32 floor_to(f32 x, f32 step) { return Floor(x / step) * step; }
+f32 round_to(f32 x, f32 step) { return Round(x / step) * step; }
+
 ////////////////////////////////////////////////////////////////////////
 // Color
 
 v4 rgba_from_u32(u32 hex) {
-  v4 result = v4(((hex & 0xff000000) >> 24) / 255.f,
-                 ((hex & 0x00ff0000) >> 16) / 255.f,
-                 ((hex & 0x0000ff00) >> 8)  / 255.f,
-                 ((hex & 0x000000ff) >> 0)  / 255.f);
+  v4 result = v4(((hex >>  0) & 0xff) / 255.f,
+                 ((hex >>  8) & 0xff) / 255.f,
+                 ((hex >> 16) & 0xff) / 255.f,
+                 ((hex >> 24) & 0xff) / 255.f);
   return result;
 }
 u32 u32_from_rgba(v4 rgba) {
   u32 result = 0;
-  result |= ((u32)((u8)(rgba.w*255.f))) << 24;
-  result |= ((u32)((u8)(rgba.z*255.f))) << 16;
-  result |= ((u32)((u8)(rgba.y*255.f))) <<  8;
   result |= ((u32)((u8)(rgba.x*255.f))) <<  0;
+  result |= ((u32)((u8)(rgba.y*255.f))) <<  8;
+  result |= ((u32)((u8)(rgba.z*255.f))) << 16;
+  result |= ((u32)((u8)(rgba.w*255.f))) << 24;
   return result;
 }
 
@@ -1010,6 +1014,10 @@ f32 rng1_unlerp(Rng1 r, f32 x)       { return Unlerp(r.min, x, r.max); }
 
 ///////////////////////////////////
 // Dim2
+
+f32 rng2u_width(Rng2u r) { return r.x1 - r.x0; }
+f32 rng2u_height(Rng2u r) { return r.y1 - r.y0; }
+
 Rng2 rng2_shift(Rng2 r, v2 x)       { return Rng2(r.min + x, r.max + x);}
 Rng2 rng2_pad(Rng2 r, f32 x)        { return Rng2(r.min - v2(x), r.max + v2(x));}
 v2 rng2_center(Rng2 r)              { return v2((r.min + r.max)/2); }

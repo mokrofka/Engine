@@ -72,6 +72,8 @@ WaitGroup thread_push(TaskDesc desc) {
   return wg;
 }
 
+WaitGroup thread_push(void* ctx, TaskFn* fn, TaskPriority prio) { return thread_push({ctx, fn, prio}); }
+
 WaitGroup thread_push_batch(Slice<TaskDesc> tasks) {
   ThreadPool& g = thread_pool;
   WaitGroup wg = thread_wg_make(tasks.count);

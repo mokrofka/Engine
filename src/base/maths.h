@@ -22,9 +22,9 @@ union v2 {
   };
   f32 v[2];
   v2() = default;
-  explicit v2(f32 s):x(s),y(s){};
-  v2(f32 x, f32 y):x(x),y(y){}
-  v2(const union v2u& v);
+  NO_DEBUG explicit v2(f32 s):x(s),y(s){};
+  NO_DEBUG v2(f32 x, f32 y):x(x),y(y){}
+  NO_DEBUG v2(const union v2u& v);
 };
 
 union v2i {
@@ -107,8 +107,8 @@ union v4 {
   };
   f32 v[4];
   v4() = default;
-  explicit v4(f32 s):x(s),y(s),z(s){};
-  v4(f32 x, f32 y, f32 z, f32 w):x(x),y(y),z(z),w(w){}
+  NO_DEBUG explicit v4(f32 s):x(s),y(s),z(s){};
+  NO_DEBUG v4(f32 x, f32 y, f32 z, f32 w):x(x),y(y),z(z),w(w){}
 };
 
 struct mat3x2 {
@@ -165,6 +165,21 @@ union Rng2 {
   Rng2(v2 min, v2 max):min(min),max(max){}
 };
 
+union Rng2u {
+  struct {
+    v2u min;
+    v2u max;
+  };
+  struct {
+    u32 x0;
+    u32 y0;
+    u32 x1;
+    u32 y1;
+  };
+  Rng2u() = default;
+  Rng2u(v2u min, v2u max):min(min),max(max){}
+};
+
 union Rng3 {
   struct {
     v3 min;
@@ -216,6 +231,10 @@ NO_DEBUG void SinCos(f32 rad, f32* a, f32* b);
 
 NO_DEBUG f32 SinD(f32 x);
 NO_DEBUG f32 CosD(f32 x);
+
+f32 ceil_to(f32 x, f32 step);
+f32 floor_to(f32 x, f32 step);
+f32 round_to(f32 x, f32 step);
 
 ////////////////////////////////////////////////////////////////////////
 // Color
@@ -575,6 +594,10 @@ f32 rng1_unlerp(Rng1 r, f32 x);
 
 ///////////////////////////////////
 // Dim2
+
+f32 rng2u_width(Rng2u r);
+f32 rng2u_height(Rng2u r);
+
 Rng2 rng2_shift(Rng2 r, v2 x);
 Rng2 rng2_pad(Rng2 r, f32 x);
 v2 rng2_center(Rng2 r);

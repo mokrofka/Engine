@@ -181,6 +181,7 @@ intern u32 my_sprintf(u8* buf, String fmt, VaList argc) {
     if (*p != '%') { w_byte(&w, *p); continue; }
     ++p; // skip '%'
     switch (*p) {
+      InvalidDefaultCase;
       case 'i': {
         if (p + 2 < end && (p[1] == '6' && p[2] == '4')) {
           p += 2;
