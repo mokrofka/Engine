@@ -279,6 +279,8 @@ enum {
 };
 
 Introspect struct Thing {
+  u32 nextidx;
+  u32 previdx;
   ThingId parent;
   ThingId next;
   ThingId prev;
@@ -297,8 +299,8 @@ Introspect struct Thing {
   };
   Rng3 aabb;
   v3 vel;
-  R_Mesh mesh;
-  R_Material mat;
+  R_MeshId mesh;
+  R_MaterialId mat;
   v4 color;
   f32 elapsed;
   u8 buf0[64];
@@ -341,22 +343,22 @@ struct GlobalState {
   f64 time;
   u32 current_frame;
   b32 should_hotreload;
-  mat4 view;
-  mat4 projection;
+  m4x4 view;
+  m4x4 projection;
   v4 ambient_color;
 
-  R_Mesh meshes_ids[Mesh_COUNT];
-  R_Texture textures_ids[Texture_COUNT];
-  R_Material materials_ids[Material_COUNT];
+  R_MeshId meshes_ids[Mesh_COUNT];
+  R_TextureId textures_ids[Texture_COUNT];
+  R_MaterialId materials_ids[Material_COUNT];
 
   String asset_dir;
   String shader_dir;
   String shader_compiled_dir;
   String models_dir;
   String textures_dir;
-  Map<String, R_Texture, R_MaxTextures> str_to_texture;
-  Map<String, R_Mesh, R_MaxMeshes> str_to_mesh;
-  Map<String, R_Material, R_MaxMaterials> str_to_material;
+  Map<String, R_TextureId, R_MaxTextures> str_to_texture;
+  Map<String, R_MeshId, R_MaxMeshes> str_to_mesh;
+  Map<String, R_MaterialId, R_MaxMaterials> str_to_material;
   Array<String, R_MaxTextures> texture_to_str;
   Array<String, R_MaxMeshes> mesh_to_str;
   Array<String, R_MaxMaterials> material_to_str;
@@ -372,15 +374,9 @@ struct GlobalState {
   Camera cam;
   R_Camera r_cam;
   b32 fps_camera;
-  Timer timer;
 
   u32 entities_count;
   PoolLinkList<Thing, MaxEntities, ThingId> entities;
-  PoolLinkList<Thing, MaxEntities+1, ThingId> things;
-  BitSetS<MaxEntities> query0;
-  BitSetS<MaxEntities> query1;
-  BitSetS<MaxEntities> query2;
-  BitSetS<MaxEntities> query3;
 
   Darray<ThingId> moving_cubes;
   ThingId axis_attached_to_cam_id;
@@ -388,7 +384,7 @@ struct GlobalState {
   ThingId rotating_cube_id;
   Map<String, ThingId, 32> find_entity;
 
-  R_Font font;
+  R_FontId font;
   v3 a;
   v3 b;
   v2 a_v2;
@@ -490,7 +486,7 @@ Thing& get_thing(ThingId id);
 Transform get_entity_transform(ThingId id);
 
 ThingId e_alloc_bare();
-ThingId e_alloc(R_Mesh mesh_id, R_Material material_id, EntityThing thing = {});
+ThingId e_alloc(R_MeshId mesh_id, R_MaterialId material_id, EntityThing thing = {});
 ThingId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing = {});
 ThingId make_thing(ThingDesc desc);
 void destroy_thing(ThingId id);
@@ -503,9 +499,9 @@ void game_load_state();
 String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, EntityFlags flags = {});
 void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser);
 
-R_Mesh get_mesh(MeshEnum id);
-void mesh_set(MeshEnum mesh_enum, R_Mesh id);
-R_Material get_material(MaterialEnum id);
+R_MeshId get_mesh(MeshEnum id);
+void mesh_set(MeshEnum mesh_enum, R_MeshId id);
+R_MaterialId get_material(MaterialEnum id);
 void assets_load();
 
 

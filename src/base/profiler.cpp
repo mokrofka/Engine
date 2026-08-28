@@ -165,7 +165,7 @@ ProfFrame prof_get_prev_frame(u32 current_frame) {
 
 ProfThread& prof_get_prof_thread() {
   ProfState& g = profiler_st;
-  return g.prof_threads[tctx_get_idx()];
+  return g.prof_threads[tctx_get_id()];
 }
 
 void prof_launch_begin() {

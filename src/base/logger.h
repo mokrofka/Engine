@@ -47,7 +47,6 @@ void println(String fmt, ...);
 
 #if LOG_ERROR_ENABLED
   #define Error(message, ...) _log_output(LogLevel_Error, message, ##__VA_ARGS__);
-  #define ErrorArena(arena, message, ...) _log_output(arena, LogLevel_Error, message, ##__VA_ARGS__);
 #else
   #define Error(message, ...)
 #endif

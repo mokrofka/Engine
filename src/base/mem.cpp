@@ -63,16 +63,16 @@ AllocatorInfo* mem_track_register(Allocator parent_alloc, AllocatorType type, St
   MemZeroStruct(info);
   
   info->type = type;
-  info->thread_idx = tctx_get_idx();
+  info->thread_idx = tctx_get_id();
   str_copy(info->name, name);
   info->parent = parent;
 
   LockScope(mem_track.mutex);
   if (parent) {
-    dll_push_back(parent->first, parent->last, info);
+    dll_list_push_back((*parent), info);
     ++parent->child_count;
   } else {
-    dll_push_back(mem_track.roots.first, mem_track.roots.last, info);
+    dll_list_push_back(mem_track.roots, info);
     ++mem_track.roots.count;
   }
   return info;
@@ -82,10 +82,10 @@ void mem_track_unregister(Allocator alloc) {
   AllocatorInfo* info = mem_track_get_info(alloc);
   LockScope(mem_track.mutex);
   if (info->parent) {
-    dll_remove(info->parent->first, info->parent->last, info);
+    dll_list_remove((*info->parent), info);
     --info->parent->child_count;
   } else {
-    dll_remove(mem_track.roots.first, mem_track.roots.last, info);
+    dll_list_remove(mem_track.roots, info);
     --mem_track.roots.count;
   }
 }
@@ -502,7 +502,6 @@ u8* alloc_realloc_zero(Alloc* alloc, void* ptr, u64 old_size, u64 new_size, u64 
 u8* mem_alloc(Allocator alloc, u64 size, u64 align) {
   switch (alloc.type) {
     case AllocatorType_None: InvalidPath;
-    // case AllocatorType_Global:    return global_alloc(size, align);
     case AllocatorType_Arena:     return arena_alloc((Arena*)alloc.ctx, size, align);
     case AllocatorType_ArenaList: return arena_list_alloc((ArenaList*)alloc.ctx, size, align);
     case AllocatorType_Alloc:     return alloc_alloc((Alloc*)alloc.ctx, size, align);
@@ -511,7 +510,6 @@ u8* mem_alloc(Allocator alloc, u64 size, u64 align) {
 u8* mem_alloc_zero(Allocator alloc, u64 size, u64 align) {
   switch (alloc.type) {
     case AllocatorType_None: InvalidPath;
-    // case AllocatorType_Global:    return global_alloc_zero(size, align);
     case AllocatorType_Arena:     return arena_alloc_zero((Arena*)alloc.ctx, size, align);
     case AllocatorType_ArenaList: return arena_list_alloc((ArenaList*)alloc.ctx, size, align);
     case AllocatorType_Alloc:     return alloc_alloc_zero((Alloc*)alloc.ctx, size, align);
@@ -520,7 +518,6 @@ u8* mem_alloc_zero(Allocator alloc, u64 size, u64 align) {
 u8* mem_realloc(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 align) {
   switch (alloc.type) {
     case AllocatorType_None: InvalidPath;
-    // case AllocatorType_Global:    return global_realloc(ptr, old_size, new_size, align);
     case AllocatorType_Arena:     return arena_realloc((Arena*)alloc.ctx, ptr, old_size, new_size, align);
     case AllocatorType_ArenaList: return arena_list_realloc((ArenaList*)alloc.ctx, ptr, old_size, new_size, align);
     case AllocatorType_Alloc:     return alloc_realloc((Alloc*)alloc.ctx, ptr, old_size, new_size, align);
@@ -529,7 +526,6 @@ u8* mem_realloc(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 alig
 u8* mem_realloc_zero(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 align) {
   switch (alloc.type) {
     case AllocatorType_None: InvalidPath;
-    // case AllocatorType_Global:    return global_realloc_zero(ptr, old_size, new_size, align);
     case AllocatorType_Arena:     return arena_realloc_zero((Arena*)alloc.ctx, ptr, old_size, new_size, align);
     case AllocatorType_ArenaList: return arena_list_realloc_zero((ArenaList*)alloc.ctx, ptr, old_size, new_size, align);
     case AllocatorType_Alloc:     return alloc_realloc_zero((Alloc*)alloc.ctx, ptr, old_size, new_size, align);
@@ -538,7 +534,6 @@ u8* mem_realloc_zero(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64
 void mem_free(Allocator alloc, void* ptr, u64 size) {
   switch (alloc.type) {
     case AllocatorType_None: InvalidPath;
-    // case AllocatorType_Global:    return global_free(ptr, size);
     case AllocatorType_Arena:     return;
     case AllocatorType_ArenaList: return;
     case AllocatorType_Alloc:     return alloc_free((Alloc*)alloc.ctx, ptr, size);

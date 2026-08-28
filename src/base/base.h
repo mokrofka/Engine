@@ -179,13 +179,10 @@ u32 remove_lowest_bit(u64 v);
 
 #define Bit(x) (1 << (x))
 b32 BitHas(u64 x, u64 pos);
-u64 FlagSet(u64 x, u64 f);
 u64 FlagClear(u64 x, u64 f);
 u64 FlagToggle(u64 x, u64 f);
 b32 FlagHas(u64 x, u64 f);
-b32 FlagEquals(u64 x, u64 f);
-b32 FlagIntersects(u64 x, u64 f);
-b32 FlagIsSubset(u64 x, u64 f);
+b32 FlagAny(u64 x, u64 f);
 
 ////////////////////////////////////////////////////////////////////////
 // Common operations
@@ -219,6 +216,7 @@ u32 prev_pow2(u32 n);
 #define is_inf(x)     __builtin_isinf((x))
 #define Restrict      __restrict
 #define Unreachable   __builtin_unreachable()
+#define bit_cast(T, x) __builtin_bit_cast(T, (x))
 
 ////////////////////////////////////////////////////////////////////////
 // Shenanigans
@@ -226,14 +224,14 @@ u32 prev_pow2(u32 n);
 #define ArrayCount(x)   (sizeof((x)) / sizeof((x)[0]))
 #define ArrayRand(arr)  arr[rand_u32_rng(0, ArrayCount(arr)-1)]
 #define ArrayZero(arr)  MemZeroArray((arr), ArrayCount((arr)))
-#define ArrayCopy(d, s) MemCopyArray((d), (s), ArrayCount((d)))
+#define ArrayCopy(d, s) MemCopyArray((d), (s), ArrayCount((s)))
 #define Assign(a,b)    (*((u8**)(&(a))) = (u8*)(b))
 #define _Stringify(S)  #S
 #define Stringify(S)   _Stringify(S)
 #define _Glue(A,B)     A##B
 #define Glue(A,B)      _Glue(A,B)
-#define Transmute(T, x) (*(T*)&(x))
 #define Scope(...)     ({__VA_ARGS__})
+#define Scope1(...)     [&]{__VA_ARGS__}()
 
 #define Loop(it, c)                      for (i32 it = 0; it < c; ++it)
 #define LoopReverse(it, count)           for (i32 it = (count) - 1; it >= 0; --it)
@@ -245,8 +243,8 @@ u32 prev_pow2(u32 n);
 #define LoopRange(it, range)             for (i32 it = (range).min; it < (range).max; ++it)
 #define LoopNode(it, first)              for (var* it = first; it != 0; it = it->next)
 #define LoopNodeReverse(it, last)        for (var* it = last; it != 0; it = it->prev)
-#define LoopHNode(it, first, arr)        for (var it = first; it.idx != 0; it = (arr)[it.idx].elem.next)
-
+#define LoopHNode(it, first, arr)        for (var it = first; it.idx != 0; it = (arr)[it.idx].next)
+#define LoopINode(it, first, arr)        for (var it = first; it != 0; it = (arr)[it].next)
 #define LoopIter(it, foo)                for (var it = foo; it; ++it)
 
 ////////////////////////////////////////////////////////////////////////
@@ -255,16 +253,17 @@ u32 prev_pow2(u32 n);
 void Trap();
 void DebugTrap();
 
-#define InvalidPath         (Assert(!"Invalid Path!"), Unreachable)
 #define InvalidDefaultCase  default: {InvalidPath;}
 #define NotImplemented      Assert(!"Not Implemented!")
 #define AssertAlways(x)     (x) ? NoOp(0) : Trap()
 #define NoOp(x) (void)(x)
 
 #if BUILD_DEBUG
+  #define InvalidPath Assert(!"Invalid Path!")
   #define Assert(x) (x) ? NoOp(0) : DebugTrap()
   #define AssertMsg(x, message, ...) (x) ? NoOp(0) : (_log_output(LogLevel_Error, message, ##__VA_ARGS__), DebugTrap())
 #else
+  #define InvalidPath Unreachable
   #define Assert(x)
   #define AssertMsg(x, message, ...)
 #endif
@@ -365,17 +364,16 @@ void DebugTrap();
 
 ////////////////////////////////////////////////////////////////////////
 // Indexed Doubly Linked List
-// index = 0 is null
 #define IDLL_push_back(arr, first, last, n, next, prev)   \
   ((arr)[n].prev = (last),                                \
    (arr)[n].next = 0,                                     \
    ((last) ? ((arr)[last].next = (n)) : ((first) = (n))), \
    (last) = (n))
 
-#define IDLL_push_front(arr, first, last, n, next, prev) \
-  ((arr)[n].next = (first),                                    \
-   (arr)[n].prev = 0,                                          \
-   ((first) ? ((arr)[first].prev = (n)) : ((last) = (n))),     \
+#define IDLL_push_front(arr, first, last, n, next, prev)   \
+  ((arr)[n].next = (first),                                \
+   (arr)[n].prev = 0,                                      \
+   ((first) ? ((arr)[first].prev = (n)) : ((last) = (n))), \
    (first) = (n))
 
 #define IDLL_remove(arr, first, last, n, next, prev)            \
@@ -438,9 +436,9 @@ void DebugTrap();
 ////////////////////////////////////////////////////////////////////////
 // Handler Linked List
 #define HDLL_push_back(arr, first, last, n, next, prev)           \
-  ((arr)[n.idx].elem.prev = (last),                                    \
-   (arr)[n.idx].elem.next = {},                                        \
-   ((last.idx) ? ((arr)[last.idx].elem.next = (n)) : ((first) = (n))), \
+  ((arr)[n.idx].prev = (last),                                    \
+   (arr)[n.idx].next = {},                                        \
+   ((last.idx) ? ((arr)[last.idx].next = (n)) : ((first) = (n))), \
    (last) = (n))
 
 #define HDLL_remove(arr, first, last, n, next, prev)                                                    \
@@ -457,7 +455,6 @@ void DebugTrap();
 
 ////////////////////////////////////////////////////////////////////////
 // Defer
-
 template<typename F>
 struct _Defer {
   F f;
@@ -467,45 +464,80 @@ struct _Defer {
 #define DeferLoop(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
 #define DeferLoopIf(begin, end) for (int _i_ = (begin); _i_; _i_ = false, (end))
 
-////////////////////////////////////////////////////////////////////////
-// Error handling
-
-template <typename E = b32>
-struct _Unexpected {
-  E e;
-  operator E() const { return e; }
-};
-template <typename E = b32> _Unexpected<E> Err(E err = {}) { return {err}; }
-template<typename T, typename E = b32>
-struct Result {
-  union {
-    T v;
-    E error;
-  };
-  b32 err;
-  Result() = default;
-  Result(T val) : v(val), err(false) {}
-  Result(_Unexpected<E> err_) {
-    v = {};
-    error = err_.e;
-    err = true;
-  }
-  template<typename U> Result(_Unexpected<U> u) : error(E(u.e)), err(true) {}
-  operator T() const { return v; }
+template<typename T>
+struct ResultOk {
+  T value;
+  b32 ok;
 };
 
-#define Try(expr)                         \
-  ({                                      \
-    if (expr.err) return Err(expr.error); \
-    expr.v;                               \
-  })
+template<typename T, typename Err = b32>
+struct ResultErr {
+  T value;
+  Err ok;
+};
 
-#define OrElse(expr, or)   \
-  ({                       \
-    var r = expr.v;        \
-    if (expr.err) r = or ; \
-    r;                     \
-  })
+///////////////////////////////////
+// or_else
+#define OrElse(value, ok, expr, fallback)     \
+  Scope(                                      \
+    var _temp = (expr);                       \
+    _temp.ok ? _temp.value : Scope(fallback); \
+  )
+#define or_else(expr, fallback) OrElse(value, ok, expr, fallback)
+#define OrElseErr(value, err, expr, fallback)   \
+  Scope(                                        \
+    var _temp = (expr);                         \
+    !_temp.err ? _temp.value : Scope(fallback); \
+  )
+#define or_else_err(expr, fallback) OrElseErr(value, err, expr, fallback)
+
+///////////////////////////////////
+// or_return
+#define OrReturn(value, ok, expr) \
+  Scope(                          \
+    var _temp = (expr);           \
+    if (!_temp.ok) return {};     \
+    _temp.value;                  \
+  )
+#define or_return(expr) OrReturn(value, ok, expr)
+#define OrReturnErr(value, err, expr)          \
+  Scope(                                       \
+    var _temp = (expr);                        \
+    if (!_temp.err) return {.err = _temp.err}; \
+    _temp.value;                               \
+  )
+#define or_return_err(expr) OrReturn(value, err, expr)
+
+///////////////////////////////////
+// or_continue
+#define OrContinue(value, ok, expr) \
+  Scope(                            \
+    var _temp = (expr);             \
+    if (!_temp.ok) continue;        \
+    _temp.value;                    \
+  )
+#define or_continue(expr) OrContinue(value, ok, expr)
+#define OrContinueErr(value, err, expr)   \
+  Scope(                                  \
+    var _temp = (expr);                   \
+    if (_temp.err) continue; _temp.value; \
+  )
+#define or_continue_err(expr) OrContinueErr(value, err, expr)
+
+///////////////////////////////////
+// or_break
+#define OrBreak(value, ok, expr)       \
+  Scope(                               \
+    var _temp = (expr);                \
+    if (!_temp.ok) break; _temp.value; \
+  )
+#define or_break(expr) OrBreak(value, ok, expr)
+#define OrBreakErr(value, err, expr)   \
+  Scope(                               \
+    var _temp = (expr);                \
+    if (_temp.err) break; _temp.value; \
+  )
+#define or_break_err(expr) OrBreakErr(value, err, expr)
 
 ////////////////////////////////////////////////////////////////////////
 // Types
@@ -593,6 +625,8 @@ struct Slice {
   }
   Slice(T* data_, u64 count_) { data = data_; count = count_; }
   Slice() = default;
+  T* begin() { return data; }
+  T* end() { return data + count; }
 };
 template<typename T> Slice<T> slice(Slice<T> a, u64 li, u64 hi)      { Assert(li <= hi && hi <= a.count); return Slice(a.data + li, hi - li); }
 template<typename T> Slice<T> slice_n(Slice<T> a, u64 off, u64 size) { Assert(off+size <= a.count); return Slice(a.data + off, size); }

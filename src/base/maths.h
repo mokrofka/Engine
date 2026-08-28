@@ -66,11 +66,13 @@ union v3 {
     f32 y;
     f32 z;
   };
+  struct {
+    v2 xy;
+  };
   f32 v[3];
   v3() = default;
   explicit v3(f32 s):x(s),y(s),z(s){};
   v3(f32 x, f32 y, f32 z):x(x),y(y),z(z){}
-  v2 xy() { return v2(x,y); };
 };
 
 union v3u {
@@ -111,21 +113,15 @@ union v4 {
   NO_DEBUG v4(f32 x, f32 y, f32 z, f32 w):x(x),y(y),z(z),w(w){}
 };
 
-struct mat3x2 {
-  f32 v[3][2];
-};
+struct m2x2 { f32 v[2][2]; };
+struct m3x2 { f32 v[3][2]; };
+struct m3x3   { f32 v[3][3]; };
+struct m4x3 { f32 v[4][3]; };
+struct m4x4   { f32 v[4][4]; };
 
-struct mat3 {
-  f32 v[3][3];
-};
-
-struct mat4x3 {
-  f32 v[4][3];
-};
-
-struct mat4 {
-  f32 v[4][4];
-};
+// typedef mat4 m4x4;
+// typedef mat3 m3x3;
+// typedef mat2x2 m2x2;
 
 ////////////////////////////////////////////////////////////////////////
 // Ranges
@@ -428,7 +424,7 @@ NO_DEBUG f32 v3_angle(v3 a, v3 b);
 v3 v3_approach(v3 current, v3 target, f32 step);
 v3 v3_clamp_length(f32 min, v3 v, f32 max);
 
-NO_DEBUG v3  v3_pos_of_mat4(mat4 mat);
+NO_DEBUG v3  v3_pos_of_mat4(m4x4 mat);
 NO_DEBUG v3  v3_rotate_x(v3 v, f32 rad);
 NO_DEBUG v3  v3_rotate_y(v3 v, f32 rad);
 NO_DEBUG v3  v3_rotate_z(v3 v, f32 rad);
@@ -493,60 +489,78 @@ v4 quat_from_euler(v3 e);
 v4 quat_look_rotation(v3 dir, v3 up);
 
 ////////////////////////////////////////////////////////////////////////
-// Matrix2
+// m2x2
+
+m2x2 operator*(m2x2 a, m2x2 b);
+m2x2& operator*=(m2x2& a, m2x2 b);
+v2 operator*(m2x2 mat, v2 v);
+m2x2 m2x2_identity();
+m2x2 m2x2_rotate(f32 rad);
+m2x2 m2x2_scale(v2 scale);
+m2x2 m2x2_inverse(m2x2 m);
+m2x2 m2x2_scale_all_elements(m2x2 mat, f32 scale);
+
+////////////////////////////////////////////////////////////////////////
+// Maxtrix3x2
+
+m3x2 operator*(m3x2 a, m3x2 b);
+m3x2& operator*=(m3x2 a, m3x2 b);
+v2 operator*(m3x2 a, v2 b);
 
 ////////////////////////////////////////////////////////////////////////
 // Matrix3
 
-mat3x2 operator*(mat3x2 a, mat3x2 b);
-mat3x2& operator*=(mat3x2 a, mat3x2 b);
-v2 operator*(mat3x2 a, v2 b);
+m3x3 operator*(m3x3 a, m3x3 b);
+m3x3& operator*=(m3x3& a, m3x3 b);
+v3 operator*(m3x3 mat, v3 vec);
 
-mat3 operator*(mat3 a, mat3 b);
-mat3& operator*=(mat3& a, mat3 b);
-v3 operator*(mat3 mat, v3 vec);
+m3x3 m3x3_identity();
+m3x3 m3x3_translate(v2 pos);
+m3x3 m3x3_scale(v2 scale);
+m3x3 m3x3_rotate(f32 rad);
+m3x3 m3x3_inverse(m3x3 m);
+m3x3 m3x3_scale_all_elements(m3x3 m, f32 scale);
 
-mat3 mat3_identity();
-mat3 mat3_translate(v2 pos);
-mat3 mat3_scale(v2 scale);
+////////////////////////////////////////////////////////////////////////
+// Matrix4x3
 
 ////////////////////////////////////////////////////////////////////////
 // Matrix4
 
-mat4 operator*(mat4 a, mat4 b);
-mat4& operator*=(mat4& a, mat4 b);
-v4 operator*(mat4 mat, v4 v);
+m4x4 operator*(m4x4 a, m4x4 b);
+m4x4& operator*=(m4x4& a, m4x4 b);
+v4 operator*(m4x4 mat, v4 v);
 
-v3 mat4_forward(mat4 matrix);
-v3 mat4_backward(mat4 matrix);
-v3 mat4_up(mat4 matrix);
-v3 mat4_down(mat4 matrix);
-v3 mat4_right(mat4 matrix);
-v3 mat4_left(mat4 matrix);
+v3 m4x4_forward(m4x4 matrix);
+v3 m4x4_backward(m4x4 matrix);
+v3 m4x4_up(m4x4 matrix);
+v3 m4x4_down(m4x4 matrix);
+v3 m4x4_right(m4x4 matrix);
+v3 m4x4_left(m4x4 matrix);
 
-mat4 mat4_identity();
-mat4 mat4_translate(v3 pos);
-mat4 mat4_scale(v3 scale);
-mat4 mat4_scale_all_elements(mat4 mat, f32 scale);
-mat4 mat4_rotate_x(f32 rad);
-mat4 mat4_rotate_y(f32 rad);
-mat4 mat4_rotate_z(f32 rad);
-mat4 mat4_rotate_xyz(v3 rad);
-mat4 mat4_rotate_around_axis(v3 axis, f32 rad);
-mat4 mat4_transform(v3 pos, v4 rot, v3 scale);
-mat4 mat4_transform(Transform trans);
-mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far);
-mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far);
-mat4 mat4_look_at(v3 pos, v3 target, v3 up = v3_up());
-mat4 mat4_transpose(mat4 matrix);
-mat4 mat4_inverse(mat4 matrix);
-mat4 mat4_from_quat(v4 q);
+m4x4 m4x4_identity();
+m4x4 m4x4_translate(v3 pos);
+m4x4 m4x4_scale(v3 scale);
+m4x4 m4x4_scale_all_elements(m4x4 mat, f32 scale);
+m4x4 m4x4_rotate_x(f32 rad);
+m4x4 m4x4_rotate_y(f32 rad);
+m4x4 m4x4_rotate_z(f32 rad);
+m4x4 m4x4_rotate_xyz(v3 rad);
+m4x4 m4x4_rotate_around_axis(v3 axis, f32 rad);
+m4x4 m4x4_transform(v3 pos, v4 rot, v3 scale);
+m4x4 m4x4_transform(Transform trans);
+m4x4 m4x4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far);
+m4x4 m4x4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far);
+m4x4 m4x4_look_at(v3 pos, v3 target, v3 up = v3_up());
+m4x4 m4x4_transpose(m4x4 matrix);
+m4x4 m4x4_inverse(m4x4 matrix);
+m4x4 m4x4_from_quat(v4 q);
 
 ////////////////////////////////////////////////////////////////////////
 // Misc
 
 Ray ray_make(v3 pos, v3 dir);
-Ray ray_from_screen(v2 screen_pos, v2u viewport_rect, v3 origin, mat4 view, mat4 projection);
+Ray ray_from_screen(v2 screen_pos, v2u viewport_rect, v3 origin, m4x4 view, m4x4 projection);
 
 ////////////////////////////////////////////////////////////////////////
 // Range Ops
@@ -603,6 +617,8 @@ Rng2 rng2_pad(Rng2 r, f32 x);
 v2 rng2_center(Rng2 r);
 b32 rng2_contains(Rng2 r, v2 x);
 v2 rng2_dim(Rng2 r);
+f32 rng2_width(Rng2 r);
+f32 rng2_height(Rng2 r);
 Rng2 rng2_union(Rng2 a, Rng2 b);
 Rng2 rng2_intersect(Rng2 a, Rng2 b);
 v2 rng2_clamp(Rng2 r, v2 x);
@@ -642,6 +658,9 @@ struct Rng2Cursor {
 
 Rng2 layout_row(Rng2Cursor& c, Rng1 x, f32 h);
 void layout_next(Rng2Cursor& c, f32 h);
+
+f32 smoothstep(f32 t);
+f32 smootherstep(f32 t);
 
 ////////////////////////////////////////////////////////////////////////
 // Ease

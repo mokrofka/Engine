@@ -16,10 +16,10 @@ enum Bindings {
 };
 
 struct GpuState {
-  alignas(16) mat4 projection_view;
-  alignas(16) mat4 projection;
-  alignas(16) mat4 view;
-  mat4 mat;
+  alignas(16) m4x4 projection_view;
+  alignas(16) m4x4 projection;
+  alignas(16) m4x4 view;
+  m4x4 mat;
   alignas(16) v4 ambient_color;
   u64 p;
   v2 res;
@@ -33,7 +33,7 @@ struct GpuState {
 };
 
 struct Glue(Gpu, DrawCall) {
-  alignas(16) mat4 model;
+  alignas(16) m4x4 model;
   alignas(16) v4 color;
   u32 tex;
   u32 mat;
@@ -75,13 +75,17 @@ struct Glue(Gpu, SpotLight) {
 global const u32 GpuUI_RectFlag_IsFont = Bit(0);
 
 struct Glue(Gpu, UI_Rect) {
-  v2 dst_p0;
-  v2 dst_p1;
-  v2 src_p0;
-  v2 src_p1;
+  alignas(8) v2 dst_p0;
+  alignas(8) v2 dst_p1;
+  alignas(8) v2 src_p0;
+  alignas(8) v2 src_p1;
+  alignas(16) v4 colors[4];
   u32 texture;
-  alignas(16) v4 color;
   u32 flags;
+  f32 corner_radius;
+  f32 edge_softness;
 };
+
+
 
 

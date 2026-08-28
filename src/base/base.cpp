@@ -44,13 +44,10 @@ u32 remove_highest_bitu32(u32 v)   { return v ^ (1u << most_significant_bitu32(v
 u64 remove_highest_bitu64(u64 v)   { return v ^ (1u << most_significant_bitu64(v)); }
 
 b32 BitHas(u64 x, u64 pos)       { return x & (1 << pos); }
-u64 FlagSet(u64 x, u64 f)        { return x | f; }
 u64 FlagClear(u64 x, u64 f)      { return x & ~f; }
 u64 FlagToggle(u64 x, u64 f)     { return x ^ f; }
 b32 FlagHas(u64 x, u64 f)        { return (x & f) == (f); }
-b32 FlagEquals(u64 x, u64 f)     { return x == f; }
-b32 FlagIntersects(u64 x, u64 f) { return (x & f) > 0; }
-b32 FlagIsSubset(u64 x, u64 f)   { return (x & ~f) == 0; }
+b32 FlagAny(u64 x, u64 f)        { return x & f; }
 
 ////////////////////////////////////////////////////////////////////////
 // Common operations
@@ -410,4 +407,158 @@ f32x4 simd_clamp01(f32x4 x)                 { return simd_clamp(simd_zero(), x, 
 //   }
 
 //   u32 a = 1;
+// }
+
+
+
+// template<i32 N> struct BitSetIter1 {
+//   BitSetS<N>* bits;
+//   u64 word_i;
+//   u64 word;
+//   operator bool() {
+//     while (word == 0) {
+//       if (word_i >= bitset_word_count(*bits))
+//         return false;
+//       word = bits->words[word_i];
+//       ++word_i;
+//     }
+//     // u64 bit = ctz(word);
+//     u64 word_i = word_i - 1;
+//     // u64 idx = word_i * 64 + (64-bit);
+//     word = remove_lowest_bit(word);
+//     return true;
+//   }
+//   BitSetIter1& operator++() {}
+//   // T& operator*() {
+//   // }
+// };
+
+// template<i32 N> BitSetIter<N> bit_iter_begin(BitSetS<N>* bits) {
+//   BitSetIter res = {
+//     .bits = bits,
+//   };
+//   return res;
+// }
+
+// template<i32 N> b32 bit_iter_next(BitSetIter<N>* it, ThingId* out) {
+//   while (it->word == 0) {
+//     if (it->word_i >= bitset_word_count(*it->bits))
+//       return false;
+//     it->word = it->bits->words[it->word_i];
+//     ++it->word_i;
+//   }
+//   u64 bit = ctz(it->word);
+//   u64 word_i = it->word_i - 1;
+//   u64 idx = word_i * 64 + (64-bit);
+//   it->word = remove_lowest_bit(it->word);
+//   *out = pool_get_handle(st->things, idx);
+//   return true;
+// }
+
+// typedef u32 EntityId;
+// struct Entity {
+//   u32 slot;
+//   // ...
+// };
+
+// Array<Entity, 1024> entities;
+// Array<EntityId, 128> specific_entities;
+
+// void push_to_specific(EntityId id) {
+//   Entity* e = &entities[id];
+//   u32 idx = specific_entities.count;
+//   array_push(specific_entities, id);
+//   e->slot = idx;
+// }
+// void remove_from_specific(EntityId id) {
+//   Entity* e = &entities[id];
+
+//   u32 idx = e->slot;
+//   u32 last = specific_entities.count - 1;
+//   EntityId moved = specific_entities[last];
+
+//   specific_entities[idx] = moved;
+//   --specific_entities.count;
+
+//   entities[moved].slot = idx;
+// }
+
+// template <typename T> f64 benchmark(T func, u32 iterations) {
+//   u64 start = cpu_timer_now();
+
+//   Loop(i, iterations) {
+//     func();
+//   }
+
+//   return tsc_to_ms(cpu_timer_now() - start);
+// }
+
+
+// struct Node {
+//   ThingId id;
+//   u32 next;
+//   u32 prev;
+// };
+
+// struct List {
+//   u32 first;
+//   u32 last;
+// };
+
+// Poolu32<Node, 128> pool;
+
+// void list_push(List& l, ThingId id) {
+//   u32 idx = pool_push(pool, {id});
+//   idll_list_push_back(pool.data, l, idx);
+// }
+// void list_remove(List& l, u32 idx) {
+//   idll_list_remove(pool.data, l, idx);
+//   pool_remove(pool, idx);
+// }
+
+// void foo() {
+//   List x_list = {};
+//   // list_push(pool, x_list, ThingId{1});
+//   list_push(x_list, ThingId{1});
+//   list_push(x_list, ThingId{2});
+//   list_push(x_list, ThingId{3});
+
+//   {
+//     Scratch scratch;
+//     struct Node {
+//       u32 i;
+//       Node* next;
+//       Node* prev;
+//     };
+//     struct List {
+//       Node* first;
+//       Node* last;
+//     };
+//     List list = {};
+//     Loop (i, 10) {
+//       Node* n = push_struct(scratch, Node);
+//       n->i = i;
+//       dll_list_push_back(list, n);
+//     }
+//     LoopNode (it, list.first) {
+//       Info("%i", it->i);
+//     }
+//   }
+
+//   LoopIter (it, pool_begin(pool, x_list.first)) {
+//     Info("%i", (*it).id);
+//   }
+//   list_remove(x_list, x_list.first);
+//   LoopIter (it, pool_begin(pool, x_list.first)) {
+//     Info("%i", (*it).id);
+//   }
+
+//   // LoopINode (it, x_list.first, pool.data) {
+//   //   Info("%i", it);
+//   // }
+
+//   // list_push<Node, 128, List>(pool, x_list, id);
+//   // list_push(pool, x_list, ThingId{1});
+//   // list_push(pool, x_list, {2});
+//   // list_push(pool, x_list, {3});
 // }

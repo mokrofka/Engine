@@ -8,45 +8,9 @@
 
 ///////////////////////////////////
 // Allocators
-extern u32 GlobalInt;
-C_LINKAGE void global_info();
 
 const u32 TEST_SAMPLES = 100;
 global i32 test_alignments[] = { 8, 16, 32, 64 };
-
-intern void test_global_alloc() {
-  // struct Mem {
-  //   u8* data;
-  //   u64 size;
-  // };
-  // Array<Mem, TEST_SAMPLES> arr = {};
-  // Allocator alloc = {.type = AllocatorType_Global};
-
-  // Loop (i, TEST_SAMPLES) {
-  //   u64 size = rand_rng_u32(8, KB(1));
-  //   u64 align = ArrayRand(test_alignments);
-  //   array_push(arr, {mem_alloc(alloc, size, align), size});
-  //   MemZero(arr[i].data, size);
-  // }
-  // Array<u32, TEST_SAMPLES> indices = {};
-  // Loop(i, TEST_SAMPLES) array_push(indices, i);
-  // rand_shuffle(slice(indices));
-  // Loop (i, TEST_SAMPLES) {
-  //   mem_free(alloc, arr[indices[i]].data, arr[indices[i]].size);
-  // }
-
-  // array_clear(arr);
-  // Loop (i, TEST_SAMPLES) {
-  //   u64 size = rand_rng_u32(8, KB(1));
-  //   u64 align = ArrayRand(test_alignments);
-  //   array_push(arr, {mem_alloc(alloc, size, align), size});
-  //   MemZero(arr[i].data, size);
-  // }
-  // rand_shuffle(slice(indices));
-  // Loop (i, TEST_SAMPLES) {
-  //   mem_free(alloc, arr[indices[i]].data, arr[indices[i]].size);
-  // }
-}
 
 intern void test_arena_alloc() {
   Arena arena = arena_make();
@@ -346,16 +310,16 @@ intern void test_id_pool() {
     IdPool id_pool = id_pool_make(scratch);
     Array<u32, TEST_SAMPLES> arr = {};
     Loop (i, TEST_SAMPLES) {
-      u32 id = id_pool_alloc(id_pool);
+      u32 id = id_pool_push(id_pool);
       array_push(arr, id);
     }
     rand_shuffle(slice(arr));
     Loop (i, arr.count) {
-      id_pool_free(id_pool, arr[i]);
+      id_pool_remove(id_pool, arr[i]);
     }
     Array<u32, TEST_SAMPLES> new_arr = {};
     Loop (i, arr.count) {
-      u32 id = id_pool_alloc(id_pool);
+      u32 id = id_pool_push(id_pool);
       array_push(new_arr, id);
     }
     Loop (i, arr.count) {
@@ -369,7 +333,7 @@ intern void test_id_pool() {
       AssertAlways(exists);
     }
     Loop (i, arr.count) {
-      id_pool_free(id_pool, new_arr[i]);
+      id_pool_remove(id_pool, new_arr[i]);
     }
   }
 
@@ -889,7 +853,6 @@ void test() {
   // test_sort();
   // os_exit(0);
   test_alloc();
-  test_global_alloc();
   test_arena_alloc();
   test_arena_list_alloc();
   test_seglist_alloc();
@@ -2072,7 +2035,7 @@ b32 time_on_time(f64 time, f64 timestamp) {
 b32 time_on_between_interval(f64 time, f32 interval, f32 offset) {
   return Mod(time - offset, interval*2) >= interval;
 }
-b32 time_on_between_interval(f32 interval, f32 offset) {
+b32 time_on_between_interval(f32 interval, f32 offset = 0) {
   return time_on_between_interval(get_time(), interval, offset);
 }
 f32 time_sine_wave(f64 time, f32 period, f32 amplitude = 1.0f) {
@@ -2187,8 +2150,10 @@ R_MeshDesc load_obj(Allocator arena, String name) {
   var map = map_make(v3u, u32, scratch);
   Loop (i, indexes.count) {
     v3u idx = indexes[i];
-    var r = map_get(map, idx);
-    if (r.err) {
+    var [value, ok] = map_get(map, idx);
+    if (ok) {
+      array_push(final_indices, value);
+    } else {
       R_Vertex v = {
         positions[idx.x],
         normals[idx.y],
@@ -2198,9 +2163,7 @@ R_MeshDesc load_obj(Allocator arena, String name) {
       array_push(vertices, v);
       array_push(final_indices, new_index);
       map_set(map, idx, new_index);
-    } else {
-      array_push(final_indices, (u32)r);
-    }
+    } 
   }
   R_MeshDesc mesh = {
     .vertices = slice(vertices),
@@ -2366,16 +2329,16 @@ global String materials_strs[] = {
 #undef X
 };
 
-R_Mesh get_mesh(MeshEnum mesh_enum) { return st->meshes_ids[mesh_enum]; }
-R_Texture get_texture(TextureEnum tex_enum) { return st->textures_ids[tex_enum]; }
-void mesh_set(MeshEnum mesh_enum, R_Mesh id) { 
+R_MeshId get_mesh(MeshEnum mesh_enum) { return st->meshes_ids[mesh_enum]; }
+R_TextureId get_texture(TextureEnum tex_enum) { return st->textures_ids[tex_enum]; }
+void mesh_set(MeshEnum mesh_enum, R_MeshId id) { 
   GlobalState& g = *st;
   g.meshes_ids[mesh_enum] = id;
   String str = push_str_copy(g.arena, meshes_strs[mesh_enum]);
   map_set(g.str_to_mesh, str, id);
   g.mesh_to_str[id.idx] = str;
 }
-R_Material get_material(MaterialEnum id) { return st->materials_ids[id]; }
+R_MaterialId get_material(MaterialEnum id) { return st->materials_ids[id]; }
 
 constexpr R_MaterialProps material_default_props() {
   R_MaterialProps props = {
@@ -2749,11 +2712,11 @@ String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, 
         dstr_push(string, push_strf(scratch, "%s %f %f %f %f %f %f\n", member.name, v.min.x,v.min.y,v.min.z, v.max.x,v.max.y,v.max.z));
       } break;
       case MetaType_MeshId: {
-        R_Mesh v = *(R_Mesh*)member_ptr;
+        R_MeshId v = *(R_MeshId*)member_ptr;
         dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->mesh_to_str[v.idx]));
       } break;
       case MetaType_MaterialId: {
-        R_Material v = *(R_Material*)member_ptr;
+        R_MaterialId v = *(R_MaterialId*)member_ptr;
         dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->material_to_str[v.idx]));
       } break;
       case MetaType_String: {
@@ -2815,15 +2778,15 @@ void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser
       } break;
       case MetaType_MeshId: {
         Token tok = tok_require(p, TokenType_String);
-        var mesh = map_get(st->str_to_mesh, tok.str);
-        Assert(!mesh.err);
-        *(R_Mesh*)mem = mesh;
+        var [mesh, ok] = map_get(st->str_to_mesh, tok.str);
+        Assert(ok);
+        *(R_MeshId*)mem = mesh;
       } break;
       case MetaType_MaterialId: {
         Token tok = tok_require(p, TokenType_String);
-        var material = map_get(st->str_to_material, tok.str);
-        Assert(!material.err);
-        *(R_Material*)mem = material;
+        var [material, ok] = map_get(st->str_to_material, tok.str);
+        Assert(ok);
+        *(R_MaterialId*)mem = material;
       } break;
       case MetaType_String: {
         Token tok = tok_require(p, TokenType_String);
@@ -3050,128 +3013,8 @@ void co_test(Coroutine* co, f32 dt) {
   co_end(co);
 }
 
-struct Packed Packed2 {
-  u8 a;
-  u32 b;
-  u32 c;
-  u64 d;
-};
-
 void init() {
   Scratch scratch;
-
-  struct Vec {
-    f32 a,b;
-  };
-  struct A {
-    u8 a0 : 1;
-    u8 a1 : 1;
-    u8 a2 : 1;
-    u8 a3 : 1;
-    u8 a4 : 1;
-    u8 a5 : 1;
-    u8 a6 : 1;
-    u8 a7 : 1;
-  };
-  // v3 pos = v3(1);
-  {
-    A a = {};
-    a.a0 = true;
-    a.a5 = true;
-    Info("%i", a.a0);
-  }
-  // Vec v = {1};
-  // v2 p = v2(Scope(f32 x = os_window_size().x; x * 2;));
-
-  f32x4 a = {
-    1,2,3,4
-  };
-  f32x4 b = {
-    11,22,33,44
-  };
-  f32x4 c = simd_shuffle(a, b, SimdShuffle(1,2,2,3));
-  Loop (i, 4) {
-    Info("%f", c.v[i]);
-  }
-  c = simd_shuffle(a, b, SimdShuffle(0,1,2,3));
-  Loop (i, 4) {
-    Info("%f", c.v[i]);
-  }
-  // f32x8 v8 = f32x8_load(ar);
-
-  // v2 v = v2(1,2);
-
-
-  // v2 v1 = {1,2};
-
-  // struct V2 {
-  //   f32 x,y;
-  // };
-  
-  // {
-  //   V2 vec2 = v2(1,2);
-  //   V3 vec3 = v3(1,2,3);
-  //   Mat3 m3 = mat3();
-  //   Mat4 m4 = mat4();
-  // }
-
-  // var arr = array_make(String, scratch);
-  // array_push(arr, S("slangc"), S("hello"), S("-target"), S("spriv"), S("-g"), S("-o"));
-
-  // String hay = "some sentence I have here";
-  // String needle = "I";
-  // Info("%s", str_make(hay.str + str_find_needle(hay, needle), needle.size));
-  // Info("%s", str_chop_last_slash("hello"));
-  // Info("%s", str_skip_last_slash("hello/my/sir"));
-  // Info("%s", str_skip_slash("hello/my/sir"));
-  // f32 x = 1.0/0;
-  // if (is_inf(x)) {
-  //   Info("inf %f", x);
-  //   printf("%f\n", x);
-  // }
-  // x = 1.0;
-  // printf("%f", x);
-  // printf("%f", x);
-  // printf("%.1f", x);
-  // fflush(stdout);
-  // Info("%.1f", x);
-  // if (is_finite(x)) {
-  //   Info("finite %f", x);
-  //   printf("%f\n", x);
-  // }
-  // x = 0.0 / 0.0;
-  // if (is_nan(x)) {
-  //   Info("nan %f", x);
-  //   printf("%f\n", x);
-  // }
-  // Info("%p", &x);
-  // MakeId(A_ID)
-  // struct A {
-  //   A_ID next;
-  //   A_ID prev;
-  // };
-  // A_ID first = {};
-  // A arr[128];
-  // for (u32 i = first.idx; i; i = arr[i].next.idx) {
-  // }
-  // {
-  //   struct List {
-  //     A_ID first;
-  //     A_ID last;
-  //   } list = {};
-  //   A_ID thing = {};
-  //   // hdll_push_back(arr, list.first, list.last, thing);
-  // }
-
-  // LoopHNode (i, first, arr) {
-  //   A* d = &arr[i.idx];
-  // }
-  // {
-  //   struct List {
-  //     u32 first;
-  //     u32 last;
-  //   };
-  // }
 
   foo_js();
   GlobalState& g = *st;
@@ -3457,7 +3300,7 @@ ThingId e_alloc_bare() {
   return e_id;
 }
 
-ThingId e_alloc(R_Mesh mesh_id, R_Material material_id, EntityThing thing) {
+ThingId e_alloc(R_MeshId mesh_id, R_MaterialId material_id, EntityThing thing) {
   var& g = *st;
   Thing e = {
     .name = thing.name,
@@ -3505,7 +3348,7 @@ void select_obj() {
   v3 dir = ray_from_screen(os_mouse_pos(), os_window_size(), g.cam.pos, st->view, st->projection).dir;
   ThingId e_id = e_alloc(Mesh_Cube, Material_Orange);
   Thing& e = get_thing(e_id);
-  // e.pos() = st->cam.pos + v3_norm(mat4_forward(st->cam.view));
+  // e.pos() = st->cam.pos + v3_norm(m4x4_forward(st->cam.view));
   e.pos = g.cam.pos;
   e.scale = v3(0.3);
   e.vel = dir * 4;
@@ -3525,16 +3368,16 @@ void camera_init() {
     SinD(cam.pitch),
     SinD(cam.yaw) * CosD(cam.pitch)
   };
-  st->view = mat4_look_at(cam.pos, cam.dir, v3_up());
+  st->view = m4x4_look_at(cam.pos, cam.dir, v3_up());
 }
 
 void camera_update() {
   var& g = *st;
   Camera& cam = g.cam;
   v2 win_size = v2_of_v2u(os_window_size());
-  mat4& projection = st->projection;
-  mat4& view = st->view;
-  projection = mat4_perspective(deg2rad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
+  m4x4& projection = st->projection;
+  m4x4& view = st->view;
+  projection = m4x4_perspective(deg2rad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
 
   // Camera rotation
   {
@@ -3569,19 +3412,19 @@ void camera_update() {
     cam.accel = {};
     f32 speed = 320;
     if (os_key_is_down(Key_W)) {
-      v3 forward = mat4_forward(view);
+      v3 forward = m4x4_forward(view);
       cam.accel += forward;
     }
     if (os_key_is_down(Key_S)) {
-      v3 backward = mat4_backward(view);
+      v3 backward = m4x4_backward(view);
       cam.accel += backward;
     }
     if (os_key_is_down(Key_Q)) {
-      v3 left = mat4_left(view);
+      v3 left = m4x4_left(view);
       cam.accel += left;
     }
     if (os_key_is_down(Key_E)) {
-      v3 right = mat4_right(view);
+      v3 right = m4x4_right(view);
       cam.accel += right;
     }
     if (os_key_is_down(Key_Space)) {
@@ -3620,7 +3463,7 @@ void camera_update() {
     SinD(cam.pitch),
     SinD(cam.yaw) * CosD(cam.pitch)
   };
-  view = mat4_look_at(cam.pos, cam.pos + cam.dir);
+  view = m4x4_look_at(cam.pos, cam.pos + cam.dir);
 }
 
 void init_scene() {
@@ -3779,39 +3622,6 @@ void init_scene() {
     // g.t_id = make_thing(THING_DESC(.pos = v3(1,1,1), .scale = v3(3)));
   }
 
-  {
-    Loop (i, MaxEntities) {
-      var& t = pool_get(g.things, pool_push(g.things));
-      t.pos = v3(1*i,2*i,3*i);
-    }
-
-    g.query0.bit_count = MaxEntities / 64;
-    g.query1.bit_count = MaxEntities / 64;
-    g.query2.bit_count = MaxEntities / 64;
-    g.query3.bit_count = MaxEntities / 64;
-    Loop (i, MaxEntities) {
-    // bitset_set(g.query0, rand_u32_rng(1, MaxEntities));
-    }
-
-    Loop (i, KB(1)) {
-      u32 id = rand_u32_rng(1, MaxEntities);
-      bitset_set(g.query1, id);
-      var& t = pool_get(g.things, pool_get_handle(g.things, id));
-      FlagSet(t.tflags, ThingFlag_1);
-    }
-    Loop (i, KB(10)) {
-      u32 id = rand_u32_rng(1, MaxEntities);
-      bitset_set(g.query1, id);
-      var& t = pool_get(g.things, pool_get_handle(g.things, id));
-      FlagSet(t.tflags, ThingFlag_2);
-    }
-    Loop (i, MaxEntities) {
-      u32 id = rand_u32_rng(1, MaxEntities);
-      bitset_set(g.query1, id);
-      var& t = pool_get(g.things, pool_get_handle(g.things, id));
-      FlagSet(t.tflags, ThingFlag_3);
-    }
-  }
 }
 
 void deinit_scene() {
@@ -3832,57 +3642,6 @@ Transform transform_indentity() {
 }
 void transform_translate_local(Transform& t, v3 delta) {
   t.pos += quat_rotate(t.rot, delta);
-}
-
-// template<i32 N> struct BitIter {
-//   BitSetS<N>* bits;
-//   u64 word_i;
-//   u64 word;
-// };
-
-// TODO: relations of linked list, iterators, adding/removing, traversing ... separate pools for linked lists?
-template<i32 N> struct BitSetIter1 {
-  BitSetS<N>* bits;
-  u64 word_i;
-  u64 word;
-  operator bool() {
-    while (word == 0) {
-      if (word_i >= bitset_word_count(*bits))
-        return false;
-      word = bits->words[word_i];
-      ++word_i;
-    }
-    // u64 bit = ctz(word);
-    u64 word_i = word_i - 1;
-    // u64 idx = word_i * 64 + (64-bit);
-    word = remove_lowest_bit(word);
-    return true;
-  }
-  BitSetIter1& operator++() {}
-  // T& operator*() {
-  // }
-};
-
-template<i32 N> BitSetIter<N> bit_iter_begin(BitSetS<N>* bits) {
-  BitSetIter res = {
-    .bits = bits,
-  };
-  return res;
-}
-
-template<i32 N> b32 bit_iter_next(BitSetIter<N>* it, ThingId* out) {
-  while (it->word == 0) {
-    if (it->word_i >= bitset_word_count(*it->bits))
-      return false;
-    it->word = it->bits->words[it->word_i];
-    ++it->word_i;
-  }
-  u64 bit = ctz(it->word);
-  u64 word_i = it->word_i - 1;
-  u64 idx = word_i * 64 + (64-bit);
-  it->word = remove_lowest_bit(it->word);
-  *out = pool_get_handle(st->things, idx);
-  return true;
 }
 
 void update_scene() {
@@ -3910,10 +3669,10 @@ void update_scene() {
     r_draw_cuboid(rng3_shift(e.aabb, e.pos), ColorWhite);
   }
   {
-    mat4& view = st->view;
-    v3 forward = mat4_forward(view);
-    v3 right   = mat4_right(view);
-    v3 up      = mat4_up(view);
+    m4x4& view = st->view;
+    v3 forward = m4x4_forward(view);
+    v3 right   = m4x4_right(view);
+    v3 up      = m4x4_up(view);
     f32 dist = 1.0f;
     f32 xoff = 0.3f;
     f32 yoff = 0.3f;
@@ -4107,8 +3866,7 @@ void update_scene() {
     input.dt = 1.0f / 60.0f;
 
     // printf("================ frame %d: %s ================\n", f, script[f].note);
-    v2 mouse_pos = os_mouse_pos();
-    input.mouse_pos = Transmute(UI_Vec2, mouse_pos);
+    // input.mouse_pos = bit_cast(UI_Vec2, os_mouse_pos());
 
     // ui_begin_frame(input, 800, 600);
     // {
@@ -4172,247 +3930,47 @@ void update_scene() {
 
   {
     // r_draw_quad(rng2_make(v2(400), v2(400,400)), ColorCyan);
-    r_draw_rect(rng2_make(v2(600), v2(100)), ColorWhite);
+    // r_draw_rect_gradient(rng2_make(v2(300), v2(100)), {v4(1,0,0,1), v4(0,1,0,1), v4(0,0,1,1), v4()});
+    // r_draw_rect(rng2_make(v2(600), v2(100)), ColorWhite);
     r_draw_texture(rng2_make(v2(800), v2(100)), get_texture(Texture_Orange));
     r_draw_text_ext(st->r.my_font, v2(300), "I'm a hobbit from Shire!", ColorOrange, 64);
+
+    r_draw_rect(rng2_make(v2(100), v2(200)), ColorGreyDark);
+    r_draw_text_ext(st->r.my_font, v2(100, 100+32), "I'm a button", ColorWhite, 32);
+    // r_draw_text_ext(st->r.my_font, os_mouse_pos(), "I'm a button", ColorWhite, 32);
+    // if (time_on_interval(0.3)) {
+    //   Info("%f %f", os_mouse_pos().x, os_mouse_pos().y);
+    // }
+
+    // r_draw_rect_gradient(rng2_make(v2(500), v2(100)), {v4(1,1,1,0.0), v4(0,0,0,0.3), v4(1,1,1,0.3), v4()});
+
+    Rng2 rect = rng2_make(v2(100), v2(100));
+    r_draw_rect_rounded(rng2_pad(rect, 10), ColorGrey, 20, 8.9);
+
+    if (rng2_contains(rect, os_mouse_pos())) {
+      if (os_mouse_is_button_down(MouseButton_Left)) {
+        r_draw_rect(rect, ColorBlack);
+      } else {
+        r_draw_rect(rect, ColorGrey);
+      }
+    } else {
+      // r_draw_rect(rect, ColorGrey1);
+    }
   }
 
   {
-    
     var& thing = get_thing(g.t_id);
     f32 t = time_ping_pong(get_time(), 2);
-    t = ease_sin_in_out(t);
-    // thing.pos.x = Lerp(-10, t, 10);
-    thing.pos = v3_rotate_x(thing.pos, get_dt());
+    // t = ease_sin_in_out(t) * 10;
+    // t = smoothstep(t);
+    // t = smoothstep(t);
+    t = ease_cube_in(t);
+    thing.pos.x = Lerp(-10, t, 10);
+    // thing.pos = v3_rotate_x(thing.pos, get_dt());
     // thing.rot = quat_axis_angle(v3(1), get_time());
     // thing.pos = quat_rotate(quat_axis_angle(v3_up(), get_time()), v3(10,10,10));
     // thing.pos = v3_rotate_around_pivot(thing.pos, v3(1), quat_axis_angle(v3(1), get_time()));
   }
-
-  {
-    ImGui::Begin("Profile");
-    // ImGui::Text("%i", 1);
-
-    {
-      ProfBlock("4 queries");
-      // ImTimeScope t;
-      u64 tsc_start = cpu_timer_now();
-      {
-        u64 tsc_start = cpu_timer_now();
-        var iter = bit_iter_begin(&g.query1);
-        for (ThingId id = {}; bit_iter_next(&iter, &id);) {
-          Thing& t = pool_get(g.things, (pool_get_handle(g.things, id.idx)));
-          t.modify1 = 1;
-        }
-        u64 elapsed = cpu_timer_now() - tsc_start;
-        local u64 show_elapsed;
-        if (time_on_interval(0.1)) {
-          show_elapsed = elapsed;
-        }
-        ImGui::Text("query1 1KB %fms", tsc_to_ms(show_elapsed));
-      }
-      {
-        u64 tsc_start = cpu_timer_now();
-        var iter = bit_iter_begin(&g.query2);
-        for (ThingId id = {}; bit_iter_next(&iter, &id);) {
-          Thing& t = pool_get(g.things, (pool_get_handle(g.things, id.idx)));
-          t.modify2 = 1;
-        }
-        u64 elapsed = cpu_timer_now() - tsc_start;
-        local u64 show_elapsed;
-        if (time_on_interval(0.1)) {
-          show_elapsed = elapsed;
-        }
-        ImGui::Text("query2 10KB %fms", tsc_to_ms(show_elapsed));
-      }
-      {
-        u64 tsc_start = cpu_timer_now();
-        var iter = bit_iter_begin(&g.query3);
-        for (ThingId id = {}; bit_iter_next(&iter, &id);) {
-          Thing& t = pool_get(g.things, (pool_get_handle(g.things, id.idx)));
-          t.modify3 = 1;
-        }
-        u64 elapsed = cpu_timer_now() - tsc_start;
-        local u64 show_elapsed;
-        if (time_on_interval(0.1)) {
-          show_elapsed = elapsed;
-        }
-        ImGui::Text("query3 100KB %fms", tsc_to_ms(show_elapsed));
-      }
-
-      u64 elapsed = cpu_timer_now() - tsc_start;
-      local u64 show_elapsed;
-      if (time_on_interval(0.1)) {
-        show_elapsed = elapsed;
-      }
-      ImGui::Text("%fms", tsc_to_ms(show_elapsed));
-      ImGui::Text("4 queries");
-    }
-    {
-      // ImTimeScope t;
-      ProfBlock("One query num0");
-      u64 tsc_start = cpu_timer_now();
-
-      var iter = bit_iter_begin(&g.query0);
-      for (ThingId id = {}; bit_iter_next(&iter, &id);) {
-        Thing& t = pool_get(g.things, (pool_get_handle(g.things, id.idx)));
-        t.modify0 = 1;
-      }
-
-      u64 elapsed = cpu_timer_now() - tsc_start;
-      local u64 show_elapsed;
-      if (time_on_interval(0.1)) {
-        show_elapsed = elapsed;
-      }
-      ImGui::Text("%fms", tsc_to_ms(show_elapsed));
-      ImGui::Text("one query");
-    }
-
-    // for (Iter it = iter_begin(); it; ++i) {
-    // }
-
-    // LoopIter (it, pool_begin(g.things)) {
-    //   var& t = *it;
-    //   Info("%f", t.pos.x);
-    //   Info("%f", t.pos.y);
-    //   Info("%f", t.pos.z);
-    // }
-
-    {
-      // ImTimeScope t;
-      ImGui::Text("linked list");
-      u64 tsc_start = cpu_timer_now();
-      {
-        u64 tsc_start = cpu_timer_now();
-
-        u64 elapsed = cpu_timer_now() - tsc_start;
-        local u64 show_elapsed;
-        if (time_on_interval(0.1)) {
-          show_elapsed = elapsed;
-        }
-        ImGui::Text("query0 0 %fms", tsc_to_ms(show_elapsed));
-      }
-      {
-        u64 tsc_start = cpu_timer_now();
-
-        LoopIter (it, pool_begin(g.things)) {
-          var& t = *it;
-          if (FlagHas(t.tflags, ThingFlag_1)) {
-            t.modify0 = 1;
-          }
-        }
-
-        u64 elapsed = cpu_timer_now() - tsc_start;
-        local u64 show_elapsed;
-        if (time_on_interval(0.1)) {
-          show_elapsed = elapsed;
-        }
-        ImGui::Text("query1 1KB %fms", tsc_to_ms(show_elapsed));
-      }
-      {
-        u64 tsc_start = cpu_timer_now();
-        LoopIter (it, pool_begin(g.things)) {
-          var& t = *it;
-          if (FlagHas(t.tflags, ThingFlag_2)) {
-            t.modify0 = 1;
-          }
-        }
-        u64 elapsed = cpu_timer_now() - tsc_start;
-        local u64 show_elapsed;
-        if (time_on_interval(0.1)) {
-          show_elapsed = elapsed;
-        }
-        ImGui::Text("query2 10KB %fms", tsc_to_ms(show_elapsed));
-      }
-      {
-        u64 tsc_start = cpu_timer_now();
-        LoopIter (it, pool_begin(g.things)) {
-          var& t = *it;
-          if (FlagHas(t.tflags, ThingFlag_3)) {
-            t.modify0 = 1;
-          }
-        }
-        u64 elapsed = cpu_timer_now() - tsc_start;
-        local u64 show_elapsed;
-        if (time_on_interval(0.1)) {
-          show_elapsed = elapsed;
-        }
-        ImGui::Text("query3 100KB %fms", tsc_to_ms(show_elapsed));
-      }
-
-      u64 elapsed = cpu_timer_now() - tsc_start;
-      local u64 show_elapsed;
-      if (time_on_interval(0.1)) {
-        show_elapsed = elapsed;
-      }
-      ImGui::Text("%fms", tsc_to_ms(show_elapsed));
-      ImGui::Text("4 queries");
-    }
-
-    {
-      // ImTimeScope t;
-      ImGui::Text("array style");
-      u64 tsc_start = cpu_timer_now();
-      {
-        u64 tsc_start = cpu_timer_now();
-
-        Loop (i, MaxEntities) {
-          var& t = g.things.data[i].elem;
-          if (FlagHas(t.tflags, ThingFlag_1)) {
-            t.modify0 = 1;
-          }
-        }
-
-        u64 elapsed = cpu_timer_now() - tsc_start;
-        local u64 show_elapsed;
-        if (time_on_interval(0.1)) {
-          show_elapsed = elapsed;
-        }
-        ImGui::Text("query1 1KB %fms", tsc_to_ms(show_elapsed));
-      }
-      {
-        u64 tsc_start = cpu_timer_now();
-        Loop (i, MaxEntities) {
-          var& t = g.things.data[i].elem;
-          if (FlagHas(t.tflags, ThingFlag_2)) {
-            t.modify0 = 1;
-          }
-        }
-        u64 elapsed = cpu_timer_now() - tsc_start;
-        local u64 show_elapsed;
-        if (time_on_interval(0.1)) {
-          show_elapsed = elapsed;
-        }
-        ImGui::Text("query2 10KB %fms", tsc_to_ms(show_elapsed));
-      }
-      {
-        u64 tsc_start = cpu_timer_now();
-        Loop (i, MaxEntities) {
-          var& t = g.things.data[i].elem;
-          if (FlagHas(t.tflags, ThingFlag_3)) {
-            t.modify0 = 1;
-          }
-        }
-        u64 elapsed = cpu_timer_now() - tsc_start;
-        local u64 show_elapsed;
-        if (time_on_interval(0.1)) {
-          show_elapsed = elapsed;
-        }
-        ImGui::Text("query3 100KB %fms", tsc_to_ms(show_elapsed));
-      }
-
-      u64 elapsed = cpu_timer_now() - tsc_start;
-      local u64 show_elapsed;
-      if (time_on_interval(0.1)) {
-        show_elapsed = elapsed;
-      }
-      ImGui::Text("%fms", tsc_to_ms(show_elapsed));
-      ImGui::Text("4 queries");
-    }
-
-    ImGui::End();
-  }
-  
 }
 
 void game_save_state() {
@@ -4495,8 +4053,6 @@ void game_init() {
   Scratch scratch;
   g.arena = arena_make("game arena");
   g.gpa = alloc_make(g.arena);
-  g.timer = timer_make(1);
-
   g.moving_cubes = array_make(ThingId, g.gpa);
   // g.font = r_font_load("arial.ttf", 512);
 
@@ -4512,7 +4068,7 @@ void game_init() {
   {
     ProfBlock("cube");
     // R_Texture cubemap = r_texture_cube_load("night_cubemap");
-    R_Texture cubemap = r_load_async_cubemap("night_cubemap");
+    R_TextureId cubemap = r_load_async_cubemap("night_cubemap");
     r_set_cubemap(cubemap);
   }
 
@@ -4520,7 +4076,7 @@ void game_init() {
     GlobalState& g = *st;
     var load_mesh = [&](MeshEnum enum_name, String name) {
       // R_Mesh id = r_mesh_load(name);
-      R_Mesh id = r_load_async_mesh(name);
+      R_MeshId id = r_load_async_mesh(name);
       g.meshes_ids[enum_name] = id;
       String str = push_str_copy(g.arena, name);
       map_set(g.str_to_mesh, str, id);
@@ -4535,7 +4091,7 @@ void game_init() {
 
     var load_tex = [&](TextureEnum enum_name, String name) {
       // R_Texture id = r_texture_load(name);
-      R_Texture id = r_load_async_texture(name);
+      R_TextureId id = r_load_async_texture(name);
       g.textures_ids[enum_name] = id;
       String str = push_str_copy(g.arena, name);
       map_set(g.str_to_texture, str, id);
@@ -4546,7 +4102,7 @@ void game_init() {
     load_tex(Texture_Barrack, "castle_diffuse.png");
   
     var load_mat = [&](MaterialEnum enum_name, R_MaterialDesc desc) {
-      R_Material id = r_material_make(desc);
+      R_MaterialId id = r_material_make(desc);
       g.materials_ids[enum_name] = id;
       String str = push_str_copy(g.arena, materials_strs[enum_name]);
       map_set(g.str_to_material, str, id);
@@ -4641,239 +4197,9 @@ void game_init() {
   // }
 }
 
-// TODO: automate entity queries with old idea? macros magic api?
-
-#define QueryList(query)
-
-#define MaxQuery 1024
-
-struct Query {
-  // Array<ThingId, MaxQuery> on_fire;
-  // Array<ThingId, MaxQuery> flying;
-  // Array<ThingId, MaxQuery> poisoned;
-
-  // PoolLinkList<ThingId, MaxQuery, OpaqueId> enemy_list;
-  // PoolLinkList<ThingId, MaxQuery, OpaqueId> ally_list;
-  // PoolLinkList<ThingId, MaxQuery, OpaqueId> neutral_list;
-};
-
-// Query query;
-
-// OpaqueId add_to_enemy(ThingId id) { return pool_push(query.enemy_list, id); }
-// OpaqueId add_to_allies(ThingId id) { return pool_push(query.ally_list, id); }
-// OpaqueId add_to_neutrals(ThingId id) { return pool_push(query.neutral_list, id); }
-
-// ThingId make_thing() {
-//   Thing t = {};
-//   ThingId id = pool_push(st->things, t);
-//   return id;
-// }
-
-// void make_kind_enemy(ThingId id) { get_thing(id).enemy_list = pool_push(query.enemy_list, id); }
-// void make_kind_ally(ThingId id) { get_thing(id).ally_list = pool_push(query.ally_list, id); }
-// void make_kind_(ThingId id) { get_thing(id).neutral_list = pool_push(query.neutral_list, id); }
-
-// ThingId make_enemy() {
-//   ThingId t_id = make_thing();
-//   get_thing(t_id).enemy_list = pool_push(query.enemy_list, t_id);
-//   return t_id;
-// }
-
-// ThingId make_ally() {
-//   ThingId t_id = make_thing();
-//   get_thing(t_id).ally_list = pool_push(query.enemy_list, t_id);
-//   return t_id;
-// }
-
-// ThingId make_neutral() {
-//   ThingId t_id = make_thing();
-//   get_thing(t_id).neutral_list = pool_push(query.enemy_list, t_id);
-//   return t_id;
-// }
-
-// void destroy_thing(ThingId id) {
-//   var& g = *st;
-//   Thing& t = pool_get(g.things, id);
-//   if (t.enemy_list.idx) pool_remove(query.enemy_list, t.enemy_list);
-//   if (t.ally_list.idx) pool_remove(query.ally_list, t.ally_list);
-//   if (t.neutral_list.idx) pool_remove(query.neutral_list, t.neutral_list);
-//   pool_remove(st->things, id);
-// }
-
-// struct BitsetIterator {
-//   BitSet* bits;
-//   u64 word_i;
-//   u64 word;
-//   u64 index;
-//   ThingId operator*() { return pool_get_handle(st->things, index); }
-//   BitsetIterator& operator++() {
-//     word = remove_lowest_bit(word);
-//     if (word == 0) {
-//       ++word_i;
-//       while (word_i < bitset_word_count(*bits)) {
-//         word = bits->words[word_i];
-//         if (word)
-//           break;
-//         ++word_i;
-//       }
-//     }
-//     if (word) {
-//       index = word_i * 64 + ctz(word);
-//     }
-//     return *this;
-//   }
-//   b32 operator!=(BitsetIterator& other) { return word_i != other.word_i || word != other.word; }
-// };
-// struct BitsetQuery {
-//   BitSet* bits;
-//   BitsetIterator begin() {
-//     BitsetIterator res = {.bits = bits};
-//     return res;
-//   }
-//   BitsetIterator end() {
-//     BitsetIterator res = {
-//       .bits = bits,
-//       .word_i = bitset_word_count(*bits),
-//     };
-//     return res;
-//   }
-// };
-
-// BitsetQuery do_query(BitSet* bits) { return {.bits = bits}; }
-
-void update_some() {
-  // LoopLinkPool(it, query.enemy_list) {
-  //   Thing& t = get_thing(query.enemy_list.data[it].elem);
-  // }
-  // LoopLinkPool(it, query.ally_list) {
-  //   Thing& t = get_thing(query.ally_list.data[it].elem);
-  // }
-  // LoopLinkPool(it, query.neutral_list) {
-  //   Thing& t = get_thing(query.neutral_list.data[it].elem);
-  // }
-
-  // Scratch scratch;
-  // BitSet bits = {
-  //   .bit_count = MaxEntities,
-  //   .words = push_array(scratch, u64, MaxEntities / 64),
-  // };
-  
-  // // C iteratores?
-  // for (u64 word_i = 0; bitset_word_count(bits); ++word_i) {
-  //   u64 word = bits.words[word_i];
-
-  //   while (word) {
-  //     u64 bit = ctz(word);
-  //     u64 idx = word_i * 64 + bit;
-
-  //     ThingId id = pool_get_handle(st->things, idx);
-  //     Thing& thing = get_thing(id);
-  //     // ...
-
-  //     word = remove_lowest_bit(word);
-  //   }
-  // }
-
-  // for (var id : do_query(&bits)) {
-  //   Thing& t = get_thing(id);
-  // }
-
-  // var iter = bit_iter_begin(&bits);
-  // for (ThingId id = {}; bit_iter_next(&iter, &id);) {
-  //   Thing& t = get_thing(id);
-  // }
-}
-
-
-
-// void gather_query() {
-//   var& g = *st;
-//   LoopLinkPool (i, g.things) {
-//     Thing& t = g.things.data[i].elem;
-//     if (FlagHas(t.state, ThingState_OnFire)) array_push(query.on_fire, pool_get_handle(g.things, i));
-//     if (FlagHas(t.state, ThingState_Flying)) array_push(query.flying, pool_get_handle(g.things, i));
-//     if (FlagHas(t.state, ThingState_Poisoned)) array_push(query.poisoned, pool_get_handle(g.things, i));
-//   }
-// }
-
-// struct Status_Def {
-//   u32 flag;
-//   Array<ThingId, MaxQuery> *bucket;
-// };
-
-// Status_Def g_status_defs[] = {
-//   {ThingState_OnFire, &query.on_fire},
-//   {ThingState_Poisoned, &query.poisoned},
-//   {ThingState_Flying, &query.flying},
-// };
-
-void gather_query() {
-  // X x = {};
-  // while (next_x(&x)) {
-  //   Info("%i");
-  // }
-
-  // Scratch scratch;
-  // BitSet bits = {
-  //   .bit_count = MaxEntities,
-  //   .words = push_array(scratch, u64, MaxEntities / 64),
-  // };
-  // bitset_set(bits, 1);
-  // bitset_set(bits, 3);
-  // bitset_set(bits, 30);
-  // for (var id : do_query(&bits)) {
-  //   Thing& t = get_thing(id);
-  //   Info("%i", id.idx);
-  // }
-
-  // for (auto& def : g_status_defs)
-  //   array_clear(*def.bucket);
-
-  // LoopLinkPool(i, st->things) {
-  //   Thing& t = st->things.data[i].elem;
-  //   ThingId id = pool_get_handle(st->things, i);
-  //   for (auto& def : g_status_defs)
-  //     if (FlagHas(t.state, def.flag))
-  //       array_push(*def.bucket, id);
-  // }
-}
-
-// #define PoisonDamage 10
-// #define FireDamage 30
-// #define GravityForce 3
-void update_stuff() {
-  // var& g = *st;
-  // for (var& id : query.poisoned) {
-  //   if (!pool_is_valid_handle(g.things, id)) continue;
-  //   var& t = get_thing(id);
-  //   if (t.health >= PoisonDamage) {
-  //     t.health -= PoisonDamage;
-  //   }
-  // }
-  // for (var& id : query.on_fire) {
-  //   if (!pool_is_valid_handle(g.things, id)) continue;
-  //   var& t = get_thing(id);
-  //   if (t.health >= FireDamage) {
-  //     t.health -= FireDamage;
-  //   }
-  // }
-  // for (var& id : query.flying) {
-  //   if (!pool_is_valid_handle(g.things, id)) continue;
-  //   var& t = get_thing(id);
-  //   t.pos.y -= GravityForce;
-  // }
-
-  // LoopLinkPool(it, query.enemy_list) {
-  //   ThingId id = query.enemy_list.data[it].elem;
-  // }
-
-}
-
 void update_game() {
   ProfFunc;
   var& g = *st;
-  
-  gather_query();
 
   {
     Thing& e = get_thing(g.monkey_id);
@@ -4881,15 +4207,6 @@ void update_game() {
     e.pos.y += get_dt() * 0.5;
   }
 
-  // push_array(g.arena, u32, 100);
-  if (timer_update(g.timer)) {
-    // push_array(g.gpa, u32, 1000);
-    // push_array(g.gpa_arena0, u32, 200);
-    // push_array(g.gpa_arena1, u32, 500);
-    // push_array(g.gpa_gpa0, u32, 100);
-    // push_array(g.gpa_gpa1, u32, 150);
-  }
-  
   Scratch scratch;
   camera_update();
   if (os_key_is_down(Key_T)) {

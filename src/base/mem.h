@@ -114,14 +114,6 @@ struct Temp {
 Temp temp_begin(Arena* arena);
 void temp_end(Temp temp);
 
-struct Scratch {
-  Temp temp;
-  NO_DEBUG operator Allocator();
-  Scratch();
-  NO_DEBUG Scratch(Allocator conflict);
-  NO_DEBUG ~Scratch();
-};
-
 ////////////////////////////////////////////////////////////////////////
 // ArenaList
 

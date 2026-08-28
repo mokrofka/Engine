@@ -9,7 +9,6 @@ MakeId(Gfx_View)
 MakeId(Gfx_Buffer)
 
 enum {
-  Gfx_InvalidId,
   Gfx_NumFramesInFlight = 2,
   Gfx_MaxImagesInFlight = 4,
   Gfx_MaxColorAttachments = 8,
@@ -406,7 +405,7 @@ struct Gfx_BufferDesc {
   u32 binding;
   u64 size;
   Gfx_MemType mem_type;
-  void** cpu_ptr;
+  void** out_cpu_ptr;
   Gfx_Buffer* out_buffer;
 };
 
@@ -467,6 +466,7 @@ enum {
 
 struct VK_Memory {
   VkDeviceMemory h;
+  VkBuffer buf;
   u8* mapped_mem;
   u64 pos;
   u64 cap;
@@ -642,7 +642,7 @@ VkCommandBuffer vk_cmd_alloc_begin();
 void vk_cmd_end_free(VkCommandBuffer cmd);
 
 VK_Memory vk_mem_make(Gfx_MemType type, u64 size);
-VK_Buffer vk_make_buffer(u64 size, Gfx_MemType type = Gfx_MemType_Gpu);
+VK_Buffer vk_make_buffer(Gfx_MemType type, u64 size);
 void vk_bind_vert_buffer(VK_Buffer buffer);
 void vk_bind_index_buffer(VK_Buffer buffer);
 VK_Buffer* vk_choose_buffer(Gfx_Buffer buf);
@@ -679,7 +679,7 @@ struct Gfx_State {
 
   VkDescriptorPool descriptor_pool;
   VkDescriptorSetLayout descriptor_set_layout;
-  VkDescriptorSet descriptor_sets;
+  VkDescriptorSet descriptor_set;
   VkPipelineLayout pipeline_layout;
 
   Gfx_Environment environment;
@@ -691,6 +691,7 @@ struct Gfx_State {
   VK_Buffer cpu_buf;
   u64 gpu_buf_address;
   u64 cpu_buf_address;
+  Gfx_Buffer stage_buffer;
 
   v2u size;
   b32 swapchain_resized;
@@ -708,7 +709,6 @@ struct Gfx_State {
   Pool<VK_View, Gfx_MaxViews, Gfx_View> cubemap_views;
   Pool<VK_Sampler, Gfx_MaxSamplers, Gfx_Sampler> samplers;
 
-  u32 cube_idx;
   struct {
     v2u size;
     b32 compute;
@@ -717,12 +717,10 @@ struct Gfx_State {
   } cur_pass;
 
   // Indirect drawing
-  Gfx_Buffer drawcall_buf;
+  Gfx_Buffer drawcalls_buf;
   u32* base_index;
   u32 entity_cursor;
   u32 drawcall_cursor;
-
-  Gfx_Buffer stage_buffer;
 
   ///////////////////////////////////
   // Vulkan loader
@@ -821,13 +819,14 @@ struct Gfx_State {
     X(CmdSetDepthWriteEnable) \
     X(CmdSetStencilReference) \
     X(CmdSetStencilOp) \
-    X(CmdBeginRendering) \
-    X(CmdEndRendering) \
     X(CmdSetStencilCompareMask) \
     X(CmdSetStencilWriteMask) \
+    X(CmdSetPrimitiveTopology) \
+    X(CmdSetPolygonModeEXT) \
+    X(CmdBeginRendering) \
+    X(CmdEndRendering) \
     X(CmdClearColorImage) \
     X(CmdClearDepthStencilImage) \
-    X(CmdSetPrimitiveTopology) \
     X(CmdPushConstants) \
     X(CmdBindVertexBuffers) \
     X(CmdBindIndexBuffer) \

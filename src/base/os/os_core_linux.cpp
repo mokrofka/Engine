@@ -750,4 +750,50 @@ void* os_lib_get_proc(OS_Handle lib, String name) {
   return result;
 }
 
+typedef enum VkDebugUtilsMessageSeverityFlagBitsEXT {
+  VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT = 0x00000001,
+  VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT = 0x00000010,
+  VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT = 0x00000100,
+  VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT = 0x00001000,
+  VK_DEBUG_UTILS_MESSAGE_SEVERITY_FLAG_BITS_MAX_ENUM_EXT = 0x7FFFFFFF
+} VkDebugUtilsMessageSeverityFlagBitsEXT;
+typedef u32 VkDebugUtilsMessageTypeFlagsEXT;
+typedef struct VkDebugUtilsMessengerCallbackDataEXT {
+  u8 padd[40];
+  const char* pMessage;
+} VkDebugUtilsMessengerCallbackDataEXT;
+typedef b32 VkBool32;
+VkBool32 vk_debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity, VkDebugUtilsMessageTypeFlagsEXT message_types, const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data) {
+  switch (message_severity) {
+    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT: {
+      Trace(String(callback_data->pMessage));
+    } break;
+    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT: {
+      Info(String(callback_data->pMessage));
+    } break;
+    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: {
+      String skip_warnings[] = {
+        "vkCreateGraphicsPipelines(): pCreateInfos[0].pVertexInputState Vertex attribute at location",
+        "vkCreateGraphicsPipelines(): pCreateInfos[0] (SPIR-V Interface) VK_SHADER_STAGE_VERTEX_BIT has an Output value declared at Location",
+        "(Warning - This VUID has now been reported 10 times, which is the duplicate_message_limit value, this will be the last time reporting it).",
+        "vkCreateGraphicsPipelines(): pCreateInfos[0] (SPIR-V Interface) [EntryPoint \"vs_main\", VK_SHADER_STAGE_VERTEX_BIT] has an Output value declared at Location",
+      };
+      for (var skip : skip_warnings) {
+        String warn = callback_data->pMessage;
+        if (warn.size >= skip.size) {
+          if (str_match(str_prefix(warn, skip.size), skip)) {
+            return false;
+          }
+        }
+      }
+      Warn(String(callback_data->pMessage));
+    } break;
+    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: {
+      Error(String(callback_data->pMessage));
+    } break;
+    default:
+  }
+  return false;
+}
+
 #endif
