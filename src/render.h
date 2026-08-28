@@ -2,9 +2,6 @@
 #include "types.h"
 #include "gfx.h"
 
-///////////////////////////////////
-// Gpu memory layout
-
 const u32 R_MaxMaterials  = 32;
 const u32 R_MaxLights     = 32;
 const u32 R_MaxMeshes     = 32;
@@ -12,8 +9,6 @@ const u32 R_MaxTextures   = 32;
 const u32 R_MaxCubemaps   = 32;
 const u32 R_MaxFonts      = 32;
 const u32 R_MaxDebugLines = KB(1);
-const u32 R_MaxTextDraws  = 32;
-const u32 R_MaxGlyphCharacters = 96;
 
 struct R_ShaderDesc { String name; Gfx_PipelineDesc pipeline_desc; };
 u64 hash(R_ShaderDesc x);
@@ -21,11 +16,11 @@ b32 equal(R_ShaderDesc a, R_ShaderDesc b);
 
 #include "shader_header.h"
 
-MakeId(R_Texture)
-MakeId(R_Mesh)
-MakeId(R_Material)
-MakeId(R_Font)
-MakeId(R_Light)
+MakeId(R_TextureId)
+MakeId(R_MeshId)
+MakeId(R_MaterialId)
+MakeId(R_FontId)
+MakeId(R_LightId)
 
 struct R_Vertex {
   v3 pos;
@@ -39,9 +34,18 @@ struct R_UI_Rect {
   v2 dst_p1;
   v2 src_p0;
   v2 src_p1;
+  v4 colors[4];
   u32 texture;
-  v4 color;
   u32 flags;
+  f32 corner_radius;
+  f32 edge_softness;
+};
+
+struct Image {
+  u32 width;
+  u32 height;
+  u8* data;
+  Gfx_PixelFormat format;
 };
 
 struct R_TextureDesc {
@@ -52,10 +56,9 @@ struct R_TextureDesc {
   b32 is_async;
 };
 
-struct R_TextureData {
+struct R_Texture {
   u32 width;
   u32 height;
-  u8* data;
   Gfx_Image image;
   Gfx_View view;
 };
@@ -64,14 +67,6 @@ struct R_CubeMapDesc {
   u32 width;
   u32 height;
   u8* cubes[6];
-};
-
-struct R_CubeMapData {
-  u32 width;
-  u32 height;
-  u8* cube[6];
-  Gfx_Image image;
-  Gfx_View view;
 };
 
 struct R_MeshDesc {
@@ -83,8 +78,6 @@ struct R_MeshDesc {
 };
 
 struct R_MeshData {
-  Slice<R_Vertex> vertices;
-  Slice<u32> indices;
   f32 bounds_min;
   f32 bounds_max;
   f32 bounds_rad;
@@ -105,11 +98,18 @@ struct R_MaterialDesc {
   String base_color;
 };
 
-struct R_MaterialData {
+struct R_MaterialInfo {
   R_MaterialDesc desc;
   u32 entity_batch_idx;
-  R_Texture tex;
+  R_TextureId tex;
   u32 idx;
+};
+
+struct R_Gradient {
+  v4 color0;
+  v4 color1;
+  v4 color2;
+  v4 color3;
 };
 
 struct R_Glyph {
@@ -119,8 +119,8 @@ struct R_Glyph {
 
 struct R_FontData {
   u32 font_height;
-  R_Texture texture;
-  R_Glyph glyphs[R_MaxGlyphCharacters];
+  R_TextureId texture;
+  R_Glyph glyphs[96];
 };
 
 struct R_DrawCall {
@@ -128,8 +128,8 @@ struct R_DrawCall {
   v4 rot;
   v3 scale;
   v4 color;
-  R_Mesh mesh;
-  R_Material mat;
+  R_MeshId mesh;
+  R_MaterialId mat;
 };
 
 struct R_DrawBatch {
@@ -140,7 +140,7 @@ struct R_DrawBatch {
 
 struct R_DrawText {
   String str;
-  R_Font font;
+  R_FontId font;
   v2 pos;
   v4 color;
 };
@@ -190,7 +190,7 @@ struct R_RenderTarget {
 };
 
 struct R_AsyncMesh {
-  R_Mesh mesh;
+  R_MeshId mesh;
   R_MeshData data;
 };
 
@@ -215,13 +215,13 @@ struct R_State {
   Map<String, u32, Gfx_MaxShaders> shader_to_module_idx;
   Map<R_ShaderDesc, Gfx_Pipeline, Gfx_MaxPipelines> shader_desc_to_pipeline;
   Map<u32, u32, Gfx_MaxPipelines> pip_idx_to_entity_batch_idx;
-  PoolLinkList<R_MaterialData, R_MaxMaterials, R_Material> materials;
+  PoolLinkList<R_MaterialInfo, R_MaxMaterials, R_MaterialId> materials;
   Array<R_DrawBatch, Gfx_MaxShaders> entity_batches;
 
-  Pool<Gfx_Mesh, R_MaxMeshes, R_Mesh> meshes;
-  Pool<R_TextureData, R_MaxTextures, R_Texture> textures;
-  Pool<R_MeshData, R_MaxMeshes, R_Mesh> new_meshes;
-  Pool<R_FontData, R_MaxFonts, R_Font> fonts;
+  Pool<Gfx_Mesh, R_MaxMeshes, R_MeshId> meshes;
+  Pool<R_Texture, R_MaxTextures, R_TextureId> textures;
+  Pool<R_MeshData, R_MaxMeshes, R_MeshId> new_meshes;
+  Pool<R_FontData, R_MaxFonts, R_FontId> fonts;
 
   Gfx_Pipeline triangle_pip;
   Gfx_Pipeline screen_pip;
@@ -233,8 +233,8 @@ struct R_State {
   Gfx_Pipeline font_pip;
   Gfx_Sampler com_sampler;
 
-  R_Font my_font;
-  R_Font raylib_font;
+  R_FontId my_font;
+  R_FontId raylib_font;
 
   R_RenderTarget world_rt;
 
@@ -251,10 +251,10 @@ struct R_State {
 
   Queue<R_AsyncMesh, 12> async_mesh;
   Mutex async_stage_mutex;
-  R_Texture dummy_texture;
-  R_Texture dummy_cubemap;
-  R_Texture dummy_mesh;
-  R_Texture cur_cubemap;
+  R_TextureId dummy_texture;
+  R_TextureId dummy_cubemap;
+  R_TextureId dummy_mesh;
+  R_TextureId cur_cubemap;
 
   v2 point;
   v2 point_dir;
@@ -271,19 +271,19 @@ struct R_State {
   GpuEntity* gpu_entities;
   u32* gpu_entities_indices;
   GpuMaterial* gpu_materials;
-  GpuDrawCall* gpu_drawcall;
+  GpuDrawCall* gpu_drawcalls;
   u32* gpu_software_render;
-  GpuUI_Rect* gpu_ui_rect;
+  GpuUI_Rect* gpu_ui_rects;
 
   Slice<OS_Handle> shader_module_compilation_pids;
   Slice<String> shaders_to_compile;
 };
 
-b32 r_texture_is_null(R_Texture tex);
-b32 r_mesh_is_null(R_Mesh mesh);
-b32 r_material_is_null(R_Mesh m);
-b32 r_font_is_null(R_Mesh f);
-b32 r_shader_is_null(R_Mesh shd);
+b32 r_texture_is_null(R_TextureId tex);
+b32 r_mesh_is_null(R_MeshId mesh);
+b32 r_material_is_null(R_MeshId m);
+b32 r_font_is_null(R_MeshId f);
+b32 r_shader_is_null(R_MeshId shd);
 
 R_DrawBatch r_make_draw_batch(Allocator alloc, Gfx_Pipeline pip);
 R_ShaderModuleWithPipelines r_make_shader_module_with_pipelines(Allocator alloc);
@@ -298,44 +298,44 @@ void r_destroy_render_target(R_RenderTarget rt);
 void r_recreate_render_target(R_RenderTarget* rt, v2u size);
 Gfx_Attachments r_render_target_to_attachments(R_RenderTarget rt);
 
-u32 r_texture_get_descriptor_idx(R_Texture id);
+u32 r_texture_get_descriptor_idx(R_TextureId id);
 R_TextureDesc r_load_image(String name);
-R_Texture r_load_texture(String name);
-R_Texture r_load_async_texture(String name);
-R_Texture r_make_texture(R_TextureDesc tex);
-R_Texture r_make_cubemap(R_CubeMapDesc desc);
-R_Texture r_load_cubemap(String dir);
-R_Texture r_load_async_cubemap(String dir);
-void r_set_cubemap(R_Texture cubemap);
-void r_texture_update(R_Texture t, u8* data);
-void r_texture_readback(R_Texture t, u8* dst);
-void r_texture_destroy(R_Texture t);
+R_TextureId r_load_texture(String name);
+R_TextureId r_load_async_texture(String name);
+R_TextureId r_make_texture(R_TextureDesc tex);
+R_TextureId r_make_cubemap(R_CubeMapDesc desc);
+R_TextureId r_load_cubemap(String dir);
+R_TextureId r_load_async_cubemap(String dir);
+void r_set_cubemap(R_TextureId cubemap);
+void r_texture_update(R_TextureId t, u8* data);
+void r_texture_readback(R_TextureId t, u8* dst);
+void r_texture_destroy(R_TextureId t);
 
-R_Mesh r_load_mesh(String name);
-R_Mesh r_load_async_mesh(String name);
-R_Mesh r_make_mesh(R_MeshDesc desc);
-void r_update_mesh(R_Mesh mesh, R_MeshDesc desc);
-void r_destroy_mesh(R_Mesh mesh);
+R_MeshId r_load_mesh(String name);
+R_MeshId r_load_async_mesh(String name);
+R_MeshId r_make_mesh(R_MeshDesc desc);
+void r_update_mesh(R_MeshId mesh, R_MeshDesc desc);
+void r_destroy_mesh(R_MeshId mesh);
 
 // TODO: primitives gen, drawing
 
-R_Material r_material_make(R_MaterialDesc desc);
-void r_material_destroy(R_Material mat);
+R_MaterialId r_material_make(R_MaterialDesc desc);
+void r_material_destroy(R_MaterialId mat);
 
 void r_shader_reload(String name);
-Gfx_Pipeline r_pipeline_make(String name, Gfx_PipelineDesc desc);
+Gfx_Pipeline r_make_pipeline(String name, Gfx_PipelineDesc desc);
 void r_shaders_compile(Allocator arena);
 void r_shaders_compile_join();
 
-R_Font r_load_font(String name, u32 size);
+R_FontId r_load_font(String name, u32 size);
 
 void r_init();
 void r_shutdown();
 void r_begin();
 void r_end();
 
-void r_draw_mesh(R_Mesh mesh, R_Material mat, v3 pos);
-void r_draw_mesh_trs(R_Mesh mesh, R_Material mat, v3 pos, v4 rot, v3 scale);
+void r_draw_mesh(R_MeshId mesh, R_MaterialId mat, v3 pos);
+void r_draw_mesh_trs(R_MeshId mesh, R_MaterialId mat, v3 pos, v4 rot, v3 scale);
 void r_draw_entity(ThingId id);
 
 void r_draw_line(v3 a, v3 b, v4 color);
@@ -343,9 +343,11 @@ void r_draw_line_persistent(v3 a, v3 b, v4 color);
 void r_draw_grid(v3 center, u32 slices, f32 spacing, v4 color);
 void r_draw_cuboid(Rng3 rng, v4 color);
 void r_draw_rect(Rng2 rect, v4 color);
-void r_draw_texture(Rng2 rect, R_Texture tex);
+void r_draw_rect_rounded(Rng2 rect, v4 color, f32 corner_radius, f32 edge_softness);
+void r_draw_rect_gradient(Rng2 rect, R_Gradient grad);
+void r_draw_texture(Rng2 rect, R_TextureId tex);
 void r_draw_rect_outline(Rng2 rect, u32 thickness, v4 color);
-void r_draw_text_ext(R_Font font, v2 pos, String str, v4 color, u32 font_height);
+void r_draw_text_ext(R_FontId font, v2 pos, String str, v4 color, u32 font_height);
 
 void imgui_init();
 void imgui_begin_frame();

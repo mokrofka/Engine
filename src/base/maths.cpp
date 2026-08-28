@@ -301,7 +301,7 @@ v3 v3_clamp_length(f32 min, v3 v, f32 max) {
   return res;
 }
 
-v3 v3_pos_of_mat4(mat4 mat)        { return v3(mat.v[3][0], mat.v[3][1], mat.v[3][2]); };
+v3 v3_pos_of_mat4(m4x4 mat)        { return v3(mat.v[3][0], mat.v[3][1], mat.v[3][2]); };
 v3 v3_rotate_x(v3 v, f32 rad)      { v2 r = v2_rotate(v2(v.y, v.z), rad); return v3(v.x, r.v[0], r.v[1]); }
 v3 v3_rotate_y(v3 v, f32 rad)      { v2 r = v2_rotate(v2(v.x, v.z), rad); return v3(r.v[0], v.y, r.v[1]); }
 v3 v3_rotate_z(v3 v, f32 rad)      { v2 r = v2_rotate(v2(v.x, v.y), rad); return v3(r.v[0], r.v[1], v.z); }
@@ -446,12 +446,12 @@ f32 quat_angle(v4 a, v4 b) {
   return Acos(d) * 2.0f;
 }
 
-mat4 mat4_from_quat(v4 q) {
+m4x4 m4x4_from_quat(v4 q) {
   f32 x=q.x, y=q.y, z=q.z, w=q.w;
   f32 xx=x*x, yy=y*y, zz=z*z;
   f32 xy=x*y, xz=x*z, yz=y*z;
   f32 wx=w*x, wy=w*y, wz=w*z;
-  mat4 m = {};
+  m4x4 m = {};
   m.v[0][0]=1-2*(yy+zz); m.v[0][1]=2*(xy+wz);   m.v[0][2]=2*(xz-wy);    m.v[0][3]=0; // column 0
   m.v[1][0]=2*(xy-wz);   m.v[1][1]=1-2*(xx+zz); m.v[1][2]=2*(yz+wx);    m.v[1][3]=0; // column 1
   m.v[2][0]=2*(xz+wy);   m.v[2][1]=2*(yz-wx);   m.v[2][2]=1-2*(xx+yy);  m.v[2][3]=0; // column 2
@@ -589,10 +589,129 @@ v4 quat_look_rotation(v3 dir, v3 up) {
 }
 
 ////////////////////////////////////////////////////////////////////////
+// Matrix2
+
+m2x2 operator*(m2x2 a, m2x2 b) {
+  m2x2 res = {};
+  Loop(y, 2) {
+    Loop(x, 2) {
+      res.v[y][x] =
+        a.v[0][x] * b.v[y][0] +
+        a.v[1][x] * b.v[y][1];
+    }
+  }
+  return res;
+}
+m2x2& operator*=(m2x2& a, m2x2 b) { return a = b * a; }
+
+v2 operator*(m2x2 mat, v2 v) {
+  v2 result = {
+    mat.v[0][0]*v.x + mat.v[1][0]*v.y,
+    mat.v[0][1]*v.x + mat.v[1][1]*v.y,
+  };
+  return result;
+}
+
+m2x2 m2x2_identity() {
+  m2x2 res = {
+    1, 0,
+    0, 1,
+  };
+  return res;
+}
+
+m2x2 m2x2_rotate(f32 rad) {
+  f32 s, c;
+  SinCos(rad, &s, &c);
+  m2x2 res = {
+     c, s,
+    -s, c,
+  };
+  return res;
+}
+
+m2x2 m2x2_scale(v2 scale) {
+  m2x2 res = {
+    scale.x, 0,
+    0,       scale.y,
+  };
+  return res;
+}
+
+m2x2 m2x2_inverse(m2x2 m) {
+  f32 det =
+    m.v[0][0] * m.v[1][1] -
+    m.v[1][0] * m.v[0][1];
+  f32 inv_det = 1.0f / det;
+  m2x2 res = {
+     m.v[1][1], -m.v[0][1],
+    -m.v[1][0],  m.v[0][0],
+  };
+  return m2x2_scale_all_elements(res, inv_det);
+}
+
+m2x2 m2x2_scale_all_elements(m2x2 mat, f32 scale) {
+  Loop(row, 2) {
+    Loop(col, 2) {
+      mat.v[row][col] *= scale;
+    }
+  }
+  return mat;
+}
+
+////////////////////////////////////////////////////////////////////////
+// Maxtrix3x2
+
+v2 operator*(m3x2 mat, v3 v) {
+  v2 result = {
+    mat.v[0][0] * v.x +
+    mat.v[1][0] * v.y +
+    mat.v[2][0] * v.z,
+
+    mat.v[0][1] * v.x +
+    mat.v[1][1] * v.y +
+    mat.v[2][1] * v.z,
+  };
+  return result;
+}
+
+m3x2 mat3x2_identity() {
+  m3x2 res = {};
+  res.v[0][0] = 1;
+  res.v[1][1] = 1;
+  return res;
+}
+
+m3x2 mat3x2_translate(v2 pos) {
+  m3x2 res = mat3x2_identity();
+  res.v[2][0] = pos.x;
+  res.v[2][1] = pos.y;
+  return res;
+}
+
+m3x2 mat3x2_scale(v2 scale) {
+  m3x2 res = {};
+  res.v[0][0] = scale.x;
+  res.v[1][1] = scale.y;
+  return res;
+}
+
+m3x2 mat3x2_rotate(f32 rad) {
+  f32 s, c;
+  SinCos(rad, &s, &c);
+  m3x2 res = {
+    c, s,
+   -s, c,
+    0, 0,
+  };
+  return res;
+}
+
+////////////////////////////////////////////////////////////////////////
 // Matrix3
 
-mat3 operator*(mat3 a, mat3 b) {
-  mat3 res = {};
+m3x3 operator*(m3x3 a, m3x3 b) {
+  m3x3 res = {};
   Loop (j, 3) {
     Loop (i, 3) {
       res.v[j][i] = b.v[j][0] * a.v[0][i] +
@@ -602,19 +721,19 @@ mat3 operator*(mat3 a, mat3 b) {
   }
   return res;
 }
-mat3& operator*=(mat3& a, mat3 b) { return a = b * a; }
+m3x3& operator*=(m3x3& a, m3x3 b) { return a = b * a; }
 
-v3 operator*(mat3 mat, v3 vec) {
+v3 operator*(m3x3 mat, v3 v) {
   v3 res = {
-    mat.v[0][0]*vec.x + mat.v[0][1]*vec.y + mat.v[0][2]*vec.z,
-    mat.v[1][0]*vec.x + mat.v[1][1]*vec.y + mat.v[1][2]*vec.z,
-    mat.v[2][0]*vec.x + mat.v[2][1]*vec.y + mat.v[2][2]*vec.z,
+    mat.v[0][0]*v.x + mat.v[0][1]*v.y + mat.v[0][2]*v.z,
+    mat.v[1][0]*v.x + mat.v[1][1]*v.y + mat.v[1][2]*v.z,
+    mat.v[2][0]*v.x + mat.v[2][1]*v.y + mat.v[2][2]*v.z,
   };
   return res;
 }
 
-mat3 mat3_identity() {
-  mat3 result = {
+m3x3 m3x3_identity() {
+  m3x3 result = {
     1,0,0,
     0,1,0,
     0,0,1
@@ -622,8 +741,8 @@ mat3 mat3_identity() {
   return result;
 }
 
-mat3 mat3_translate(v2 pos) {
-  mat3 res = {
+m3x3 m3x3_translate(v2 pos) {
+  m3x3 res = {
     1,     0,     0,
     0,     1,     0,
     pos.x, pos.y, 1
@@ -631,8 +750,8 @@ mat3 mat3_translate(v2 pos) {
   return res;
 }
 
-mat3 mat3_scale(v2 scale) {
-  mat3 res = {
+m3x3 m3x3_scale(v2 scale) {
+  m3x3 res = {
     scale.x, 0,       0,
     0,       scale.y, 0,
     0,       0,       1
@@ -640,11 +759,115 @@ mat3 mat3_scale(v2 scale) {
   return res;
 }
 
+m3x3 m3x3_rotate(f32 rad) {
+  f32 s, c;
+  SinCos(rad, &s, &c);
+  m3x3 res = {
+    c, s,    0,
+   -s,   c,  0,
+    0,      0,       1,
+  };
+  return res;
+}
+
+m3x3 m3x3_inverse(m3x3 m) {
+  f32 a = m.v[0][0];
+  f32 b = m.v[1][0];
+  f32 c = m.v[2][0];
+
+  f32 d = m.v[0][1];
+  f32 e = m.v[1][1];
+  f32 f = m.v[2][1];
+
+  f32 g = m.v[0][2];
+  f32 h = m.v[1][2];
+  f32 i = m.v[2][2];
+
+  f32 A = e*i - f*h;
+  f32 B = c*h - b*i;
+  f32 C = b*f - c*e;
+
+  f32 D = f*g - d*i;
+  f32 E = a*i - c*g;
+  f32 F = c*d - a*f;
+
+  f32 G = d*h - e*g;
+  f32 H = b*g - a*h;
+  f32 I = a*e - b*d;
+
+  f32 det = a*A + b*D + c*G;
+  f32 inv_det = 1.0f / det;
+
+  m3x3 res = {
+      A, D, G,
+      B, E, H,
+      C, F, I,
+  };
+
+  return m3x3_scale_all_elements(res, inv_det);
+}
+
+m3x3 m3x3_scale_all_elements(m3x3 mat, f32 scale) {
+  Loop(row, 3) {
+    Loop(col, 3) {
+      mat.v[row][col] *= scale;
+    }
+  }
+  return mat;
+}
+
+////////////////////////////////////////////////////////////////////////
+// Matrix4x3
+
+m4x3 mat4x3_identity() {
+  m4x3 res = {};
+  res.v[0][0] = 1;
+  res.v[1][1] = 1;
+  res.v[2][2] = 1;
+  return res;
+}
+
+m4x3 mat4x3_scale(v3 scale) {
+  m4x3 res = {};
+  res.v[0][0] = scale.x;
+  res.v[1][1] = scale.y;
+  res.v[2][2] = scale.z;
+  return res;
+}
+
+m4x3 mat4x3_translate(v3 pos) {
+  m4x3 res = mat4x3_identity();
+  res.v[3][0] = pos.x;
+  res.v[3][1] = pos.y;
+  res.v[3][2] = pos.z;
+  return res;
+}
+
+v3 operator*(m4x3 mat, v4 v) {
+  v3 res = {
+      mat.v[0][0] * v.x +
+      mat.v[1][0] * v.y +
+      mat.v[2][0] * v.z +
+      mat.v[3][0] * v.w,
+
+      mat.v[0][1] * v.x +
+      mat.v[1][1] * v.y +
+      mat.v[2][1] * v.z +
+      mat.v[3][1] * v.w,
+
+      mat.v[0][2] * v.x +
+      mat.v[1][2] * v.y +
+      mat.v[2][2] * v.z +
+      mat.v[3][2] * v.w,
+  };
+  return res;
+}
+
 ////////////////////////////////////////////////////////////////////////
 // Matrix4
 
-mat4 operator*(mat4 a, mat4 b) {
-  mat4 res = {};
+m4x4 operator*(m4x4 a, m4x4 b) {
+  m4x4 res = {};
   Loop (y, 4) {
     Loop (x, 4) {
       res.v[y][x] = a.v[0][x] * b.v[y][0] +
@@ -655,9 +878,9 @@ mat4 operator*(mat4 a, mat4 b) {
   }
   return res;
 }
-mat4& operator*=(mat4& a, mat4 b) { return a = b * a; }
+m4x4& operator*=(m4x4& a, m4x4 b) { return a = b * a; }
 
-v4 operator*(mat4 mat, v4 v) {
+v4 operator*(m4x4 mat, v4 v) {
   v4 result = {
     mat.v[0][0]*v.x + mat.v[0][1]*v.y + mat.v[0][2]*v.z + mat.v[0][3]*v.w,
     mat.v[1][0]*v.x + mat.v[1][1]*v.y + mat.v[1][2]*v.z + mat.v[1][3]*v.w,
@@ -668,7 +891,7 @@ v4 operator*(mat4 mat, v4 v) {
 }
 
 // NOTE: camera is looking at -z so forward is negative
-v3 mat4_forward(mat4 matrix) {
+v3 m4x4_forward(m4x4 matrix) {
   v3 res = {
     -matrix.v[0][2],
     -matrix.v[1][2],
@@ -678,7 +901,7 @@ v3 mat4_forward(mat4 matrix) {
   return res;
 }
 
-v3 mat4_backward(mat4 matrix) {
+v3 m4x4_backward(m4x4 matrix) {
   v3 res = {
     matrix.v[0][2],
     matrix.v[1][2],
@@ -688,7 +911,7 @@ v3 mat4_backward(mat4 matrix) {
   return res;
 }
 
-v3 mat4_up(mat4 matrix) {
+v3 m4x4_up(m4x4 matrix) {
   v3 up = {
     matrix.v[0][1],
     matrix.v[1][1],
@@ -698,7 +921,7 @@ v3 mat4_up(mat4 matrix) {
   return up;
 }
 
-v3 mat4_down(mat4 matrix) {
+v3 m4x4_down(m4x4 matrix) {
   v3 down = {
     -matrix.v[0][1],
     -matrix.v[1][1],
@@ -708,7 +931,7 @@ v3 mat4_down(mat4 matrix) {
   return down;
 }
 
-v3 mat4_right(mat4 matrix) {
+v3 m4x4_right(m4x4 matrix) {
   v3 left = {
     matrix.v[0][0],
     matrix.v[1][0],
@@ -718,7 +941,7 @@ v3 mat4_right(mat4 matrix) {
   return left;
 }
 
-v3 mat4_left(mat4 matrix) {
+v3 m4x4_left(m4x4 matrix) {
   v3 right = {
     -matrix.v[0][0],
     -matrix.v[1][0],
@@ -728,8 +951,8 @@ v3 mat4_left(mat4 matrix) {
   return right;
 }
 
-mat4 mat4_identity() {
-  mat4 res = {
+m4x4 m4x4_identity() {
+  m4x4 res = {
     1,0,0,0,
     0,1,0,0,
     0,0,1,0,
@@ -738,8 +961,8 @@ mat4 mat4_identity() {
   return res;
 }
 
-mat4 mat4_translate(v3 pos) {
-  mat4 res = {
+m4x4 m4x4_translate(v3 pos) {
+  m4x4 res = {
     1,     0,     0,     0,
     0,     1,     0,     0,
     0,     0,     1,     0,
@@ -748,8 +971,8 @@ mat4 mat4_translate(v3 pos) {
   return res;
 }
 
-mat4 mat4_scale(v3 scale) {
-  mat4 res = {
+m4x4 m4x4_scale(v3 scale) {
+  m4x4 res = {
     scale.x, 0,       0,       0,
     0,       scale.y, 0,       0,
     0,       0,       scale.z, 0,
@@ -758,7 +981,7 @@ mat4 mat4_scale(v3 scale) {
   return res;
 }
 
-mat4 mat4_scale_all_elements(mat4 mat, f32 scale) {
+m4x4 m4x4_scale_all_elements(m4x4 mat, f32 scale) {
   Loop (row, 4) {
     Loop (col, 4) {
       mat.v[row][col] *= scale;
@@ -767,10 +990,10 @@ mat4 mat4_scale_all_elements(mat4 mat, f32 scale) {
   return mat;
 }
 
-mat4 mat4_rotate_x(f32 rad) {
+m4x4 m4x4_rotate_x(f32 rad) {
   f32 sin, cos;
   SinCos(rad, &sin, &cos);
-  mat4 mat = {
+  m4x4 mat = {
     1,   0,    0,   0,
     0, cos,  sin,   0,
     0,-sin,  cos,   0,
@@ -779,10 +1002,10 @@ mat4 mat4_rotate_x(f32 rad) {
   return mat;
 }
 
-mat4 mat4_rotate_y(f32 rad) {
+m4x4 m4x4_rotate_y(f32 rad) {
   f32 sin, cos;
   SinCos(rad, &sin, &cos);
-  mat4 mat = {
+  m4x4 mat = {
     cos, 0,  -sin, 0,
     0,   1,   0,   0,
     sin, 0,   cos, 0,
@@ -791,10 +1014,10 @@ mat4 mat4_rotate_y(f32 rad) {
   return mat;
 }
 
-mat4 mat4_rotate_z(f32 rad) {
+m4x4 m4x4_rotate_z(f32 rad) {
   f32 sin, cos;
   SinCos(rad, &sin, &cos);
-  mat4 mat = {
+  m4x4 mat = {
     cos, sin, 0,   0,
    -sin, cos, 0,   0,
     0,   0,   1,   0,
@@ -803,15 +1026,15 @@ mat4 mat4_rotate_z(f32 rad) {
   return mat;
 }
 
-mat4 mat4_rotate_xyz(v3 rad) {
-  mat4 rx = mat4_rotate_x(rad.x);
-  mat4 ry = mat4_rotate_y(rad.y);
-  mat4 rz = mat4_rotate_z(rad.z);
-  mat4 res = rz * ry * rx;
+m4x4 m4x4_rotate_xyz(v3 rad) {
+  m4x4 rx = m4x4_rotate_x(rad.x);
+  m4x4 ry = m4x4_rotate_y(rad.y);
+  m4x4 rz = m4x4_rotate_z(rad.z);
+  m4x4 res = rz * ry * rx;
   return res;
 }
 
-mat4 mat4_rotate_around_axis(v3 axis, f32 rad) {
+m4x4 m4x4_rotate_around_axis(v3 axis, f32 rad) {
   f32 len_sqr = v3_length_sqr(axis);
   if ((len_sqr != 1.0f) && (len_sqr != 0.0f)) {
     axis = v3_norm(axis);
@@ -821,7 +1044,7 @@ mat4 mat4_rotate_around_axis(v3 axis, f32 rad) {
   SinCos(rad, &sine, &cosine);
   f32 x = axis.x, y = axis.y, z = axis.z;
   f32 t = 1.0f - cosine;
-  mat4 res = {
+  m4x4 res = {
     x*x*t + cosine, y*x*t + z*sine, z*x*t - y*sine, 0,
     x*y*t - z*sine, y*y*t + cosine, z*y*t + x*sine, 0,
     x*z*t + y*sine, y*z*t - x*sine, z*z*t + cosine, 0,
@@ -830,17 +1053,17 @@ mat4 mat4_rotate_around_axis(v3 axis, f32 rad) {
   return res;
 }
 
-mat4 mat4_transform(v3 pos, v4 rot, v3 scale) {
-  mat4 res = mat4_translate(pos) * mat4_from_quat(rot) * mat4_scale(scale);
+m4x4 m4x4_transform(v3 pos, v4 rot, v3 scale) {
+  m4x4 res = m4x4_translate(pos) * m4x4_from_quat(rot) * m4x4_scale(scale);
   return res;
 }
-mat4 mat4_transform(Transform trans) {
-  mat4 res = mat4_transform(trans.pos, trans.rot, trans.scale);
+m4x4 m4x4_transform(Transform trans) {
+  m4x4 res = m4x4_transform(trans.pos, trans.rot, trans.scale);
   return res;
 }
 
-mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far) {
-  mat4 res = {
+m4x4 m4x4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far) {
+  m4x4 res = {
     2/(right - left), 0,                0,                  0,
     0,                2/(top - bottom), 0,                  0,
     0,                0,                1/(far - near),     0,
@@ -850,7 +1073,7 @@ mat4 mat4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 f
 }
 
 // NOTE: I use camera looking at -Z direction since I found it's more intuitive
-mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far) {
+m4x4 m4x4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far) {
   f32 fov = Tan(fov_radians/2.0f);
   // mat4 result = {
   //   1/(fov*aspect_ratio), 0,                       0,                    0,
@@ -859,7 +1082,7 @@ mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far) {
   //   0,                    0,                       -Far*Near/(Far-Near), 0
   // };
   // NOTE: This flips Z value so camera is looking at -Z direction
-  mat4 res = {
+  m4x4 res = {
     1/(fov*aspect_ratio), 0,                0,                             0,
     0,                    1/(fov),          0,                             0,
     0,                    0,                -(far + near)/(far - near),   -1,
@@ -869,11 +1092,11 @@ mat4 mat4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far) {
 }
 
 // NOTE: we negate Z direction since camera is looking at -Z direction
-mat4 mat4_look_at(v3 pos, v3 target, v3 up) {
+m4x4 m4x4_look_at(v3 pos, v3 target, v3 up) {
   v3 z = -v3_norm(target - pos);
   v3 x = v3_norm(v3_cross(up, z));
   v3 y = v3_cross(z, x);
-  mat4 res = {
+  m4x4 res = {
     x.x, y.x, z.x, 0,
     x.y, y.y, z.y, 0,
     x.z, y.z, z.z, 0,
@@ -882,8 +1105,8 @@ mat4 mat4_look_at(v3 pos, v3 target, v3 up) {
   return res;
 }
 
-mat4 mat4_transpose(mat4 mat) {
-  mat4 res = {
+m4x4 m4x4_transpose(m4x4 mat) {
+  m4x4 res = {
     mat.v[0][0], mat.v[1][0], mat.v[2][0], mat.v[3][0],
     mat.v[0][1], mat.v[1][1], mat.v[2][1], mat.v[3][1],
     mat.v[0][2], mat.v[1][2], mat.v[2][2], mat.v[3][2],
@@ -892,7 +1115,7 @@ mat4 mat4_transpose(mat4 mat) {
   return res;
 }
 
-mat4 mat4_inverse(mat4 m) {
+m4x4 m4x4_inverse(m4x4 m) {
   f32 coef00 = m.v[2][2] * m.v[3][3] - m.v[3][2] * m.v[2][3];
   f32 coef02 = m.v[1][2] * m.v[3][3] - m.v[3][2] * m.v[1][3];
   f32 coef03 = m.v[1][2] * m.v[2][3] - m.v[2][2] * m.v[1][3];
@@ -932,7 +1155,7 @@ mat4 mat4_inverse(mat4 m) {
   v4 sign_a = { +1, -1, +1, -1 };
   v4 sign_b = { -1, +1, -1, +1 };
   
-  mat4 inverse;
+  m4x4 inverse;
   Loop (i, 4) {
     inverse.v[0][i] = inv0.v[i] * sign_a.v[i];
     inverse.v[1][i] = inv1.v[i] * sign_b.v[i];
@@ -947,19 +1170,19 @@ mat4 mat4_inverse(mat4 m) {
   
   f32 one_over_det = 1 / dot1;
   
-  return mat4_scale_all_elements(inverse, one_over_det);
+  return m4x4_scale_all_elements(inverse, one_over_det);
 }
 
 ////////////////////////////////////////////////////////////////////////
 // Misc
 
 Ray ray_make(v3 pos, v3 dir) { return Ray(pos, dir); }
-Ray ray_from_screen(v2 screen_pos, v2u viewport_rect, v3 origin, mat4 view, mat4 projection) {
+Ray ray_from_screen(v2 screen_pos, v2u viewport_rect, v3 origin, m4x4 view, m4x4 projection) {
   v2 mouse_pos = screen_pos;
   v2u win_size = viewport_rect;
   v2 norm_coords = v2(2 * (mouse_pos.x/win_size.x) - 1, 2 * -(mouse_pos.y/win_size.y) + 1);
   v4 clip_coords = v4(norm_coords.x, norm_coords.y, -1, 1);
-  v4 eye_coord = mat4_inverse(projection) * clip_coords;
+  v4 eye_coord = m4x4_inverse(projection) * clip_coords;
   eye_coord = v4(eye_coord.x, eye_coord.y, -1, 0);
   v3 world_coord = v3_of_v4(view * eye_coord);
   world_coord = v3_norm(world_coord);
@@ -1023,6 +1246,8 @@ Rng2 rng2_pad(Rng2 r, f32 x)        { return Rng2(r.min - v2(x), r.max + v2(x));
 v2 rng2_center(Rng2 r)              { return v2((r.min + r.max)/2); }
 b32 rng2_contains(Rng2 r, v2 x)     { return (r.min.x <= x.x && x.x < r.max.x && r.min.y <= x.y && x.y < r.max.y); }
 v2 rng2_dim(Rng2 r)                 { return v2(r.max.x - r.min.x, r.max.y - r.min.y); }
+f32 rng2_width(Rng2 r)              { return r.x1 - r.x0; }
+f32 rng2_height(Rng2 r)             { return r.y1 - r.y0; }
 Rng2 rng2_union(Rng2 a, Rng2 b)     { return Rng2(v2(Min(a.min.x, b.min.x), Min(a.min.y, b.min.y)), v2(Max(a.max.x, b.max.x), Max(a.max.y, b.max.y))); }
 Rng2 rng2_intersect(Rng2 a, Rng2 b) { return Rng2(v2(Max(a.min.x, b.min.x), Max(a.min.y, b.min.y)), v2(Min(a.max.x, b.max.x), Min(a.max.y, b.max.y))); }
 v2 rng2_clamp(Rng2 r, v2 x)         { return v2(Clamp(r.min.x, x.x, r.max.x), Clamp(r.min.y, x.y, r.max.y)); }
@@ -1076,6 +1301,9 @@ Rng2 layout_row(Rng2Cursor& c, Rng1 x, f32 h) {
 void layout_next(Rng2Cursor& c, f32 h) {
   c.pos.y += h;
 }
+
+f32 smoothstep(f32 t)   { return t*t*(3-2*t); }
+f32 smootherstep(f32 t) { return t * t * t * (t * (t * 6 - 15) + 10); }
 
 ////////////////////////////////////////////////////////////////////////
 // Ease

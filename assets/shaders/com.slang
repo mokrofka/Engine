@@ -84,13 +84,15 @@ struct VSOutput {
   u32 id;
 };
 
-///////////////////////////////////
-// UI rect
-
 struct UI_VSOutput {
   v4 vert : SV_Position;
   v2 uv;
   v4 color;
+  v2 dst_pos;
+  v2 dst_center;
+  v2 dst_half_size;
+  f32 corner_radius;
+  f32 edge_softness;
   u32 texture;
   u32 flags;
 };

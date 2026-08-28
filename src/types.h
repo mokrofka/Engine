@@ -65,3 +65,18 @@ struct Timer {
   f32 acc;
 };
 
+// union Color {
+//   u32 value;
+//   struct {
+//     u8 r;
+//     u8 g;
+//     u8 b;
+//     u8 a;
+//   };
+//   Color(u32 col):value(col){}
+//   Color(v4 col) { value = u32_from_rgba(col); }
+//   operator v4() { return rgba_from_u32(value); }
+// };
+
+
+

@@ -3,12 +3,6 @@
 #include "mem.h"
 #include "maths.h"
 
-////////////////////////////////////////////////////////////////////////
-// Base
-
-String str_make(u8* str, u64 size);
-String str_make(Slice<u8> str);
-
 struct Dstring {
   u8* str;
   u32 size;
@@ -16,11 +10,6 @@ struct Dstring {
   Allocator alloc;
   operator String();
 };
-
-Slice<u8> dstr_slice(Dstring dstr);
-Dstring dstr_make(Allocator alloc);
-void dstr_push(Dstring& arr, String str);
-void dstr_clear(Dstring& arr);
 
 struct StringNode {
   StringNode* next;
@@ -33,6 +22,11 @@ struct StringList {
   u32 node_count;
   u32 total_size;
 };
+
+Slice<u8> dstr_slice(Dstring dstr);
+Dstring dstr_make(Allocator alloc);
+void dstr_push(Dstring& arr, String str);
+void dstr_clear(Dstring& arr);
 
 u64 cstr_length(const void* c);
 
@@ -69,10 +63,10 @@ b32 char_is_number_cont(u8 c);
 ////////////////////////////////////////////////////////////////////////
 // String Constructors
 
+String str_make(u8* str, u64 size);
+String str_make(Slice<u8> str);
 #define S(str) str_make((u8*)str, sizeof(str)-1)
-
 String str_range(u8* first, u8* one_past_last);
-String str_cstr_capped(const void* String, const void* cap);
 
 ////////////////////////////////////////////////////////////////////////
 // String Stylization

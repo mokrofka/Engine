@@ -28,7 +28,3 @@ i32 main(i32 count, char* args[]) {
     Assign(update, os_lib_get_proc(lib, "update_main"));
   }
 }
-
-
-
-

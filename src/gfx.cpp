@@ -389,7 +389,7 @@ VkBorderColor vk_sampler_border_color(Gfx_BorderColor c) {
 
 b32 vk_is_read_access(VK_Access access) {
   VK_Access read_bits = VK_Access_IndexBuffer | VK_Access_VertBuffer | VK_Access_StorageBuffer_RO | VK_Access_Texture | VK_Access_Present;
-  return FlagIsSubset(access, read_bits);
+  return FlagHas(read_bits, access);
 }
 
 VkPipelineStageFlags2 vk_stage_mask(VK_Access access, b32 is_dst_access) {
@@ -802,11 +802,11 @@ VK_Memory vk_mem_make(Gfx_MemType type, u64 size) {
   u32 mem_idx = 0;
   switch (type) {
     InvalidDefaultCase;
-    case Gfx_MemType_Gpu: {
-      mem_idx = g.device.gpu_type_idx; 
-    } break;
     case Gfx_MemType_Cpu: {
       mem_idx = g.device.cpu_type_idx; 
+    } break;
+    case Gfx_MemType_Gpu: {
+      mem_idx = g.device.gpu_type_idx; 
     } break;
   }
   VkMemoryAllocateFlagsInfoKHR flags_info = {
@@ -827,7 +827,7 @@ VK_Memory vk_mem_make(Gfx_MemType type, u64 size) {
   return res;
 }
 
-VK_Buffer vk_make_buffer(u64 size, Gfx_MemType type) {
+VK_Buffer vk_make_buffer(Gfx_MemType type, u64 size) {
   Gfx_State& g = st->gfx;
   VkBufferUsageFlags buf_usage_flags = 0;
   buf_usage_flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
@@ -844,13 +844,12 @@ VK_Buffer vk_make_buffer(u64 size, Gfx_MemType type) {
   };
   VK_Buffer res = {.cap = size};
   VK_CHECK(g.CreateBuffer(vkdevice, &buffer_create_info, g.allocator, &res.h));
-  if (type == Gfx_MemType_Default) {
-    type = Gfx_MemType_Gpu;
-  }
-
   u32 mem_prop_flags = 0;
-  if (type == Gfx_MemType_Gpu) mem_prop_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-  else if (type == Gfx_MemType_Cpu) mem_prop_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+  switch (type) {
+    InvalidDefaultCase;
+    case Gfx_MemType_Cpu: mem_prop_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT; break;
+    case Gfx_MemType_Gpu: mem_prop_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT; break;
+  }
   VkMemoryRequirements requirements;
   g.GetBufferMemoryRequirements(vkdevice, res.h, &requirements);
 
@@ -864,15 +863,18 @@ VK_Buffer vk_make_buffer(u64 size, Gfx_MemType type) {
 
   VK_Memory* mem = null;
   u64 offset = 0;
-  if (type == Gfx_MemType_Gpu) {
-    mem = &g.gpu_mem;
-    offset = offset_push(mem->pos, size, requirements.alignment);
-    Assert(mem->pos <= mem->cap);
-  }
-  else if (type == Gfx_MemType_Cpu) {
-    mem = &g.cpu_mem;
-    offset = offset_push(mem->pos, size, requirements.alignment);
-    Assert(mem->pos <= mem->cap);
+  switch (type) {
+    InvalidDefaultCase;
+    case Gfx_MemType_Cpu: {
+      mem = &g.cpu_mem;
+      offset = offset_push(mem->pos, size, requirements.alignment);
+      Assert(mem->pos <= mem->cap);
+    } break;
+    case Gfx_MemType_Gpu: {
+      mem = &g.gpu_mem;
+      offset = offset_push(mem->pos, size, requirements.alignment);
+      Assert(mem->pos <= mem->cap);
+    } break;
   }
   VK_CHECK(g.BindBufferMemory(vkdevice, res.h, mem->h, offset));
   res.base = Offset(mem->mapped_mem, offset);
@@ -893,7 +895,7 @@ void vk_bind_index_buffer(VK_Buffer buffer) {
 VK_Buffer* vk_choose_buffer(Gfx_Buffer buf) {
   Gfx_State& g = st->gfx;
   Gfx_BufferData buffer = pool_get(st->gfx.buffers, buf);
-  VK_Buffer* res = null;
+  VK_Buffer* res;
   switch (buffer.type) {
     InvalidDefaultCase;
     case Gfx_MemType_Cpu: res = &g.cpu_buf; break;
@@ -1083,6 +1085,8 @@ VkPipeline vk_pipeline_create(Gfx_PipelineDesc desc) {
   VkDynamicState dynamic_states[] = {
     VK_DYNAMIC_STATE_VIEWPORT,
     VK_DYNAMIC_STATE_SCISSOR,
+    // VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE,
+    VK_DYNAMIC_STATE_POLYGON_MODE_EXT,
   };
   VkPipelineDynamicStateCreateInfo dynamic_state_info = {
     .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
@@ -1153,6 +1157,7 @@ void vk_loader_load_device() {
 #undef X
 }
 
+VkBool32 vk_debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity, VkDebugUtilsMessageTypeFlagsEXT message_types, const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data);
 intern void vk_instance_init() {
   Scratch scratch;
   Gfx_State& g = st->gfx;
@@ -1166,7 +1171,6 @@ intern void vk_instance_init() {
   array_push(required_extensions, VK_KHR_SURFACE_EXTENSION_NAME, VK1_SURFACE_NAME);
 
 #if BUILD_DEBUG
-
   // Validation layer
   array_push(required_validation_layer_names, "VK_LAYER_KHRONOS_validation");
   Debug("Required layers:");
@@ -1232,44 +1236,7 @@ intern void vk_instance_init() {
     .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
                    VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT |
                    VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT,
-    .pfnUserCallback = [](
-      VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
-      VkDebugUtilsMessageTypeFlagsEXT message_types,
-      const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
-      void* user_data) -> VkBool32 
-    {
-      switch (message_severity) {
-        default:break;
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT: {
-          Trace(String(callback_data->pMessage));
-        } break;
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT: {
-          Info(String(callback_data->pMessage));
-        } break;
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: {
-          String skip_warnings[] = {
-            "vkCreateGraphicsPipelines(): pCreateInfos[0].pVertexInputState Vertex attribute at location",
-            "vkCreateGraphicsPipelines(): pCreateInfos[0] (SPIR-V Interface) VK_SHADER_STAGE_VERTEX_BIT has an Output value declared at Location",
-            "(Warning - This VUID has now been reported 10 times, which is the duplicate_message_limit value, this will be the last time reporting it).",
-            "vkCreateGraphicsPipelines(): pCreateInfos[0] (SPIR-V Interface) [EntryPoint \"vs_main\", VK_SHADER_STAGE_VERTEX_BIT] has an Output value declared at Location",
-          };
-          LoopArray (i, skip_warnings) {
-            String skip = skip_warnings[i];
-            String warn = callback_data->pMessage;
-            if (warn.size >= skip.size) {
-              if (str_match(str_prefix(warn, skip.size), skip)) {
-                return false;
-              }
-            }
-          }
-          Warn(String(callback_data->pMessage));
-        } break;
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: {
-          ErrorArena(st->r.arena, String(callback_data->pMessage));
-        } break;
-      }
-      return false;
-    },
+    .pfnUserCallback = vk_debug_callback,
   };
   PFN_vkCreateDebugUtilsMessengerEXT func = null;
   Assign(func, g.GetInstanceProcAddr(g.instance, "vkCreateDebugUtilsMessengerEXT"));
@@ -1340,7 +1307,6 @@ intern void vk_device_init() {
       // Gpu Info
       Info("Available device: '%s'", String(device.properties.deviceName));
       switch (device.properties.deviceType) {
-        default:{}break;
         case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: {
           integrated_idx = i;
           Info("GPU type is Integrated");
@@ -1350,11 +1316,12 @@ intern void vk_device_init() {
           discrete_idx = i;
           Info("GPU type is Descrete");
         } break;
+        default:
       }
       Info("GPU Driver version: %i.%i.%i", VK_VERSION_MAJOR(device.properties.driverVersion), VK_VERSION_MINOR(device.properties.driverVersion), VK_VERSION_PATCH(device.properties.driverVersion));
       Info("GPU API version: %i.%i.%i", VK_VERSION_MAJOR(device.properties.apiVersion), VK_VERSION_MINOR(device.properties.apiVersion), VK_VERSION_PATCH(device.properties.apiVersion));
       Loop (i, device.memory.memoryHeapCount) {
-        f64 mem_size = (((f64)device.memory.memoryHeaps[i].size) / GB(1));
+        f64 mem_size = (f64)device.memory.memoryHeaps[i].size / GB(1);
         if (device.memory.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
           Info("Heap %i: GPU: %.2f GiB", i, mem_size);
         else
@@ -1365,14 +1332,15 @@ intern void vk_device_init() {
       // Find cpu/gpu memory type index
       Loop (i, device.memory.memoryTypeCount) {
         VkMemoryType t = device.memory.memoryTypes[i];
-        if (FlagEquals(t.propertyFlags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
+        // if (FlagEquals(t.propertyFlags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
+        if (t.propertyFlags == VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
           device.gpu_type_idx = i;
           break;
         }
       }
       Loop (i, device.memory.memoryTypeCount) {
         VkMemoryType t = device.memory.memoryTypes[i];
-        if ((t.propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)) {
+        if (FlagAny(t.propertyFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)) {
           device.cpu_type_idx = i;
           break;
         }
@@ -1417,8 +1385,15 @@ intern void vk_device_init() {
     
     ///////////////////////////////////
     // Features
+    VkPhysicalDeviceExtendedDynamicState3FeaturesEXT eds3 = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT,
+      .extendedDynamicState3PolygonMode = true,
+      .extendedDynamicState3ColorBlendEnable = true,
+      .extendedDynamicState3ColorBlendEquation = true,
+    };
     VkPhysicalDeviceVulkan14Features vulkan14 = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
+      .pNext = &eds3,
     };
     VkPhysicalDeviceVulkan13Features vulkan13 = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
@@ -1452,6 +1427,7 @@ intern void vk_device_init() {
     };
     const char* extension_names[] = {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+      VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME
     };
     VkDeviceCreateInfo device_create_info = {
       .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -1695,7 +1671,7 @@ void gfx_pipeline_desc_defaults(Gfx_PipelineDesc* desc) {
 
 void gfx_image_desc_defaults(Gfx_ImageDesc* desc) {
   desc->type = _Def(desc->type, Gfx_ImageType_2D);
-  desc->usage = FlagSet(desc->usage, Gfx_ImageUsage_Immutable);
+  desc->usage = desc->usage | Gfx_ImageUsage_Immutable;
   desc->slices_count = _Def(desc->slices_count, desc->type == Gfx_ImageType_Cube ? 6 : 1);
   if (FlagHas(desc->usage, Gfx_ImageUsage_ColorAttachment)) {
     desc->pixel_format = _Def(desc->pixel_format, Gfx_DefaultTextureTargetColorFormat);
@@ -1947,7 +1923,7 @@ Gfx_View gfx_make_view(Gfx_ViewDesc desc) {
   };
   VkWriteDescriptorSet texture_descriptor = {
     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    .dstSet = g.descriptor_sets,
+    .dstSet = g.descriptor_set,
     .dstBinding = (img.type == Gfx_ImageType_2D || img.type == Gfx_ImageType_Array) ? Bindings::Textures : Bindings::CubeTextures,
     .dstArrayElement = res.idx,
     .descriptorCount = 1,
@@ -2001,7 +1977,7 @@ Gfx_Sampler gfx_make_sampler(Gfx_SamplerDesc desc) {
   };
   VkWriteDescriptorSet sampler_descriptor = {
     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    .dstSet = g.descriptor_sets,
+    .dstSet = g.descriptor_set,
     .dstBinding = Bindings::Samplers,
     .dstArrayElement = res.idx,
     .descriptorCount = 1,
@@ -2013,17 +1989,20 @@ Gfx_Sampler gfx_make_sampler(Gfx_SamplerDesc desc) {
 }
 
 Gfx_Buffer gfx_make_buffer(u64 size, Gfx_MemType type, u64 align) {
-  Gfx_State& g = st->gfx;
+  var& g = st->gfx;
   u64 offset = 0;
-  if (type == Gfx_MemType_Gpu) {
-    var& buffer = g.gpu_buf;
-    offset = offset_push(buffer.pos, size, align);
-    Assert(buffer.pos <= buffer.cap);
-  }
-  else if (type == Gfx_MemType_Cpu) {
-    var& buffer= g.cpu_buf;
-    offset = offset_push(buffer.pos, size, align);
-    Assert(buffer.pos <= buffer.cap);
+  switch (type) {
+    InvalidDefaultCase;
+    case Gfx_MemType_Cpu: {
+      var& buffer= g.cpu_buf;
+      offset = offset_push(buffer.pos, size, align);
+      Assert(buffer.pos <= buffer.cap);
+    } break;
+    case Gfx_MemType_Gpu: {
+      var& buffer = g.gpu_buf;
+      offset = offset_push(buffer.pos, size, align);
+      Assert(buffer.pos <= buffer.cap);
+    } break;
   }
   Gfx_BufferData buf = {
     .type = type,
@@ -2251,7 +2230,7 @@ void gfx_update_view(Gfx_View view, Gfx_ViewDesc desc) {
   };
   VkWriteDescriptorSet texture_descriptor = {
     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    .dstSet = g.descriptor_sets,
+    .dstSet = g.descriptor_set,
     .dstBinding = (img.type == Gfx_ImageType_2D || img.type == Gfx_ImageType_Array) ? Bindings::Textures : Bindings::CubeTextures,
     .dstArrayElement = view.idx,
     .descriptorCount = 1,
@@ -2350,10 +2329,10 @@ void gfx_begin_pass(Gfx_Pass pass) {
   // Is swapchain?
   b32 is_swapchain_pass = true;
   Loop (i, Gfx_MaxColorAttachments) {
-    if (pass.attachments.colors[i].idx != Gfx_InvalidId) is_swapchain_pass = false;
-    if (pass.attachments.resolves[i].idx != Gfx_InvalidId) is_swapchain_pass = false;
+    if (pass.attachments.colors[i].idx) is_swapchain_pass = false;
+    if (pass.attachments.resolves[i].idx) is_swapchain_pass = false;
   }
-  if (pass.attachments.depth_stencil.idx != Gfx_InvalidId) is_swapchain_pass = false;
+  if (pass.attachments.depth_stencil.idx) is_swapchain_pass = false;
 
   ///////////////////////////////////
   // Barrier
@@ -2364,7 +2343,7 @@ void gfx_begin_pass(Gfx_Pass pass) {
   else {
     // Color + Resolve
     Loop (i, Gfx_MaxColorAttachments) {
-      if (pass.attachments.colors[i].idx == Gfx_InvalidId) break;
+      if (pass.attachments.colors[i].idx == 0) break;
       Gfx_View color_view_id = pass.attachments.colors[i];
       VK_View& color_view = pool_get(g.views, color_view_id);
       VK_Image& color_image = pool_get(g.images, color_view.ref);
@@ -2373,7 +2352,7 @@ void gfx_begin_pass(Gfx_Pass pass) {
         color_image.cur_access |= VK_Access_Discard;
       }
       vk_image_barrier(vk_get_cur_cmd(), &color_image, VK_Access_ColorAttachment);
-      if (pass.attachments.resolves[i].idx != Gfx_InvalidId) {
+      if (pass.attachments.resolves[i].idx) {
         VK_Image& resolve_image = pool_get(g.images, pool_get(g.views, pass.attachments.resolves[i]).ref);
         resolve_image.cur_access |= VK_Access_Discard;
         vk_image_barrier(vk_get_cur_cmd(), &resolve_image, VK_Access_ResolveAttachment);
@@ -2381,7 +2360,7 @@ void gfx_begin_pass(Gfx_Pass pass) {
     }
 
     // Depth / Stencil
-    if (pass.attachments.depth_stencil.idx != Gfx_InvalidId) {
+    if (pass.attachments.depth_stencil.idx) {
       Gfx_Image img = pool_get(g.views, pass.attachments.depth_stencil).ref;
       VK_Image& ds_image = pool_get(g.images, img);
       b32 has_stencil = ds_image.pixel_format == Gfx_PixelFormat_DepthStencil;
@@ -2421,7 +2400,7 @@ void gfx_begin_pass(Gfx_Pass pass) {
     // Color
     u32 color_view_count = 0;
     Loop (i, Gfx_MaxColorAttachments) {
-      if (pass.attachments.colors[i].idx == Gfx_InvalidId) break;
+      if (pass.attachments.colors[i].idx == 0) break;
       VkImageView vk_color_view = pool_get(g.views, pass.attachments.colors[i]).h;
       VkImageView vk_resolve_view = pool_get(g.views, pass.attachments.resolves[i]).h;
       vk_init_color_attachment_info(&color_att_infos[i], action.colors[i], vk_color_view, vk_resolve_view);
@@ -2433,7 +2412,7 @@ void gfx_begin_pass(Gfx_Pass pass) {
     }
 
     // Depth / Stencil
-    if (pass.attachments.depth_stencil.idx != Gfx_InvalidId) {
+    if (pass.attachments.depth_stencil.idx) {
       VK_View ds_view = pool_get(g.views, pass.attachments.depth_stencil);
       VK_Image ds_image = pool_get(g.images, ds_view.ref);
       vk_init_depth_attachment_info(&depth_att_info, action.depth, ds_view.h);
@@ -2456,27 +2435,27 @@ void gfx_end_pass() {
   // Barrier
   b32 is_swapchain_pass = true;
   Loop (i, Gfx_MaxColorAttachments) {
-    if (g.cur_pass.attachments.colors[i].idx != Gfx_InvalidId) is_swapchain_pass = false;
-    if (g.cur_pass.attachments.resolves[i].idx != Gfx_InvalidId) is_swapchain_pass = false;
+    if (g.cur_pass.attachments.colors[i].idx) is_swapchain_pass = false;
+    if (g.cur_pass.attachments.resolves[i].idx) is_swapchain_pass = false;
   }
-  if (g.cur_pass.attachments.depth_stencil.idx != Gfx_InvalidId) is_swapchain_pass = false;
+  if (g.cur_pass.attachments.depth_stencil.idx) is_swapchain_pass = false;
 
   if (is_swapchain_pass) {
     vk_swapchain_end_barrier(g.swapchain.images[g.current_image_idx], VK_Access_Present);
   }
   else {
     Loop (i, Gfx_MaxColorAttachments) {
-      if (g.cur_pass.attachments.colors[i].idx == Gfx_InvalidId) break;
+      if (g.cur_pass.attachments.colors[i].idx == 0) break;
       if (g.cur_pass.action.colors[i].store_action == Gfx_StoreAction_Store) {
         VK_Image& img = pool_get(g.images, pool_get(g.views, g.cur_pass.attachments.colors[i]).ref);
         vk_image_barrier(vk_get_cur_cmd(), &img, VK_Access_Texture | VK_Access_FragmentShader);
       }
-      if (g.cur_pass.attachments.resolves[i].idx != Gfx_InvalidId) {
+      if (g.cur_pass.attachments.resolves[i].idx) {
         VK_Image& img = pool_get(g.images, pool_get(g.views, g.cur_pass.attachments.resolves[i]).ref);
         vk_image_barrier(vk_get_cur_cmd(), &img, VK_Access_Texture | VK_Access_FragmentShader);
       }
     }
-    if (g.cur_pass.attachments.depth_stencil.idx != Gfx_InvalidId) {
+    if (g.cur_pass.attachments.depth_stencil.idx) {
       VK_Image& img = pool_get(g.images, pool_get(g.views, g.cur_pass.attachments.depth_stencil).ref);
       if (g.cur_pass.action.depth.store_action == Gfx_StoreAction_Store) {
         vk_image_barrier(vk_get_cur_cmd(), &img, VK_Access_Texture | VK_Access_FragmentShader);
@@ -2486,30 +2465,22 @@ void gfx_end_pass() {
 }
 
 void gfx_apply_viewport(Rng2 rect, b32 y_origin_at_bottom) {
-  Gfx_State& g = st->gfx;
+  var& g = st->gfx;
+  f32 y = rect.min.y;
+  f32 height = rng2_height(rect);
   if (y_origin_at_bottom) {
-    v2 dim = rng2_dim(rect);
-    VkViewport viewport = {
-      .x = rect.min.x,
-      .y = dim.y-rect.min.y,
-      .width = (f32)dim.x,
-      .height = -(f32)dim.y,
-      .minDepth = 0.0f,
-      .maxDepth = 1.0f,
-    };
-    g.CmdSetViewport(vk_get_cur_cmd(), 0, 1, &viewport);
-  } else {
-    v2 dim = rng2_dim(rect);
-    VkViewport viewport = {
-      .x = rect.min.x,
-      .y = rect.min.y,
-      .width = (f32)dim.x,
-      .height = (f32)dim.y,
-      .minDepth = 0.0f,
-      .maxDepth = 1.0f,
-    };
-    g.CmdSetViewport(vk_get_cur_cmd(), 0, 1, &viewport);
+    y = height - rect.min.y;
+    height = -height;
   }
+  VkViewport viewport = {
+    .x = rect.min.x,
+    .y = y,
+    .width = rng2_width(rect),
+    .height = height,
+    .minDepth = 0.0f,
+    .maxDepth = 1.0f,
+  };
+  g.CmdSetViewport(vk_get_cur_cmd(), 0, 1, &viewport);
 }
 
 void gfx_apply_scissor(Rng2 rect) {
@@ -2535,13 +2506,13 @@ void gfx_draw_indexed(u32 base_index, u32 index_count, u32 base_vert, u32 instan
 
 void gfx_draw_indirect(Gfx_IndirectDrawcall drawcall) {
   Gfx_State& g = st->gfx;
-  Gfx_BufferData buf = pool_get(g.buffers, g.drawcall_buf);
+  Gfx_BufferData buf = pool_get(g.buffers, g.drawcalls_buf);
   st->gfx.CmdDrawIndirect(vk_get_cur_cmd(), g.cpu_buf.h, buf.base + drawcall.base*sizeof(VK_IndirectDrawCall), drawcall.count, sizeof(VK_IndirectDrawCall));
 }
 
 void gfx_draw_indexed_indirect(Gfx_IndirectDrawcall drawcall) {
   Gfx_State& g = st->gfx;
-  Gfx_BufferData buf = pool_get(g.buffers, g.drawcall_buf);
+  Gfx_BufferData buf = pool_get(g.buffers, g.drawcalls_buf);
   st->gfx.CmdDrawIndexedIndirect(vk_get_cur_cmd(), g.cpu_buf.h, buf.base + drawcall.base*sizeof(VK_IndirectDrawCall), drawcall.count, sizeof(VK_IndirectDrawCall));
 }
 
@@ -2582,7 +2553,7 @@ void gfx_draw_mesh_indirect(Gfx_Mesh mesh, u32 id, u32 instance_count) {
     };
   }
   info.base_instance = id;
-  VK_IndirectDrawCall* drawcalls = (VK_IndirectDrawCall*)gfx_buffer_base_ptr(st->gfx.drawcall_buf);
+  VK_IndirectDrawCall* drawcalls = (VK_IndirectDrawCall*)gfx_buffer_base_ptr(st->gfx.drawcalls_buf);
   drawcalls[st->gfx.drawcall_cursor++] = info;
 }
 
@@ -2643,7 +2614,7 @@ void gfx_bind_buffer(Gfx_Buffer buf, u32 binding) {
   };
   writer.writes[writer.writes_count] = {
     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    .dstSet = g.descriptor_sets,
+    .dstSet = g.descriptor_set,
     .dstBinding = binding,
     .dstArrayElement = 0,
     .descriptorCount = 1,
@@ -2654,14 +2625,13 @@ void gfx_bind_buffer(Gfx_Buffer buf, u32 binding) {
 }
 
 void gfx_make_buffers(Slice<Gfx_BufferDesc> descs) {
-  Loop (i, descs.count) {
-    Gfx_BufferDesc desc = descs[i];
+  for (var desc : descs) {
     gfx_make_bind({.binding = desc.binding});
     Gfx_Buffer buf = gfx_make_buffer(desc.size, desc.mem_type == Gfx_MemType_Default ? Gfx_MemType_Cpu : desc.mem_type);
     if (desc.out_buffer) {
       *desc.out_buffer = buf;
     }
-    *desc.cpu_ptr = gfx_buffer_base_ptr(buf);
+    *desc.out_cpu_ptr = gfx_buffer_base_ptr(buf);
     gfx_bind_buffer(buf, desc.binding);
   }
 }
@@ -2692,9 +2662,9 @@ void gfx_flush() {
     .descriptorSetCount = 1,
     .pSetLayouts = &g.descriptor_set_layout,
   };
-  VK_CHECK(g.AllocateDescriptorSets(vkdevice, &alloc_info, &g.descriptor_sets));
+  VK_CHECK(g.AllocateDescriptorSets(vkdevice, &alloc_info, &g.descriptor_set));
   Loop (i, writer.writes_count) {
-    writer.writes[i].dstSet = g.descriptor_sets;
+    writer.writes[i].dstSet = g.descriptor_set;
   }
   g.UpdateDescriptorSets(vkdevice, writer.writes_count, writer.writes, 0, null);
 
@@ -2837,28 +2807,26 @@ void gfx_init(Gfx_Environment environment) {
   }
 
   u32 drawcall_mem = MaxEntities * sizeof(VK_IndirectDrawCall);
-  g.gpu_mem = vk_mem_make(Gfx_MemType_Gpu, environment.gpu_mem_size + environment.image_mem_size);
   g.cpu_mem = vk_mem_make(Gfx_MemType_Cpu, environment.cpu_mem_size);
-  g.gpu_buf = vk_make_buffer(environment.gpu_mem_size);
-  g.cpu_buf = vk_make_buffer(environment.cpu_mem_size - drawcall_mem, Gfx_MemType_Cpu);
+  g.gpu_mem = vk_mem_make(Gfx_MemType_Gpu, environment.gpu_mem_size + environment.image_mem_size);
+  g.cpu_buf = vk_make_buffer(Gfx_MemType_Cpu, environment.cpu_mem_size - drawcall_mem);
+  g.gpu_buf = vk_make_buffer(Gfx_MemType_Gpu, environment.gpu_mem_size);
 
-  VkBufferDeviceAddressInfoKHR gpu_address_info = {
-    .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO_KHR,
-    .buffer = g.gpu_buf.h,
-  };
-  g.gpu_buf_address = g.GetBufferDeviceAddress(vkdevice, &gpu_address_info);
-  VkBufferDeviceAddressInfoKHR cpu_address_info = {
-    .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO_KHR,
-    .buffer = g.cpu_buf.h,
-  };
-  g.cpu_buf_address = g.GetBufferDeviceAddress(vkdevice, &cpu_address_info);
+  // VkBufferDeviceAddressInfoKHR gpu_address_info = {
+  //   .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO_KHR,
+  //   .buffer = g.gpu_buf.h,
+  // };
+  // g.gpu_buf_address = g.GetBufferDeviceAddress(vkdevice, &gpu_address_info);
+  // VkBufferDeviceAddressInfoKHR cpu_address_info = {
+  //   .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO_KHR,
+  //   .buffer = g.cpu_buf.h,
+  // };
+  // g.cpu_buf_address = g.GetBufferDeviceAddress(vkdevice, &cpu_address_info);
 
-  g.drawcall_buf = gfx_make_buffer(drawcall_mem, Gfx_MemType_Cpu);
+  g.drawcalls_buf = gfx_make_buffer(drawcall_mem, Gfx_MemType_Cpu);
   gfx_make_bind({.binding = Bindings::Drawinfo});
-  gfx_bind_buffer(g.drawcall_buf, Bindings::Drawinfo);
+  gfx_bind_buffer(g.drawcalls_buf, Bindings::Drawinfo);
   g.stage_buffer = gfx_make_buffer(MB(10), Gfx_MemType_Cpu);
-
-  // g.cube_idx = 1;
 }
 
 void gfx_shutdown() {
@@ -2896,7 +2864,7 @@ void gfx_begin() {
     Info("Swapchain recreated x: %i y: %i", win_size.x, win_size.y);
   }
 
-  g.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipeline_layout, 0, 1, &g.descriptor_sets, 0, null);
+  g.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipeline_layout, 0, 1, &g.descriptor_set, 0, null);
   // Next image
   {
   ProfBlock("swapchain flip waiting");
@@ -2913,7 +2881,7 @@ void gfx_begin() {
 
 void gfx_end() {
   ProfFunc;
-  Gfx_State& g = st->gfx;
+  var& g = st->gfx;
 
   g.base_index = null;
   g.entity_cursor = 0;

@@ -1,20 +1,15 @@
 #include "base_impl.h"
 
-String str_make(u8* str, u64 size) {
-  String res = {};
-  res.str = str;
-  res.size = size;
-  return res;
-}
-String str_make(Slice<u8> str) {
-  String res = str_make(str.data, str.size);
-  return res;
-}
-u64 cstr_length(const void* c) {
-  u8* p = (u8*)c;
-  for (; *p != 0; ++p);
-  return (u64)(p - (u8*)c);
-}
+read_only u64 pow10[] = {
+  1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000,
+  1000000000ull, 10000000000ull, 100000000000ull, 1000000000000ull,
+  10000000000000ull, 100000000000000ull, 1000000000000000ull,
+  10000000000000000ull, 100000000000000000ull, 1000000000000000000ull,
+  10000000000000000000ull
+};
+
+#define HEX_LENGTH 16
+read_only global u8 HEX[] = "0123456789ABCDEF";
 
 String::String(const char* str_) { 
   str = (u8*)str_;
@@ -52,13 +47,11 @@ void dstr_clear(Dstring&arr) {
 Dstring::operator String() { return str_make(str, size); }
 String64::operator String() { return str_make(str, size); }
 
-read_only u64 pow10[] = {
-  1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000,
-  1000000000ull, 10000000000ull, 100000000000ull, 1000000000000ull,
-  10000000000000ull, 100000000000000ull, 1000000000000000ull,
-  10000000000000000ull, 100000000000000000ull, 1000000000000000000ull,
-  10000000000000000000ull
-};
+u64 cstr_length(const void* c) {
+  u8* p = (u8*)c;
+  for (; *p != 0; ++p);
+  return (u64)(p - (u8*)c);
+}
 
 u32 u64_length(u64 x) {
   u32 n = 1;
@@ -147,11 +140,8 @@ u32 f64_write(u8* dest, f64 x, u32 precision) {
 }
 u32 f32_write(u8* dest, f32 x, u32 precision) { return f64_write(dest, x, precision); }
 
-#define HEX_LENGTH 16
-global u8 HEX[] = "0123456789ABCDEF";
-
 void u64_hex_write(u8* dest, u64 value) {
-  LoopReverse(i, HEX_LENGTH) {
+  LoopReverse (i, HEX_LENGTH) {
     dest[i] = HEX[value & 0xF];
     value >>= 4;
   }
@@ -276,22 +266,25 @@ b32 char_is_digit(u8 c)        { return (c >= '0' && c <= '9'); }
 u8 char_to_lower(u8 c)         { if (char_is_upper(c)) { c += ('a' - 'A'); } return c; }
 u8 char_to_upper(u8 c)         { if (char_is_lower(c)) { c += ('A' - 'a'); } return c; }
 u8 char_to_correct_slash(u8 c) { if (char_is_slash(c)) { c = '/'; } return c; }
-b32 char_is_number_cont(u8 c)  { return (c >= '0' && c <= '9') || c == '.' || c == '-'; }
+b32 char_is_number_cont(u8 c)  { return char_is_digit(c) || c == '.' || c == '-'; }
 
 ////////////////////////////////////////////////////////////////////////
 // String Constructors
 
-String str_range(u8* first, u8* one_past_last) {
-  String result = str_make(first, (u32)(one_past_last - first));
-  return result;
+String str_make(u8* str, u64 size) {
+  String res = {};
+  res.str = str;
+  res.size = size;
+  return res;
 }
 
-String str_cstr_capped(const void *cstr, const void *cap) {
-  u8* ptr = (u8*)cstr;
-  u8* opl = (u8*)cap;
-  for (;ptr < opl && *ptr != 0; ptr += 1);
-  u32 size = (u32)(ptr - (u8*)cstr);
-  String result = str_make((u8*)cstr, size);
+String str_make(Slice<u8> str) {
+  String res = str_make(str.data, str.size);
+  return res;
+}
+
+String str_range(u8* first, u8* one_past_last) {
+  String result = str_make(first, (u32)(one_past_last - first));
   return result;
 }
 
@@ -446,14 +439,14 @@ String push_strf(Allocator arena, String fmt, ...) {
 
 StringNode* str_list_push_node(StringList& list, StringNode* node) {
   sll_list_queue_push(list, node);
-  list.node_count += 1;
+  ++list.node_count;
   list.total_size += node->string.size;
   return node;
 }
 
 StringNode* str_list_push_node_set_string(StringList& list, StringNode* node, String string) {
   sll_list_queue_push(list, node);
-  list.node_count += 1;
+  ++list.node_count;
   list.total_size += string.size;
   node->string = string;
   return node;
