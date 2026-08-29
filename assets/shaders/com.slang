@@ -21,20 +21,22 @@ typedef float2 v2;
 typedef float3 v3;
 typedef float4 v4;
 
-typedef float3x3 mat3;
-typedef float4x4 mat4;
+typedef float3x3 m3x3;
+typedef float4x4 m4x4;
 
 #define VkBind(idx) [[vk::binding(idx, 0)]]
 #define alignas(x)
 #define Glue(a, b) b
 
-v4 operator*(mat4 mat, v4 vec) { return mul(mat, vec); }
-mat4 operator*(mat4 a, mat4 b) { return mul(a, b); }
+v4 operator*(m4x4 mat, v4 vec) { return mul(mat, vec); }
+m4x4 operator*(m4x4 a, m4x4 b) { return mul(a, b); }
 
 global const u32 MaxMaterials = KB(1);
 global const u32 MaxLights = KB(1);
 
 global const f32 PI = 3.14159265358f;
+
+#include "../../src/shader_header.h"
 
 struct IndirectDrawCall {
   u32 indexCount;
@@ -45,43 +47,12 @@ struct IndirectDrawCall {
   u32 base;
 };
 
-struct DrawCallData {
-  mat4 model;
-  v4 color;
-  u32 tex;
-  u32 mat;
-};
-
-// struct State {
-//   mat4 projection_view;
-//   mat4 projection;
-//   mat4 view;
-//   mat4 mat;
-//   v4 ambient_color;
-//   f32 time;
-//   u32 point_light_count;
-//   u32 dir_light_count;
-//   u32 spot_light_count;
-// };
-
-///////////////////////////////////
-// 3D
-struct VSInput {
-  v3 pos;
-  v3 norm;
-  v2 uv;
-  v4 color;
-  u32 vert_id : SV_VertexID;
-  u32 draw_id : SV_DrawIndex;
-  u32 inst_id : SV_InstanceID;
-};
-
 struct VSOutput {
-  v4 pos : SV_Position;
+  v4 pos: SV_Position;
   v3 norm;
   v2 uv;
   v4 color;
-  u32 id;
+  u32 id; // drawcalls_idx
 };
 
 struct UI_VSOutput {
@@ -98,34 +69,33 @@ struct UI_VSOutput {
 };
 
 struct PushConstants {
-  u32 drawcall_base;
+  u32 idx;
 }
 
 [[vk::push_constant]]
 PushConstants push;
 
-#include "../../src/shader_header.h"
-
 VkBind(Bindings.Textures)       Texture2D textures[];
 VkBind(Bindings.Samplers)       SamplerState samplers[];
 VkBind(Bindings.CubeTextures)   TextureCube cube_texture[];
 VkBind(Bindings.State)          StructuredBuffer<GpuState> state;
-VkBind(Bindings.Drawinfo)       StructuredBuffer<IndirectDrawCall> drawinfo;
 VkBind(Bindings.Entities)       StructuredBuffer<Entity> entities;
 VkBind(Bindings.Materials)      StructuredBuffer<Material> materials;
 VkBind(Bindings.PointLights)    StructuredBuffer<PointLight> point_lights;
 VkBind(Bindings.DirLights)      StructuredBuffer<DirLight> dir_lights;
 VkBind(Bindings.SpotLights)     StructuredBuffer<SpotLight> spot_lights;
-VkBind(Bindings.DrawCtx)        StructuredBuffer<DrawCallData> drawcalls_data;
+VkBind(Bindings.Drawinfo)       StructuredBuffer<IndirectDrawCall> drawinfo;
+VkBind(Bindings.DrawCtx)        StructuredBuffer<DrawCall> drawcalls;
 VkBind(Bindings.SoftwareRender) StructuredBuffer<u32> software_render;
 VkBind(Bindings.UI_RectBinding) StructuredBuffer<UI_Rect> ui_rects;
+VkBind(Bindings.Vertices)       StructuredBuffer<Vertex> vertices;
 
-DrawCallData get_data(u32 draw_id) {
-  return drawcalls_data[push.drawcall_base + draw_id];
+DrawCall get_data(u32 draw_id) {
+  return drawcalls[push.idx + draw_id];
 }
 
 u32 get_id(u32 draw_id) {
-  return push.drawcall_base + draw_id;
+  return push.idx + draw_id;
 }
 
 bool FlagHas(u64 x, u64 f) { return (x & f) == (f); }

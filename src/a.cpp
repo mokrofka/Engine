@@ -30,8 +30,8 @@ void gfx_push_indirect(Gfx_Mesh mesh, u32 id, u32 instance_count = 1) {
     };
   }
   info.base_instance = id;
-  VK_DrawCall* drawcalls = (VK_DrawCall*)st->vk.indirect_draw_buffer.base;
-  drawcalls[w.drawcall_cursor++] = info;
+  VK_DrawCall*  = (VK_DrawCall*)st->vk.indirect_draw_buffer.base;
+  [w.drawcall_cursor++] = info;
 }
 
 void gfx_push_indirect_instanced(Gfx_Mesh mesh, u32 count) {

@@ -3040,7 +3040,7 @@ void init() {
     r_shaders_compile(scratch);
     r_init();
     debug_init();
-    game_init();
+    init_game();
     watch_directory_add(g.shader_dir, WatchOp_RecompileShader);
     watch_directory_add(g.shader_compiled_dir, WatchOp_ShaderReload);
 
@@ -4047,7 +4047,7 @@ void game_load_state() {
   }
 }
 
-void game_init() {
+void init_game() {
   ProfFunc;
   var& g = *st;
   Scratch scratch;
@@ -4100,68 +4100,54 @@ void game_init() {
     load_tex(Texture_Orange, "orange_lines_512.png");
     load_tex(Texture_Container, "container.jpg");
     load_tex(Texture_Barrack, "castle_diffuse.png");
-  
-    var load_mat = [&](MaterialEnum enum_name, R_MaterialDesc desc) {
-      R_MaterialId id = r_material_make(desc);
+
+    var default_state = r_make_pipeline_state({
+      .depth = {
+        .compare = Gfx_CompareOp_Less,
+        .write_enabled = true,
+      }
+    });
+    var default_state_line = r_make_pipeline_state({
+      .primitive_type = Gfx_PrimitiveType_Line,
+      .depth = {
+        .compare = Gfx_CompareOp_Less,
+        .write_enabled = true,
+      }
+    });
+
+    var load_mat2 = [&](MaterialEnum enum_name, R_Material desc) {
+      R_MaterialId id = r_material_make2(desc);
       g.materials_ids[enum_name] = id;
       String str = push_str_copy(g.arena, materials_strs[enum_name]);
       map_set(g.str_to_material, str, id);
       g.material_to_str[id.idx] = str;
     };
-    load_mat(Material_Orange, {
-      .shader = "e_texture",
-      .pipeline_desc = {
-        .depth = {
-          .compare = Gfx_CompareOp_Less,
-          .write_enabled = true,
-        }
-      },
+
+    load_mat2(Material_Orange, {
+      .type = ShaderType::Texture,
+      .batch = default_state,
       .props = material_default_props(),
-      .base_color = "orange_lines_512.png",
+      .base_color = get_texture(Texture_Orange),
     });
-    load_mat(Material_Container, {
-      .shader = "e_texture",
-      .pipeline_desc = {
-        .depth = {
-          .compare = Gfx_CompareOp_Less,
-          .write_enabled = true,
-        }
-      },
+    load_mat2(Material_Container, {
+      .type = ShaderType::Texture,
+      .batch = default_state,
       .props = material_default_props(),
-      .base_color = "container.jpg",
+      .base_color = get_texture(Texture_Container),
     });
-    load_mat(Material_Axis, {
-      .shader = "e_vert_color",
-      .pipeline_desc = {
-        .primitive_type = Gfx_PrimitiveType_Line,
-        .depth = {
-          .compare = Gfx_CompareOp_Less,
-          .write_enabled = true,
-        }
-      },
-      .props = material_default_props(),
+    load_mat2(Material_Axis, {
+      .type = ShaderType::VertColor,
+      .batch = default_state_line,
     });
-    load_mat(Material_Line, {
-      .shader = "e_color",
-      .pipeline_desc = {
-        .primitive_type = Gfx_PrimitiveType_Line,
-        .depth = {
-          .compare = Gfx_CompareOp_Less,
-          .write_enabled = true,
-        }
-      },
-      .props = material_default_props(),
+    load_mat2(Material_Line, {
+      .type = ShaderType::E_Color,
+      .batch = default_state_line,
     });
-    load_mat(Material_Barrack, {
-      .shader = "e_texture",
-      .pipeline_desc = {
-        .depth = {
-          .compare = Gfx_CompareOp_Less,
-          .write_enabled = true,
-        }
-      },
+    load_mat2(Material_Barrack, {
+      .type = ShaderType::Texture,
+      .batch = default_state,
       .props = material_default_props(),
-      .base_color = "castle_diffuse.png",
+      .base_color = get_texture(Texture_Barrack),
     });
   }
 
