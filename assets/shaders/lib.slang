@@ -13,6 +13,8 @@ import com;
 #define FS_Entry [shader("fragment")]
 #define CS_Entry [shader("compute")]
 
+#define ShaderEnum [UnscopedEnum] enum
+
 #define st state[0]
 
 #define Bit(x) (1 << (x))

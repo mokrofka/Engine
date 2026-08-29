@@ -13,6 +13,22 @@ enum Bindings {
   DrawCtx,
   SoftwareRender,
   UI_RectBinding,
+  Vertices,
+};
+
+enum class ShaderType {
+  Cube = 1,
+  E_Color,
+  Texture,
+  VertColor,
+  Line,
+  Screen,
+  SoftwareRender,
+};
+
+typedef u32 DrawCallFlags;
+enum {
+  DrawCallFlag_Indexed,
 };
 
 struct GpuState {
@@ -32,11 +48,21 @@ struct GpuState {
   // u32 win_height;
 };
 
+struct Glue(R_, Vertex) {
+  alignas(16) v3 pos;
+  alignas(16) v3 norm;
+  alignas(8)  v2 uv;
+  alignas(16) v4 color;
+};
+
 struct Glue(Gpu, DrawCall) {
   alignas(16) m4x4 model;
   alignas(16) v4 color;
+  ShaderType type;
   u32 tex;
   u32 mat;
+  u32 cur_resolve_idx;
+  DrawCallFlags flags;
 };
 
 struct Glue(Gpu, Entity) {

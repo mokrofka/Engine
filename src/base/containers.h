@@ -66,7 +66,6 @@ template<typename T, i32 N> b32 array_exists(Array<T, N>& arr, T a, b32(*fn)(T a
   }
   return false;
 }
-template<typename T, i32 N> b32 array_empty(Array<T, N>& arr) { return arr.count == 0; }
 
 ///////////////////////////////////
 // Darray
@@ -82,9 +81,7 @@ template <typename T> struct Darray {
   }
 };
 
-template<typename T> Slice<T> slice(Darray<T>& arr) {
-  return {arr.data, arr.count};
-}
+template<typename T> Slice<T> NO_DEBUG slice(Darray<T>& arr) { return {arr.data, arr.count}; }
 #define array_make(T, alloc) _array_make<T>(alloc)
 template<typename T> Darray<T> _array_make(Allocator alloc) {
   Darray<T> res = {
@@ -181,7 +178,6 @@ template<typename T> b32 array_exists_at(Darray<T>& arr, T a, u32* out_idx, b32(
   }
   return false;
 }
-template<typename T> b32 array_empty(Darray<T>& arr) { return arr.count == 0; }
 
 ////////////////////////////////////////////////////////////////////////
 // ArrayHandler

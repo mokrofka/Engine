@@ -22,12 +22,12 @@ MakeId(R_MaterialId)
 MakeId(R_FontId)
 MakeId(R_LightId)
 
-struct R_Vertex {
-  v3 pos;
-  v3 norm;
-  v2 uv;
-  v4 color;
-};
+// struct R_Vertex {
+//   v3 pos;
+//   v3 norm;
+//   v2 uv;
+//   v4 color;
+// };
 
 struct R_UI_Rect {
   v2 dst_p0;
@@ -93,17 +93,27 @@ struct R_MaterialProps {
 
 struct R_MaterialDesc {
   String shader;
+  ShaderType type;
   Gfx_PipelineDesc pipeline_desc;
   R_MaterialProps props;
   String base_color;
 };
 
-struct R_MaterialInfo {
-  R_MaterialDesc desc;
-  u32 entity_batch_idx;
-  R_TextureId tex;
+struct R_Material {
+  ShaderType type;
+  u32 batch;
+  R_MaterialProps props;
+  R_TextureId base_color;
   u32 idx;
 };
+
+// struct R_Material {
+//   R_MaterialDesc desc;
+//   R_MaterialDesc2 desc2;
+//   u32 batch;
+//   R_TextureId tex;
+//   u32 idx;
+// };
 
 struct R_Gradient {
   v4 color0;
@@ -130,12 +140,14 @@ struct R_DrawCall {
   v4 color;
   R_MeshId mesh;
   R_MaterialId mat;
+  ShaderType type;
 };
 
 struct R_DrawBatch {
   Gfx_Pipeline pip;
   Darray<R_DrawCall> draws;
   Darray<R_DrawCall> unindexed_draws;
+  Gfx_PipelineState state;
 };
 
 struct R_DrawText {
@@ -148,12 +160,6 @@ struct R_DrawText {
 struct R_ShaderModuleWithPipelines {
   Gfx_Shader shd;
   Darray<Gfx_Pipeline> pipelines;
-};
-
-struct R_ArenaBuffer {
-  Gfx_Buffer buf;
-  u64 pos;
-  u64 cap;
 };
 
 enum R_AttachmentType {
@@ -215,22 +221,20 @@ struct R_State {
   Map<String, u32, Gfx_MaxShaders> shader_to_module_idx;
   Map<R_ShaderDesc, Gfx_Pipeline, Gfx_MaxPipelines> shader_desc_to_pipeline;
   Map<u32, u32, Gfx_MaxPipelines> pip_idx_to_entity_batch_idx;
-  PoolLinkList<R_MaterialInfo, R_MaxMaterials, R_MaterialId> materials;
-  Array<R_DrawBatch, Gfx_MaxShaders> entity_batches;
+  PoolLinkList<R_Material, R_MaxMaterials, R_MaterialId> materials;
+  // Array<R_DrawBatch, Gfx_MaxShaders> entity_batches;
+  Array<R_DrawBatch, 8> batches;
 
   Pool<Gfx_Mesh, R_MaxMeshes, R_MeshId> meshes;
   Pool<R_Texture, R_MaxTextures, R_TextureId> textures;
   Pool<R_MeshData, R_MaxMeshes, R_MeshId> new_meshes;
   Pool<R_FontData, R_MaxFonts, R_FontId> fonts;
 
-  Gfx_Pipeline triangle_pip;
-  Gfx_Pipeline screen_pip;
-  Gfx_Pipeline software_render_pip;
-  Gfx_Pipeline cubemap_pip;
-  Gfx_Pipeline debug_line_pip;
-  Gfx_Pipeline ui_pip;
+  Gfx_Pipeline uber_pip;
+  Gfx_Pipeline uber_pip_screen;
   Gfx_Pipeline ui_rect_pip;
-  Gfx_Pipeline font_pip;
+  Gfx_Pipeline prev_pip;
+  Gfx_PipelineState prev_pip_state;
   Gfx_Sampler com_sampler;
 
   R_FontId my_font;
@@ -238,16 +242,14 @@ struct R_State {
 
   R_RenderTarget world_rt;
 
-  R_ArenaBuffer vert_arena;
-  R_ArenaBuffer index_arena;
+  Gfx_Buffer cpu_vert_reg;
+  R_Vertex* cpu_vertices;
+  Gfx_Buffer vert_reg;
+  Gfx_Buffer index_reg;
 
-  Gfx_Buffer vert_buffer_each_frame;
-  RingBuffer vert_ring_buffer;
   Array<R_Vertex, R_MaxDebugLines> draw_lines;
   Array<R_Vertex, R_MaxDebugLines> draw_lines_persistent;
   Array<R_UI_Rect, R_MaxDebugLines> draw_rects;
-  u64 draw_base_lines;
-  u64 draw_base_persistent_lines;
 
   Queue<R_AsyncMesh, 12> async_mesh;
   Mutex async_stage_mutex;
@@ -287,9 +289,6 @@ b32 r_shader_is_null(R_MeshId shd);
 
 R_DrawBatch r_make_draw_batch(Allocator alloc, Gfx_Pipeline pip);
 R_ShaderModuleWithPipelines r_make_shader_module_with_pipelines(Allocator alloc);
-R_ArenaBuffer r_make_arena_buffer(u64 size, Gfx_MemType type = Gfx_MemType_Gpu);
-R_ArenaBuffer r_make_round_arena_buffer(u64 size, u64 round, Gfx_MemType type = Gfx_MemType_Gpu);
-u64 r_push_arena_buffer(R_ArenaBuffer* buf, u64 size);
 R_Attachment r_make_attachment(R_AttachmentDesc desc);
 void r_destroy_attachment(R_Attachment attachment);
 void r_recreate_attachment(R_Attachment* attachment, v2u size);
@@ -319,7 +318,10 @@ void r_destroy_mesh(R_MeshId mesh);
 
 // TODO: primitives gen, drawing
 
+u32 r_make_pipeline_state(Gfx_PipelineState s);
 R_MaterialId r_material_make(R_MaterialDesc desc);
+R_MaterialId r_material_make2(R_Material mat);
+
 void r_material_destroy(R_MaterialId mat);
 
 void r_shader_reload(String name);
@@ -328,6 +330,7 @@ void r_shaders_compile(Allocator arena);
 void r_shaders_compile_join();
 
 R_FontId r_load_font(String name, u32 size);
+void r_apply_state(Gfx_PipelineState s);
 
 void r_init();
 void r_shutdown();

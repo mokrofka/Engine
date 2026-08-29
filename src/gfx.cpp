@@ -153,6 +153,7 @@ String vk_result_str(VkResult result) {
 }
 
 #define _Def(val, def) (((val) == 0) ? (def) : (val))
+#define _DefSet(val, def) if (val == 0) val = def
 
 VkImageAspectFlags vk_aspect_mask(Gfx_PixelFormat fmt) {
   switch (fmt) {
@@ -193,25 +194,15 @@ VkImageUsageFlags vk_image_usage(Gfx_ImageUsage usg) {
 
 VkFormat vk_format(Gfx_PixelFormat fmt) {
   switch (fmt) {
-    case Gfx_PixelFormat_None:           return VK_FORMAT_UNDEFINED;
-    case Gfx_PixelFormat_BGRA8:          return VK_FORMAT_B8G8R8A8_UNORM;
+    InvalidDefaultCase;
     case Gfx_PixelFormat_R8_UI:          return VK_FORMAT_R8_UINT;
     case Gfx_PixelFormat_R8:             return VK_FORMAT_R8_UNORM;
+    case Gfx_PixelFormat_BGRA8:          return VK_FORMAT_B8G8R8A8_UNORM;
     case Gfx_PixelFormat_BGRA8_SRGB:     return VK_FORMAT_B8G8R8A8_SRGB;
     case Gfx_PixelFormat_RGBA8:          return VK_FORMAT_R8G8B8A8_UNORM;
     case Gfx_PixelFormat_RGBA8_SRGB:     return VK_FORMAT_R8G8B8A8_SRGB;
     case Gfx_PixelFormat_Depth:          return VK_FORMAT_D32_SFLOAT;
     case Gfx_PixelFormat_DepthStencil:   return VK_FORMAT_D32_SFLOAT_S8_UINT;
-    default:                             return VK_FORMAT_UNDEFINED;
-  }
-}
-
-VkFormat vk_vert_format(Gfx_VertFormat f) {
-  switch (f) {
-    InvalidDefaultCase;
-    case Gfx_VertFormat_v2: return VK_FORMAT_R32G32_SFLOAT;
-    case Gfx_VertFormat_v3: return VK_FORMAT_R32G32B32_SFLOAT;
-    case Gfx_VertFormat_v4: return VK_FORMAT_R32G32B32A32_SFLOAT;
   }
 }
 
@@ -548,7 +539,7 @@ void vk_swapchain_beginpass_barrier(VkImage vkimg, VK_Access pass_access) {
     .imageMemoryBarrierCount = 1,
     .pImageMemoryBarriers = &barrier,
   };
-  g.CmdPipelineBarrier2(vk_get_cur_cmd(), &dep_info);
+  g.CmdPipelineBarrier2(vk_cur_cmd(), &dep_info);
 }
 
 void vk_swapchain_end_barrier(VkImage vkimg, VK_Access pass_access) {
@@ -575,7 +566,7 @@ void vk_swapchain_end_barrier(VkImage vkimg, VK_Access pass_access) {
     .imageMemoryBarrierCount = 1,
     .pImageMemoryBarriers = &barrier,
   };
-  g.CmdPipelineBarrier2(vk_get_cur_cmd(), &dep_info);
+  g.CmdPipelineBarrier2(vk_cur_cmd(), &dep_info);
 }
 
 void vk_image_barrier(VkCommandBuffer cmd, VK_Image* img, VK_Access new_access) {
@@ -627,7 +618,7 @@ void vk_buffer_barrier(VK_BufferRegion buf, VK_Access new_access) {
     .bufferMemoryBarrierCount = 1,
     .pBufferMemoryBarriers = &barrier,
   };
-  g.CmdPipelineBarrier2(vk_get_cur_cmd(), &dep_info);
+  g.CmdPipelineBarrier2(vk_cur_cmd(), &dep_info);
 }
 
 void vk_init_color_attachment_info(VkRenderingAttachmentInfo* info, Gfx_ColorAttachmentAction action, VkImageView color_view, VkImageView resolve_view) {
@@ -635,13 +626,13 @@ void vk_init_color_attachment_info(VkRenderingAttachmentInfo* info, Gfx_ColorAtt
   info->imageView = color_view;
   info->imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
   if (resolve_view) {
-      info->resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
-      info->resolveImageView = resolve_view;
-      info->resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    info->resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
+    info->resolveImageView = resolve_view;
+    info->resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
   } else {
-      info->resolveMode = VK_RESOLVE_MODE_NONE;
-      info->resolveImageView = 0;
-      info->resolveImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    info->resolveMode = VK_RESOLVE_MODE_NONE;
+    info->resolveImageView = 0;
+    info->resolveImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   }
   info->loadOp = vk_load_op(action.load_action);
   info->storeOp = vk_store_op(action.store_action);
@@ -673,11 +664,8 @@ void vk_init_stencil_attachment_info(VkRenderingAttachmentInfo* info, Gfx_Stenci
 
 VkSemaphore vk_get_cur_image_available_semaphore() { return st->gfx.image_available_semaphores[st->gfx.current_frame_idx]; }
 VkSemaphore vk_get_cur_render_complete_semaphore() { return st->gfx.render_complete_semaphores[st->gfx.current_image_idx]; }
-VkCommandBuffer vk_get_cur_cmd()                       { return st->gfx.cmds_render[st->gfx.current_frame_idx]; }
-
-void vk_bind_pipeline(VkPipeline pipeline) {
-  st->gfx.CmdBindPipeline(vk_get_cur_cmd(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-}
+VkCommandBuffer vk_cur_cmd()                       { return st->gfx.cmds_render[st->gfx.current_frame_idx]; }
+void vk_bind_pipeline(VkPipeline pipeline)         { st->gfx.CmdBindPipeline(vk_cur_cmd(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline); }
 
 u32 vk_find_memory_idx(u32 type_filter, u32 property_flags) {
   VkPhysicalDeviceMemoryProperties memory_properties = st->gfx.device.memory;
@@ -693,8 +681,7 @@ u32 vk_find_memory_idx(u32 type_filter, u32 property_flags) {
 }
 
 void vk_push_constants(VK_PushConstant constants) {
-  Gfx_State& g = st->gfx;
-  g.CmdPushConstants(vk_get_cur_cmd(), g.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &constants);
+  st->gfx.CmdPushConstants(vk_cur_cmd(), st->gfx.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &constants);
 }
 
 // VK_Semaphore vk_semaphore_make(u64 initial_counter) {
@@ -884,32 +871,29 @@ VK_Buffer vk_make_buffer(Gfx_MemType type, u64 size) {
 void vk_bind_vert_buffer(VK_Buffer buffer) {
   Gfx_State& g = st->gfx;
   VkDeviceSize size = 0;
-  g.CmdBindVertexBuffers(vk_get_cur_cmd(), 0, 1, &buffer.h, &size);
+  g.CmdBindVertexBuffers(vk_cur_cmd(), 0, 1, &buffer.h, &size);
 }
 
 void vk_bind_index_buffer(VK_Buffer buffer) {
   Gfx_State& g = st->gfx;
-  g.CmdBindIndexBuffer(vk_get_cur_cmd(), buffer.h, 0, VK_INDEX_TYPE_UINT32);
+  g.CmdBindIndexBuffer(vk_cur_cmd(), buffer.h, 0, VK_INDEX_TYPE_UINT32);
 }
 
-VK_Buffer* vk_choose_buffer(Gfx_Buffer buf) {
-  Gfx_State& g = st->gfx;
-  Gfx_BufferData buffer = pool_get(st->gfx.buffers, buf);
-  VK_Buffer* res;
-  switch (buffer.type) {
+VK_Buffer vk_get_vkbuffer(Gfx_Buffer buf) {
+  var& g = st->gfx;
+  switch (buf.type) {
     InvalidDefaultCase;
-    case Gfx_MemType_Cpu: res = &g.cpu_buf; break;
-    case Gfx_MemType_Gpu: res = &g.gpu_buf; break;
+    case Gfx_MemType_Cpu: return g.cpu_buf;
+    case Gfx_MemType_Gpu: return g.gpu_buf;
   }
-  return res;
 }
 
-VkShaderModule vk_shader_create(Gfx_ShaderDesc desc) {
+VkShaderModule vk_shader_create(Slice<u8> code) {
   Gfx_State& g = st->gfx;
   VkShaderModuleCreateInfo module_info = {
     .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-    .codeSize = desc.shader.size,
-    .pCode = (u32*)desc.shader.str,
+    .codeSize = code.size,
+    .pCode = (u32*)code.data,
   };
   VkShaderModule res;
   VK_CHECK(g.CreateShaderModule(vkdevice, &module_info, g.allocator, &res));
@@ -941,7 +925,7 @@ VkPipeline vk_pipeline_create(Gfx_PipelineDesc desc) {
   // Graphics pipeline
   // Dynamic rendering
   VkFormat color_formats[Gfx_MaxColorAttachments] = {};
-  Loop (i, Gfx_MaxColorAttachments) {
+  Loop (i, desc.color_count) {
     color_formats[i] = vk_format(desc.colors[i].pixel_format);
   }
   VkPipelineRenderingCreateInfo rendering_info = {
@@ -962,32 +946,26 @@ VkPipeline vk_pipeline_create(Gfx_PipelineDesc desc) {
   // Attributes
   VkVertexInputAttributeDescription attribute_desriptions[16] = {};
   u32 attribute_desriptions_count = 0;
-  switch (desc.vert_layout) {
-    InvalidDefaultCase;
-    case Gfx_VertLayout_3D: {
-      attribute_desriptions_count = 4;
-      attribute_desriptions[0] = {
-        .format = vk_vert_format(Gfx_VertFormat_v3),
-        .offset = (u32)OffsetOf(R_Vertex, pos),
-      };
-      attribute_desriptions[1] = {
-        .format = vk_vert_format(Gfx_VertFormat_v3),
-        .offset = (u32)OffsetOf(R_Vertex, norm),
-      };
-      attribute_desriptions[2] = {
-        .format = vk_vert_format(Gfx_VertFormat_v2),
-        .offset = (u32)OffsetOf(R_Vertex, uv),
-      };
-      attribute_desriptions[3] = {
-        .format = vk_vert_format(Gfx_VertFormat_v4),
-        .offset = (u32)OffsetOf(R_Vertex, color),
-      };
-    } break;
-  }
+  attribute_desriptions_count = 4;
+  attribute_desriptions[0] = {
+    .format = VK_FORMAT_R32G32B32_SFLOAT,
+    .offset = (u32)OffsetOf(R_Vertex, pos),
+  };
+  attribute_desriptions[1] = {
+    .format = VK_FORMAT_R32G32B32_SFLOAT,
+    .offset = (u32)OffsetOf(R_Vertex, norm),
+  };
+  attribute_desriptions[2] = {
+    .format = VK_FORMAT_R32G32_SFLOAT,
+    .offset = (u32)OffsetOf(R_Vertex, uv),
+  };
+  attribute_desriptions[3] = {
+    .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+    .offset = (u32)OffsetOf(R_Vertex, color),
+  };
   Loop (i, attribute_desriptions_count) {
     attribute_desriptions[i].location = i;
   }
-
   VkPipelineVertexInputStateCreateInfo vertex_input_state = {
     .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
     .vertexBindingDescriptionCount = 1,
@@ -1085,8 +1063,6 @@ VkPipeline vk_pipeline_create(Gfx_PipelineDesc desc) {
   VkDynamicState dynamic_states[] = {
     VK_DYNAMIC_STATE_VIEWPORT,
     VK_DYNAMIC_STATE_SCISSOR,
-    // VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE,
-    VK_DYNAMIC_STATE_POLYGON_MODE_EXT,
   };
   VkPipelineDynamicStateCreateInfo dynamic_state_info = {
     .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
@@ -1097,22 +1073,18 @@ VkPipeline vk_pipeline_create(Gfx_PipelineDesc desc) {
   // Shader stages
   u32 stages_count = 0;
   VkPipelineShaderStageCreateInfo stages[2] = {};
-  if (shader.vert) {
-    stages[stages_count++] = {
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-      .stage = VK_SHADER_STAGE_VERTEX_BIT,
-      .module = shader.h,
-      .pName = "vs_main",
-    };
-  }
-  if (shader.frag) {
-    stages[stages_count++] = {
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-      .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-      .module = shader.h,
-      .pName = "fs_main",
-    };
-  }
+  stages[stages_count++] = {
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+    .stage = VK_SHADER_STAGE_VERTEX_BIT,
+    .module = shader.h,
+    .pName = "vs_main",
+  };
+  stages[stages_count++] = {
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+    .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+    .module = shader.h,
+    .pName = "fs_main",
+  };
   
   // Pipeline
   VkGraphicsPipelineCreateInfo pipeline_info = {
@@ -1126,6 +1098,153 @@ VkPipeline vk_pipeline_create(Gfx_PipelineDesc desc) {
     .pRasterizationState = &rasterizer_state,
     .pMultisampleState = &multisampling_info,
     .pDepthStencilState = &depth_stencil_info,
+    .pColorBlendState = &color_blend_state_info,
+    .pDynamicState = &dynamic_state_info,
+    .layout = g.pipeline_layout,
+  };
+  VkPipeline res;
+  VK_CHECK(g.CreateGraphicsPipelines(vkdevice, VK_NULL_HANDLE, 1, &pipeline_info, g.allocator, &res));
+  return res;
+}
+
+VkPipeline vk_pipeline_create2(Gfx_PipelineDesc2 desc) {
+  var& g = st->gfx;
+
+  // Dynamic rendering
+  VkFormat color_formats = vk_format(desc.pixel_format);
+  VkPipelineRenderingCreateInfo rendering_info = {
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+    .colorAttachmentCount = 1,
+    .pColorAttachmentFormats = &color_formats,
+    .depthAttachmentFormat = vk_format(desc.depth_pixel_format),
+    .stencilAttachmentFormat = desc.depth_pixel_format == Gfx_PixelFormat_DepthStencil ? vk_format(desc.depth_pixel_format) : VK_FORMAT_UNDEFINED,
+  };
+  
+  // Vertex input
+  VkVertexInputBindingDescription binding_description = {
+    .binding = 0,
+    .stride = sizeof(R_Vertex),
+    .inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+  };
+
+  // Attributes
+  VkVertexInputAttributeDescription attribute_desriptions[16] = {};
+  u32 attribute_desriptions_count = 0;
+  attribute_desriptions_count = 4;
+  attribute_desriptions[0] = {
+    .format = VK_FORMAT_R32G32B32_SFLOAT,
+    .offset = (u32)OffsetOf(R_Vertex, pos),
+  };
+  attribute_desriptions[1] = {
+    .format = VK_FORMAT_R32G32B32_SFLOAT,
+    .offset = (u32)OffsetOf(R_Vertex, norm),
+  };
+  attribute_desriptions[2] = {
+    .format = VK_FORMAT_R32G32_SFLOAT,
+    .offset = (u32)OffsetOf(R_Vertex, uv),
+  };
+  attribute_desriptions[3] = {
+    .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+    .offset = (u32)OffsetOf(R_Vertex, color),
+  };
+  Loop (i, attribute_desriptions_count) {
+    attribute_desriptions[i].location = i;
+  }
+  VkPipelineVertexInputStateCreateInfo vertex_input_state = {
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+    .vertexBindingDescriptionCount = 1,
+    .pVertexBindingDescriptions = &binding_description,
+    .vertexAttributeDescriptionCount = attribute_desriptions_count,
+    .pVertexAttributeDescriptions = attribute_desriptions,
+  };
+
+  VkPipelineInputAssemblyStateCreateInfo input_assembly_state = {
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+    .primitiveRestartEnable = VK_FALSE,
+  };
+
+  // Viewport
+  VkPipelineViewportStateCreateInfo viewport_state = {
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+    .viewportCount = 1,
+    .scissorCount = 1,
+  };
+  
+  // Rasterizer
+  VkPipelineRasterizationStateCreateInfo rasterizer_state = {
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+    .depthClampEnable = VK_FALSE,
+    .rasterizerDiscardEnable = VK_FALSE,
+    .polygonMode = VK_POLYGON_MODE_FILL,
+    .lineWidth = 1.0f,
+  };
+
+  // Multisampling
+  VkPipelineMultisampleStateCreateInfo multisampling_info = {
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+    .rasterizationSamples = (VkSampleCountFlagBits)desc.sample_count,
+    .alphaToCoverageEnable = (u32)desc.alpha_to_coverage_enabled,
+  };
+
+  VkPipelineColorBlendStateCreateInfo color_blend_state_info = {
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+    // .attachmentCount = 1,
+    .blendConstants[0] = desc.blend_color.v[0],
+    .blendConstants[1] = desc.blend_color.v[1],
+    .blendConstants[2] = desc.blend_color.v[2],
+    .blendConstants[3] = desc.blend_color.v[3],
+  };
+
+  // Dynamic state
+  VkDynamicState dynamic_states[] = {
+    VK_DYNAMIC_STATE_VIEWPORT,
+    VK_DYNAMIC_STATE_SCISSOR,
+    VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY,
+    VK_DYNAMIC_STATE_CULL_MODE,
+    VK_DYNAMIC_STATE_FRONT_FACE,
+    VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE,
+    VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE,
+    VK_DYNAMIC_STATE_DEPTH_COMPARE_OP,
+    VK_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT,
+    VK_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT,
+    VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT,
+    // VK_DYNAMIC_STATE_BLEND_CONSTANTS,
+  };
+  VkPipelineDynamicStateCreateInfo dynamic_state_info = {
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+    .dynamicStateCount = ArrayCount(dynamic_states),
+    .pDynamicStates = dynamic_states,
+  };
+
+  // Shader stages
+  VK_Shader shader = pool_get(g.shaders, desc.shader);
+  u32 stages_count = 0;
+  VkPipelineShaderStageCreateInfo stages[2] = {};
+  stages[stages_count++] = {
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+    .stage = VK_SHADER_STAGE_VERTEX_BIT,
+    .module = shader.h,
+    .pName = "vs_main",
+  };
+  stages[stages_count++] = {
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+    .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+    .module = shader.h,
+    .pName = "fs_main",
+  };
+  
+  // Pipeline
+  VkGraphicsPipelineCreateInfo pipeline_info = {
+    .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+    .pNext = &rendering_info,
+    .stageCount = stages_count,
+    .pStages = stages,
+    .pVertexInputState = &vertex_input_state,
+    .pInputAssemblyState = &input_assembly_state,
+    .pViewportState = &viewport_state,
+    .pRasterizationState = &rasterizer_state,
+    .pMultisampleState = &multisampling_info,
+    .pDepthStencilState = null,
     .pColorBlendState = &color_blend_state_info,
     .pDynamicState = &dynamic_state_info,
     .layout = g.pipeline_layout,
@@ -1390,6 +1509,7 @@ intern void vk_device_init() {
       .extendedDynamicState3PolygonMode = true,
       .extendedDynamicState3ColorBlendEnable = true,
       .extendedDynamicState3ColorBlendEquation = true,
+      .extendedDynamicState3ColorWriteMask = true,
     };
     VkPhysicalDeviceVulkan14Features vulkan14 = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
@@ -1506,10 +1626,9 @@ void vk_swapchain_create() {
 
 void vk_image_upload(VkCommandBuffer cmd, VK_Image image) {
   var& g = st->gfx;
-  Gfx_BufferData stage_buf = pool_get(st->gfx.buffers, st->gfx.stage_buffer);
   VkBufferImageCopy2 region = {
     .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
-    .bufferOffset = stage_buf.base,
+    .bufferOffset = st->gfx.stage_buffer.base,
     .bufferRowLength = 0,
     .bufferImageHeight = 0,
     .imageSubresource = {
@@ -1621,9 +1740,7 @@ void vk_texture_generate_mipmaps(VK_Image image) {
 
 u32 gfx_pixelformat_bytesize(Gfx_PixelFormat fmt) {
   switch (fmt) {
-    case Gfx_PixelFormat_Default:
-    case Gfx_PixelFormat_None:
-    InvalidPath;
+    InvalidDefaultCase;
     case Gfx_PixelFormat_R8_UI:
     case Gfx_PixelFormat_R8:
       return 1;
@@ -1637,68 +1754,36 @@ u32 gfx_pixelformat_bytesize(Gfx_PixelFormat fmt) {
   }
 }
 
-void gfx_pipeline_desc_defaults(Gfx_PipelineDesc* desc) {
-  desc->depth.pixel_format = _Def(desc->depth.pixel_format, Gfx_DefaultDepthFormat);
-  desc->depth.compare = _Def(desc->depth.compare, Gfx_CompareOp_Always);
-
-  desc->stencil.front.compare = _Def(desc->stencil.front.compare, Gfx_CompareOp_Always);
-  desc->stencil.front.fail_op = _Def(desc->stencil.front.fail_op, Gfx_StencilOp_Keep);
-  desc->stencil.front.depth_fail_op = _Def(desc->stencil.front.fail_op, Gfx_StencilOp_Keep);
-  desc->stencil.front.pass_op = _Def(desc->stencil.front.fail_op, Gfx_StencilOp_Keep);
-  desc->stencil.back.compare = _Def(desc->stencil.back.compare, Gfx_CompareOp_Always);
-  desc->stencil.back.fail_op = _Def(desc->stencil.back.fail_op, Gfx_StencilOp_Keep);
-  desc->stencil.back.depth_fail_op = _Def(desc->stencil.back.fail_op, Gfx_StencilOp_Keep);
-  desc->stencil.back.pass_op = _Def(desc->stencil.back.fail_op, Gfx_StencilOp_Keep);
-
-  desc->color_count = _Def(desc->color_count, 1);
-  Loop (i, desc->color_count) {
-    Gfx_ColorTargetState& col = desc->colors[i];
-    col.pixel_format = _Def(col.pixel_format, Gfx_DefaultTextureTargetColorFormat);
-    col.write_mask = _Def(col.write_mask, Gfx_ColorMask_RGBA);
-    col.blend.src_factor_rgb = _Def(col.blend.src_factor_rgb, Gfx_BlendFactor_One);
-    col.blend.dst_factor_rgb = _Def(col.blend.dst_factor_rgb, Gfx_BlendFactor_Zero);
-    col.blend.op_rgb = _Def(col.blend.op_rgb, Gfx_BlendOp_Add);
-    col.blend.src_factor_alpha = _Def(col.blend.src_factor_alpha, Gfx_BlendFactor_One);
-    col.blend.dst_factor_alpha = _Def(col.blend.dst_factor_alpha, Gfx_BlendFactor_Zero);
-    col.blend.op_alpha = _Def(col.blend.op_alpha, Gfx_BlendOp_Add);
-  }
-  desc->primitive_type = _Def(desc->primitive_type, Gfx_PrimitiveType_Triangle);
-  desc->cull_mode = _Def(desc->cull_mode, Gfx_CullMode_None);
-  desc->face_winding = _Def(desc->face_winding, Gfx_FaceWinding_CW);
-  desc->sample_count = _Def(desc->sample_count, Gfx_DefaultSampleCount);
-  desc->vert_layout = _Def(desc->vert_layout, Gfx_VertLayout_3D);
-}
-
 void gfx_image_desc_defaults(Gfx_ImageDesc* desc) {
-  desc->type = _Def(desc->type, Gfx_ImageType_2D);
-  desc->usage = desc->usage | Gfx_ImageUsage_Immutable;
-  desc->slices_count = _Def(desc->slices_count, desc->type == Gfx_ImageType_Cube ? 6 : 1);
+  _DefSet(desc->type, Gfx_ImageType_2D);
+  desc->usage |= Gfx_ImageUsage_Immutable;
+  _DefSet(desc->slices_count, desc->type == Gfx_ImageType_Cube ? 6 : 1);
   if (FlagHas(desc->usage, Gfx_ImageUsage_ColorAttachment)) {
-    desc->pixel_format = _Def(desc->pixel_format, Gfx_DefaultTextureTargetColorFormat);
-    desc->sample_count = _Def(desc->sample_count, Gfx_DefaultSampleCount);
+    _DefSet(desc->pixel_format, Gfx_PixelFormat_DefaulttAttachment);
+    _DefSet(desc->sample_count, Gfx_DefaultSampleCount);
   } else if (FlagHas(desc->usage, Gfx_ImageUsage_DepthStencilAttachment)) {
-    desc->pixel_format = _Def(desc->pixel_format, Gfx_DefaultDepthFormat);
-    desc->sample_count = _Def(desc->sample_count, Gfx_DefaultSampleCount);
+    _DefSet(desc->pixel_format, Gfx_PixelFormat_DefaultDepth);
+    _DefSet(desc->sample_count, Gfx_DefaultSampleCount);
   } else if (FlagHas(desc->usage, Gfx_ImageUsage_ResolveAttachment)) {
-    desc->pixel_format = _Def(desc->pixel_format, Gfx_DefaultTextureTargetColorFormat);
-    desc->sample_count = _Def(desc->sample_count, 1);
+    _DefSet(desc->pixel_format, Gfx_PixelFormat_DefaulttAttachment);
+    _DefSet(desc->sample_count, 1);
   } else {
-    desc->pixel_format = _Def(desc->pixel_format, Gfx_PixelFormat_RGBA8);
-    desc->sample_count = _Def(desc->sample_count, 1);
+    _DefSet(desc->pixel_format, Gfx_PixelFormat_RGBA8);
+    _DefSet(desc->sample_count, 1);
   }
 }
 
 void gfx_sampler_desc_defaults(Gfx_SamplerDesc* desc) {
-  desc->min_filter = _Def(desc->min_filter, Gfx_Filter_Nearest);
-  desc->mag_filter = _Def(desc->mag_filter, Gfx_Filter_Nearest);
-  desc->mipmap_filter = _Def(desc->mipmap_filter, Gfx_Filter_Nearest);
-  desc->wrap_u = _Def(desc->wrap_u, Gfx_Wrap_Repeat);
-  desc->wrap_v = _Def(desc->wrap_v, Gfx_Wrap_Repeat);
-  desc->wrap_w = _Def(desc->wrap_w, Gfx_Wrap_Repeat);
-  desc->max_lod = _Def(desc->max_lod, VK_LOD_CLAMP_NONE);
-  desc->border_color = _Def(desc->border_color, Gfx_BorderColor_OpaqueBlack);
-  desc->compare = _Def(desc->compare, Gfx_CompareOp_Never);
-  desc->max_anisotropy = _Def(desc->max_anisotropy, 1);
+  _DefSet(desc->min_filter, Gfx_Filter_Nearest);
+  _DefSet(desc->mag_filter, Gfx_Filter_Nearest);
+  _DefSet(desc->mipmap_filter, Gfx_Filter_Nearest);
+  _DefSet(desc->wrap_u, Gfx_Wrap_Repeat);
+  _DefSet(desc->wrap_v, Gfx_Wrap_Repeat);
+  _DefSet(desc->wrap_w, Gfx_Wrap_Repeat);
+  _DefSet(desc->max_lod, VK_LOD_CLAMP_NONE);
+  _DefSet(desc->border_color, Gfx_BorderColor_OpaqueBlack);
+  _DefSet(desc->compare, Gfx_CompareOp_Never);
+  _DefSet(desc->max_anisotropy, 1);
 }
 
 void gfx_pass_defaults(Gfx_Pass* pass) {
@@ -1743,34 +1828,71 @@ void gfx_pipeline_common_init(VK_Pipeline* pip, Gfx_PipelineDesc desc) {
   pip->sample_count = desc.sample_count;
   pip->blend_color = desc.blend_color;
   pip->alpha_to_coverage_enabled = desc.alpha_to_coverage_enabled;
-  pip->vert_layout = desc.vert_layout;
   ArrayCopy(pip->colors, desc.colors);
 }
 
-Gfx_Shader gfx_make_shader(Gfx_ShaderDesc desc) {
+u64 gfx_push_buffer(Gfx_Buffer& arena, u64 size, u64 align) {
+  u64 res = offset_push(arena.pos, size, align);
+  Assert(arena.pos <= arena.size);
+  return res;
+}
+
+Gfx_Shader gfx_make_shader(Slice<u8> code) {
   Scratch scratch;
   Gfx_State& g = st->gfx;
   VK_Shader shader = {};
-  shader.vert = desc.vert;
-  shader.frag = desc.frag;
-  shader.comp = desc.comp;
-  if (!shader.vert || !shader.frag || shader.comp) {
-    shader.vert = true;
-    shader.frag = true;
-  }
-  shader.h = vk_shader_create(desc);
-  Gfx_Shader res = {pool_push(g.shaders, shader)};
+  shader.h = vk_shader_create(code);
+  Gfx_Shader res = pool_push(g.shaders, shader);
   return res;
 }
 
 Gfx_Pipeline gfx_make_pipeline(Gfx_PipelineDesc desc) {
-  Scratch scratch;
   Gfx_State& g = st->gfx;
-  gfx_pipeline_desc_defaults(&desc);
+
+  _DefSet(desc.depth.pixel_format, Gfx_PixelFormat_DefaultDepth);
+  _DefSet(desc.depth.compare, Gfx_CompareOp_Always);
+  _DefSet(desc.stencil.front.compare, Gfx_CompareOp_Always);
+  _DefSet(desc.stencil.front.fail_op, Gfx_StencilOp_Keep);
+  _DefSet(desc.stencil.front.depth_fail_op, Gfx_StencilOp_Keep);
+  _DefSet(desc.stencil.front.pass_op, Gfx_StencilOp_Keep);
+  _DefSet(desc.stencil.back.compare, Gfx_CompareOp_Always);
+  _DefSet(desc.stencil.back.fail_op, Gfx_StencilOp_Keep);
+  _DefSet(desc.stencil.back.depth_fail_op, Gfx_StencilOp_Keep);
+  _DefSet(desc.stencil.back.pass_op, Gfx_StencilOp_Keep);
+  _DefSet(desc.color_count, 1);
+  Loop (i, desc.color_count) {
+    Gfx_ColorTargetState& col = desc.colors[i];
+    _DefSet(col.pixel_format, Gfx_PixelFormat_DefaulttAttachment);
+    _DefSet(col.write_mask, Gfx_ColorMask_RGBA);
+    _DefSet(col.blend.src_factor_rgb, Gfx_BlendFactor_One);
+    _DefSet(col.blend.dst_factor_rgb, Gfx_BlendFactor_Zero);
+    _DefSet(col.blend.op_rgb, Gfx_BlendOp_Add);
+    _DefSet(col.blend.src_factor_alpha, Gfx_BlendFactor_One);
+    _DefSet(col.blend.dst_factor_alpha, Gfx_BlendFactor_Zero);
+    _DefSet(col.blend.op_alpha, Gfx_BlendOp_Add);
+  }
+  _DefSet(desc.primitive_type, Gfx_PrimitiveType_Triangle);
+  _DefSet(desc.cull_mode, Gfx_CullMode_None);
+  _DefSet(desc.face_winding, Gfx_FaceWinding_CCW);
+  _DefSet(desc.sample_count, Gfx_DefaultSampleCount);
+
   VK_Pipeline pipeline = {};
   gfx_pipeline_common_init(&pipeline, desc);
   pipeline.h = vk_pipeline_create(desc);
-  Gfx_Pipeline res = {pool_push(g.pipelines, pipeline)};
+  Gfx_Pipeline res = pool_push(g.pipelines, pipeline);
+  return res;
+}
+
+Gfx_Pipeline gfx_make_pipeline2(Gfx_PipelineDesc2 desc) {
+  Gfx_State& g = st->gfx;
+
+  _DefSet(desc.sample_count, Gfx_DefaultSampleCount);
+  _DefSet(desc.depth_pixel_format, Gfx_PixelFormat_DefaultDepth);
+  _DefSet(desc.pixel_format, Gfx_PixelFormat_DefaulttAttachment);
+
+  VK_Pipeline pipeline = {};
+  pipeline.h = vk_pipeline_create2(desc);
+  Gfx_Pipeline res = pool_push(g.pipelines, pipeline);
   return res;
 }
 
@@ -1869,7 +1991,7 @@ Gfx_View gfx_make_view(Gfx_ViewDesc desc) {
         case Gfx_ImageType_2D:    view.slice_count = 1; break;
         case Gfx_ImageType_Cube:  view.slice_count = 6; break;
         case Gfx_ImageType_3D:    view.slice_count = 1; break;
-        case Gfx_ImageType_Array: view.slice_count = _Def(desc.slice_count, img.slices_count - view.slice);
+        case Gfx_ImageType_Array: view.slice_count = _Def(desc.slice_count, img.slices_count - view.slice); break;
       }
     } break;
     case Gfx_ViewType_ColorAttachment: {
@@ -2004,21 +2126,12 @@ Gfx_Buffer gfx_make_buffer(u64 size, Gfx_MemType type, u64 align) {
       Assert(buffer.pos <= buffer.cap);
     } break;
   }
-  Gfx_BufferData buf = {
+  Gfx_Buffer res = {
     .type = type,
     .base = offset,
     .size = size,
   };
-  Gfx_Buffer res = pool_push(st->gfx.buffers, buf);
   return res;
-}
-
-Gfx_Buffer gfx_make_buffer_round_base(u64 size, u64 round, Gfx_MemType type, u64 align) {
-  Gfx_State& g = st->gfx;
-  Gfx_Buffer buf = gfx_make_buffer(size + round, type, align);
-  Gfx_BufferData& buffer = pool_get(g.buffers, buf);
-  buffer.base = RoundUp(buffer.base, round);
-  return buf;
 }
 
 void gfx_make_bind(Gfx_DescriptorDesc desc) {
@@ -2026,9 +2139,7 @@ void gfx_make_bind(Gfx_DescriptorDesc desc) {
   if (desc.count == 0) {
     desc.count = 1;
   }
-  if (desc.type == Gfx_BindType_Default) {
-    desc.type = Gfx_BindType_Storage;
-  }
+  _DefSet(desc.type, Gfx_BindType_Storage);
   VK_DescriptorWriter& writer = g.descriptor_writer;
   VkDescriptorBindingFlags flags = {};
   if (desc.type == Gfx_BindType_Image) {
@@ -2066,7 +2177,6 @@ Gfx_PipelineDesc gfx_query_pipeline_desc(Gfx_Pipeline pip) {
     .sample_count = pipeline.sample_count,
     .blend_color = pipeline.blend_color,
     .alpha_to_coverage_enabled = pipeline.alpha_to_coverage_enabled,
-    .vert_layout = pipeline.vert_layout,
   };
   Loop (i, pipeline.color_count) {
     res.colors[i] = pipeline.colors[i];
@@ -2089,12 +2199,12 @@ Gfx_ImageDesc gfx_query_image_desc(Gfx_Image img) {
   return res;
 }
 
-void gfx_update_shader(Gfx_Shader shd, Gfx_ShaderDesc desc) {
+void gfx_update_shader(Gfx_Shader shd, Slice<u8> code) {
   var& g = st->gfx;
   VK_Shader& shader = pool_get(g.shaders, shd);
   gfx_idle();
   g.DestroyShaderModule(vkdevice, shader.h, g.allocator);
-  shader.h = vk_shader_create(desc);
+  shader.h = vk_shader_create(code);
 }
 
 void gfx_update_pipeline(Gfx_Pipeline pip, Gfx_PipelineDesc desc) {
@@ -2240,17 +2350,15 @@ void gfx_update_view(Gfx_View view, Gfx_ViewDesc desc) {
   g.UpdateDescriptorSets(vkdevice, 1, &texture_descriptor, 0, null);
 }
 
-void gfx_update_buffer(Gfx_Buffer buf, u64 offset, Slice<u8> data) {
-  Gfx_State& g = st->gfx;
-  Gfx_BufferData buffer = pool_get(g.buffers, buf);
-  Assert(offset+data.size <= buffer.size);
+void gfx_upload(Gfx_Buffer dst, u64 offset, Slice<u8> data) {
+  var& g = st->gfx;
+  Assert(offset+data.size <= dst.size);
   MemCopy(gfx_buffer_base_ptr(g.stage_buffer), data.data, data.size);
   vk_cmd_begin(g.cmds_upload[0]);
-  Gfx_BufferData stage_buffer = pool_get(g.buffers, g.stage_buffer);
   VkBufferCopy2 copy_region = {
     .sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2,
-    .srcOffset = stage_buffer.base,
-    .dstOffset = buffer.base + offset,
+    .srcOffset = g.stage_buffer.base,
+    .dstOffset = dst.base + offset,
     .size = data.size,
   };
   VkCopyBufferInfo2 info = {
@@ -2351,11 +2459,11 @@ void gfx_begin_pass(Gfx_Pass pass) {
       if (pass.action.colors[i].load_action != Gfx_LoadAction_Load) {
         color_image.cur_access |= VK_Access_Discard;
       }
-      vk_image_barrier(vk_get_cur_cmd(), &color_image, VK_Access_ColorAttachment);
+      vk_image_barrier(vk_cur_cmd(), &color_image, VK_Access_ColorAttachment);
       if (pass.attachments.resolves[i].idx) {
         VK_Image& resolve_image = pool_get(g.images, pool_get(g.views, pass.attachments.resolves[i]).ref);
         resolve_image.cur_access |= VK_Access_Discard;
-        vk_image_barrier(vk_get_cur_cmd(), &resolve_image, VK_Access_ResolveAttachment);
+        vk_image_barrier(vk_cur_cmd(), &resolve_image, VK_Access_ResolveAttachment);
       }
     }
 
@@ -2371,7 +2479,7 @@ void gfx_begin_pass(Gfx_Pass pass) {
       if (has_stencil) {
         dst_access |= VK_Access_StencilAttachment;
       }
-      vk_image_barrier(vk_get_cur_cmd(), &ds_image, dst_access);
+      vk_image_barrier(vk_cur_cmd(), &ds_image, dst_access);
     }
   }
 
@@ -2424,12 +2532,12 @@ void gfx_begin_pass(Gfx_Pass pass) {
       }
     }
   }
-  g.CmdBeginRendering(vk_get_cur_cmd(), &render_info);
+  g.CmdBeginRendering(vk_cur_cmd(), &render_info);
 }
 
 void gfx_end_pass() {
   Gfx_State& g = st->gfx;
-  g.CmdEndRendering(vk_get_cur_cmd());
+  g.CmdEndRendering(vk_cur_cmd());
 
   ///////////////////////////////////
   // Barrier
@@ -2448,17 +2556,17 @@ void gfx_end_pass() {
       if (g.cur_pass.attachments.colors[i].idx == 0) break;
       if (g.cur_pass.action.colors[i].store_action == Gfx_StoreAction_Store) {
         VK_Image& img = pool_get(g.images, pool_get(g.views, g.cur_pass.attachments.colors[i]).ref);
-        vk_image_barrier(vk_get_cur_cmd(), &img, VK_Access_Texture | VK_Access_FragmentShader);
+        vk_image_barrier(vk_cur_cmd(), &img, VK_Access_Texture | VK_Access_FragmentShader);
       }
       if (g.cur_pass.attachments.resolves[i].idx) {
         VK_Image& img = pool_get(g.images, pool_get(g.views, g.cur_pass.attachments.resolves[i]).ref);
-        vk_image_barrier(vk_get_cur_cmd(), &img, VK_Access_Texture | VK_Access_FragmentShader);
+        vk_image_barrier(vk_cur_cmd(), &img, VK_Access_Texture | VK_Access_FragmentShader);
       }
     }
     if (g.cur_pass.attachments.depth_stencil.idx) {
       VK_Image& img = pool_get(g.images, pool_get(g.views, g.cur_pass.attachments.depth_stencil).ref);
       if (g.cur_pass.action.depth.store_action == Gfx_StoreAction_Store) {
-        vk_image_barrier(vk_get_cur_cmd(), &img, VK_Access_Texture | VK_Access_FragmentShader);
+        vk_image_barrier(vk_cur_cmd(), &img, VK_Access_Texture | VK_Access_FragmentShader);
       }
     }
   }
@@ -2480,7 +2588,7 @@ void gfx_apply_viewport(Rng2 rect, b32 y_origin_at_bottom) {
     .minDepth = 0.0f,
     .maxDepth = 1.0f,
   };
-  g.CmdSetViewport(vk_get_cur_cmd(), 0, 1, &viewport);
+  g.CmdSetViewport(vk_cur_cmd(), 0, 1, &viewport);
 }
 
 void gfx_apply_scissor(Rng2 rect) {
@@ -2493,27 +2601,53 @@ void gfx_apply_scissor(Rng2 rect) {
       .height = (u32)dim.y,
     },
   };
-  g.CmdSetScissor(vk_get_cur_cmd(), 0, 1, &scissor);
+  g.CmdSetScissor(vk_cur_cmd(), 0, 1, &scissor);
 }
 
+void gfx_apply_primitive_type(Gfx_PrimitiveType t)     { st->gfx.CmdSetPrimitiveTopology(vk_cur_cmd(), vk_primitive_topology(t)); }
+void gfx_apply_cull_mode(Gfx_CullMode cm)              { st->gfx.CmdSetCullMode(vk_cur_cmd(), vk_cullmode(cm)); }
+void gfx_apply_face_winding(Gfx_FaceWinding fw)        { st->gfx.CmdSetFrontFace(vk_cur_cmd(), vk_frontface(fw)); }
+void gfx_apply_depth_test(b32 disable)                 { st->gfx.CmdSetDepthTestEnable(vk_cur_cmd(), !disable); }
+void gfx_apply_depth_write(b32 enable)                 { st->gfx.CmdSetDepthWriteEnable(vk_cur_cmd(), enable); }
+void gfx_apply_depth_compare(Gfx_CompareOp op)         { st->gfx.CmdSetDepthCompareOp(vk_cur_cmd(), vk_compare_op(op)); }
+void gfx_apply_color_blend_enable(b32 enable)          { VkBool32 enabled = enable; st->gfx.CmdSetColorBlendEnableEXT(vk_cur_cmd(), 0, 1, &enabled); }
+void gfx_apply_color_blend_equation(Gfx_BlendState bs) {
+  VkColorBlendEquationEXT equation = {
+    .srcColorBlendFactor = vk_blend_factor(bs.src_factor_rgb),
+    .dstColorBlendFactor = vk_blend_factor(bs.dst_factor_rgb),
+    .colorBlendOp = vk_blend_op(bs.op_rgb),
+    .srcAlphaBlendFactor = vk_blend_factor(bs.src_factor_alpha),
+    .dstAlphaBlendFactor = vk_blend_factor(bs.dst_factor_alpha),
+    .alphaBlendOp = vk_blend_op(bs.op_alpha),
+  };
+  st->gfx.CmdSetColorBlendEquationEXT(vk_cur_cmd(), 0, 1, &equation);
+};
+void gfx_apply_color_blend_mask(Gfx_BlendState bs) { 
+  VkColorComponentFlags write_mask = vk_color_write_mask(bs.write_mask);
+  st->gfx.CmdSetColorWriteMaskEXT(vk_cur_cmd(), 0, 1, &write_mask);
+}
 void gfx_draw(u32 base_vert, u32 vert_count, u32 instance_count, u32 base_instance) {
-  st->gfx.CmdDraw(vk_get_cur_cmd(), vert_count, instance_count, base_vert, base_instance);
+  st->gfx.CmdDraw(vk_cur_cmd(), vert_count, instance_count, base_vert, base_instance);
 }
-
 void gfx_draw_indexed(u32 base_index, u32 index_count, u32 base_vert, u32 instance_count, u32 base_instance) {
-  st->gfx.CmdDrawIndexed(vk_get_cur_cmd(), index_count, instance_count, base_index, base_vert, base_instance);
+  st->gfx.CmdDrawIndexed(vk_cur_cmd(), index_count, instance_count, base_index, base_vert, base_instance);
+}
+void gfx_draw_indirect(Gfx_IndirectDrawCall drawcall) {
+  var& g = st->gfx;
+  g.CmdDrawIndirect(vk_cur_cmd(), g.cpu_buf.h, g.drawcalls_buf.base + drawcall.base*sizeof(VK_IndirectDrawCall), drawcall.count, sizeof(VK_IndirectDrawCall));
 }
 
-void gfx_draw_indirect(Gfx_IndirectDrawcall drawcall) {
-  Gfx_State& g = st->gfx;
-  Gfx_BufferData buf = pool_get(g.buffers, g.drawcalls_buf);
-  st->gfx.CmdDrawIndirect(vk_get_cur_cmd(), g.cpu_buf.h, buf.base + drawcall.base*sizeof(VK_IndirectDrawCall), drawcall.count, sizeof(VK_IndirectDrawCall));
+void gfx_draw_indirect_mesh(Gfx_Mesh mesh, u32 id) {
+  // var& g = st->gfx;
+  // Gfx_BufferRegion buf = pool_get(g.buffers, g.drawcalls_buf);
+  vk_push_constants({id});
+  gfx_draw_mesh(mesh);
+  // g.CmdDrawIndirect(vk_cur_cmd(), g.cpu_buf.h, buf.base + g.indirect_drawcall_cursor++ * sizeof(VK_IndirectDrawCall), 1, sizeof(VK_IndirectDrawCall));
 }
 
-void gfx_draw_indexed_indirect(Gfx_IndirectDrawcall drawcall) {
-  Gfx_State& g = st->gfx;
-  Gfx_BufferData buf = pool_get(g.buffers, g.drawcalls_buf);
-  st->gfx.CmdDrawIndexedIndirect(vk_get_cur_cmd(), g.cpu_buf.h, buf.base + drawcall.base*sizeof(VK_IndirectDrawCall), drawcall.count, sizeof(VK_IndirectDrawCall));
+void gfx_draw_indexed_indirect(Gfx_IndirectDrawCall drawcall) {
+  var& g = st->gfx;
+  g.CmdDrawIndexedIndirect(vk_cur_cmd(), g.cpu_buf.h, g.drawcalls_buf.base + drawcall.base*sizeof(VK_IndirectDrawCall), drawcall.count, sizeof(VK_IndirectDrawCall));
 }
 
 void gfx_draw_mesh(Gfx_Mesh mesh) {
@@ -2525,17 +2659,17 @@ void gfx_draw_mesh(Gfx_Mesh mesh) {
 }
 
 u32 gfx_begin_indirect() {
-  return st->gfx.drawcall_cursor;
+  return st->gfx.indirect_drawcall_cursor;
 }
-Gfx_IndirectDrawcall gfx_end_indirect(u32 base) {
-  Gfx_IndirectDrawcall res = {
+Gfx_IndirectDrawCall gfx_end_indirect(u32 base) {
+  Gfx_IndirectDrawCall res = {
     .base = base,
-    .count = st->gfx.drawcall_cursor - base,
+    .count = st->gfx.indirect_drawcall_cursor - base,
   };
   return res;
 }
 void gfx_draw_mesh_indirect(Gfx_Mesh mesh, u32 id, u32 instance_count) {
-  VK_IndirectDrawCall info = {};
+  VK_IndirectDrawCall info = {.base_instance = id};
   if (mesh.index_count) {
     info.index_draw_command = {
       .indexCount = mesh.index_count,
@@ -2552,9 +2686,8 @@ void gfx_draw_mesh_indirect(Gfx_Mesh mesh, u32 id, u32 instance_count) {
       .firstInstance = 0,
     };
   }
-  info.base_instance = id;
-  VK_IndirectDrawCall* drawcalls = (VK_IndirectDrawCall*)gfx_buffer_base_ptr(st->gfx.drawcalls_buf);
-  drawcalls[st->gfx.drawcall_cursor++] = info;
+  VK_IndirectDrawCall* indirect_drawcalls = (VK_IndirectDrawCall*)gfx_buffer_base_ptr(st->gfx.drawcalls_buf);
+  indirect_drawcalls[st->gfx.indirect_drawcall_cursor++] = info;
 }
 
 void gfx_push_indirect_instanced(Gfx_Mesh mesh, u32 count) {
@@ -2566,51 +2699,45 @@ void gfx_instance_set_indices(u32* indices) {
 }
 
 u32* gfx_indirect_indices() { return st->gfx.base_index + st->gfx.entity_cursor; }
-
-u8* gfx_buffer_base_ptr(Gfx_Buffer buf) {
-  Gfx_State& g = st->gfx;
-  Gfx_BufferData buffer = pool_get(g.buffers, buf);
-  VK_Buffer* vkbuf = vk_choose_buffer(buf);
-  return Offset(vkbuf->base, buffer.base);
-}
-
-u64 gfx_buffer_base(Gfx_Buffer buf) {
-  Gfx_State& g = st->gfx;
-  Gfx_BufferData buffer = pool_get(g.buffers, buf);
-  return buffer.base;
-}
+u8* gfx_buffer_base_ptr(Gfx_Buffer buf) { return Offset(vk_get_vkbuffer(buf).base, buf.base); }
 
 void gfx_bind_pipeline(Gfx_Pipeline pip) {
   Gfx_State& g = st->gfx;
-  g.CmdBindPipeline(vk_get_cur_cmd(), VK_PIPELINE_BIND_POINT_GRAPHICS, pool_get(g.pipelines, pip).h);
+  g.CmdBindPipeline(vk_cur_cmd(), VK_PIPELINE_BIND_POINT_GRAPHICS, pool_get(g.pipelines, pip).h);
 }
 
-void gfx_bind_vert(Gfx_MemType type) {
-  Gfx_State& g = st->gfx;
-  VK_Buffer buf = {};
-  if (type == Gfx_MemType_Gpu) buf = g.gpu_buf;
-  else if (type == Gfx_MemType_Cpu) buf = g.cpu_buf;
-  VkDeviceSize offset = 0;
-  g.CmdBindVertexBuffers(vk_get_cur_cmd(), 0, 1, &buf.h, &offset);
+void gfx_bind_vert(Gfx_Buffer reg) {
+  var& g = st->gfx;
+  VkBuffer buf = {};
+  switch (reg.type) {
+    InvalidDefaultCase;
+    case Gfx_MemType_Cpu: buf = g.cpu_buf.h; break;
+    case Gfx_MemType_Gpu: buf = g.gpu_buf.h; break;
+  }
+  VkDeviceSize offset = reg.base;
+  g.CmdBindVertexBuffers(vk_cur_cmd(), 0, 1, &buf, &offset);
 }
 
-void gfx_bind_index(Gfx_MemType type) {
-  Gfx_State& g = st->gfx;
-  VK_Buffer buf = {};
-  if (type == Gfx_MemType_Gpu) buf = g.gpu_buf;
-  else if (type == Gfx_MemType_Cpu) buf = g.cpu_buf;
-  g.CmdBindIndexBuffer(vk_get_cur_cmd(), buf.h, 0, VK_INDEX_TYPE_UINT32);
+void gfx_bind_index(Gfx_Buffer reg) {
+  var& g = st->gfx;
+  VkBuffer buf = {};
+  switch (reg.type) {
+    InvalidDefaultCase;
+    case Gfx_MemType_Cpu: buf = g.cpu_buf.h; break;
+    case Gfx_MemType_Gpu: buf = g.gpu_buf.h; break;
+  }
+  VkDeviceSize offset = reg.base;
+  g.CmdBindIndexBuffer(vk_cur_cmd(), buf, offset, VK_INDEX_TYPE_UINT32);
 }
 
 void gfx_bind_buffer(Gfx_Buffer buf, u32 binding) {
   Gfx_State& g = st->gfx;
   VK_DescriptorWriter& writer = g.descriptor_writer;
-  Gfx_BufferData buffer = pool_get(g.buffers, buf);
-  VK_Buffer vkbuf = *vk_choose_buffer(buf);
+  VK_Buffer vkbuf = vk_get_vkbuffer(buf);
   writer.buffers[writer.writes_count] = {
     .buffer = vkbuf.h,
-    .offset = buffer.base,
-    .range = buffer.size,
+    .offset = buf.base,
+    .range = buf.size,
   };
   writer.writes[writer.writes_count] = {
     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -2627,7 +2754,7 @@ void gfx_bind_buffer(Gfx_Buffer buf, u32 binding) {
 void gfx_make_buffers(Slice<Gfx_BufferDesc> descs) {
   for (var desc : descs) {
     gfx_make_bind({.binding = desc.binding});
-    Gfx_Buffer buf = gfx_make_buffer(desc.size, desc.mem_type == Gfx_MemType_Default ? Gfx_MemType_Cpu : desc.mem_type);
+    Gfx_Buffer buf = gfx_make_buffer(desc.size, _Def(desc.mem_type, Gfx_MemType_Cpu));
     if (desc.out_buffer) {
       *desc.out_buffer = buf;
     }
@@ -2812,16 +2939,16 @@ void gfx_init(Gfx_Environment environment) {
   g.cpu_buf = vk_make_buffer(Gfx_MemType_Cpu, environment.cpu_mem_size - drawcall_mem);
   g.gpu_buf = vk_make_buffer(Gfx_MemType_Gpu, environment.gpu_mem_size);
 
-  // VkBufferDeviceAddressInfoKHR gpu_address_info = {
-  //   .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO_KHR,
-  //   .buffer = g.gpu_buf.h,
-  // };
-  // g.gpu_buf_address = g.GetBufferDeviceAddress(vkdevice, &gpu_address_info);
-  // VkBufferDeviceAddressInfoKHR cpu_address_info = {
-  //   .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO_KHR,
-  //   .buffer = g.cpu_buf.h,
-  // };
-  // g.cpu_buf_address = g.GetBufferDeviceAddress(vkdevice, &cpu_address_info);
+  VkBufferDeviceAddressInfoKHR gpu_address_info = {
+    .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO_KHR,
+    .buffer = g.gpu_buf.h,
+  };
+  g.gpu_buf_address = g.GetBufferDeviceAddress(vkdevice, &gpu_address_info);
+  VkBufferDeviceAddressInfoKHR cpu_address_info = {
+    .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO_KHR,
+    .buffer = g.cpu_buf.h,
+  };
+  g.cpu_buf_address = g.GetBufferDeviceAddress(vkdevice, &cpu_address_info);
 
   g.drawcalls_buf = gfx_make_buffer(drawcall_mem, Gfx_MemType_Cpu);
   gfx_make_bind({.binding = Bindings::Drawinfo});
@@ -2851,7 +2978,7 @@ void gfx_begin() {
     VK_CHECK(g.ResetFences(vkdevice, 1, &g.in_flight_fences[g.current_frame_idx]));
   }
 
-  VkCommandBuffer cmd = vk_get_cur_cmd();
+  VkCommandBuffer cmd = vk_cur_cmd();
   vk_cmd_begin(cmd);
 
   g.swapchain_resized = false;
@@ -2885,9 +3012,9 @@ void gfx_end() {
 
   g.base_index = null;
   g.entity_cursor = 0;
-  g.drawcall_cursor = 0;
+  g.indirect_drawcall_cursor = 0;
 
-  VkCommandBuffer cmd = vk_get_cur_cmd();
+  VkCommandBuffer cmd = vk_cur_cmd();
   vk_cmd_end(cmd);
 
   ///////////////////////////////////
@@ -2899,7 +3026,7 @@ void gfx_end() {
   };
   VkCommandBufferSubmitInfo command_info = {
     .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-    .commandBuffer = vk_get_cur_cmd(),
+    .commandBuffer = vk_cur_cmd(),
   };
   VkSemaphoreSubmitInfo signal_info = {
     .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,

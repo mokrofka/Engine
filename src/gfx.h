@@ -6,13 +6,11 @@ MakeId(Gfx_Sampler)
 MakeId(Gfx_Shader)
 MakeId(Gfx_Pipeline)
 MakeId(Gfx_View)
-MakeId(Gfx_Buffer)
 
 enum {
   Gfx_NumFramesInFlight = 2,
   Gfx_MaxImagesInFlight = 4,
   Gfx_MaxColorAttachments = 8,
-  Gfx_MaxMipmaps = 16,
   Gfx_MaxShaders = 32,
   Gfx_MaxPipelines = 32,
   Gfx_MaxViews = 32,
@@ -31,22 +29,16 @@ enum {
 // signed integer (SI postfix)
 enum Gfx_PixelFormat {
   Gfx_PixelFormat_Default,
-  Gfx_PixelFormat_None,
-
   Gfx_PixelFormat_R8_UI,
   Gfx_PixelFormat_R8,
-
   Gfx_PixelFormat_BGRA8,
   Gfx_PixelFormat_BGRA8_SRGB,
-
   Gfx_PixelFormat_RGBA8,
   Gfx_PixelFormat_RGBA8_SRGB,
-
   Gfx_PixelFormat_Depth,
   Gfx_PixelFormat_DepthStencil,
-
-  Gfx_DefaultTextureTargetColorFormat = Gfx_PixelFormat_BGRA8,
-  Gfx_DefaultDepthFormat = Gfx_PixelFormat_Depth,
+  Gfx_PixelFormat_DefaulttAttachment = Gfx_PixelFormat_BGRA8,
+  Gfx_PixelFormat_DefaultDepth = Gfx_PixelFormat_Depth,
 };
 
 enum Gfx_PrimitiveType {
@@ -178,18 +170,6 @@ enum Gfx_StoreAction {
   Gfx_StoreAction_DontCare,
 };
 
-enum Gfx_VertFormat {
-  Gfx_VertFormat_v2,
-  Gfx_VertFormat_v3,
-  Gfx_VertFormat_v4,
-};
-
-enum Gfx_VertLayout {
-  Gfx_VertLayout_Default,
-  Gfx_VertLayout_3D,
-  Gfx_VertLayout_UI,
-};
-
 struct Gfx_ColorAttachmentAction {
   Gfx_LoadAction load_action;
   Gfx_StoreAction store_action;
@@ -297,13 +277,6 @@ struct Gfx_SamplerDesc {
   u32 max_anisotropy;
 };
 
-struct Gfx_ShaderDesc {
-  String shader;
-  b32 vert : 1;
-  b32 frag : 1;
-  b32 comp : 1;
-};
-
 struct Gfx_StencilFaceState {
   Gfx_CompareOp compare;
   Gfx_StencilOp fail_op;
@@ -338,6 +311,7 @@ struct Gfx_BlendState {
   Gfx_BlendFactor src_factor_alpha;
   Gfx_BlendFactor dst_factor_alpha;
   Gfx_BlendOp op_alpha;
+  Gfx_ColorMask write_mask;
 };
 
 struct Gfx_ColorTargetState {
@@ -362,7 +336,24 @@ struct Gfx_PipelineDesc {
   u32 sample_count;
   v4 blend_color;
   b32 alpha_to_coverage_enabled;
-  Gfx_VertLayout vert_layout;
+};
+
+struct Gfx_PipelineDesc2 {
+  b32 compute;
+  Gfx_Shader shader;
+  Gfx_PixelFormat pixel_format;
+  Gfx_PixelFormat depth_pixel_format;
+  u32 sample_count;
+  v4 blend_color;
+  b32 alpha_to_coverage_enabled;
+};
+
+struct Gfx_PipelineState {
+  Gfx_DepthState depth;
+  Gfx_BlendState blend;
+  Gfx_PrimitiveType primitive_type;
+  Gfx_CullMode cull_mode;
+  Gfx_FaceWinding face_winding;
 };
 
 enum Gfx_MemType {
@@ -384,7 +375,7 @@ struct Gfx_DescriptorDesc {
   u32 count;
 };
 
-struct Gfx_IndirectDrawcall {
+struct Gfx_IndirectDrawCall {
   u32 base;
   u32 count;
 };
@@ -396,9 +387,11 @@ struct Gfx_Mesh {
   u32 base_index;
 };
 
-struct Gfx_Task {
-  void (*on_complete)(void*);
-  void* user_data;
+struct Gfx_Buffer {
+  Gfx_MemType type;
+  u64 base;
+  u64 size;
+  u64 pos;
 };
 
 struct Gfx_BufferDesc {
@@ -408,6 +401,7 @@ struct Gfx_BufferDesc {
   void** out_cpu_ptr;
   Gfx_Buffer* out_buffer;
 };
+
 
 ////////////////////////////////////////////////////////////////////////
 // @Vulkan
@@ -466,7 +460,6 @@ enum {
 
 struct VK_Memory {
   VkDeviceMemory h;
-  VkBuffer buf;
   u8* mapped_mem;
   u64 pos;
   u64 cap;
@@ -487,15 +480,9 @@ struct VK_BufferRegion {
   VK_Access cur_access;
 };
 
-struct Gfx_BufferData {
-  Gfx_MemType type;
-  u64 base;
-  u64 size;
-};
-
 struct VK_Image {
-  VkDeviceMemory memory;
   VkImage h;
+  VkDeviceMemory memory;
   Gfx_ImageType type;
   u32 width;
   u32 height;
@@ -534,9 +521,6 @@ struct VK_Sampler {
 
 struct VK_Shader {
   VkShaderModule h;
-  b32 vert : 1;
-  b32 frag : 1;
-  b32 comp : 1;
 };
 
 struct VK_Pipeline {
@@ -553,7 +537,6 @@ struct VK_Pipeline {
   u32 sample_count;
   v4 blend_color;
   b32 alpha_to_coverage_enabled;
-  Gfx_VertLayout vert_layout;
 };
 
 struct VK_Device {
@@ -584,11 +567,11 @@ struct VK_Swapchain {
   VkSwapchainKHR h;
   VkSurfaceFormatKHR format;  
   VkPresentModeKHR present_mode;
-  VkImage images[4];
-  VkImageView views[4];
+  VkImage images[Gfx_MaxImagesInFlight];
+  VkImageView views[Gfx_MaxImagesInFlight];
   VK_Image depth_attachment;
   VkSwapchainKHR h_old;
-  VkImageView old_view[4];
+  VkImageView old_view[Gfx_MaxImagesInFlight];
 };
 
 struct VK_Semaphore {
@@ -596,9 +579,8 @@ struct VK_Semaphore {
   u64 counter;
 };
 
-union VK_PushConstant {
-  u32 drawcall_base;
-  u32 image_index;
+struct VK_PushConstant {
+  u32 idx;
 };
 
 struct VK_DescriptorWriter {
@@ -619,12 +601,13 @@ struct VK_IndirectDrawCall {
 };
 
 String vk_result_str(VkResult result);
+
 void vk_surface_create();
 void vk_swapchain_create();
 
 VkSemaphore vk_get_cur_image_available_semaphore();
 VkSemaphore vk_get_cur_render_complete_semaphore();
-VkCommandBuffer vk_get_cur_cmd();
+VkCommandBuffer vk_cur_cmd();
 
 void vk_bind_pipeline(VkPipeline pipeline);
 u32 vk_find_memory_idx(u32 type_filter, u32 property_flags);
@@ -645,7 +628,7 @@ VK_Memory vk_mem_make(Gfx_MemType type, u64 size);
 VK_Buffer vk_make_buffer(Gfx_MemType type, u64 size);
 void vk_bind_vert_buffer(VK_Buffer buffer);
 void vk_bind_index_buffer(VK_Buffer buffer);
-VK_Buffer* vk_choose_buffer(Gfx_Buffer buf);
+VK_Buffer vk_get_vkbuffer(Gfx_Buffer buf);
 
 ////////////////////////////////////////////////////////////////////////
 // @Gfx
@@ -701,7 +684,6 @@ struct Gfx_State {
   u32 current_frame_idx;
   u32 current_frame_idx_plus_one;
 
-  Pool<Gfx_BufferData, Gfx_MaxBuffers, Gfx_Buffer> buffers;
   Pool<VK_Shader, Gfx_MaxShaders, Gfx_Shader> shaders;
   Pool<VK_Pipeline, Gfx_MaxPipelines, Gfx_Pipeline> pipelines;
   Pool<VK_Image, Gfx_MaxImages, Gfx_Image> images;
@@ -720,7 +702,7 @@ struct Gfx_State {
   Gfx_Buffer drawcalls_buf;
   u32* base_index;
   u32 entity_cursor;
-  u32 drawcall_cursor;
+  u32 indirect_drawcall_cursor;
 
   ///////////////////////////////////
   // Vulkan loader
@@ -817,6 +799,10 @@ struct Gfx_State {
     X(CmdSetStencilTestEnable) \
     X(CmdSetDepthTestEnable) \
     X(CmdSetDepthWriteEnable) \
+    X(CmdSetDepthCompareOp) \
+    X(CmdSetColorBlendEnableEXT) \
+    X(CmdSetColorBlendEquationEXT) \
+    X(CmdSetColorWriteMaskEXT) \
     X(CmdSetStencilReference) \
     X(CmdSetStencilOp) \
     X(CmdSetStencilCompareMask) \
@@ -853,24 +839,26 @@ struct Gfx_State {
 #undef X
 };
 
-Gfx_Shader gfx_make_shader(Gfx_ShaderDesc desc);
+u64 gfx_push_buffer(Gfx_Buffer& arena, u64 size, u64 align = 1);
+
+Gfx_Shader gfx_make_shader(Slice<u8> shd);
 Gfx_Pipeline gfx_make_pipeline(Gfx_PipelineDesc desc);
+Gfx_Pipeline gfx_make_pipeline2(Gfx_PipelineDesc2 desc);
 Gfx_Image gfx_make_image(Gfx_ImageDesc desc);
 Gfx_View gfx_make_view(Gfx_ViewDesc desc);
 Gfx_Sampler gfx_make_sampler(Gfx_SamplerDesc desc);
-Gfx_Buffer gfx_make_buffer(u64 size, Gfx_MemType type = Gfx_MemType_Gpu, u64 align = 16);
-Gfx_Buffer gfx_make_buffer_round_base(u64 size, u64 round, Gfx_MemType type = Gfx_MemType_Gpu, u64 align = 16);
+Gfx_Buffer gfx_make_buffer(u64 size, Gfx_MemType type, u64 align = 16);
 void gfx_make_bind(Gfx_DescriptorDesc desc);
 
 Gfx_PipelineDesc gfx_query_pipeline_desc(Gfx_Pipeline pip);
 Gfx_ImageDesc gfx_query_image_desc(Gfx_Image img);
 
-void gfx_update_shader(Gfx_Shader shd, Gfx_ShaderDesc desc);
+void gfx_update_shader(Gfx_Shader shd, Slice<u8> code);
 void gfx_update_pipeline(Gfx_Pipeline pip, Gfx_PipelineDesc desc);
 void gfx_update_image(Gfx_Image img, u8* data);
 void gfx_update_image(Gfx_Image img, Gfx_ImageDesc desc);
 void gfx_update_view(Gfx_View view, Gfx_ViewDesc desc);
-void gfx_update_buffer(Gfx_Buffer buf, u64 offset, Slice<u8> data);
+void gfx_upload(Gfx_Buffer dst, u64 offset, Slice<u8> data);
 
 void gfx_destroy_image(Gfx_Image img);
 void gfx_destroy_view(Gfx_View view);
@@ -882,26 +870,35 @@ void gfx_begin_pass(Gfx_Pass pass);
 void gfx_end_pass();
 void gfx_apply_viewport(Rng2 rect, b32 y_origin_at_bottom = false);
 void gfx_apply_scissor(Rng2 rect);
+void gfx_apply_primitive_type(Gfx_PrimitiveType t);
+void gfx_apply_cull_mode(Gfx_CullMode cm);
+void gfx_apply_face_winding(Gfx_FaceWinding fw);
+void gfx_apply_depth_test(b32 disable);
+void gfx_apply_depth_write(b32 enable);
+void gfx_apply_depth_compare(Gfx_CompareOp op);
+void gfx_apply_color_blend_enable(b32 enable);
+void gfx_apply_color_blend_equation(Gfx_BlendState bs);
+void gfx_apply_color_blend_mask(Gfx_BlendState bs);
 void gfx_draw(u32 base_vert, u32 vert_count, u32 instance_count = 1, u32 base_instance = 0);
 void gfx_draw_indexed(u32 base_index, u32 index_count, u32 base_vert, u32 instance_count = 1, u32 base_instance = 0);
-void gfx_draw_indirect(Gfx_IndirectDrawcall drawcall);
-void gfx_draw_indexed_indirect(Gfx_IndirectDrawcall drawcall);
+void gfx_draw_indirect(Gfx_IndirectDrawCall drawcall);
+void gfx_draw_indirect_mesh(Gfx_Mesh mesh, u32 id);
+void gfx_draw_indexed_indirect(Gfx_IndirectDrawCall drawcall);
 void gfx_draw_mesh(Gfx_Mesh mesh);
 
 void gfx_draw_mesh_indirect(Gfx_Mesh mesh, u32 id, u32 instance_count = 1);
 u32  gfx_begin_indirect();
-Gfx_IndirectDrawcall gfx_end_indirect(u32 base);
+Gfx_IndirectDrawCall gfx_end_indirect(u32 base);
 
 void gfx_push_indirect_instanced(Gfx_Mesh mesh, u32 count);
 void gfx_instance_set_indices(u32* indices);
 u32* gfx_indirect_indices();
 
 u8* gfx_buffer_base_ptr(Gfx_Buffer buf);
-u64 gfx_buffer_base(Gfx_Buffer buf);
 
 void gfx_bind_pipeline(Gfx_Pipeline pip);
-void gfx_bind_vert(Gfx_MemType type = Gfx_MemType_Gpu);
-void gfx_bind_index(Gfx_MemType type = Gfx_MemType_Gpu);
+void gfx_bind_vert(Gfx_Buffer reg);
+void gfx_bind_index(Gfx_Buffer reg);
 void gfx_bind_buffer(Gfx_Buffer buf, u32 binding);
 void gfx_make_buffers(Slice<Gfx_BufferDesc> descs);
 void gfx_flush();

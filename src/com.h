@@ -15,6 +15,7 @@
 // thread safe allocator
 // glb loader
 // obj mouse selection
+// uber shader, new pipeline rendering, gfx buffers, relook code, more math code
 
 enum MetaType {
   MetaType_Null,
@@ -490,7 +491,7 @@ ThingId e_alloc(R_MeshId mesh_id, R_MaterialId material_id, EntityThing thing = 
 ThingId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing = {});
 ThingId make_thing(ThingDesc desc);
 void destroy_thing(ThingId id);
-void game_init();
+void init_game();
 void update_game();
 void game_view();
 void game_save_state();
