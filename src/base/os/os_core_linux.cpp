@@ -28,27 +28,17 @@ _LockScope::~_LockScope() {
 }
 
 global u64 _cpu_frequency;
-u64 cpu_timer_now() { return __rdtsc(); }
+u64 cpu_now()       { return __rdtsc(); }
 u64 cpu_frequency() { return _cpu_frequency; }
 void cpu_find_frequency() {
-  u64 os_freq = os_timer_frequency();
-  u64 cpu_start = cpu_timer_now();
-  u64 os_start = os_timer_now();
-  u64 milliseconds = 1;
-  u64 os_end = 0;
-  u64 os_elapsed = 0;
-  u64 os_wait_time = os_freq * milliseconds / 1000;
-  while (os_elapsed < os_wait_time) {
-    os_end = os_timer_now();
-    os_elapsed = os_end - os_start;
+  u64 cpu_start = cpu_now();
+  u64 start_ns = os_now_ns();
+  u64 ns_elapsed = 0;
+  while (ns_elapsed < Million(1)) {
+    ns_elapsed = os_now_ns() - start_ns;
   }
-  u64 cpu_end = cpu_timer_now();
-  u64 cpu_elapsed = cpu_end - cpu_start;
-  u64 cpu_freq = 0;
-  if (cpu_elapsed) {
-    cpu_freq = os_freq * cpu_elapsed / os_elapsed;
-  }
-  _cpu_frequency = cpu_freq;
+  u64 cpu_elapsed = cpu_now() - cpu_start;
+  _cpu_frequency = Billion(1) / ns_elapsed * cpu_elapsed;
 }
 
 struct OS_LNX_FileIter {

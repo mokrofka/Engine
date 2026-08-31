@@ -26,7 +26,7 @@ template<typename T, i32 N> struct Array {
   T* end()   { return data + count; }
 };
 
-template<typename T, i32 N> Slice<T> slice(Array<T, N>& arr) {
+template<typename T, i32 N> NO_DEBUG Slice<T> slice(Array<T, N>& arr) {
   return {arr.data, arr.count};
 }
 template<typename T, i32 N> u32 array_push_empty(Array<T, N>& arr) {

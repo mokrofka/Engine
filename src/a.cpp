@@ -492,4 +492,138 @@ template<typename T, typename L, typename H> void list_push_front(T* p,  L* list
   list->first = n;
 }
 
+struct DrawCall_std430 {
+  float4x4 model : [[RowMajor, MatrixStride(16), Offset(0)]];
+  float4 color : [[Offset(64)]];
+  int type : [[Offset(80)]];
+  float3x4 m : [[RowMajor, MatrixStride(16), Offset(96)]];
+  uint tex : [[Offset(144)]];
+  uint mat : [[Offset(148)]];
+  uint cur_resolve_idx : [[Offset(152)]];
+  uint flags : [[Offset(156)]];
+}
+struct StructuredBuffer : [[Block]] {
+  DrawCall_std430[] __member0 : [[Offset(0)]] : [[ArrayStride(160)]];
+}
 
+struct DrawCall_std430 {
+  float4x4 model : [[RowMajor, MatrixStride(16), Offset(0)]];
+  float4 color : [[Offset(64)]];
+  int type : [[Offset(80)]];
+  float4x3 m : [[RowMajor, MatrixStride(16), Offset(96)]];
+  uint tex : [[Offset(160)]];
+  uint mat : [[Offset(164)]];
+  uint cur_resolve_idx : [[Offset(168)]];
+  uint flags : [[Offset(172)]];
+}
+struct StructuredBuffer : [[Block]] {
+  DrawCall_std430[] __member0 : [[Offset(0)]] : [[ArrayStride(176)]];
+}
+
+
+DebugEntryPoint(vs_main, Slang Compiler from Khronos slangc,
+
+    command line: -target spirv  -I "/opt/shader-slang-bin/bin" -matrix-layout-column-major -O0 -stage vertex -entry vs_main -g2);
+
+struct DrawCall_std430 {
+
+  float4x4 model : [[RowMajor, MatrixStride(16), Offset(0)]];
+
+  float4 color : [[Offset(64)]];
+
+  int type : [[Offset(80)]];
+
+  float3x4 m : [[RowMajor, MatrixStride(16), Offset(96)]];
+
+  uint tex : [[Offset(144)]];
+
+  uint mat : [[Offset(148)]];
+
+  uint cur_resolve_idx : [[Offset(152)]];
+
+  uint flags : [[Offset(156)]];
+
+}
+
+struct StructuredBuffer : [[Block]] {
+
+  DrawCall_std430[] __member0 : [[Offset(0)]] : [[ArrayStride(160)]];
+
+}
+
+struct DrawCall_std430 {
+
+  float4x4 model : [[RowMajor, MatrixStride(16), Offset(0)]];
+
+  float4 color : [[Offset(64)]];
+
+  int type : [[Offset(80)]];
+
+  float4x3 m : [[RowMajor, MatrixStride(16), Offset(96)]];
+
+  uint tex : [[Offset(160)]];
+
+  uint mat : [[Offset(164)]];
+
+  uint cur_resolve_idx : [[Offset(168)]];
+
+  uint flags : [[Offset(172)]];
+
+}
+
+struct StructuredBuffer : [[Block]] {
+
+  DrawCall_std430[] __member0 : [[Offset(0)]] : [[ArrayStride(176)]];
+
+}
+
+
+
+
+
+}
+
+
+
+
+DebugEntryPoint(vs_main, Slang Compiler from Khronos slangc,
+
+    command line: -target spirv  -I "/opt/shader-slang-bin/bin" -matrix-layout-row-major -O0 -stage vertex -entry vs_main -g2);
+
+const float2[3] _147 = {{-1.0000, -1.0000}, {-1.0000, 3.0000}, {3.0000, -1.0000}};
+
+const float2[3] _163 = {{0.0000, 0.0000}, {0.0000, 2.0000}, {2.0000, 0.0000}};
+
+struct PushConstants_std430 : [[Block]] {
+
+  uint idx : [[Offset(0)]];
+
+}
+
+struct DrawCall_std430 {
+
+  float4x4 model : [[ColMajor, MatrixStride(16), Offset(0)]];
+
+  float4 color : [[Offset(64)]];
+
+  int type : [[Offset(80)]];
+
+  float3x4 m : [[ColMajor, MatrixStride(16), Offset(96)]];
+
+  uint tex : [[Offset(160)]];
+
+  uint mat : [[Offset(164)]];
+
+  uint cur_resolve_idx : [[Offset(168)]];
+
+  uint flags : [[Offset(172)]];
+
+}
+
+struct StructuredBuffer : [[Block]] {
+
+  DrawCall_std430[] __member0 : [[Offset(0)]] : [[ArrayStride(176)]];
+
+}
+
+with with row major flag, matrices are column major and with column major, matrices are row major?

@@ -1,9 +1,10 @@
 #pragma once
 #include "os/os_core.h"
+#include "thread_ctx.h"
 
 const u32 Thread_MaxTasks = 1024;
 const u32 Thread_MaxCounters = 1024;
-const u32 Thread_NumWorkers = 2;
+const u32 Thread_NumWorkers = 4;
 
 MakeId(WaitGroup);
 

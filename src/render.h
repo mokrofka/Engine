@@ -9,10 +9,7 @@ const u32 R_MaxTextures   = 32;
 const u32 R_MaxCubemaps   = 32;
 const u32 R_MaxFonts      = 32;
 const u32 R_MaxDebugLines = KB(1);
-
-struct R_ShaderDesc { String name; Gfx_PipelineDesc pipeline_desc; };
-u64 hash(R_ShaderDesc x);
-b32 equal(R_ShaderDesc a, R_ShaderDesc b);
+#define _Matrix4x3 m4x3
 
 #include "shader_header.h"
 
@@ -21,13 +18,6 @@ MakeId(R_MeshId)
 MakeId(R_MaterialId)
 MakeId(R_FontId)
 MakeId(R_LightId)
-
-// struct R_Vertex {
-//   v3 pos;
-//   v3 norm;
-//   v2 uv;
-//   v4 color;
-// };
 
 struct R_UI_Rect {
   v2 dst_p0;
@@ -144,10 +134,9 @@ struct R_DrawCall {
 };
 
 struct R_DrawBatch {
-  Gfx_Pipeline pip;
+  Gfx_PipelineState state;
   Darray<R_DrawCall> draws;
   Darray<R_DrawCall> unindexed_draws;
-  Gfx_PipelineState state;
 };
 
 struct R_DrawText {
@@ -159,7 +148,7 @@ struct R_DrawText {
 
 struct R_ShaderModuleWithPipelines {
   Gfx_Shader shd;
-  Darray<Gfx_Pipeline> pipelines;
+  Array<Gfx_Pipeline, 4> pipelines;
 };
 
 enum R_AttachmentType {
@@ -219,10 +208,7 @@ struct R_State {
   
   Array<R_ShaderModuleWithPipelines, Gfx_MaxShaders> shader_modules;
   Map<String, u32, Gfx_MaxShaders> shader_to_module_idx;
-  Map<R_ShaderDesc, Gfx_Pipeline, Gfx_MaxPipelines> shader_desc_to_pipeline;
-  Map<u32, u32, Gfx_MaxPipelines> pip_idx_to_entity_batch_idx;
   PoolLinkList<R_Material, R_MaxMaterials, R_MaterialId> materials;
-  // Array<R_DrawBatch, Gfx_MaxShaders> entity_batches;
   Array<R_DrawBatch, 8> batches;
 
   Pool<Gfx_Mesh, R_MaxMeshes, R_MeshId> meshes;
@@ -281,14 +267,7 @@ struct R_State {
   Slice<String> shaders_to_compile;
 };
 
-b32 r_texture_is_null(R_TextureId tex);
-b32 r_mesh_is_null(R_MeshId mesh);
-b32 r_material_is_null(R_MeshId m);
-b32 r_font_is_null(R_MeshId f);
-b32 r_shader_is_null(R_MeshId shd);
-
 R_DrawBatch r_make_draw_batch(Allocator alloc, Gfx_Pipeline pip);
-R_ShaderModuleWithPipelines r_make_shader_module_with_pipelines(Allocator alloc);
 R_Attachment r_make_attachment(R_AttachmentDesc desc);
 void r_destroy_attachment(R_Attachment attachment);
 void r_recreate_attachment(R_Attachment* attachment, v2u size);
@@ -319,13 +298,13 @@ void r_destroy_mesh(R_MeshId mesh);
 // TODO: primitives gen, drawing
 
 u32 r_make_pipeline_state(Gfx_PipelineState s);
-R_MaterialId r_material_make(R_MaterialDesc desc);
-R_MaterialId r_material_make2(R_Material mat);
+R_MaterialId r_material_make(R_Material mat);
 
 void r_material_destroy(R_MaterialId mat);
 
 void r_shader_reload(String name);
 Gfx_Pipeline r_make_pipeline(String name, Gfx_PipelineDesc desc);
+Gfx_Pipeline r_make_pipeline2(String name, Gfx_PipelineDesc2 desc);
 void r_shaders_compile(Allocator arena);
 void r_shaders_compile_join();
 

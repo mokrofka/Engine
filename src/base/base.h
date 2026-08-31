@@ -625,7 +625,7 @@ struct Slice {
     Assert(idx < count);
     return data[idx];
   }
-  Slice(T* data_, u64 count_) { data = data_; count = count_; }
+  NO_DEBUG Slice(T* data_, u64 count_) { data = data_; count = count_; }
   Slice() = default;
   T* begin() { return data; }
   T* end() { return data + count; }

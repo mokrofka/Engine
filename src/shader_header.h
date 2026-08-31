@@ -58,7 +58,9 @@ struct Glue(R_, Vertex) {
 struct Glue(Gpu, DrawCall) {
   alignas(16) m4x4 model;
   alignas(16) v4 color;
+  alignas(16) m4x4 m;
   ShaderType type;
+  // u32 m;
   u32 tex;
   u32 mat;
   u32 cur_resolve_idx;

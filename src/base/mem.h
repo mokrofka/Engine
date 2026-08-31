@@ -1,7 +1,7 @@
 #pragma once
 #include "base.h"
 
-#define MEM_TRACK 1
+#define MEM_TRACK 0
 
 const u32 MEM_DEFAULT_ALIGNMENT = sizeof(void*);
 

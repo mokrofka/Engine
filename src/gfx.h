@@ -851,10 +851,12 @@ Gfx_Buffer gfx_make_buffer(u64 size, Gfx_MemType type, u64 align = 16);
 void gfx_make_bind(Gfx_DescriptorDesc desc);
 
 Gfx_PipelineDesc gfx_query_pipeline_desc(Gfx_Pipeline pip);
+Gfx_PipelineDesc2 gfx_query_pipeline_desc2(Gfx_Pipeline pip);
 Gfx_ImageDesc gfx_query_image_desc(Gfx_Image img);
 
 void gfx_update_shader(Gfx_Shader shd, Slice<u8> code);
 void gfx_update_pipeline(Gfx_Pipeline pip, Gfx_PipelineDesc desc);
+void gfx_update_pipeline2(Gfx_Pipeline pip, Gfx_PipelineDesc2 desc);
 void gfx_update_image(Gfx_Image img, u8* data);
 void gfx_update_image(Gfx_Image img, Gfx_ImageDesc desc);
 void gfx_update_view(Gfx_View view, Gfx_ViewDesc desc);

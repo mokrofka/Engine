@@ -14,9 +14,8 @@ global v2 tex_coords[] = {
   {2.0, 0.0}
 };
 
+
 VS_Entry VSOutput vs_main(Vertex in, u32 vert_id : SV_VertexID, u32 draw_id : SV_DrawIndex, u32 inst_id : SV_InstanceID) {
-  // u32 drawcall_idx = drawinfo[push.idx + in.draw_id].base;
-  // DrawCall draw = drawcalls[drawcall_idx];
   u32 drawcall_idx = push.idx + draw_id;
   DrawCall draw = drawcalls[drawcall_idx];
   VSOutput o;
@@ -35,6 +34,7 @@ VS_Entry VSOutput vs_main(Vertex in, u32 vert_id : SV_VertexID, u32 draw_id : SV
     } break;
     case ShaderType::Texture: {
       o.pos = st.projection_view * draw.model * v4(in.pos, 1.0);
+      // o.pos = st.projection_view * draw.m * v4(in.pos, 1.0);
       o.uv = in.uv;
     } break;
     case ShaderType::VertColor: {
@@ -71,6 +71,7 @@ FS_Entry v4 fs_main(VSOutput in) {
     case ShaderType::Texture: {
       u32 tex = materials[draw.mat].tex;
       o = textures[tex].Sample(samplers[1], in.uv);
+      o = v4_hadamard(o, v4(1));
     } break;
     case ShaderType::VertColor: {
       o = in.color;
@@ -90,4 +91,5 @@ FS_Entry v4 fs_main(VSOutput in) {
   }
   return o;
 }
+
 
