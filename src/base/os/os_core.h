@@ -73,7 +73,7 @@ struct _LockScope {
 };
 #define LockScope(m) _LockScope Glue(_lock_scope, __LINE__)(m)
 
-u64 cpu_timer_now();
+u64 cpu_now();
 u64 cpu_frequency();
 void cpu_find_frequency();
 

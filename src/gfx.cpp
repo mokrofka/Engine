@@ -1831,6 +1831,16 @@ void gfx_pipeline_common_init(VK_Pipeline* pip, Gfx_PipelineDesc desc) {
   ArrayCopy(pip->colors, desc.colors);
 }
 
+void gfx_pipeline_common_init2(VK_Pipeline* pip, Gfx_PipelineDesc2 desc) {
+  pip->shd_ref = desc.shader;
+  pip->compute = desc.compute;
+  pip->colors[0].pixel_format = desc.pixel_format;
+  pip->depth.pixel_format = desc.depth_pixel_format;
+  pip->sample_count = desc.sample_count;
+  pip->blend_color = desc.blend_color;
+  pip->alpha_to_coverage_enabled = desc.alpha_to_coverage_enabled;
+}
+
 u64 gfx_push_buffer(Gfx_Buffer& arena, u64 size, u64 align) {
   u64 res = offset_push(arena.pos, size, align);
   Assert(arena.pos <= arena.size);
@@ -1891,6 +1901,7 @@ Gfx_Pipeline gfx_make_pipeline2(Gfx_PipelineDesc2 desc) {
   _DefSet(desc.pixel_format, Gfx_PixelFormat_DefaulttAttachment);
 
   VK_Pipeline pipeline = {};
+  gfx_pipeline_common_init2(&pipeline, desc);
   pipeline.h = vk_pipeline_create2(desc);
   Gfx_Pipeline res = pool_push(g.pipelines, pipeline);
   return res;
@@ -2184,6 +2195,21 @@ Gfx_PipelineDesc gfx_query_pipeline_desc(Gfx_Pipeline pip) {
   return res;
 }
 
+Gfx_PipelineDesc2 gfx_query_pipeline_desc2(Gfx_Pipeline pip) {
+  var& g = st->gfx;
+  VK_Pipeline pipeline = pool_get(g.pipelines, pip);
+  Gfx_PipelineDesc2 res = {
+    .shader = pipeline.shd_ref,
+    .compute = pipeline.compute,
+    .sample_count = pipeline.sample_count,
+    .blend_color = pipeline.blend_color,
+    .alpha_to_coverage_enabled = pipeline.alpha_to_coverage_enabled,
+    .pixel_format = pipeline.colors[0].pixel_format,
+    .depth_pixel_format = pipeline.depth.pixel_format,
+  };
+  return res;
+}
+
 Gfx_ImageDesc gfx_query_image_desc(Gfx_Image img) {
   var& g = st->gfx;
   VK_Image image = pool_get(g.images, img);
@@ -2213,6 +2239,14 @@ void gfx_update_pipeline(Gfx_Pipeline pip, Gfx_PipelineDesc desc) {
   g.DestroyPipeline(vkdevice, pipeline.h, g.allocator);
   gfx_pipeline_common_init(&pipeline, desc);
   pipeline.h = vk_pipeline_create(desc);
+}
+
+void gfx_update_pipeline2(Gfx_Pipeline pip, Gfx_PipelineDesc2 desc) {
+  var& g = st->gfx;
+  VK_Pipeline& pipeline = pool_get(g.pipelines, pip);
+  g.DestroyPipeline(vkdevice, pipeline.h, g.allocator);
+  gfx_pipeline_common_init2(&pipeline, desc);
+  pipeline.h = vk_pipeline_create2(desc);
 }
 
 void gfx_update_image(Gfx_Image img, u8* data) {

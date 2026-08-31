@@ -2,27 +2,10 @@
 #include "stb_image.h"
 #include "stb_truetype.h"
 
-u64 hash(R_ShaderDesc x) { return hash(x.name) + hash_memory(&x.pipeline_desc, sizeof(Gfx_PipelineDesc)); }
-b32 equal(R_ShaderDesc a, R_ShaderDesc b) { return equal(a.name, b.name) && MemMatchStruct(&a.pipeline_desc, &b.pipeline_desc); }
-
-b32 r_texture_is_null(R_TextureId tex) { return tex.idx == 0; }
-b32 r_mesh_is_null(R_MeshId mesh)      { return mesh.idx == 0; }
-b32 r_material_is_null(R_MeshId m)     { return m.idx == 0; }
-b32 r_font_is_null(R_MeshId f)         { return f.idx == 0; }
-b32 r_shader_is_null(R_MeshId shd)     { return shd.idx == 0; }
-
 R_DrawBatch r_make_draw_batch(Allocator alloc, Gfx_Pipeline pip) {
   R_DrawBatch res = {
-    .pip = pip,
     .draws = array_make(R_DrawCall, alloc),
     .unindexed_draws = array_make(R_DrawCall, alloc),
-  };
-  return res;
-}
-
-R_ShaderModuleWithPipelines r_make_shader_module_with_pipelines(Allocator alloc) {
-  R_ShaderModuleWithPipelines res = {
-    .pipelines = array_make(Gfx_Pipeline, alloc),
   };
   return res;
 }
@@ -382,38 +365,7 @@ u32 r_make_pipeline_state(Gfx_PipelineState s) {
   return res;
 }
 
-R_MaterialId r_material_make(R_MaterialDesc desc) {
-  // R_State& g = st->r;
-  // R_ShaderDesc key = {desc.shader, desc.pipeline_desc};
-  // Gfx_Pipeline pip = or_else(map_get(g.shader_desc_to_pipeline, key),
-  //   r_make_pipeline(desc.shader, desc.pipeline_desc);
-  // );
-  // u32 batch_idx = or_else(map_get(g.pip_idx_to_entity_batch_idx, pip.idx),
-  //   u32 idx = array_push(g.entity_batches, r_make_draw_batch(g.gpa, pip));
-  //   map_set(g.pip_idx_to_entity_batch_idx, pip.idx, idx);
-  //   idx;
-  // );
-  // R_TextureId texture_id = or_else(map_get(st->str_to_texture, desc.base_color), 
-  //   g.dummy_texture;
-  // );
-  // R_Material mat = {
-  //   .desc = desc,
-  //   .entity_batch_idx = batch_idx,
-  //   .tex = texture_id,
-  // };
-  // R_MaterialId res = pool_push(g.materials, mat);
-  // g.gpu_materials[res.idx] = {
-  //   .ambient = desc.props.ambient,
-  //   .diffuse = desc.props.diffuse,
-  //   .specular = desc.props.specular,
-  //   .shininess = desc.props.shininess, 
-  //   .tex = r_texture_get_descriptor_idx(texture_id),
-  // };
-  // return res;
-  return {};
-}
-
-R_MaterialId r_material_make2(R_Material mat) {
+R_MaterialId r_material_make(R_Material mat) {
   var& g = st->r;
   if (!mat.base_color.idx) {
     mat.base_color = g.dummy_texture;
@@ -438,27 +390,41 @@ void r_shader_reload(String name) {
   gfx_update_shader(entry.shd, code);
   Loop (i, entry.pipelines.count) {
     Gfx_Pipeline pip = entry.pipelines[i];
-    gfx_update_pipeline(pip, gfx_query_pipeline_desc(pip));
+    // gfx_update_pipeline(pip, gfx_query_pipeline_desc(pip));
+    gfx_update_pipeline2(pip, gfx_query_pipeline_desc2(pip));
   }
 }
 
 Gfx_Pipeline r_make_pipeline(String name, Gfx_PipelineDesc desc) {
   Scratch scratch;
-  R_State& g = st->r;
-  R_ShaderDesc key = {name, desc};
+  var& g = st->r;
   u32 module_idx = or_else(map_get(g.shader_to_module_idx, name),
-    R_ShaderModuleWithPipelines entry = r_make_shader_module_with_pipelines(g.gpa);
     Slice code = os_file_path_read_all(scratch, push_strf(scratch, "%s/%s.spv", st->shader_compiled_dir, name));
-    entry.shd = gfx_make_shader(code);
+    R_ShaderModuleWithPipelines entry = {.shd = gfx_make_shader(code)};
     u32 idx = array_push(g.shader_modules, entry);
     map_set(g.shader_to_module_idx, name, idx);
     idx;
   );
   desc.shader = g.shader_modules[module_idx].shd;
   Gfx_Pipeline pip = gfx_make_pipeline(desc);
-  map_set(g.shader_desc_to_pipeline, key, pip);
   R_ShaderModuleWithPipelines& entry = g.shader_modules[module_idx];
   array_push(entry.pipelines, pip);
+  return pip;
+}
+
+Gfx_Pipeline r_make_pipeline2(String name, Gfx_PipelineDesc2 desc) {
+  Scratch scratch;
+  var& g = st->r;
+  u32 module_idx = or_else(map_get(g.shader_to_module_idx, name),
+    Slice code = os_file_path_read_all(scratch, push_strf(scratch, "%s/%s.spv", st->shader_compiled_dir, name));
+    R_ShaderModuleWithPipelines entry = {.shd = gfx_make_shader(code)};
+    u32 idx = array_push(g.shader_modules, entry);
+    map_set(g.shader_to_module_idx, name, idx);
+    idx;
+  );
+  desc.shader = g.shader_modules[module_idx].shd;
+  Gfx_Pipeline pip = gfx_make_pipeline2(desc);
+  array_push(g.shader_modules[module_idx].pipelines, pip);
   return pip;
 }
 
@@ -749,24 +715,22 @@ void r_init() {
   ///////////////////////////////////
   // Load basic shaders
   
-  Gfx_Shader shd = gfx_make_shader(os_file_path_read_all(scratch, "../assets/shaders/compiled/uber.spv"));
-  g.uber_pip = gfx_make_pipeline2({.shader = shd});
-  g.uber_pip_screen = gfx_make_pipeline2({
-    .shader = shd,
-    .sample_count = 1,
-  });
-  g.ui_rect_pip = r_make_pipeline("ui_rect", {
-    .primitive_type = Gfx_PrimitiveType_TriangleStrip,
-    .color = {
-      .blend = {
-        .enabled = true,
-        .src_factor_rgb = Gfx_BlendFactor_SrcAlpha,
-        .dst_factor_rgb = Gfx_BlendFactor_OneMinusSrcAlpha,
-        .src_factor_alpha = Gfx_BlendFactor_SrcAlpha,
-        .dst_factor_alpha = Gfx_BlendFactor_OneMinusSrcAlpha,
-      }
-    }
-  });
+  {
+    // Gfx_Shader shd = gfx_make_shader(os_file_path_read_all(scratch, "../assets/shaders/compiled/uber.spv"));
+    // g.uber_pip = gfx_make_pipeline2({.shader = shd});
+    // g.uber_pip_screen = gfx_make_pipeline2({
+    //   .shader = shd,
+    //   .sample_count = 1,
+    // });
+    g.uber_pip = r_make_pipeline2("uber", {});
+    g.uber_pip_screen = r_make_pipeline2("uber", {
+      .sample_count = 1,
+    });
+  }
+  {
+    Gfx_Shader shd = gfx_make_shader(os_file_path_read_all(scratch, "../assets/shaders/compiled/ui_rect.spv"));
+    g.ui_rect_pip = gfx_make_pipeline2({.shader = shd});
+  }
 
   g.my_font = r_load_font("arial.ttf", 32);
   g.point_dir = v2(Cos(rand_f32()), Sin(rand_f32()));
@@ -898,10 +862,14 @@ void r_end() {
           u32 base = gfx_begin_indirect();
           Loop (i, pushes.count) {
             R_DrawCall draw = pushes[i];
-            m4x4 model = m4x4_translate(draw.pos) * m4x4_from_quat(draw.rot) * m4x4_scale(draw.scale);
+            // m4x4 model = m4x4_scale_translate(draw.scale, draw.pos) * m4x4_from_quat(draw.rot);
+            m4x4 model = m4x4_transform(draw.scale, draw.pos, draw.rot);
+            // m4x3 m = m4x3_scale_translate(draw.scale, draw.pos) * m4x3_from_quat(draw.rot);
             var mat = pool_get(g.materials, draw.mat);
             g.gpu_drawcalls[drawcall_count] = {
               .model = model,
+              // .model = m4x4_from_m4x3(m),
+              .m = {},
               .color = draw.color,
               .mat = mat.idx,
               .type = draw.type,
@@ -979,6 +947,16 @@ void r_end() {
           ArrayCopy(g.gpu_ui_rects[i].colors, rect.colors);
         }
         gfx_bind_pipeline(g.ui_rect_pip);
+        apply_state({
+          .primitive_type = Gfx_PrimitiveType_TriangleStrip,
+          .blend = {
+            .enabled = true,
+            .src_factor_rgb = Gfx_BlendFactor_SrcAlpha,
+            .dst_factor_rgb = Gfx_BlendFactor_OneMinusSrcAlpha,
+            .src_factor_alpha = Gfx_BlendFactor_SrcAlpha,
+            .dst_factor_alpha = Gfx_BlendFactor_OneMinusSrcAlpha,
+          }
+        });
         gfx_draw(0, 4, g.draw_rects.count);
         array_clear(g.draw_rects);
       }
@@ -1006,65 +984,6 @@ void r_end() {
   gfx_end_pass();
   gfx_end();
 }
-
-// void r_draw_mesh(R_MeshId mesh, R_MaterialId mat, v3 pos) {
-//   var& g = st->r;
-//   var material = pool_get(g.materials, mat);
-//   u32 batch_idx = material.batch;
-//   R_DrawCall cmd = {
-//     .pos = pos,
-//     .scale = v3(1),
-//     .rot = quat_identity(),
-//     .mesh = mesh,
-//     .mat = mat,
-//     .type = material.desc.type,
-//   };
-//   if (pool_get(g.meshes, mesh).index_count) {
-//     array_push(g.entity_batches[batch_idx].draws, cmd);
-//   } else {
-//     array_push(g.entity_batches[batch_idx].unindexed_draws, cmd);
-//   }
-// }
-
-// void r_draw_mesh_trs(R_MeshId mesh, R_MaterialId mat, v3 pos, v4 rot, v3 scale) {
-//   var& g = st->r;
-//   var material = pool_get(g.materials, mat);
-//   u32 batch_idx = material.batch;
-//   R_DrawCall cmd = {
-//     .pos = pos,
-//     .scale = scale,
-//     .rot = rot,
-//     .mesh = mesh,
-//     .mat = mat,
-//     .type = material.desc.type,
-//   };
-//   if (pool_get(g.meshes, mesh).index_count) {
-//     array_push(g.entity_batches[batch_idx].draws, cmd);
-//   } else {
-//     array_push(g.entity_batches[batch_idx].unindexed_draws, cmd);
-//   }
-// }
-
-// void r_draw_entity(ThingId id) {
-//   var& g = st->r;
-//   Thing& e = get_thing(id);
-//   var material = pool_get(g.materials, e.mat);
-//   u32 batch_idx = material.batch;
-//   R_DrawCall cmd = {
-//     .pos = e.pos,
-//     .scale = e.scale,
-//     .rot = e.rot,
-//     .color = e.color,
-//     .mesh = e.mesh,
-//     .mat = e.mat,
-//     .type = material.desc.type,
-//   };
-//   if (pool_get(g.meshes, e.mesh).index_count) {
-//     array_push(g.entity_batches[batch_idx].draws, cmd);
-//   } else {
-//     array_push(g.entity_batches[batch_idx].unindexed_draws, cmd);
-//   }
-// }
 
 void r_draw_mesh(R_MeshId mesh, R_MaterialId mat, v3 pos) {
   var& g = st->r;
@@ -1407,14 +1326,14 @@ Timer _timer_type_repeat_delay = {.interval = 1.0f/6};
 
 void imgui_impl_new_frame() {
   ImGuiIO& io = ImGui::GetIO();
-  io.DeltaTime = get_dt();
+  io.DeltaTime = time_dt();
   v2u win_size = os_window_size();
   io.DisplaySize = ImVec2(win_size.x, win_size.y);
   Slice<OS_InputEvent> events = os_get_input_events();
   if (last_key_event.is_pressed) {
-    _timer_type_repeat_delay.acc += get_dt();
+    _timer_type_repeat_delay.acc += time_dt();
     if (_timer_type_repeat_delay.acc >= _timer_type_repeat_delay.interval) {
-      if (timer_update(_timer_type_repeat_speed)) {
+      if (time_on_interval(1.0/20)) {
         io.AddInputCharacter(os_key_to_character(last_key_event.key, last_key_event.modifier));
       }
     }

@@ -30,7 +30,7 @@ _ProfBlock::_ProfBlock(String label_, String func_, ProfType type_) {
   ProfEvent event = {
     .type = ProfEventType_Push,
     .prof_type = type_,
-    .tsc = cpu_timer_now(),
+    .tsc = cpu_now(),
     .label = label_,
     .func = func_,
   };
@@ -43,7 +43,7 @@ _ProfBlock::~_ProfBlock() {
   ProfEvent event = {
     .type = ProfEventType_Pop,
     .prof_type = type,
-    .tsc = cpu_timer_now(),
+    .tsc = cpu_now(),
     .label = label,
     .func = func,
   };
@@ -57,7 +57,7 @@ void prof_begin(u32 current_frame) {
     ProfThread& prof_thread = g.prof_threads[i];
     array_clear(prof_thread.events[g.current_buf]);
   }
-  frame_time.tsc_start = cpu_timer_now();
+  frame_time.tsc_start = cpu_now();
 }
 
 void prof_end(u32 current_frame) {
@@ -65,7 +65,7 @@ void prof_end(u32 current_frame) {
   ProfState& g = profiler_st;
 
   ProfFrameTime& frame_time = g.current_frame_time;
-  frame_time.tsc_end = cpu_timer_now();
+  frame_time.tsc_end = cpu_now();
   if (!g.paused) {
     ProfFrameTime& write_frame_time = g.frames_times[current_frame % ArrayCount(g.frames_times)];
     write_frame_time.tsc_start = frame_time.tsc_start;
@@ -170,7 +170,7 @@ ProfThread& prof_get_prof_thread() {
 
 void prof_launch_begin() {
   ProfState& g = profiler_st;
-  g.current_frame_time.tsc_start = cpu_timer_now();
+  g.current_frame_time.tsc_start = cpu_now();
 }
 
 void prof_launch_end() {
@@ -178,7 +178,7 @@ void prof_launch_end() {
   ProfState& g = profiler_st;
 
   ProfFrameTime& frame_time = g.current_frame_time;
-  frame_time.tsc_end = cpu_timer_now();
+  frame_time.tsc_end = cpu_now();
   g.launch_time = frame_time;
 
   LoopArray (j, g.prof_threads) {

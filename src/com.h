@@ -15,7 +15,52 @@
 // thread safe allocator
 // glb loader
 // obj mouse selection
-// uber shader, new pipeline rendering, gfx buffers, relook code, more math code
+// relook code, more math code
+
+#define MESH_LIST \
+  X(Cube) \
+  X(MonkeyGlb) \
+  X(Triangle) \
+  X(Grid) \
+  X(Axis) \
+  X(Sphere) \
+  X(CubeGlft) \
+  X(GreeMan) \
+  X(Barrack) \
+
+enum MeshEnum {
+#define X(name) Glue(Mesh_, name),
+  MESH_LIST
+#undef X
+  Mesh_COUNT,
+};
+
+#define TEXTURE_LIST \
+  X(Orange) \
+  X(Container) \
+  X(Barrack) \
+
+enum TextureEnum {
+#define X(name) Glue(Texture_, name),
+  TEXTURE_LIST
+#undef X
+  Texture_COUNT,
+};
+
+#define MATERIAL_LIST \
+  X(Orange) \
+  X(Container) \
+  X(Axis) \
+  X(Line) \
+  X(Screen) \
+  X(Barrack) \
+
+enum MaterialEnum {
+#define X(name) Glue(Material_, name),
+  MATERIAL_LIST
+#undef X
+  Material_COUNT,
+};
 
 enum MetaType {
   MetaType_Null,
@@ -88,7 +133,7 @@ struct ProfColors {
   v4 mem_cap;
 };
 
-struct DebugProfWindow {
+struct ProfWindow {
   DebugWindow win;
   ScrollState root_scroll_state;
   ScrollState frames_scroll_state;
@@ -103,7 +148,7 @@ struct DebugProfWindow {
 };
 
 struct DebugState {
-  DebugProfWindow prof_win;
+  ProfWindow prof_win;
   DebugWindow game_win;
   b32 imgui_demo_open;
   ImFont* font;
@@ -146,72 +191,6 @@ struct JsParser {
   Allocator arena;
   String str;
   u32 cursor;
-};
-
-struct Cooldown {
-  f32 remaining;
-};
-
-#define MESH_LIST \
-  X(Cube) \
-  X(MonkeyGlb) \
-  X(Triangle) \
-  X(Grid) \
-  X(Axis) \
-  X(Sphere) \
-  X(CubeGlft) \
-  X(GreeMan) \
-  X(Barrack) \
-
-enum MeshEnum {
-#define X(name) Glue(Mesh_, name),
-  MESH_LIST
-#undef X
-  Mesh_COUNT,
-};
-
-#define TEXTURE_LIST \
-  X(Orange) \
-  X(Container) \
-  X(Barrack) \
-
-enum TextureEnum {
-#define X(name) Glue(Texture_, name),
-  TEXTURE_LIST
-#undef X
-  Texture_COUNT,
-};
-
-#define MATERIAL_LIST \
-  X(Orange) \
-  X(Container) \
-  X(Axis) \
-  X(Line) \
-  X(Screen) \
-  X(Barrack) \
-
-enum MaterialEnum {
-#define X(name) Glue(Material_, name),
-  MATERIAL_LIST
-#undef X
-  Material_COUNT,
-};
-
-struct TimeScope {
-  u64 tsc_start;
-  TimeScope();
-  ~TimeScope();
-};
-
-struct ImTimeScope {
-  u64 tsc_start;
-  ImTimeScope();
-  ~ImTimeScope();
-};
-
-struct Serealizer {
-  u8* base;
-  u32 offset;
 };
 
 struct InputState {
@@ -372,6 +351,9 @@ struct GlobalState {
   UI_State ui;
   // UI_State0* ui0;
 
+  #define Alot KB(1)
+  Array<m4x4, Alot> m4x4_buf;
+  Array<m4x3, Alot> m4x3_buf;
   Camera cam;
   R_Camera r_cam;
   b32 fps_camera;
@@ -404,7 +386,31 @@ struct GlobalState {
 
 extern GlobalState* st;
 
-ThingDesc default_thing_desc();
+void test();
+f64 tsc_to_ms(u64 tsc);
+f32 time_dt();
+f32 time_now();
+b32 time_on_interval(f64 time, f32 delta, f32 interval, f32 offset);
+u32 time_on_interval_steps(f64 time, f32 delta, f32 interval, f32 offset);
+f64 time_next_interval(f64 time, f32 interval, f32 offset);
+f64 time_prev_interval(f64 time, f32 interval, f32 offset);
+b32 time_on_time(f64 time, f64 timestamp, f64 dt);
+b32 time_on_between_interval(f64 time, f32 interval, f32 offset);
+f32 time_percent(f64 time, f64 start, f64 duration);
+f32 time_lerp_delta(f32 current, f32 target, f32 rate, f32 delta);
+b32 time_on_frame_interval(u32 frame, u32 n, u32 offset);
+f64 time_saw_wave(f64 time, f32 interval, f32 offset);
+f32 time_sine_wave(f64 time, f32 period);
+f32 time_smooth_wave(f64 time, f32 period);
+f32 time_triangle_wave(f64 time, f32 period);
+b32 time_pulse_wave(f64 time, f32 period, f32 duration, f32 offset);
+u32 time_frame(f64 time, f32 frame_duration, u32 frame_count);
+b32 time_elapsed(f64 time, f32 start, f32 duration);
+b32 time_between(f64 time, f32 start, f32 end);
+b32 time_on_interval(f32 interval, f32 offset = 0);
+b32 time_on_between_interval(f32 interval, f32 offset = 0);
+f64 time_since(f64 timestamp);
+f64 time_until(f64 timestamp);
 
 void ui_draw_rect(Rng2 rect, v4 color);
 b32 ui_button(u32 id, v2 pos);
@@ -433,24 +439,6 @@ void debug_update();
 void debug_game();
 void debug_prof_view();
 
-void test();
-
-u64 hash(R_Vertex vert);
-b32 equal(R_Vertex a, R_Vertex b);
-
-Timer timer_make(f32 interval);
-b32 timer_update(Timer& t);
-b32 timer_ready(Timer& t);
-void timer_trigger(Timer& t);
-
-f64 tsc_to_ms(u64 tsc);
-
-f32 get_dt();
-f32 get_time();
-b32 time_on_interval(f64 time, f32 delta, f32 interval, f32 offset);
-b32 time_on_interval(f32 interval, f32 offset = 0);
-b32 time_on_time(f64 time, f64 timestamp);
-
 R_MeshDesc load_obj(Allocator arena, String name);
 R_MeshDesc load_gltf(Allocator arena, String path, b32 is_glb);
 
@@ -468,8 +456,6 @@ String js_get_str(JsObj obj, String key);
 Slice<JsVal*> js_get_array(JsObj obj, String key);
 JsObj js_get_obj(JsObj obj, String key);
 
-void serialize_data(Serealizer ser, Slice<MemberDefinition> members, void* ptr);
-
 b32 key_pressed(Key key);
 b32 key_pressed_consume(Key key);
 b32 key_down(Key key);
@@ -483,26 +469,32 @@ void watch_add(String watch_name, WatchOp op);
 void watch_directory_add(String watch_name, WatchOp op, OS_WatchFlags flags = OS_WatchFlag_Modify);
 void watch_update();
 
+ThingDesc default_thing_desc();
+R_MaterialProps default_material_props();
 Thing& get_thing(ThingId id);
-Transform get_entity_transform(ThingId id);
+R_MeshId get_mesh(MeshEnum id);
+R_MaterialId get_material(MaterialEnum id);
+void mesh_set(MeshEnum mesh_enum, R_MeshId id);
+
+String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, EntityFlags flags = {});
+void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser);
+
+void init();
+shared_function void com(HotReloadData* data);
+
+R_MeshDesc generate_sphere(Allocator arena);
+R_MeshDesc generate_grid(Allocator arena, u32 size, f32 step);
 
 ThingId e_alloc_bare();
 ThingId e_alloc(R_MeshId mesh_id, R_MaterialId material_id, EntityThing thing = {});
 ThingId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing = {});
 ThingId make_thing(ThingDesc desc);
 void destroy_thing(ThingId id);
+void select_obj();
+void save_game_state();
+void load_game_state();
 void init_game();
 void update_game();
-void game_view();
-void game_save_state();
-void game_load_state();
 
-String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, EntityFlags flags = {});
-void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser);
-
-R_MeshId get_mesh(MeshEnum id);
-void mesh_set(MeshEnum mesh_enum, R_MeshId id);
-R_MaterialId get_material(MaterialEnum id);
-void assets_load();
 
 

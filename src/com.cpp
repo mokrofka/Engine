@@ -6,6 +6,91 @@
 
 #include "generated.h"
 
+R_Vertex cube_vertices[] = {
+  // Front face (0, 0, 1)
+  {.pos = v3(-1.00, -1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0.0f, 0.0f)},
+  {.pos = v3( 1.00, -1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1.0f, 0.0f)},
+  {.pos = v3( 1.00,  1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3( 1.00,  1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3(-1.00,  1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0.0f, 1.0f)},
+  {.pos = v3(-1.00, -1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0.0f, 0.0f)},
+
+  // Back face (0, 0, -1)
+  {.pos = v3( 1.00, -1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0.0f, 0.0f)},
+  {.pos = v3(-1.00, -1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1.0f, 0.0f)},
+  {.pos = v3(-1.00,  1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3(-1.00,  1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3( 1.00,  1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0.0f, 1.0f)},
+  {.pos = v3( 1.00, -1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0.0f, 0.0f)},
+
+  // Left face (-1, 0, 0)
+  {.pos = v3(-1.00, -1.00, -1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+  {.pos = v3(-1.00, -1.00,  1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
+  {.pos = v3(-1.00,  1.00,  1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3(-1.00,  1.00,  1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3(-1.00,  1.00, -1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
+  {.pos = v3(-1.00, -1.00, -1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+
+  // Right face (1, 0, 0)
+  {.pos = v3(1.00, -1.00,  1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+  {.pos = v3(1.00, -1.00, -1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
+  {.pos = v3(1.00,  1.00, -1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3(1.00,  1.00, -1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3(1.00,  1.00,  1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
+  {.pos = v3(1.00, -1.00,  1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+
+  // Bottom face (0, -1, 0)
+  {.pos = v3(-1.00, -1.00, -1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
+  {.pos = v3( 1.00, -1.00, -1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3( 1.00, -1.00,  1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
+  {.pos = v3( 1.00, -1.00,  1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
+  {.pos = v3(-1.00, -1.00,  1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+  {.pos = v3(-1.00, -1.00, -1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
+
+  // Top face (0, 1, 0)
+  {.pos = v3(-1.00,  1.00,  1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+  {.pos = v3( 1.00,  1.00,  1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
+  {.pos = v3( 1.00,  1.00, -1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3( 1.00,  1.00, -1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
+  {.pos = v3(-1.00,  1.00, -1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
+  {.pos = v3(-1.00,  1.00,  1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+};
+
+R_Vertex triangle_vertices[] = {
+  {.pos = v3( 0.0,   0.5, 0), .uv = v2(0.5, 0), .color = v4(1,0,0,1)},
+  {.pos = v3(-0.5,  -0.5, 0), .uv = v2(0.0, 1), .color = v4(0,1,0,1)},
+  {.pos = v3( 0.5,  -0.5, 0), .uv = v2(1.0, 1), .color = v4(0,0,1,1)},
+};
+
+R_Vertex axis_vertices[] = {
+  {.pos = v3(),      .color = v4(1,0,0,1)},
+  {.pos = v3(1,0,0), .color = v4(1,0,0,1)},
+  {.pos = v3(),      .color = v4(0,1,0,1)},
+  {.pos = v3(0,1,0), .color = v4(0,1,0,1)},
+  {.pos = v3(),      .color = v4(0,0,1,1)},
+  {.pos = v3(0,0,1), .color = v4(0,0,1,1)},
+};
+
+global String meshes_strs[] = {
+#define X(name) [Glue(Mesh_, name)] = Stringify(name),
+  MESH_LIST
+#undef X
+};
+
+global String textures_strs[] = {
+#define X(name) [Glue(Texture_, name)] = Stringify(name),
+  TEXTURE_LIST
+#undef X
+};
+
+global String materials_strs[] = {
+#define X(name) [Glue(Material_, name)] = Stringify(name),
+  MATERIAL_LIST
+#undef X
+};
+
+Extern GlobalState* st;
+
 ///////////////////////////////////
 // Allocators
 
@@ -430,287 +515,6 @@ intern void profiler_test() {
   test_profiler_die(10);
 }
 
-// struct Transform1 {
-//   v3 pos;
-//   // v3 arr[2];
-// };
-
-// void task_queue_push(Task t);
-// u32 task_queue_count();
-
-// struct TransformTask {
-//   Transform1* transforms;
-//   u32* idx_arr;
-//   u64 count;
-//   v3* out_sum;
-//   b32 use_random;
-// };
-
-// void transform_task_func(void* arg) {
-//   TransformTask* t = (TransformTask*)arg;
-//   v3 sum = {0, 0, 0};
-//   if (t->use_random) {
-//     for (u64 i = 0; i < t->count; ++i) {
-//       sum += t->transforms[t->idx_arr[i]].pos;
-//     }
-//   }
-//   else {
-//     for (u64 i = 0; i < t->count; ++i) {
-//       sum += t->transforms[i].pos;
-//     }
-//   }
-//   // store result (safe if each thread writes to its own slot)
-//   *t->out_sum = sum;
-// }
-
-// void test_bandwidth() {
-//   Scratch scratch;
-//   // task_queue_init(4);
-
-//   u64 cpu_frequ = cpu_frequency();
-//   Info("%.2f Ghz/s cpu frequency", (f64)cpu_frequ / Billion(1));
-//   #define IterationNum (MB(10))
-//   #define NUM_THREADS 4
-//   #define IterationChunk (IterationNum / NUM_THREADS)
-//   #define SIZE (IterationNum * sizeof(Transform1))
-//   #define USEFUL_SIZE (IterationNum * sizeof(v3))
-//   Info("%.2f mb Memory size", (f64)SIZE / MB(1));
-
-//   u8* idx_buf = os_reserve(IterationNum*sizeof(u32));
-//   os_commit(idx_buf, IterationNum*sizeof(u32));
-//   u8* buf = os_reserve(SIZE);
-//   os_commit(buf, SIZE);
-
-//   u32* idx_arr = (u32*)idx_buf;
-//   Loop(i, IterationNum) {
-//     idx_arr[i] = i;
-//   }
-//   for (u32 i = IterationNum - 1; i > 0; --i) {
-//     u32 j = rand_range_u32(0, i);
-//     Swap(idx_arr[i], idx_arr[j]);
-//   }
-//   Transform1* transforms = (Transform1*)buf;
-//   Loop (i, IterationNum) {
-//     transforms[i].pos = v3_rand_range(v3_scale(-10), v3_scale(10));
-//   }
-
-// #if 0
-//   Loop (i, 1) {
-//     u64 now = cpu_timer_now();
-//     v3 vec_res = {};
-//     Loop (i, IterationNum) {
-//       vec_res += transforms[i].pos;
-//     }
-//     u64 end = cpu_timer_now();
-//     f64 seconds = f64(end-now) / cpu_frequ;
-//     f64 bandwidth_gb = SIZE / seconds / GB(1);
-//     f64 useful_bandwidth_gb = USEFUL_SIZE / seconds / GB(1);
-//     Info("%.2f GB/s", bandwidth_gb);
-//     Info("%.2f useful GB/s", useful_bandwidth_gb);
-//     Info("%f took sec", seconds);
-//     Info("%f %f %f\n\n", vec_res.x, vec_res.y, vec_res.z);
-//   }
-//   Info("------------- RANDOM ACCESS");
-//   Loop (i, 1) {
-//     u64 now = cpu_timer_now();
-//     v3 vec_res = {};
-//     Loop (i, IterationNum) {
-//       vec_res += transforms[idx_arr[i]].pos;
-//     }
-//     u64 end = cpu_timer_now();
-//     f64 seconds = f64(end-now) / cpu_frequ;
-//     f64 bandwidth_gb = SIZE / seconds / GB(1);
-//     f64 useful_bandwidth_gb = USEFUL_SIZE / seconds / GB(1);
-//     Info("%.2f GB/s", bandwidth_gb);
-//     Info("%.2f useful GB/s", useful_bandwidth_gb);
-//     Info("%f took sec", seconds);
-//     Info("%f %f %f\n\n", vec_res.x, vec_res.y, vec_res.z);
-//   }
-// #else
-
-//   Loop (k, 2) {
-//     Info("---------------- LINEAR ACCESS");
-//     Loop (m, 2) {
-//       u64 now = cpu_timer_now();
-//       v3 thread_sums[NUM_THREADS] = {};
-//       TransformTask trans_tasks[NUM_THREADS] = {};
-//       Task tasks[NUM_THREADS] = {};
-//       Loop (i, NUM_THREADS) {
-//         trans_tasks[i] = {
-//           .transforms = transforms + i*IterationChunk,
-//           .idx_arr = idx_arr + i*IterationChunk,
-//           .count = IterationChunk,
-//           .out_sum = &thread_sums[i],
-//           .use_random = false,
-//         };
-//         // tasks[i] = {
-//         //   .func = transform_task_func,
-//         //   .arg = &trans_tasks[i],
-//         // };
-//         task_queue_push(tasks[i]);
-//       }
-//       while (true) {
-//         if (task_queue_count() == 0) {
-//           break;
-//         }
-//         os_sleep_ms(5);
-//       }
-//       u64 end = cpu_timer_now();
-//       f64 seconds = f64(end-now) / cpu_frequ;
-//       f64 bandwidth_gb = SIZE / seconds / GB(1);
-//       f64 useful_bandwidth_gb = USEFUL_SIZE / seconds / GB(1);
-//       Info("%.2f GB/s", bandwidth_gb);
-//       Info("%.2f useful GB/s", useful_bandwidth_gb);
-//       Info("%f took sec", seconds);
-//       v3 vec_res = {};
-//       Loop (i, NUM_THREADS) {
-//         vec_res += thread_sums[i];
-//       }
-//       Info("%f %f %f\n\n", vec_res.x, vec_res.y, vec_res.z);
-//     }
-
-//     Info("---------------- RANDOM ACCESS");
-//     Loop (m, 2) {
-//       u64 now = cpu_timer_now();
-//       v3 thread_sums[NUM_THREADS] = {};
-//       TransformTask trans_tasks[NUM_THREADS] = {};
-//       Task tasks[NUM_THREADS] = {};
-//       Loop (i, NUM_THREADS) {
-//         trans_tasks[i] = {
-//           .transforms = transforms,
-//           .idx_arr = idx_arr + i*IterationChunk,
-//           .count = IterationChunk,
-//           .out_sum = &thread_sums[i],
-//           .use_random = true,
-//         };
-//         // tasks[i] = {
-//         //   .func = transform_task_func,
-//         //   .arg = &trans_tasks[i],
-//         // };
-//         task_queue_push(tasks[i]);
-//       }
-//       while (true) {
-//         if (task_queue_count() == 0) {
-//           break;
-//         }
-//       }
-//       u64 end = cpu_timer_now();
-//       f64 seconds = f64(end-now) / cpu_frequ;
-//       f64 bandwidth_gb = SIZE / seconds / GB(1);
-//       f64 useful_bandwidth_gb = USEFUL_SIZE / seconds / GB(1);
-//       Info("%.2f GB/s", bandwidth_gb);
-//       Info("%.2f useful GB/s", useful_bandwidth_gb);
-//       Info("%f took sec", seconds);
-//       v3 vec_res = {};
-//       Loop (i, NUM_THREADS) {
-//         vec_res += thread_sums[i];
-//       }
-//       Info("%f %f %f\n\n", vec_res.x, vec_res.y, vec_res.z);
-//     }
-//   }
-
-
-// #endif
-
-//   os_exit(0);
-  
-//   // u8* 
-
-//   // i32 arr[] = {5, 2, 9, 1, 5, 6};
-//   // i32 n = sizeof(arr)/sizeof(arr[0]);
-//   // for (var i : arr) {
-//   //   print("%i ", i);
-//   // }
-//   // quick_sort(arr, 0, n - 1);
-//   // print("\n");
-//   // for (var i : arr) {
-//   //   print("%i ", i);
-//   // }
-
-//   // RingBuffer ring = {
-//   //   .base = push_buffer(scratch, KB(1)),
-//   //   .size = KB(1),
-//   // };
-//   // u64 size = 128;
-//   // u8* buf0 = push_buffer(scratch, size);
-//   // Loop (i, size) { buf0[i] = 0; }
-//   // u8* buf1 = push_buffer(scratch, size);
-//   // ring_write(ring, buf0, size);
-//   // ring_read(ring, buf1, size);
-//   // Loop (i, size) { Info("%i", buf1[i]); }
-
-//   // ring_read(ring, Slice(buf0, size));
-
-// }
-
-// void test_link_list() {
-//   Scratch scratch;
-//   Thing* thing = push_struct_zero(scratch, Thing);
-//   Thing* thing1 = push_struct_zero(scratch, Thing);
-//   Thing* thing2 = push_struct_zero(scratch, Thing);
-//   Thing* thing3 = push_struct_zero(scratch, Thing);
-//   Thing* thing4 = push_struct_zero(scratch, Thing);
-//   Thing* thing5 = push_struct_zero(scratch, Thing);
-//   Thing* thing6 = push_struct_zero(scratch, Thing);
-//   Thing* thing7 = push_struct_zero(scratch, Thing);
-
-//   thing->data = 0;
-//   thing1->data = 1;
-//   thing2->data = 2;
-//   thing3->data = 3;
-//   thing4->data = 4;
-//   thing5->data = 5;
-//   thing6->data = 6;
-//   thing7->data = 7;
-
-//   Thing* first = null;
-//   Thing* last = null;
-
-//   #if 0
-//   sll_stack_push(head, thing1);
-//   sll_stack_push(head, thing2);
-//   sll_stack_push(head, thing3);
-
-//   for EachNode(it, Thing, head) {
-//     Info("%i", it->data);
-//   }
-
-//   sll_stack_pop(head);
-//   sll_stack_pop(head);
-//   for EachNode(it, Thing, head) {
-//     Info("%i", it->data);
-//   }
-//   #endif
-
-//   #if 0
-//   sll_queue_push(first, last, thing);
-//   sll_queue_push(first, last, thing1);
-//   sll_queue_push(first, last, thing2);
-//   sll_queue_push(first, last, thing3);
-
-//   for EachNode (it, Thing, first) {
-//     Info("%i", it->data);
-//   }
-//   #endif
-
-//   dll_push_back(first, last, thing);
-//   dll_push_back(first, last, thing1);
-//   dll_push_back(first, last, thing2);
-//   dll_push_back(first, last, thing3);
-
-//   dll_push_front(first, last, thing4);
-//   dll_push_front(first, last, thing5);
-//   dll_push_front(first, last, thing6);
-//   dll_push_front(first, last, thing7);
-
-//   dll_remove(first, last, thing5);
-
-//   LoopNode (it, first) {
-//     Info("%i", it->data);
-//   }
-
-// }
-
 ////////////////////////////////////////////////////////////////////////
 // sort
 
@@ -774,8 +578,9 @@ void test_sort() {
       Info("Count %i", counts[i]);
       rand_shuffle(arrs[i]);
       {
-        TimeScope t;
+        u64 s = cpu_now();
         sort_quick(arrs[i], [](var a, var b) {return a < b;});
+        Info("%fms", tsc_to_ms(cpu_now()-s));
       }
     }
   }
@@ -786,8 +591,9 @@ void test_sort() {
       Info("Count %i", counts[i]);
       rand_shuffle(arrs[i]);
       {
-        TimeScope t;
+        u64 s = cpu_now();
         sort_merge(scratch, arrs[i], [](var a, var b) {return a < b;});
+        Info("%fms", tsc_to_ms(cpu_now()-s));
       }
     }
   }
@@ -802,9 +608,10 @@ void test_sort() {
         entries[j] = {arrs[i][j], (u32)j};
       }
       {
-        TimeScope t;
+        u64 s = cpu_now();
         Scratch scratch;
         sort_radix(scratch, entries);
+        Info("%fms", tsc_to_ms(cpu_now()-s));
       }
     }
   }
@@ -848,6 +655,137 @@ void test_alloc() {
   }
 }
 
+void test_js() {
+  String d = R"(
+  {
+    "name": "cube",
+    "visible": true,
+    "pos": [1.0, 2.0, 3.0],
+    "material": {
+      "color": [1.0, 0.0, 0.0],
+      "roughness": 0.5
+    }
+  }
+  )";
+
+  Scratch scratch;
+
+  {
+    struct {
+      String name;
+      b32 visible;
+      v3 pos;
+      struct {
+        v3 color;
+        f32 roughness;
+      } material;
+    } res = {};
+
+    JsParser p = js_parse_make(scratch, d);
+    JsObj root = js_parse(&p).obj;
+    Loop (i, root.fields.count) {
+      var [k, v] = root.fields[i];
+      if (str_match(k, "name")) {
+        res.name = push_str_copy(scratch, v->str);
+      }
+      else if (str_match(k, "visible")) {
+        res.visible = v->boolean;
+      }
+      else if (str_match(k, "pos")) {
+        Loop (i, v->array.count) {
+          res.pos.v[i] = v->array[i]->number;
+        }
+      }
+      else if (str_match(k, "material")) {
+        JsObj material = v->obj;
+        Loop (i, material.fields.count) {
+          var [k, v] = material.fields[i];
+          if (str_match(k, "color")) {
+            Loop (i, v->array.count) {
+              res.material.color.v[i] = v->array[i]->number;
+            }
+          } else if (str_match(k, "roughness")) {
+            res.material.roughness = v->number;
+          }
+        }
+      }
+    }
+  }
+
+  {
+    JsParser p = js_parse_make(scratch, d);
+    JsObj root = js_parse(&p).obj;
+    String name = js_get_str(root, "name");
+    Info("%s", name);
+    b32 visible = js_get_bool(root, "visible");
+    Info("%u", visible);
+    Slice pos = js_get_array(root, "pos");
+    Loop (i, pos.count) {
+      Info("%f", pos[i]->number);
+    }
+    {
+      JsObj material = js_get_obj(root, "material");
+      Slice color = js_get_array(material, "color");
+      Loop (i, color.count) {
+        Info("%f", color[i]->number);
+      }
+      f64 roughness = js_get_number(material, "roughness");
+      Info("%f", roughness);
+    }
+  }
+
+  {
+    JsParser p = js_parse_make(scratch, d);
+    JsVal root = js_parse(&p);
+    JsVal name = js_get_val(root, "name");
+    Info("%s", name.str);
+    JsVal visible = js_get_val(root, "visible");
+    Info("%u", visible.boolean);
+    JsVal pos = js_get_val(root, "pos");
+    Loop (i, pos.array.count) {
+      Info("%f", pos.array[i]->number);
+    }
+    JsVal material = js_get_val(root, "material");
+    JsVal color = js_get_val(material, "color");
+    Loop (i, color.array.count) {
+      Info("%f", color.array[i]->number);
+    }
+    JsVal roughness = js_get_val(material, "roughness");
+    Info("%f", roughness.number);
+  }
+}
+
+void test_co1(Coroutine* co, f32 dt) {
+  co_begin(co);
+
+  Info("child");
+  co_wait(co, 1, dt);
+  co_yield(co);
+  Info("child waits");
+  co_wait(co, 1, dt);
+
+  co_end(co);
+}
+
+void test_co(Coroutine* co, f32 dt) {
+  f32 wait_time = 1;
+  var& a = co_var(co, u32);
+  co_begin(co);
+
+  Info("start");
+  co_wait(co, wait_time, dt);
+  co_yield(co);
+
+  Info("waited 0, %i", a++);
+  co_wait(co, wait_time, dt);
+  co_call(co, test_co1(co, dt));
+  Info("waited 1, %i", a);
+  co_wait(co, wait_time, dt);
+  Info("waited 2, %i", a);
+
+  co_end(co);
+}
+
 void test() {
   ProfFunc;
   // test_sort();
@@ -863,42 +801,67 @@ void test() {
   test_id_pool();
 }
 
-TimeScope::TimeScope() {
-  tsc_start = cpu_timer_now();
+f64 tsc_to_ms(u64 tsc) { return (f64)tsc/cpu_frequency()*1000; }
+f32 time_dt() { return st->dt; }
+f32 time_now() { return st->time; }
+b32 time_on_interval(f64 time, f32 delta, f32 interval, f32 offset) {
+	u32 last = (time - offset - delta) / interval;
+	u32 next = (time - offset) / interval;
+	return last < next;
 }
-TimeScope::~TimeScope() {
-  u64 elapsed = cpu_timer_now() - tsc_start;
-  Info("%fms", tsc_to_ms(elapsed));
+u32 time_on_interval_steps(f64 time, f32 delta, f32 interval, f32 offset) {
+  u32 last = (time - offset - delta) / interval;
+  u32 next = (time - offset) / interval;
+  return next - last;
 }
-ImTimeScope::ImTimeScope() {
-  tsc_start = cpu_timer_now();
+f64 time_next_interval(f64 time, f32 interval, f32 offset) {
+  u32 next = (time - offset) / interval + 1;
+  return offset + next * interval;
 }
-ImTimeScope::~ImTimeScope() {
-  u64 elapsed = cpu_timer_now() - tsc_start;
-  ImGui::Text("%fms", tsc_to_ms(elapsed));
+f64 time_prev_interval(f64 time, f32 interval, f32 offset) {
+  u32 prev = (time - offset) / interval;
+  return offset + prev * interval;
+}
+b32 time_on_time(f64 time, f64 timestamp, f64 dt)                  { return time >= timestamp && (time - dt) < timestamp; }
+b32 time_on_between_interval(f64 time, f32 interval, f32 offset)   { return Mod(time - offset, interval*2) >= interval; }
+f32 time_percent(f64 time, f64 start, f64 duration)                { return (time - start) / duration; }
+f32 time_lerp_delta(f32 current, f32 target, f32 rate, f32 delta)  { return target + (current - target) * Exp(-rate * delta); }
+b32 time_on_frame_interval(u32 frame, u32 n, u32 offset = 0)       { return (frame + offset) % n == 0; }
+f64 time_saw_wave(f64 time, f32 interval, f32 offset) {
+  f64 t = (time - offset) / interval;
+  return t - Floor(t);
+}
+f32 time_sine_wave(f64 time, f32 period) {
+  return Sin(time / period * 2.0f * PI);
+}
+f32 time_smooth_wave(f64 time, f32 period) {
+  f32 p = time_saw_wave(time, period, 0);
+  return 0.5f - 0.5f * Cos(p * 2.0f * PI);
+}
+f32 time_triangle_wave(f64 time, f32 period) {
+  f32 p = time_saw_wave(time, period, 0);
+  return (1.0f - Abs(2.0f * p - 1.0f));
+}
+b32 time_pulse_wave(f64 time, f32 period, f32 duration, f32 offset) {
+  return Mod(time - offset, period) < duration;
+}
+u32 time_frame(f64 time, f32 frame_duration, u32 frame_count) {
+  return u32(time / frame_duration) % frame_count;
 }
 
-Rng2 debug_window_get_rect(DebugWindow win) {
-  if (win.fullscreen) {
-    return rng2_make(v2(), v2_of_v2u(os_window_size()));
-  } else {
-    return rng2_make(win.pos, win.size);
-  }
+b32 time_elapsed(f64 time, f32 start, f32 duration) { 
+  return time > start && start + duration > time;
+}
+b32 time_between(f64 time, f32 start, f32 end) {
+  return rng1_contains({start, end}, time);
 }
 
-#ifdef IMGUI_SRC_ID
-  #define GEN_ID ((IMGUI_SRC_ID) + (__LINE__))
-#else
-  #define GEN_ID (__LINE__)
-#endif
+b32 time_on_interval(f32 interval, f32 offset)         { return time_on_interval(time_now(), time_dt(), interval, offset); }
+b32 time_on_between_interval(f32 interval, f32 offset) { return time_on_between_interval(time_now(), interval, offset); }
+f64 time_since(f64 timestamp) { return time_now() - timestamp; }
+f64 time_until(f64 timestamp) { return timestamp - time_now(); }
 
-ThingDesc default_thing_desc() {
-  ThingDesc res = {
-    .scale = v3(1),
-    .rot = quat_identity(),
-  };
-  return res;
-}
+#define GEN_ID (__LINE__)
 
 void ui_draw_rect(Rng2 rect, v4 color) {
   r_draw_rect(rect, color);
@@ -1102,6 +1065,14 @@ void imgui_begin_tab_item(String str) {
   ImGui::BeginTabItem((char*)str_c.str);
 }
 
+Rng2 debug_window_get_rect(DebugWindow win) {
+  if (win.fullscreen) {
+    return rng2_make(v2(), v2_of_v2u(os_window_size()));
+  } else {
+    return rng2_make(win.pos, win.size);
+  }
+}
+
 void debug_window_apply_state(DebugWindow& win) {
   if (win.toggle_fullscreen) {
     if (!win.fullscreen) {
@@ -1201,10 +1172,10 @@ void debug_game() {
     }
 
     if (ImGui::Button("save state")) {
-      game_save_state();
+      save_game_state();
     }
     if (ImGui::Button("load state")) {
-      game_load_state();
+      load_game_state();
     }
     if (ImGui::Button("clear moving cubes")) {
       Loop (i, g.moving_cubes.count) {
@@ -1223,7 +1194,7 @@ void debug_prof_view() {
   Scratch scratch;
   DebugState& debug = st->debug;
   ProfState& prof = prof_get();
-  DebugProfWindow& prof_win = st->debug.prof_win;
+  ProfWindow& prof_win = st->debug.prof_win;
 
   // Avg, min, max
   u64 tsc_elapsed_sum = 0;
@@ -1883,203 +1854,6 @@ void debug_prof_view() {
   prof_win.active_tab = prof_win.future_active_tab;
 }
 
-R_Vertex cube_vertices[] = {
-  // Front face (0, 0, 1)
-  {.pos = v3(-1.00, -1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0.0f, 0.0f)},
-  {.pos = v3( 1.00, -1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1.0f, 0.0f)},
-  {.pos = v3( 1.00,  1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1.0f, 1.0f)},
-  {.pos = v3( 1.00,  1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1.0f, 1.0f)},
-  {.pos = v3(-1.00,  1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0.0f, 1.0f)},
-  {.pos = v3(-1.00, -1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0.0f, 0.0f)},
-
-  // Back face (0, 0, -1)
-  {.pos = v3( 1.00, -1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0.0f, 0.0f)},
-  {.pos = v3(-1.00, -1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1.0f, 0.0f)},
-  {.pos = v3(-1.00,  1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1.0f, 1.0f)},
-  {.pos = v3(-1.00,  1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1.0f, 1.0f)},
-  {.pos = v3( 1.00,  1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0.0f, 1.0f)},
-  {.pos = v3( 1.00, -1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0.0f, 0.0f)},
-
-  // Left face (-1, 0, 0)
-  {.pos = v3(-1.00, -1.00, -1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
-  {.pos = v3(-1.00, -1.00,  1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
-  {.pos = v3(-1.00,  1.00,  1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
-  {.pos = v3(-1.00,  1.00,  1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
-  {.pos = v3(-1.00,  1.00, -1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
-  {.pos = v3(-1.00, -1.00, -1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
-
-  // Right face (1, 0, 0)
-  {.pos = v3(1.00, -1.00,  1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
-  {.pos = v3(1.00, -1.00, -1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
-  {.pos = v3(1.00,  1.00, -1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
-  {.pos = v3(1.00,  1.00, -1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
-  {.pos = v3(1.00,  1.00,  1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
-  {.pos = v3(1.00, -1.00,  1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
-
-  // Bottom face (0, -1, 0)
-  {.pos = v3(-1.00, -1.00, -1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
-  {.pos = v3( 1.00, -1.00, -1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
-  {.pos = v3( 1.00, -1.00,  1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
-  {.pos = v3( 1.00, -1.00,  1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
-  {.pos = v3(-1.00, -1.00,  1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
-  {.pos = v3(-1.00, -1.00, -1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
-
-  // Top face (0, 1, 0)
-  {.pos = v3(-1.00,  1.00,  1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
-  {.pos = v3( 1.00,  1.00,  1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
-  {.pos = v3( 1.00,  1.00, -1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
-  {.pos = v3( 1.00,  1.00, -1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
-  {.pos = v3(-1.00,  1.00, -1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
-  {.pos = v3(-1.00,  1.00,  1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
-};
-
-R_Vertex triangle_vertices[] = {
-  {.pos = v3( 0.0,   0.5, 0), .uv = v2(0.5, 0), .color = v4(1,0,0,1)},
-  {.pos = v3(-0.5,  -0.5, 0), .uv = v2(0.0, 1), .color = v4(0,1,0,1)},
-  {.pos = v3( 0.5,  -0.5, 0), .uv = v2(1.0, 1), .color = v4(0,0,1,1)},
-};
-
-R_Vertex axis_vertices[] = {
-  {.pos = v3(),      .color = v4(1,0,0,1)},
-  {.pos = v3(1,0,0), .color = v4(1,0,0,1)},
-  {.pos = v3(),      .color = v4(0,1,0,1)},
-  {.pos = v3(0,1,0), .color = v4(0,1,0,1)},
-  {.pos = v3(),      .color = v4(0,0,1,1)},
-  {.pos = v3(0,0,1), .color = v4(0,0,1,1)},
-};
-
-u64 hash(R_Vertex x) { return hash_memory(&x, sizeof(x)); }
-b32 equal(R_Vertex a, R_Vertex b) { return MemMatchStruct(&a, &b); }
-
-Extern GlobalState* st;
-
-Timer timer_make(f32 interval) {
-  Timer timer = {
-    .interval = interval,
-  };
-  return timer;
-}
-
-b32 timer_update(Timer& t) {
-  t.acc += get_dt();
-  if (t.acc >= t.interval) {
-    t.acc -= t.interval;
-    return true;
-  }
-  return false;
-}
-
-b32 timer_passed(Timer& t) {
-  return t.acc >= t.interval;
-}
-
-void timer_tick(Timer& t) {
-  t.acc += get_dt();
-}
-
-void timer_trigger(Timer& t) {
-  t.acc -= t.interval;
-}
-
-void timer_reset(Timer& t) {
-  t.acc = 0;
-}
-
-b32 cooldown_ready(Cooldown& cd) {
-  return cd.remaining <= 0;
-}
-
-void cooldown_tick(Cooldown& cd, f32 dt) {
-  if (cd.remaining > 0) cd.remaining -= dt;
-}
-
-void cooldown_start(Cooldown& cd, f32 duration) {
-  cd.remaining = duration;
-}
-
-f64 tsc_to_ms(u64 tsc) {
-  return (f64)tsc/cpu_frequency()*1000;
-}
-
-f32 get_dt() { return st->dt; }
-f32 get_time() { return st->time; }
-b32 time_on_interval(f64 time, f32 delta, f32 interval, f32 offset) {
-	u32 last = (time - offset - delta) / interval;
-	u32 next = (time - offset) / interval;
-	return last < next;
-}
-b32 time_on_interval(f32 interval, f32 offset) {
-  return time_on_interval(get_time(), get_dt(), interval, offset);
-}
-u32 time_interval_steps(f64 time, f32 delta, f32 interval, f32 offset) {
-  u32 last = (time - offset - delta) / interval;
-  u32 next = (time - offset) / interval;
-  return next - last;
-}
-f64 time_next_interval(f64 time, f32 interval, f32 offset) {
-  u32 next = (time - offset) / interval + 1;
-  return offset + next * interval;
-}
-f64 time_interval_progress(f64 time, f32 interval, f32 offset) {
-  f64 t = time - offset;
-  f64 into = t - Floor(t / interval) * interval;
-  return into / interval;
-}
-f32 time_ping_pong(f64 time, f32 duration) {
-  f32 t = Mod(time, duration * 2);
-  return (t < duration) ? (t / duration) : (2 - t / duration);
-}
-b32 time_on_time(f64 time, f64 timestamp) { 
-  return time >= timestamp && (time - get_dt()) < timestamp;
-}
-b32 time_on_between_interval(f64 time, f32 interval, f32 offset) {
-  return Mod(time - offset, interval*2) >= interval;
-}
-b32 time_on_between_interval(f32 interval, f32 offset = 0) {
-  return time_on_between_interval(get_time(), interval, offset);
-}
-f32 time_sine_wave(f64 time, f32 period, f32 amplitude = 1.0f) {
-  return Sin(time / period * 2.0f * PI) * amplitude;
-}
-f32 time_percent(f64 start, f64 duration) {
-  return (get_time() - start) / duration;
-}
-f32 time_percent_clamped(f64 start, f64 duration) {
-  return Clamp(0.0f, (get_time() - start) / duration, 1.0f);
-}
-f32 time_lerp_delta(f32 current, f32 target, f32 rate, f32 delta) {
-  return target + (current - target) * Exp(-rate * delta);
-}
-b32 time_on_frame_interval(u32 frame, u32 n, u32 offset = 0) {
-  return (frame + offset) % n == 0;
-}
-
-Thing& get_thing(ThingId id) { return pool_get(st->entities, id); }
-
-struct WordLexer {
-  String str;
-  u32 cursor;
-};
-
-WordLexer word_lexer_make(String str) {
-  WordLexer res = {
-    .str = str,
-  };
-  return res;
-}
-
-String word_lexer_next(WordLexer& l) {
-  while (l.cursor < l.str.size && char_is_ws(l.str.str[l.cursor])) {
-    ++l.cursor;
-  }
-  u32 word_base = l.cursor;
-  while (l.cursor < l.str.size && !char_is_ws(l.str.str[l.cursor])) {
-    ++l.cursor;
-  }
-  String res = str_make(l.str.str + word_base, l.cursor - word_base);
-  return res;
-}
-
 R_MeshDesc load_obj(Allocator arena, String name) {
   Scratch scratch(arena);
   var positions = array_make(v3, scratch);
@@ -2097,7 +1871,23 @@ R_MeshDesc load_obj(Allocator arena, String name) {
   //   f 10/4/1 1/2/3 11/22/33
   //   f 20/2/2 91/42/13 141/22/33
   // )";
-  WordLexer l = word_lexer_make(os_file_path_read_all_str(scratch, name));
+
+  struct WordLexer {
+    String str;
+    u32 cursor;
+  };
+  var word_lexer_next = [](WordLexer& l) {
+    while (l.cursor < l.str.size && char_is_ws(l.str.str[l.cursor])) {
+      ++l.cursor;
+    }
+    u32 word_base = l.cursor;
+    while (l.cursor < l.str.size && !char_is_ws(l.str.str[l.cursor])) {
+      ++l.cursor;
+    }
+    String res = str_make(l.str.str + word_base, l.cursor - word_base);
+    return res;
+  };
+  WordLexer l = {os_file_path_read_all_str(scratch, name)};
   for (String word = {}; (word = word_lexer_next(l)).size;) {
     // Info("%s", word);
     if (word.str[0] == 'v' && word.str[1] == ' ') {
@@ -2308,51 +2098,6 @@ R_MeshDesc load_gltf(Allocator arena, String path, b32 is_glb) {
   return mesh;
 }
 
-////////////////////////////////////////////////////////////////////////
-// @Assets
-
-global String meshes_strs[] = {
-#define X(name) [Glue(Mesh_, name)] = Stringify(name),
-  MESH_LIST
-#undef X
-};
-
-global String textures_strs[] = {
-#define X(name) [Glue(Texture_, name)] = Stringify(name),
-  TEXTURE_LIST
-#undef X
-};
-
-global String materials_strs[] = {
-#define X(name) [Glue(Material_, name)] = Stringify(name),
-  MATERIAL_LIST
-#undef X
-};
-
-R_MeshId get_mesh(MeshEnum mesh_enum) { return st->meshes_ids[mesh_enum]; }
-R_TextureId get_texture(TextureEnum tex_enum) { return st->textures_ids[tex_enum]; }
-void mesh_set(MeshEnum mesh_enum, R_MeshId id) { 
-  GlobalState& g = *st;
-  g.meshes_ids[mesh_enum] = id;
-  String str = push_str_copy(g.arena, meshes_strs[mesh_enum]);
-  map_set(g.str_to_mesh, str, id);
-  g.mesh_to_str[id.idx] = str;
-}
-R_MaterialId get_material(MaterialEnum id) { return st->materials_ids[id]; }
-
-constexpr R_MaterialProps material_default_props() {
-  R_MaterialProps props = {
-    .ambient = v3(1),
-    .diffuse = v3(1),
-    .specular = v3(1),
-    .shininess = 1,
-  };
-  return props;
-}
-
-////////////////////////////////////////////////////////////////////////
-// @Json
-
 JsParser js_parse_make(Allocator arena, String str) {
   JsParser res = {
     .arena = arena,
@@ -2360,26 +2105,21 @@ JsParser js_parse_make(Allocator arena, String str) {
   };
   return res;
 }
-
 u8 js_peek(JsParser* p) {
   if (p->cursor >= p->str.size) return 0;
   return p->str.str[p->cursor];
 }
-
 b32 js_at_end(JsParser* p) {
   return p->cursor >= p->str.size;
 }
-
 void js_advance(JsParser* p) {
   ++p->cursor;
 }
-
 void js_skip_ws(JsParser* p) {
   while (char_is_ws(js_peek(p))) {
     js_advance(p);
   }
 }
-
 String js_parse_str(JsParser* p) {
   Assert(js_peek(p) == '\"');
   js_advance(p);
@@ -2392,40 +2132,31 @@ String js_parse_str(JsParser* p) {
   js_advance(p);
   return res;
 }
-
 f64 js_parse_number(JsParser* p) {
   u32 start = p->cursor;
   // while (char_is_number_cont(js_peek(p))) {
   //   js_advance(p);
   // }
-
   if (js_peek(p) == '-')
     js_advance(p);
-
   while (char_is_digit(js_peek(p)))
     js_advance(p);
-
   if (js_peek(p) == '.') {
     js_advance(p);
     while (char_is_digit(js_peek(p)))
       js_advance(p);
   }
-
   if (js_peek(p) == 'e' || js_peek(p) == 'E') {
     js_advance(p);
-
     if (js_peek(p) == '+' || js_peek(p) == '-')
       js_advance(p);
-
     while (char_is_digit(js_peek(p)))
       js_advance(p);
   }
-
   String str = str_substr(p->str, Rng1u(start, p->cursor));
   f64 res = f64_from_str(str);
   return res;
 }
-
 JsVal js_parse(JsParser* p) {
   js_skip_ws(p);
   switch (js_peek(p)) {
@@ -2478,7 +2209,6 @@ JsVal js_parse(JsParser* p) {
         js_skip_ws(p);
         Assert(js_peek(p) == ':');
         js_advance(p);
-        
         JsVal* val = push_struct(p->arena, JsVal);
         *val = js_parse(p);
         // switch (val->type) {
@@ -2514,7 +2244,6 @@ JsVal js_get_val(JsVal val, String key) {
   }
   return {};
 }
-
 b32 js_get_bool(JsObj obj, String key) {
   Loop (i, obj.fields.count) {
     JsField& field = obj.fields[i];
@@ -2525,7 +2254,6 @@ b32 js_get_bool(JsObj obj, String key) {
   }
   return {};
 }
-
 f64 js_get_number(JsObj obj, String key) {
   Loop (i, obj.fields.count) {
     JsField& field = obj.fields[i];
@@ -2536,7 +2264,6 @@ f64 js_get_number(JsObj obj, String key) {
   }
   return {};
 }
-
 String js_get_str(JsObj obj, String key) {
   Loop (i, obj.fields.count) {
     JsField& field = obj.fields[i];
@@ -2547,7 +2274,6 @@ String js_get_str(JsObj obj, String key) {
   }
   return {};
 }
-
 Slice<JsVal*> js_get_array(JsObj obj, String key) {
   Loop (i, obj.fields.count) {
     JsField& field = obj.fields[i];
@@ -2558,7 +2284,6 @@ Slice<JsVal*> js_get_array(JsObj obj, String key) {
   }
   return {};
 }
-
 JsObj js_get_obj(JsObj obj, String key) {
   Loop (i, obj.fields.count) {
     JsField& field = obj.fields[i];
@@ -2570,19 +2295,12 @@ JsObj js_get_obj(JsObj obj, String key) {
   return {};
 }
 
-////////////////////////////////////////////////////////////////////////
-// @Serialization
-
-////////////////////////////////////////////////////////////////////////
-// @Input
-
 b32 key_pressed(Key key) {
   if (os_key_is_pressed(key)) {
     if (!st->input.consumed[key]) return true;
   }
   return false;
 }
-
 b32 key_pressed_consume(Key key) {
   if (key_pressed(key)) {
     key_consume(key);
@@ -2590,14 +2308,12 @@ b32 key_pressed_consume(Key key) {
   }
   return false;
 }
-
 b32 key_down(Key key) {
   if (os_key_is_down(key)) {
     if (!st->input.consumed[key]) return true;
   }
   return false;
 }
-
 b32 key_down_consume(Key key) {
   if (key_down(key)) {
     key_consume(key);
@@ -2605,13 +2321,9 @@ b32 key_down_consume(Key key) {
   }
   return false;
 }
-
 void key_consume(Key key) {
   st->input.consumed[key] = true;
 }
-
-////////////////////////////////////////////////////////////////////////
-// @UI
 
 ScrollState scroll_state_make(f32 scale) {
   ScrollState res = {
@@ -2673,6 +2385,112 @@ void scroll_state_update(ScrollState& s, ScrollType type) {
     }
     s.offset.x += scroll_h * sensity;
   }
+}
+
+void watch_add(String watch_name, WatchOp op) {
+  WatchState& g = st->watch;
+  FileProperties props = os_file_path_properties(watch_name);
+  WatchFile file_watch = {
+    .path = watch_name,
+    .modified = props.modified,
+    .op = op,
+  };
+  array_push(g.watches, file_watch);
+}
+
+void watch_directory_add(String watch_name, WatchOp op, OS_WatchFlags flags) {
+  WatchState& g = st->watch;
+  String dir_path = push_strf(g.arena, "%s", watch_name);
+  OS_Watch watch = os_watch_open(flags);
+  os_watch_attach(watch, dir_path);
+  WatchDirectory dir_watch = {
+    .path = dir_path,
+    .watch = watch,
+    .op = op,
+  };
+  array_push(g.directories, dir_watch);
+}
+
+void watch_update() {
+  WatchState& g = st->watch;
+  Scratch scratch;
+  Loop (i, g.watches.count) {
+    WatchFile& x = g.watches[i];
+    FileProperties props = os_file_path_properties(x.path);
+    if (props.modified > x.modified) {
+      switch (x.op) {
+        case WatchOp_NotifyHotreload: {
+          st->should_hotreload = true;
+        } break;
+        InvalidDefaultCase;
+      }
+      x.modified = props.modified;
+    }
+  }
+  Loop (i, g.directories.count) {
+    WatchDirectory x = g.directories[i];
+    Slice strs = os_watch_check(scratch, x.watch);
+    Loop (i, strs.count) {
+      String name = strs[i];
+      switch (x.op) {
+        case WatchOp_RecompileShader: {
+          GlobalState& g = *st;
+          Scratch scratch;
+          String shader_filepath = push_strf(scratch, "%s/%s", g.shader_dir, name);
+          String shader_compiled_filepath = push_strf(scratch, "%s/%s%s", g.shader_compiled_dir, str_chop_last_dot(name), String(".spv"));
+          StringList list = {};
+          str_list_push(scratch, list, "slangc");
+          str_list_push(scratch, list, shader_filepath);
+          str_list_push(scratch, list, "-target");
+          str_list_push(scratch, list, "spirv");
+          str_list_push(scratch, list, "-g");
+          str_list_push(scratch, list, "-o");
+          str_list_push(scratch, list, shader_compiled_filepath);
+          os_process_make(list);
+        } break;
+        case WatchOp_ShaderReload: {
+          GlobalState& g = *st;
+          String shader_name = str_chop_last_dot(name);
+          String shader_name_slang = push_strf(scratch, "%s.slang", shader_name);
+          String shader_filepath = push_strf(scratch, "%s/%s", g.shader_dir, shader_name_slang);
+          String shader_compiled_filepath = push_strf(scratch, "%s/%s", g.shader_compiled_dir, name);
+          os_file_path_copy_mtime(shader_filepath, shader_compiled_filepath);
+          r_shader_reload(shader_name);
+        } break;
+        InvalidDefaultCase;
+      }
+    }
+  }
+}
+
+ThingDesc default_thing_desc() {
+  ThingDesc res = {
+    .scale = v3(1),
+    .rot = quat_identity(),
+  };
+  return res;
+}
+
+R_MaterialProps default_material_props() {
+  R_MaterialProps props = {
+    .ambient = v3(1),
+    .diffuse = v3(1),
+    .specular = v3(1),
+    .shininess = 1,
+  };
+  return props;
+}
+
+Thing& get_thing(ThingId id) { return pool_get(st->entities, id); }
+R_MeshId get_mesh(MeshEnum mesh_enum) { return st->meshes_ids[mesh_enum]; }
+R_TextureId get_texture(TextureEnum tex_enum) { return st->textures_ids[tex_enum]; }
+R_MaterialId get_material(MaterialEnum id) { return st->materials_ids[id]; }
+void mesh_set(MeshEnum mesh_enum, R_MeshId id) { 
+  GlobalState& g = *st;
+  g.meshes_ids[mesh_enum] = id;
+  String str = push_str_copy(g.arena, meshes_strs[mesh_enum]);
+  map_set(g.str_to_mesh, str, id);
+  g.mesh_to_str[id.idx] = str;
 }
 
 String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, EntityFlags flags) {
@@ -2799,225 +2617,9 @@ void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser
   }
 }
 
-////////////////////////////////////////////////////////////////////////
-// @Watch
-
-void watch_add(String watch_name, WatchOp op) {
-  WatchState& g = st->watch;
-  FileProperties props = os_file_path_properties(watch_name);
-  WatchFile file_watch = {
-    .path = watch_name,
-    .modified = props.modified,
-    .op = op,
-  };
-  array_push(g.watches, file_watch);
-}
-
-void watch_directory_add(String watch_name, WatchOp op, OS_WatchFlags flags) {
-  WatchState& g = st->watch;
-  String dir_path = push_strf(g.arena, "%s", watch_name);
-  OS_Watch watch = os_watch_open(flags);
-  os_watch_attach(watch, dir_path);
-  WatchDirectory dir_watch = {
-    .path = dir_path,
-    .watch = watch,
-    .op = op,
-  };
-  array_push(g.directories, dir_watch);
-}
-
-void watch_update() {
-  WatchState& g = st->watch;
-  Scratch scratch;
-  Loop (i, g.watches.count) {
-    WatchFile& x = g.watches[i];
-    FileProperties props = os_file_path_properties(x.path);
-    if (props.modified > x.modified) {
-      switch (x.op) {
-        case WatchOp_NotifyHotreload: {
-          st->should_hotreload = true;
-        } break;
-        InvalidDefaultCase;
-      }
-      x.modified = props.modified;
-    }
-  }
-  Loop (i, g.directories.count) {
-    WatchDirectory x = g.directories[i];
-    Slice strs = os_watch_check(scratch, x.watch);
-    Loop (i, strs.count) {
-      String name = strs[i];
-      switch (x.op) {
-        case WatchOp_RecompileShader: {
-          GlobalState& g = *st;
-          Scratch scratch;
-          String shader_filepath = push_strf(scratch, "%s/%s", g.shader_dir, name);
-          String shader_compiled_filepath = push_strf(scratch, "%s/%s%s", g.shader_compiled_dir, str_chop_last_dot(name), String(".spv"));
-          StringList list = {};
-          str_list_push(scratch, list, "slangc");
-          str_list_push(scratch, list, shader_filepath);
-          str_list_push(scratch, list, "-target");
-          str_list_push(scratch, list, "spirv");
-          str_list_push(scratch, list, "-g");
-          str_list_push(scratch, list, "-o");
-          str_list_push(scratch, list, shader_compiled_filepath);
-          os_process_make(list);
-        } break;
-        case WatchOp_ShaderReload: {
-          GlobalState& g = *st;
-          String shader_name = str_chop_last_dot(name);
-          String shader_name_slang = push_strf(scratch, "%s.slang", shader_name);
-          String shader_filepath = push_strf(scratch, "%s/%s", g.shader_dir, shader_name_slang);
-          String shader_compiled_filepath = push_strf(scratch, "%s/%s", g.shader_compiled_dir, name);
-          os_file_path_copy_mtime(shader_filepath, shader_compiled_filepath);
-          r_shader_reload(shader_name);
-        } break;
-        InvalidDefaultCase;
-      }
-    }
-  }
-}
-
-////////////////////////////////////////////////////////////////////////
-// @State
-
-void foo_js() {
-  String d = R"(
-  {
-    "name": "cube",
-    "visible": true,
-    "pos": [1.0, 2.0, 3.0],
-    "material": {
-      "color": [1.0, 0.0, 0.0],
-      "roughness": 0.5
-    }
-  }
-  )";
-
-  Scratch scratch;
-
-  {
-    struct {
-      String name;
-      b32 visible;
-      v3 pos;
-      struct {
-        v3 color;
-        f32 roughness;
-      } material;
-    } res = {};
-
-    JsParser p = js_parse_make(scratch, d);
-    JsObj root = js_parse(&p).obj;
-    Loop (i, root.fields.count) {
-      var [k, v] = root.fields[i];
-      if (str_match(k, "name")) {
-        res.name = push_str_copy(scratch, v->str);
-      }
-      else if (str_match(k, "visible")) {
-        res.visible = v->boolean;
-      }
-      else if (str_match(k, "pos")) {
-        Loop (i, v->array.count) {
-          res.pos.v[i] = v->array[i]->number;
-        }
-      }
-      else if (str_match(k, "material")) {
-        JsObj material = v->obj;
-        Loop (i, material.fields.count) {
-          var [k, v] = material.fields[i];
-          if (str_match(k, "color")) {
-            Loop (i, v->array.count) {
-              res.material.color.v[i] = v->array[i]->number;
-            }
-          } else if (str_match(k, "roughness")) {
-            res.material.roughness = v->number;
-          }
-        }
-      }
-    }
-  }
-
-  {
-    JsParser p = js_parse_make(scratch, d);
-    JsObj root = js_parse(&p).obj;
-    String name = js_get_str(root, "name");
-    Info("%s", name);
-    b32 visible = js_get_bool(root, "visible");
-    Info("%u", visible);
-    Slice pos = js_get_array(root, "pos");
-    Loop (i, pos.count) {
-      Info("%f", pos[i]->number);
-    }
-    {
-      JsObj material = js_get_obj(root, "material");
-      Slice color = js_get_array(material, "color");
-      Loop (i, color.count) {
-        Info("%f", color[i]->number);
-      }
-      f64 roughness = js_get_number(material, "roughness");
-      Info("%f", roughness);
-    }
-  }
-
-  {
-    JsParser p = js_parse_make(scratch, d);
-    JsVal root = js_parse(&p);
-    JsVal name = js_get_val(root, "name");
-    Info("%s", name.str);
-    JsVal visible = js_get_val(root, "visible");
-    Info("%u", visible.boolean);
-    JsVal pos = js_get_val(root, "pos");
-    Loop (i, pos.array.count) {
-      Info("%f", pos.array[i]->number);
-    }
-    JsVal material = js_get_val(root, "material");
-    JsVal color = js_get_val(material, "color");
-    Loop (i, color.array.count) {
-      Info("%f", color.array[i]->number);
-    }
-    JsVal roughness = js_get_val(material, "roughness");
-    Info("%f", roughness.number);
-  }
-}
-
-void co_test1(Coroutine* co, f32 dt) {
-  co_begin(co);
-
-  Info("child");
-  co_wait(co, 1, dt);
-  co_yield(co);
-  Info("child waits");
-  co_wait(co, 1, dt);
-
-  co_end(co);
-}
-
-
-void co_test(Coroutine* co, f32 dt) {
-  f32 wait_time = 1;
-  var& a = co_var(co, u32);
-  co_begin(co);
-
-  Info("start");
-  co_wait(co, wait_time, dt);
-  co_yield(co);
-
-  Info("waited 0, %i", a++);
-  co_wait(co, wait_time, dt);
-  co_call(co, co_test1(co, dt));
-  Info("waited 1, %i", a);
-  co_wait(co, wait_time, dt);
-  Info("waited 2, %i", a);
-
-  co_end(co);
-}
-
 void init() {
   Scratch scratch;
-
-  foo_js();
-  GlobalState& g = *st;
+  var& g = *st;
 
   cpu_find_frequency();
   os_gfx_init();
@@ -3049,73 +2651,16 @@ void init() {
   prof_launch_end();
 }
 
-void update_com() {
-  // GlobalState& g = *st;
-  ArrayZero(st->input.consumed);
-  debug_update();
-  {
-    ProfBlock("push jobs");
-    Loop (i, 2) {
-      thread_push({.fn = [](void* ctx) {os_sleep_ms(rand_u32()%4);}, .priority = TaskPriority_Low});
-    }
-    WaitGroup id0 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
-    WaitGroup id1 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
-    WaitGroup id2 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
-    WaitGroup id3 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
-
-    TaskDesc tasks[] = {
-      {.fn = [](void* ctx) { os_sleep_ms(2); }},
-      {.fn = [](void* ctx) { os_sleep_ms(2); }},
-      {.fn = [](void* ctx) { os_sleep_ms(2); }},
-      {.fn = [](void* ctx) { os_sleep_ms(2); }},
-    };
-    WaitGroup batch = thread_push_batch(slice(tasks));
-
-    thread_wg_wait(id0);
-    thread_wg_wait(id1);
-    thread_wg_wait(id2);
-    thread_wg_wait(id3);
-    thread_wg_wait(batch);
-
-    // struct Ctx {
-    //   u32 i;
-    // };
-    // var& ctx = thread_push_ctx(Ctx);
-    // ctx.i = 1;
-    // thread_push({.ctx = &ctx, .fn = [](void* ctx) {
-    //   Ctx* data = (Ctx*)ctx;
-    //   Info("%i", data->i);
-    //   os_sleep_ms(1);
-    // }});
-
-    // Scratch scratch;
-    // u64 size = KB(1);
-    // var s = push_slice(scratch, u32, size);
-    // Loop (i, size) {
-    //   s[i] = 1;
-    // }
-    // thread_parallel_for(s, [](Slice<u32> s) {
-      // u32 sum = 0;
-      // Loop (i, s.count) {
-      //   sum += s[i];
-      // }
-      // Info("%i", sum);
-      // os_sleep_ms(1);
-    // });
-    // u32 a = 1;
-  }
-}
-
-shared_function void update_main(HotReloadData* data) {
+shared_function void update(HotReloadData* data) {
   Scratch scratch;
 if (data->ctx == null) {
     Arena arena = arena_make("common arena");
     data->ctx = st = push_struct_zero(arena, GlobalState);
     st->arena = arena;
     {
-      u64 start = cpu_timer_now();
+      u64 start = cpu_now();
       init();
-      Debug("init time: %fms", tsc_to_ms(cpu_timer_now() - start));
+      Debug("init time: %fms", tsc_to_ms(cpu_now() - start));
     }
 #if HOTRELOAD_BUILD
     watch_add(data->lib_path, WatchOp_NotifyHotreload);
@@ -3151,7 +2696,6 @@ if (data->ctx == null) {
       prev_ns = now_ns;
       r_begin();
       // ui_begin();
-      update_com();
       update_game();
       // ui_end();
       r_end();
@@ -3177,36 +2721,7 @@ if (data->ctx == null) {
   thread_wait_remanings();
 }
 
-void gfx_api_design_foo() {
-  // {
-  //   bind_pipeline(shader0);
-  //   draw_thing(mesh0, pos0);
-  
-  //   bind_pipeline(shader1);
-  //   draw_thing(mesh1, pos1);
-  // }
-
-  // {
-  //   push_pipeline(shader0);
-  //   draw_thing(mesh, pos);
-  //   pop_pipeline();
-  
-  //   push_pipeline(shader1);
-  //   draw_thing(mesh1, pos1);
-  //   pop_pipeline();
-  // }
-
-  // {
-  //   init:
-  //   make_renderable(e_id0, mesh0, pipeline0);
-  //   make_renderable(e_id1, mesh1, pipeline1);
-  // }
-}
-
-////////////////////////////////////////////////////////////////////////
-// @Game
-
-R_MeshDesc sphere_generate(Allocator arena) {
+R_MeshDesc generate_sphere(Allocator arena) {
   u32 lat_steps = 10;
   u32 lon_steps = 10;
   u32 vert_count = lat_steps*lon_steps;
@@ -3262,7 +2777,7 @@ R_MeshDesc sphere_generate(Allocator arena) {
   return mesh;
 }
 
-R_MeshDesc grid_generate(Allocator arena, u32 size, f32 step) {
+R_MeshDesc generate_grid(Allocator arena, u32 size, f32 step) {
   var vertices = push_slice(arena, R_Vertex, size*4);
   v3 pos_offset = v3(-(i32)size/2, 0, -(i32)size/2);
   for (i32 i = 0; i < size; ++i) {
@@ -3317,9 +2832,7 @@ ThingId e_alloc(R_MeshId mesh_id, R_MaterialId material_id, EntityThing thing) {
   ++g.entities_count;
   return e_id;
 }
-ThingId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing) {
-  return e_alloc(get_mesh(mesh_id), get_material(material_id), thing);
-}
+ThingId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing) { return e_alloc(get_mesh(mesh_id), get_material(material_id), thing); }
 
 ThingId make_thing(ThingDesc desc) {
   var& g = *st;
@@ -3354,122 +2867,203 @@ void select_obj() {
   e.vel = dir * 4;
 }
 
-void camera_init() {
-  var& g = *st;
-  Camera& cam = g.cam;
-  cam = {
-    .pos = v3(0,0,5),
-    .yaw = -90,
-    .fov = 45,
-    // .speed = 10,
-  };
-  cam.dir = {
-    CosD(cam.yaw) * CosD(cam.pitch),
-    SinD(cam.pitch),
-    SinD(cam.yaw) * CosD(cam.pitch)
-  };
-  st->view = m4x4_look_at(cam.pos, cam.dir, v3_up());
-}
-
-void camera_update() {
-  var& g = *st;
-  Camera& cam = g.cam;
-  v2 win_size = v2_of_v2u(os_window_size());
-  m4x4& projection = st->projection;
-  m4x4& view = st->view;
-  projection = m4x4_perspective(deg2rad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
-
-  // Camera rotation
-  {
-    f32 rotation_speed = 180.0f * get_dt();
-    f32 rot_x_dt = 0;
-    f32 rot_y_dt = 0;
-    if (os_key_is_down(Key_A)) {
-      cam.yaw += -rotation_speed;
-      rot_x_dt += -rotation_speed;
-    }
-    if (os_key_is_down(Key_D)) {
-      cam.yaw += rotation_speed;
-      rot_x_dt += rotation_speed;
-    }
-    if (os_key_is_down(Key_R)) {
-      cam.pitch += rotation_speed;
-      rot_y_dt += rotation_speed;
-    }
-    if (os_key_is_down(Key_F)) {
-      cam.pitch += -rotation_speed;
-      rot_y_dt += -rotation_speed;
-    }
-    if (g.fps_camera) {
-      f32 rot_speed = 10;
-      cam.pitch -= os_mouse_dt().y * get_dt() * rot_speed;
-      cam.yaw += os_mouse_dt().x * get_dt() * rot_speed;
-    }
-  }
-
-  // Camera movement
-  {
-    cam.accel = {};
-    f32 speed = 320;
-    if (os_key_is_down(Key_W)) {
-      v3 forward = m4x4_forward(view);
-      cam.accel += forward;
-    }
-    if (os_key_is_down(Key_S)) {
-      v3 backward = m4x4_backward(view);
-      cam.accel += backward;
-    }
-    if (os_key_is_down(Key_Q)) {
-      v3 left = m4x4_left(view);
-      cam.accel += left;
-    }
-    if (os_key_is_down(Key_E)) {
-      v3 right = m4x4_right(view);
-      cam.accel += right;
-    }
-    if (os_key_is_down(Key_Space)) {
-      cam.accel.y += 1.0f;
-    }
-    if (os_key_is_down(Key_X)) {
-      cam.accel.y -= 1.0f;
-    }
-    if (os_key_is_down(Key_Shift)) {
-      speed *= 10;
-    }
-    if (os_key_is_down(Key_LAlt)) {
-      speed *= 0.1;
-    }
-    // velocity = v3_norm(velocity);
-    // cam.vel += accel * 10 * get_dt();
-    // cam.pos += cam.vel * get_dt();
-    // cam.pos = 0.5 * accel * Square(get_dt()) + cam.vel * get_dt() + cam.pos;
-    // cam.vel = accel * get_dt() * 10 + cam.vel;
-    // cam.pos += velocity * speed * get_dt();
-
-    f32 dt = get_dt();
-    // cam.pos += cam.vel*dt + 0.5*accel*Square(dt);
-    // cam.vel += accel*dt;
-    cam.vel += speed * cam.accel * dt;
-    cam.vel += -cam.vel * 8.0 * dt;
-    cam.pos += cam.vel * dt;
-    // cam.accel += -cam.vel * 0.4;
-
-  }
-  
-  // Camera update
-  cam.pitch = Clamp(-89.0f, cam.pitch, 89.0f);
-  cam.dir = {
-    CosD(cam.yaw) * CosD(cam.pitch),
-    SinD(cam.pitch),
-    SinD(cam.yaw) * CosD(cam.pitch)
-  };
-  view = m4x4_look_at(cam.pos, cam.pos + cam.dir);
-}
-
-void init_scene() {
+void save_game_state() {
   Scratch scratch;
   var& g = *st;
-  camera_init();
+
+  Dstring data = dstr_make(scratch);
+  dstr_push(data, "Camera {\n");
+  dstr_push(data, dumb_struct(scratch, slice(members_of_Camera), &g.cam));
+  dstr_push(data, "}\n");
+
+  {
+    Thing e = get_thing(g.e);
+    dstr_push(data, "e {\n");
+    dstr_push(data, dumb_struct(scratch, slice(members_of_Entity), &e));
+    dstr_push(data, "}\n");
+  }
+  {
+    LoopIter (it, pool_begin(g.entities)) {
+      Thing& e = *it;
+      dstr_push(data, "Entity {\n");
+      dstr_push(data, dumb_struct(scratch, slice(members_of_Entity), &e, e.flags));
+      dstr_push(data, "}\n");
+    }
+  }
+
+  OS_Handle file = os_file_open(push_strf(scratch, "%s/saved", os_cur_directory(), String("saved")), OS_AccessFlag_Write | OS_AccessFlag_Trunc);
+  os_file_write(file, dstr_slice(data));
+  os_file_close(file);
+}
+
+void load_game_state() {
+  var& g = *st;
+  Scratch scratch;
+  Slice data = os_file_path_read_all(scratch, push_strf(scratch, "%s/saved", os_cur_directory(), String("saved")));
+  Slice tokens = tokens_from_str(scratch, str_make(data.data, data.size));
+  Parser p = parser_make(tokens);
+
+  {
+    LoopIter (it, pool_begin(g.entities)) {
+      ThingId e_id = it.handle();
+      destroy_thing(e_id);
+    }
+  }
+
+  while (!tok_is_end(p)) {
+    Token tok = tok_advance(p);
+    switch (tok.type) {
+      default:{} break;
+      case TokenType_Identifier: {
+        if (str_match(tok.str, "Camera")) {
+          dumb_struct_load(slice(members_of_Camera), &g.cam, &p);
+        } else if (str_match(tok.str, "Entity")) {
+          ThingId e_id = e_alloc_bare();
+          Thing& e = get_thing(e_id);
+          dumb_struct_load(slice(members_of_Entity), &e, &p);
+          if (FlagHas(e.flags, EntityFlag_Referenced)) {
+            if (str_match("monkey", e.name)) {
+              g.monkey_id = e_id;
+            } else if (str_match("axis_attached_to_cam", e.name)) {
+              g.axis_attached_to_cam_id = e_id;
+            } else if (str_match("rotating_cube", e.name)) {
+              g.rotating_cube_id = e_id;
+            } 
+          }
+        } else if (str_match(tok.str, "e")) {
+          ThingId e_id = e_alloc_bare();
+          Thing& e = get_thing(e_id);
+          dumb_struct_load(slice(members_of_Entity), &e, &p);
+          g.e = e_id;
+        }
+      }
+    }
+  }
+}
+
+void init_game() {
+  ProfFunc;
+  var& g = *st;
+  Scratch scratch;
+  g.arena = arena_make("game arena");
+  g.gpa = alloc_make(g.arena);
+  g.moving_cubes = array_make(ThingId, g.gpa);
+  // g.font = r_font_load("arial.ttf", 512);
+
+  R_MeshDesc triangle_mesh = {.vertices = slice(triangle_vertices)};
+  mesh_set(Mesh_Triangle, r_make_mesh(triangle_mesh));
+  R_MeshDesc grid_mesh = generate_grid(scratch, 100, 1);
+  mesh_set(Mesh_Grid, r_make_mesh(grid_mesh));
+  R_MeshDesc axis_mesh = {.vertices = slice(axis_vertices)};
+  mesh_set(Mesh_Axis, r_make_mesh(axis_mesh));
+  R_MeshDesc sphere = generate_sphere(scratch);
+  mesh_set(Mesh_Sphere, r_make_mesh(sphere));
+
+  {
+    ProfBlock("cube");
+    // R_Texture cubemap = r_texture_cube_load("night_cubemap");
+    R_TextureId cubemap = r_load_async_cubemap("night_cubemap");
+    r_set_cubemap(cubemap);
+  }
+
+  {
+    GlobalState& g = *st;
+    var load_mesh = [&](MeshEnum enum_name, String name) {
+      // R_Mesh id = r_mesh_load(name);
+      R_MeshId id = r_load_async_mesh(name);
+      g.meshes_ids[enum_name] = id;
+      String str = push_str_copy(g.arena, name);
+      map_set(g.str_to_mesh, str, id);
+      g.mesh_to_str[id.idx] = str;
+    };
+    load_mesh(Mesh_Cube, "cube_ok_uv.glb");
+    load_mesh(Mesh_MonkeyGlb, "monkey.glb");
+    load_mesh(Mesh_CubeGlft, "cube.gltf");
+    load_mesh(Mesh_Barrack, "castle.gltf");
+    // m_load(Mesh_Barrack, "castle.obj");
+    // m_load(Mesh_GreeMan, "greenman.glb");
+
+    var load_tex = [&](TextureEnum enum_name, String name) {
+      // R_Texture id = r_texture_load(name);
+      R_TextureId id = r_load_async_texture(name);
+      g.textures_ids[enum_name] = id;
+      String str = push_str_copy(g.arena, name);
+      map_set(g.str_to_texture, str, id);
+      g.texture_to_str[id.idx] = str;
+    };
+    load_tex(Texture_Orange, "orange_lines_512.png");
+    load_tex(Texture_Container, "container.jpg");
+    load_tex(Texture_Barrack, "castle_diffuse.png");
+
+    var default_state = r_make_pipeline_state({
+      .depth = {
+        .compare = Gfx_CompareOp_Less,
+        .write_enabled = true,
+      }
+    });
+    var default_state_line = r_make_pipeline_state({
+      .primitive_type = Gfx_PrimitiveType_Line,
+      .depth = {
+        .compare = Gfx_CompareOp_Less,
+        .write_enabled = true,
+      }
+    });
+
+    var load_mat = [&](MaterialEnum enum_name, R_Material desc) {
+      R_MaterialId id = r_material_make(desc);
+      g.materials_ids[enum_name] = id;
+      String str = push_str_copy(g.arena, materials_strs[enum_name]);
+      map_set(g.str_to_material, str, id);
+      g.material_to_str[id.idx] = str;
+    };
+
+    load_mat(Material_Orange, {
+      .type = ShaderType::Texture,
+      .batch = default_state,
+      .props = default_material_props(),
+      .base_color = get_texture(Texture_Orange),
+    });
+    load_mat(Material_Container, {
+      .type = ShaderType::Texture,
+      .batch = default_state,
+      .props = default_material_props(),
+      .base_color = get_texture(Texture_Container),
+    });
+    load_mat(Material_Axis, {
+      .type = ShaderType::VertColor,
+      .batch = default_state_line,
+    });
+    load_mat(Material_Line, {
+      .type = ShaderType::E_Color,
+      .batch = default_state_line,
+    });
+    load_mat(Material_Barrack, {
+      .type = ShaderType::Texture,
+      .batch = default_state,
+      .props = default_material_props(),
+      .base_color = get_texture(Texture_Barrack),
+    });
+  }
+
+  ///////////////////////////////////
+  // Camera
+  {
+    var& g = *st;
+    Camera& cam = g.cam;
+    cam = {
+      .pos = v3(0,0,5),
+      .yaw = -90,
+      .fov = 45,
+      // .speed = 10,
+    };
+    cam.dir = {
+      CosD(cam.yaw) * CosD(cam.pitch),
+      SinD(cam.pitch),
+      SinD(cam.yaw) * CosD(cam.pitch)
+    };
+    st->view = m4x4_look_at(cam.pos, cam.dir, v3_up());
+  }
+
   g.rotating_cube_id = e_alloc(Mesh_Cube, Material_Orange, {"rotating_cube", EntityFlag_Referenced});
   g.monkey_id = e_alloc(Mesh_MonkeyGlb, Material_Container, {"monkey", EntityFlag_Referenced});
   Thing& monkey = get_thing(g.monkey_id);
@@ -3621,32 +3215,149 @@ void init_scene() {
     g.t_id = make_thing(desc);
     // g.t_id = make_thing(THING_DESC(.pos = v3(1,1,1), .scale = v3(3)));
   }
-
 }
 
-void deinit_scene() {
+u32 rand(u32* seed) {
+  u32 x = *seed;
+  x ^= x << 13;
+  x ^= x >> 17;
+  x ^= x << 5;
+  return *seed = x;
+}
+
+void update_game() {
+  ProfFunc;
   var& g = *st;
-  pool_clear(g.entities);
-}
 
-v3 transform_forward(Transform t) { return quat_rotate(t.rot, v3_forward()); }
-v3 transform_right(Transform t) { return quat_rotate(t.rot, v3_right()); }
-v3 transform_up(Transform t) { return quat_rotate(t.rot, v3_up()); }
-Transform transform_indentity() {
-  Transform res = {
-    .pos = v3(),
-    .rot = quat_identity(),
-    .scale = v3(1),
-  };
-  return res;
-}
-void transform_translate_local(Transform& t, v3 delta) {
-  t.pos += quat_rotate(t.rot, delta);
-}
+  ArrayZero(st->input.consumed);
+  debug_update();
+  {
+    ProfBlock("push jobs");
+    Loop (i, 2) {
+      thread_push({.fn = [](void* ctx) {os_sleep_ms(rand_u32()%4);}, .priority = TaskPriority_Low});
+    }
+    WaitGroup id0 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
+    WaitGroup id1 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
+    WaitGroup id2 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
+    WaitGroup id3 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
 
-void update_scene() {
-  Scratch scratch;
-  var& g = *st;
+    TaskDesc tasks[] = {
+      {.fn = [](void* ctx) { os_sleep_ms(2); }},
+      {.fn = [](void* ctx) { os_sleep_ms(2); }},
+      {.fn = [](void* ctx) { os_sleep_ms(2); }},
+      {.fn = [](void* ctx) { os_sleep_ms(2); }},
+    };
+    WaitGroup batch = thread_push_batch(slice(tasks));
+
+    thread_wg_wait(id0);
+    thread_wg_wait(id1);
+    thread_wg_wait(id2);
+    thread_wg_wait(id3);
+    thread_wg_wait(batch);
+  }
+
+  {
+    Thing& e = get_thing(g.monkey_id);
+    e.pos.x += time_dt() * 1;
+    e.pos.y += time_dt() * 0.5;
+  }
+
+  if (os_key_is_down(Key_Escape)) {
+    os_window_close();
+  }
+
+  ///////////////////////////////////
+  // Camera
+  {
+    Camera& cam = g.cam;
+    v2 win_size = v2_of_v2u(os_window_size());
+    m4x4& projection = st->projection;
+    m4x4& view = st->view;
+    projection = m4x4_perspective(deg2rad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
+
+    // Camera rotation
+    {
+      f32 rotation_speed = 180.0f * time_dt();
+      f32 rot_x_dt = 0;
+      f32 rot_y_dt = 0;
+      if (os_key_is_down(Key_A)) {
+        cam.yaw += -rotation_speed;
+        rot_x_dt += -rotation_speed;
+      }
+      if (os_key_is_down(Key_D)) {
+        cam.yaw += rotation_speed;
+        rot_x_dt += rotation_speed;
+      }
+      if (os_key_is_down(Key_R)) {
+        cam.pitch += rotation_speed;
+        rot_y_dt += rotation_speed;
+      }
+      if (os_key_is_down(Key_F)) {
+        cam.pitch += -rotation_speed;
+        rot_y_dt += -rotation_speed;
+      }
+      if (g.fps_camera) {
+        f32 rot_speed = 10;
+        cam.pitch -= os_mouse_dt().y * time_dt() * rot_speed;
+        cam.yaw += os_mouse_dt().x * time_dt() * rot_speed;
+      }
+    }
+
+    // Camera movement
+    {
+      cam.accel = {};
+      f32 speed = 320;
+      if (os_key_is_down(Key_W)) {
+        v3 forward = m4x4_forward(view);
+        cam.accel += forward;
+      }
+      if (os_key_is_down(Key_S)) {
+        v3 backward = m4x4_backward(view);
+        cam.accel += backward;
+      }
+      if (os_key_is_down(Key_Q)) {
+        v3 left = m4x4_left(view);
+        cam.accel += left;
+      }
+      if (os_key_is_down(Key_E)) {
+        v3 right = m4x4_right(view);
+        cam.accel += right;
+      }
+      if (os_key_is_down(Key_Space)) {
+        cam.accel.y += 1.0f;
+      }
+      if (os_key_is_down(Key_X)) {
+        cam.accel.y -= 1.0f;
+      }
+      if (os_key_is_down(Key_Shift)) {
+        speed *= 10;
+      }
+      if (os_key_is_down(Key_LAlt)) {
+        speed *= 0.1;
+      }
+      // velocity = v3_norm(velocity);
+      // cam.vel += accel * 10 * get_dt();
+      // cam.pos += cam.vel * get_dt();
+      // cam.pos = 0.5 * accel * Square(get_dt()) + cam.vel * get_dt() + cam.pos;
+      // cam.vel = accel * get_dt() * 10 + cam.vel;
+      // cam.pos += velocity * speed * get_dt();
+      f32 dt = time_dt();
+      // cam.pos += cam.vel*dt + 0.5*accel*Square(dt);
+      // cam.vel += accel*dt;
+      cam.vel += speed * cam.accel * dt;
+      cam.vel += -cam.vel * 8.0 * dt;
+      cam.pos += cam.vel * dt;
+      // cam.accel += -cam.vel * 0.4;
+    }
+    cam.pitch = Clamp(-89.0f, cam.pitch, 89.0f);
+    cam.dir = {
+      CosD(cam.yaw) * CosD(cam.pitch),
+      SinD(cam.pitch),
+      SinD(cam.yaw) * CosD(cam.pitch)
+    };
+    view = m4x4_look_at(cam.pos, cam.pos + cam.dir);
+  }
+
   if (os_mouse_is_button_pressed(MouseButton_Left)) {
     // select_obj();
     // v3 dir = ray_from_screen();
@@ -3659,10 +3370,10 @@ void update_scene() {
   {
     Thing& cube = get_thing(g.rotating_cube_id);
     Thing& monkey = get_thing(g.monkey_id);
-    monkey.pos.x += 0.1 * get_dt();
-    cube.pos.x = monkey.pos.x + Sin(get_dt()) * 4;
-    cube.pos.z = monkey.pos.z + Cos(get_dt()) * 4;
-    cube.pos.y = monkey.pos.z + Cos(get_dt()) * 4;
+    monkey.pos.x += 0.1 * time_dt();
+    cube.pos.x = monkey.pos.x + Sin(time_dt()) * 4;
+    cube.pos.z = monkey.pos.z + Cos(time_dt()) * 4;
+    cube.pos.y = monkey.pos.z + Cos(time_dt()) * 4;
   }
   {
     Thing& e = get_thing(g.monkey_id);
@@ -3714,12 +3425,12 @@ void update_scene() {
   // });
   Loop (i, g.moving_cubes.count) {
     Thing& e = get_thing(g.moving_cubes[i]);
-    e.pos += e.vel * get_dt();
+    e.pos += e.vel * time_dt();
     v3 center = {0, 0, 0};
     v3 dir = e.pos - center;
     v3 tangent = v3_norm(v3{-dir.z, 0, dir.x});
-    e.vel += tangent * 2.0f * get_dt();
-    e.vel += -dir * 0.5f * get_dt();
+    e.vel += tangent * 2.0f * time_dt();
+    e.vel += -dir * 0.5f * time_dt();
   }
 
   // vk_draw_rect(Rng2(v2(100,100), v2(200,200)), v3(1,1,1));
@@ -3739,7 +3450,7 @@ void update_scene() {
   // e.pos = v3_rotate_z(e.pos, degtorad(20) * get_dt());
   // e.pos = v3_rotate_y(e.pos, degtorad(20) * get_dt());
   // e.pos = v3_rotate_z(e.pos, degtorad(20) * get_dt());
-  e.pos = v3_rotate_around_axis(e.pos, v3(1,1,1), deg2rad(60)*get_dt());
+  e.pos = v3_rotate_around_axis(e.pos, v3(1,1,1), deg2rad(60)*time_dt());
 
   {
     if (os_key_is_pressed(Key_U)) {
@@ -3765,7 +3476,7 @@ void update_scene() {
 
   {
     Thing& e = get_thing(g.thing);
-    v4 dt = quat_axis_angle(v3_up(), 0.1 * get_dt());
+    v4 dt = quat_axis_angle(v3_up(), 0.1 * time_dt());
     // v4 dt = quat_axis_angle(v3_right(), 1 * get_dt());
     // v4 dt = quat_axis_angle(v3_right(), 0.1 * get_dt());
     // e.rot = quat_mul(e.rot, dt);
@@ -3804,7 +3515,7 @@ void update_scene() {
 
   {
     var& my = get_thing(g.my);
-    my.pos.z += get_dt() * 1;
+    my.pos.z += time_dt() * 1;
     u32 i = 1;
     LoopHNode (it, my.first, g.entities.data) {
       var& child = get_thing(it);
@@ -3960,248 +3671,65 @@ void update_scene() {
 
   {
     var& thing = get_thing(g.t_id);
-    f32 t = time_ping_pong(get_time(), 2);
+    // f32 t = time_triangle_wave(get_time(), 1);
     // t = ease_sin_in_out(t) * 10;
     // t = smoothstep(t);
     // t = smoothstep(t);
-    t = ease_cube_in(t);
-    thing.pos.x = Lerp(-10, t, 10);
+    // t = ease_cube_in(t);
+    // thing.pos.x = Lerp(-10, t, 10);
+    // thing.pos.x = Lerp(-10, time_interval_progress(get_time(), 2, 0), 10);
+    // thing.pos.x = Lerp(-10, time_smooth_wave(get_time(), 2), 10);
+    // thing.pos.x = Lerp(-10, time_sine_wave(get_time(), 2), 10);
+    // thing.pos.x = Lerp(-10, time_triangle(get_time(), 2), 10);
+    thing.pos.x = Lerp(-10, time_smooth_wave(time_now(), 2), 10);
+    thing.rot = quat_axis_angle(v3_up(), time_now());
+    // thing.scale = v3(2);
     // thing.pos = v3_rotate_x(thing.pos, get_dt());
-    // thing.rot = quat_axis_angle(v3(1), get_time());
     // thing.pos = quat_rotate(quat_axis_angle(v3_up(), get_time()), v3(10,10,10));
     // thing.pos = v3_rotate_around_pivot(thing.pos, v3(1), quat_axis_angle(v3(1), get_time()));
   }
-}
 
-void game_save_state() {
-  Scratch scratch;
-  var& g = *st;
-
-  Dstring data = dstr_make(scratch);
-  dstr_push(data, "Camera {\n");
-  dstr_push(data, dumb_struct(scratch, slice(members_of_Camera), &g.cam));
-  dstr_push(data, "}\n");
-
+  ImGui::Begin("prof");
+  f64 ms0;
+  f64 ms1;
+  local f64 show0;
+  local f64 show1;
+  v3 scl = v3(1);
+  v3 p = v3(1);
+  v4 q = quat_identity();
   {
-    Thing e = get_thing(g.e);
-    dstr_push(data, "e {\n");
-    dstr_push(data, dumb_struct(scratch, slice(members_of_Entity), &e));
-    dstr_push(data, "}\n");
-  }
-  {
-    LoopIter (it, pool_begin(g.entities)) {
-      Thing& e = *it;
-      dstr_push(data, "Entity {\n");
-      dstr_push(data, dumb_struct(scratch, slice(members_of_Entity), &e, e.flags));
-      dstr_push(data, "}\n");
+    u64 s = cpu_now();
+    u32 seed = rand_u32();
+    Loop (i, Alot) {
+      scl = v3(rand(&seed));
+      p = v3(rand(&seed));
+      q = v4(rand(&seed));
+      g.m4x4_buf[i] = m4x4_scale_translate(scl, p) * m4x4_from_quat(q);
+      // g.m4x4_buf[i] = m4x4_transform(scl, p, q);
     }
+    ms0 = tsc_to_ms(cpu_now()-s);
   }
-
-  OS_Handle file = os_file_open(push_strf(scratch, "%s/saved", os_cur_directory(), String("saved")), OS_AccessFlag_Write | OS_AccessFlag_Trunc);
-  os_file_write(file, dstr_slice(data));
-  os_file_close(file);
-}
-
-void game_load_state() {
-  var& g = *st;
-  Scratch scratch;
-  Slice data = os_file_path_read_all(scratch, push_strf(scratch, "%s/saved", os_cur_directory(), String("saved")));
-  Slice tokens = tokens_from_str(scratch, str_make(data.data, data.size));
-  Parser p = parser_make(tokens);
-
   {
-    LoopIter (it, pool_begin(g.entities)) {
-      ThingId e_id = it.handle();
-      destroy_thing(e_id);
+    u64 s = cpu_now();
+    u32 seed = rand_u32();
+    Loop (i, Alot) {
+      scl = v3(rand(&seed));
+      p = v3(rand(&seed));
+      q = v4(rand(&seed));
+      // g.m4x3_buf[i] = m4x3_transform(scl, p, q);
+      g.m4x3_buf[i] = m4x3_scale_translate(scl, p) * m4x3_from_quat(q);
+      // g.m4x3_buf[i] = m4x3_transform(scl, p, q);
     }
+    ms1 = tsc_to_ms(cpu_now()-s);
   }
-
-  while (!tok_is_end(p)) {
-    Token tok = tok_advance(p);
-    switch (tok.type) {
-      default:{} break;
-      case TokenType_Identifier: {
-        if (str_match(tok.str, "Camera")) {
-          dumb_struct_load(slice(members_of_Camera), &g.cam, &p);
-        } else if (str_match(tok.str, "Entity")) {
-          ThingId e_id = e_alloc_bare();
-          Thing& e = get_thing(e_id);
-          dumb_struct_load(slice(members_of_Entity), &e, &p);
-          if (FlagHas(e.flags, EntityFlag_Referenced)) {
-            if (str_match("monkey", e.name)) {
-              g.monkey_id = e_id;
-            } else if (str_match("axis_attached_to_cam", e.name)) {
-              g.axis_attached_to_cam_id = e_id;
-            } else if (str_match("rotating_cube", e.name)) {
-              g.rotating_cube_id = e_id;
-            } 
-          }
-        } else if (str_match(tok.str, "e")) {
-          ThingId e_id = e_alloc_bare();
-          Thing& e = get_thing(e_id);
-          dumb_struct_load(slice(members_of_Entity), &e, &p);
-          g.e = e_id;
-        }
-      }
-    }
+  if (time_on_interval(0.5)) {
+    show0 = ms0;
+    show1 = ms1;
   }
-}
-
-void init_game() {
-  ProfFunc;
-  var& g = *st;
-  Scratch scratch;
-  g.arena = arena_make("game arena");
-  g.gpa = alloc_make(g.arena);
-  g.moving_cubes = array_make(ThingId, g.gpa);
-  // g.font = r_font_load("arial.ttf", 512);
-
-  R_MeshDesc triangle_mesh = {.vertices = slice(triangle_vertices)};
-  mesh_set(Mesh_Triangle, r_make_mesh(triangle_mesh));
-  R_MeshDesc grid_mesh = grid_generate(scratch, 100, 1);
-  mesh_set(Mesh_Grid, r_make_mesh(grid_mesh));
-  R_MeshDesc axis_mesh = {.vertices = slice(axis_vertices)};
-  mesh_set(Mesh_Axis, r_make_mesh(axis_mesh));
-  R_MeshDesc sphere = sphere_generate(scratch);
-  mesh_set(Mesh_Sphere, r_make_mesh(sphere));
-
-  {
-    ProfBlock("cube");
-    // R_Texture cubemap = r_texture_cube_load("night_cubemap");
-    R_TextureId cubemap = r_load_async_cubemap("night_cubemap");
-    r_set_cubemap(cubemap);
-  }
-
-  {
-    GlobalState& g = *st;
-    var load_mesh = [&](MeshEnum enum_name, String name) {
-      // R_Mesh id = r_mesh_load(name);
-      R_MeshId id = r_load_async_mesh(name);
-      g.meshes_ids[enum_name] = id;
-      String str = push_str_copy(g.arena, name);
-      map_set(g.str_to_mesh, str, id);
-      g.mesh_to_str[id.idx] = str;
-    };
-    load_mesh(Mesh_Cube, "cube_ok_uv.glb");
-    load_mesh(Mesh_MonkeyGlb, "monkey.glb");
-    load_mesh(Mesh_CubeGlft, "cube.gltf");
-    load_mesh(Mesh_Barrack, "castle.gltf");
-    // m_load(Mesh_Barrack, "castle.obj");
-    // m_load(Mesh_GreeMan, "greenman.glb");
-
-    var load_tex = [&](TextureEnum enum_name, String name) {
-      // R_Texture id = r_texture_load(name);
-      R_TextureId id = r_load_async_texture(name);
-      g.textures_ids[enum_name] = id;
-      String str = push_str_copy(g.arena, name);
-      map_set(g.str_to_texture, str, id);
-      g.texture_to_str[id.idx] = str;
-    };
-    load_tex(Texture_Orange, "orange_lines_512.png");
-    load_tex(Texture_Container, "container.jpg");
-    load_tex(Texture_Barrack, "castle_diffuse.png");
-
-    var default_state = r_make_pipeline_state({
-      .depth = {
-        .compare = Gfx_CompareOp_Less,
-        .write_enabled = true,
-      }
-    });
-    var default_state_line = r_make_pipeline_state({
-      .primitive_type = Gfx_PrimitiveType_Line,
-      .depth = {
-        .compare = Gfx_CompareOp_Less,
-        .write_enabled = true,
-      }
-    });
-
-    var load_mat2 = [&](MaterialEnum enum_name, R_Material desc) {
-      R_MaterialId id = r_material_make2(desc);
-      g.materials_ids[enum_name] = id;
-      String str = push_str_copy(g.arena, materials_strs[enum_name]);
-      map_set(g.str_to_material, str, id);
-      g.material_to_str[id.idx] = str;
-    };
-
-    load_mat2(Material_Orange, {
-      .type = ShaderType::Texture,
-      .batch = default_state,
-      .props = material_default_props(),
-      .base_color = get_texture(Texture_Orange),
-    });
-    load_mat2(Material_Container, {
-      .type = ShaderType::Texture,
-      .batch = default_state,
-      .props = material_default_props(),
-      .base_color = get_texture(Texture_Container),
-    });
-    load_mat2(Material_Axis, {
-      .type = ShaderType::VertColor,
-      .batch = default_state_line,
-    });
-    load_mat2(Material_Line, {
-      .type = ShaderType::E_Color,
-      .batch = default_state_line,
-    });
-    load_mat2(Material_Barrack, {
-      .type = ShaderType::Texture,
-      .batch = default_state,
-      .props = material_default_props(),
-      .base_color = get_texture(Texture_Barrack),
-    });
-  }
-
-  init_scene();
-
-  // camera_init();
-  // g.cube0 = e_alloc(Mesh_Cube, Material_Container);
-  // g.cube0.pos() = v3(1,0,0);
-  // g.cube1 = e_alloc(Mesh_Cube, Material_Orange);
-  // g.cube1.pos() = v3(-1,0,0);
-  // g.monkey = e_alloc(Mesh_MonkeyGlb, Material_Container);
-  // g.monkey.pos() = v3(2,0,0);
-
-  // var grid = e_alloc(Mesh_Grid, Material_Line);
-  // g.grid = grid;
-  // vk_set_entity_color(grid, v4_scale(0.6));
-  // grid.pos() = v3(0,0,-5);
-
-  // Loop (i, KB(10)) {
-  //   R_Mesh meshes[] = {
-  //     // Mesh_MonkeyGlb,
-  //     // Mesh_Triangle,
-  //     Mesh_Cube,
-  //   };
-  //   R_Material materials[] = {
-  //     Material_Orange,
-  //     // Material_Container,
-  //     // Material_Screen,
-  //   };
-  //   var e = e_static_alloc(ArrayRand(meshes), ArrayRand(materials));
-  //   u32 range = KB(1);
-  //   e.pos() = v3_rand_rng(-v3_scale(range), v3_scale(range));
-  // }
-}
-
-void update_game() {
-  ProfFunc;
-  var& g = *st;
-
-  {
-    Thing& e = get_thing(g.monkey_id);
-    e.pos.x += get_dt() * 1;
-    e.pos.y += get_dt() * 0.5;
-  }
-
-  Scratch scratch;
-  camera_update();
-  if (os_key_is_down(Key_T)) {
-    deinit_scene();
-    init_scene();
-  }
-  if (os_key_is_down(Key_Escape)) {
-    os_window_close();
-  }
-  update_scene();
+  ImGui::Text("4x4 %fms", show0);
+  ImGui::Text("4x3 %fms", show1);
+  ImGui::Text("4x3 faster by %f", show0/show1);
+  ImGui::Text("4x3 faster by %f", show1/show0);
+  ImGui::End();
 }
 
