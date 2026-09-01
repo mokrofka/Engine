@@ -264,6 +264,7 @@ v3  v3_max(v3 a, v3 b)              { return v3(Max(a.x,b.x), Max(a.y,b.y), Max(
 v3  v3_clamp(v3 min, v3 v, v3 max)  { return v3(Clamp(min.x, v.x, max.x), Clamp(min.y, v.y, max.y), Clamp(min.z, v.z, max.z)); }
 v3  v3_sign(v3 v)                   { return v3(Sign(v.x), Sign(v.y), Sign(v.z)); }
 v3  v3_invert(v3 v)                 { return v3(1.0f/v.x, 1.0f/v.y, 1.0f/v.z); }
+b32 v3_equal(v3 a, v3 b)            { return a.x == b.x && a.y == b.y && a.z == b.z; }
 v3b v3_greater(v3 a, v3 b)          { return v3b(a.x>b.x, a.y>b.y, a.z>b.z); }
 v3b v3_less(v3 a, v3 b)             { return v3b(a.x<b.x, a.y<b.y, a.z<b.z); }
 b32 v3_greater_all(v3 a, v3 b)      { return a.x>b.x && a.y>b.y && a.z>b.z; }
@@ -283,12 +284,13 @@ v3  v3_lerp(v3 a, f32 t, v3 b)       { return v3(Lerp(a.x, t, b.x), Lerp(a.y, t,
 v3  v3_hadamard(v3 a, v3 b)          { return v3(a.x*b.x, a.y*b.y, a.z*b.z); }
 v3  v3_hadamard_div(v3 a, v3 b)      { return v3(a.x/b.x, a.y/b.y, a.z/b.z); }
 v3  v3_project(v3 a, v3 b)           { return v3_dot(a, b) / v3_length_sqr(b) * b; }
-v3  v3_project_on_unit(v3 a, v3 b)   { return v3_dot(a, b) * b; }
+v3  v3_project_on_norm(v3 a, v3 b)   { return v3_dot(a, b) * b; }
 f32 v3_length_projection(v3 a, v3 b) { return v3_dot(a, v3_norm(b)); }
 v3  v3_reject(v3 a, v3 b)            { return a - v3_project(a, b); }
-v3  v3_reject_on_unit(v3 a, v3 b)    { return a - v3_project_on_unit(a, b); }
+v3  v3_reject_on_norm(v3 a, v3 b)    { return a - v3_project_on_norm(a, b); }
 v3  v3_reflect(v3 v, v3 n)           { return v - 2*n*v3_dot(v, n); }
 f32 v3_angle(v3 a, v3 b)             { return Atan2(v3_length(v3_cross(a, b)), v3_dot(a, b)); }
+v3  v3_bounce(v3 vel, v3 n, f32 restitution) { return vel - v3_project_on_norm(vel, n) * (1.0f + restitution); }
 
 v3 v3_approach(v3 current, v3 target, f32 step) {
   if (v3_length_sqr(current - target) <= Square(step)) return target;
@@ -348,8 +350,8 @@ v3 v3_perpendicular(v3 v) {
 }
 v3 v3_rotate_around_axis(v3 v, v3 axis, f32 rad) {
   axis = v3_norm(axis);
-  v3 proj = v3_project_on_unit(v, axis);
-  v3 reject = v3_reject_on_unit(v, axis);
+  v3 proj = v3_project_on_norm(v, axis);
+  v3 reject = v3_reject_on_norm(v, axis);
   v3 cross = v3_cross(axis, v);
   f32 sine;
   f32 cosine;
@@ -393,6 +395,7 @@ v4 v4_set_w(v4 v, f32 w)           { return v4(v.x, v.y, v.x, w); }
 v4 v4_min(v4 a, v4 b)              { return v4(Min(a.x,b.x), Min(a.y,b.y), Min(a.z,b.z), Min(a.w,b.w)); }
 v4 v4_max(v4 a, v4 b)              { return v4(Max(a.x,b.x), Max(a.y,b.y), Max(a.z,b.z), Max(a.w,b.w)); }
 v4 v4_invert(v4 v)                 { return v4(1.0f/v.x,1.0f/v.y,1.0f/v.z,1.0f/v.w); }
+b32 v4_equal(v4 a, v4 b)           { return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w; }
 
 f32 v4_length(v4 v)                { return Sqrt(v4_length_squared(v)); }
 f32 v4_length_squared(v4 v)        { return Square(v.x) + Square(v.y) + Square(v.z) + Square(v.w); }
@@ -418,8 +421,13 @@ v3 transform_point(Transform t, v3 p) {
   return p;
 }
 
-v3 transform_direction(Transform t, v3 v) {
-  return quat_rotate(t.rot, v * t.scale.x);
+v3 transform_point(m4x4 m, v3 p) {
+  v3 res = {
+    m.v[0][0]*p.x + m.v[0][1]*p.y + m.v[0][2]*p.z + m.v[0][3],
+    m.v[1][0]*p.x + m.v[1][1]*p.y + m.v[1][2]*p.z + m.v[1][3],
+    m.v[2][0]*p.x + m.v[2][1]*p.y + m.v[2][2]*p.z + m.v[2][3],
+  };
+  return res;
 }
 
 v3 transform_inverse_point(Transform t, v3 p) {
@@ -429,10 +437,23 @@ v3 transform_inverse_point(Transform t, v3 p) {
   return p;
 }
 
+v3 transform_direction(Transform t, v3 v) {
+  return quat_rotate(t.rot, v * t.scale.x);
+}
+
+v3 transform_direction(m4x4 m, v3 v) {
+  v3 res = {
+    m.v[0][0]*v.x + m.v[0][1]*v.y + m.v[0][2]*v.z,
+    m.v[1][0]*v.x + m.v[1][1]*v.y + m.v[1][2]*v.z,
+    m.v[2][0]*v.x + m.v[2][1]*v.y + m.v[2][2]*v.z,
+  };
+  return res;
+}
+
 ////////////////////////////////////////////////////////////////////////
 // Quatornion
 
-v4 quat_identity()      { return v4(0, 0, 0, 1); }
+v4 quat_identity()    { return v4(0, 0, 0, 1); }
 v3 quat_forward(v4 q) { return quat_rotate(q, v3_forward()); }
 v3 quat_right(v4 q)   { return quat_rotate(q, v3_right());   }
 v3 quat_up(v4 q)      { return quat_rotate(q, v3_up());      }
@@ -476,30 +497,6 @@ f32 quat_angle(v4 a, v4 b) {
   f32 d = Abs(v4_dot(a,b));
   d = Clamp11(d);
   return Acos(d) * 2.0f;
-}
-
-m4x4 m4x4_from_quat(v4 q) {
-  f32 x=q.x, y=q.y, z=q.z, w=q.w;
-  f32 xx=x*x, yy=y*y, zz=z*z;
-  f32 xy=x*y, xz=x*z, yz=y*z;
-  f32 wx=w*x, wy=w*y, wz=w*z;
-  m4x4 res = {
-    1-2*(yy+zz), 2*(xy+wz),   2*(xz-wy),   0,
-    2*(xy-wz),   1-2*(xx+zz), 2*(yz+wx),   0,
-    2*(xz+wy),   2*(yz-wx),   1-2*(xx+yy), 0,
-    0,           0,           0,           1,
-  };
-  return res;
-}
-
-m4x4 m4x4_from_m4x3(m4x3 m) {
-  m4x4 res = {
-    m.v[0][0], m.v[0][1], m.v[0][2], 0,
-    m.v[1][0], m.v[1][1], m.v[1][2], 0,
-    m.v[2][0], m.v[2][1], m.v[2][2], 0,
-    m.v[3][0], m.v[3][1], m.v[3][2], 1,
-  };
-  return res;
 }
 
 v4 quat_slerp(v4 a, f32 t, v4 b) {
@@ -1339,6 +1336,30 @@ m4x4 m4x4_inverse(m4x4 m) {
   f32 one_over_det = 1 / dot1;
   
   return m4x4_scale_all_elements(inverse, one_over_det);
+}
+
+m4x4 m4x4_from_quat(v4 q) {
+  f32 x=q.x, y=q.y, z=q.z, w=q.w;
+  f32 xx=x*x, yy=y*y, zz=z*z;
+  f32 xy=x*y, xz=x*z, yz=y*z;
+  f32 wx=w*x, wy=w*y, wz=w*z;
+  m4x4 res = {
+    1-2*(yy+zz), 2*(xy+wz),   2*(xz-wy),   0,
+    2*(xy-wz),   1-2*(xx+zz), 2*(yz+wx),   0,
+    2*(xz+wy),   2*(yz-wx),   1-2*(xx+yy), 0,
+    0,           0,           0,           1,
+  };
+  return res;
+}
+
+m4x4 m4x4_from_m4x3(m4x3 m) {
+  m4x4 res = {
+    m.v[0][0], m.v[0][1], m.v[0][2], 0,
+    m.v[1][0], m.v[1][1], m.v[1][2], 0,
+    m.v[2][0], m.v[2][1], m.v[2][2], 0,
+    m.v[3][0], m.v[3][1], m.v[3][2], 1,
+  };
+  return res;
 }
 
 m4x4 m4x4_inverse_rigid(m4x4 m) {

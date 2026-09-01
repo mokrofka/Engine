@@ -127,7 +127,7 @@ struct R_DrawCall {
   v3 pos;
   v4 rot;
   v3 scale;
-  v4 color;
+  u32 color;
   R_MeshId mesh;
   R_MaterialId mat;
   ShaderType type;

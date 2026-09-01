@@ -15,7 +15,7 @@
 // thread safe allocator
 // glb loader
 // obj mouse selection
-// relook code, more math code
+// relook code, fix vulkan threading issue
 
 #define MESH_LIST \
   X(Cube) \
@@ -247,6 +247,9 @@ struct ThingDesc {
   v3 pos;
   v4 rot;
   v3 scale;
+  v3 vel;
+  u32 color;
+  Rng3 aabb;
   MeshEnum mesh;
   MaterialEnum mat;
 };
@@ -258,14 +261,24 @@ enum {
   ThingFlag_3,
 };
 
+struct ThingList {
+  ThingId first;
+  ThingId last;
+};
+
 Introspect struct Thing {
   u32 nextidx;
   u32 previdx;
   ThingId parent;
   ThingId next;
   ThingId prev;
-  ThingId first;
-  ThingId last;
+  union {
+    ThingList list;
+    struct {
+      ThingId first;
+      ThingId last;
+    };
+  };
   String name;
   EntityFlags flags;
   ThingFlags tflags;
@@ -281,7 +294,7 @@ Introspect struct Thing {
   v3 vel;
   R_MeshId mesh;
   R_MaterialId mat;
-  v4 color;
+  u32 color;
   f32 elapsed;
   u8 buf0[64];
   f32 modify0;
@@ -362,24 +375,18 @@ struct GlobalState {
   PoolLinkList<Thing, MaxEntities, ThingId> entities;
 
   Darray<ThingId> moving_cubes;
-  ThingId axis_attached_to_cam_id;
-  ThingId monkey_id;
-  ThingId rotating_cube_id;
   Map<String, ThingId, 32> find_entity;
 
+  ThingId axis_attached_to_cam_id;
+  ThingId monkey0;
+  ThingId cube0;
+  ThingId cube1;
+  ThingId cube2;
+
   R_FontId font;
-  v3 a;
-  v3 b;
-  v2 a_v2;
-  v2 b_v2;
-  ThingId e;
-  f32 t;
-  v4 color;
-  ThingId my;
-  ThingId thing;
-  v3 euler;
-  v3 point;
-  ThingId t_id;
+  ThingId cube_root;
+  ThingId monkey1;
+  v3 pos_target;
 
   Coroutine co;
 };
@@ -472,6 +479,7 @@ void watch_update();
 ThingDesc default_thing_desc();
 R_MaterialProps default_material_props();
 Thing& get_thing(ThingId id);
+void push_child_thing(ThingId parent, ThingId id);
 R_MeshId get_mesh(MeshEnum id);
 R_MaterialId get_material(MaterialEnum id);
 void mesh_set(MeshEnum mesh_enum, R_MeshId id);
@@ -485,9 +493,9 @@ shared_function void com(HotReloadData* data);
 R_MeshDesc generate_sphere(Allocator arena);
 R_MeshDesc generate_grid(Allocator arena, u32 size, f32 step);
 
-ThingId e_alloc_bare();
-ThingId e_alloc(R_MeshId mesh_id, R_MaterialId material_id, EntityThing thing = {});
-ThingId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing = {});
+// ThingId e_alloc_bare();
+// ThingId e_alloc(R_MeshId mesh_id, R_MaterialId material_id, EntityThing thing = {});
+// ThingId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing = {});
 ThingId make_thing(ThingDesc desc);
 void destroy_thing(ThingId id);
 void select_obj();

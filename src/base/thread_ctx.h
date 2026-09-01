@@ -1,6 +1,11 @@
 #pragma once
 #include "mem.h"
 
+struct TCTX {
+  Arena arenas[2];
+  u32 id;
+};
+
 struct Scratch {
   Temp temp;
   NO_DEBUG operator Allocator();

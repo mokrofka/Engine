@@ -1,13 +1,15 @@
 #pragma once
 #include "base.h"
 
-#define MEM_TRACK 0
+#define MEM_TRACK 1
 
 const u32 MEM_DEFAULT_ALIGNMENT = sizeof(void*);
 
+const u32 ARENA_DEFAULT_RESERVE_SIZE = MB(64);
+const u32 ARENA_DEFAULT_COMMIT_SIZE  = KB(4);
+
 enum AllocatorType {
-  AllocatorType_None,
-  AllocatorType_Arena,
+  AllocatorType_Arena = 1,
   AllocatorType_ArenaList,
   AllocatorType_Alloc,
 };
@@ -60,16 +62,19 @@ struct AllocatorInfo {
   u32 child_count;
 
   String64 name;
+  String64 file;
+  u32 line;
+
   AllocatorType type;
   u32 thread_idx;
 
   u64 pos;
-  u64 exclusive_pos;
+  u64 children_size;
   u64 cap;
-  u64 res;
-  u64 allocs;
-  u64 frees;
-  u64 current_allocs;
+  u64 cmt;
+
+  u64 allocs_count;
+  u64 frees_count;
   u64 allocs_per_frame;
 };
 
@@ -81,9 +86,18 @@ struct AllocatorInfoList {
 
 AllocatorInfoList mem_track_info();
 void mem_track_init();
+void mem_track_end();
 
 ////////////////////////////////////////////////////////////////////////
 // Arena (page allocator)
+
+struct ArenaParams {
+  String name;
+  String file;
+  u32 line;
+  u64 reserve_size;
+  u64 commit_size;
+};
 
 struct Arena {
 #if MEM_TRACK
@@ -96,9 +110,8 @@ struct Arena {
   operator Allocator();
 };
 
-#define arena_make(...) arena_make_(__func__)
-Arena arena_make_named(String name);
-Arena arena_make_(String name);
+#define arena_make(...) _arena_make(ArenaParams{.reserve_size = ARENA_DEFAULT_RESERVE_SIZE, .commit_size = ARENA_DEFAULT_COMMIT_SIZE, .name = __func__, .file = __FILE__, .line = __LINE__, __VA_ARGS__})
+Arena _arena_make(ArenaParams params);
 void  arena_destroy(Arena& arena);
 void  arena_clear(Arena& arena);
 
@@ -140,6 +153,12 @@ struct MemNode {
   MemNode* next;
 };
 
+struct AllocParams {
+  String name;
+  String file;
+  u32 line;
+};
+
 struct Alloc {
 #if MEM_TRACK
   AllocatorInfo* info;
@@ -149,8 +168,9 @@ struct Alloc {
   operator Allocator();
 };
 
-Alloc alloc_make(Allocator alloc);
-void alloc_destroy(Allocator alloc);
+#define alloc_make(alloc, ...) _alloc_make(alloc, AllocParams{.name = __func__, .file = __FILE__, .line = __LINE__, __VA_ARGS__})
+Alloc _alloc_make(Allocator alloc, AllocParams params);
+void alloc_destroy(Alloc alloc);
 
 ////////////////////////////////////////////////////////////////////////
 // tlsf TODO: implement

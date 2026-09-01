@@ -154,6 +154,7 @@ String vk_result_str(VkResult result) {
 
 #define _Def(val, def) (((val) == 0) ? (def) : (val))
 #define _DefSet(val, def) if (val == 0) val = def
+#define _DefIfSet(val, expr, def) if (expr) val = def
 
 VkImageAspectFlags vk_aspect_mask(Gfx_PixelFormat fmt) {
   switch (fmt) {
@@ -2855,7 +2856,7 @@ void gfx_idle() {
 void gfx_init(Gfx_Environment environment) {
   Gfx_State& g = st->gfx;
   g.environment = environment;
-  g.arena = arena_make("gfx arena");
+  g.arena = arena_make(.name = "gfx arena");
 
 #if VulkanUseAllocator
   g._allocator = vk_allocator_create();

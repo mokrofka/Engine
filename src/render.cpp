@@ -613,7 +613,7 @@ void r_apply_state(Gfx_PipelineState s) {
 void r_init() {
   ProfFunc;
   Scratch scratch;
-  Arena arena = arena_make("render arena");
+  Arena arena = arena_make(.name = "render arena");
   R_State& g = st->r;
   g.arena = arena;
   g.gpa = alloc_make(g.arena);
@@ -862,14 +862,10 @@ void r_end() {
           u32 base = gfx_begin_indirect();
           Loop (i, pushes.count) {
             R_DrawCall draw = pushes[i];
-            // m4x4 model = m4x4_scale_translate(draw.scale, draw.pos) * m4x4_from_quat(draw.rot);
             m4x4 model = m4x4_transform(draw.scale, draw.pos, draw.rot);
-            // m4x3 m = m4x3_scale_translate(draw.scale, draw.pos) * m4x3_from_quat(draw.rot);
             var mat = pool_get(g.materials, draw.mat);
             g.gpu_drawcalls[drawcall_count] = {
               .model = model,
-              // .model = m4x4_from_m4x3(m),
-              .m = {},
               .color = draw.color,
               .mat = mat.idx,
               .type = draw.type,

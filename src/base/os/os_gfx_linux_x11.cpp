@@ -272,7 +272,7 @@ u32 os_key_to_character(Key key, OS_Modifiers modifiers) {
 
 void os_gfx_init() {
   X11State& g = gfx_st;
-  g.arena = arena_make("gfx arena");
+  g.arena = arena_make(.name = "gfx arena");
   g.gpa = alloc_make(g.arena);
   g.input_events = array_make(OS_InputEvent, g.gpa);
   g.xcb_events = array_make(xcb_generic_event_t*, g.gpa);

@@ -401,6 +401,7 @@ NO_DEBUG v3  v3_max(v3 a, v3 b);
 NO_DEBUG v3  v3_clamp(v3 min, v3 v, v3 max);
 NO_DEBUG v3  v3_sign(v3 v);
 NO_DEBUG v3  v3_invert(v3 v);
+NO_DEBUG b32 v3_equal(v3 a, v3 b);
 NO_DEBUG v3b v3_greater(v3 a, v3 b);
 NO_DEBUG v3b v3_less(v3 a, v3 b);
 NO_DEBUG b32 v3_greater_all(v3 a, v3 b);
@@ -420,10 +421,10 @@ NO_DEBUG v3  v3_lerp(v3 a, f32 t, v3 b);
 NO_DEBUG v3  v3_hadamard(v3 a, v3 b);
 NO_DEBUG v3  v3_hadamard_div(v3 a, v3 b);
 NO_DEBUG v3  v3_project(v3 a, v3 b);
-NO_DEBUG v3  v3_project_on_unit(v3 a, v3 b);
+NO_DEBUG v3  v3_project_on_norm(v3 a, v3 b);
 NO_DEBUG f32 v3_length_projection(v3 a, v3 b);
 NO_DEBUG v3  v3_reject(v3 a, v3 b);
-NO_DEBUG v3  v3_reject_on_unit(v3 a, v3 b);
+NO_DEBUG v3  v3_reject_on_norm(v3 a, v3 b);
 NO_DEBUG v3  v3_reflect(v3 v, v3 normal);
 NO_DEBUG f32 v3_angle(v3 a, v3 b);
 
@@ -463,6 +464,7 @@ NO_DEBUG v4  v4_set_w(v4 v, f32 w);
 NO_DEBUG v4  v4_min(v4 a, v4 b);
 NO_DEBUG v4  v4_max(v4 a, v4 b);
 NO_DEBUG v4  v4_invert(v4 v);
+NO_DEBUG b32 v4_equal(v4 a, v4 b);
 
 NO_DEBUG f32 v4_length(v4 v);
 NO_DEBUG f32 v4_length_squared(v4 v);
@@ -475,8 +477,8 @@ NO_DEBUG v4  v4_hadamard(v4 a, v4 b);
 
 Transform transform_mul(Transform a, Transform b);
 v3 transform_point(Transform t, v3 p);
-v3 transform_direction(Transform t, v3 v);
 v3 transform_inverse_point(Transform t, v3 p);
+v3 transform_direction(Transform t, v3 v);
 
 ////////////////////////////////////////////////////////////////////////
 // Quatornion
@@ -583,6 +585,7 @@ m4x4 m4x4_transpose(m4x4 matrix);
 m4x4 m4x4_inverse(m4x4 matrix);
 m4x4 m4x4_from_quat(v4 q);
 m4x4 m4x4_from_m4x3(m4x3 m);
+m4x4 m4x4_inverse_rigid(m4x4 m);
 
 ////////////////////////////////////////////////////////////////////////
 // Misc

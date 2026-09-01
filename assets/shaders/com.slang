@@ -136,3 +136,12 @@ v4 rgba_from_u32(u32 hex) {
   return result;
 }
 
+u32 u32_from_rgba(v4 rgba) {
+  u32 result = 0;
+  result |= ((u32)((u8)(rgba.x*255.f))) <<  0;
+  result |= ((u32)((u8)(rgba.y*255.f))) <<  8;
+  result |= ((u32)((u8)(rgba.z*255.f))) << 16;
+  result |= ((u32)((u8)(rgba.w*255.f))) << 24;
+  return result;
+}
+

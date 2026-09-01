@@ -16,9 +16,7 @@ const u32 MEM_ALLOC_TAIL_GUARD     = 0xdeedbeef;
   #define MemGuardDealloc(d, c)
 #endif
 
-const u32 ARENA_DEFAULT_RESERVE_SIZE = MB(64);
-const u32 ARENA_DEFAULT_COMMIT_SIZE  = KB(4);
-const u32 ARENA_LIST_BLOCK_SIZE      = KB(64);
+const u32 ARENA_LIST_BLOCK_SIZE = KB(64);
 
 ////////////////////////////////////////////////////////////////////////
 // Mem track
@@ -28,21 +26,20 @@ const u32 ARENA_LIST_BLOCK_SIZE      = KB(64);
 const u32 MaxAllocators = 128;
 
 struct MemState {
-  Arena arena;
   Mutex mutex;
   AllocatorInfoList roots;
-
   AllocatorInfo* free;
-  AllocatorInfoList list;
-  Array<AllocatorInfo, MaxAllocators> infos;
-  u32 count_alloc;
+  AllocatorInfo infos[MaxAllocators];
+  u32 infos_alocs_per_frame[MaxAllocators];
+  u32 allocated_infos_count;
 };
 
 global MemState mem_track;
+extern thread_local TCTX tctx;
 
-void mem_track_init() {
-  mem_track.mutex = os_mutex_make();
-}
+void mem_track_init() { mem_track.mutex = os_mutex_make(); }
+void mem_track_end() { ArrayZero(mem_track.infos_alocs_per_frame); }
+AllocatorInfoList mem_track_info() { return mem_track.roots; }
 
 AllocatorInfo* mem_track_get_info(Allocator alloc) {
   switch (alloc.type) {
@@ -52,19 +49,24 @@ AllocatorInfo* mem_track_get_info(Allocator alloc) {
   }
 }
 
-AllocatorInfo* mem_track_register(Allocator parent_alloc, AllocatorType type, String name) {
+AllocatorInfo* mem_track_make(Allocator parent_alloc, AllocatorType type, String name, String file, u32 line) {
+  if (PtrMatch(parent_alloc.ctx, &tctx.arenas[0]) || PtrMatch(parent_alloc.ctx, &tctx.arenas[1])) {
+    return null;
+  }
   AllocatorInfo* info = mem_track.free;
   AllocatorInfo* parent = mem_track_get_info(parent_alloc);
   if (info) {
     sll_stack_pop(mem_track.free);
   } else {
-    info = &mem_track.infos[mem_track.count_alloc++];
+    info = &mem_track.infos[mem_track.allocated_infos_count++];
   }
   MemZeroStruct(info);
   
   info->type = type;
   info->thread_idx = tctx_get_id();
   str_copy(info->name, name);
+  str_copy(info->file, file);
+  info->line = line;
   info->parent = parent;
 
   LockScope(mem_track.mutex);
@@ -78,49 +80,55 @@ AllocatorInfo* mem_track_register(Allocator parent_alloc, AllocatorType type, St
   return info;
 }
 
-void mem_track_unregister(Allocator alloc) {
-  AllocatorInfo* info = mem_track_get_info(alloc);
-  LockScope(mem_track.mutex);
-  if (info->parent) {
-    dll_list_remove((*info->parent), info);
-    --info->parent->child_count;
-  } else {
-    dll_list_remove(mem_track.roots, info);
-    --mem_track.roots.count;
+void mem_track_destroy(AllocatorInfo* info) {
+  if (info) {
+    LockScope(mem_track.mutex);
+    if (info->parent) {
+      dll_list_remove((*info->parent), info);
+      --info->parent->child_count;
+    } else {
+      dll_list_remove(mem_track.roots, info);
+      --mem_track.roots.count;
+    }
   }
 }
 
 void mem_track_on_alloc(AllocatorInfo* info, u64 size) {
-  atomic_add(&info->pos, size);
-  atomic_add(&info->exclusive_pos, size);
-  atomic_inc(&info->allocs);
-  atomic_inc(&info->current_allocs);
-  if (info->parent) {
-    atomic_add(&info->parent->pos, size);
+  if (info) {
+    atomic_add(&info->pos, size);
+    atomic_inc(&info->allocs_count);
+    atomic_inc(&mem_track.infos_alocs_per_frame[info - mem_track.infos]);
   }
 }
 
 void mem_track_on_free(AllocatorInfo* info, u64 size) {
-  atomic_sub(&info->pos, size);
-  atomic_sub(&info->exclusive_pos, size);
-  atomic_inc(&info->frees);
-  atomic_dec(&info->current_allocs);
-  if (info->parent) {
-    atomic_sub(&info->parent->pos, size);
+  if (info) {
+    atomic_sub(&info->pos, size);
+    atomic_inc(&info->frees_count);
   }
 }
 
 void mem_track_on_commit(AllocatorInfo* info, u64 size) {
-  atomic_add(&info->cap, size);
+  if (info) {
+    if (info->parent) {
+      atomic_add(&info->parent->children_size, size);
+    }
+    atomic_add(&info->cap, size);
+  }
 }
 
-AllocatorInfoList mem_track_info() {
-  return mem_track.roots;
+void mem_track_reset(AllocatorInfo* info) {
+  info->pos = 0;
+  info->children_size = 0;
+  info->cap = 0;
+  info->allocs_count = 0;
+  info->frees_count = 0;
 }
 
 #else
 AllocatorInfoList mem_track_info() { return {}; }
 void mem_track_init() {}
+void mem_track_end() {}
 #endif
 
 ////////////////////////////////////////////////////////////////////////
@@ -128,28 +136,37 @@ void mem_track_init() {}
 
 Arena::operator Allocator() { return {.type = AllocatorType_Arena, .ctx = this}; }
 
-Arena arena_make_named(String name) {
-  return arena_make_(name);
-}
-
-Arena arena_make_(String name) {
-  u64 reserve_size = ARENA_DEFAULT_RESERVE_SIZE;
+Arena _arena_make(ArenaParams params) {
+  u64 reserve_size = params.reserve_size;
   u8* base = os_reserve(reserve_size);
   Arena result = {
     .base = base,
     .cap = reserve_size,
   };
 #if MEM_TRACK
-  result.info = mem_track_register({}, AllocatorType_Arena, name);
+  result.info = mem_track_make({}, AllocatorType_Arena, params.name, params.file, params.line);
 #endif
   return result;
+}
+
+void destroy(AllocatorInfo* info) {
+  LoopNode (child, info->first) {
+    destroy(child);
+  }
+  mem_track_destroy(info);
+}
+
+void reset(AllocatorInfo* info) {
+  LoopNode (child, info->first) {
+    destroy(child);
+  }
+  mem_track_reset(info);
 }
 
 void arena_destroy(Arena& arena) {
   os_release(arena.base, arena.cap);
 #if MEM_TRACK
-  // TODO: traverse tree
-  mem_track_unregister(arena);
+  destroy(arena.info);
 #endif
 }
 
@@ -157,10 +174,12 @@ void arena_clear(Arena& arena) {
   AsanPoisonMemRegion(arena.base, arena.cmt);
 #if MEM_TRACK
   mem_track_on_free(arena.info, arena.pos);
-  // TODO: traverse tree
+  if (arena.info->first) {
+    reset(arena.info->first);
+  }
 #endif
   arena.pos = 0;
-};
+}
 
 intern u8* arena_alloc(Arena* arena, u64 size, u64 align) {
   u64 pos = AlignUp(arena->pos, align);
@@ -172,7 +191,6 @@ intern u8* arena_alloc(Arena* arena, u64 size, u64 align) {
     MemGuardDealloc(Offset(arena->base, arena->cmt), commit_size);
     AsanPoisonMemRegion(Offset(arena->base, arena->cmt), commit_size);
     arena->cmt += commit_size;
-
 #if MEM_TRACK
     mem_track_on_commit(arena->info, commit_size);
 #endif
@@ -208,7 +226,7 @@ intern u8* arena_realloc_zero(Arena* arena, void* ptr, u64 old_size, u64 new_siz
 
 Temp temp_begin(Arena* arena) {
 #if MEM_TRACK
-  return Temp{arena, arena->pos, arena->info->exclusive_pos};
+  return Temp{arena, arena->pos, arena->info->children_size};
 #endif
   return Temp{arena, arena->pos};
 };
@@ -216,7 +234,6 @@ void temp_end(Temp temp) {
   temp.arena->pos = temp.pos;
 #if MEM_TRACK
   temp.arena->info->pos = temp.arena->pos;
-  temp.arena->info->exclusive_pos = temp.temp_exclusive_pos;
 #endif
 }
 
@@ -311,19 +328,19 @@ struct AllocHeader {
 
 Alloc::operator Allocator() { return {.type = AllocatorType_Alloc, .ctx = this};}
 
-Alloc alloc_make(Allocator alloc) {
+Alloc _alloc_make(Allocator alloc, AllocParams params) {
   Alloc res = {
     .alloc = alloc,
   };
 #if MEM_TRACK
-  res.info = mem_track_register(alloc, AllocatorType_Alloc, {});
+  res.info = mem_track_make(alloc, AllocatorType_Alloc, params.name, params.file, params.line);
 #endif
   return res;
 }
 
-void alloc_destroy(Allocator alloc) {
+void alloc_destroy(Alloc alloc) {
 #if MEM_TRACK
-  mem_track_unregister(alloc);
+  mem_track_destroy(alloc.info);
 #endif
 }
 
@@ -501,7 +518,7 @@ u8* alloc_realloc_zero(Alloc* alloc, void* ptr, u64 old_size, u64 new_size, u64 
 
 u8* mem_alloc(Allocator alloc, u64 size, u64 align) {
   switch (alloc.type) {
-    case AllocatorType_None: InvalidPath;
+    InvalidDefaultCase;
     case AllocatorType_Arena:     return arena_alloc((Arena*)alloc.ctx, size, align);
     case AllocatorType_ArenaList: return arena_list_alloc((ArenaList*)alloc.ctx, size, align);
     case AllocatorType_Alloc:     return alloc_alloc((Alloc*)alloc.ctx, size, align);
@@ -509,7 +526,7 @@ u8* mem_alloc(Allocator alloc, u64 size, u64 align) {
 }
 u8* mem_alloc_zero(Allocator alloc, u64 size, u64 align) {
   switch (alloc.type) {
-    case AllocatorType_None: InvalidPath;
+    InvalidDefaultCase;
     case AllocatorType_Arena:     return arena_alloc_zero((Arena*)alloc.ctx, size, align);
     case AllocatorType_ArenaList: return arena_list_alloc((ArenaList*)alloc.ctx, size, align);
     case AllocatorType_Alloc:     return alloc_alloc_zero((Alloc*)alloc.ctx, size, align);
@@ -517,7 +534,7 @@ u8* mem_alloc_zero(Allocator alloc, u64 size, u64 align) {
 }
 u8* mem_realloc(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 align) {
   switch (alloc.type) {
-    case AllocatorType_None: InvalidPath;
+    InvalidDefaultCase;
     case AllocatorType_Arena:     return arena_realloc((Arena*)alloc.ctx, ptr, old_size, new_size, align);
     case AllocatorType_ArenaList: return arena_list_realloc((ArenaList*)alloc.ctx, ptr, old_size, new_size, align);
     case AllocatorType_Alloc:     return alloc_realloc((Alloc*)alloc.ctx, ptr, old_size, new_size, align);
@@ -525,7 +542,7 @@ u8* mem_realloc(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 alig
 }
 u8* mem_realloc_zero(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 align) {
   switch (alloc.type) {
-    case AllocatorType_None: InvalidPath;
+    InvalidDefaultCase;
     case AllocatorType_Arena:     return arena_realloc_zero((Arena*)alloc.ctx, ptr, old_size, new_size, align);
     case AllocatorType_ArenaList: return arena_list_realloc_zero((ArenaList*)alloc.ctx, ptr, old_size, new_size, align);
     case AllocatorType_Alloc:     return alloc_realloc_zero((Alloc*)alloc.ctx, ptr, old_size, new_size, align);
@@ -533,7 +550,7 @@ u8* mem_realloc_zero(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64
 }
 void mem_free(Allocator alloc, void* ptr, u64 size) {
   switch (alloc.type) {
-    case AllocatorType_None: InvalidPath;
+    InvalidDefaultCase;
     case AllocatorType_Arena:     return;
     case AllocatorType_ArenaList: return;
     case AllocatorType_Alloc:     return alloc_free((Alloc*)alloc.ctx, ptr, size);
