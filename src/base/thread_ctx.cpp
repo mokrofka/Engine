@@ -1,11 +1,5 @@
 #include "base_impl.h"
 
-struct TCTX {
-  Arena arenas[2];
-  u32 id;
-  b32 role;
-};
-
 global thread_local TCTX tctx;
 global u32 _next_thread_id;
 

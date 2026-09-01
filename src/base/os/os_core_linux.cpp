@@ -109,7 +109,7 @@ u64 os_commited_size()       { return os_st.mem_commited; }
 u64 os_reserved_size()       { return os_st.mem_address_space_reserve; }
 
 void os_init(String name) {
-  os_st.arena = arena_make("os arena");
+  os_st.arena = arena_make(.name = "os arena");
   os_st.binary_filepath = name;
   os_st.binary_directory = str_chop_last_slash(name);
   os_st.binary_name = str_skip_last_slash(name);

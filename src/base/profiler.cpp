@@ -7,7 +7,7 @@ void prof_init(Allocator arena) {
   LoopArray (i, g.prof_threads) {
     ProfThread& prof_thread = g.prof_threads[i];
     String str = push_strf(arena, "profiler_st thread %u arena", i);
-    prof_thread.arena = arena_make_named(str);
+    prof_thread.arena = arena_make(.name = str);
     prof_thread.gpa = alloc_make(prof_thread.arena);
     prof_thread.events[0] = array_make(ProfEvent, prof_thread.gpa);
     prof_thread.events[1] = array_make(ProfEvent, prof_thread.gpa);
