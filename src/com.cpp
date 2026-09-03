@@ -802,8 +802,8 @@ void test() {
 }
 
 f64 tsc_to_ms(u64 tsc) { return (f64)tsc/cpu_frequency()*1000; }
-f32 time_dt() { return st->dt; }
-f32 time_now() { return st->time; }
+// f32 time_dt { return st->dt; }
+// f32 time_now { return st->time; }
 b32 time_on_interval(f64 time, f32 delta, f32 interval, f32 offset) {
 	u32 last = (time - offset - delta) / interval;
 	u32 next = (time - offset) / interval;
@@ -856,10 +856,10 @@ b32 time_between(f64 time, f32 start, f32 end) {
   return rng1_contains({start, end}, time);
 }
 
-b32 time_on_interval(f32 interval, f32 offset)         { return time_on_interval(time_now(), time_dt(), interval, offset); }
-b32 time_on_between_interval(f32 interval, f32 offset) { return time_on_between_interval(time_now(), interval, offset); }
-f64 time_since(f64 timestamp) { return time_now() - timestamp; }
-f64 time_until(f64 timestamp) { return timestamp - time_now(); }
+b32 time_on_interval(f32 interval, f32 offset)         { return time_on_interval(time_now, time_dt, interval, offset); }
+b32 time_on_between_interval(f32 interval, f32 offset) { return time_on_between_interval(time_now, interval, offset); }
+f64 time_since(f64 timestamp) { return time_now - timestamp; }
+f64 time_until(f64 timestamp) { return timestamp - time_now; }
 
 #define GEN_ID (__LINE__)
 
@@ -1298,7 +1298,7 @@ void debug_prof_view() {
                 f32 height = 30;
                 f32 height_off = anchor.depth * height;
                 f32 width = (f64)var_tsc_elapsed_incl / tsc_elapsed * avail_size.x;
-                f32 width_off = remapf64(var_tsc_start, tsc_start, tsc_end, 0, avail_size.x);
+                f32 width_off = remap(var_tsc_start, tsc_start, tsc_end, 0, avail_size.x);
                 Rng2 rect = rng2_make(v2(width_off, height_off), v2(width, height));
                 UI_Item item = {
                   .type = UI_ItemType_Bar,
@@ -2693,8 +2693,8 @@ if (data->ctx == null) {
       ProfBlock("frame");
       os_pump_messages();
       u64 now_ns = os_now_ns();
-      g.dt = f64(now_ns - prev_ns) / Billion(1);
-      g.time += g.dt;
+      time_dt = f64(now_ns - prev_ns) / Billion(1);
+      time_now += time_dt;
       prev_ns = now_ns;
       r_begin();
       // ui_begin();
@@ -2970,15 +2970,15 @@ void init_game() {
   {
     ProfBlock("cube");
     // R_Texture cubemap = r_texture_cube_load("night_cubemap");
-    R_TextureId cubemap = r_load_async_cubemap("night_cubemap");
+    // R_TextureId cubemap = r_load_async_cubemap("night_cubemap");
+    R_TextureId cubemap = r_make_texture({.name = "night_cubemap", .is_cube = true, .async = true});
     r_set_cubemap(cubemap);
   }
 
   {
     GlobalState& g = *st;
     var load_mesh = [&](MeshEnum enum_name, String name) {
-      // R_Mesh id = r_mesh_load(name);
-      R_MeshId id = r_load_async_mesh(name);
+      R_MeshId id = r_make_mesh({.name = name, .async = false});
       g.meshes_ids[enum_name] = id;
       String str = push_str_copy(g.arena, name);
       map_set(g.str_to_mesh, str, id);
@@ -2992,8 +2992,7 @@ void init_game() {
     // m_load(Mesh_GreeMan, "greenman.glb");
 
     var load_tex = [&](TextureEnum enum_name, String name) {
-      // R_Texture id = r_texture_load(name);
-      R_TextureId id = r_load_async_texture(name);
+      R_TextureId id = r_make_texture({.name = name, .async = true});
       g.textures_ids[enum_name] = id;
       String str = push_str_copy(g.arena, name);
       map_set(g.str_to_texture, str, id);
@@ -3062,7 +3061,8 @@ void init_game() {
       .pos = v3(0,0,5),
       .yaw = 180,
       .fov = 45,
-      // .speed = 10,
+      .vel_friction = 7.7,
+      .accel = 300,
     };
     cam.dir = {
       CosD(cam.yaw) * CosD(cam.pitch),
@@ -3224,6 +3224,14 @@ void init_game() {
     var desc = default_thing_desc();
     desc.pos = v3(1);
     g.cube2 = make_thing(desc);
+    desc.pos = v3(0,3,0);
+    g.cube3 = make_thing(desc);
+    desc.pos += v3(0,3,0);
+    desc.mat = Material_Container;
+    g.cube4 = make_thing(desc);
+    get_thing(g.cube4).angle = Rad(-160);
+    g.cube5 = make_thing(desc);
+    get_thing(g.cube5).angle = Rad(160);
   }
 }
 
@@ -3281,74 +3289,93 @@ void update_game() {
     m4x4& view = st->view;
     projection = m4x4_perspective(deg2rad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
 
-    // Camera rotation
+    f32 rotation_speed = 180.0f * time_dt;
+    if (os_key_is_down(Key_A)) {
+      cam.yaw += rotation_speed;
+    }
+    if (os_key_is_down(Key_D)) {
+      cam.yaw -= rotation_speed;
+    }
+    if (os_key_is_down(Key_R)) {
+      cam.pitch += rotation_speed;
+    }
+    if (os_key_is_down(Key_F)) {
+      cam.pitch -= rotation_speed;
+    }
+    if (g.fps_camera) {
+      f32 rot_speed = 10;
+      cam.pitch -= os_mouse_dt().y * time_dt * rot_speed;
+      cam.yaw -= os_mouse_dt().x * time_dt * rot_speed;
+    }
+    f32 speed = 1;
+    v3 mov = {};
+    if (os_key_is_down(Key_W)) {
+      mov += m4x4_forward(view);
+    }
+    if (os_key_is_down(Key_S)) {
+      mov += m4x4_backward(view);
+    }
+    if (os_key_is_down(Key_Q)) {
+      mov += m4x4_left(view);
+    }
+    if (os_key_is_down(Key_E)) {
+      mov += m4x4_right(view);
+    }
+    if (os_key_is_down(Key_Space)) {
+      mov.y += 1.0f;
+    }
+    if (os_key_is_down(Key_X)) {
+      mov.y -= 1.0f;
+    }
+    if (os_key_is_down(Key_Shift)) {
+      speed *= 10;
+    }
+    if (os_key_is_down(Key_LAlt)) {
+      speed *= 0.1;
+    }
+    mov *= cam.accel * speed;
+    f32 dt = time_dt;
+
+    cam.vel += mov * dt;
+    cam.pos += cam.vel * dt;
+    cam.vel -= cam.vel * cam.vel_friction * dt;
+    // cam.vel.y -= 9 * dt;
+
+    ImGui::Begin("cam");
+    // ImGui::DragFloat("accel", &cam.accel, 0, 0, 3000);
+    ImGui::DragFloat("vel fric", &cam.vel_friction, 0.1, 0, 100);
+
     {
-      f32 rotation_speed = 180.0f * time_dt();
-      if (os_key_is_down(Key_A)) {
-        cam.yaw += rotation_speed;
-      }
-      if (os_key_is_down(Key_D)) {
-        cam.yaw -= rotation_speed;
-      }
-      if (os_key_is_down(Key_R)) {
-        cam.pitch += rotation_speed;
-      }
-      if (os_key_is_down(Key_F)) {
-        cam.pitch -= rotation_speed;
-      }
-      if (g.fps_camera) {
-        f32 rot_speed = 10;
-        cam.pitch -= os_mouse_dt().y * time_dt() * rot_speed;
-        cam.yaw += os_mouse_dt().x * time_dt() * rot_speed;
-      }
+      var& cube2 = get_thing(g.cube2);
+      var& cube3 = get_thing(g.cube3);
+      var& cube4 = get_thing(g.cube4);
+      // var& cube5 = get_thing(g.cube5);
+      // local f32 deg = 0;
+      // ImGui::DragFloat("angel", &deg);
+      // ImGui::Text("cube5 - cub4 %f", Deg(cube5.angle - cube4.angle));
+      // cube4.angle = Rad(deg);
+      // ImGui::Text("cube4 wrap_pi %f", Deg(wrap_pi(cube4.angle)));
+      // ImGui::Text("cube4 wrap_2pi %f", Deg(wrap_2pi(cube4.angle)));
+      // ImGui::Text("wrap_pi(cube5 - cub4) %f", Deg(wrap_pi(cube5.angle - cube4.angle)));
+      // ImGui::Text("wrap_2pi(cube5 - cub4) %f", Deg(wrap_2pi(cube5.angle - cube4.angle)));
+      // cube3.pos = v3_lerp(cube3.pos, 0.50 * dt, cam.pos);
+      // cube3.pos += (cam.pos - cube3.pos)*0.50 * dt;
+      // a = (a, 0.01*dt, b);
+
+
+      // f32 t = 1.0f - Pow(0.5f, dt);
+      // f32 t = 1.0f - Exp(-111.9 * dt);
+      // cube3.pos += (cam.pos - cube3.pos) * t;
+      // cube3.pos.x += (cube2.pos.x - cube3.pos.x) * t;
+
+      cube3.pos.x = exp_decay(cube3.pos.x, cube2.pos.x, 1.1f, dt);
+
+      ImGui::DragFloat3("drag", cube4.pos.v, 0.1);
     }
 
-    // Camera movement
-    {
-      cam.accel = {};
-      f32 speed = 320;
-      if (os_key_is_down(Key_W)) {
-        v3 forward = m4x4_forward(view);
-        cam.accel += forward;
-      }
-      if (os_key_is_down(Key_S)) {
-        v3 backward = m4x4_backward(view);
-        cam.accel += backward;
-      }
-      if (os_key_is_down(Key_Q)) {
-        v3 left = m4x4_left(view);
-        cam.accel += left;
-      }
-      if (os_key_is_down(Key_E)) {
-        v3 right = m4x4_right(view);
-        cam.accel += right;
-      }
-      if (os_key_is_down(Key_Space)) {
-        cam.accel.y += 1.0f;
-      }
-      if (os_key_is_down(Key_X)) {
-        cam.accel.y -= 1.0f;
-      }
-      if (os_key_is_down(Key_Shift)) {
-        speed *= 10;
-      }
-      if (os_key_is_down(Key_LAlt)) {
-        speed *= 0.1;
-      }
-      // velocity = v3_norm(velocity);
-      // cam.vel += accel * 10 * get_dt();
-      // cam.pos += cam.vel * get_dt();
-      // cam.pos = 0.5 * accel * Square(get_dt()) + cam.vel * get_dt() + cam.pos;
-      // cam.vel = accel * get_dt() * 10 + cam.vel;
-      // cam.pos += velocity * speed * get_dt();
-      f32 dt = time_dt();
-      // cam.pos += cam.vel*dt + 0.5*accel*Square(dt);
-      // cam.vel += accel*dt;
-      cam.vel += speed * cam.accel * dt;
-      cam.vel += -cam.vel * 8.0 * dt;
-      cam.pos += cam.vel * dt;
-      // cam.accel += -cam.vel * 0.4;
-    }
+    ImGui::End();
+
+    // cam.pos -= v3(0,1,0) * 10 * time_dt;
     // cam.pitch = Clamp(-89.0f, cam.pitch, 89.0f);
     // cam.dir = {
     //   CosD(cam.yaw) * CosD(cam.pitch),
@@ -3356,10 +3383,8 @@ void update_game() {
     //   SinD(cam.yaw) * CosD(cam.pitch)
     // };
     // view = m4x4_look_at(cam.pos, cam.pos + cam.dir);
-
     v4 yaw = quat_axis_angle(v3_up(), deg2rad(cam.yaw));
     v4 pitch = quat_axis_angle(v3_right(), deg2rad(-cam.pitch));
-
     v4 quat = quat_mul(yaw, pitch);
     cam.dir = quat_forward(quat);
     view = m4x4_look_at(cam.pos, cam.pos + cam.dir, quat_up(quat));
@@ -3378,10 +3403,10 @@ void update_game() {
   {
     Thing& cube0 = get_thing(g.cube0);
     Thing& monkey = get_thing(g.monkey0);
-    monkey.pos.x += 0.1 * time_dt();
-    cube0.pos.x = monkey.pos.x + Sin(time_dt()) * 4;
-    cube0.pos.z = monkey.pos.z + Cos(time_dt()) * 4;
-    cube0.pos.y = monkey.pos.z + Cos(time_dt()) * 4;
+    monkey.pos.x += 0.1 * time_dt;
+    cube0.pos.x = monkey.pos.x + Sin(time_dt) * 4;
+    cube0.pos.z = monkey.pos.z + Cos(time_dt) * 4;
+    cube0.pos.y = monkey.pos.z + Cos(time_dt) * 4;
     r_draw_cuboid(rng3_shift(monkey.aabb, monkey.pos), ColorWhite);
     Thing& cube1 = get_thing(g.cube1);
     // v2_rotate_relative(a, b, cosine, sine);
@@ -3390,37 +3415,30 @@ void update_game() {
     // e.pos = v3_rotate_z(e.pos, degtorad(20) * get_dt());
     // e.pos = v3_rotate_y(e.pos, degtorad(20) * get_dt());
     // e.pos = v3_rotate_z(e.pos, degtorad(20) * get_dt());
-    cube1.pos = v3_rotate_around_axis(cube1.pos, v3(1,1,1), deg2rad(60)*time_dt());
+    cube1.pos = v3_rotate_around_axis(cube1.pos, v3(1,1,1), deg2rad(60)*time_dt);
 
     {
       var& thing = get_thing(g.cube2);
-      // f32 t = time_triangle_wave(get_time(), 1);
-      // t = ease_sin_in_out(t) * 10;
-      // t = smoothstep(t);
-      // t = smoothstep(t);
-      // t = ease_cube_in(t);
-      // thing.pos.x = Lerp(-10, t, 10);
-      // thing.pos.x = Lerp(-10, time_interval_progress(get_time(), 2, 0), 10);
-      // thing.pos.x = Lerp(-10, time_smooth_wave(get_time(), 2), 10);
-      // thing.pos.x = Lerp(-10, time_sine_wave(get_time(), 2), 10);
-      // thing.pos.x = Lerp(-10, time_triangle(get_time(), 2), 10);
-      thing.pos.x = Lerp(-10, time_smooth_wave(time_now(), 2), 10);
-      thing.rot = quat_axis_angle(v3_up(), time_now());
-      // thing.scale = v3(2);
-      // thing.pos = v3_rotate_x(thing.pos, get_dt());
-      // thing.pos = quat_rotate(quat_axis_angle(v3_up(), get_time()), v3(10,10,10));
-      // thing.pos = v3_rotate_around_pivot(thing.pos, v3(1), quat_axis_angle(v3(1), get_time()));
-      // t1.pos = quat_rotate(t1.rot, v3_right());
-      // v4 q = quat_axis_angle(v3(0, 1, 0), PI / 2);
-      // t1.pos = quat_rotate(q, v3_forward());
-      // t1.pos = v3(-1);
+      thing.scale = v3(1,1,3);
+      // thing.pos.x = Lerp(-10, time_smooth_wave(time_now, 2), 10);
+      thing.rot = quat_axis_angle(v3_up(), time_now);
+    }
+
+    {
+      var& cube4 = get_thing(g.cube4);
+      var& cube5 = get_thing(g.cube5);
+      f32 dst = 10;
+      cube4.pos = v2_to_v3(v2_from_angle(cube4.angle), 0) * dst;
+      cube5.pos = v2_to_v3(v2_from_angle(cube5.angle), 0) * dst;
+      // cube4.angle = angle_move_toward(cube4.angle, cube5.angle, 0.1, time_dt);
+      
     }
 
     {
       Thing& e = get_thing(g.monkey1);
       // e.rot = quat_look_rotation(v3_back(), v3(0,1,0));
       // e.rot = quat_look_rotation(g.pos_target - e.pos, v3(0,1,0));
-      e.rot = quat_axis_angle(v3_up(),time_now());
+      e.rot = quat_axis_angle(v3_up(),time_now);
       r_draw_line(e.pos, e.pos + quat_right(e.rot)*2, ColorRed);
       r_draw_line(e.pos, e.pos + quat_up(e.rot)*2, ColorGreen);
       r_draw_line(e.pos, e.pos + quat_forward(e.rot)*2, ColorBlue);
@@ -3435,7 +3453,7 @@ void update_game() {
 
     {
       var& my = get_thing(g.cube_root);
-      my.pos.z += time_dt() * 1;
+      my.pos.z += time_dt * 1;
       u32 i = 1;
       LoopHNode (it, my.first, g.entities.data) {
         var& child = get_thing(it);
@@ -3488,12 +3506,12 @@ void update_game() {
   // Moving cubes
   Loop (i, g.moving_cubes.count) {
     Thing& e = get_thing(g.moving_cubes[i]);
-    e.pos += e.vel * time_dt();
+    e.pos += e.vel * time_dt;
     v3 center = {0, 0, 0};
     v3 dir = e.pos - center;
     v3 tangent = v3_norm(v3{-dir.z, 0, dir.x});
-    e.vel += tangent * 2.0f * time_dt();
-    e.vel += -dir * 0.5f * time_dt();
+    e.vel += tangent * 2.0f * time_dt;
+    e.vel += -dir * 0.5f * time_dt;
   }
 
   ///////////////////////////////////

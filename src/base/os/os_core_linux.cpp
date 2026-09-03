@@ -314,7 +314,6 @@ FileProperties os_file_path_properties(String path) {
 }
 
 Slice<u8> os_file_path_read_all(Allocator arena, String path) {
-  Scratch scratch(arena);
   OS_Handle f = os_file_open(path, OS_AccessFlag_Read);
   u64 file_size = os_file_size(f);
   Slice buffer = push_buffer_slice(arena, file_size);

@@ -39,27 +39,26 @@ struct Image {
 };
 
 struct R_TextureDesc {
+  String name;
   u32 width;
   u32 height;
-  u8* data;
+  union {
+    u8* data;
+    u8* cube[6];
+  };
   Gfx_PixelFormat pixel_format;
-  b32 is_async;
+  b32 async;
+  b32 is_cube;
 };
 
 struct R_Texture {
-  u32 width;
-  u32 height;
   Gfx_Image image;
   Gfx_View view;
 };
 
-struct R_CubeMapDesc {
-  u32 width;
-  u32 height;
-  u8* cubes[6];
-};
-
 struct R_MeshDesc {
+  String name;
+  b32 async;
   Slice<R_Vertex> vertices;
   Slice<u32> indices;
   f32 bounds_min;
@@ -117,7 +116,7 @@ struct R_Glyph {
   f32 xoff, yoff, xadvance;
 };
 
-struct R_FontData {
+struct R_Font {
   u32 font_height;
   R_TextureId texture;
   R_Glyph glyphs[96];
@@ -184,11 +183,6 @@ struct R_RenderTarget {
   R_Attachment depth;
 };
 
-struct R_AsyncMesh {
-  R_MeshId mesh;
-  R_MeshData data;
-};
-
 struct R_Camera {
   v3 pos;
   v4 rot;
@@ -197,6 +191,13 @@ struct R_Camera {
   f32 far_plane;
   b32 orthographic;
   f32 ortho_size;
+};
+
+struct R_AsyncView {
+  Gfx_Image image;
+  Gfx_View view;
+  u32 counter;
+  R_TextureId tex;
 };
 
 struct R_State {
@@ -214,11 +215,12 @@ struct R_State {
   Pool<Gfx_Mesh, R_MaxMeshes, R_MeshId> meshes;
   Pool<R_Texture, R_MaxTextures, R_TextureId> textures;
   Pool<R_MeshData, R_MaxMeshes, R_MeshId> new_meshes;
-  Pool<R_FontData, R_MaxFonts, R_FontId> fonts;
+  Pool<R_Font, R_MaxFonts, R_FontId> fonts;
 
   Gfx_Pipeline uber_pip;
   Gfx_Pipeline uber_pip_screen;
   Gfx_Pipeline ui_rect_pip;
+  Gfx_Pipeline cur_pip;
   Gfx_Pipeline prev_pip;
   Gfx_PipelineState prev_pip_state;
   Gfx_Sampler com_sampler;
@@ -237,8 +239,8 @@ struct R_State {
   Array<R_Vertex, R_MaxDebugLines> draw_lines_persistent;
   Array<R_UI_Rect, R_MaxDebugLines> draw_rects;
 
-  Queue<R_AsyncMesh, 12> async_mesh;
-  Mutex async_stage_mutex;
+  Queue<R_AsyncView, 16> async_view;
+  Mutex async_mutex;
   R_TextureId dummy_texture;
   R_TextureId dummy_cubemap;
   R_TextureId dummy_mesh;
@@ -276,23 +278,20 @@ void r_destroy_render_target(R_RenderTarget rt);
 void r_recreate_render_target(R_RenderTarget* rt, v2u size);
 Gfx_Attachments r_render_target_to_attachments(R_RenderTarget rt);
 
-u32 r_texture_get_descriptor_idx(R_TextureId id);
 R_TextureDesc r_load_image(String name);
-R_TextureId r_load_texture(String name);
-R_TextureId r_load_async_texture(String name);
-R_TextureId r_make_texture(R_TextureDesc tex);
-R_TextureId r_make_cubemap(R_CubeMapDesc desc);
-R_TextureId r_load_cubemap(String dir);
-R_TextureId r_load_async_cubemap(String dir);
-void r_set_cubemap(R_TextureId cubemap);
-void r_texture_update(R_TextureId t, u8* data);
-void r_texture_readback(R_TextureId t, u8* dst);
-void r_texture_destroy(R_TextureId t);
-
-R_MeshId r_load_mesh(String name);
-R_MeshId r_load_async_mesh(String name);
+R_TextureDesc r_load_cubemap(String dir);
+R_MeshDesc r_load_mesh(String name);
+R_TextureId r_make_texture(R_TextureDesc desc);
 R_MeshId r_make_mesh(R_MeshDesc desc);
+
+Gfx_Mesh r_upload_mesh(R_MeshDesc desc);
+void r_readback_texture(R_TextureId t, u8* dst);
+u32 r_texture_descriptor_idx(R_TextureId id);
+void r_set_cubemap(R_TextureId cubemap);
+
+void r_update_texture(R_TextureId t, u8* data);
 void r_update_mesh(R_MeshId mesh, R_MeshDesc desc);
+void r_destroy_texture(R_TextureId t);
 void r_destroy_mesh(R_MeshId mesh);
 
 // TODO: primitives gen, drawing

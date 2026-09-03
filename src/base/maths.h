@@ -11,6 +11,8 @@ const f32 MachineEpsilon = 1.1920929e-7f;
 
 f32 deg2rad(f32 degrees);
 f32 rad2deg(f32 radians);
+f32 Rad(f32 deg);
+f32 Deg(f32 rad);
 
 ///////////////////////////////////
 // v2
@@ -284,15 +286,27 @@ i32 wrap_i32(i32 min, i32 x, i32 max);
 f32 wrap_f32(f32 min, f32 x, f32 max);
 f32 Lerp(f32 a, f32 t, f32 b);
 f32 LerpClamp(f32 a, f32 t, f32 b);
-f32 Unlerp(f32 a, f32 x, f32 b);
-f64 Unlerpf64(f64 a, f64 x, f64 b);
+f32 unlerp(f32 a, f32 x, f32 b);
+f64 unlerp(f64 a, f64 x, f64 b);
 f32 norm(f32 min, f32 x, f32 max);
 f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
 f32 remap(f32 x, f32 old_max, f32 new_max);
-f64 remapf64(f64 x, f64 old_min, f64 old_max, f64 new_min, f64 new_max);
+f64 remap(f64 x, f64 old_min, f64 old_max, f64 new_min, f64 new_max);
 f32 remap_clamped(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
 f32 remap01(f32 t, f32 lo, f32 hi);
-f32 approach(f32 current, f32 target, f32 step);
+f32 approach(f32 from, f32 to, f32 step);
+
+f32 exp_decay(f32 x, f32 target, f32 decay, f32 dt);
+
+f32 wrap_2pi(f32 a);
+f32 wrap_pi(f32 a);
+f32 angle_delta(f32 from, f32 to);
+f32 angle_delta_cw(f32 from, f32 to);
+f32 angle_delta_ccw(f32 from, f32 to);
+f32 angle_delta_longest(f32 from, f32 to);
+f32 angle_approach(f32 from, f32 to, f32 step);
+
+v3 v3_bezier2(v3 p0, v3 p1, v3 p2, f32 t);
 
 ////////////////////////////////////////////////////////////////////////
 // Vector2
@@ -348,17 +362,19 @@ NO_DEBUG f32 v2_cross(v2 a, v2 b);
 NO_DEBUG v2  v2_lerp(v2 a, f32 t, v2 b);
 NO_DEBUG v2  v2_hadamard(v2 a, v2 b);
 NO_DEBUG v2  v2_hadamard_div(v2 a, v2 b);
-NO_DEBUG v2  v2_project(v2 a, v2 b);
-NO_DEBUG v2  v2_project_on_unit(v2 a, v2 b);
-NO_DEBUG f32 v2_length_projection(v2 a, v2 b);
-NO_DEBUG v2  v2_reject(v2 a, v2 b);
-NO_DEBUG v2  v2_reflect(v2 v, v2 normal);
+NO_DEBUG v2  v2_project(v2 v, v2 dir);
+NO_DEBUG v2  v2_project_on_unit(v2 v, v2 dir);
+NO_DEBUG f32 v2_project_length(v2 v, v2 dir);
+NO_DEBUG v2  v2_reject(v2 v, v2 dir);
+NO_DEBUG v2  v2_reject_on_unit(v2 v, v2 dir);
+NO_DEBUG v2  v2_reflect(v2 v, v2 norm);
 NO_DEBUG f32 v2_angle(v2 a, v2 b);
 NO_DEBUG f32 v2_angle(v2 v);
 NO_DEBUG v2  v2_from_angle(f32 rad);
 
 v2 v2_approach(v2 current, v2 target, f32 step);
 v2 v2_clamp_length(f32 min, v2 v, f32 max);
+v2 v2_bounce(v2 v, v2 normal, f32 restitution);
 
 NO_DEBUG v2  v2_flip_y(v2 v);
 NO_DEBUG v2  v2_remap_01_to_11(v2 pos, v2 range);
@@ -430,6 +446,7 @@ NO_DEBUG f32 v3_angle(v3 a, v3 b);
 
 v3 v3_approach(v3 current, v3 target, f32 step);
 v3 v3_clamp_length(f32 min, v3 v, f32 max);
+v3 v3_bounce(v3 v, v3 normal, f32 restitution);
 
 NO_DEBUG v3  v3_pos_of_mat4(m4x4 mat);
 NO_DEBUG v3  v3_rotate_x(v3 v, f32 rad);
