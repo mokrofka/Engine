@@ -4,6 +4,8 @@ v2::v2(const v2u& v):x(v.x),y(v.y){}
 
 f32 deg2rad(f32 degrees) { return degrees * PI / 180.0f; }
 f32 rad2deg(f32 radians) { return radians * 180.0f / PI; }
+f32 Rad(f32 deg) { return deg * PI / 180.0f; }
+f32 Deg(f32 rad) { return rad * 180.0f / PI; }
 
 f32 Sin(f32 x)                         { return __builtin_sinf(x); }
 f32 Cos(f32 x)                         { return __builtin_cosf(x); }
@@ -132,16 +134,66 @@ f32 wrap_f32(f32 min, f32 x, f32 max) {
 }
 f32 Lerp(f32 a, f32 t, f32 b)      { return (1 - t)*a + t*b; }
 f32 LerpClamp(f32 a, f32 t, f32 b) { return Lerp(a, Clamp01(t), b); }
-f32 Unlerp(f32 a, f32 x, f32 b)    { return (x - a) / (b - a); }
-f64 Unlerpf64(f64 a, f64 x, f64 b) { return (x - a) / (b - a); }
+f32 unlerp(f32 a, f32 x, f32 b)    { return (x - a) / (b - a); }
+f64 unlerp(f64 a, f64 x, f64 b) { return (x - a) / (b - a); }
 f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max)    { return (x - old_min) / (old_max - old_min) * (new_max - new_min) + new_min; }
 f32 remap(f32 x, f32 old_max, f32 new_max)                              { return x / old_max * new_max; }
-f64 remapf64(f64 x, f64 old_min, f64 old_max, f64 new_min, f64 new_max) { return (x - old_min) / (old_max - old_min) * (new_max - new_min) + new_min; }
+f64 remap(f64 x, f64 old_min, f64 old_max, f64 new_min, f64 new_max) { return (x - old_min) / (old_max - old_min) * (new_max - new_min) + new_min; }
 f32 remap_clamped(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max) {
   return remap(Clamp(old_min, x, old_max), old_min, old_max, new_min, new_max);
 }
 f32 remap01(f32 t, f32 lo, f32 hi) { return lo + t * (hi - lo); }
-f32 approach(f32 current, f32 target, f32 step) { return current < target ? Min(current + step, target) : Max(current - step, target); }
+f32 approach(f32 from, f32 to, f32 step) {
+  f32 d = to - from;
+  if (Abs(d) <= step) {
+    return to;
+  }
+  return from + Sign(d)*step;
+}
+
+f32 exp_decay(f32 x, f32 target, f32 decay, f32 dt) {
+  return target + (x - target) * Exp(-decay * dt);
+}
+
+f32 wrap_2pi(f32 a) {
+  a = Mod(a, 2 * PI);
+  if (a < 0)
+    a += 2 * PI;
+  return a;
+}
+f32 wrap_pi(f32 a) { return wrap_2pi(a + PI) - PI; }
+
+f32 angle_delta(f32 from, f32 to)     { return wrap_pi(to - from); }
+f32 angle_delta_cw(f32 from, f32 to)  { return wrap_2pi(to - from); }
+f32 angle_delta_ccw(f32 from, f32 to) { return wrap_2pi(from - to); }
+f32 angle_delta_longest(f32 from, f32 to) {
+  f32 d = wrap_pi(to - from);
+  if (d > 0)
+    return d - 2*PI;
+  else if (d < 0)
+    return d + 2*PI;
+  return 0;
+}
+f32 angle_approach(f32 from, f32 to, f32 step) {
+  f32 d = angle_delta(from, to);
+  if (Abs(d) <= step)
+    return to;
+  return from + Sign(d)*step;
+}
+
+v3 v3_bezier2(v3 p0, v3 p1, v3 p2, f32 t) {
+  v3 a = v3_lerp(p0, t, p1);
+  v3 b = v3_lerp(p1, t, p2);
+  return v3_lerp(a, t, b);
+}
+v3 v3_bezier3(v3 p0, v3 p1, v3 p2, v3 p3, f32 t) {
+  v3 a = v3_lerp(p0, t, p1);
+  v3 b = v3_lerp(p1, t, p2);
+  v3 c = v3_lerp(p2, t, p3);
+  v3 d = v3_lerp(a, t, b);
+  v3 e = v3_lerp(b, t, c);
+  return v3_lerp(d, t, e);
+}
 
 ////////////////////////////////////////////////////////////////////////
 // Vector2
@@ -197,11 +249,14 @@ f32 v2_cross(v2 a, v2 b)                        { return a.x*b.y - a.y*b.x; }
 v2  v2_lerp(v2 a, f32 t, v2 b)                  { return v2(Lerp(a.x, t, b.x), Lerp(a.y, t, b.y));}
 v2  v2_hadamard(v2 a, v2 b)                     { return v2(a.x*b.x, a.y*b.y); }
 v2  v2_hadamard_div(v2 a, v2 b)                 { return v2(a.x/b.x, a.y/b.y); }
-v2  v2_project(v2 a, v2 b)                      { return v2_dot(a, b) / v2_length_sqr(b) * b; }
-v2  v2_project_on_unit(v2 a, v2 b)              { return v2_dot(a, b) * b; }
-f32 v2_length_projection(v2 a, v2 b)            { return v2_dot(a, v2_norm(b)); }
-v2  v2_reject(v2 a, v2 b)                       { return a - v2_project(a, b); }
-v2  v2_reflect(v2 v, v2 normal)                 { return v - 2*normal*v2_dot(v, normal); }
+v2  v2_project(v2 v, v2 dir)                    { return v2_dot(v, dir) / v2_length_sqr(dir) * dir; }
+v2  v2_project_on_unit(v2 v, v2 dir)            { return v2_dot(v, dir) * dir; }
+f32 v2_project_length(v2 v, v2 dir)             { return v2_dot(v, v2_norm(dir)); }
+f32 v2_project_length_on_unit(v2 v, v2 dir)     { return v2_dot(v, dir); }
+v2  v2_reject(v2 v, v2 dir)                     { return v - v2_project(v, dir); }
+v2  v2_reject_on_unit(v2 v, v2 dir)             { return v - v2_project_on_unit(v, dir); }
+v2  v2_reflect(v2 v, v2 norm)                   { return v - 2*v2_project(v, norm); }
+v2  v2_reflect_on_unit(v2 v, v2 norm)           { return v - 2*v2_project_on_unit(v, norm); }
 f32 v2_angle(v2 a, v2 b)                        { return Atan2(v2_cross(a, b), v2_dot(a, b)); }
 f32 v2_angle(v2 v)                              { return Atan2(v.y, v.x); }
 v2  v2_from_angle(f32 rad)                      { return v2(Cos(rad), Sin(rad)); }
@@ -231,6 +286,7 @@ v2 v2_clamp_length(f32 min, v2 v, f32 max) {
   }
   return res;
 }
+v2 v2_bounce(v2 v, v2 normal, f32 restitution) { return v - (1 + restitution) * v2_project_on_unit(v, normal); }
 
 ////////////////////////////////////////////////////////////////////////
 // Vector3
@@ -283,11 +339,11 @@ v3  v3_cross(v3 a, v3 b)             { return v3(a.y*b.z - a.z*b.y, a.z*b.x - a.
 v3  v3_lerp(v3 a, f32 t, v3 b)       { return v3(Lerp(a.x, t, b.x), Lerp(a.y, t, b.y), Lerp(a.z, t, b.z)); }
 v3  v3_hadamard(v3 a, v3 b)          { return v3(a.x*b.x, a.y*b.y, a.z*b.z); }
 v3  v3_hadamard_div(v3 a, v3 b)      { return v3(a.x/b.x, a.y/b.y, a.z/b.z); }
-v3  v3_project(v3 a, v3 b)           { return v3_dot(a, b) / v3_length_sqr(b) * b; }
-v3  v3_project_on_norm(v3 a, v3 b)   { return v3_dot(a, b) * b; }
+v3  v3_project(v3 v, v3 dir)         { return v3_dot(v, dir) / v3_length_sqr(dir) * dir; }
+v3  v3_project_on_norm(v3 v, v3 dir) { return v3_dot(v, dir) * dir; }
 f32 v3_length_projection(v3 a, v3 b) { return v3_dot(a, v3_norm(b)); }
-v3  v3_reject(v3 a, v3 b)            { return a - v3_project(a, b); }
-v3  v3_reject_on_norm(v3 a, v3 b)    { return a - v3_project_on_norm(a, b); }
+v3  v3_reject(v3 v, v3 dir)          { return v - v3_project(v, dir); }
+v3  v3_reject_on_norm(v3 v, v3 dir)  { return v - v3_project_on_norm(v, dir); }
 v3  v3_reflect(v3 v, v3 n)           { return v - 2*n*v3_dot(v, n); }
 f32 v3_angle(v3 a, v3 b)             { return Atan2(v3_length(v3_cross(a, b)), v3_dot(a, b)); }
 v3  v3_bounce(v3 vel, v3 n, f32 restitution) { return vel - v3_project_on_norm(vel, n) * (1.0f + restitution); }
@@ -474,7 +530,6 @@ v3 quat_rotate(v4 q, v3 v) {
   v3 u = v3_of_v4(q);
   f32 s = q.w;
   v3 t = 2 * v3_cross(u, v);
-  // result = v + s*t + cross(u, t)
   v3 cross_ut = v3_cross(u, t);
   v3 res = {
     v.x + s * t.x + cross_ut.x,
@@ -1156,9 +1211,9 @@ m4x4 m4x4_transform(v3 scale, v3 pos, v4 q) {
 }
 
 m4x4 m4x4_scale_all_elements(m4x4 mat, f32 scale) {
-  Loop (row, 4) {
-    Loop (col, 4) {
-      mat.v[row][col] *= scale;
+  Loop (y, 4) {
+    Loop (x, 4) {
+      mat.v[y][x] *= scale;
     }
   }
   return mat;
@@ -1444,7 +1499,7 @@ f32 rng1_clamp(Rng1 r, f32 x)          { return Clamp(r.min, x, r.max); }
 Rng1 rng1_subrng(Rng1 r, Rng1 sub)   { return Rng1(r.min + sub.min, r.min+sub.min + rng1_dim(sub)); }
 Rng1 rng1_subrng01(Rng1 r, Rng1 sub) { f32 w = rng1_dim(r); return Rng1(r.min + w*sub.min, r.min + w*sub.max); }
 f32 rng1_lerp(Rng1 r, f32 t)         { return Lerp(r.min, t, r.max); } 
-f32 rng1_unlerp(Rng1 r, f32 x)       { return Unlerp(r.min, x, r.max); }
+f32 rng1_unlerp(Rng1 r, f32 x)       { return unlerp(r.min, x, r.max); }
 
 ///////////////////////////////////
 // Dim2

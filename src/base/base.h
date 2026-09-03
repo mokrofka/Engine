@@ -751,4 +751,7 @@ f32x4 simd_clamp01(f32x4 x);
 #define SimdShuffle(a, b, c, d) (((d) << 6) | ((c) << 4) | ((b) << 2) | (a))
 #define simd_shuffle(a, b, imm) f32x4(_mm_shuffle_ps(a.p, b.p, imm))
 
+extern f32 time_dt;
+extern f32 time_now;
+
 

@@ -227,9 +227,9 @@ Introspect struct Camera {
   f32 yaw;
   f32 pitch;
   f32 fov;
-  // f32 speed;
+  f32 accel;
   v3 vel;
-  v3 accel;
+  f32 vel_friction;
 };
 
 typedef u32 EntityFlags;
@@ -304,6 +304,7 @@ Introspect struct Thing {
   f32 modify2;
   u8 buf3[64];
   f32 modify3;
+  f32 angle;
 };
 
 struct UI_State {
@@ -332,8 +333,6 @@ struct GlobalState {
   Arena arena;
   Arena frame_arena;
   Alloc gpa;
-  f32 dt;
-  f64 time;
   u32 current_frame;
   b32 should_hotreload;
   m4x4 view;
@@ -382,6 +381,9 @@ struct GlobalState {
   ThingId cube0;
   ThingId cube1;
   ThingId cube2;
+  ThingId cube3;
+  ThingId cube4;
+  ThingId cube5;
 
   R_FontId font;
   ThingId cube_root;
@@ -395,8 +397,8 @@ extern GlobalState* st;
 
 void test();
 f64 tsc_to_ms(u64 tsc);
-f32 time_dt();
-f32 time_now();
+// f32 time_dt;
+// f32 time_now;
 b32 time_on_interval(f64 time, f32 delta, f32 interval, f32 offset);
 u32 time_on_interval_steps(f64 time, f32 delta, f32 interval, f32 offset);
 f64 time_next_interval(f64 time, f32 interval, f32 offset);

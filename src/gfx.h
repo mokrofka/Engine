@@ -402,6 +402,19 @@ struct Gfx_BufferDesc {
   Gfx_Buffer* out_buffer;
 };
 
+enum Gfx_StageBufferCmdType {
+  Gfx_StageBufferCmdType_UploadTexture = 1,
+  Gfx_StageBufferCmdType_UploadMesh,
+};
+
+struct Gfx_StageBufferCmd {
+  Gfx_StageBufferCmdType type;
+  Gfx_Image img;
+  Gfx_Buffer buf;
+  b32 mipmaps;
+  u64 offset;
+  u64 size;
+};
 
 ////////////////////////////////////////////////////////////////////////
 // @Vulkan
@@ -430,8 +443,8 @@ enum {
   VK_Access_TransferSrc = Bit(1),
 
   // Vertex
-  VK_Access_VertBuffer = Bit(2),
-  VK_Access_IndexBuffer = Bit(3),
+  // VK_Access_VertBuffer = Bit(2),
+  // VK_Access_IndexBuffer = Bit(3),
 
   // Shader reads
   VK_Access_StorageBuffer_RO = Bit(4),
@@ -555,6 +568,7 @@ struct VK_Device {
   VkQueue transfer_queue;
   VkQueue compute_queue;
   VkCommandPool cmd_pool;
+  VkCommandPool upload_cmd_pool;
   VkPhysicalDeviceProperties properties;
   VkPhysicalDeviceFeatures features;
   VkPhysicalDeviceMemoryProperties memory;
@@ -572,11 +586,6 @@ struct VK_Swapchain {
   VK_Image depth_attachment;
   VkSwapchainKHR h_old;
   VkImageView old_view[Gfx_MaxImagesInFlight];
-};
-
-struct VK_Semaphore {
-  VkSemaphore h;
-  u64 counter;
 };
 
 struct VK_PushConstant {
@@ -609,25 +618,19 @@ VkSemaphore vk_get_cur_image_available_semaphore();
 VkSemaphore vk_get_cur_render_complete_semaphore();
 VkCommandBuffer vk_cur_cmd();
 
-void vk_bind_pipeline(VkPipeline pipeline);
 u32 vk_find_memory_idx(u32 type_filter, u32 property_flags);
 void vk_push_constants(VK_PushConstant constants);
-// VK_Semaphore vk_semaphore_make(u64 initial_counter = 0);
-// void vk_semaphore_wait(VK_Semaphore semaphore, u64 counter);
 
-VkCommandBuffer vk_cmd_alloc(VkCommandPool pool);
-void vk_cmd_free(VkCommandPool pool, VkCommandBuffer cmd);
+VkSemaphore vk_make_semaphore(u64 initial_counter);
+
+void vk_cmd_alloc(VkCommandPool pool, u32 count, VkCommandBuffer* out);
 void vk_cmd_begin(VkCommandBuffer cmd);
 void vk_cmd_end(VkCommandBuffer cmd);
 void vk_cmd_submit(VkCommandBuffer cmd);
 void vk_cmd_end_submit(VkCommandBuffer cmd);
-VkCommandBuffer vk_cmd_alloc_begin();
-void vk_cmd_end_free(VkCommandBuffer cmd);
 
 VK_Memory vk_mem_make(Gfx_MemType type, u64 size);
 VK_Buffer vk_make_buffer(Gfx_MemType type, u64 size);
-void vk_bind_vert_buffer(VK_Buffer buffer);
-void vk_bind_index_buffer(VK_Buffer buffer);
 VK_Buffer vk_get_vkbuffer(Gfx_Buffer buf);
 
 ////////////////////////////////////////////////////////////////////////
@@ -654,11 +657,9 @@ struct Gfx_State {
   VkSemaphore compute_complete_semaphores[Gfx_MaxImagesInFlight];
   VkFence in_flight_fences[Gfx_NumFramesInFlight];
 
-  VkCommandBuffer cmds_frames_upload[Gfx_NumFramesInFlight];
-  VkFence fences_frames_upload[Gfx_NumFramesInFlight];
-  VkCommandBuffer cmds_render[Gfx_NumFramesInFlight];
-  VkCommandBuffer cmds_upload[Gfx_NumFramesInFlight];
-  VkFence fences_async_upload[Gfx_NumFramesInFlight];
+  VkCommandBuffer render_cmds[Gfx_NumFramesInFlight];
+  VkCommandBuffer upload_cmd;
+  VkCommandBuffer upload_cmd2;
 
   VkDescriptorPool descriptor_pool;
   VkDescriptorSetLayout descriptor_set_layout;
@@ -690,6 +691,13 @@ struct Gfx_State {
   Pool<VK_View, Gfx_MaxViews, Gfx_View> views;
   Pool<VK_View, Gfx_MaxViews, Gfx_View> cubemap_views;
   Pool<VK_Sampler, Gfx_MaxSamplers, Gfx_Sampler> samplers;
+
+  VkSemaphore stage_semaphore;
+  u64 stage_cmd_counter;
+  u64 stage_cmd_ready_counter;
+  b32 stage_cmd_busy;
+  Mutex stage_mutex;
+  Queue<Gfx_StageBufferCmd, 32> stage_buffer_cmds;
 
   struct {
     v2u size;
@@ -757,6 +765,7 @@ struct Gfx_State {
     X(CreateSemaphore) \
     X(DestroySemaphore) \
     X(WaitSemaphores) \
+    X(GetSemaphoreCounterValue) \
     X(CreateFence) \
     X(DestroyFence) \
     X(WaitForFences) \
@@ -839,7 +848,7 @@ struct Gfx_State {
 #undef X
 };
 
-u64 gfx_push_buffer(Gfx_Buffer& arena, u64 size, u64 align = 1);
+u32 gfx_pixelformat_bytesize(Gfx_PixelFormat fmt);
 
 Gfx_Shader gfx_make_shader(Slice<u8> shd);
 Gfx_Pipeline gfx_make_pipeline(Gfx_PipelineDesc desc);
@@ -860,16 +869,13 @@ void gfx_update_pipeline2(Gfx_Pipeline pip, Gfx_PipelineDesc2 desc);
 void gfx_update_image(Gfx_Image img, u8* data);
 void gfx_update_image(Gfx_Image img, Gfx_ImageDesc desc);
 void gfx_update_view(Gfx_View view, Gfx_ViewDesc desc);
-void gfx_upload(Gfx_Buffer dst, u64 offset, Slice<u8> data);
+void gfx_update_buffer(Gfx_Buffer dst, u64 offset, Slice<u8> data);
 
 void gfx_destroy_image(Gfx_Image img);
 void gfx_destroy_view(Gfx_View view);
 void gfx_destroy_shader(Gfx_Shader shd);
 void gfx_destroy_pipeline(Gfx_Pipeline pip);
 
-void gfx_readback_image(Gfx_Image img, u8* dst);
-void gfx_begin_pass(Gfx_Pass pass);
-void gfx_end_pass();
 void gfx_apply_viewport(Rng2 rect, b32 y_origin_at_bottom = false);
 void gfx_apply_scissor(Rng2 rect);
 void gfx_apply_primitive_type(Gfx_PrimitiveType t);
@@ -881,6 +887,7 @@ void gfx_apply_depth_compare(Gfx_CompareOp op);
 void gfx_apply_color_blend_enable(b32 enable);
 void gfx_apply_color_blend_equation(Gfx_BlendState bs);
 void gfx_apply_color_blend_mask(Gfx_BlendState bs);
+
 void gfx_draw(u32 base_vert, u32 vert_count, u32 instance_count = 1, u32 base_instance = 0);
 void gfx_draw_indexed(u32 base_index, u32 index_count, u32 base_vert, u32 instance_count = 1, u32 base_instance = 0);
 void gfx_draw_indirect(Gfx_IndirectDrawCall drawcall);
@@ -888,24 +895,32 @@ void gfx_draw_indirect_mesh(Gfx_Mesh mesh, u32 id);
 void gfx_draw_indexed_indirect(Gfx_IndirectDrawCall drawcall);
 void gfx_draw_mesh(Gfx_Mesh mesh);
 
-void gfx_draw_mesh_indirect(Gfx_Mesh mesh, u32 id, u32 instance_count = 1);
+void gfx_begin_pass(Gfx_Pass pass);
+void gfx_end_pass();
+
+u64 gfx_push_buffer(Gfx_Buffer& arena, u64 size);
+u64 gfx_push_stage_buffer(Slice<u8> buf);
+u64 gfx_push_stage_buffers(Slice<Slice<u8>> buffers);
+u32 gfx_push_stage_buffer_cmd(Gfx_StageBufferCmd cmd);
+u32 gfx_ready_counter();
+
 u32  gfx_begin_indirect();
 Gfx_IndirectDrawCall gfx_end_indirect(u32 base);
-
+void gfx_push_indirect_mesh(Gfx_Mesh mesh, u32 id, u32 instance_count = 1);
 void gfx_push_indirect_instanced(Gfx_Mesh mesh, u32 count);
 void gfx_instance_set_indices(u32* indices);
 u32* gfx_indirect_indices();
-
 u8* gfx_buffer_base_ptr(Gfx_Buffer buf);
 
 void gfx_bind_pipeline(Gfx_Pipeline pip);
-void gfx_bind_vert(Gfx_Buffer reg);
-void gfx_bind_index(Gfx_Buffer reg);
+void gfx_bind_vert(Gfx_Buffer buf);
+void gfx_bind_index(Gfx_Buffer buf);
 void gfx_bind_buffer(Gfx_Buffer buf, u32 binding);
-void gfx_make_buffers(Slice<Gfx_BufferDesc> descs);
+void gfx_make_binding_buffers(Slice<Gfx_BufferDesc> descs);
 void gfx_flush();
-
 void gfx_idle();
+
+void gfx_readback_image(Gfx_Image img, u8* dst);
 void gfx_init(Gfx_Environment environment);
 void gfx_shutdown();
 void gfx_begin();
