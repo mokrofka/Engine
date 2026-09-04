@@ -127,6 +127,7 @@ f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max) {
 }
 
 v4 v4_hadamard(v4 a, v4 b) { return v4(a.x*b.x, a.y*b.y, a.z*b.z, a.w*b.w); }
+v4 v4_hadamard_div(v4 a, v4 b) { return v4(a.x/b.x, a.y/b.y, a.z/b.z, a.w/b.w); }
 
 v4 rgba_from_u32(u32 hex) {
   v4 result = v4(((hex >>  0) & 0xff) / 255.f,

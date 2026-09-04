@@ -474,7 +474,7 @@ void r_shaders_compile(Allocator arena) {
   Loop (i, files.count) {
     File& f = files[i];
     var arr = array_make(String, scratch);
-    array_push(arr, S("slangc"), f.file_path, S("-target"), S("spirv"), S("-O0"), S("-g"), S("-o"), f.compiled_file_path);
+    array_push(arr, S("slangc"), f.file_path, S("-target"), S("spirv"), S("-O0"), S("-g3"), S("-o"), f.compiled_file_path);
     g.shader_module_compilation_pids[i] = os_process_make(slice(arr));
     Debug("%s", f.file_path);
     array_push(file_names, f.shader_name);
@@ -717,12 +717,12 @@ void r_init() {
     });
   }
   {
-    Gfx_Shader shd = gfx_make_shader(os_file_path_read_all(scratch, "../assets/shaders/compiled/ui_rect.spv"));
-    g.ui_rect_pip = gfx_make_pipeline2({.shader = shd});
+    // Gfx_Shader shd = gfx_make_shader(os_file_path_read_all(scratch, "../assets/shaders/compiled/ui_rect.spv"));
+    // g.ui_rect_pip = gfx_make_pipeline2({.shader = shd});
+    g.ui_rect_pip = r_make_pipeline2("ui_rect", {});
   }
 
-  g.my_font = r_load_font("arial.ttf", 32);
-  g.point_dir = v2(Cos(rand_f32()), Sin(rand_f32()));
+  g.my_font = r_load_font("arial.ttf", 8);
   Info("Renderer initialized");
 }
 
@@ -877,6 +877,7 @@ void r_end() {
             .dst_p1 = rect.dst_p1,
             .src_p0 = rect.src_p0,
             .src_p1 = rect.src_p1,
+            .tex_size = rect.tex_size,
             .corner_radius = rect.corner_radius,
             .edge_softness = rect.edge_softness,
             .texture = rect.texture,
@@ -1082,12 +1083,15 @@ void r_draw_rect_gradient(Rng2 rect, R_Gradient grad) {
 void r_draw_texture(Rng2 rect, R_TextureId tex) {
   var& g = st->r;
   var t = pool_get(g.textures, tex);
+  var desc = gfx_query_image_desc(t.image);
+  v2 tex_size = v2(desc.width, desc.height);
   R_UI_Rect vert = {
     .dst_p0 = rect.min,
     .dst_p1 = rect.max,
-    .texture = r_texture_descriptor_idx(tex),
     .src_p0 = v2(),
-    .src_p1 = v2(gfx_query_image_desc(t.image).width, gfx_query_image_desc(t.image).height),
+    .src_p1 = tex_size,
+    .tex_size = tex_size,
+    .texture = r_texture_descriptor_idx(tex),
   };
   for (v4& x : vert.colors) x = ColorWhite;
   array_push(g.draw_rects, vert);
@@ -1110,6 +1114,8 @@ void r_draw_rect_outline(Rng2 rect, u32 thickness, v4 color) {
 void r_draw_text_ext(R_FontId font, v2 pos, String str, v4 color, u32 font_height) {
   var& g = st->r;
   var fo = pool_get(g.fonts, font);
+  var desc = gfx_query_image_desc(pool_get(g.textures, fo.texture).image);
+  v2 tex_size = v2(desc.width, desc.height);
   v2 cursor = pos;
   f32 scale = (f32)font_height / fo.font_height;
   Loop (i, str.size) {
@@ -1130,6 +1136,7 @@ void r_draw_text_ext(R_FontId font, v2 pos, String str, v4 color, u32 font_heigh
       .dst_p1 = v2(x1,y1),
       .src_p0 = glyph.rect.min,
       .src_p1 = glyph.rect.max,
+      .tex_size = tex_size,
       .texture = r_texture_descriptor_idx(fo.texture),
       .flags = GpuUI_RectFlag_IsFont,
     };

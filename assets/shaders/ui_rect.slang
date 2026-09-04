@@ -17,14 +17,11 @@ VS_Entry UI_VSOutput vs_main(u32 vert_id : SV_VertexID, u32 inst_id : SV_Instanc
   v2 src_center = (in.src_p1 + in.src_p0) / 2;
   v2 src_pos = vertices[vert_id] * src_half_size + src_center;
 
-  v2 cur_texture_size = v2(1);
-  if (in.texture > 0) {
-    textures[in.texture].GetDimensions(cur_texture_size.x, cur_texture_size.y);
-  }
+  // printf("tex: %u, x: %v2f", in.texture, cur_texture_size);
 
   UI_VSOutput o;
   o.vert = v4(2 * dst_pos.x / st.res.x - 1, 2 * dst_pos.y / st.res.y - 1, 0, 1);
-  o.uv = v2(src_pos.x / cur_texture_size.x, src_pos.y / cur_texture_size.y);
+  o.uv = v2(src_pos.x / in.tex_size.x, src_pos.y / in.tex_size.y);
   o.color = in.colors[vert_id];
 
   o.dst_pos = dst_pos;
@@ -54,7 +51,12 @@ FS_Entry v4 fs_main(UI_VSOutput in) {
 
   // Texture?
   if (in.texture > 0) {
+    // return v4(in.uv, 0, 1);
+
+    // u32 tex_idx = NonUniformResourceIndex(in.texture);
+    // v4 sampled = textures[tex_idx].Sample(samplers[1], in.uv);
     v4 sampled = textures[in.texture].Sample(samplers[1], in.uv);
+    // v4 sampled = textures[15].Sample(samplers[1], in.uv);
     v4 color = v4_hadamard(in.color, sampled);
     return color;
   }
@@ -71,4 +73,5 @@ FS_Entry v4 fs_main(UI_VSOutput in) {
   v4 color = in.color * sdf_factor;
   return color;
 }
+
 

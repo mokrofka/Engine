@@ -39,6 +39,10 @@ enum MeshEnum {
   X(Orange) \
   X(Container) \
   X(Barrack) \
+  X(Black) \
+  X(Black1) \
+  X(Black2) \
+  X(Bricks) \
 
 enum TextureEnum {
 #define X(name) Glue(Texture_, name),

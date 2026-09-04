@@ -105,6 +105,7 @@ struct Glue(Gpu, UI_Rect) {
   alignas(8) v2 dst_p1;
   alignas(8) v2 src_p0;
   alignas(8) v2 src_p1;
+  alignas(8) v2 tex_size;
   alignas(16) v4 colors[4];
   u32 texture;
   u32 flags;
