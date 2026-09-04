@@ -24,6 +24,7 @@ struct R_UI_Rect {
   v2 dst_p1;
   v2 src_p0;
   v2 src_p1;
+  v2 tex_size;
   v4 colors[4];
   u32 texture;
   u32 flags;
@@ -245,9 +246,6 @@ struct R_State {
   R_TextureId dummy_cubemap;
   R_TextureId dummy_mesh;
   R_TextureId cur_cubemap;
-
-  v2 point;
-  v2 point_dir;
 
   Gfx_Buffer gpu_state_buf;
   Gfx_Buffer gpu_entities_buf;

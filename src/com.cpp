@@ -3001,6 +3001,49 @@ void init_game() {
     load_tex(Texture_Orange, "orange_lines_512.png");
     load_tex(Texture_Container, "container.jpg");
     load_tex(Texture_Barrack, "castle_diffuse.png");
+    load_tex(Texture_Bricks, "bricks.png");
+    // load_tex(Texture_Orange, "16x16.png");
+    // load_tex(Texture_Container, "16x16.png");
+    // load_tex(Texture_Barrack, "16x16.png");
+    
+    u32 size = 32;
+    // u8* data = push_buffer_zero(g.arena, size*size*4);
+    u32* data = push_array_zero(g.arena, u32, size*size);
+    Loop (i, size) {
+      Loop (j, size) {
+        if ((j+i) % 2 == 0) {
+          data[i*size + j] = u32_from_rgba(v4(0,1,0,1));
+        } else {
+          data[i*size + j] = u32_from_rgba(v4(1,1,0,1));
+        }
+      }
+      }
+    
+    // MemSet(data, 255, size*size*4);
+    g.textures_ids[Texture_Black] = r_make_texture({
+      // .name = "16x16.png",
+      .width = size,
+      .height = size,
+      // .pixel_format = Gfx_PixelFormat_R8,
+      .async = false,
+      .data = (u8*)data,
+    });
+    g.textures_ids[Texture_Black1] = r_make_texture({
+      .name = "16x16.png",
+      .width = size,
+      .height = size,
+      // .pixel_format = Gfx_PixelFormat_R8,
+      .async = false,
+      .data = (u8*)data,
+    });
+    g.textures_ids[Texture_Black2] = r_make_texture({
+      .name = "16x16.png",
+      .width = size,
+      .height = size,
+      // .pixel_format = Gfx_PixelFormat_R8,
+      .async = false,
+      .data = (u8*)data,
+    });
 
     var default_state = r_make_pipeline_state({
       .depth = {
@@ -3529,7 +3572,11 @@ void update_game() {
     // r_draw_quad(rng2_make(v2(400), v2(400,400)), ColorCyan);
     // r_draw_rect_gradient(rng2_make(v2(300), v2(100)), {v4(1,0,0,1), v4(0,1,0,1), v4(0,0,1,1), v4()});
     // r_draw_rect(rng2_make(v2(600), v2(100)), ColorWhite);
+    r_draw_texture(rng2_make(v2(600, 50), v2(200)), get_texture(Texture_Bricks));
     r_draw_texture(rng2_make(v2(800), v2(100)), get_texture(Texture_Orange));
+    r_draw_texture(rng2_make(v2(100,400), v2(400)), get_texture(Texture_Black));
+    r_draw_texture(rng2_make(v2(400,400), v2(200)), get_texture(Texture_Black1));
+    r_draw_texture(rng2_make(v2(700,400), v2(200)), get_texture(Texture_Black2));
     r_draw_text_ext(st->r.my_font, v2(300), "I'm a hobbit from Shire!", ColorOrange, 64);
     r_draw_rect(rng2_make(v2(100), v2(200)), ColorGreyDark);
     r_draw_text_ext(st->r.my_font, v2(100, 100+32), "I'm a button", ColorWhite, 32);
