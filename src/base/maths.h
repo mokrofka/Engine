@@ -18,101 +18,101 @@ f32 Deg(f32 rad);
 // v2
 
 union v2 {
-  struct {
-    f32 x;
-    f32 y;
-  };
-  f32 v[2];
-  v2() = default;
-  NO_DEBUG explicit v2(f32 s):x(s),y(s){};
-  NO_DEBUG v2(f32 x, f32 y):x(x),y(y){}
-  NO_DEBUG v2(const union v2u& v);
+	struct {
+		f32 x;
+		f32 y;
+	};
+	f32 v[2];
+	v2() = default;
+	NO_DEBUG explicit v2(f32 s):x(s),y(s){};
+	NO_DEBUG v2(f32 x, f32 y):x(x),y(y){}
+	NO_DEBUG v2(const union v2u& v);
 };
 
 union v2i {
-  struct {
-    i32 x;
-    i32 y;
-  };
-  i32 v[2];
-  v2i() = default;
-  v2i(i32 x, i32 y):x(x),y(y){}
+	struct {
+		i32 x;
+		i32 y;
+	};
+	i32 v[2];
+	v2i() = default;
+	v2i(i32 x, i32 y):x(x),y(y){}
 };
 
 union v2u {
-  struct {
-    u32 x;
-    u32 y;
-  };
-  u32 v[2];
-  v2u() = default;
-  v2u(u32 x, u32 y):x(x),y(y){}
+	struct {
+		u32 x;
+		u32 y;
+	};
+	u32 v[2];
+	v2u() = default;
+	v2u(u32 x, u32 y):x(x),y(y){}
 };
 
 union v2b {
-  struct {
-    b32 x;
-    b32 y;
-  };
-  b32 v[2];
-  v2b() = default;
-  v2b(b32 x, b32 y):x(x),y(y){}
+	struct {
+		b32 x;
+		b32 y;
+	};
+	b32 v[2];
+	v2b() = default;
+	v2b(b32 x, b32 y):x(x),y(y){}
 };
 
 ///////////////////////////////////
 // v3
 
 union v3 {
-  struct {
-    f32 x;
-    f32 y;
-    f32 z;
-  };
-  struct {
-    v2 xy;
-  };
-  f32 v[3];
-  v3() = default;
-  explicit v3(f32 s):x(s),y(s),z(s){};
-  v3(f32 x, f32 y, f32 z):x(x),y(y),z(z){}
+	struct {
+		f32 x;
+		f32 y;
+		f32 z;
+	};
+	struct {
+		v2 xy;
+	};
+	f32 v[3];
+	v3() = default;
+	explicit v3(f32 s):x(s),y(s),z(s){};
+	v3(f32 x, f32 y, f32 z):x(x),y(y),z(z){}
 };
 
 union v3u {
-  struct {
-    u32 x;
-    u32 y;
-    u32 z;
-  };
-  u32 v[3];
-  v3u() = default;
-  v3u(u32 x, u32 y, u32 z):x(x),y(y),z(z){}
+	struct {
+		u32 x;
+		u32 y;
+		u32 z;
+	};
+	u32 v[3];
+	v3u() = default;
+	v3u(u32 x, u32 y, u32 z):x(x),y(y),z(z){}
 };
 
 union v3b {
-  struct {
-    b32 x;
-    b32 y;
-    b32 z;
-  };
-  b32 v[3];
-  v3b() = default;
-  v3b(b32 x, b32 y, b32 z):x(x),y(y),z(z){}
+	struct {
+		b32 x;
+		b32 y;
+		b32 z;
+	};
+	b32 v[3];
+	v3b() = default;
+	v3b(b32 x, b32 y, b32 z):x(x),y(y),z(z){}
 };
 
 ///////////////////////////////////
 // v4
 
 union v4 {
-  struct {
-    f32 x;
-    f32 y;
-    f32 z;
-    f32 w;
-  };
-  f32 v[4];
-  v4() = default;
-  NO_DEBUG explicit v4(f32 s):x(s),y(s),z(s){};
-  NO_DEBUG v4(f32 x, f32 y, f32 z, f32 w):x(x),y(y),z(z),w(w){}
+	struct {
+		f32 x;
+		f32 y;
+		f32 z;
+		f32 w;
+	};
+	f32 v[4];
+	v4() = default;
+	NO_DEBUG explicit v4(f32 s):x(s),y(s),z(s){};
+	NO_DEBUG v4(f32 x, f32 y, f32 z, f32 w):x(x),y(y),z(z),w(w){}
 };
 
 struct m2x2 { f32 v[2][2]; };
@@ -129,81 +129,81 @@ struct m4x4 { f32 v[4][4]; };
 // Ranges
 
 struct Rng1u {
-  u32 min;
-  u32 max;
+	u32 min;
+	u32 max;
 };
 
 struct Rng1i {
-  i32 min;
-  i32 max;
+	i32 min;
+	i32 max;
 };
 
 struct Rng1u64 {
-  u64 min;
-  u64 max;
+	u64 min;
+	u64 max;
 };
 
 struct Rng1 {
-  f32 min;
-  f32 max;
+	f32 min;
+	f32 max;
 };
 
 union Rng2 {
-  struct {
-    v2 min;
-    v2 max;
-  };
-  struct {
-    f32 x0;
-    f32 y0;
-    f32 x1;
-    f32 y1;
-  };
-  Rng2() = default;
-  Rng2(v2 min, v2 max):min(min),max(max){}
+	struct {
+		v2 min;
+		v2 max;
+	};
+	struct {
+		f32 x0;
+		f32 y0;
+		f32 x1;
+		f32 y1;
+	};
+	Rng2() = default;
+	Rng2(v2 min, v2 max):min(min),max(max){}
 };
 
 union Rng2u {
-  struct {
-    v2u min;
-    v2u max;
-  };
-  struct {
-    u32 x0;
-    u32 y0;
-    u32 x1;
-    u32 y1;
-  };
-  Rng2u() = default;
-  Rng2u(v2u min, v2u max):min(min),max(max){}
+	struct {
+		v2u min;
+		v2u max;
+	};
+	struct {
+		u32 x0;
+		u32 y0;
+		u32 x1;
+		u32 y1;
+	};
+	Rng2u() = default;
+	Rng2u(v2u min, v2u max):min(min),max(max){}
 };
 
 union Rng3 {
-  struct {
-    v3 min;
-    v3 max;
-  };
-  struct {
-    f32 x0;
-    f32 y0;
-    f32 z0;
-    f32 x1;
-    f32 y1;
-    f32 z1;
-  };
-  Rng3() = default;
-  Rng3(v3 min, v3 max):min(min),max(max){}
+	struct {
+		v3 min;
+		v3 max;
+	};
+	struct {
+		f32 x0;
+		f32 y0;
+		f32 z0;
+		f32 x1;
+		f32 y1;
+		f32 z1;
+	};
+	Rng3() = default;
+	Rng3(v3 min, v3 max):min(min),max(max){}
 };
 
 struct Transform {
-  v3 pos;
-  v4 rot;
-  v3 scale;
+	v3 pos;
+	v4 rot;
+	v3 scale;
 };
 
 struct Ray {
-  v3 pos;
-  v3 dir;
+	v3 pos;
+	v3 dir;
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -268,10 +268,10 @@ NO_DEBUG b32 rand_b32();
 NO_DEBUG void rand_set_seed();
 NO_DEBUG u32 rand_get_seed();
 template<typename T> void rand_shuffle(Slice<T> data) {
-  Loop (i, data.count) {
-    u32 j = rand_u32_rng(i, data.count - 1);
-    Swap(data[i], data[j]);
-  }
+	Loop (i, data.count) {
+		u32 j = rand_u32_rng(i, data.count - 1);
+		Swap(data[i], data[j]);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -701,7 +701,7 @@ Rng3 rng3_scale(Rng3 r, f32 scale);
 Rng3 rng3_scale(Rng3 r, v3 scale);
 
 struct Rng2Cursor {
-  v2 pos;
+		v2 pos;
 };
 
 Rng2 layout_row(Rng2Cursor& c, Rng1 x, f32 h);

@@ -9,14 +9,14 @@ const u32 ARENA_DEFAULT_RESERVE_SIZE = MB(64);
 const u32 ARENA_DEFAULT_COMMIT_SIZE  = KB(4);
 
 enum AllocatorType {
-  AllocatorType_Arena = 1,
-  AllocatorType_ArenaList,
-  AllocatorType_Alloc,
+	AllocatorType_Arena = 1,
+	AllocatorType_ArenaList,
+	AllocatorType_Alloc,
 };
 
 struct Allocator {
-  AllocatorType type;
-  void* ctx;
+	AllocatorType type;
+	void* ctx;
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -39,12 +39,12 @@ template<typename T> T* mem_realloc_array_zero(Allocator a, T* ptr, u32 old_c, u
 #define push_array_zero(a, T, c)     (T*)mem_alloc_zero(a, sizeof(T)*(c), alignof(T))
 
 template<typename T> Slice<T> slice_free(Allocator alloc, Slice<T> slice) {
-  mem_free(alloc, slice.data);
+	mem_free(alloc, slice.data);
 }
 template<typename T> Slice<T> slice_clone(Allocator alloc, Slice<T> slice) {
-  T* data = push_array(alloc, T, slice.count);
-  MemCopyArray(data, slice.data, slice.count);
-  return {data, slice.count};
+	T* data = push_array(alloc, T, slice.count);
+	MemCopyArray(data, slice.data, slice.count);
+	return {data, slice.count};
 }
 #define push_slice(a, T, c) Slice(push_array(a, T, c), c)
 #define push_slice_zero(a, T, c) Slice(push_array_zero(a, T, c), c)
@@ -54,34 +54,34 @@ template<typename T> Slice<T> slice_clone(Allocator alloc, Slice<T> slice) {
 // Mem track
 
 struct AllocatorInfo {
-  AllocatorInfo* first;
-  AllocatorInfo* last;
-  AllocatorInfo* next;
-  AllocatorInfo* prev;
-  AllocatorInfo* parent;
-  u32 child_count;
+	AllocatorInfo* first;
+	AllocatorInfo* last;
+	AllocatorInfo* next;
+	AllocatorInfo* prev;
+	AllocatorInfo* parent;
+	u32 child_count;
 
-  String64 name;
-  String64 file;
-  u32 line;
+	String64 name;
+	String64 file;
+	u32 line;
 
-  AllocatorType type;
-  u32 thread_idx;
+	AllocatorType type;
+	u32 thread_idx;
 
-  u64 pos;
-  u64 children_size;
-  u64 cap;
-  u64 cmt;
+	u64 pos;
+	u64 children_size;
+	u64 cap;
+	u64 cmt;
 
-  u64 allocs_count;
-  u64 frees_count;
-  u64 allocs_per_frame;
+	u64 allocs_count;
+	u64 frees_count;
+	u64 allocs_per_frame;
 };
 
 struct AllocatorInfoList {
-  AllocatorInfo* first;
-  AllocatorInfo* last;
-  u32 count;
+	AllocatorInfo* first;
+	AllocatorInfo* last;
+	u32 count;
 };
 
 AllocatorInfoList mem_track_info();
@@ -92,22 +92,22 @@ void mem_track_end();
 // Arena (page allocator)
 
 struct ArenaParams {
-  String name;
-  String file;
-  u32 line;
-  u64 reserve_size;
-  u64 commit_size;
+	String name;
+	String file;
+	u32 line;
+	u64 reserve_size;
+	u64 commit_size;
 };
 
 struct Arena {
 #if MEM_TRACK
-  AllocatorInfo* info;
+	AllocatorInfo* info;
 #endif
-  u8* base;
-  u64 pos;
-  u64 cmt;
-  u64 cap;
-  operator Allocator();
+	u8* base;
+	u64 pos;
+	u64 cmt;
+	u64 cap;
+	operator Allocator();
 };
 
 #define arena_make(...) _arena_make(ArenaParams{.reserve_size = ARENA_DEFAULT_RESERVE_SIZE, .commit_size = ARENA_DEFAULT_COMMIT_SIZE, .name = __func__, .file = __FILE__, .line = __LINE__, __VA_ARGS__})
@@ -116,11 +116,11 @@ void  arena_destroy(Arena& arena);
 void  arena_clear(Arena& arena);
 
 struct Temp {
-  Arena* arena;
-  u64 pos;
+	Arena* arena;
+	u64 pos;
 
 #if MEM_TRACK
-  u64 temp_exclusive_pos;
+	u64 temp_exclusive_pos;
 #endif
 };
 
@@ -131,16 +131,16 @@ void temp_end(Temp temp);
 // ArenaList
 
 struct ArenaBlock {
-  u64 pos;
-  u64 cap;
-  ArenaBlock* next;
+	u64 pos;
+	u64 cap;
+	ArenaBlock* next;
 };
 
 struct ArenaList {
-  Allocator alloc;
-  ArenaBlock* current;
-  ArenaBlock* first;
-  operator Allocator();
+	Allocator alloc;
+	ArenaBlock* current;
+	ArenaBlock* first;
+	operator Allocator();
 };
 
 ArenaList alloc_arena_list_make(Allocator alloc);
@@ -150,22 +150,22 @@ void alloc_arena_list_clear(ArenaList& arena);
 // Segregated pow2 list
 
 struct MemNode {
-  MemNode* next;
+	MemNode* next;
 };
 
 struct AllocParams {
-  String name;
-  String file;
-  u32 line;
+	String name;
+	String file;
+	u32 line;
 };
 
 struct Alloc {
 #if MEM_TRACK
-  AllocatorInfo* info;
+	AllocatorInfo* info;
 #endif
-  Allocator alloc;
-  MemNode pools[32];
-  operator Allocator();
+	Allocator alloc;
+	MemNode pools[32];
+	operator Allocator();
 };
 
 #define alloc_make(alloc, ...) _alloc_make(alloc, AllocParams{.name = __func__, .file = __FILE__, .line = __LINE__, __VA_ARGS__})
@@ -194,19 +194,19 @@ void alloc_destroy(Alloc alloc);
 typedef u32 GpuMemId;
 
 struct GpuBlockList {
-  u32 next;
-  b32 is_allocated;
-  Region range;
+	u32 next;
+	b32 is_allocated;
+	Region range;
 };
 
 struct GpuAllocSegList {
-  u64 pos;
-  u64 cap;
-  Allocator alloc;
-  GpuBlockList* data;
-  u32 range_count;
-  u32 range_cap;
-  u32 heads[32];
+	u64 pos;
+	u64 cap;
+	Allocator alloc;
+	GpuBlockList* data;
+	u32 range_count;
+	u32 range_cap;
+	u32 heads[32];
 };
 
 GpuAllocSegList gpu_alloc_seglist_make(Allocator alloc);
@@ -218,9 +218,9 @@ u64 gpu_alloc_seglist_get(GpuAllocSegList& a, GpuMemId h);
 // Misc
 
 struct SoA_Field {
-  void** dst_ptr;
-  u32 elem_size;
-  u32 align;
+	void** dst_ptr;
+	u32 elem_size;
+	u32 align;
 };
 #define SoA_push_field(ptr) {(void**)(&ptr), sizeof(*ptr), alignof(*ptr)}
 
@@ -238,9 +238,9 @@ u64 offset_push(u64& offset, u64 size, u64 align = 1);
 #define offset_push_array(a, T, c)        offset_push(a, sizeof(T)*(c), alignof(T))
 
 struct MemFormatSize {
-  String format;
-  u32 format_id;
-  f32 size;
+	String format;
+	u32 format_id;
+	f32 size;
 };
 MemFormatSize mem_format_size(f32 value);
 

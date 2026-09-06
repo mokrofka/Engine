@@ -7,55 +7,55 @@ struct OS_Handle { u64 v; };
 
 typedef u32 FilePropertyFlags;
 enum {
-  FilePropertyFlag_IsFolder = Bit(0),
+	FilePropertyFlag_IsFolder = Bit(0),
 };
 
 struct FileProperties {
-  u64 size;
-  DenseTime modified;
-  DenseTime created;
-  FilePropertyFlags flags;
+	u64 size;
+	DenseTime modified;
+	DenseTime created;
+	FilePropertyFlags flags;
 };
 
 typedef u32 OS_FileIterFlags;
 enum {
-  OS_FileIterFlag_SkipFolders     = Bit(0),
-  OS_FileIterFlag_SkipFiles       = Bit(1),
-  OS_FileIterFlag_SkipHiddenFiles = Bit(2),
-  OS_FileIterFlag_Done            = Bit(31),
+	OS_FileIterFlag_SkipFolders     = Bit(0),
+	OS_FileIterFlag_SkipFiles       = Bit(1),
+	OS_FileIterFlag_SkipHiddenFiles = Bit(2),
+	OS_FileIterFlag_Done            = Bit(31),
 };
 
 struct OS_FileIter {
-  OS_FileIterFlags flags;
-  u8 memory[800];
+	OS_FileIterFlags flags;
+	u8 memory[800];
 };
 
 struct OS_FileInfo {
-  String name;
-  FileProperties props;
+	String name;
+	FileProperties props;
 };
 
 typedef u32 OS_AccessFlags;
 enum {
-  OS_AccessFlag_Read       = Bit(0),
-  OS_AccessFlag_Write      = Bit(1),
-  OS_AccessFlag_Trunc      = Bit(2),
-  OS_AccessFlag_Execute    = Bit(3),
-  OS_AccessFlag_Append     = Bit(4),
-  OS_AccessFlag_ShareRead  = Bit(5),
-  OS_AccessFlag_ShareWrite = Bit(6),
+	OS_AccessFlag_Read       = Bit(0),
+	OS_AccessFlag_Write      = Bit(1),
+	OS_AccessFlag_Trunc      = Bit(2),
+	OS_AccessFlag_Execute    = Bit(3),
+	OS_AccessFlag_Append     = Bit(4),
+	OS_AccessFlag_ShareRead  = Bit(5),
+	OS_AccessFlag_ShareWrite = Bit(6),
 };
 
 typedef u32 OS_WatchFlags;
 enum {
-  OS_WatchFlag_Create = Bit(0),
-  OS_WatchFlag_Delete = Bit(1),
-  OS_WatchFlag_Modify = Bit(2),
+	OS_WatchFlag_Create = Bit(0),
+	OS_WatchFlag_Delete = Bit(1),
+	OS_WatchFlag_Modify = Bit(2),
 };
 
 struct OS_Watch{
-  OS_Handle handle;
-  OS_WatchFlags flags;
+	OS_Handle handle;
+	OS_WatchFlags flags;
 };
 
 typedef void ThreadEntryPointFn(void* p);
@@ -67,9 +67,9 @@ struct Semaphore { u64 v; };
 struct Barrier { u64 v; };
 
 struct _LockScope {
-  Mutex mutex;
-  _LockScope(Mutex mutex_);
-  ~_LockScope();
+	Mutex mutex;
+	_LockScope(Mutex mutex_);
+	~_LockScope();
 };
 #define LockScope(m) _LockScope Glue(_lock_scope, __LINE__)(m)
 
@@ -87,7 +87,6 @@ void os_init(String name);
 void os_exit(i32 exit_code);
 
 u64 os_timer_frequency();
-u64 os_timer_now();
 u64 os_now_ns();
 void os_sleep_ms(u64 ms);
 void os_sleep_us(u64 us);

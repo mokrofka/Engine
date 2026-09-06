@@ -18,384 +18,384 @@
 // play around atomic queues, futex
 
 #define MESH_LIST \
-  X(Cube) \
-  X(MonkeyGlb) \
-  X(Triangle) \
-  X(Grid) \
-  X(Axis) \
-  X(Sphere) \
-  X(CubeGlft) \
-  X(GreeMan) \
-  X(Barrack) \
+	X(Cube) \
+	X(MonkeyGlb) \
+	X(Triangle) \
+	X(Grid) \
+	X(Axis) \
+	X(Sphere) \
+	X(CubeGlft) \
+	X(GreeMan) \
+	X(Barrack) \
 
 enum MeshEnum {
 #define X(name) Glue(Mesh_, name),
-  MESH_LIST
+	MESH_LIST
 #undef X
-  Mesh_COUNT,
+	Mesh_COUNT,
 };
 
 #define TEXTURE_LIST \
-  X(Dummy) \
-  X(Orange) \
-  X(Container) \
-  X(Barrack) \
-  X(Black) \
-  X(Black1) \
-  X(Black2) \
-  X(Bricks) \
+	X(Dummy) \
+	X(Orange) \
+	X(Container) \
+	X(Barrack) \
+	X(Black) \
+	X(Black1) \
+	X(Black2) \
+	X(Bricks) \
 
 enum TextureEnum {
 #define X(name) Glue(Texture_, name),
-  TEXTURE_LIST
+	TEXTURE_LIST
 #undef X
-  Texture_COUNT,
+	Texture_COUNT,
 };
 
 #define MATERIAL_LIST \
-  X(Dummy) \
-  X(Orange) \
-  X(Container) \
-  X(Axis) \
-  X(Line) \
-  X(Barrack) \
+	X(Dummy) \
+	X(Orange) \
+	X(Container) \
+	X(Axis) \
+	X(Line) \
+	X(Barrack) \
 
 enum MaterialEnum {
 #define X(name) Glue(Material_, name),
-  MATERIAL_LIST
+	MATERIAL_LIST
 #undef X
-  Material_COUNT,
+	Material_COUNT,
 };
 
 enum MetaType {
-  MetaType_Null,
-  MetaType_u32,
-  MetaType_i32,
-  MetaType_b32,
-  MetaType_f32,
-  MetaType_v2,
-  MetaType_v3,
-  MetaType_v4,
-  MetaType_Rng2,
-  MetaType_Rng3,
-  MetaType_MeshId,
-  MetaType_MaterialId,
-  MetaType_RenderId,
-  MetaType_String,
-  MetaType_EntityFlags
+	MetaType_Null,
+	MetaType_u32,
+	MetaType_i32,
+	MetaType_b32,
+	MetaType_f32,
+	MetaType_v2,
+	MetaType_v3,
+	MetaType_v4,
+	MetaType_Rng2,
+	MetaType_Rng3,
+	MetaType_MeshId,
+	MetaType_MaterialId,
+	MetaType_RenderId,
+	MetaType_String,
+	MetaType_EntityFlags
 };
 
 struct MemberDefinition {
-  MetaType type;
-  String name;
-  u64 offset;
+	MetaType type;
+	String name;
+	u64 offset;
 };
 
 enum ScrollType {
-  ScrollType_Default,
-  ScrollType_PowClamp,
+	ScrollType_Default,
+	ScrollType_PowClamp,
 };
 
 struct ScrollState {
-  v2 offset;
-  v2 scale;
-  f32 scale_level;
+	v2 offset;
+	v2 scale;
+	f32 scale_level;
 };
 
 struct DebugWindow {
-  v2 pos;
-  v2 size;
-  b32 toggle_fullscreen;
-  b32 fullscreen;
-  b32 open;
-  ImGuiWindowFlags flags;
+	v2 pos;
+	v2 size;
+	b32 toggle_fullscreen;
+	b32 fullscreen;
+	b32 open;
+	ImGuiWindowFlags flags;
 };
 
 enum ProfTabActive {
-  ProfileTabActive_Root,
-  ProfileTabActive_Frames,
-  ProfileTabActive_Time,
-  ProfileTabActive_LaunchTime,
-  ProfileTabActive_Memory,
+	ProfileTabActive_Root,
+	ProfileTabActive_Frames,
+	ProfileTabActive_Time,
+	ProfileTabActive_LaunchTime,
+	ProfileTabActive_Memory,
 };
 
 struct ProfColors {
-  v4 work;
-  v4 sleep;
-  v4 job;
-  v4 async;
-  v4 selected;
-  v4 hovered;
-  v4 border;
-  v4 text;
-  v4 text_dim;
-  v4 current_frame;
-  v4 frame_ok;     // < 16ms
-  v4 frame_warn;   // 16-20ms
-  v4 frame_bad;    // > 20ms
-  v4 mem_used;
-  v4 mem_committed;
-  v4 mem_cap;
+	v4 work;
+	v4 sleep;
+	v4 job;
+	v4 async;
+	v4 selected;
+	v4 hovered;
+	v4 border;
+	v4 text;
+	v4 text_dim;
+	v4 current_frame;
+	v4 frame_ok;     // < 16ms
+	v4 frame_warn;   // 16-20ms
+	v4 frame_bad;    // > 20ms
+	v4 mem_used;
+	v4 mem_committed;
+	v4 mem_cap;
 };
 
 struct ProfWindow {
-  DebugWindow win;
-  ScrollState root_scroll_state;
-  ScrollState frames_scroll_state;
-  ScrollState launch_time_scroll_state;
-  ScrollState mem_scroll_state;
-  ProfTabActive active_tab;
-  ProfTabActive future_active_tab;
-  f32 frame_avg_time;
-  f32 frame_min_time;
-  f32 frame_max_time;
-  ProfColors colors;
+	DebugWindow win;
+	ScrollState root_scroll_state;
+	ScrollState frames_scroll_state;
+	ScrollState launch_time_scroll_state;
+	ScrollState mem_scroll_state;
+	ProfTabActive active_tab;
+	ProfTabActive future_active_tab;
+	f32 frame_avg_time;
+	f32 frame_min_time;
+	f32 frame_max_time;
+	ProfColors colors;
 };
 
 struct DebugState {
-  ProfWindow prof_win;
-  DebugWindow game_win;
-  b32 imgui_demo_open;
-  ImFont* font;
+	ProfWindow prof_win;
+	DebugWindow game_win;
+	b32 imgui_demo_open;
+	ImFont* font;
 };
 
 struct ImGui_DrawList {
-  ImDrawList* draw;
+	ImDrawList* draw;
 };
 
 enum JsType {
-  JsType_Null,
-  JsType_Bool,
-  JsType_Number,
-  JsType_Str,
-  JsType_Array,
-  JsType_Obj,
+	JsType_Null,
+	JsType_Bool,
+	JsType_Number,
+	JsType_Str,
+	JsType_Array,
+	JsType_Obj,
 };
 
 struct JsField {
-  String key;
-  struct JsVal* val;
+	String key;
+	struct JsVal* val;
 };
 
 struct JsObj {
-  Slice<JsField> fields;
+	Slice<JsField> fields;
 };
 
 struct JsVal {
-  JsType type;
-  union {
-    b32 boolean;
-    f64 number;
-    String str;
-    Slice<JsVal*> array;
-    JsObj obj;
-  };
+	JsType type;
+	union {
+		b32 boolean;
+		f64 number;
+		String str;
+		Slice<JsVal*> array;
+		JsObj obj;
+	};
 };
 
 struct JsParser {
-  Allocator arena;
-  String str;
-  u32 cursor;
+	Allocator arena;
+	String str;
+	u32 cursor;
 };
 
 struct InputState {
-  b8 consumed[Key_COUNT];
+	b8 consumed[Key_COUNT];
 };
 
 enum WatchOp {
-  WatchOp_NotifyHotreload = 1,
-  WatchOp_RecompileShader,
-  WatchOp_ShaderReload,
+	WatchOp_NotifyHotreload = 1,
+	WatchOp_RecompileShader,
+	WatchOp_ShaderReload,
 };
 
 struct WatchFile {
-  String path;
-  DenseTime modified;
-  WatchOp op;
+	String path;
+	DenseTime modified;
+	WatchOp op;
 };
 
 struct WatchDirectory {
-  String path;
-  OS_Watch watch;
-  WatchOp op;
+	String path;
+	OS_Watch watch;
+	WatchOp op;
 };
 
 struct WatchState {
-  Allocator arena;
-  Array<WatchFile, 128> watches;
-  Array<WatchDirectory, 128> directories;
+	Allocator arena;
+	Array<WatchFile, 128> watches;
+	Array<WatchDirectory, 128> directories;
 };
 
 Introspect struct Camera {
-  v3 pos;
-  v3 dir;
-  f32 yaw;
-  f32 pitch;
-  f32 fov;
-  f32 accel;
-  v3 vel;
-  f32 vel_friction;
+	v3 pos;
+	v3 dir;
+	f32 yaw;
+	f32 pitch;
+	f32 fov;
+	f32 accel;
+	v3 vel;
+	f32 vel_friction;
 };
 
 typedef u32 EntityFlags;
 enum {
-  EntityFlag_Referenced = 1,
-  EntityFlag_NotRender,
+	EntityFlag_Referenced = 1,
+	EntityFlag_NotRender,
 };
 
 struct EntityThing {
-  String name;
-  EntityFlags flags;
+	String name;
+	EntityFlags flags;
 };
 
 struct ThingDesc {
-  v3 pos;
-  v4 rot;
-  v3 scale;
-  v3 vel;
-  u32 color;
-  Rng3 aabb;
-  MeshEnum mesh;
-  MaterialEnum mat;
+	v3 pos;
+	v4 rot;
+	v3 scale;
+	v3 vel;
+	u32 color;
+	Rng3 aabb;
+	MeshEnum mesh;
+	MaterialEnum mat;
 };
 
 typedef u32 ThingFlags;
 enum {
-  ThingFlag_1 = 1,
-  ThingFlag_2,
-  ThingFlag_3,
+	ThingFlag_1 = 1,
+	ThingFlag_2,
+	ThingFlag_3,
 };
 
 struct ThingList {
-  ThingId first;
-  ThingId last;
+	ThingId first;
+	ThingId last;
 };
 
 Introspect struct Thing {
-  u32 nextidx;
-  u32 previdx;
-  ThingId parent;
-  ThingId next;
-  ThingId prev;
-  union {
-    ThingList list;
-    struct {
-      ThingId first;
-      ThingId last;
-    };
-  };
-  String name;
-  EntityFlags flags;
-  ThingFlags tflags;
-  union {
-    Transform trans;
-    struct {
-      v3 pos;
-      v4 rot;
-      v3 scale;
-    };
-  };
-  Rng3 aabb;
-  v3 vel;
-  R_MeshId mesh;
-  R_MaterialId mat;
-  u32 color;
-  f32 elapsed;
-  u8 buf0[64];
-  f32 modify0;
-  u8 buf1[64];
-  f32 modify1;
-  u8 buf2[64];
-  f32 modify2;
-  u8 buf3[64];
-  f32 modify3;
-  f32 angle;
+	u32 nextidx;
+	u32 previdx;
+	ThingId parent;
+	ThingId next;
+	ThingId prev;
+	union {
+		ThingList list;
+		struct {
+			ThingId first;
+			ThingId last;
+		};
+	};
+	String name;
+	EntityFlags flags;
+	ThingFlags tflags;
+	union {
+		Transform trans;
+		struct {
+			v3 pos;
+			v4 rot;
+			v3 scale;
+		};
+	};
+	Rng3 aabb;
+	v3 vel;
+	R_MeshId mesh;
+	R_MaterialId mat;
+	u32 color;
+	f32 elapsed;
+	u8 buf0[64];
+	f32 modify0;
+	u8 buf1[64];
+	f32 modify1;
+	u8 buf2[64];
+	f32 modify2;
+	u8 buf3[64];
+	f32 modify3;
+	f32 angle;
 };
 
 struct UI_State {
-  u32 hotitem;
-  u32 activeitem;
-  b32 mouse_down;
+	u32 hotitem;
+	u32 activeitem;
+	b32 mouse_down;
 
-  u32 kbditem;
-  u32 last_widget;
-  b32 tab;
-  b32 enter;
-  b32 up;
-  b32 down;
+	u32 kbditem;
+	u32 last_widget;
+	b32 tab;
+	b32 enter;
+	b32 up;
+	b32 down;
 };
 
 #include "ui.h"
 
 typedef u32 ThingState;
 enum {
-  ThingState_OnFire = Bit(0),
-  ThingState_Flying = Bit(1),
-  ThingState_Poisoned = Bit(2),
+	ThingState_OnFire = Bit(0),
+	ThingState_Flying = Bit(1),
+	ThingState_Poisoned = Bit(2),
 };
 
 struct GlobalState {
-  Arena arena;
-  Arena frame_arena;
-  Alloc gpa;
-  u32 current_frame;
-  b32 should_hotreload;
-  m4x4 view;
-  m4x4 projection;
-  v4 ambient_color;
+	Arena arena;
+	Arena frame_arena;
+	Alloc gpa;
+	u32 current_frame;
+	b32 should_hotreload;
+	m4x4 view;
+	m4x4 projection;
+	v4 ambient_color;
 
-  R_MeshId meshes_ids[Mesh_COUNT];
-  R_TextureId textures_ids[Texture_COUNT];
-  R_MaterialId materials_ids[Material_COUNT];
-  R_FontId font;
+	R_MeshId meshes_ids[Mesh_COUNT];
+	R_TextureId textures_ids[Texture_COUNT];
+	R_MaterialId materials_ids[Material_COUNT];
+	R_FontId font;
 
-  String asset_dir;
-  String shader_dir;
-  String shader_compiled_dir;
-  String models_dir;
-  String textures_dir;
-  Map<String, R_TextureId, R_MaxTextures> str_to_texture;
-  Map<String, R_MeshId, R_MaxMeshes> str_to_mesh;
-  Map<String, R_MaterialId, R_MaxMaterials> str_to_material;
-  Array<String, R_MaxTextures> texture_to_str;
-  Array<String, R_MaxMeshes> mesh_to_str;
-  Array<String, R_MaxMaterials> material_to_str;
+	String asset_dir;
+	String shader_dir;
+	String shader_compiled_dir;
+	String models_dir;
+	String textures_dir;
+	Map<String, R_TextureId, R_MaxTextures> str_to_texture;
+	Map<String, R_MeshId, R_MaxMeshes> str_to_mesh;
+	Map<String, R_MaterialId, R_MaxMaterials> str_to_material;
+	Array<String, R_MaxTextures> texture_to_str;
+	Array<String, R_MaxMeshes> mesh_to_str;
+	Array<String, R_MaxMaterials> material_to_str;
 
-  WatchState watch;
-  InputState input;
-  R_State r;
-  Gfx_State gfx;
-  DebugState debug;
-  UI_State ui;
-  // UI_State0* ui0;
+	WatchState watch;
+	InputState input;
+	R_State r;
+	Gfx_State gfx;
+	DebugState debug;
+	UI_State ui;
+	// UI_State0* ui0;
 
-  #define Alot KB(1)
-  Array<m4x4, Alot> m4x4_buf;
-  Array<m4x3, Alot> m4x3_buf;
-  Camera cam;
-  R_Camera r_cam;
-  b32 fps_camera;
+	#define Alot KB(1)
+	Array<m4x4, Alot> m4x4_buf;
+	Array<m4x3, Alot> m4x3_buf;
+	Camera cam;
+	R_Camera r_cam;
+	b32 fps_camera;
 
-  u32 entities_count;
-  PoolLinkList<Thing, MaxEntities, ThingId> entities;
+	u32 entities_count;
+	PoolLinkList<Thing, MaxEntities, ThingId> entities;
 
-  Darray<ThingId> moving_cubes;
-  Map<String, ThingId, 32> find_entity;
+	Darray<ThingId> moving_cubes;
+	Map<String, ThingId, 32> find_entity;
 
-  ThingId axis_attached_to_cam_id;
-  ThingId monkey0;
-  ThingId cube0;
-  ThingId cube1;
-  ThingId cube2;
-  ThingId cube3;
-  ThingId cube4;
-  ThingId cube5;
+	ThingId axis_attached_to_cam_id;
+	ThingId monkey0;
+	ThingId cube0;
+	ThingId cube1;
+	ThingId cube2;
+	ThingId cube3;
+	ThingId cube4;
+	ThingId cube5;
 
-  ThingId cube_root;
-  ThingId monkey1;
-  v3 pos_target;
+	ThingId cube_root;
+	ThingId monkey1;
+	v3 pos_target;
 
-  Coroutine co;
+	Coroutine co;
 };
 
 extern GlobalState* st;

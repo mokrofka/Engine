@@ -46,30 +46,30 @@ u32 remove_lowest_bit(u64 v)       { return v & (v - 1);}
 u32 remove_highest_bitu32(u32 v)   { return v ^ (1u << most_significant_bitu32(v)); }
 u64 remove_highest_bitu64(u64 v)   { return v ^ (1u << most_significant_bitu64(v)); }
 
-b32 BitHas(u64 x, u64 pos)       { return x & (1 << pos); }
-u64 FlagClear(u64 x, u64 f)      { return x & ~f; }
-u64 FlagToggle(u64 x, u64 f)     { return x ^ f; }
-b32 FlagHas(u64 x, u64 f)        { return (x & f) == (f); }
-b32 FlagAny(u64 x, u64 f)        { return x & f; }
+b32 bit_has(u64 x, u64 pos)       { return x & (1 << pos); }
+u64 flag_clear(u64 x, u64 f)      { return x & ~f; }
+u64 flag_toggle(u64 x, u64 f)     { return x ^ f; }
+b32 flag_has(u64 x, u64 f)        { return (x & f) == (f); }
+b32 flag_any(u64 x, u64 f)        { return x & f; }
 
 ////////////////////////////////////////////////////////////////////////
 // Common operations
 
-u64 ModPow2(u64 x, u64 b)      { return x & (b - 1); }
-u64 DivPow2(u64 x, u64 b)      { return x >> ctz(b); }
-u64 CeilIntDiv(u64 x, u64 b)   { return (x + b - 1) / b; }
-u64 RoundUp(u64 x, u64 a)      { return CeilIntDiv(x, a) * a; }
-u64 RoundDown(u64 x, u64 a)    { return x / a * a; }
-u64 Compose64Bit(u64 a, u64 b) { return (a << 32) | b; }
+u64 mod_pow2(u64 x, u64 b)   { return x & (b - 1); }
+u64 div_pow2(u64 x, u64 b)   { return x >> ctz(b); }
+u64 div_ceil(u64 x, u64 b)   { return (x + b - 1) / b; }
+u64 round_up(u64 x, u64 a)   { return div_ceil(x, a) * a; }
+u64 round_down(u64 x, u64 a) { return x / a * a; }
+u64 compose_64(u64 a, u64 b) { return (a << 32) | b; }
 u32 next_pow2(u32 v) {
-  v--;
-  v |= v >> 1;
-  v |= v >> 2;
-  v |= v >> 4;
-  v |= v >> 8;
-  v |= v >> 16;
-  v++;
-  return v;
+	v--;
+	v |= v >> 1;
+	v |= v >> 2;
+	v |= v >> 4;
+	v |= v >> 8;
+	v |= v >> 16;
+	v++;
+	return v;
 }
 u32 prev_pow2(u32 n) {
 	n |= n >> 1;
@@ -95,75 +95,75 @@ b32 bitset_get(BitSet& bits, u64 idx)    { return (bits.words[idx >> 6] >> (idx 
 u64 bitset_word_count(BitSet& bits)      { return (bits.bit_count + 63) / 64; }
 
 RingBuffer ring_make(void* base, u64 size) {
-  RingBuffer res = {
-    .base = (u8*)base,
-    .size = size,
-  };
-  return res;
+	RingBuffer res = {
+		.base = (u8*)base,
+		.size = size,
+	};
+	return res;
 }
 
 u64 ring_write(RingBuffer& ring, void* src, u64 src_size) {
-  Assert(ring.size >= src_size);
-  u64 offset = ring.write_pos % ring.size;
-  u64 first = Min(ring.size - offset, src_size);
-  u64 second = src_size - first;
-  MemCopy(ring.base + offset, src, first);
-  if (second) {
-    MemCopy(ring.base, Offset(src, first), second);
-  }
-  ring.write_pos += src_size;
-  return offset;
+	Assert(ring.size >= src_size);
+	u64 offset = ring.write_pos % ring.size;
+	u64 first = Min(ring.size - offset, src_size);
+	u64 second = src_size - first;
+	MemCopy(ring.base + offset, src, first);
+	if (second) {
+		MemCopy(ring.base, Offset(src, first), second);
+	}
+	ring.write_pos += src_size;
+	return offset;
 }
 
 u64 ring_read(RingBuffer& ring, void* dst, u64 dst_size) {
-  Assert(ring.size >= dst_size);
-  u64 offset = ring.read_pos % ring.size;
-  u64 first = Min(ring.size - offset, dst_size);
-  u64 second = dst_size - first;
-  MemCopy(dst, ring.base+offset, first);
-  if (second) {
-    MemCopy(Offset(dst, first), ring.base, second);
-  }
-  ring.read_pos += dst_size;
-  return offset;
+	Assert(ring.size >= dst_size);
+	u64 offset = ring.read_pos % ring.size;
+	u64 first = Min(ring.size - offset, dst_size);
+	u64 second = dst_size - first;
+	MemCopy(dst, ring.base+offset, first);
+	if (second) {
+		MemCopy(Offset(dst, first), ring.base, second);
+	}
+	ring.read_pos += dst_size;
+	return offset;
 }
 
 u64 ring_write_nowrap(RingBuffer& ring, void* src, u64 src_size, u64 align) {
-  Assert(ring.size >= src_size);
-  u64 offset = AlignUp(ring.write_pos, align) % ring.size;
-  u64 tail = ring.size - offset;
-  b32 wrap = src_size > tail;
-  if (wrap) {
-    ring.write_pos += tail;
-    offset = 0;
-  }
-  MemCopy(ring.base + offset, src, src_size);
-  ring.write_pos += src_size;
-  return offset;
+	Assert(ring.size >= src_size);
+	u64 offset = AlignUp(ring.write_pos, align) % ring.size;
+	u64 tail = ring.size - offset;
+	b32 wrap = src_size > tail;
+	if (wrap) {
+		ring.write_pos += tail;
+		offset = 0;
+	}
+	MemCopy(ring.base + offset, src, src_size);
+	ring.write_pos += src_size;
+	return offset;
 }
 
 u64 ring_read_nowrap(RingBuffer& ring, void* dst, u64 dst_size) {
-  Assert(ring.size >= dst_size);
-  u64 offset = ring.read_pos % ring.size;
-  u64 tail = ring.size - offset;
-  b32 wrap = dst_size > tail;
-  if (wrap) {
-    ring.read_pos += tail;
-    offset = 0;
-  }
-  MemCopy(dst, ring.base+offset, dst_size);
-  ring.read_pos += dst_size;
-  return offset;
+	Assert(ring.size >= dst_size);
+	u64 offset = ring.read_pos % ring.size;
+	u64 tail = ring.size - offset;
+	b32 wrap = dst_size > tail;
+	if (wrap) {
+		ring.read_pos += tail;
+		offset = 0;
+	}
+	MemCopy(dst, ring.base+offset, dst_size);
+	ring.read_pos += dst_size;
+	return offset;
 }
 
 ////////////////////////////////////////////////////////////////////////
 // Coroutine
 
 u8* Restrict _coroutine_var(Coroutine* co, u32 size) {
-  Assert(co->stack_pointer + size < CoroutineStackSize);
-  u8* res = co->stack + co->stack_pointer;
-  co->stack_pointer += size;
-  return res;
+	Assert(co->stack_pointer + size < CoroutineStackSize);
+	u8* res = co->stack + co->stack_pointer;
+	co->stack_pointer += size;
+	return res;
 }
 
 ////////////////////////////////////////////////////////////////////////

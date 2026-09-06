@@ -4,23 +4,23 @@
 #include "maths.h"
 
 struct Dstring {
-  u8* str;
-  u32 size;
-  u32 cap;
-  Allocator alloc;
-  operator String();
+	u8* str;
+	u32 size;
+	u32 cap;
+	Allocator alloc;
+	operator String();
 };
 
 struct StringNode {
-  StringNode* next;
-  String string;
+	StringNode* next;
+	String string;
 };
 
 struct StringList {
-  StringNode* first;
-  StringNode* last;
-  u32 node_count;
-  u32 total_size;
+	StringNode* first;
+	StringNode* last;
+	u32 node_count;
+	u32 total_size;
 };
 
 Slice<u8> dstr_slice(Dstring dstr);
@@ -156,8 +156,8 @@ String push_str_wchar(Allocator arena, const wchar_t* in, u32 wchar_length);
 
 
 struct Lexer {
-  u8* cur;
-  u8* end;
+		u8* cur;
+		u8* end;
 };
 
 Lexer lexer_init(String buffer);

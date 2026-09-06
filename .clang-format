@@ -1,4 +1,6 @@
 BasedOnStyle: LLVM
+UseTab: Always
+TabWidth: 2
 IndentWidth: 2
 ContinuationIndentWidth: 2
 ColumnLimit: 0

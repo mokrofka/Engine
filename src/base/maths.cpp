@@ -36,50 +36,50 @@ f32 round_to(f32 x, f32 step) { return Round(x / step) * step; }
 // Color
 
 v4 rgba_from_u32(u32 hex) {
-  v4 result = v4(((hex >>  0) & 0xff) / 255.f,
-                 ((hex >>  8) & 0xff) / 255.f,
-                 ((hex >> 16) & 0xff) / 255.f,
-                 ((hex >> 24) & 0xff) / 255.f);
-  return result;
+	v4 result = v4(((hex >>  0) & 0xff) / 255.f,
+																((hex >>  8) & 0xff) / 255.f,
+																((hex >> 16) & 0xff) / 255.f,
+																((hex >> 24) & 0xff) / 255.f);
+	return result;
 }
 u32 u32_from_rgba(v4 rgba) {
-  u32 result = 0;
-  result |= ((u32)((u8)(rgba.x*255.f))) <<  0;
-  result |= ((u32)((u8)(rgba.y*255.f))) <<  8;
-  result |= ((u32)((u8)(rgba.z*255.f))) << 16;
-  result |= ((u32)((u8)(rgba.w*255.f))) << 24;
-  return result;
+	u32 result = 0;
+	result |= ((u32)((u8)(rgba.x*255.f))) <<  0;
+	result |= ((u32)((u8)(rgba.y*255.f))) <<  8;
+	result |= ((u32)((u8)(rgba.z*255.f))) << 16;
+	result |= ((u32)((u8)(rgba.w*255.f))) << 24;
+	return result;
 }
 
 ////////////////////////////////////////////////////////////////////////
 // Hash
 
 u64 squirrel3(u64 x) {
-  x *= 0x9E3779B185EBCA87ULL;
-  x ^= (x >> 8);
-  x += 0xC2B2AE3D27D4EB4FULL;
-  x ^= (x << 8);
-  x *= 0x27D4EB2F165667C5ULL;
-  x ^= (x >> 8);
-  return x;
+	x *= 0x9E3779B185EBCA87ULL;
+	x ^= (x >> 8);
+	x += 0xC2B2AE3D27D4EB4FULL;
+	x ^= (x << 8);
+	x *= 0x27D4EB2F165667C5ULL;
+	x ^= (x >> 8);
+	return x;
 }
 
 u64 str_hash_FNV(String str) {
-  u32 hash = 0x811c9dc5;
-  Loop (i, str.size) {
-    hash = (*str.str++ ^ hash) * 0x01000193;
-  }
-  return hash;
+	u32 hash = 0x811c9dc5;
+	Loop (i, str.size) {
+		hash = (*str.str++ ^ hash) * 0x01000193;
+	}
+	return hash;
 }
 
 u64 hash_memory(void* data, u64 size) {
-  u8*p = (u8*)data;
-  uint64_t h = 1469598103934665603ull;
-  Loop (i, size) {
-    h ^= p[i];
-    h *= 1099511628211ull;
-  }
-  return h;
+	u8*p = (u8*)data;
+	uint64_t h = 1469598103934665603ull;
+	Loop (i, size) {
+		h ^= p[i];
+		h *= 1099511628211ull;
+	}
+	return h;
 }
 
 u64 hash(u64 x) { return squirrel3(x); }
@@ -89,11 +89,11 @@ u64 hash(String str) { return str_hash_FNV(str); }
 // Random
 
 u32 xorshift32(u32* seed) {
-  u32 x = *seed;
-  x ^= x << 13;
-  x ^= x >> 17;
-  x ^= x << 5;
-  return *seed = x;
+	u32 x = *seed;
+	x ^= x << 13;
+	x ^= x >> 17;
+	x ^= x << 5;
+	return *seed = x;
 }
 
 global thread_local u32 _seed = 0x95123512;
@@ -114,23 +114,23 @@ u32 rand_get_seed()                         { return _seed; }
 ////////////////////////////////////////////////////////////////////////
 // Misc
 i32 ipow(i32 base, u32 exponent) {
-  i32 res = 1;
-  Loop (i, exponent) {
-    res *= base;
-  }
-  return res;
+	i32 res = 1;
+	Loop (i, exponent) {
+		res *= base;
+	}
+	return res;
 }
 
 f32 safe_divn(f32 a, f32 b, f32 n) { return b == 0 ? n : a/b; }
 f32 safe_div0(f32 a, f32 b)        { return safe_divn(a,b,0); }
 f32 safe_div1(f32 a, f32 b)        { return safe_divn(a,b,1); }
 i32 wrap_i32(i32 min, i32 x, i32 max) {
-  i32 res = (x - min) % (max - min);
-  return res + min;
+	i32 res = (x - min) % (max - min);
+	return res + min;
 }
 f32 wrap_f32(f32 min, f32 x, f32 max) {
-  f32 res = x - (max - min)*Floor((x - min)/(max - min));
-  return res;
+	f32 res = x - (max - min)*Floor((x - min)/(max - min));
+	return res;
 }
 f32 Lerp(f32 a, f32 t, f32 b)      { return (1 - t)*a + t*b; }
 f32 LerpClamp(f32 a, f32 t, f32 b) { return Lerp(a, Clamp01(t), b); }
@@ -140,26 +140,26 @@ f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max)    { return
 f32 remap(f32 x, f32 old_max, f32 new_max)                              { return x / old_max * new_max; }
 f64 remap(f64 x, f64 old_min, f64 old_max, f64 new_min, f64 new_max) { return (x - old_min) / (old_max - old_min) * (new_max - new_min) + new_min; }
 f32 remap_clamped(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max) {
-  return remap(Clamp(old_min, x, old_max), old_min, old_max, new_min, new_max);
+	return remap(Clamp(old_min, x, old_max), old_min, old_max, new_min, new_max);
 }
 f32 remap01(f32 t, f32 lo, f32 hi) { return lo + t * (hi - lo); }
 f32 approach(f32 from, f32 to, f32 step) {
-  f32 d = to - from;
-  if (Abs(d) <= step) {
-    return to;
-  }
-  return from + Sign(d)*step;
+	f32 d = to - from;
+	if (Abs(d) <= step) {
+		return to;
+	}
+	return from + Sign(d)*step;
 }
 
 f32 exp_decay(f32 x, f32 target, f32 decay, f32 dt) {
-  return target + (x - target) * Exp(-decay * dt);
+	return target + (x - target) * Exp(-decay * dt);
 }
 
 f32 wrap_2pi(f32 a) {
-  a = Mod(a, 2 * PI);
-  if (a < 0)
-    a += 2 * PI;
-  return a;
+	a = Mod(a, 2 * PI);
+	if (a < 0)
+		a += 2 * PI;
+	return a;
 }
 f32 wrap_pi(f32 a) { return wrap_2pi(a + PI) - PI; }
 
@@ -167,32 +167,32 @@ f32 angle_delta(f32 from, f32 to)     { return wrap_pi(to - from); }
 f32 angle_delta_cw(f32 from, f32 to)  { return wrap_2pi(to - from); }
 f32 angle_delta_ccw(f32 from, f32 to) { return wrap_2pi(from - to); }
 f32 angle_delta_longest(f32 from, f32 to) {
-  f32 d = wrap_pi(to - from);
-  if (d > 0)
-    return d - 2*PI;
-  else if (d < 0)
-    return d + 2*PI;
-  return 0;
+	f32 d = wrap_pi(to - from);
+	if (d > 0)
+		return d - 2*PI;
+	else if (d < 0)
+		return d + 2*PI;
+	return 0;
 }
 f32 angle_approach(f32 from, f32 to, f32 step) {
-  f32 d = angle_delta(from, to);
-  if (Abs(d) <= step)
-    return to;
-  return from + Sign(d)*step;
+	f32 d = angle_delta(from, to);
+	if (Abs(d) <= step)
+		return to;
+	return from + Sign(d)*step;
 }
 
 v3 v3_bezier2(v3 p0, v3 p1, v3 p2, f32 t) {
-  v3 a = v3_lerp(p0, t, p1);
-  v3 b = v3_lerp(p1, t, p2);
-  return v3_lerp(a, t, b);
+	v3 a = v3_lerp(p0, t, p1);
+	v3 b = v3_lerp(p1, t, p2);
+	return v3_lerp(a, t, b);
 }
 v3 v3_bezier3(v3 p0, v3 p1, v3 p2, v3 p3, f32 t) {
-  v3 a = v3_lerp(p0, t, p1);
-  v3 b = v3_lerp(p1, t, p2);
-  v3 c = v3_lerp(p2, t, p3);
-  v3 d = v3_lerp(a, t, b);
-  v3 e = v3_lerp(b, t, c);
-  return v3_lerp(d, t, e);
+	v3 a = v3_lerp(p0, t, p1);
+	v3 b = v3_lerp(p1, t, p2);
+	v3 c = v3_lerp(p2, t, p3);
+	v3 d = v3_lerp(a, t, b);
+	v3 e = v3_lerp(b, t, c);
+	return v3_lerp(d, t, e);
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -271,20 +271,20 @@ v2  v2_rotate(v2 v, f32 rad)                    { f32 s, c; SinCos(rad, &s, &c);
 v2  v2_rotate_around(v2 v, v2 pivot, f32 rad)   { return v2_rotate(v - pivot, rad) + pivot; }
 
 v2 v2_approach(v2 current, v2 target, f32 step) {
-  if (v2_length_sqr(current - target) <= Square(step)) return target;
-  return current + v2_norm(target - current) * step;
+	if (v2_length_sqr(current - target) <= Square(step)) return target;
+	return current + v2_norm(target - current) * step;
 }
 v2 v2_clamp_length(f32 min, v2 v, f32 max) {
-  v2 res = v;
-  f32 len = v2_length_sqr(v);
-  if (len > 0.0f) {
-    len = Sqrt(len);
-    f32 scale = 1;
-    if (len < min) scale = min/len;
-    else if (len > min) scale = max/len;
-    res *= scale;
-  }
-  return res;
+	v2 res = v;
+	f32 len = v2_length_sqr(v);
+	if (len > 0.0f) {
+		len = Sqrt(len);
+		f32 scale = 1;
+		if (len < min) scale = min/len;
+		else if (len > min) scale = max/len;
+		res *= scale;
+	}
+	return res;
 }
 v2 v2_bounce(v2 v, v2 normal, f32 restitution) { return v - (1 + restitution) * v2_project_on_unit(v, normal); }
 
@@ -349,20 +349,20 @@ f32 v3_angle(v3 a, v3 b)             { return Atan2(v3_length(v3_cross(a, b)), v
 v3  v3_bounce(v3 vel, v3 n, f32 restitution) { return vel - v3_project_on_norm(vel, n) * (1.0f + restitution); }
 
 v3 v3_approach(v3 current, v3 target, f32 step) {
-  if (v3_length_sqr(current - target) <= Square(step)) return target;
-  return current + v3_norm(target - current) * step;
+	if (v3_length_sqr(current - target) <= Square(step)) return target;
+	return current + v3_norm(target - current) * step;
 }
 v3 v3_clamp_length(f32 min, v3 v, f32 max) {
-  v3 res = v;
-  f32 len = v3_length_sqr(v);
-  if (len > 0.0f) {
-    len = Sqrt(len);
-    f32 scale = 1;
-    if (len < min) scale = min/len;
-    else if (len > min) scale = max/len;
-    res *= scale;
-  }
-  return res;
+	v3 res = v;
+	f32 len = v3_length_sqr(v);
+	if (len > 0.0f) {
+		len = Sqrt(len);
+		f32 scale = 1;
+		if (len < min) scale = min/len;
+		else if (len > min) scale = max/len;
+		res *= scale;
+	}
+	return res;
 }
 
 v3 v3_pos_of_mat4(m4x4 mat)        { return v3(mat.v[3][0], mat.v[3][1], mat.v[3][2]); };
@@ -370,62 +370,62 @@ v3 v3_rotate_x(v3 v, f32 rad)      { v2 r = v2_rotate(v2(v.y, v.z), rad); return
 v3 v3_rotate_y(v3 v, f32 rad)      { v2 r = v2_rotate(v2(v.x, v.z), rad); return v3(r.v[0], v.y, r.v[1]); }
 v3 v3_rotate_z(v3 v, f32 rad)      { v2 r = v2_rotate(v2(v.x, v.y), rad); return v3(r.v[0], r.v[1], v.z); }
 v3 v3_rotate_around_pivot(v3 pos, v3 pivot, v4 q) {
-  v3 l = pos - pivot;
-  v3 rotated = quat_rotate(q, l);
-  return pivot + rotated;
+	v3 l = pos - pivot;
+	v3 rotated = quat_rotate(q, l);
+	return pivot + rotated;
 }
 
 v3 v3_barycentric(v3 v, v3 a, v3 b, v3 c) {
-  v3 v0 = b-a;
-  v3 v1 = c-a;
-  v3 v2 = v-a;
-  f32 d00 = v3_dot(v0,v0);
-  f32 d01 = v3_dot(v0,v1);
-  f32 d11 = v3_dot(v1,v1);
-  f32 d20 = v3_dot(v2,v0);
-  f32 d21 = v3_dot(v2,v1);
-  f32 denom = d00 * d11 - d01 * d01;
-  v3 res;
-  res.y = (d11 * d20 - d01 * d21) / denom;
-  res.z = (d00 * d21 - d01 * d20) / denom;
-  res.x = 1.0f - (res.z + res.y);
-  return res;
+	v3 v0 = b-a;
+	v3 v1 = c-a;
+	v3 v2 = v-a;
+	f32 d00 = v3_dot(v0,v0);
+	f32 d01 = v3_dot(v0,v1);
+	f32 d11 = v3_dot(v1,v1);
+	f32 d20 = v3_dot(v2,v0);
+	f32 d21 = v3_dot(v2,v1);
+	f32 denom = d00 * d11 - d01 * d01;
+	v3 res;
+	res.y = (d11 * d20 - d01 * d21) / denom;
+	res.z = (d00 * d21 - d01 * d20) / denom;
+	res.x = 1.0f - (res.z + res.y);
+	return res;
 }
 v3 v3_perpendicular(v3 v) {
-  v3 cardinal_axis = v3(1,0,0);
-  f32 min = Abs(v.x);
-  if (Abs(v.y) < min) {
-    min = Abs(v.y);
-    cardinal_axis = v3(0,1,0);
-  }
-  if (Abs(v.z) < min) {
-    min = Abs(v.z);
-    cardinal_axis = v3(0,0,1);
-  }
-  return v3_cross(v, cardinal_axis);
+	v3 cardinal_axis = v3(1,0,0);
+	f32 min = Abs(v.x);
+	if (Abs(v.y) < min) {
+		min = Abs(v.y);
+		cardinal_axis = v3(0,1,0);
+	}
+	if (Abs(v.z) < min) {
+		min = Abs(v.z);
+		cardinal_axis = v3(0,0,1);
+	}
+	return v3_cross(v, cardinal_axis);
 }
 v3 v3_rotate_around_axis(v3 v, v3 axis, f32 rad) {
-  axis = v3_norm(axis);
-  v3 proj = v3_project_on_norm(v, axis);
-  v3 reject = v3_reject_on_norm(v, axis);
-  v3 cross = v3_cross(axis, v);
-  f32 sine;
-  f32 cosine;
-  SinCos(rad, &sine, &cosine);
-  return proj + reject*cosine + cross*sine;
+	axis = v3_norm(axis);
+	v3 proj = v3_project_on_norm(v, axis);
+	v3 reject = v3_reject_on_norm(v, axis);
+	v3 cross = v3_cross(axis, v);
+	f32 sine;
+	f32 cosine;
+	SinCos(rad, &sine, &cosine);
+	return proj + reject*cosine + cross*sine;
 }
 v3 v3_refract(v3 v, v3 n, f32 r) {
-  v3 res = {};
-  f32 v_norm_len = v3_dot(v, n); // v and n are normalized
-  f32 v_tangent_len_sqr = 1 - Square(v_norm_len);
-  f32 r_tangent_len_sqr = Square(r)*(v_tangent_len_sqr); // Snell's law: n1sin(theta1) = n2sin(theta2), r = n1/n2, v_tangent_len = sin(theta), r_tangent = r*v_tangent
-  f32 r_norm_len_sqr = 1 - r_tangent_len_sqr;
-  if (r_norm_len_sqr < 0) {
-    return v3_reflect(v, n);
-  }
-  f32 r_norm_len = Sqrt(r_norm_len_sqr);
-  res = r*v - (r*v_norm_len + r_norm_len)*n;
-  return res;
+	v3 res = {};
+	f32 v_norm_len = v3_dot(v, n); // v and n are normalized
+	f32 v_tangent_len_sqr = 1 - Square(v_norm_len);
+	f32 r_tangent_len_sqr = Square(r)*(v_tangent_len_sqr); // Snell's law: n1sin(theta1) = n2sin(theta2), r = n1/n2, v_tangent_len = sin(theta), r_tangent = r*v_tangent
+	f32 r_norm_len_sqr = 1 - r_tangent_len_sqr;
+	if (r_norm_len_sqr < 0) {
+		return v3_reflect(v, n);
+	}
+	f32 r_norm_len = Sqrt(r_norm_len_sqr);
+	res = r*v - (r*v_norm_len + r_norm_len)*n;
+	return res;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -463,47 +463,47 @@ v4  v4_lerp(v4 a, f32 t, v4 b)     { return v4(Lerp(a.x, t, b.x), Lerp(a.y, t, b
 v4  v4_hadamard(v4 a, v4 b)        { return v4(a.x*b.x, a.y*b.y, a.z*b.z, a.w*b.w); }
 
 Transform transform_mul(Transform a, Transform b) {
-  Transform r;
-  r.scale = v3(a.scale.x*b.scale.x);
-  r.rot = quat_mul(a.rot, b.rot);
-  r.pos = quat_rotate(a.rot, a.pos * b.scale.x) + a.pos;
-  return r;
+	Transform r;
+	r.scale = v3(a.scale.x*b.scale.x);
+	r.rot = quat_mul(a.rot, b.rot);
+	r.pos = quat_rotate(a.rot, a.pos * b.scale.x) + a.pos;
+	return r;
 }
 
 v3 transform_point(Transform t, v3 p) {
-  p *= t.scale.x;
-  p = quat_rotate(t.rot, p);
-  p += t.pos;
-  return p;
+	p *= t.scale.x;
+	p = quat_rotate(t.rot, p);
+	p += t.pos;
+	return p;
 }
 
 v3 transform_point(m4x4 m, v3 p) {
-  v3 res = {
-    m.v[0][0]*p.x + m.v[0][1]*p.y + m.v[0][2]*p.z + m.v[0][3],
-    m.v[1][0]*p.x + m.v[1][1]*p.y + m.v[1][2]*p.z + m.v[1][3],
-    m.v[2][0]*p.x + m.v[2][1]*p.y + m.v[2][2]*p.z + m.v[2][3],
-  };
-  return res;
+	v3 res = {
+		m.v[0][0]*p.x + m.v[0][1]*p.y + m.v[0][2]*p.z + m.v[0][3],
+		m.v[1][0]*p.x + m.v[1][1]*p.y + m.v[1][2]*p.z + m.v[1][3],
+		m.v[2][0]*p.x + m.v[2][1]*p.y + m.v[2][2]*p.z + m.v[2][3],
+	};
+	return res;
 }
 
 v3 transform_inverse_point(Transform t, v3 p) {
-  p -= t.pos;
-  p = quat_rotate(quat_conjugate(t.rot), p);
-  p /= t.scale.x;
-  return p;
+	p -= t.pos;
+	p = quat_rotate(quat_conjugate(t.rot), p);
+	p /= t.scale.x;
+	return p;
 }
 
 v3 transform_direction(Transform t, v3 v) {
-  return quat_rotate(t.rot, v * t.scale.x);
+	return quat_rotate(t.rot, v * t.scale.x);
 }
 
 v3 transform_direction(m4x4 m, v3 v) {
-  v3 res = {
-    m.v[0][0]*v.x + m.v[0][1]*v.y + m.v[0][2]*v.z,
-    m.v[1][0]*v.x + m.v[1][1]*v.y + m.v[1][2]*v.z,
-    m.v[2][0]*v.x + m.v[2][1]*v.y + m.v[2][2]*v.z,
-  };
-  return res;
+	v3 res = {
+		m.v[0][0]*v.x + m.v[0][1]*v.y + m.v[0][2]*v.z,
+		m.v[1][0]*v.x + m.v[1][1]*v.y + m.v[1][2]*v.z,
+		m.v[2][0]*v.x + m.v[2][1]*v.y + m.v[2][2]*v.z,
+	};
+	return res;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -519,549 +519,549 @@ v4 quat_conjugate(v4 q) { return v4(-q.x, -q.y, -q.z, q.w); }
 v4 quat_inverse(v4 q)   { return quat_norm(quat_conjugate(q)); }
 
 v4 quat_axis_angle(v3 axis, f32 rad) {
-  axis = v3_norm(axis);
-  f32 s, c;
-  SinCos(rad / 2, &s, &c);
-  v4 res = {axis.x*s, axis.y*s, axis.z*s, c};
-  return res;
+	axis = v3_norm(axis);
+	f32 s, c;
+	SinCos(rad / 2, &s, &c);
+	v4 res = {axis.x*s, axis.y*s, axis.z*s, c};
+	return res;
 }
 
 v3 quat_rotate(v4 q, v3 v) {
-  v3 u = v3_of_v4(q);
-  f32 s = q.w;
-  v3 t = 2 * v3_cross(u, v);
-  v3 cross_ut = v3_cross(u, t);
-  v3 res = {
-    v.x + s * t.x + cross_ut.x,
-    v.y + s * t.y + cross_ut.y,
-    v.z + s * t.z + cross_ut.z
-  };
-  return res;
+	v3 u = v3_of_v4(q);
+	f32 s = q.w;
+	v3 t = 2 * v3_cross(u, v);
+	v3 cross_ut = v3_cross(u, t);
+	v3 res = {
+		v.x + s * t.x + cross_ut.x,
+		v.y + s * t.y + cross_ut.y,
+		v.z + s * t.z + cross_ut.z
+	};
+	return res;
 }
 
 v4 quat_mul(v4 a, v4 b) {
-  v3 vec_a = v3_of_v4(a);
-  v3 vec_b = v3_of_v4(b);
-  f32 scalar = a.w*b.w - v3_dot(vec_a, vec_b);
-  v3 v = a.w*vec_b + b.w*vec_a + v3_cross(vec_a, vec_b);
-  v4 res = v3_to_v4(v, scalar);
-  return res;
+	v3 vec_a = v3_of_v4(a);
+	v3 vec_b = v3_of_v4(b);
+	f32 scalar = a.w*b.w - v3_dot(vec_a, vec_b);
+	v3 v = a.w*vec_b + b.w*vec_a + v3_cross(vec_a, vec_b);
+	v4 res = v3_to_v4(v, scalar);
+	return res;
 }
 
 f32 quat_angle(v4 a, v4 b) {
-  f32 d = Abs(v4_dot(a,b));
-  d = Clamp11(d);
-  return Acos(d) * 2.0f;
+	f32 d = Abs(v4_dot(a,b));
+	d = Clamp11(d);
+	return Acos(d) * 2.0f;
 }
 
 v4 quat_slerp(v4 a, f32 t, v4 b) {
-  f32 dot = v4_dot(a, b);
+	f32 dot = v4_dot(a, b);
 
-  // take shortest path
-  if (dot < 0.0f) {
-    b = -b;
-    dot = -dot;
-  }
+	// take shortest path
+	if (dot < 0.0f) {
+		b = -b;
+		dot = -dot;
+	}
 
-  // if very close → use lerp (avoid division by zero)
-  if (dot > 0.9995f) {
-    v4 r = {
-      a.x + t * (b.x - a.x),
-      a.y + t * (b.y - a.y),
-      a.z + t * (b.z - a.z),
-      a.w + t * (b.w - a.w)
-    };
-    // important: renormalize
-    r = v4_norm(r);
-    return r;
-  }
+	// if very close → use lerp (avoid division by zero)
+	if (dot > 0.9995f) {
+		v4 r = {
+			a.x + t * (b.x - a.x),
+			a.y + t * (b.y - a.y),
+			a.z + t * (b.z - a.z),
+			a.w + t * (b.w - a.w)
+		};
+		// important: renormalize
+		r = v4_norm(r);
+		return r;
+	}
 
-  f32 theta = Acos(dot);
-  f32 sin_theta = Sin(theta);
-  f32 w1 = Sin((1 - t) * theta) / sin_theta;
-  f32 w2 = Sin(t * theta) / sin_theta;
-  v4 res = {
-    a.x * w1 + b.x * w2,
-    a.y * w1 + b.y * w2,
-    a.z * w1 + b.z * w2,
-    a.w * w1 + b.w * w2
-  };
-  return res;
+	f32 theta = Acos(dot);
+	f32 sin_theta = Sin(theta);
+	f32 w1 = Sin((1 - t) * theta) / sin_theta;
+	f32 w2 = Sin(t * theta) / sin_theta;
+	v4 res = {
+		a.x * w1 + b.x * w2,
+		a.y * w1 + b.y * w2,
+		a.z * w1 + b.z * w2,
+		a.w * w1 + b.w * w2
+	};
+	return res;
 }
 
 v4 quat_nlerp(v4 a, f32 t, v4 b) {
-  if (v4_dot(a, b) < 0) {
-    b = -b;
-  }
-  v4 res = quat_norm(v4_lerp(a, t, b));
-  return res;
+	if (v4_dot(a, b) < 0) {
+		b = -b;
+	}
+	v4 res = quat_norm(v4_lerp(a, t, b));
+	return res;
 }
 
 v4 quat_rotate_towards(v4 a, v4 b, f32 max_rad) {
-  f32 d = v4_dot(a, b);
-  if (d < 0.f) {
-    b.x = -b.x;
-    b.y = -b.y;
-    b.z = -b.z;
-    b.w = -b.w;
-    d = -d;
-  }
-  if (d > 0.9995f) return b;
-  f32 angle = Acos(d) * 2.f;
-  f32 t = (max_rad >= angle) ? 1.f : max_rad / angle;
-  return quat_slerp(a, t, b);
+	f32 d = v4_dot(a, b);
+	if (d < 0.f) {
+		b.x = -b.x;
+		b.y = -b.y;
+		b.z = -b.z;
+		b.w = -b.w;
+		d = -d;
+	}
+	if (d > 0.9995f) return b;
+	f32 angle = Acos(d) * 2.f;
+	f32 t = (max_rad >= angle) ? 1.f : max_rad / angle;
+	return quat_slerp(a, t, b);
 }
 
 v4 quat_from_to(v3 a, v3 b) {
-  a = v3_norm(a);
-  b = v3_norm(b);
-  f32 dot = v3_dot(a, b);
-  if (dot > 0.9999f)
-    return quat_identity();
-  if (dot < -0.9999f) {
-    // we do this since v3_cross(a, -a) == v3() and quat will be invalid
-    v3 axis = v3_cross(v3(1, 0, 0), a);
-    if (v3_dot(axis, axis) < 0.0001f) {
-      axis = v3_cross(v3(0, 1, 0), a);
-    }
-    axis = v3_norm(axis);
-    return quat_axis_angle(axis, PI);
-  }
-  v3 c = v3_cross(a, b);
-  v4 res = quat_norm(v4(c.x, c.y, c.z, 1.0f + dot));
-  return res;
+	a = v3_norm(a);
+	b = v3_norm(b);
+	f32 dot = v3_dot(a, b);
+	if (dot > 0.9999f)
+		return quat_identity();
+	if (dot < -0.9999f) {
+		// we do this since v3_cross(a, -a) == v3() and quat will be invalid
+		v3 axis = v3_cross(v3(1, 0, 0), a);
+		if (v3_dot(axis, axis) < 0.0001f) {
+			axis = v3_cross(v3(0, 1, 0), a);
+		}
+		axis = v3_norm(axis);
+		return quat_axis_angle(axis, PI);
+	}
+	v3 c = v3_cross(a, b);
+	v4 res = quat_norm(v4(c.x, c.y, c.z, 1.0f + dot));
+	return res;
 }
 
 v4 quat_from_euler(v3 e) {
-  f32 cy, cx, cz;
-  f32 sy, sx, sz;
-  SinCos(e.y/2, &sy, &cy);
-  SinCos(e.x/2, &sx, &cx);
-  SinCos(e.z/2, &sz, &cz);
-  v4 qy = v4(0, sy, 0, cy);
-  v4 qx = v4(sx, 0, 0, cx);
-  v4 qz = v4(0, 0, sz, cz);
-  v4 res = quat_mul(qy, quat_mul(qx, qz));
-  return quat_norm(res);
+	f32 cy, cx, cz;
+	f32 sy, sx, sz;
+	SinCos(e.y/2, &sy, &cy);
+	SinCos(e.x/2, &sx, &cx);
+	SinCos(e.z/2, &sz, &cz);
+	v4 qy = v4(0, sy, 0, cy);
+	v4 qx = v4(sx, 0, 0, cx);
+	v4 qz = v4(0, 0, sz, cz);
+	v4 res = quat_mul(qy, quat_mul(qx, qz));
+	return quat_norm(res);
 }
 
 v4 quat_look_rotation(v3 dir, v3 up) {
-  v3 f = v3_norm(dir);
-  v3 r = v3_norm(v3_cross(up, f));
-  v3 u = v3_cross(f, r);
-  /* Build rotation matrix columns then convert to quaternion */
-  f32 m00=r.x, m01=r.y, m02=r.z;
-  f32 m10=u.x, m11=u.y, m12=u.z;
-  f32 m20=f.x, m21=f.y, m22=f.z;
-  f32 tr = m00+m11+m22;
-  v4 q = {};
-  if (tr > 0.f) {
-    f32 s = 0.5f / Sqrt(tr+1.f);
-    q.x = (m12 - m21) * s;
-    q.y = (m20 - m02) * s;
-    q.z = (m01 - m10) * s;
-    q.w = 0.25f / s;
-  } else if (m00 > m11 && m00 > m22) {
-    f32 s = 2.f * Sqrt(1.f + m00 - m11 - m22);
-    q.x = 0.25f * s;
-    q.y = (m01 + m10) / s;
-    q.z = (m20 + m02) / s;
-    q.w = (m12 - m21) / s;
-  } else if (m11 > m22) {
-    f32 s = 2.f * Sqrt(1.f + m11 - m00 - m22);
-    q.x = (m01 + m10) / s;
-    q.y = 0.25f * s;
-    q.z = (m12 + m21) / s;
-    q.w = (m20 - m02) / s;
-  } else {
-    f32 s = 2.f * Sqrt(1.f + m22 - m00 - m11);
-    q.x = (m20 + m02) / s;
-    q.y = (m12 + m21) / s;
-    q.z = 0.25f * s;
-    q.w = (m01 - m10) / s;
-  }
-  return quat_norm(q);
+	v3 f = v3_norm(dir);
+	v3 r = v3_norm(v3_cross(up, f));
+	v3 u = v3_cross(f, r);
+	/* Build rotation matrix columns then convert to quaternion */
+	f32 m00=r.x, m01=r.y, m02=r.z;
+	f32 m10=u.x, m11=u.y, m12=u.z;
+	f32 m20=f.x, m21=f.y, m22=f.z;
+	f32 tr = m00+m11+m22;
+	v4 q = {};
+	if (tr > 0.f) {
+		f32 s = 0.5f / Sqrt(tr+1.f);
+		q.x = (m12 - m21) * s;
+		q.y = (m20 - m02) * s;
+		q.z = (m01 - m10) * s;
+		q.w = 0.25f / s;
+	} else if (m00 > m11 && m00 > m22) {
+		f32 s = 2.f * Sqrt(1.f + m00 - m11 - m22);
+		q.x = 0.25f * s;
+		q.y = (m01 + m10) / s;
+		q.z = (m20 + m02) / s;
+		q.w = (m12 - m21) / s;
+	} else if (m11 > m22) {
+		f32 s = 2.f * Sqrt(1.f + m11 - m00 - m22);
+		q.x = (m01 + m10) / s;
+		q.y = 0.25f * s;
+		q.z = (m12 + m21) / s;
+		q.w = (m20 - m02) / s;
+	} else {
+		f32 s = 2.f * Sqrt(1.f + m22 - m00 - m11);
+		q.x = (m20 + m02) / s;
+		q.y = (m12 + m21) / s;
+		q.z = 0.25f * s;
+		q.w = (m01 - m10) / s;
+	}
+	return quat_norm(q);
 }
 
 ////////////////////////////////////////////////////////////////////////
 // m2x2
 
 m2x2 operator*(m2x2 a, m2x2 b) {
-  m2x2 res = {};
-  Loop(y, 2) {
-    Loop(x, 2) {
-      res.v[y][x] = a.v[0][x] * b.v[y][0] +
-                    a.v[1][x] * b.v[y][1];
-    }
-  }
-  return res;
+	m2x2 res = {};
+	Loop (y, 2) {
+		Loop (x, 2) {
+			res.v[y][x] = a.v[0][x] * b.v[y][0] +
+																	a.v[1][x] * b.v[y][1];
+		}
+	}
+	return res;
 }
 m2x2& operator*=(m2x2& a, m2x2 b) { return a = b * a; }
 
 v2 operator*(m2x2 mat, v2 v) {
-  v2 result = {
-    mat.v[0][0]*v.x + mat.v[1][0]*v.y,
-    mat.v[0][1]*v.x + mat.v[1][1]*v.y,
-  };
-  return result;
+	v2 result = {
+		mat.v[0][0]*v.x + mat.v[1][0]*v.y,
+		mat.v[0][1]*v.x + mat.v[1][1]*v.y,
+	};
+	return result;
 }
 
 m2x2 m2x2_identity() {
-  m2x2 res = {
-    1, 0,
-    0, 1,
-  };
-  return res;
+	m2x2 res = {
+		1, 0,
+		0, 1,
+	};
+	return res;
 }
 
 m2x2 m2x2_rotate(f32 rad) {
-  f32 s, c;
-  SinCos(rad, &s, &c);
-  m2x2 res = {
-    c, s,
-   -s, c,
-  };
-  return res;
+	f32 s, c;
+	SinCos(rad, &s, &c);
+	m2x2 res = {
+		c, s,
+	-s, c,
+	};
+	return res;
 }
 
 m2x2 m2x2_scale(v2 scale) {
-  m2x2 res = {
-    scale.x, 0,
-    0,       scale.y,
-  };
-  return res;
+	m2x2 res = {
+		scale.x, 0,
+		0,       scale.y,
+	};
+	return res;
 }
 
 m2x2 m2x2_inverse(m2x2 m) {
-  f32 det =
-    m.v[0][0] * m.v[1][1] -
-    m.v[1][0] * m.v[0][1];
-  f32 inv_det = 1.0f / det;
-  m2x2 res = {
-     m.v[1][1], -m.v[0][1],
-    -m.v[1][0],  m.v[0][0],
-  };
-  return m2x2_scale_all_elements(res, inv_det);
+	f32 det =
+		m.v[0][0] * m.v[1][1] -
+		m.v[1][0] * m.v[0][1];
+	f32 inv_det = 1.0f / det;
+	m2x2 res = {
+		m.v[1][1], -m.v[0][1],
+	-m.v[1][0],  m.v[0][0],
+	};
+	return m2x2_scale_all_elements(res, inv_det);
 }
 
 m2x2 m2x2_scale_all_elements(m2x2 mat, f32 scale) {
-  Loop (y, 2) {
-    Loop (x, 2) {
-      mat.v[y][x] *= scale;
-    }
-  }
-  return mat;
+	Loop (y, 2) {
+		Loop (x, 2) {
+			mat.v[y][x] *= scale;
+		}
+	}
+	return mat;
 }
 
 ////////////////////////////////////////////////////////////////////////
 // m3x2
 
 m3x2 operator*(m3x2 a, m3x2 b) {
-  m3x2 res;
-  Loop(y, 2) {
-    Loop(x, 2) {
-      res.v[y][x] = a.v[0][x] * b.v[y][0] +
-                    a.v[1][x] * b.v[y][1];
-    }
-  }
-  res.v[2][0] = a.v[0][0] * b.v[2][0] +
-                a.v[1][0] * b.v[2][1] + 
-                a.v[2][0];
-  res.v[2][1] = a.v[0][1] * b.v[2][0] +
-                a.v[1][1] * b.v[2][1] + 
-                a.v[2][0];
-  return res;
+	m3x2 res;
+	Loop(y, 2) {
+		Loop(x, 2) {
+			res.v[y][x] = a.v[0][x] * b.v[y][0] +
+																	a.v[1][x] * b.v[y][1];
+		}
+	}
+	res.v[2][0] = a.v[0][0] * b.v[2][0] +
+															a.v[1][0] * b.v[2][1] + 
+															a.v[2][0];
+	res.v[2][1] = a.v[0][1] * b.v[2][0] +
+															a.v[1][1] * b.v[2][1] + 
+															a.v[2][0];
+	return res;
 }
 m3x2& operator*=(m3x2& a, m3x2 b) { return a = b * a; }
 
 v2 operator*(m3x2 mat, v2 v) {
-  v2 res = {
-    mat.v[0][0] * v.x + mat.v[1][0] * v.y + mat.v[2][0],
-    mat.v[0][1] * v.x + mat.v[1][1] * v.y + mat.v[2][1],
-  };
-  return res;
+	v2 res = {
+		mat.v[0][0] * v.x + mat.v[1][0] * v.y + mat.v[2][0],
+		mat.v[0][1] * v.x + mat.v[1][1] * v.y + mat.v[2][1],
+	};
+	return res;
 }
 
 m3x2 m3x2_identity() {
-  m3x2 res = {
-    1, 0,
-    0, 1,
-    0, 0,
-  };
-  return res;
+	m3x2 res = {
+		1, 0,
+		0, 1,
+		0, 0,
+	};
+	return res;
 }
 
 m3x2 m3x2_translate(v2 pos) {
-  m3x2 res = {
-    1, 0,
-    0, 1,
-    pos.x, pos.y
-  };
-  return res;
+	m3x2 res = {
+		1, 0,
+		0, 1,
+		pos.x, pos.y
+	};
+	return res;
 }
 
 m3x2 m3x2_scale(v2 scale) {
-  m3x2 res = {
-    scale.x, 0,
-    0,       scale.y,
-    0,       0,
-  };
-  return res;
+	m3x2 res = {
+		scale.x, 0,
+		0,       scale.y,
+		0,       0,
+	};
+	return res;
 }
 
 m3x2 m3x2_rotate(f32 rad) {
-  f32 s, c;
-  SinCos(rad, &s, &c);
-  m3x2 res = {
-    c, s,
-   -s, c,
-    0, 0,
-  };
-  return res;
+	f32 s, c;
+	SinCos(rad, &s, &c);
+	m3x2 res = {
+		c, s,
+	-s, c,
+		0, 0,
+	};
+	return res;
 }
 
 m3x2 m3x2_transform(v2 pos, v2 scale, f32 rad) {
-  f32 s, c;
-  SinCos(rad, &s, &c);
-  m3x2 res = {
-    c*scale.x, s*scale.y,
-   -s*scale.x, c*scale.y,
-    pos.x,     pos.y,
-  };
-  return res;
+	f32 s, c;
+	SinCos(rad, &s, &c);
+	m3x2 res = {
+		c*scale.x, s*scale.y,
+	-s*scale.x, c*scale.y,
+		pos.x,     pos.y,
+	};
+	return res;
 }
 
 m3x2 m3x2_inverse(m3x2 a) {
-  f32 det = a.v[0][0] * a.v[1][1]
-          - a.v[1][0] * a.v[0][1];
-  f32 inv_det = 1.0f / det;
-  m3x2 r;
-  r.v[0][0] =  a.v[1][1] * inv_det;
-  r.v[0][1] = -a.v[0][1] * inv_det;
-  r.v[1][0] = -a.v[1][0] * inv_det;
-  r.v[1][1] =  a.v[0][0] * inv_det;
-  r.v[2][0] = -(r.v[0][0] * a.v[2][0] +
-                r.v[1][0] * a.v[2][1]);
-  r.v[2][1] = -(r.v[0][1] * a.v[2][0] +
-                r.v[1][1] * a.v[2][1]);
-  return r;
+	f32 det = a.v[0][0] * a.v[1][1]
+									- a.v[1][0] * a.v[0][1];
+	f32 inv_det = 1.0f / det;
+	m3x2 r;
+	r.v[0][0] =  a.v[1][1] * inv_det;
+	r.v[0][1] = -a.v[0][1] * inv_det;
+	r.v[1][0] = -a.v[1][0] * inv_det;
+	r.v[1][1] =  a.v[0][0] * inv_det;
+	r.v[2][0] = -(r.v[0][0] * a.v[2][0] +
+															r.v[1][0] * a.v[2][1]);
+	r.v[2][1] = -(r.v[0][1] * a.v[2][0] +
+															r.v[1][1] * a.v[2][1]);
+	return r;
 }
 
 ////////////////////////////////////////////////////////////////////////
 // m3x3
 
 m3x3 operator*(m3x3 a, m3x3 b) {
-  m3x3 res = {};
-  Loop (j, 3) {
-    Loop (i, 3) {
-      res.v[j][i] = b.v[j][0] * a.v[0][i] +
-                    b.v[j][1] * a.v[1][i] +
-                    b.v[j][2] * a.v[2][i];
-    }
-  }
-  return res;
+	m3x3 res = {};
+	Loop (j, 3) {
+		Loop (i, 3) {
+			res.v[j][i] = b.v[j][0] * a.v[0][i] +
+																	b.v[j][1] * a.v[1][i] +
+																	b.v[j][2] * a.v[2][i];
+		}
+	}
+	return res;
 }
 m3x3& operator*=(m3x3& a, m3x3 b) { return a = b * a; }
 
 v3 operator*(m3x3 mat, v3 v) {
-  v3 res = {
-    mat.v[0][0]*v.x + mat.v[0][1]*v.y + mat.v[0][2]*v.z,
-    mat.v[1][0]*v.x + mat.v[1][1]*v.y + mat.v[1][2]*v.z,
-    mat.v[2][0]*v.x + mat.v[2][1]*v.y + mat.v[2][2]*v.z,
-  };
-  return res;
+	v3 res = {
+		mat.v[0][0]*v.x + mat.v[0][1]*v.y + mat.v[0][2]*v.z,
+		mat.v[1][0]*v.x + mat.v[1][1]*v.y + mat.v[1][2]*v.z,
+		mat.v[2][0]*v.x + mat.v[2][1]*v.y + mat.v[2][2]*v.z,
+	};
+	return res;
 }
 
 m3x3 m3x3_identity() {
-  m3x3 res = {
-    1,0,0,
-    0,1,0,
-    0,0,1
-  };
-  return res;
+	m3x3 res = {
+		1,0,0,
+		0,1,0,
+		0,0,1
+	};
+	return res;
 }
 
 m3x3 m3x3_translate(v2 pos) {
-  m3x3 res = {
-    1,     0,     0,
-    0,     1,     0,
-    pos.x, pos.y, 1
-  };
-  return res;
+	m3x3 res = {
+		1,     0,     0,
+		0,     1,     0,
+		pos.x, pos.y, 1
+	};
+	return res;
 }
 
 m3x3 m3x3_scale(v2 scale) {
-  m3x3 res = {
-    scale.x, 0,       0,
-    0,       scale.y, 0,
-    0,       0,       1
-  };
-  return res;
+	m3x3 res = {
+		scale.x, 0,       0,
+		0,       scale.y, 0,
+		0,       0,       1
+	};
+	return res;
 }
 
 m3x3 m3x3_rotate(f32 rad) {
-  f32 s, c;
-  SinCos(rad, &s, &c);
-  m3x3 res = {
-    c, s, 0,
-   -s, c, 0,
-    0, 0, 1,
-  };
-  return res;
+	f32 s, c;
+	SinCos(rad, &s, &c);
+	m3x3 res = {
+		c, s, 0,
+	-s, c, 0,
+		0, 0, 1,
+	};
+	return res;
 }
 
 m3x3 m3x3_inverse(m3x3 m) {
-  f32 a = m.v[0][0];
-  f32 b = m.v[1][0];
-  f32 c = m.v[2][0];
+	f32 a = m.v[0][0];
+	f32 b = m.v[1][0];
+	f32 c = m.v[2][0];
 
-  f32 d = m.v[0][1];
-  f32 e = m.v[1][1];
-  f32 f = m.v[2][1];
+	f32 d = m.v[0][1];
+	f32 e = m.v[1][1];
+	f32 f = m.v[2][1];
 
-  f32 g = m.v[0][2];
-  f32 h = m.v[1][2];
-  f32 i = m.v[2][2];
+	f32 g = m.v[0][2];
+	f32 h = m.v[1][2];
+	f32 i = m.v[2][2];
 
-  f32 A = e*i - f*h;
-  f32 B = c*h - b*i;
-  f32 C = b*f - c*e;
+	f32 A = e*i - f*h;
+	f32 B = c*h - b*i;
+	f32 C = b*f - c*e;
 
-  f32 D = f*g - d*i;
-  f32 E = a*i - c*g;
-  f32 F = c*d - a*f;
+	f32 D = f*g - d*i;
+	f32 E = a*i - c*g;
+	f32 F = c*d - a*f;
 
-  f32 G = d*h - e*g;
-  f32 H = b*g - a*h;
-  f32 I = a*e - b*d;
+	f32 G = d*h - e*g;
+	f32 H = b*g - a*h;
+	f32 I = a*e - b*d;
 
-  f32 det = a*A + b*D + c*G;
-  f32 inv_det = 1.0f / det;
+	f32 det = a*A + b*D + c*G;
+	f32 inv_det = 1.0f / det;
 
-  m3x3 res = {
-    A, D, G,
-    B, E, H,
-    C, F, I,
-  };
+	m3x3 res = {
+		A, D, G,
+		B, E, H,
+		C, F, I,
+	};
 
-  return m3x3_scale_all_elements(res, inv_det);
+	return m3x3_scale_all_elements(res, inv_det);
 }
 
 m3x3 m3x3_scale_all_elements(m3x3 mat, f32 scale) {
-  Loop(row, 3) {
-    Loop(col, 3) {
-      mat.v[row][col] *= scale;
-    }
-  }
-  return mat;
+	Loop(row, 3) {
+		Loop(col, 3) {
+			mat.v[row][col] *= scale;
+		}
+	}
+	return mat;
 }
 
 ////////////////////////////////////////////////////////////////////////
 // m4x3
 
 m4x3 operator*(m4x3 a, m4x3 b) {
-  m4x3 res;
-  Loop(y, 3) {
-    Loop(x, 3) {
-      res.v[y][x] = a.v[0][x] * b.v[y][0] +
-                    a.v[1][x] * b.v[y][1] +
-                    a.v[2][x] * b.v[y][2];
-    }
-  }
-  res.v[3][0] = a.v[0][0] * b.v[3][0] +
-                a.v[1][0] * b.v[3][1] + 
-                a.v[2][0] * b.v[3][2] + 
-                a.v[3][0];
-  res.v[3][1] = a.v[0][1] * b.v[3][0] +
-                a.v[1][1] * b.v[3][1] + 
-                a.v[2][1] * b.v[3][2] + 
-                a.v[3][1];
-  res.v[3][2] = a.v[0][2] * b.v[3][0] +
-                a.v[1][2] * b.v[3][1] + 
-                a.v[2][2] * b.v[3][2] + 
-                a.v[3][2];
-  return res;
+	m4x3 res;
+	Loop(y, 3) {
+		Loop(x, 3) {
+			res.v[y][x] = a.v[0][x] * b.v[y][0] +
+																	a.v[1][x] * b.v[y][1] +
+																	a.v[2][x] * b.v[y][2];
+		}
+	}
+	res.v[3][0] = a.v[0][0] * b.v[3][0] +
+															a.v[1][0] * b.v[3][1] + 
+															a.v[2][0] * b.v[3][2] + 
+															a.v[3][0];
+	res.v[3][1] = a.v[0][1] * b.v[3][0] +
+															a.v[1][1] * b.v[3][1] + 
+															a.v[2][1] * b.v[3][2] + 
+															a.v[3][1];
+	res.v[3][2] = a.v[0][2] * b.v[3][0] +
+															a.v[1][2] * b.v[3][1] + 
+															a.v[2][2] * b.v[3][2] + 
+															a.v[3][2];
+	return res;
 }
 m4x3& operator*=(m4x3& a, m4x3 b) { return a = b * a; }
 
 v3 operator*(m4x3 mat, v3 v) {
-  v3 res = {
-    mat.v[0][0]*v.x + mat.v[1][0]*v.y + mat.v[2][0]*v.z + mat.v[3][0],
-    mat.v[0][1]*v.x + mat.v[1][1]*v.y + mat.v[2][1]*v.z + mat.v[3][1],
-    mat.v[0][2]*v.x + mat.v[1][2]*v.y + mat.v[2][2]*v.z + mat.v[3][2],
-  };
-  return res;
+	v3 res = {
+		mat.v[0][0]*v.x + mat.v[1][0]*v.y + mat.v[2][0]*v.z + mat.v[3][0],
+		mat.v[0][1]*v.x + mat.v[1][1]*v.y + mat.v[2][1]*v.z + mat.v[3][1],
+		mat.v[0][2]*v.x + mat.v[1][2]*v.y + mat.v[2][2]*v.z + mat.v[3][2],
+	};
+	return res;
 }
 
 m4x3 m4x3_identity() {
-  m4x3 res = {
-    1,0,0,
-    0,1,0,
-    0,0,1,
-    0,0,0,
-  };
-  return res;
+	m4x3 res = {
+		1,0,0,
+		0,1,0,
+		0,0,1,
+		0,0,0,
+	};
+	return res;
 }
 
 m4x3 m4x3_translate(v3 pos) {
-  m4x3 res = {
-    1,     0,     0,
-    0,     1,     0,
-    0,     0,     1,
-    pos.x, pos.y, pos.z,
-  };
-  return res;
+	m4x3 res = {
+		1,     0,     0,
+		0,     1,     0,
+		0,     0,     1,
+		pos.x, pos.y, pos.z,
+	};
+	return res;
 }
 
 m4x3 m4x3_scale(v3 scale) {
-  m4x3 res = {
-    scale.x, 0,       0,
-    0,       scale.y, 0,
-    0,       0,       scale.z,
-    0,       0,       0,
-  };
-  return res;
+	m4x3 res = {
+		scale.x, 0,       0,
+		0,       scale.y, 0,
+		0,       0,       scale.z,
+		0,       0,       0,
+	};
+	return res;
 }
 
 m4x3 m4x3_scale_translate(v3 scale, v3 pos) {
-  m4x3 res = {
-    scale.x, 0,       0,
-    0,       scale.y, 0,
-    0,       0,       scale.z,
-    pos.x,   pos.y,   pos.z,
-  };
-  return res;
+	m4x3 res = {
+		scale.x, 0,       0,
+		0,       scale.y, 0,
+		0,       0,       scale.z,
+		pos.x,   pos.y,   pos.z,
+	};
+	return res;
 }
 
 m4x3 m4x3_transform(v3 scale, v3 pos, v4 q) {
-  m4x3 r = m4x3_from_quat(q);
-  r.v[0][0] *= scale.x;
-  r.v[0][1] *= scale.x;
-  r.v[0][2] *= scale.x;
-  r.v[1][0] *= scale.y;
-  r.v[1][1] *= scale.y;
-  r.v[1][2] *= scale.y;
-  r.v[2][0] *= scale.z;
-  r.v[2][1] *= scale.z;
-  r.v[2][2] *= scale.z;
-  r.v[3][0] = pos.x;
-  r.v[3][1] = pos.y;
-  r.v[3][2] = pos.z;
-  return r;
+	m4x3 r = m4x3_from_quat(q);
+	r.v[0][0] *= scale.x;
+	r.v[0][1] *= scale.x;
+	r.v[0][2] *= scale.x;
+	r.v[1][0] *= scale.y;
+	r.v[1][1] *= scale.y;
+	r.v[1][2] *= scale.y;
+	r.v[2][0] *= scale.z;
+	r.v[2][1] *= scale.z;
+	r.v[2][2] *= scale.z;
+	r.v[3][0] = pos.x;
+	r.v[3][1] = pos.y;
+	r.v[3][2] = pos.z;
+	return r;
 }
 
 m4x3 m4x3_from_quat(v4 q) {
-  f32 x=q.x, y=q.y, z=q.z, w=q.w;
-  f32 xx=x*x, yy=y*y, zz=z*z;
-  f32 xy=x*y, xz=x*z, yz=y*z;
-  f32 wx=w*x, wy=w*y, wz=w*z;
-  m4x3 res = {
-    1-2*(yy+zz), 2*(xy+wz),   2*(xz-wy),
-    2*(xy-wz),   1-2*(xx+zz), 2*(yz+wx),
-    2*(xz+wy),   2*(yz-wx),   1-2*(xx+yy),
-    0,           0,           0,
-  };
-  return res;
+	f32 x=q.x, y=q.y, z=q.z, w=q.w;
+	f32 xx=x*x, yy=y*y, zz=z*z;
+	f32 xy=x*y, xz=x*z, yz=y*z;
+	f32 wx=w*x, wy=w*y, wz=w*z;
+	m4x3 res = {
+		1-2*(yy+zz), 2*(xy+wz),   2*(xz-wy),
+		2*(xy-wz),   1-2*(xx+zz), 2*(yz+wx),
+		2*(xz+wy),   2*(yz-wx),   1-2*(xx+yy),
+		0,           0,           0,
+	};
+	return res;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -1069,374 +1069,374 @@ m4x3 m4x3_from_quat(v4 q) {
 
 // NOTE: camera is looking at -z so forward is negative
 v3 m4x4_forward(m4x4 matrix) {
-  v3 res = {
-    -matrix.v[0][2],
-    -matrix.v[1][2],
-    -matrix.v[2][2],
-  };
-  res = v3_norm(res);
-  return res;
+	v3 res = {
+		-matrix.v[0][2],
+		-matrix.v[1][2],
+		-matrix.v[2][2],
+	};
+	res = v3_norm(res);
+	return res;
 }
 
 v3 m4x4_backward(m4x4 matrix) {
-  v3 res = {
-    matrix.v[0][2],
-    matrix.v[1][2],
-    matrix.v[2][2],
-  };
-  res = v3_norm(res);
-  return res;
+	v3 res = {
+		matrix.v[0][2],
+		matrix.v[1][2],
+		matrix.v[2][2],
+	};
+	res = v3_norm(res);
+	return res;
 }
 
 v3 m4x4_up(m4x4 matrix) {
-  v3 up = {
-    matrix.v[0][1],
-    matrix.v[1][1],
-    matrix.v[2][1],
-  };
-  up = v3_norm(up);
-  return up;
+	v3 up = {
+		matrix.v[0][1],
+		matrix.v[1][1],
+		matrix.v[2][1],
+	};
+	up = v3_norm(up);
+	return up;
 }
 
 v3 m4x4_down(m4x4 matrix) {
-  v3 down = {
-    -matrix.v[0][1],
-    -matrix.v[1][1],
-    -matrix.v[2][1],
-  };
-  down = v3_norm(down);
-  return down;
+	v3 down = {
+		-matrix.v[0][1],
+		-matrix.v[1][1],
+		-matrix.v[2][1],
+	};
+	down = v3_norm(down);
+	return down;
 }
 
 v3 m4x4_right(m4x4 matrix) {
-  v3 left = {
-    matrix.v[0][0],
-    matrix.v[1][0],
-    matrix.v[2][0],
-  };
-  left = v3_norm(left);
-  return left;
+	v3 left = {
+		matrix.v[0][0],
+		matrix.v[1][0],
+		matrix.v[2][0],
+	};
+	left = v3_norm(left);
+	return left;
 }
 
 v3 m4x4_left(m4x4 matrix) {
-  v3 right = {
-    -matrix.v[0][0],
-    -matrix.v[1][0],
-    -matrix.v[2][0],
-  };
-  right = v3_norm(right);
-  return right;
+	v3 right = {
+		-matrix.v[0][0],
+		-matrix.v[1][0],
+		-matrix.v[2][0],
+	};
+	right = v3_norm(right);
+	return right;
 }
 
 m4x4 operator*(m4x4 a, m4x4 b) {
-  m4x4 res = {};
-  Loop (y, 4) {
-    Loop (x, 4) {
-      res.v[y][x] = a.v[0][x] * b.v[y][0] +
-                    a.v[1][x] * b.v[y][1] +
-                    a.v[2][x] * b.v[y][2] +
-                    a.v[3][x] * b.v[y][3];
-    }
-  }
-  return res;
+	m4x4 res = {};
+	Loop (y, 4) {
+		Loop (x, 4) {
+			res.v[y][x] = a.v[0][x] * b.v[y][0] +
+																	a.v[1][x] * b.v[y][1] +
+																	a.v[2][x] * b.v[y][2] +
+																	a.v[3][x] * b.v[y][3];
+		}
+	}
+	return res;
 }
 m4x4& operator*=(m4x4& a, m4x4 b) { return a = b * a; }
 
 v4 operator*(m4x4 mat, v4 v) {
-  v4 result = {
-    mat.v[0][0]*v.x + mat.v[0][1]*v.y + mat.v[0][2]*v.z + mat.v[0][3]*v.w,
-    mat.v[1][0]*v.x + mat.v[1][1]*v.y + mat.v[1][2]*v.z + mat.v[1][3]*v.w,
-    mat.v[2][0]*v.x + mat.v[2][1]*v.y + mat.v[2][2]*v.z + mat.v[2][3]*v.w,
-    mat.v[3][0]*v.x + mat.v[3][1]*v.y + mat.v[3][2]*v.z + mat.v[3][3]*v.w,
-  };
-  return result;
+	v4 result = {
+		mat.v[0][0]*v.x + mat.v[0][1]*v.y + mat.v[0][2]*v.z + mat.v[0][3]*v.w,
+		mat.v[1][0]*v.x + mat.v[1][1]*v.y + mat.v[1][2]*v.z + mat.v[1][3]*v.w,
+		mat.v[2][0]*v.x + mat.v[2][1]*v.y + mat.v[2][2]*v.z + mat.v[2][3]*v.w,
+		mat.v[3][0]*v.x + mat.v[3][1]*v.y + mat.v[3][2]*v.z + mat.v[3][3]*v.w,
+	};
+	return result;
 }
 
 m4x4 m4x4_identity() {
-  m4x4 res = {
-    1,0,0,0,
-    0,1,0,0,
-    0,0,1,0,
-    0,0,0,1
-  };
-  return res;
+	m4x4 res = {
+		1,0,0,0,
+		0,1,0,0,
+		0,0,1,0,
+		0,0,0,1
+	};
+	return res;
 }
 
 m4x4 m4x4_translate(v3 pos) {
-  m4x4 res = {
-    1,     0,     0,     0,
-    0,     1,     0,     0,
-    0,     0,     1,     0,
-    pos.x, pos.y, pos.z, 1
-  };
-  return res;
+	m4x4 res = {
+		1,     0,     0,     0,
+		0,     1,     0,     0,
+		0,     0,     1,     0,
+		pos.x, pos.y, pos.z, 1
+	};
+	return res;
 }
 
 m4x4 m4x4_scale(v3 scale) {
-  m4x4 res = {
-    scale.x, 0,       0,       0,
-    0,       scale.y, 0,       0,
-    0,       0,       scale.z, 0,
-    0,       0,       0,       1
-  };
-  return res;
+	m4x4 res = {
+		scale.x, 0,       0,       0,
+		0,       scale.y, 0,       0,
+		0,       0,       scale.z, 0,
+		0,       0,       0,       1
+	};
+	return res;
 }
 
 m4x4 m4x4_scale_translate(v3 scale, v3 pos) {
-  m4x4 res = {
-    scale.x, 0,       0,       0,
-    0,       scale.y, 0,       0,
-    0,       0,       scale.z, 0,
-    pos.x,   pos.y,   pos.z,   1
-  };
-  return res;
+	m4x4 res = {
+		scale.x, 0,       0,       0,
+		0,       scale.y, 0,       0,
+		0,       0,       scale.z, 0,
+		pos.x,   pos.y,   pos.z,   1
+	};
+	return res;
 }
 
 m4x4 m4x4_transform(v3 scale, v3 pos, v4 q) {
-  m4x4 r = m4x4_from_quat(q);
-  r.v[0][0] *= scale.x;
-  r.v[0][1] *= scale.x;
-  r.v[0][2] *= scale.x;
-  r.v[1][0] *= scale.y;
-  r.v[1][1] *= scale.y;
-  r.v[1][2] *= scale.y;
-  r.v[2][0] *= scale.z;
-  r.v[2][1] *= scale.z;
-  r.v[2][2] *= scale.z;
-  r.v[3][0] = pos.x;
-  r.v[3][1] = pos.y;
-  r.v[3][2] = pos.z;
-  r.v[3][3] = 1;
-  return r;
+	m4x4 r = m4x4_from_quat(q);
+	r.v[0][0] *= scale.x;
+	r.v[0][1] *= scale.x;
+	r.v[0][2] *= scale.x;
+	r.v[1][0] *= scale.y;
+	r.v[1][1] *= scale.y;
+	r.v[1][2] *= scale.y;
+	r.v[2][0] *= scale.z;
+	r.v[2][1] *= scale.z;
+	r.v[2][2] *= scale.z;
+	r.v[3][0] = pos.x;
+	r.v[3][1] = pos.y;
+	r.v[3][2] = pos.z;
+	r.v[3][3] = 1;
+	return r;
 }
 
 m4x4 m4x4_scale_all_elements(m4x4 mat, f32 scale) {
-  Loop (y, 4) {
-    Loop (x, 4) {
-      mat.v[y][x] *= scale;
-    }
-  }
-  return mat;
+	Loop (y, 4) {
+		Loop (x, 4) {
+			mat.v[y][x] *= scale;
+		}
+	}
+	return mat;
 }
 
 m4x4 m4x4_rotate_x(f32 rad) {
-  f32 sin, cos;
-  SinCos(rad, &sin, &cos);
-  m4x4 mat = {
-    1,   0,    0,   0,
-    0, cos,  sin,   0,
-    0,-sin,  cos,   0,
-    0,   0,    0,   1,
-  };
-  return mat;
+	f32 sin, cos;
+	SinCos(rad, &sin, &cos);
+	m4x4 mat = {
+		1,   0,    0,   0,
+		0, cos,  sin,   0,
+		0,-sin,  cos,   0,
+		0,   0,    0,   1,
+	};
+	return mat;
 }
 
 m4x4 m4x4_rotate_y(f32 rad) {
-  f32 sin, cos;
-  SinCos(rad, &sin, &cos);
-  m4x4 mat = {
-    cos, 0,  -sin, 0,
-    0,   1,   0,   0,
-    sin, 0,   cos, 0,
-    0,   0,   0,   1
-  };
-  return mat;
+	f32 sin, cos;
+	SinCos(rad, &sin, &cos);
+	m4x4 mat = {
+		cos, 0,  -sin, 0,
+		0,   1,   0,   0,
+		sin, 0,   cos, 0,
+		0,   0,   0,   1
+	};
+	return mat;
 }
 
 m4x4 m4x4_rotate_z(f32 rad) {
-  f32 sin, cos;
-  SinCos(rad, &sin, &cos);
-  m4x4 mat = {
-    cos, sin, 0,   0,
-   -sin, cos, 0,   0,
-    0,   0,   1,   0,
-    0,   0,   0,   1
-  };
-  return mat;
+	f32 sin, cos;
+	SinCos(rad, &sin, &cos);
+	m4x4 mat = {
+		cos, sin, 0,   0,
+	-sin, cos, 0,   0,
+		0,   0,   1,   0,
+		0,   0,   0,   1
+	};
+	return mat;
 }
 
 m4x4 m4x4_rotate_xyz(v3 rad) {
-  m4x4 rx = m4x4_rotate_x(rad.x);
-  m4x4 ry = m4x4_rotate_y(rad.y);
-  m4x4 rz = m4x4_rotate_z(rad.z);
-  m4x4 res = rz * ry * rx;
-  return res;
+	m4x4 rx = m4x4_rotate_x(rad.x);
+	m4x4 ry = m4x4_rotate_y(rad.y);
+	m4x4 rz = m4x4_rotate_z(rad.z);
+	m4x4 res = rz * ry * rx;
+	return res;
 }
 
 m4x4 m4x4_rotate_around_axis(v3 axis, f32 rad) {
-  f32 len_sqr = v3_length_sqr(axis);
-  if ((len_sqr != 1.0f) && (len_sqr != 0.0f)) {
-    axis = v3_norm(axis);
-  }
-  f32 sine;
-  f32 cosine;
-  SinCos(rad, &sine, &cosine);
-  f32 x = axis.x, y = axis.y, z = axis.z;
-  f32 t = 1.0f - cosine;
-  m4x4 res = {
-    x*x*t + cosine, y*x*t + z*sine, z*x*t - y*sine, 0,
-    x*y*t - z*sine, y*y*t + cosine, z*y*t + x*sine, 0,
-    x*z*t + y*sine, y*z*t - x*sine, z*z*t + cosine, 0,
-    0,              0,              0,              1,
-  };
-  return res;
+	f32 len_sqr = v3_length_sqr(axis);
+	if ((len_sqr != 1.0f) && (len_sqr != 0.0f)) {
+		axis = v3_norm(axis);
+	}
+	f32 sine;
+	f32 cosine;
+	SinCos(rad, &sine, &cosine);
+	f32 x = axis.x, y = axis.y, z = axis.z;
+	f32 t = 1.0f - cosine;
+	m4x4 res = {
+		x*x*t + cosine, y*x*t + z*sine, z*x*t - y*sine, 0,
+		x*y*t - z*sine, y*y*t + cosine, z*y*t + x*sine, 0,
+		x*z*t + y*sine, y*z*t - x*sine, z*z*t + cosine, 0,
+		0,              0,              0,              1,
+	};
+	return res;
 }
 
 m4x4 m4x4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far) {
-  m4x4 res = {
-    2/(right - left), 0,                0,                  0,
-    0,                2/(top - bottom), 0,                  0,
-    0,                0,                1/(far - near),     0,
-    0,                0,                -near/(far - near), 1
-  };
-  return res;
+	m4x4 res = {
+		2/(right - left), 0,                0,                  0,
+		0,                2/(top - bottom), 0,                  0,
+		0,                0,                1/(far - near),     0,
+		0,                0,                -near/(far - near), 1
+	};
+	return res;
 }
 
 // NOTE: I use camera looking at -Z direction since I found it's more intuitive
 m4x4 m4x4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far) {
-  f32 fov = Tan(fov_radians/2.0f);
-  // mat4 result = {
-  //   1/(fov*aspect_ratio), 0,                       0,                    0,
-  //   0,                    1/fov,                   0,                    0,
-  //   0,                    0,                       Far/(Far-Near),       1,
-  //   0,                    0,                       -Far*Near/(Far-Near), 0
-  // };
-  // NOTE: This flips Z value so camera is looking at -Z direction
-  m4x4 res = {
-    1/(fov*aspect_ratio), 0,                0,                             0,
-    0,                    1/(fov),          0,                             0,
-    0,                    0,                -(far + near)/(far - near),   -1,
-    0,                    0,                (-2.0f*far*near)/(far - near), 0
-  };
-  return res;
+	f32 fov = Tan(fov_radians/2.0f);
+	// mat4 result = {
+	//   1/(fov*aspect_ratio), 0,                       0,                    0,
+	//   0,                    1/fov,                   0,                    0,
+	//   0,                    0,                       Far/(Far-Near),       1,
+	//   0,                    0,                       -Far*Near/(Far-Near), 0
+	// };
+	// NOTE: This flips Z value so camera is looking at -Z direction
+	m4x4 res = {
+		1/(fov*aspect_ratio), 0,                0,                             0,
+		0,                    1/(fov),          0,                             0,
+		0,                    0,                -(far + near)/(far - near),   -1,
+		0,                    0,                (-2.0f*far*near)/(far - near), 0
+	};
+	return res;
 }
 
 // NOTE: we negate Z direction since camera is looking at -Z direction
 m4x4 m4x4_look_at(v3 pos, v3 target, v3 up) {
-  v3 z = -v3_norm(target - pos);
-  v3 x = v3_norm(v3_cross(up, z));
-  v3 y = v3_cross(z, x);
-  m4x4 res = {
-    x.x, y.x, z.x, 0,
-    x.y, y.y, z.y, 0,
-    x.z, y.z, z.z, 0,
-   -v3_dot(x, pos), -v3_dot(y, pos), -v3_dot(z, pos), 1
-  };
-  return res;
+	v3 z = -v3_norm(target - pos);
+	v3 x = v3_norm(v3_cross(up, z));
+	v3 y = v3_cross(z, x);
+	m4x4 res = {
+		x.x, y.x, z.x, 0,
+		x.y, y.y, z.y, 0,
+		x.z, y.z, z.z, 0,
+	-v3_dot(x, pos), -v3_dot(y, pos), -v3_dot(z, pos), 1
+	};
+	return res;
 }
 
 m4x4 m4x4_transpose(m4x4 mat) {
-  m4x4 res = {
-    mat.v[0][0], mat.v[1][0], mat.v[2][0], mat.v[3][0],
-    mat.v[0][1], mat.v[1][1], mat.v[2][1], mat.v[3][1],
-    mat.v[0][2], mat.v[1][2], mat.v[2][2], mat.v[3][2],
-    mat.v[0][3], mat.v[1][3], mat.v[2][3], mat.v[3][3],
-  };
-  return res;
+	m4x4 res = {
+		mat.v[0][0], mat.v[1][0], mat.v[2][0], mat.v[3][0],
+		mat.v[0][1], mat.v[1][1], mat.v[2][1], mat.v[3][1],
+		mat.v[0][2], mat.v[1][2], mat.v[2][2], mat.v[3][2],
+		mat.v[0][3], mat.v[1][3], mat.v[2][3], mat.v[3][3],
+	};
+	return res;
 }
 
 m4x4 m4x4_inverse(m4x4 m) {
-  f32 coef00 = m.v[2][2] * m.v[3][3] - m.v[3][2] * m.v[2][3];
-  f32 coef02 = m.v[1][2] * m.v[3][3] - m.v[3][2] * m.v[1][3];
-  f32 coef03 = m.v[1][2] * m.v[2][3] - m.v[2][2] * m.v[1][3];
-  f32 coef04 = m.v[2][1] * m.v[3][3] - m.v[3][1] * m.v[2][3];
-  f32 coef06 = m.v[1][1] * m.v[3][3] - m.v[3][1] * m.v[1][3];
-  f32 coef07 = m.v[1][1] * m.v[2][3] - m.v[2][1] * m.v[1][3];
-  f32 coef08 = m.v[2][1] * m.v[3][2] - m.v[3][1] * m.v[2][2];
-  f32 coef10 = m.v[1][1] * m.v[3][2] - m.v[3][1] * m.v[1][2];
-  f32 coef11 = m.v[1][1] * m.v[2][2] - m.v[2][1] * m.v[1][2];
-  f32 coef12 = m.v[2][0] * m.v[3][3] - m.v[3][0] * m.v[2][3];
-  f32 coef14 = m.v[1][0] * m.v[3][3] - m.v[3][0] * m.v[1][3];
-  f32 coef15 = m.v[1][0] * m.v[2][3] - m.v[2][0] * m.v[1][3];
-  f32 coef16 = m.v[2][0] * m.v[3][2] - m.v[3][0] * m.v[2][2];
-  f32 coef18 = m.v[1][0] * m.v[3][2] - m.v[3][0] * m.v[1][2];
-  f32 coef19 = m.v[1][0] * m.v[2][2] - m.v[2][0] * m.v[1][2];
-  f32 coef20 = m.v[2][0] * m.v[3][1] - m.v[3][0] * m.v[2][1];
-  f32 coef22 = m.v[1][0] * m.v[3][1] - m.v[3][0] * m.v[1][1];
-  f32 coef23 = m.v[1][0] * m.v[2][1] - m.v[2][0] * m.v[1][1];
-  
-  v4 fac0 = { coef00, coef00, coef02, coef03 };
-  v4 fac1 = { coef04, coef04, coef06, coef07 };
-  v4 fac2 = { coef08, coef08, coef10, coef11 };
-  v4 fac3 = { coef12, coef12, coef14, coef15 };
-  v4 fac4 = { coef16, coef16, coef18, coef19 };
-  v4 fac5 = { coef20, coef20, coef22, coef23 };
-  
-  v4 vec0 = { m.v[1][0], m.v[0][0], m.v[0][0], m.v[0][0] };
-  v4 vec1 = { m.v[1][1], m.v[0][1], m.v[0][1], m.v[0][1] };
-  v4 vec2 = { m.v[1][2], m.v[0][2], m.v[0][2], m.v[0][2] };
-  v4 vec3 = { m.v[1][3], m.v[0][3], m.v[0][3], m.v[0][3] };
-  
-  v4 inv0 = (v4_hadamard(vec1, fac0) - v4_hadamard(vec2, fac1)) + v4_hadamard(vec3, fac2);
-  v4 inv1 = (v4_hadamard(vec0, fac0) - v4_hadamard(vec2, fac3)) + v4_hadamard(vec3, fac4);
-  v4 inv2 = (v4_hadamard(vec0, fac1) - v4_hadamard(vec1, fac3)) + v4_hadamard(vec3, fac5);
-  v4 inv3 = (v4_hadamard(vec0, fac2) - v4_hadamard(vec1, fac4)) + v4_hadamard(vec2, fac5);
-  
-  v4 sign_a = { +1, -1, +1, -1 };
-  v4 sign_b = { -1, +1, -1, +1 };
-  
-  m4x4 inverse;
-  Loop (i, 4) {
-    inverse.v[0][i] = inv0.v[i] * sign_a.v[i];
-    inverse.v[1][i] = inv1.v[i] * sign_b.v[i];
-    inverse.v[2][i] = inv2.v[i] * sign_a.v[i];
-    inverse.v[3][i] = inv3.v[i] * sign_b.v[i];
-  }
-  
-  v4 row0 = { inverse.v[0][0], inverse.v[1][0], inverse.v[2][0], inverse.v[3][0] };
-  v4 m0 = { m.v[0][0], m.v[0][1], m.v[0][2], m.v[0][3] };
-  v4 dot0 = v4_hadamard(m0, row0);
-  f32 dot1 = (dot0.x + dot0.y) + (dot0.z + dot0.w);
-  
-  f32 one_over_det = 1 / dot1;
-  
-  return m4x4_scale_all_elements(inverse, one_over_det);
+	f32 coef00 = m.v[2][2] * m.v[3][3] - m.v[3][2] * m.v[2][3];
+	f32 coef02 = m.v[1][2] * m.v[3][3] - m.v[3][2] * m.v[1][3];
+	f32 coef03 = m.v[1][2] * m.v[2][3] - m.v[2][2] * m.v[1][3];
+	f32 coef04 = m.v[2][1] * m.v[3][3] - m.v[3][1] * m.v[2][3];
+	f32 coef06 = m.v[1][1] * m.v[3][3] - m.v[3][1] * m.v[1][3];
+	f32 coef07 = m.v[1][1] * m.v[2][3] - m.v[2][1] * m.v[1][3];
+	f32 coef08 = m.v[2][1] * m.v[3][2] - m.v[3][1] * m.v[2][2];
+	f32 coef10 = m.v[1][1] * m.v[3][2] - m.v[3][1] * m.v[1][2];
+	f32 coef11 = m.v[1][1] * m.v[2][2] - m.v[2][1] * m.v[1][2];
+	f32 coef12 = m.v[2][0] * m.v[3][3] - m.v[3][0] * m.v[2][3];
+	f32 coef14 = m.v[1][0] * m.v[3][3] - m.v[3][0] * m.v[1][3];
+	f32 coef15 = m.v[1][0] * m.v[2][3] - m.v[2][0] * m.v[1][3];
+	f32 coef16 = m.v[2][0] * m.v[3][2] - m.v[3][0] * m.v[2][2];
+	f32 coef18 = m.v[1][0] * m.v[3][2] - m.v[3][0] * m.v[1][2];
+	f32 coef19 = m.v[1][0] * m.v[2][2] - m.v[2][0] * m.v[1][2];
+	f32 coef20 = m.v[2][0] * m.v[3][1] - m.v[3][0] * m.v[2][1];
+	f32 coef22 = m.v[1][0] * m.v[3][1] - m.v[3][0] * m.v[1][1];
+	f32 coef23 = m.v[1][0] * m.v[2][1] - m.v[2][0] * m.v[1][1];
+	
+	v4 fac0 = { coef00, coef00, coef02, coef03 };
+	v4 fac1 = { coef04, coef04, coef06, coef07 };
+	v4 fac2 = { coef08, coef08, coef10, coef11 };
+	v4 fac3 = { coef12, coef12, coef14, coef15 };
+	v4 fac4 = { coef16, coef16, coef18, coef19 };
+	v4 fac5 = { coef20, coef20, coef22, coef23 };
+	
+	v4 vec0 = { m.v[1][0], m.v[0][0], m.v[0][0], m.v[0][0] };
+	v4 vec1 = { m.v[1][1], m.v[0][1], m.v[0][1], m.v[0][1] };
+	v4 vec2 = { m.v[1][2], m.v[0][2], m.v[0][2], m.v[0][2] };
+	v4 vec3 = { m.v[1][3], m.v[0][3], m.v[0][3], m.v[0][3] };
+	
+	v4 inv0 = (v4_hadamard(vec1, fac0) - v4_hadamard(vec2, fac1)) + v4_hadamard(vec3, fac2);
+	v4 inv1 = (v4_hadamard(vec0, fac0) - v4_hadamard(vec2, fac3)) + v4_hadamard(vec3, fac4);
+	v4 inv2 = (v4_hadamard(vec0, fac1) - v4_hadamard(vec1, fac3)) + v4_hadamard(vec3, fac5);
+	v4 inv3 = (v4_hadamard(vec0, fac2) - v4_hadamard(vec1, fac4)) + v4_hadamard(vec2, fac5);
+	
+	v4 sign_a = { +1, -1, +1, -1 };
+	v4 sign_b = { -1, +1, -1, +1 };
+	
+	m4x4 inverse;
+	Loop (i, 4) {
+			inverse.v[0][i] = inv0.v[i] * sign_a.v[i];
+			inverse.v[1][i] = inv1.v[i] * sign_b.v[i];
+			inverse.v[2][i] = inv2.v[i] * sign_a.v[i];
+			inverse.v[3][i] = inv3.v[i] * sign_b.v[i];
+	}
+	
+	v4 row0 = { inverse.v[0][0], inverse.v[1][0], inverse.v[2][0], inverse.v[3][0] };
+	v4 m0 = { m.v[0][0], m.v[0][1], m.v[0][2], m.v[0][3] };
+	v4 dot0 = v4_hadamard(m0, row0);
+	f32 dot1 = (dot0.x + dot0.y) + (dot0.z + dot0.w);
+	
+	f32 one_over_det = 1 / dot1;
+	
+	return m4x4_scale_all_elements(inverse, one_over_det);
 }
 
 m4x4 m4x4_from_quat(v4 q) {
-  f32 x=q.x, y=q.y, z=q.z, w=q.w;
-  f32 xx=x*x, yy=y*y, zz=z*z;
-  f32 xy=x*y, xz=x*z, yz=y*z;
-  f32 wx=w*x, wy=w*y, wz=w*z;
-  m4x4 res = {
-    1-2*(yy+zz), 2*(xy+wz),   2*(xz-wy),   0,
-    2*(xy-wz),   1-2*(xx+zz), 2*(yz+wx),   0,
-    2*(xz+wy),   2*(yz-wx),   1-2*(xx+yy), 0,
-    0,           0,           0,           1,
-  };
-  return res;
+	f32 x=q.x, y=q.y, z=q.z, w=q.w;
+	f32 xx=x*x, yy=y*y, zz=z*z;
+	f32 xy=x*y, xz=x*z, yz=y*z;
+	f32 wx=w*x, wy=w*y, wz=w*z;
+	m4x4 res = {
+		1-2*(yy+zz), 2*(xy+wz),   2*(xz-wy),   0,
+		2*(xy-wz),   1-2*(xx+zz), 2*(yz+wx),   0,
+		2*(xz+wy),   2*(yz-wx),   1-2*(xx+yy), 0,
+		0,           0,           0,           1,
+	};
+	return res;
 }
 
 m4x4 m4x4_from_m4x3(m4x3 m) {
-  m4x4 res = {
-    m.v[0][0], m.v[0][1], m.v[0][2], 0,
-    m.v[1][0], m.v[1][1], m.v[1][2], 0,
-    m.v[2][0], m.v[2][1], m.v[2][2], 0,
-    m.v[3][0], m.v[3][1], m.v[3][2], 1,
-  };
-  return res;
+	m4x4 res = {
+		m.v[0][0], m.v[0][1], m.v[0][2], 0,
+		m.v[1][0], m.v[1][1], m.v[1][2], 0,
+		m.v[2][0], m.v[2][1], m.v[2][2], 0,
+		m.v[3][0], m.v[3][1], m.v[3][2], 1,
+	};
+	return res;
 }
 
 m4x4 m4x4_inverse_rigid(m4x4 m) {
-  m4x4 r;
-  r.v[0][0] = m.v[0][0];
-  r.v[0][1] = m.v[1][0];
-  r.v[0][2] = m.v[2][0];
+	m4x4 r;
+	r.v[0][0] = m.v[0][0];
+	r.v[0][1] = m.v[1][0];
+	r.v[0][2] = m.v[2][0];
 
-  r.v[1][0] = m.v[0][1];
-  r.v[1][1] = m.v[1][1];
-  r.v[1][2] = m.v[2][1];
+	r.v[1][0] = m.v[0][1];
+	r.v[1][1] = m.v[1][1];
+	r.v[1][2] = m.v[2][1];
 
-  r.v[2][0] = m.v[0][2];
-  r.v[2][1] = m.v[1][2];
-  r.v[2][2] = m.v[2][2];
+	r.v[2][0] = m.v[0][2];
+	r.v[2][1] = m.v[1][2];
+	r.v[2][2] = m.v[2][2];
 
-  r.v[3][0] = -(r.v[0][0]*m.v[3][0] + r.v[1][0]*m.v[3][1] + r.v[2][0]*m.v[3][2]);
-  r.v[3][1] = -(r.v[0][1]*m.v[3][0] + r.v[1][1]*m.v[3][1] + r.v[2][1]*m.v[3][2]);
-  r.v[3][2] = -(r.v[0][2]*m.v[3][0] + r.v[1][2]*m.v[3][1] + r.v[2][2]*m.v[3][2]);
+	r.v[3][0] = -(r.v[0][0]*m.v[3][0] + r.v[1][0]*m.v[3][1] + r.v[2][0]*m.v[3][2]);
+	r.v[3][1] = -(r.v[0][1]*m.v[3][0] + r.v[1][1]*m.v[3][1] + r.v[2][1]*m.v[3][2]);
+	r.v[3][2] = -(r.v[0][2]*m.v[3][0] + r.v[1][2]*m.v[3][1] + r.v[2][2]*m.v[3][2]);
 
-  r.v[3][3] = 1;
-  return r;
+	r.v[3][3] = 1;
+	return r;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -1444,15 +1444,15 @@ m4x4 m4x4_inverse_rigid(m4x4 m) {
 
 Ray ray_make(v3 pos, v3 dir) { return Ray(pos, dir); }
 Ray ray_from_screen(v2 screen_pos, v2u viewport_rect, v3 origin, m4x4 view, m4x4 projection) {
-  v2 mouse_pos = screen_pos;
-  v2u win_size = viewport_rect;
-  v2 norm_coords = v2(2 * (mouse_pos.x/win_size.x) - 1, 2 * -(mouse_pos.y/win_size.y) + 1);
-  v4 clip_coords = v4(norm_coords.x, norm_coords.y, -1, 1);
-  v4 eye_coord = m4x4_inverse(projection) * clip_coords;
-  eye_coord = v4(eye_coord.x, eye_coord.y, -1, 0);
-  v3 world_coord = v3_of_v4(view * eye_coord);
-  world_coord = v3_norm(world_coord);
-  return ray_make(origin, world_coord);
+	v2 mouse_pos = screen_pos;
+	v2u win_size = viewport_rect;
+	v2 norm_coords = v2(2 * (mouse_pos.x/win_size.x) - 1, 2 * -(mouse_pos.y/win_size.y) + 1);
+	v4 clip_coords = v4(norm_coords.x, norm_coords.y, -1, 1);
+	v4 eye_coord = m4x4_inverse(projection) * clip_coords;
+	eye_coord = v4(eye_coord.x, eye_coord.y, -1, 0);
+	v3 world_coord = v3_of_v4(view * eye_coord);
+	world_coord = v3_norm(world_coord);
+	return ray_make(origin, world_coord);
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -1539,12 +1539,12 @@ v3 rng3_center(Rng3 r)           { return v3((r.min.x + r.max.x)/2, (r.min.y + r
 b32 rng3_contains(Rng3 r, v3 x)  { return (r.min.x <= x.x && x.x < r.max.x && r.min.y <= x.y && x.y < r.max.y && r.min.z <= x.z && x.z < r.max.z); }
 v3 rng3_dim(Rng3 r)              { return v3(r.max.x - r.min.x, r.max.y - r.min.y, r.max.z - r.min.z); }
 Rng3 rng3_union(Rng3 a, Rng3 b) {
-  return Rng3(v3(Min(a.min.x, b.min.x), Min(a.min.y, b.min.y), Min(a.min.z, b.min.z)),
-              v3(Max(a.max.x, b.max.x), Max(a.max.y, b.max.y), Max(a.max.z, b.max.z)));
+	return Rng3(v3(Min(a.min.x, b.min.x), Min(a.min.y, b.min.y), Min(a.min.z, b.min.z)),
+													v3(Max(a.max.x, b.max.x), Max(a.max.y, b.max.y), Max(a.max.z, b.max.z)));
 }
 Rng3 rng3_intersect(Rng3 a, Rng3 b) {
-  return Rng3(v3(Max(a.min.x, b.min.x), Max(a.min.y, b.min.y), Max(a.min.z, b.min.z)),
-              v3(Min(a.max.x, b.max.x), Min(a.max.y, b.max.y), Min(a.max.z, b.max.z)));
+	return Rng3(v3(Max(a.min.x, b.min.x), Max(a.min.y, b.min.y), Max(a.min.z, b.min.z)),
+													v3(Min(a.max.x, b.max.x), Min(a.max.y, b.max.y), Min(a.max.z, b.max.z)));
 }
 v3 rng3_clamp(Rng3 r, v3 x) { return v3(Clamp(r.min.x, x.x, r.max.x), Clamp(r.min.y, x.y, r.max.y), Clamp(r.min.z, x.z, r.max.z)); }
 
@@ -1556,16 +1556,16 @@ Rng3 rng3_scale(Rng3 r, f32 scale)          { return Rng3(r.min*scale, r.max*sca
 Rng3 rng3_scale(Rng3 r, v3 scale)           { return Rng3(v3_hadamard(r.min, scale), v3_hadamard(r.max, scale)); }
 
 Rng2 layout_row(Rng2Cursor& c, Rng1 x, f32 h) {
-  Rng2 r = {
-    v2(x.min, c.pos.y),
-    v2(x.max, c.pos.y + h)
-  };
-  c.pos.y += h;
-  return r;
+	Rng2 r = {
+		v2(x.min, c.pos.y),
+		v2(x.max, c.pos.y + h)
+	};
+	c.pos.y += h;
+	return r;
 }
 
 void layout_next(Rng2Cursor& c, f32 h) {
-  c.pos.y += h;
+	c.pos.y += h;
 }
 
 f32 smoothstep(f32 t)   { return t*t*(3-2*t); }
@@ -1577,43 +1577,43 @@ f32 smootherstep(f32 t) { return t * t * t * (t * (t * 6 - 15) + 10); }
 f32 ease_quad_in(f32 t)     { return Square(t); }
 f32 ease_quad_out(f32 t)    { return -(t * (t - 2)); }
 f32 ease_quad_in_out(f32 t) {
-  if (t < 0.5f)
-    return 2 * t * t;
-  else
-    return -2*t*t + 4*t - 1;
+	if (t < 0.5f)
+		return 2 * t * t;
+	else
+		return -2*t*t + 4*t - 1;
 }
 
 f32 ease_cube_in(f32 t)     { return Cube(t); }
 f32 ease_cube_out(f32 t)    { f32 f = t - 1; return Cube(f) + 1; }
 f32 ease_cube_in_out(f32 t) {
-  if (t < 0.5f)
-    return 4 * t * t * t;
-  else {
-    f32 f = 2*t - 2;
-    return 0.5f * f * f * f + 1;
-  }
+	if (t < 0.5f)
+		return 4 * t * t * t;
+	else {
+		f32 f = 2*t - 2;
+		return 0.5f * f * f * f + 1;
+	}
 }
 
 f32 ease_quart_in(f32 t)     { return Cube(t) * t; }
 f32 ease_quart_out(f32 t)    { f32 f = (t - 1); return Cube(f) * (1 - t) + 1; }
 f32 ease_quart_in_out(f32 t) {
-  if (t < 0.5f)
-    return 8 * t * t * t * t;
-  else {
-    f32 f = t - 1;
-    return -8 * f * f * f * f + 1;
-  }
+	if (t < 0.5f)
+		return 8 * t * t * t * t;
+	else {
+		f32 f = t - 1;
+		return -8 * f * f * f * f + 1;
+	}
 }
 
 f32 ease_quint_in(f32 t)     { return Cube(t) * Square(t); }
 f32 ease_quint_out(f32 t)    { f32 f = (t - 1); return Cube(f) * Square(f) + 1; }
 f32 ease_quint_in_out(f32 t) {
-  if (t < 0.5f)
-    return 16 * t * t * t * t * t;
-  else {
-    f32 f = 2 * t - 2;
-    return 0.5f * f * f * f * f * f + 1;
-  }
+	if (t < 0.5f)
+		return 16 * t * t * t * t * t;
+	else {
+		f32 f = 2 * t - 2;
+		return 0.5f * f * f * f * f * f + 1;
+	}
 }
 
 f32 ease_sin_in(f32 t) { return Sin((t - 1) * PI/2) + 1; }
@@ -1623,64 +1623,64 @@ f32 ease_sin_in_out(f32 t) { return (1 - Cos(t * PI)) / 2; }
 f32 ease_circ_in(f32 t) { return 1 - Sqrt(1 - Square(t)); }
 f32 ease_circ_out(f32 t) { return Sqrt((2 - t) * t); }
 f32 ease_circ_in_out(f32 t) {
-  if (t < 0.5) {
-    return 0.5 * (1 - Sqrt(1 - 4 * (t * t)));
-  } else {
-    return 0.5 * (Sqrt(-((2 * t) - 3) * ((2 * t) - 1)) + 1);
-  }
+	if (t < 0.5) {
+		return 0.5 * (1 - Sqrt(1 - 4 * (t * t)));
+	} else {
+		return 0.5 * (Sqrt(-((2 * t) - 3) * ((2 * t) - 1)) + 1);
+	}
 }
 
 f32 ease_exp_in(f32 t)  { return (t == 0.0) ? t : Pow(2, 10 * (t - 1)); }
 f32 ease_exp_out(f32 t) { return (t == 1.0) ? t : 1 - Pow(2, -10 * t); }
 f32 ease_exp_in_out(f32 t) {
-  if (t == 0.0 || t == 1.0) return t;
-  if (t < 0.5) {
-    return 0.5 * Pow(2, (20 * t) - 10);
-  } else {
-    return -0.5 * Pow(2, (-20 * t) + 10) + 1;
-  }
+	if (t == 0.0 || t == 1.0) return t;
+	if (t < 0.5) {
+		return 0.5 * Pow(2, (20 * t) - 10);
+	} else {
+		return -0.5 * Pow(2, (-20 * t) + 10) + 1;
+	}
 }
 
 f32 ease_elastic_in(f32 t) { return Sin(13 * PI/2 * t) * Pow(2, 10 * (t - 1));}
 f32 ease_elastic_out(f32 t) {	return Sin(-13 * PI/2 * (t + 1)) * Pow(2, -10 * t) + 1;}
 f32 ease_elastic_in_out(f32 t) {
-  if (t < 0.5) {
-    return 0.5 * Sin(13 * PI/2 * (2 * t)) * Pow(2, 10 * ((2 * t) - 1));
-  } else {
-    return 0.5 * (Sin(-13 * PI/2 * ((2 * t - 1) + 1)) * Pow(2, -10 * (2 * t - 1)) + 2);
-  }
+	if (t < 0.5) {
+		return 0.5 * Sin(13 * PI/2 * (2 * t)) * Pow(2, 10 * ((2 * t) - 1));
+	} else {
+		return 0.5 * (Sin(-13 * PI/2 * ((2 * t - 1) + 1)) * Pow(2, -10 * (2 * t - 1)) + 2);
+	}
 }
 
 f32 ease_back_in(f32 t) { return t * t * t - t * Sin(t * PI); }
 f32 ease_back_out(f32 t) { f32 f = (1 - t); return 1 - (f * f * f - f * Sin(f * PI));	}
 f32 ease_back_in_out(f32 t) {
-  if (t < 0.5) {
-    f32 f = 2 * t;
-    return 0.5 * (f * f * f - f * Sin(f * PI));
-  } else {
-    f32 f = (1 - (2 * t - 1));
-    return 0.5 * (1 - (f * f * f - f * Sin(f * PI))) + 0.5;
-  }
+	if (t < 0.5) {
+		f32 f = 2 * t;
+		return 0.5 * (f * f * f - f * Sin(f * PI));
+	} else {
+		f32 f = (1 - (2 * t - 1));
+		return 0.5 * (1 - (f * f * f - f * Sin(f * PI))) + 0.5;
+	}
 }
 
 f32 ease_bounce_in(f32 t) { return 1 - ease_bounce_out(1 - t); }
 f32 ease_bounce_out(f32 t) {
-  if (t < 4 / 11.0) {
-    return (121 * t * t) / 16.0;
-  } else if (t < 8 / 11.0) {
-    return (363 / 40.0 * t * t) - (99 / 10.0 * t) + 17 / 5.0;
-  } else if (t < 9 / 10.0) {
-    return (4356 / 361.0 * t * t) - (35442 / 1805.0 * t) + 16061 / 1805.0;
-  } else {
-    return (54 / 5.0 * t * t) - (513 / 25.0 * t) + 268 / 25.0;
-  }
+	if (t < 4 / 11.0) {
+		return (121 * t * t) / 16.0;
+	} else if (t < 8 / 11.0) {
+		return (363 / 40.0 * t * t) - (99 / 10.0 * t) + 17 / 5.0;
+	} else if (t < 9 / 10.0) {
+		return (4356 / 361.0 * t * t) - (35442 / 1805.0 * t) + 16061 / 1805.0;
+	} else {
+		return (54 / 5.0 * t * t) - (513 / 25.0 * t) + 268 / 25.0;
+	}
 }
 f32 ease_bounce_in_out(f32 t) {
-  if (t < 0.5) {
-    return 0.5 * ease_bounce_in(t * 2);
-  } else {
-    return 0.5 * ease_bounce_out(t * 2 - 1) + 0.5;
-  }
+	if (t < 0.5) {
+		return 0.5 * ease_bounce_in(t * 2);
+	} else {
+		return 0.5 * ease_bounce_out(t * 2 - 1) + 0.5;
+	}
 }
 
 u64 hash(v3u v) { return hash(v.x)+hash(v.y)+hash(v.z); }

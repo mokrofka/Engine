@@ -23,54 +23,54 @@ typedef u64 DenseTime;
 typedef va_list VaList;
 
 #if _WIN64
-  #define OS_WINDOWS 1
+	#define OS_WINDOWS 1
 #elif __linux__
-  #define OS_LINUX 1
+	#define OS_LINUX 1
 #elif __APPLE__
-  #define OS_MAC 1
+	#define OS_MAC 1
 #endif
 #if _MSC_VER
-  #define COMPILER_MSVC 1
+	#define COMPILER_MSVC 1
 #elif __clang__
-  #define COMPILER_CLANG 1
+	#define COMPILER_CLANG 1
 #elif __GNUC__
-  #define COMPILER_GCC 1
+	#define COMPILER_GCC 1
 #endif
 #if __x86_64__ || _M_X64
-  #define ARCH_X64 1
+	#define ARCH_X64 1
 #elif __aarch64__ || _M_ARM64
-  #define ARCH_ARM64 1
+	#define ARCH_ARM64 1
 #endif
 
 ////////////////////////////////////////////////////////////////////////
 // OS
 
 #if OS_WINDOWS
-  #define shared_function C_LINKAGE __declspec(dllexport)
-  #error not implemented
+	#define shared_function C_LINKAGE __declspec(dllexport)
+	#error not implemented
 #elif OS_LINUX
-  #define shared_function C_LINKAGE
+	#define shared_function C_LINKAGE
 #else
-  #error OS not supported.
+	#error OS not supported.
 #endif
 
 ////////////////////////////////////////////////////////////////////////
 // Compiler
 
 #if COMPILER_CLANG
-  #define NO_DEBUG __attribute__((nodebug))
-  #define INLINE   inline __attribute__((always_inline))
-  #define NO_ASAN  __attribute__((no_sanitize("address")))
-  #define read_only __attribute__((section(".rodata")))
-  #define Packed __attribute__((packed))
+	#define NO_DEBUG __attribute__((nodebug))
+	#define INLINE   inline __attribute__((always_inline))
+	#define NO_ASAN  __attribute__((no_sanitize("address")))
+	#define read_only __attribute__((section(".rodata")))
+	#define Packed __attribute__((packed))
 #else
-  #error Compiler not supported.
+	#error Compiler not supported.
 #endif
 
 #if BUILD_DEBUG
-  #define DebugDo(...) __VA_ARGS__
+	#define DebugDo(...) __VA_ARGS__
 #else
-  #define DebugDo(...)
+	#define DebugDo(...)
 #endif
 
 #define C_LINKAGE_BEGIN extern "C"{
@@ -81,13 +81,13 @@ typedef va_list VaList;
 // Address Sanitizer
 
 #if ASAN_ENABLED
-  C_LINKAGE void __asan_poison_memory_region(void const volatile* addr, u64 size);
-  C_LINKAGE void __asan_unpoison_memory_region(void const volatile* addr, u64 size);
-  #define AsanPoisonMemRegion(addr, size)   __asan_poison_memory_region((addr), (size))
-  #define AsanUnpoisonMemRegion(addr, size) __asan_unpoison_memory_region((addr), (size))
+	C_LINKAGE void __asan_poison_memory_region(void const volatile* addr, u64 size);
+	C_LINKAGE void __asan_unpoison_memory_region(void const volatile* addr, u64 size);
+	#define AsanPoisonMemRegion(addr, size)   __asan_poison_memory_region((addr), (size))
+	#define AsanUnpoisonMemRegion(addr, size) __asan_unpoison_memory_region((addr), (size))
 #else
-  #define AsanPoisonMemRegion(addr, size)   ((void)(addr), (void)(size))
-  #define AsanUnpoisonMemRegion(addr, size) ((void)(addr), (void)(size))
+	#define AsanPoisonMemRegion(addr, size)   ((void)(addr), (void)(size))
+	#define AsanUnpoisonMemRegion(addr, size) ((void)(addr), (void)(size))
 #endif
 
 ////////////////////////////////////////////////////////////////////////
@@ -110,9 +110,9 @@ const u64 INVALID_ID = U32_MAX;
 const u64 PAGE_SIZE = 4096;
 
 template<typename T> void Swap(T& a, T& b) {
-  T temp = a;
-  a = b;
-  b = temp;
+	T temp = a;
+	a = b;
+	b = temp;
 }
 template<typename T> b32 equal(T a, T b) { return a == b; }
 
@@ -178,11 +178,11 @@ u64 most_significant_bitu64(u64 size);
 u32 remove_lowest_bit(u64 v);
 
 #define Bit(x) (1 << (x))
-b32 BitHas(u64 x, u64 pos);
-u64 FlagClear(u64 x, u64 f);
-u64 FlagToggle(u64 x, u64 f);
-b32 FlagHas(u64 x, u64 f);
-b32 FlagAny(u64 x, u64 f);
+b32 bit_has(u64 x, u64 pos);
+u64 flag_clear(u64 x, u64 f);
+u64 flag_toggle(u64 x, u64 f);
+b32 flag_has(u64 x, u64 f);
+b32 flag_any(u64 x, u64 f);
 
 ////////////////////////////////////////////////////////////////////////
 // Common operations
@@ -202,12 +202,12 @@ b32 FlagAny(u64 x, u64 f);
 #define Sign(x)                (((x) < 0) ? -1 : ((x) > 0) ? 1 : 0)
 #define Abs(x)                 (((x) < 0) ? -(x) : (x))
 
-u64 ModPow2(u64 x, u64 b);
-u64 DivPow2(u64 x, u64 b);
-u64 CeilIntDiv(u64 x, u64 b);
-u64 RoundUp(u64 x, u64 a);
-u64 RoundDown(u64 x, u64 a);
-u64 Compose64Bit(u64 a, u64 b);
+u64 mod_pow2(u64 x, u64 b);
+u64 div_pow2(u64 x, u64 b);
+u64 div_ceil(u64 x, u64 b);
+u64 round_up(u64 x, u64 a);
+u64 round_down(u64 x, u64 a);
+u64 compose_64(u64 a, u64 b);
 u32 next_pow2(u32 v);
 u32 prev_pow2(u32 n);
 
@@ -232,8 +232,9 @@ u32 prev_pow2(u32 n);
 #define Glue(A,B)      _Glue(A,B)
 #define Scope(...)     ({__VA_ARGS__})
 #define Scope1(...)     [&]{__VA_ARGS__}()
-#define _Def(val, def)    (((val) == 0) ? (def) : (val))
-#define _DefSet(val, def) if (val == 0) val = def
+#define _Def(val, def)    											(((val) == 0) ? (def) : (val))
+#define _DefSet(val, def) 											if (val == 0) val = def
+#define _DefIfSet(val, expr, def) if (expr) val = def
 
 #define Loop(it, c)                      for (i32 it = 0; it < c; ++it)
 #define LoopNoInc(it, c)                 for (i32 it = 0; it < c;)
@@ -262,13 +263,13 @@ void DebugTrap();
 #define NoOp(x) (void)(x)
 
 #if BUILD_DEBUG
-  #define InvalidPath Assert(!"Invalid Path!")
-  #define Assert(x) (x) ? NoOp(0) : DebugTrap()
-  #define AssertMsg(x, message, ...) (x) ? NoOp(0) : (_log_output(LogLevel_Error, message, ##__VA_ARGS__), DebugTrap())
+	#define InvalidPath Assert(!"Invalid Path!")
+	#define Assert(x) (x) ? NoOp(0) : DebugTrap()
+	#define AssertMsg(x, message, ...) (x) ? NoOp(0) : (_log_output(LogLevel_Error, message, ##__VA_ARGS__), DebugTrap())
 #else
-  #define InvalidPath Unreachable
-  #define Assert(x)
-  #define AssertMsg(x, message, ...)
+	#define InvalidPath Unreachable
+	#define Assert(x)
+	#define AssertMsg(x, message, ...)
 #endif
 
 ////////////////////////////////////////////////////////////////////////
@@ -279,71 +280,82 @@ void DebugTrap();
 #define AtomicAcquire __ATOMIC_ACQUIRE
 #define AtomicRelease __ATOMIC_RELEASE
 
-#define atomic_inc(x)                     __atomic_fetch_add((x), 1, AtomicSeqCst)
-#define atomic_dec(x)                     __atomic_fetch_sub((x), 1, AtomicSeqCst)
-#define atomic_add(x, v)                  __atomic_fetch_add((x), (v), AtomicSeqCst)
-#define atomic_sub(x, v)                  __atomic_fetch_sub((x), (v), AtomicSeqCst)
-#define atomic_load(x)                    __atomic_load_n((x), AtomicSeqCst)
-#define atomic_store(x, v)                __atomic_store_n((x), (v), AtomicSeqCst)
-#define atomic_or(x, v)                   __atomic_fetch_or((x), (v), AtomicSeqCst)
-#define atomic_and(x, v)                  __atomic_fetch_and((x), (v), AtomicSeqCst)
-#define atomic_xor(x, v)                  __atomic_fetch_xor((x), (v), AtomicSeqCst)
-#define atomic_swap(x, v)                 __atomic_exchange_n((x), (v), AtomicSeqCst)
-#define atomic_cmp_swap(x, expect, v)     __atomic_compare_exchange_n((x), (expect), (v), 0, AtomicSeqCst, AtomicSeqCst)
-#define atomic_cond_swap(x, expect, v) ({ u32 _new = (expect); atomic_cmp_exchange(((x), (&_new), (v))); _new; })
+#define atomic_inc(x, ...)       _atomic_inc((x), ##__VA_ARGS__, AtomicSeqCst)
+#define atomic_dec(x, ...)       _atomic_dec((x), ##__VA_ARGS__, AtomicSeqCst)
+#define atomic_add(x, v, ...)    _atomic_add((x), (v), ##__VA_ARGS__, AtomicSeqCst)
+#define atomic_sub(x, v, ...)    _atomic_sub((x), (v), ##__VA_ARGS__, AtomicSeqCst)
+#define atomic_load(x, ...)      _atomic_load((x), ##__VA_ARGS__, AtomicSeqCst)
+#define atomic_store(x, v, ...)  _atomic_store((x), (v), ##__VA_ARGS__, AtomicSeqCst)
+#define atomic_or(x, v, ...)     _atomic_or((x), (v), ##__VA_ARGS__, AtomicSeqCst)
+#define atomic_and(x, v, ...)    _atomic_and((x), (v), ##__VA_ARGS__, AtomicSeqCst)
+#define atomic_xor(x, v, ...)    _atomic_xor((x), (v), ##__VA_ARGS__, AtomicSeqCst)
+#define atomic_swap(x, v, ...)   _atomic_swap((x), (v), ##__VA_ARGS__, AtomicSeqCst)
+#define atomic_cmp_swap(x, expect, v, ...) _atomic_cmp_swap((x), (expect), (v), ##__VA_ARGS__, AtomicSeqCst, AtomicSeqCst)
+
+#define _atomic_inc(x, order, ...)      __atomic_fetch_add((x), 1, order)
+#define _atomic_dec(x, order, ...)      __atomic_fetch_sub((x), 1, order)
+#define _atomic_add(x, v, order, ...)   __atomic_fetch_add((x), (v), order)
+#define _atomic_sub(x, v, order, ...)   __atomic_fetch_sub((x), (v), order)
+#define _atomic_load(x, order, ...)     __atomic_load_n((x), order)
+#define _atomic_store(x, v, order, ...) __atomic_store_n((x), (v), order)
+#define _atomic_or(x, v, order, ...)    __atomic_fetch_or((x), (v), order)
+#define _atomic_and(x, v, order, ...)   __atomic_fetch_and((x), (v), order)
+#define _atomic_xor(x, v, order, ...)   __atomic_fetch_xor((x), (v), order)
+#define _atomic_swap(x, v, order, ...)  __atomic_exchange_n((x), (v), order)
+#define _atomic_cmp_swap(x, expect, v, success, failure, ...) __atomic_compare_exchange_n((x), (expect), (v), 0, (success), (failure))
 
 ////////////////////////////////////////////////////////////////////////
 // Doulby Linked List
 #define DLL_push_back(first, last, n, next, prev)     \
-  ((n)->prev = (last),                                \
-   (n)->next = null,                                  \
-   ((last) ? ((last)->next = (n)) : ((first) = (n))), \
-   (last) = (n))
+	((n)->prev = (last),                                \
+		(n)->next = null,                                  \
+		((last) ? ((last)->next = (n)) : ((first) = (n))), \
+		(last) = (n))
 
 #define DLL_push_front(first, last, n, next, prev)     \
-  ((n)->next = (first),                                \
-   (n)->prev = null,                                   \
-   ((first) ? ((first)->prev = (n)) : ((last) = (n))), \
-   (first) = (n))
+	((n)->next = (first),                                \
+		(n)->prev = null,                                   \
+		((first) ? ((first)->prev = (n)) : ((last) = (n))), \
+		(first) = (n))
 
 #define DLL_remove(first, last, n, next, prev) \
-  (((n)->prev ? ((n)->prev->next = (n)->next)  \
-              : ((first) = (n)->next)),        \
-   ((n)->next ? ((n)->next->prev = (n)->prev)  \
-              : ((last) = (n)->prev)))
+	(((n)->prev ? ((n)->prev->next = (n)->next)  \
+													: ((first) = (n)->next)),        \
+		((n)->next ? ((n)->next->prev = (n)->prev)  \
+													: ((last) = (n)->prev)))
 
 #define DLL_pop_back(first, last, n, next, prev)  \
-  (((n) = (last)),                                \
-    ((n) ? (                                      \
-      ((last) = (n)->prev),                       \
-      ((last) ? ((last)->next = null)             \
-              : ((first) = null))                 \
-    ) : 0))
+	(((n) = (last)),                                \
+			((n) ? (                                      \
+					((last) = (n)->prev),                       \
+					((last) ? ((last)->next = null)             \
+													: ((first) = null))                 \
+			) : 0))
 
 #define DLL_pop_front(first, last, n, next, prev) \
-  (((n) = (first)),                               \
-    ((n) ? (                                      \
-      ((first) = (n)->next),                      \
-      ((first) ? ((first)->prev = null)           \
-               : ((last) = null))                 \
-    ) : 0))
+	(((n) = (first)),                               \
+			((n) ? (                                      \
+					((first) = (n)->next),                      \
+					((first) ? ((first)->prev = null)           \
+														: ((last) = null))                 \
+			) : 0))
 
 ////////////////////////////////////////////////////////////////////////
 // Singly Linked List
 #define SLL_stack_push(first, n, next) \
-  ((n)->next = (first), (first) = (n))
+	((n)->next = (first), (first) = (n))
 
 #define SLL_stack_pop(first, next) \
-  ((first) = (first)->next)
+	((first) = (first)->next)
 
-#define SLL_queue_push(first, last, n, next)          \
-  ((n)->next = null,                                  \
-   ((last) ? ((last)->next = (n)) : ((first) = (n))), \
-   (last) = (n))
+#define SLL_queue_push(first, last, n, next)         \
+	((n)->next = null,                                  \
+		((last) ? ((last)->next = (n)) : ((first) = (n))), \
+		(last) = (n))
 
-#define SLL_queue_pop(first, last, next)           \
-  (((first) == (last)) ? ((first) = (last) = null) \
-                       : ((first) = (first)->next))
+#define SLL_queue_pop(first, last, next)          \
+	(((first) == (last)) ? ((first) = (last) = null) \
+																						: ((first) = (first)->next))
 
 #define dll_push_back(first, last, n)  DLL_push_back(first, last, n, next, prev)
 #define dll_push_front(first, last, n) DLL_push_front(first, last, n, next, prev)
@@ -368,53 +380,53 @@ void DebugTrap();
 ////////////////////////////////////////////////////////////////////////
 // Indexed Doubly Linked List
 #define IDLL_push_back(arr, first, last, n, next, prev)   \
-  ((arr)[n].prev = (last),                                \
-   (arr)[n].next = 0,                                     \
-   ((last) ? ((arr)[last].next = (n)) : ((first) = (n))), \
-   (last) = (n))
+		((arr)[n].prev = (last),                                \
+			(arr)[n].next = 0,                                     \
+			((last) ? ((arr)[last].next = (n)) : ((first) = (n))), \
+			(last) = (n))
 
 #define IDLL_push_front(arr, first, last, n, next, prev)   \
-  ((arr)[n].next = (first),                                \
-   (arr)[n].prev = 0,                                      \
-   ((first) ? ((arr)[first].prev = (n)) : ((last) = (n))), \
-   (first) = (n))
+		((arr)[n].next = (first),                                \
+			(arr)[n].prev = 0,                                      \
+			((first) ? ((arr)[first].prev = (n)) : ((last) = (n))), \
+			(first) = (n))
 
 #define IDLL_remove(arr, first, last, n, next, prev)            \
-  (((arr)[n].prev ? ((arr)[(arr)[n].prev].next = (arr)[n].next) \
-                  : ((first) = (arr)[n].next)),                 \
-   ((arr)[n].next ? ((arr)[(arr)[n].next].prev = (arr)[n].prev) \
-                  : ((last) = (arr)[n].prev)))
+		(((arr)[n].prev ? ((arr)[(arr)[n].prev].next = (arr)[n].next) \
+																		: ((first) = (arr)[n].next)),                 \
+			((arr)[n].next ? ((arr)[(arr)[n].next].prev = (arr)[n].prev) \
+																		: ((last) = (arr)[n].prev)))
 
 #define IDLL_pop_back(arr, first, last, n, next, prev)  \
-  (((n) = (last)),                                      \
-    ((n) ? (                                            \
-      ((last) = (arr)[n].prev),                         \
-      ((last) ? ((arr)[last].next = 0) : ((first) = 0)) \
-    ) : 0))
+		(((n) = (last)),                                      \
+				((n) ? (                                            \
+						((last) = (arr)[n].prev),                         \
+						((last) ? ((arr)[last].next = 0) : ((first) = 0)) \
+				) : 0))
 
 #define IDLL_pop_front(arr, first, last, n, next, prev)  \
-  (((n) = (first)),                                      \
-    ((n) ? (                                             \
-      ((first) = (arr)[n].next),                         \
-      ((first) ? ((arr)[first].prev = 0) : ((last) = 0)) \
-    ) : 0))
+		(((n) = (first)),                                      \
+				((n) ? (                                             \
+						((first) = (arr)[n].next),                         \
+						((first) ? ((arr)[first].prev = 0) : ((last) = 0)) \
+				) : 0))
 
 ////////////////////////////////////////////////////////////////////////
 // Indexed Singly Linked List
 #define ISLL_stack_push(arr, first, n, next) \
-  ((arr)[n].next = (first), (first) = (n))
+		((arr)[n].next = (first), (first) = (n))
 
 #define ISLL_stack_pop(arr, first, next) \
-  ((first) = (arr)[first].next)
+		((first) = (arr)[first].next)
 
 #define ISLL_queue_push(arr, first, last, n, next)        \
-  ((arr)[n].next = 0,                                     \
-   ((last) ? ((arr)[last].next = (n)) : ((first) = (n))), \
-   (last) = (n))
+		((arr)[n].next = 0,                                     \
+			((last) ? ((arr)[last].next = (n)) : ((first) = (n))), \
+			(last) = (n))
 
 #define ISLL_queue_pop(arr, first, last, next) \
-  (((first) == (last)) ? ((first) = (last) = 0)      \
-                       : ((first) = (arr)[first].next))
+		(((first) == (last)) ? ((first) = (last) = 0)      \
+																							: ((first) = (arr)[first].next))
 
 #define idll_push_back(arr, first, last, n)  IDLL_push_back(arr, first, last, n, next, prev)
 #define idll_push_front(arr, first, last, n) IDLL_push_front(arr, first, last, n, next, prev)
@@ -439,16 +451,16 @@ void DebugTrap();
 ////////////////////////////////////////////////////////////////////////
 // Handler Linked List
 #define HDLL_push_back(arr, first, last, n, next, prev)           \
-  ((arr)[n.idx].prev = (last),                                    \
-   (arr)[n.idx].next = {},                                        \
-   ((last.idx) ? ((arr)[last.idx].next = (n)) : ((first) = (n))), \
-   (last) = (n))
+		((arr)[n.idx].prev = (last),                                    \
+			(arr)[n.idx].next = {},                                        \
+			((last.idx) ? ((arr)[last.idx].next = (n)) : ((first) = (n))), \
+			(last) = (n))
 
 #define HDLL_remove(arr, first, last, n, next, prev)                                                    \
-  (((arr)[n.idx].elem.prev.idx ? ((arr)[(arr)[n.idx].elem.prev.idx].elem.next = (arr)[n.idx].elem.next) \
-                               : ((first) = (arr)[n.idx].elem.next)),                                   \
-   ((arr)[n.idx].elem.next.idx ? ((arr)[(arr)[n.idx].elem.next.idx].elem.prev = (arr)[n.idx].elem.prev) \
-                               : ((last) = (arr)[n.idx].elem.prev)))
+		(((arr)[n.idx].elem.prev.idx ? ((arr)[(arr)[n.idx].elem.prev.idx].elem.next = (arr)[n.idx].elem.next) \
+																															: ((first) = (arr)[n.idx].elem.next)),                                   \
+			((arr)[n.idx].elem.next.idx ? ((arr)[(arr)[n.idx].elem.next.idx].elem.prev = (arr)[n.idx].elem.prev) \
+																															: ((last) = (arr)[n.idx].elem.prev)))
 
 #define hdll_push_back(arr, first, last, n)  HDLL_push_back(arr, first, last, n, next, prev)
 #define hdll_remove(arr, first, last, n)     HDLL_remove(arr, first, last, n, next, prev)
@@ -458,88 +470,85 @@ void DebugTrap();
 
 ////////////////////////////////////////////////////////////////////////
 // Defer
-template<typename F>
-struct _Defer {
-  F f;
-  ~_Defer() { f(); }
+template<typename F> struct _Defer {
+	F f;
+	~_Defer() { f(); }
 };
 #define defer(code) auto Glue(_defer_, __LINE__) = _Defer([&](){ code; })
 #define DeferLoop(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
 #define DeferLoopIf(begin, end) for (int _i_ = (begin); _i_; _i_ = false, (end))
 
-template<typename T>
-struct ResultOk {
-  T value;
-  b32 ok;
+template<typename T> struct ResultOk {
+	T value;
+	b32 ok;
 };
 
-template<typename T, typename Err = b32>
-struct ResultErr {
-  T value;
-  Err ok;
+template<typename T, typename Err = b32> struct ResultErr {
+	T value;
+	Err ok;
 };
 
 ///////////////////////////////////
 // or_else
 #define OrElse(value, ok, expr, fallback)     \
-  Scope(                                      \
-    var _temp = (expr);                       \
-    _temp.ok ? _temp.value : Scope(fallback); \
-  )
+		Scope(                                      \
+				var _temp = (expr);                       \
+				_temp.ok ? _temp.value : Scope(fallback); \
+		)
 #define or_else(expr, fallback) OrElse(value, ok, expr, fallback)
 #define OrElseErr(value, err, expr, fallback)   \
-  Scope(                                        \
-    var _temp = (expr);                         \
-    !_temp.err ? _temp.value : Scope(fallback); \
-  )
+		Scope(                                        \
+				var _temp = (expr);                         \
+				!_temp.err ? _temp.value : Scope(fallback); \
+		)
 #define or_else_err(expr, fallback) OrElseErr(value, err, expr, fallback)
 
 ///////////////////////////////////
 // or_return
 #define OrReturn(value, ok, expr) \
-  Scope(                          \
-    var _temp = (expr);           \
-    if (!_temp.ok) return {};     \
-    _temp.value;                  \
-  )
+		Scope(                          \
+				var _temp = (expr);           \
+				if (!_temp.ok) return {};     \
+				_temp.value;                  \
+		)
 #define or_return(expr) OrReturn(value, ok, expr)
 #define OrReturnErr(value, err, expr)          \
-  Scope(                                       \
-    var _temp = (expr);                        \
-    if (!_temp.err) return {.err = _temp.err}; \
-    _temp.value;                               \
-  )
+		Scope(                                       \
+				var _temp = (expr);                        \
+				if (!_temp.err) return {.err = _temp.err}; \
+				_temp.value;                               \
+		)
 #define or_return_err(expr) OrReturn(value, err, expr)
 
 ///////////////////////////////////
 // or_continue
 #define OrContinue(value, ok, expr) \
-  Scope(                            \
-    var _temp = (expr);             \
-    if (!_temp.ok) continue;        \
-    _temp.value;                    \
-  )
+		Scope(                            \
+				var _temp = (expr);             \
+				if (!_temp.ok) continue;        \
+				_temp.value;                    \
+		)
 #define or_continue(expr) OrContinue(value, ok, expr)
 #define OrContinueErr(value, err, expr)   \
-  Scope(                                  \
-    var _temp = (expr);                   \
-    if (_temp.err) continue; _temp.value; \
-  )
+		Scope(                                  \
+				var _temp = (expr);                   \
+				if (_temp.err) continue; _temp.value; \
+		)
 #define or_continue_err(expr) OrContinueErr(value, err, expr)
 
 ///////////////////////////////////
 // or_break
 #define OrBreak(value, ok, expr)       \
-  Scope(                               \
-    var _temp = (expr);                \
-    if (!_temp.ok) break; _temp.value; \
-  )
+		Scope(                               \
+				var _temp = (expr);                \
+				if (!_temp.ok) break; _temp.value; \
+		)
 #define or_break(expr) OrBreak(value, ok, expr)
 #define OrBreakErr(value, err, expr)   \
-  Scope(                               \
-    var _temp = (expr);                \
-    if (_temp.err) break; _temp.value; \
-  )
+		Scope(                               \
+				var _temp = (expr);                \
+				if (_temp.err) break; _temp.value; \
+		)
 #define or_break_err(expr) OrBreakErr(value, err, expr)
 
 ////////////////////////////////////////////////////////////////////////
@@ -551,14 +560,14 @@ const u32 DEFAULT_RESIZE_FACTOR = 2;
 #define Introspect
 
 #define MakeId(T) \
-  struct T {      \
-    u32 idx;      \
-    u32 gen;      \
-  };
+	struct T {       \
+		u32 idx;        \
+		u32 gen;        \
+	};
 
 struct BitSet {
-  u64* words;
-  u64 bit_count;
+	u64* words;
+	u64 bit_count;
 };
 
 void bitset_set(BitSet& bits, u64 idx);
@@ -567,8 +576,8 @@ b32 bitset_get(BitSet& bits, u64 idx);
 u64 bitset_word_count(BitSet& bits);
 
 template<i32 N> struct BitSetS {
-  u64 words[N];
-  u64 bit_count;
+	u64 words[N];
+	u64 bit_count;
 };
 
 template<i32 N> void bitset_set(BitSetS<N>& bits, u64 idx)   { bits.words[idx >> 6] |= Bit(idx & 63); }
@@ -577,27 +586,27 @@ template<i32 N> b32 bitset_get(BitSetS<N>& bits, u64 idx)    { return (bits.word
 template<i32 N> u64 bitset_word_count(BitSetS<N>& bits)      { return (bits.bit_count + 63) / 64; }
 
 template<i32 N> struct BitSetIter {
-  BitSetS<N>* bits;
-  u64 word_i;
-  u64 word;
+	BitSetS<N>* bits;
+	u64 word_i;
+	u64 word;
 };
 
 struct Region {
-  union {
-    u64 base;
-    u64 offset;
-  };
-  union {
-    u64 size;
-    u64 count;
-  };
+	union {
+		u64 base;
+		u64 offset;
+	};
+	union {
+		u64 size;
+		u64 count;
+	};
 };
 
 struct RingBuffer {
-  u8* base;
-  u64 size;
-  u64 write_pos;
-  u64 read_pos;
+	u8* base;
+	u64 size;
+	u64 write_pos;
+	u64 read_pos;
 };
 
 RingBuffer ring_make(void* base, u64 size);
@@ -615,21 +624,20 @@ u64 ring_read_nowrap(RingBuffer& ring, void* dst, u64 read_size);
 #define ring_write_nowrap_array(ring, ptr, c) ring_write_nowrap((ring), (ptr), (c) * sizeof(*(ptr)), alignof(*(ptr)))
 #define ring_read_nowrap_array(ring, ptr, c) ring_read_nowrap((ring), (ptr), (c) * sizeof(*(ptr)))
 
-template<typename T>
-struct Slice {
-  T* data;
-  union {
-    u64 count;
-    u64 size;
-  };
-  NO_DEBUG T& operator[](u64 idx) {
-    Assert(idx < count);
-    return data[idx];
-  }
-  NO_DEBUG Slice(T* data_, u64 count_) { data = data_; count = count_; }
-  Slice() = default;
-  T* begin() { return data; }
-  T* end() { return data + count; }
+template<typename T> struct Slice {
+	T* data;
+	union {
+		u64 count;
+		u64 size;
+	};
+	NO_DEBUG T& operator[](u64 idx) {
+		Assert(idx < count);
+		return data[idx];
+	}
+	NO_DEBUG Slice(T* data_, u64 count_) { data = data_; count = count_; }
+	Slice() = default;
+	T* begin() { return data; }
+	T* end() { return data + count; }
 };
 template<typename T> NO_DEBUG Slice<T> slice(Slice<T> a, u64 li, u64 hi)      { Assert(li <= hi && hi <= a.count); return Slice(a.data + li, hi - li); }
 template<typename T> NO_DEBUG Slice<T> slice_n(Slice<T> a, u64 off, u64 size) { Assert(off+size <= a.count); return Slice(a.data + off, size); }
@@ -642,26 +650,26 @@ template<typename T> NO_DEBUG Slice<u8> slice_to_bytes(Slice<T> s)            { 
 template<typename T> NO_DEBUG Slice<u8> slice_struct_to_bytes(T* s)           { return Slice((u8*)s, sizeof(T)); }
 template<typename T> NO_DEBUG u64 slice_size(Slice<T> s)                      { return s.count * sizeof(T); }
 template<typename To, typename From> NO_DEBUG Slice<To> slice_reinterpret(Slice<From> s) {
-  Assert((s.count * sizeof(From)) % sizeof(To) == 0);
-  return Slice((To*)s.data, (s.count*sizeof(From)) / sizeof(To));
+	Assert((s.count * sizeof(From)) % sizeof(To) == 0);
+	return Slice((To*)s.data, (s.count*sizeof(From)) / sizeof(To));
 }
 
 struct String {
-  u8* str;
-  u64 size;
-  String() = default;
-  NO_DEBUG String(const char* str_);
+	u8* str;
+	u64 size;
+	String() = default;
+	NO_DEBUG String(const char* str_);
 };
 
 struct String64 {
-  u8 str[64];
-  u32 size;
-  operator String();
+	u8 str[64];
+	u32 size;
+	operator String();
 };
 
 struct HotReloadData {
-  void* ctx;
-  String lib_path;
+	void* ctx;
+	String lib_path;
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -672,12 +680,12 @@ struct HotReloadData {
 #define CoroutineStackSize (512)
 
 struct Coroutine {
-  f32 elapsed;
-  u32 flag;
-  u32 index;
-  u32 line[CoroutineMaxDepth];
-  u32 stack_pointer;
-  u8 stack[CoroutineStackSize];
+	f32 elapsed;
+	u32 flag;
+	u32 index;
+	u32 line[CoroutineMaxDepth];
+	u32 stack_pointer;
+	u8 stack[CoroutineStackSize];
 };
 
 u8* Restrict _coroutine_var(Coroutine* co, u32 size);
@@ -697,8 +705,8 @@ u8* Restrict _coroutine_var(Coroutine* co, u32 size);
 #include <smmintrin.h>
 
 union f32x4 {
-  __m128 p;
-  f32 v[4];
+	__m128 p;
+	f32 v[4];
 };
 
 f32x4 simd_load(void* p);
@@ -755,4 +763,10 @@ f32x4 simd_clamp01(f32x4 x);
 extern f32 time_dt;
 extern f32 time_now;
 
+// #define X(a, ...) X_IMPL(a, ##__VA_ARGS__, 3)
+// #define X_IMPL(a, value, ...) x_foo(a, value)
 
+// #define X_1(a) x_foo(a, 3)
+// #define X_2(a, value) x_foo(a, value)
+// #define X_SELECT(_1, _2, NAME, ...) NAME
+// #define X(...) X_SELECT(__VA_ARGS__, X_2, X_1)(__VA_ARGS__)
