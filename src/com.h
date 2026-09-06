@@ -15,7 +15,7 @@
 // thread safe allocator
 // glb loader
 // obj mouse selection
-// relook code, fix vulkan threading issue
+// play around atomic queues, futex
 
 #define MESH_LIST \
   X(Cube) \
@@ -36,6 +36,7 @@ enum MeshEnum {
 };
 
 #define TEXTURE_LIST \
+  X(Dummy) \
   X(Orange) \
   X(Container) \
   X(Barrack) \
@@ -52,11 +53,11 @@ enum TextureEnum {
 };
 
 #define MATERIAL_LIST \
+  X(Dummy) \
   X(Orange) \
   X(Container) \
   X(Axis) \
   X(Line) \
-  X(Screen) \
   X(Barrack) \
 
 enum MaterialEnum {
@@ -346,6 +347,7 @@ struct GlobalState {
   R_MeshId meshes_ids[Mesh_COUNT];
   R_TextureId textures_ids[Texture_COUNT];
   R_MaterialId materials_ids[Material_COUNT];
+  R_FontId font;
 
   String asset_dir;
   String shader_dir;
@@ -389,7 +391,6 @@ struct GlobalState {
   ThingId cube4;
   ThingId cube5;
 
-  R_FontId font;
   ThingId cube_root;
   ThingId monkey1;
   v3 pos_target;
