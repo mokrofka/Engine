@@ -2,8 +2,8 @@
 #include "lib.h"
 
 #define IM_VEC2_CLASS_EXTRA                               \
-        constexpr ImVec2(const v2& f) : x(f.x), y(f.y) {} \
-        operator v2() const { return v2(x,y); }
+								constexpr ImVec2(const v2& f) : x(f.x), y(f.y) {} \
+								operator v2() const { return v2(x,y); }
 #include "imgui/imgui.h"
 
 MakeId(OpaqueId)
@@ -44,25 +44,25 @@ const v4 ColorSelection  = v4(0.95, 0.65, 0.30, 1);
 const v4 ColorCollision  = v4(0.86, 0.33, 0.33, 1);
 
 enum LightType {
-  LightType_Point,
-  LightType_Dir,
-  LightType_Spot,
+	LightType_Point,
+	LightType_Dir,
+	LightType_Spot,
 };
 
 struct Light {
-  LightType type;
-  v3 pos;
-  v3 dir;
-  v3 color;
-  f32 intensity;
-  f32 radius;
-  f32 cone_angle;
-  b32 cast_shadow;
+	LightType type;
+	v3 pos;
+	v3 dir;
+	v3 color;
+	f32 intensity;
+	f32 radius;
+	f32 cone_angle;
+	b32 cast_shadow;
 };
 
 struct Timer {
-  f32 interval;
-  f32 acc;
+	f32 interval;
+	f32 acc;
 };
 
 // union Color {

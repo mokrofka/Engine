@@ -20,81 +20,81 @@ MakeId(R_FontId)
 MakeId(R_LightId)
 
 struct R_UI_Rect {
-  v2 dst_p0;
-  v2 dst_p1;
-  v2 src_p0;
-  v2 src_p1;
-  v2 tex_size;
-  v4 colors[4];
-  u32 texture;
-  u32 flags;
-  f32 corner_radius;
-  f32 edge_softness;
+	v2 dst_p0;
+	v2 dst_p1;
+	v2 src_p0;
+	v2 src_p1;
+	v2 tex_size;
+	v4 colors[4];
+	u32 texture;
+	u32 flags;
+	f32 corner_radius;
+	f32 edge_softness;
 };
 
 struct Image {
-  u32 width;
-  u32 height;
-  u8* data;
-  Gfx_PixelFormat format;
+	u32 width;
+	u32 height;
+	u8* data;
+	Gfx_PixelFormat format;
 };
 
 struct R_TextureDesc {
-  String name;
-  u32 width;
-  u32 height;
-  union {
-    u8* data;
-    u8* cube[6];
-  };
-  Gfx_PixelFormat pixel_format;
-  b32 async;
-  b32 is_cube;
+	String name;
+	u32 width;
+	u32 height;
+	union {
+		u8* data;
+		u8* cube[6];
+	};
+	Gfx_PixelFormat pixel_format;
+	b32 async;
+	b32 is_cube;
 };
 
 struct R_Texture {
-  Gfx_Image image;
-  Gfx_View view;
-  b32 is_ready;
+	Gfx_Image image;
+	Gfx_View view;
+	b32 is_ready;
 };
 
 struct R_MeshDesc {
-  String name;
-  Slice<R_Vertex> vertices;
-  Slice<u32> indices;
-  f32 bounds_min;
-  f32 bounds_max;
-  f32 bounds_rad;
+	String name;
+	Slice<R_Vertex> vertices;
+	Slice<u32> indices;
+	f32 bounds_min;
+	f32 bounds_max;
+	f32 bounds_rad;
 };
 
 struct R_MeshData {
-  f32 bounds_min;
-  f32 bounds_max;
-  f32 bounds_rad;
-  Gfx_Mesh mesh;
+	f32 bounds_min;
+	f32 bounds_max;
+	f32 bounds_rad;
+	Gfx_Mesh mesh;
 };
 
 struct R_MaterialProps {
-  v3 ambient;
-  v3 diffuse;
-  v3 specular;
-  f32 shininess;
+	v3 ambient;
+	v3 diffuse;
+	v3 specular;
+	f32 shininess;
 };
 
 struct R_MaterialDesc {
-  String shader;
-  ShaderType type;
-  Gfx_PipelineDesc pipeline_desc;
-  R_MaterialProps props;
-  String base_color;
+	String shader;
+	ShaderType type;
+	Gfx_PipelineDesc pipeline_desc;
+	R_MaterialProps props;
+	String base_color;
 };
 
 struct R_Material {
-  ShaderType type;
-  u32 batch;
-  R_MaterialProps props;
-  R_TextureId base_color;
-  u32 idx;
+	ShaderType type;
+	u32 batch;
+	R_MaterialProps props;
+	R_TextureId base_color;
+	u32 idx;
 };
 
 // struct R_Material {
@@ -106,191 +106,191 @@ struct R_Material {
 // };
 
 struct R_Gradient {
-  v4 color0;
-  v4 color1;
-  v4 color2;
-  v4 color3;
+	v4 color0;
+	v4 color1;
+	v4 color2;
+	v4 color3;
 };
 
 struct R_Glyph {
-  Rng2u rect;
-  f32 xoff, yoff, xadvance;
+	Rng2u rect;
+	f32 xoff, yoff, xadvance;
 };
 
 struct R_FontDesc {
-  String name;
-  u32 font_height;
-  b32 async;
-  u8* data;
+	String name;
+	u32 font_height;
+	b32 async;
+	u8* data;
 };
 
 struct R_Font {
-  u32 font_height;
-  R_TextureId texture;
-  R_Glyph glyphs[96];
+	u32 font_height;
+	R_TextureId texture;
+	R_Glyph glyphs[96];
 };
 
 struct R_DrawCall {
-  v3 pos;
-  v4 rot;
-  v3 scale;
-  u32 color;
-  R_MeshId mesh;
-  R_MaterialId mat;
-  ShaderType type;
+	v3 pos;
+	v4 rot;
+	v3 scale;
+	u32 color;
+	R_MeshId mesh;
+	R_MaterialId mat;
+	ShaderType type;
 };
 
 struct R_DrawBatch {
-  Gfx_PipelineState state;
-  Darray<R_DrawCall> draws;
-  Darray<R_DrawCall> unindexed_draws;
+	Gfx_PipelineState state;
+	Darray<R_DrawCall> draws;
+	Darray<R_DrawCall> unindexed_draws;
 };
 
 struct R_DrawText {
-  String str;
-  R_FontId font;
-  v2 pos;
-  v4 color;
+	String str;
+	R_FontId font;
+	v2 pos;
+	v4 color;
 };
 
 struct R_ShaderModuleWithPipelines {
-  Gfx_Shader shd;
-  Array<Gfx_Pipeline, 4> pipelines;
+	Gfx_Shader shd;
+	Array<Gfx_Pipeline, 4> pipelines;
 };
 
 enum R_AttachmentType {
-  R_AttachmentType_Default,
-  R_AttachmentType_Color,
-  R_AttachmentType_Resolve,
-  R_AttachmentType_Depth,
+	R_AttachmentType_Default,
+	R_AttachmentType_Color,
+	R_AttachmentType_Resolve,
+	R_AttachmentType_Depth,
 };
 
 struct R_Attachment {
-  R_AttachmentType type;
-  Gfx_Image images[Gfx_MaxImagesInFlight];
-  Gfx_View views[Gfx_MaxImagesInFlight];
+	R_AttachmentType type;
+	Gfx_Image images[Gfx_MaxImagesInFlight];
+	Gfx_View views[Gfx_MaxImagesInFlight];
 };
 
 struct R_AttachmentDesc {
-  R_AttachmentType type;
-  v2u size;
+	R_AttachmentType type;
+	v2u size;
 };
 
 typedef u32 R_RenderTargetUsage;
 enum {
-  R_RenderTargetUsage_Default,
-  R_RenderTargetUsage_Color = Bit(0),
-  R_RenderTargetUsage_Resolve = Bit(1),
-  R_RenderTargetUsage_Depth = Bit(2),
+	R_RenderTargetUsage_Default,
+	R_RenderTargetUsage_Color = Bit(0),
+	R_RenderTargetUsage_Resolve = Bit(1),
+	R_RenderTargetUsage_Depth = Bit(2),
 };
 
 struct R_RenderTarget {
-  R_RenderTargetUsage attachments;
-  R_Attachment color;
-  R_Attachment resolve;
-  R_Attachment depth;
+	R_RenderTargetUsage attachments;
+	R_Attachment color;
+	R_Attachment resolve;
+	R_Attachment depth;
 };
 
 struct R_Camera {
-  v3 pos;
-  v4 rot;
-  f32 fov;
-  f32 near_plane;
-  f32 far_plane;
-  b32 orthographic;
-  f32 ortho_size;
+	v3 pos;
+	v4 rot;
+	f32 fov;
+	f32 near_plane;
+	f32 far_plane;
+	b32 orthographic;
+	f32 ortho_size;
 };
 
 enum R_PushToGpuType {
-  R_PushToGpuType_Texture,
-  R_PushToGpuType_Mesh,
+	R_PushToGpuType_Texture,
+	R_PushToGpuType_Mesh,
 };
 
 struct R_PuhsToGpu {
-  R_PushToGpuType type;
-  R_TextureId texture_id;
-  R_MeshId mesh_id;
-  u32 stage_off;
-  Gfx_ImageDesc image_desc;
-  Gfx_ViewDesc view_desc;
-  Gfx_Mesh mesh;
-  R_Texture texture;
-  u32 counter;
+	R_PushToGpuType type;
+	R_TextureId texture_id;
+	R_MeshId mesh_id;
+	u32 stage_off;
+	Gfx_ImageDesc image_desc;
+	Gfx_ViewDesc view_desc;
+	Gfx_Mesh mesh;
+	R_Texture texture;
+	u32 counter;
 };
 
 struct R_WaitingFont {
-  R_FontId id;
-  R_Font font;
+	R_FontId id;
+	R_Font font;
 };
 
 struct R_State {
-  Arena arena;
-  Alloc gpa;
-  
-  f32 scale;
-  f32 old_scale;
-  
-  Array<R_ShaderModuleWithPipelines, Gfx_MaxShaders> shader_modules;
-  Map<String, u32, Gfx_MaxShaders> shader_to_module_idx;
-  PoolLinkList<R_Material, R_MaxMaterials, R_MaterialId> materials;
-  Array<R_DrawBatch, 8> batches;
+	Arena arena;
+	Alloc gpa;
+	
+	f32 scale;
+	f32 old_scale;
+	
+	Array<R_ShaderModuleWithPipelines, Gfx_MaxShaders> shader_modules;
+	Map<String, u32, Gfx_MaxShaders> shader_to_module_idx;
+	PoolLinkList<R_Material, R_MaxMaterials, R_MaterialId> materials;
+	Array<R_DrawBatch, 8> batches;
 
-  Pool<Gfx_Mesh, R_MaxMeshes, R_MeshId> meshes;
-  Pool<R_Texture, R_MaxTextures, R_TextureId> textures;
-  Pool<R_MeshData, R_MaxMeshes, R_MeshId> new_meshes;
-  Pool<R_Font, R_MaxFonts, R_FontId> fonts;
+	Pool<Gfx_Mesh, R_MaxMeshes, R_MeshId> meshes;
+	Pool<R_Texture, R_MaxTextures, R_TextureId> textures;
+	Pool<R_MeshData, R_MaxMeshes, R_MeshId> new_meshes;
+	Pool<R_Font, R_MaxFonts, R_FontId> fonts;
 
-  Gfx_Pipeline uber_pip;
-  Gfx_Pipeline uber_pip_screen;
-  Gfx_Pipeline ui_rect_pip;
-  Gfx_Pipeline cur_pip;
-  Gfx_Pipeline prev_pip;
-  Gfx_PipelineState prev_pip_state;
-  Gfx_Sampler com_sampler;
+	Gfx_Pipeline uber_pip;
+	Gfx_Pipeline uber_pip_screen;
+	Gfx_Pipeline ui_rect_pip;
+	Gfx_Pipeline cur_pip;
+	Gfx_Pipeline prev_pip;
+	Gfx_PipelineState prev_pip_state;
+	Gfx_Sampler com_sampler;
 
-  R_RenderTarget world_rt;
+	R_RenderTarget world_rt;
 
-  Gfx_Buffer cpu_vert_reg;
-  R_Vertex* cpu_vertices;
-  Mutex vert_index_buffer_mutex;
-  Gfx_Buffer vert_reg;
-  Gfx_Buffer index_reg;
+	Gfx_Buffer cpu_vert_reg;
+	R_Vertex* cpu_vertices;
+	Mutex vert_index_buffer_mutex;
+	Gfx_Buffer vert_reg;
+	Gfx_Buffer index_reg;
 
-  Array<R_Vertex, R_MaxDebugLines> draw_lines;
-  Array<R_Vertex, R_MaxDebugLines> draw_lines_persistent;
-  Array<R_UI_Rect, R_MaxDebugLines> draw_rects;
+	Array<R_Vertex, R_MaxDebugLines> draw_lines;
+	Array<R_Vertex, R_MaxDebugLines> draw_lines_persistent;
+	Array<R_UI_Rect, R_MaxDebugLines> draw_rects;
 
-  Mutex push_to_gpu_queue_mutex;
-  Queue<R_PuhsToGpu, 32> push_to_gpu_queue;
-  Queue<R_PuhsToGpu, 32> finished_gpu_queue;
-  Mutex waiting_fonts_mutex;
-  Array<R_WaitingFont, 32> waiting_fonts;
+	Mutex push_to_gpu_queue_mutex;
+	Queue<R_PuhsToGpu, 32> push_to_gpu_queue;
+	Queue<R_PuhsToGpu, 32> finished_gpu_queue;
+	Mutex waiting_fonts_mutex;
+	Array<R_WaitingFont, 32> waiting_fonts;
 
-  R_TextureId cur_cubemap;
+	R_TextureId cur_cubemap;
 
-  R_TextureId dummy_texture;
-  R_TextureId dummy_cubemap;
-  R_MeshId dummy_mesh;
-  R_FontId dummy_font;
+	R_TextureId dummy_texture;
+	R_TextureId dummy_cubemap;
+	R_MeshId dummy_mesh;
+	R_FontId dummy_font;
 
-  Gfx_Buffer gpu_state_buf;
-  Gfx_Buffer gpu_entities_buf;
-  Gfx_Buffer gpu_entities_indices_buf;
-  Gfx_Buffer gpu_materials_buf;
-  Gfx_Buffer gpu_drawcall_buf;
-  Gfx_Buffer gpu_software_render_buf;
-  Gfx_Buffer gpu_ui_rect_buf;
+	Gfx_Buffer gpu_state_buf;
+	Gfx_Buffer gpu_entities_buf;
+	Gfx_Buffer gpu_entities_indices_buf;
+	Gfx_Buffer gpu_materials_buf;
+	Gfx_Buffer gpu_drawcall_buf;
+	Gfx_Buffer gpu_software_render_buf;
+	Gfx_Buffer gpu_ui_rect_buf;
 
-  GpuState* gpu_state;
-  GpuEntity* gpu_entities;
-  u32* gpu_entities_indices;
-  GpuMaterial* gpu_materials;
-  GpuDrawCall* gpu_drawcalls;
-  u32* gpu_software_render;
-  GpuUI_Rect* gpu_ui_rects;
+	GpuState* gpu_state;
+	GpuEntity* gpu_entities;
+	u32* gpu_entities_indices;
+	GpuMaterial* gpu_materials;
+	GpuDrawCall* gpu_drawcalls;
+	u32* gpu_software_render;
+	GpuUI_Rect* gpu_ui_rects;
 
-  Slice<OS_Handle> shader_module_compilation_pids;
-  Slice<String> shaders_to_compile;
+	Slice<OS_Handle> shader_module_compilation_pids;
+	Slice<String> shaders_to_compile;
 };
 
 R_DrawBatch r_make_draw_batch(Allocator alloc, Gfx_Pipeline pip);

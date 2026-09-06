@@ -9,11 +9,11 @@
 #define LOG_ERROR_ENABLED 1
 
 enum LogLevel {
-  LogLevel_Trace = 1,
-  LogLevel_Debug,
-  LogLevel_Info,
-  LogLevel_Warn,
-  LogLevel_Error,
+	LogLevel_Trace = 1,
+	LogLevel_Debug,
+	LogLevel_Info,
+	LogLevel_Warn,
+	LogLevel_Error,
 };
 
 void _log_output(LogLevel level, String fmt, ...); // with \n
@@ -22,31 +22,31 @@ void print(String fmt, ...);
 void println(String fmt, ...);
 
 #if LOG_TRACE_ENABLED
-  #define Trace(message, ...) _log_output(LogLevel_Trace, message, ##__VA_ARGS__)
+	#define Trace(message, ...) _log_output(LogLevel_Trace, message, ##__VA_ARGS__)
 #else
-  #define Trace(message, ...)
+	#define Trace(message, ...)
 #endif
 
 #if LOG_DEBUG_ENABLED
-  #define Debug(message, ...) _log_output(LogLevel_Debug, message, ##__VA_ARGS__)
+	#define Debug(message, ...) _log_output(LogLevel_Debug, message, ##__VA_ARGS__)
 #else
-  #define Debug(message, ...)
+	#define Debug(message, ...)
 #endif
 
 #if LOG_INFO_ENABLED
-  #define Info(message, ...) _log_output(LogLevel_Info, message, ##__VA_ARGS__)
+	#define Info(message, ...) _log_output(LogLevel_Info, message, ##__VA_ARGS__)
 #else
-  #define Info(message, ...)
+	#define Info(message, ...)
 #endif
 
 #if LOG_WARN_ENABLED
-  #define Warn(message, ...) _log_output(LogLevel_Warn, message, ##__VA_ARGS__)
+	#define Warn(message, ...) _log_output(LogLevel_Warn, message, ##__VA_ARGS__)
 #else
-  #define Warn(message, ...)
+	#define Warn(message, ...)
 #endif
 
 #if LOG_ERROR_ENABLED
-  #define Error(message, ...) _log_output(LogLevel_Error, message, ##__VA_ARGS__);
+	#define Error(message, ...) _log_output(LogLevel_Error, message, ##__VA_ARGS__);
 #else
-  #define Error(message, ...)
+	#define Error(message, ...)
 #endif

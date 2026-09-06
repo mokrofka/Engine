@@ -9,34 +9,34 @@ const u32 Thread_NumWorkers = 4;
 MakeId(WaitGroup);
 
 enum TaskPriority {
-  TaskPriority_High,
-  TaskPriority_Low,
-  TaskPriority_COUNT,
+	TaskPriority_High,
+	TaskPriority_Low,
+	TaskPriority_COUNT,
 };
 
 typedef void TaskFn(void* ctx);
 
 struct TaskDesc {
-  void* ctx;
-  TaskFn* fn;
-  TaskPriority priority;
+	void* ctx;
+	TaskFn* fn;
+	TaskPriority priority;
 };
 
 struct Task {
-  TaskFn* fn;
-  void* ctx;
-  WaitGroup wg;
-  TaskPriority priority;
+	TaskFn* fn;
+	void* ctx;
+	WaitGroup wg;
+	TaskPriority priority;
 };
 
 typedef void (*ParallelForFn)(void* ctx, u32 base, u32 count);
 
 struct ParallelForCtx {
-  void* ctx;
-  ParallelForFn fn;
-  u32 next_idx;
-  u32 count;
-  u32 chunk_size;
+	void* ctx;
+	ParallelForFn fn;
+	u32 next_idx;
+	u32 count;
+	u32 chunk_size;
 };
 
 WaitGroup thread_wg_make(u32 count);
@@ -52,26 +52,26 @@ u8* _thread_push_ctx(u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
 void thread_pool_init();
 
 template<typename T, typename F> void thread_parallel_for(u32 chunk_size, Slice<T> s, F fn) {
-  if (s.count == 0) return;
-  Scratch scratch;
-  u32 task_count = CeilIntDiv(s.count, chunk_size);
-  var tasks = push_slice_zero(scratch, TaskDesc, task_count);
-  u32 task_id = 0;
-  for (u32 i = 0; i < s.count; i += chunk_size) {
-    struct TaskCtx {
-      Slice<T> s;
-      F fn;
-    };
-    var& ctx = thread_push_ctx(TaskCtx);
-    ctx.s = slice_n(s, i, Min(chunk_size, s.size - i));
-    ctx.fn = fn;
-    tasks[task_id].ctx = &ctx;
-    tasks[task_id].fn = [](void* ctx) {
-      TaskCtx data = *(TaskCtx*)ctx;
-      data.fn(data.s);
-    };
-    ++task_id;
-  }
-  WaitGroup wg = thread_push_batch(tasks);
-  thread_wg_wait(wg);
+	if (s.count == 0) return;
+	Scratch scratch;
+	u32 task_count = div_ceil(s.count, chunk_size);
+	var tasks = push_slice_zero(scratch, TaskDesc, task_count);
+	u32 task_id = 0;
+	for (u32 i = 0; i < s.count; i += chunk_size) {
+		struct TaskCtx {
+			Slice<T> s;
+			F fn;
+		};
+		var& ctx = thread_push_ctx(TaskCtx);
+		ctx.s = slice_n(s, i, Min(chunk_size, s.size - i));
+		ctx.fn = fn;
+		tasks[task_id].ctx = &ctx;
+		tasks[task_id].fn = [](void* ctx) {
+			TaskCtx data = *(TaskCtx*)ctx;
+			data.fn(data.s);
+		};
+		++task_id;
+	}
+	WaitGroup wg = thread_push_batch(tasks);
+	thread_wg_wait(wg);
 }

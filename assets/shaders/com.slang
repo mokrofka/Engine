@@ -39,37 +39,37 @@ global const f32 PI = 3.14159265358f;
 #include "../../src/shader_header.h"
 
 struct IndirectDrawCall {
-  u32 indexCount;
-  u32 instanceCount;
-  u32 firstIndex;
-  i32 vertexOffset;
-  u32 firstInstance;
-  u32 base;
+	u32 indexCount;
+	u32 instanceCount;
+	u32 firstIndex;
+	i32 vertexOffset;
+	u32 firstInstance;
+	u32 base;
 };
 
 struct VSOutput {
-  v4 pos: SV_Position;
-  v3 norm;
-  v2 uv;
-  v4 color;
-  u32 id; // drawcalls_idx
+	v4 pos: SV_Position;
+	v3 norm;
+	v2 uv;
+	v4 color;
+	u32 id; // drawcalls_idx
 };
 
 struct UI_VSOutput {
-  v4 vert : SV_Position;
-  v2 uv;
-  v4 color;
-  v2 dst_pos;
-  v2 dst_center;
-  v2 dst_half_size;
-  f32 corner_radius;
-  f32 edge_softness;
-  u32 texture;
-  u32 flags;
+	v4 vert : SV_Position;
+	v2 uv;
+	v4 color;
+	v2 dst_pos;
+	v2 dst_center;
+	v2 dst_half_size;
+	f32 corner_radius;
+	f32 edge_softness;
+	u32 texture;
+	u32 flags;
 };
 
 struct PushConstants {
-  u32 idx;
+	u32 idx;
 }
 
 [[vk::push_constant]]
@@ -90,15 +90,7 @@ VkBind(Bindings.SoftwareRender) StructuredBuffer<u32> software_render;
 VkBind(Bindings.UI_RectBinding) StructuredBuffer<UI_Rect> ui_rects;
 VkBind(Bindings.Vertices)       StructuredBuffer<Vertex> vertices;
 
-DrawCall get_data(u32 draw_id) {
-  return drawcalls[push.idx + draw_id];
-}
-
-u32 get_id(u32 draw_id) {
-  return push.idx + draw_id;
-}
-
-bool FlagHas(u64 x, u64 f) { return (x & f) == (f); }
+bool flag_has(u64 x, u64 f) { return (x & f) == (f); }
 
 v2 flip_uv_y(v2 uv) { return v2(uv.x, -uv.y); }
 
@@ -123,26 +115,26 @@ f32 Lerp(f32 a, f32 t, f32 b)      { return (1 - t)*a + t*b; }
 f32 LerpClamp(f32 a, f32 t, f32 b) { return Lerp(a, Clamp01(t), b); }
 f32 Unlerp(f32 a, f32 x, f32 b)    { return (x - a) / (b - a); }
 f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max) {
-  return new_min + (((x - old_min) * (new_max - new_min)) / (old_max - old_min));
+	return new_min + (((x - old_min) * (new_max - new_min)) / (old_max - old_min));
 }
 
 v4 v4_hadamard(v4 a, v4 b) { return v4(a.x*b.x, a.y*b.y, a.z*b.z, a.w*b.w); }
 v4 v4_hadamard_div(v4 a, v4 b) { return v4(a.x/b.x, a.y/b.y, a.z/b.z, a.w/b.w); }
 
 v4 rgba_from_u32(u32 hex) {
-  v4 result = v4(((hex >>  0) & 0xff) / 255.f,
-                 ((hex >>  8) & 0xff) / 255.f,
-                 ((hex >> 16) & 0xff) / 255.f,
-                 ((hex >> 24) & 0xff) / 255.f);
-  return result;
+	v4 result = v4(((hex >>  0) & 0xff) / 255.f,
+																((hex >>  8) & 0xff) / 255.f,
+																((hex >> 16) & 0xff) / 255.f,
+																((hex >> 24) & 0xff) / 255.f);
+	return result;
 }
 
 u32 u32_from_rgba(v4 rgba) {
-  u32 result = 0;
-  result |= ((u32)((u8)(rgba.x*255.f))) <<  0;
-  result |= ((u32)((u8)(rgba.y*255.f))) <<  8;
-  result |= ((u32)((u8)(rgba.z*255.f))) << 16;
-  result |= ((u32)((u8)(rgba.w*255.f))) << 24;
-  return result;
+	u32 result = 0;
+	result |= ((u32)((u8)(rgba.x*255.f))) <<  0;
+	result |= ((u32)((u8)(rgba.y*255.f))) <<  8;
+	result |= ((u32)((u8)(rgba.z*255.f))) << 16;
+	result |= ((u32)((u8)(rgba.w*255.f))) << 24;
+	return result;
 }
 
