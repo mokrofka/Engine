@@ -381,10 +381,10 @@ struct Gfx_IndirectDrawCall {
 };
 
 struct Gfx_Mesh {
-  u32 vert_count;
   u32 base_vert;
-  u32 index_count;
+  u32 vert_count;
   u32 base_index;
+  u32 index_count;
 };
 
 struct Gfx_Buffer {
@@ -403,16 +403,16 @@ struct Gfx_BufferDesc {
 };
 
 enum Gfx_StageBufferCmdType {
-  Gfx_StageBufferCmdType_UploadTexture = 1,
-  Gfx_StageBufferCmdType_UploadMesh,
+  Gfx_CmdType_Texture = 1,
+  Gfx_CmdType_Mesh,
 };
 
 struct Gfx_StageBufferCmd {
   Gfx_StageBufferCmdType type;
   Gfx_Image img;
   Gfx_Buffer buf;
-  b32 mipmaps;
-  u64 offset;
+  u64 buf_offset;
+  u64 stage_offset;
   u64 size;
 };
 
@@ -627,7 +627,6 @@ void vk_cmd_alloc(VkCommandPool pool, u32 count, VkCommandBuffer* out);
 void vk_cmd_begin(VkCommandBuffer cmd);
 void vk_cmd_end(VkCommandBuffer cmd);
 void vk_cmd_submit(VkCommandBuffer cmd);
-void vk_cmd_end_submit(VkCommandBuffer cmd);
 
 VK_Memory vk_mem_make(Gfx_MemType type, u64 size);
 VK_Buffer vk_make_buffer(Gfx_MemType type, u64 size);
@@ -659,7 +658,6 @@ struct Gfx_State {
 
   VkCommandBuffer render_cmds[Gfx_NumFramesInFlight];
   VkCommandBuffer upload_cmd;
-  VkCommandBuffer upload_cmd2;
 
   VkDescriptorPool descriptor_pool;
   VkDescriptorSetLayout descriptor_set_layout;
@@ -696,8 +694,9 @@ struct Gfx_State {
   u64 stage_cmd_counter;
   u64 stage_cmd_ready_counter;
   b32 stage_cmd_busy;
-  Mutex stage_mutex;
-  Queue<Gfx_StageBufferCmd, 32> stage_buffer_cmds;
+
+  Queue<Gfx_StageBufferCmd, 32> stage_cmd_queue;
+  Mutex stage_buffer_reserve_mutex;
 
   struct {
     v2u size;

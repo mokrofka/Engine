@@ -2,6 +2,66 @@
 #include "stb_image.h"
 #include "stb_truetype.h"
 
+static R_Vertex dummy_vertices[] = {
+ // Body - front
+ {{-1, -1, +1}, { 0,  0, +1}, {0, 0}, {0.8, 0.8, 0.8, 1}},
+ {{+1, -1, +1}, { 0,  0, +1}, {1, 0}, {0.8, 0.8, 0.8, 1}},
+ {{+1, +1, +1}, { 0,  0, +1}, {1, 1}, {0.8, 0.8, 0.8, 1}},
+ {{-1, +1, +1}, { 0,  0, +1}, {0, 1}, {0.8, 0.8, 0.8, 1}},
+
+ // Body - back
+ {{+1, -1, -1}, { 0,  0, -1}, {0, 0}, {0.8, 0.8, 0.8, 1}},
+ {{-1, -1, -1}, { 0,  0, -1}, {1, 0}, {0.8, 0.8, 0.8, 1}},
+ {{-1, +1, -1}, { 0,  0, -1}, {1, 1}, {0.8, 0.8, 0.8, 1}},
+ {{+1, +1, -1}, { 0,  0, -1}, {0, 1}, {0.8, 0.8, 0.8, 1}},
+
+ // Body - right
+ {{+1, -1, +1}, {+1,  0,  0}, {0, 0}, {0.8, 0.8, 0.8, 1}},
+ {{+1, -1, -1}, {+1,  0,  0}, {1, 0}, {0.8, 0.8, 0.8, 1}},
+ {{+1, +1, -1}, {+1,  0,  0}, {1, 1}, {0.8, 0.8, 0.8, 1}},
+ {{+1, +1, +1}, {+1,  0,  0}, {0, 1}, {0.8, 0.8, 0.8, 1}},
+
+ // Body - left
+ {{-1, -1, -1}, {-1,  0,  0}, {0, 0}, {0.8, 0.8, 0.8, 1}},
+ {{-1, -1, +1}, {-1,  0,  0}, {1, 0}, {0.8, 0.8, 0.8, 1}},
+ {{-1, +1, +1}, {-1,  0,  0}, {1, 1}, {0.8, 0.8, 0.8, 1}},
+ {{-1, +1, -1}, {-1,  0,  0}, {0, 1}, {0.8, 0.8, 0.8, 1}},
+
+ // Roof - front
+ {{-1, +1, +1}, {0, 0.707, 0.707}, {0, 0}, {1, 0.2, 0.1, 1}},
+ {{+1, +1, +1}, {0, 0.707, 0.707}, {1, 0}, {1, 0.2, 0.1, 1}},
+ {{ 0, +2, +1}, {0, 0.707, 0.707}, {0.5, 1}, {1, 0.2, 0.1, 1}},
+
+ // Roof - back
+ {{+1, +1, -1}, {0, 0.707, -0.707}, {0, 0}, {0.8, 0.1, 0.1, 1}},
+ {{-1, +1, -1}, {0, 0.707, -0.707}, {1, 0}, {0.8, 0.1, 0.1, 1}},
+ {{ 0, +2, -1}, {0, 0.707, -0.707}, {0.5, 1}, {0.8, 0.1, 0.1, 1}},
+
+ // Roof - right
+ {{+1, +1, +1}, {0.707, 0.707, 0}, {0, 0}, {1, 0.3, 0.1, 1}},
+ {{+1, +1, -1}, {0.707, 0.707, 0}, {1, 0}, {1, 0.3, 0.1, 1}},
+ {{ 0, +2,  0}, {0.707, 0.707, 0}, {0.5, 1}, {1, 0.3, 0.1, 1}},
+
+ // Roof - left
+ {{-1, +1, -1}, {-0.707, 0.707, 0}, {0, 0}, {0.9, 0.2, 0.1, 1}},
+ {{-1, +1, +1}, {-0.707, 0.707, 0}, {1, 0}, {0.9, 0.2, 0.1, 1}},
+ {{ 0, +2,  0}, {-0.707, 0.707, 0}, {0.5, 1}, {0.9, 0.2, 0.1, 1}},
+};
+
+static u32 dummy_indices[] = {
+  // Body
+  0, 1, 2,  0, 2, 3,
+  4, 5, 6,  4, 6, 7,
+  8, 9,10,  8,10,11,
+  12,13,14, 12,14,15,
+
+  // Roof
+  16,17,18,
+  19,20,21,
+  22,23,24,
+  25,26,27,
+};
+
 R_DrawBatch r_make_draw_batch(Allocator alloc, Gfx_Pipeline pip) {
   R_DrawBatch res = {
     .draws = array_make(R_DrawCall, alloc),
@@ -87,7 +147,7 @@ Gfx_Attachments r_render_target_to_attachments(R_RenderTarget rt) {
   return att;
 }
 
-R_TextureDesc r_load_image(String name) {
+R_TextureDesc r_load_texture(String name) {
   Scratch scratch;
   u32 required_channel_count = 4;
   u32 channel_count;
@@ -109,7 +169,7 @@ R_TextureDesc r_load_cubemap(String dir) {
   R_TextureDesc cube = {};
   LoopArray (i, sides) {
     String name = push_strf(scratch, "%s/%s%s", dir, sides[i], S(".png"));
-    R_TextureDesc tex = r_load_image(name);
+    R_TextureDesc tex = r_load_texture(name);
     cube.cube[i] = tex.data;
     cube.width = tex.width;
     cube.height = tex.height;
@@ -135,187 +195,233 @@ R_MeshDesc r_load_mesh(String name) {
 }
 
 R_TextureId r_make_texture(R_TextureDesc desc) {
-  var& g = st->r;
   Scratch scratch;
+  var& g = st->r;
   _DefSet(desc.pixel_format, Gfx_PixelFormat_RGBA8);
-
-  R_TextureId res = {};
-  if (desc.async) {
-    struct Ctx {
-      R_TextureId tex;
-      R_TextureDesc desc;
-    };
+  R_Texture dum = desc.is_cube ? pool_get(g.textures, g.dummy_cubemap) : pool_get(g.textures, g.dummy_texture);
+  R_TextureId res = pool_push(g.textures, dum);
+  struct Ctx {
+    R_TextureDesc desc;
+    R_TextureId texture_id;
+  };
+  var f = [](void* in){
+    Scratch scratch;
+    Ctx& ctx = *(Ctx*)in;
+    var& g = st->r;
+    var desc = ctx.desc;
+    if (desc.name.size) {
+      R_TextureDesc loaded = desc.is_cube ? r_load_cubemap(desc.name) : r_load_texture(desc.name);
+      desc.width = loaded.width;
+      desc.height = loaded.height;
+      ArrayCopy(desc.cube, loaded.cube);
+    }
+    Slice<Slice<u8>> data = push_slice(scratch, Slice<u8>, 6);
+    Loop (i, 6) {
+      data[i] = Slice(desc.cube[i], desc.width * desc.height * gfx_pixelformat_bytesize(desc.pixel_format));
+    }
+    u32 stage_offset = desc.is_cube ? gfx_push_stage_buffers(data) : gfx_push_stage_buffer(data[0]);
+    LockScope(g.push_to_gpu_queue_mutex);
+    queue_push(g.push_to_gpu_queue, {
+      .type = R_PushToGpuType_Texture,
+      .texture_id = ctx.texture_id,
+      .stage_off = stage_offset,
+      .image_desc = {
+        .type = desc.is_cube ? Gfx_ImageType_Cube : Gfx_ImageType_2D,
+        .width = desc.width,
+        .height = desc.height,
+        .pixel_format = desc.pixel_format,
+        .mipmaps = true,
+      },
+    });
+  };
+  if (desc.name.size) {
     var& ctx = thread_push_ctx(Ctx);
     ctx = {
       .desc = desc,
+      .texture_id = res,
     };
-    R_Texture dum = desc.is_cube ? pool_get(g.textures, g.dummy_cubemap) : pool_get(g.textures, g.dummy_texture);
-    res = pool_push(g.textures, dum);
-    ctx.tex = res;
-    thread_push(&ctx, [](void* in){
-      Scratch scratch;
-      Ctx& ctx = *(Ctx*)in;
-      var& g = st->r;
-      if (ctx.desc.name.size) {
-        R_TextureDesc loaded = ctx.desc.is_cube ? r_load_cubemap(ctx.desc.name) : r_load_image(ctx.desc.name);
-        ctx.desc.width = loaded.width;
-        ctx.desc.height = loaded.height;
-        ArrayCopy(ctx.desc.cube, loaded.cube);
-      }
-      LockScope(g.async_mutex);
-      Gfx_Image image = gfx_make_image({
-        .type = ctx.desc.is_cube ? Gfx_ImageType_Cube : Gfx_ImageType_2D,
-        .width = ctx.desc.width,
-        .height = ctx.desc.height,
-        .pixel_format = ctx.desc.pixel_format,
-        .mipmaps = true,
-      });
-      Gfx_View view = gfx_make_view({Gfx_ViewType_Texture, image});
-      Slice<Slice<u8>> data = push_slice(scratch, Slice<u8>, 6);
-      Loop (i, 6) {
-        data[i] = Slice(ctx.desc.cube[i], ctx.desc.width * ctx.desc.height * gfx_pixelformat_bytesize(ctx.desc.pixel_format));
-      }
-      u32 counter = gfx_push_stage_buffer_cmd({
-        .type = Gfx_StageBufferCmdType_UploadTexture,
-        .img = image,
-        .offset = ctx.desc.is_cube ? gfx_push_stage_buffers(data) : gfx_push_stage_buffer(data[0]),
-        .mipmaps = true,
-      });
-      queue_push(g.async_view, {image, view, counter, ctx.tex});
-    });
+    thread_push(&ctx, f);
   } else {
-    if (desc.name.size) {
-      R_TextureDesc t = {};
-      if (desc.is_cube) {
-        t = r_load_cubemap(desc.name);
-        ArrayCopy(desc.cube, t.cube);
-      } else {
-        t = r_load_image(desc.name);
-        desc.data = t.data;
-      }
-      desc.width = t.width;
-      desc.height = t.height;
-    }
-    R_Texture tex = {};
-    Gfx_ImageDesc img_desc = {
-      .type = desc.is_cube ? Gfx_ImageType_Cube : Gfx_ImageType_2D,
-      .width = desc.width,
-      .height = desc.height,
-      .pixel_format = desc.pixel_format,
-      .mipmaps = true,
+    Ctx ctx = {
+      .desc = desc,
+      .texture_id = res,
     };
-    ArrayCopy(img_desc.cube, desc.cube);
-    tex.image = gfx_make_image(img_desc),
-    tex.view = gfx_make_view({Gfx_ViewType_Texture, tex.image});
-    res = pool_push(g.textures, tex);
+    f(&ctx);
   }
+  return res;
+}
+
+// R_TextureId r_make_texture(R_TextureDesc desc) {
+//   var& g = st->r;
+//   Scratch scratch;
+//   _DefSet(desc.pixel_format, Gfx_PixelFormat_RGBA8);
+//   R_Texture dum = desc.is_cube ? pool_get(g.textures, g.dummy_cubemap) : pool_get(g.textures, g.dummy_texture);
+//   R_TextureId res = pool_push(g.textures, dum);
+//   struct Ctx {
+//     R_TextureId tex;
+//     R_TextureDesc desc;
+//   };
+//   var f = [](void* in){
+//     Scratch scratch;
+//     Ctx& ctx = *(Ctx*)in;
+//     var desc = ctx.desc;
+//     var& g = st->r;
+//     if (desc.name.size) {
+//       R_TextureDesc loaded = ctx.desc.is_cube ? r_load_cubemap(ctx.desc.name) : r_load_texture(ctx.desc.name);
+//       ctx.desc.width = loaded.width;
+//       ctx.desc.height = loaded.height;
+//       ArrayCopy(ctx.desc.cube, loaded.cube);
+//     }
+//     LockScope(g.async_mutex);
+//     Gfx_Image image = gfx_make_image({
+//       .type = ctx.desc.is_cube ? Gfx_ImageType_Cube : Gfx_ImageType_2D,
+//       .width = ctx.desc.width,
+//       .height = ctx.desc.height,
+//       .pixel_format = ctx.desc.pixel_format,
+//       .mipmaps = true,
+//     });
+//     Gfx_View view = gfx_make_view({Gfx_ViewType_Texture, image});
+//     Slice<Slice<u8>> data = push_slice(scratch, Slice<u8>, 6);
+//     Loop (i, 6) {
+//       data[i] = Slice(ctx.desc.cube[i], ctx.desc.width * ctx.desc.height * gfx_pixelformat_bytesize(ctx.desc.pixel_format));
+//     }
+//     u32 counter = gfx_push_stage_buffer_cmd({
+//       .type = Gfx_StageBufferCmdType_UploadTexture,
+//       .img = image,
+//       .stage_offset = ctx.desc.is_cube ? gfx_push_stage_buffers(data) : gfx_push_stage_buffer(data[0]),
+//       .mipmaps = true,
+//     });
+//     queue_push(g.async_cmd_queue, {
+//       .type = R_AsyncCmdType_UploadTexture,
+//       .texture_id = ctx.tex,
+//       .texture = {
+//         .image = image,
+//         .view = view,
+//       },
+//       .counter = counter,
+//     });
+//   };
+//   if (desc.name.size) {
+//     var& ctx = thread_push_ctx(Ctx);
+//     ctx = {
+//       .desc = desc,
+//       .tex = res,
+//     };
+//     thread_push(&ctx, f);
+//   } else {
+//     Ctx ctx = {
+//       .desc = desc,
+//       .tex = res,
+//     };
+//     f(&ctx);
+//   }
+//   return res;
+// }
+
+R_TextureId r_make_dummy_texture(R_TextureDesc desc) {
+  var& g = st->r;
+  if (desc.name.size) {
+    R_TextureDesc loaded = desc.is_cube ? r_load_cubemap(desc.name) : r_load_texture(desc.name);
+    desc.width = loaded.width;
+    desc.height = loaded.height;
+    ArrayCopy(desc.cube, loaded.cube);
+  }
+  Gfx_ImageDesc img_desc = {
+    .type = desc.is_cube ? Gfx_ImageType_Cube : Gfx_ImageType_2D,
+    .width = desc.width,
+    .height = desc.height,
+    .pixel_format = desc.pixel_format,
+    .mipmaps = true,
+  };
+  ArrayCopy(img_desc.cube, desc.cube);
+  R_Texture tex = {
+    .image = gfx_make_image(img_desc),
+    .view = gfx_make_view({Gfx_ViewType_Texture, tex.image}),
+  };
+  R_TextureId res = pool_push(g.textures, tex);
   return res;
 }
 
 R_MeshId r_make_mesh(R_MeshDesc desc) {
   Scratch scratch;
   var& g = st->r;
-  R_MeshId res = {};
-  if (desc.async) {
-    res = pool_push(g.meshes, {});
-    struct Ctx {
-      String name;
-      R_MeshId mesh;
-    };
+  R_MeshId res = pool_push(g.meshes, pool_get(g.meshes, g.dummy_mesh));
+  struct Ctx {
+    R_MeshDesc desc;
+    R_MeshId mesh_id;
+  };
+  var f = [](void* in){
+    Scratch scratch;
+    Ctx& ctx = *(Ctx*)in;
+    var& g = st->r;
+    var desc = ctx.desc;
+    if (desc.name.size) {
+      desc = r_load_mesh(desc.name);
+    }
+    os_mutex_lock(g.vert_index_buffer_mutex);
+    u64 vert_buf_off = gfx_push_buffer(g.vert_reg, slice_size(desc.vertices));
+    u64 index_buf_off = gfx_push_buffer(g.index_reg, slice_size(desc.indices));
+    os_mutex_unlock(g.vert_index_buffer_mutex);
+
+    u32 base_vert = vert_buf_off / sizeof(R_Vertex);
+    u32 stage_offset = gfx_push_stage_buffer(slice_to_bytes(desc.vertices));
+    u32 base_index = 0;
+    if (desc.indices.count) {
+      base_index = index_buf_off / sizeof(u32);
+      gfx_push_stage_buffer(slice_to_bytes(desc.indices));
+    }
+    LockScope(g.push_to_gpu_queue_mutex);
+    queue_push(g.push_to_gpu_queue, {
+      .type = R_PushToGpuType_Mesh,
+      .mesh_id = ctx.mesh_id,
+      .mesh = {
+        .vert_count = (u32)desc.vertices.count,
+        .base_vert = base_vert,
+        .index_count = (u32)desc.indices.count,
+        .base_index = base_index,
+      },
+      .stage_off = stage_offset,
+    });
+  };
+  if (desc.name.size) {
     var& ctx = thread_push_ctx(Ctx);
     ctx = {
-      .name = desc.name,
-      .mesh = res,
+      .desc = desc,
+      .mesh_id = res,
     };
-    thread_push(&ctx, [](void* in) {
-      Scratch scratch;
-      var& g = st->r;
-      Ctx& ctx = *(Ctx*)in;
-      String filepath = push_strf(scratch, "%s/%s", st->models_dir, ctx.name);
-      String format = str_skip_last_dot(ctx.name);
-      R_MeshDesc desc = {};
-      if (str_match(format, "glb")) {
-        desc = load_gltf(scratch, filepath, true);
-      } else if (str_match(format, "gltf")) {
-        desc = load_gltf(scratch, filepath, false);
-      } else if (str_match(format, "obj")) {
-        desc = load_obj(scratch, filepath);
-      } else {
-        InvalidPath;
-      }
-      LockScope(g.async_mutex);
-      pool_get(g.meshes, ctx.mesh) = r_upload_mesh(desc);
-    });
+    thread_push(&ctx, f);
   } else {
-    if (desc.name.size) {
-      R_MeshDesc mesh = r_load_mesh(desc.name);
-      desc.vertices = mesh.vertices;
-      desc.indices = mesh.indices;
-      desc.bounds_min = mesh.bounds_min;
-      desc.bounds_max = mesh.bounds_max;
-      desc.bounds_rad = mesh.bounds_rad;
-    }
-    Gfx_Mesh m = r_upload_mesh(desc);
-    res = pool_push(g.meshes, m);
+    Ctx ctx = {
+      .desc = desc,
+      .mesh_id = res,
+    };
+    f(&ctx);
   }
   return res;
 }
 
-Gfx_Mesh r_upload_mesh(R_MeshDesc desc) {
+R_MeshId r_make_dummy_mesh(R_MeshDesc desc) {
   var& g = st->r;
-  u64 offset = gfx_push_buffer(g.vert_reg, slice_size(desc.vertices));
-  u32 base_vert = offset / sizeof(R_Vertex);
-  gfx_update_buffer(g.vert_reg, offset, slice_to_bytes(desc.vertices));
+  if (desc.name.size) {
+    desc = r_load_mesh(desc.name);
+  }
+  u64 buf_offset = gfx_push_buffer(g.vert_reg, slice_size(desc.vertices));
+  u32 base_vert = buf_offset / sizeof(R_Vertex);
+  gfx_update_buffer(g.vert_reg, buf_offset, slice_to_bytes(desc.vertices));
   u32 base_index = 0;
   if (desc.indices.count) {
-    u64 offset = gfx_push_buffer(g.index_reg, slice_size(desc.indices));
-    base_index = offset / sizeof(u32);
-    gfx_update_buffer(g.index_reg, offset, slice_to_bytes(desc.indices));
+    u64 buf_offset = gfx_push_buffer(g.index_reg, slice_size(desc.indices));
+    base_index = buf_offset / sizeof(u32);
+    gfx_update_buffer(g.index_reg, buf_offset, slice_to_bytes(desc.indices));
   }
-  Gfx_Mesh res = {
-    .vert_count = (u32)desc.vertices.count,
+  Gfx_Mesh mesh = {
     .base_vert = base_vert,
-    .index_count = (u32)desc.indices.count,
+    .vert_count = (u32)desc.vertices.count,
     .base_index = base_index,
+    .index_count = (u32)desc.indices.count,
   };
+  R_MeshId res = pool_push(g.meshes, mesh);
   return res;
-}
-
-void r_readback_texture(R_TextureId t, u8* dst) {
-  var& g = st->r;
-  R_Texture texture = pool_get(g.textures, t);
-  gfx_readback_image(texture.image, dst);
-}
-
-u32 r_texture_descriptor_idx(R_TextureId id) {
-  R_State& g = st->r;
-  u32 res = pool_get(g.textures, id).view.idx;
-  return res;
-}
-
-void r_set_cubemap(R_TextureId cubemap) {
-  var& g = st->r;
-  g.cur_cubemap = cubemap;
-}
-
-void r_update_texture(R_TextureId t, u8* data) {
-  var& g = st->r;
-  R_Texture tex = pool_get(g.textures, t);
-  gfx_update_image(tex.image, data);
-}
-
-void r_update_mesh(R_MeshId mesh, R_MeshDesc desc) {
-}
-
-void r_destroy_texture(R_TextureId t) {
-  var& g = st->r;
-  R_Texture texture = pool_get(g.textures, t);
-  gfx_destroy_image(texture.image);
-  gfx_destroy_view(texture.view);
-  pool_remove(g.textures, t);
-}
-
-void r_destroy_mesh(R_MeshId mesh) {
 }
 
 u32 r_make_pipeline_state(Gfx_PipelineState s) {
@@ -325,34 +431,13 @@ u32 r_make_pipeline_state(Gfx_PipelineState s) {
   return res;
 }
 
-R_MaterialId r_material_make(R_Material mat) {
+R_MaterialId r_make_material(R_Material mat) {
   var& g = st->r;
   if (!mat.base_color.idx) {
     mat.base_color = g.dummy_texture;
   }
   R_MaterialId res = pool_push(g.materials, mat);
   return res;
-}
-
-void r_material_destroy(R_MaterialId mat) {
-  var& g = st->r;
-  pool_remove(g.materials, mat);
-}
-
-void r_shader_reload(String name) {
-  Scratch scratch;
-  R_State& g = st->r;
-  Info("reload '%s' shader", name);
-  var module_idx = map_get(g.shader_to_module_idx, name);
-  Assert(module_idx.ok);
-  R_ShaderModuleWithPipelines entry = g.shader_modules[module_idx.value];
-  Slice code = os_file_path_read_all(scratch, push_strf(scratch, "%s/%s.spv", st->shader_compiled_dir, name));
-  gfx_update_shader(entry.shd, code);
-  Loop (i, entry.pipelines.count) {
-    Gfx_Pipeline pip = entry.pipelines[i];
-    // gfx_update_pipeline(pip, gfx_query_pipeline_desc(pip));
-    gfx_update_pipeline2(pip, gfx_query_pipeline_desc2(pip));
-  }
 }
 
 Gfx_Pipeline r_make_pipeline(String name, Gfx_PipelineDesc desc) {
@@ -386,6 +471,151 @@ Gfx_Pipeline r_make_pipeline2(String name, Gfx_PipelineDesc2 desc) {
   Gfx_Pipeline pip = gfx_make_pipeline2(desc);
   array_push(g.shader_modules[module_idx].pipelines, pip);
   return pip;
+}
+
+R_FontId r_make_font(R_FontDesc desc) {
+  // return r_make_dummy_font(desc);
+  Scratch scratch;
+  var& g = st->r;
+  R_FontId res = pool_push(g.fonts, pool_get(g.fonts, g.dummy_font));
+  struct Ctx {
+    R_FontDesc desc;
+    R_FontId font_id;
+  };
+  var& ctx = thread_push_ctx(Ctx);
+  ctx = {
+    .desc = desc,
+    .font_id = res,
+  };
+  thread_push(&ctx, [](void* in) {
+    Scratch scratch;
+    Ctx& ctx = *(Ctx*)in;
+    var& g = st->r;
+    String path = push_strf(scratch, "%s/%s/%s", st->asset_dir, S("fonts"), ctx.desc.name);
+    Slice data = os_file_path_read_all(scratch, path);
+    stbtt_bakedchar characters_info[96];
+    u32 font_height = ctx.desc.font_height;
+    u32 pixels_size = 96 * Square(font_height);
+    u32 dim = Sqrt(pixels_size);
+    u32 width = RoundUp(dim, font_height);
+    u32 height = RoundUp(dim, font_height);
+    u8* pixels = push_buffer(g.arena, width*height);
+    stbtt_BakeFontBitmap(data.data, 0, font_height, pixels, width, height, 32, 96, characters_info);
+    R_TextureId texture_id = r_make_texture({.width = width, .height = height, .data = pixels, .pixel_format = Gfx_PixelFormat_R8});
+    R_Font font = {.font_height = font_height, .texture = texture_id};
+    LoopArray (i, font.glyphs) {
+      stbtt_bakedchar bakedchar = characters_info[i];
+      font.glyphs[i] = {
+        .rect.x0 = bakedchar.x0,
+        .rect.y0 = bakedchar.y0,
+        .rect.x1 = bakedchar.x1,
+        .rect.y1 = bakedchar.y1,
+        .xoff = bakedchar.xoff,
+        .yoff = bakedchar.yoff,
+        .xadvance = bakedchar.xadvance,
+      };
+    }
+    LockScope(g.waiting_fonts_mutex);
+    array_push(g.waiting_fonts, {
+      .id = ctx.font_id,
+      .font = font,
+    });
+  });
+  return res;
+}
+
+R_FontId r_make_dummy_font(R_FontDesc desc) {
+  Scratch scratch;
+  var& g = st->r;
+  String path = push_strf(scratch, "%s/%s/%s", st->asset_dir, S("fonts"), desc.name);
+  Slice data = os_file_path_read_all(scratch, path);
+  stbtt_bakedchar characters_info[96];
+  u32 font_height = desc.font_height;
+  u32 pixels_size = 96 * Square(font_height);
+  u32 dim = Sqrt(pixels_size);
+  u32 width = RoundUp(dim, font_height);
+  u32 height = RoundUp(dim, font_height);
+  u8* pixels = push_buffer(g.arena, width*height);
+  stbtt_BakeFontBitmap(data.data, 0, font_height, pixels, width, height, 32, 96, characters_info);
+  R_TextureId texture_id = r_make_texture({.width = width, .height = height, .data = pixels, .pixel_format = Gfx_PixelFormat_R8, .async = desc.async});
+  R_Font font = {.font_height = font_height, .texture = texture_id};
+  LoopArray (i, font.glyphs) {
+    stbtt_bakedchar bakedchar = characters_info[i];
+    font.glyphs[i] = {
+      .rect.x0 = bakedchar.x0,
+      .rect.y0 = bakedchar.y0,
+      .rect.x1 = bakedchar.x1,
+      .rect.y1 = bakedchar.y1,
+      .xoff = bakedchar.xoff,
+      .yoff = bakedchar.yoff,
+      .xadvance = bakedchar.xadvance,
+    };
+  }
+  R_FontId res = pool_push(g.fonts, font);
+  return res;
+}
+
+b32 r_texture_is_ready(R_TextureId id) {
+  var& g = st->r;
+  return pool_get(g.textures, id).is_ready;
+}
+
+void r_readback_texture(R_TextureId t, u8* dst) {
+  var& g = st->r;
+  R_Texture texture = pool_get(g.textures, t);
+  gfx_readback_image(texture.image, dst);
+}
+
+u32 r_texture_descriptor_idx(R_TextureId id) {
+  var& g = st->r;
+  u32 res = pool_get(g.textures, id).view.idx;
+  return res;
+}
+
+void r_set_cubemap(R_TextureId cubemap) {
+  var& g = st->r;
+  g.cur_cubemap = cubemap;
+}
+
+void r_update_texture(R_TextureId t, u8* data) {
+  var& g = st->r;
+  R_Texture tex = pool_get(g.textures, t);
+  gfx_update_image(tex.image, data);
+}
+
+void r_update_mesh(R_MeshId mesh, R_MeshDesc desc) {
+}
+
+void r_destroy_texture(R_TextureId t) {
+  var& g = st->r;
+  R_Texture texture = pool_get(g.textures, t);
+  gfx_destroy_image(texture.image);
+  gfx_destroy_view(texture.view);
+  pool_remove(g.textures, t);
+}
+
+void r_destroy_mesh(R_MeshId mesh) {
+}
+
+void r_material_destroy(R_MaterialId mat) {
+  var& g = st->r;
+  pool_remove(g.materials, mat);
+}
+
+void r_reload_shader(String name) {
+  Scratch scratch;
+  R_State& g = st->r;
+  Info("reload '%s' shader", name);
+  var module_idx = map_get(g.shader_to_module_idx, name);
+  Assert(module_idx.ok);
+  R_ShaderModuleWithPipelines entry = g.shader_modules[module_idx.value];
+  Slice code = os_file_path_read_all(scratch, push_strf(scratch, "%s/%s.spv", st->shader_compiled_dir, name));
+  gfx_update_shader(entry.shd, code);
+  Loop (i, entry.pipelines.count) {
+    Gfx_Pipeline pip = entry.pipelines[i];
+    // gfx_update_pipeline(pip, gfx_query_pipeline_desc(pip));
+    gfx_update_pipeline2(pip, gfx_query_pipeline_desc2(pip));
+  }
 }
 
 void r_shaders_compile(Allocator arena) {
@@ -493,36 +723,6 @@ void r_shaders_compile_join() {
   }
 }
 
-R_FontId r_load_font(String name, u32 font_height) {
-  Scratch scratch;
-  var& g = st->r;
-  String path = push_strf(scratch, "%s/%s/%s", st->asset_dir, S("fonts"), name);
-  Slice data = os_file_path_read_all(scratch, path);
-  stbtt_bakedchar characters_info[96];
-  u32 pixels_size = 96 * Square(font_height);
-  u32 dim = Sqrt(pixels_size);
-  u32 width = RoundUp(dim, font_height);
-  u32 height = RoundUp(dim, font_height);
-  u8* pixels = push_buffer(g.arena, width*height);
-  stbtt_BakeFontBitmap(data.data, 0, font_height, pixels, width, height, 32, 96, characters_info);
-  R_TextureId texture_id = r_make_texture({.width = width, .height = height, .data = pixels, .pixel_format = Gfx_PixelFormat_R8, .async = true});
-  R_Font font = {.font_height = font_height, .texture = texture_id};
-  LoopArray (i, font.glyphs) {
-    stbtt_bakedchar bakedchar = characters_info[i];
-    font.glyphs[i] = {
-      .rect.x0 = bakedchar.x0,
-      .rect.y0 = bakedchar.y0,
-      .rect.x1 = bakedchar.x1,
-      .rect.y1 = bakedchar.y1,
-      .xoff = bakedchar.xoff,
-      .yoff = bakedchar.yoff,
-      .xadvance = bakedchar.xadvance,
-    };
-  }
-  R_FontId res = pool_push(g.fonts, font);
-  return res;
-}
-
 void r_bind_pipeline(Gfx_Pipeline pip) {
   var& g = st->r;
   g.cur_pip = pip;
@@ -606,7 +806,9 @@ void r_init() {
   g.arena = arena;
   g.gpa = alloc_make(g.arena);
   g.scale = 1;
-  g.async_mutex = os_mutex_make();
+  g.push_to_gpu_queue_mutex = os_mutex_make();
+  g.vert_index_buffer_mutex = os_mutex_make();
+  g.waiting_fonts_mutex = os_mutex_make();
 
   gfx_init({.cpu_mem_size = MB(100), .gpu_mem_size = MB(10), .image_mem_size = MB(10)});
 
@@ -673,57 +875,40 @@ void r_init() {
   ///////////////////////////////////
   // Dummy
   {
-    u32 width = 1;
-    u32 height = 1;
-    u32* pixels = push_array(scratch, u32, width*height);
-    MemSet(pixels, 255, width*height*4);
-    R_TextureDesc tex = {
-      .data = (u8*)pixels,
-      .width = width,
-      .height = height,
-    };
-    g.dummy_texture = r_make_texture(tex);
-  }
-  {
-    u32 width = 1;
-    u32 height = 1;
-    u32* pixels = push_array(scratch, u32, width*height);
-    MemSet(pixels, 255, width*height*4);
+    R_TextureDesc dum = r_load_texture("dummy.png");
+    g.dummy_texture = r_make_dummy_texture({
+      .data = dum.data,
+      .width = dum.width,
+      .height = dum.height,
+    });
     R_TextureDesc cube = {
-      .width = width,
-      .height = height,
+      .width = dum.width,
+      .height = dum.width,
       .is_cube = true,
     };
     Loop (i, 6) {
-      cube.cube[i] = (u8*)pixels;
+      cube.cube[i] = (u8*)dum.data;
     }
-    g.dummy_cubemap = r_make_texture(cube);
-    g.gpu_state->cubemap = pool_get(g.textures, g.dummy_cubemap).view.idx;
+    g.dummy_cubemap = r_make_dummy_texture(cube);
+    g.gpu_state->cubemap = r_texture_descriptor_idx(g.dummy_cubemap);
+    g.dummy_mesh = r_make_dummy_mesh({.name = "dummy.glb"});
+    g.dummy_font = r_make_dummy_font({"Roboto-Bold.ttf", 32});
   }
 
   ///////////////////////////////////
   // Load basic shaders
-  
   {
-    // Gfx_Shader shd = gfx_make_shader(os_file_path_read_all(scratch, "../assets/shaders/compiled/uber.spv"));
-    // g.uber_pip = gfx_make_pipeline2({.shader = shd});
-    // g.uber_pip_screen = gfx_make_pipeline2({
-    //   .shader = shd,
-    //   .sample_count = 1,
-    // });
     g.uber_pip = r_make_pipeline2("uber", {});
     g.uber_pip_screen = r_make_pipeline2("uber", {
       .sample_count = 1,
     });
   }
   {
-    // Gfx_Shader shd = gfx_make_shader(os_file_path_read_all(scratch, "../assets/shaders/compiled/ui_rect.spv"));
-    // g.ui_rect_pip = gfx_make_pipeline2({.shader = shd});
     g.ui_rect_pip = r_make_pipeline2("ui_rect", {});
   }
 
-  g.my_font = r_load_font("arial.ttf", 8);
   Info("Renderer initialized");
+
 }
 
 void r_shutdown() {
@@ -751,14 +936,82 @@ void r_end() {
     r_recreate_render_target(&g.world_rt, win_size);
   }
 
+  // Push to gpu
+  {
+    LockScope(g.push_to_gpu_queue_mutex);
+    Loop (i, g.push_to_gpu_queue.count) {
+      var push = queue_pop(g.push_to_gpu_queue);
+      switch (push.type) {
+        InvalidDefaultCase;
+        case R_PushToGpuType_Texture: {
+          Gfx_Image image = gfx_make_image(push.image_desc);
+          Gfx_View view = gfx_make_view({Gfx_ViewType_Texture, image});
+          u32 counter = gfx_push_stage_buffer_cmd({
+            .type = Gfx_CmdType_Texture,
+            .img = image,
+            .stage_offset = push.stage_off,
+          });
+          push.texture = {
+            .image = image,
+            .view = view,
+          };
+          push.counter = counter;
+          queue_push(g.finished_gpu_queue, push);
+        } break;
+        case R_PushToGpuType_Mesh: {
+          var mesh = push.mesh;
+          u32 vert_size = mesh.vert_count*sizeof(R_Vertex);
+          u32 counter = gfx_push_stage_buffer_cmd({
+            .type = Gfx_CmdType_Mesh,
+            .stage_offset = push.stage_off,
+            .buf = g.vert_reg,
+            .size = vert_size,
+            .buf_offset = push.mesh.base_vert*sizeof(R_Vertex),
+          });
+          if (mesh.index_count) {
+            gfx_push_stage_buffer_cmd({
+              .type = Gfx_CmdType_Mesh,
+              .stage_offset = push.stage_off + vert_size,
+              .buf = g.index_reg,
+              .size = mesh.index_count*sizeof(u32),
+              .buf_offset = push.mesh.base_index*sizeof(u32),
+            });
+          }
+          push.counter = counter;
+          queue_push(g.finished_gpu_queue, push);
+        } break;
+      }
+    }
+  }
+
   // Update dummies
   {
-    Loop (i, g.async_view.count) {
-      if (g.async_view.data[g.async_view.first].counter <= gfx_ready_counter()) {
-        var slot = queue_pop(g.async_view);
-        var& t = pool_get(g.textures, slot.tex);
-        t.view = slot.view;
-        t.image = slot.image;
+    Loop (i, g.finished_gpu_queue.count) {
+      if (queue_front(g.finished_gpu_queue).counter <= gfx_ready_counter()) {
+        var slot = queue_pop(g.finished_gpu_queue);
+        switch (slot.type) {
+          InvalidDefaultCase;
+          case R_PushToGpuType_Texture: {
+            var& t = pool_get(g.textures, slot.texture_id);
+            t = slot.texture;
+            t.is_ready = true;
+          } break;
+          case R_PushToGpuType_Mesh: {
+            var& t = pool_get(g.meshes, slot.mesh_id);
+            t = slot.mesh;
+          } break;
+        }
+      } else break;
+    } 
+
+    LockScope(g.waiting_fonts_mutex);
+    LoopNoInc (i, g.waiting_fonts.count) {
+      var slot = g.waiting_fonts[i];
+      if (r_texture_is_ready(slot.font.texture)) {
+        pool_get(g.fonts, slot.id) = slot.font;
+        array_swap_remove(g.waiting_fonts, i);
+      } else {
+        ++i;
       }
     }
   }
@@ -779,10 +1032,10 @@ void r_end() {
         .diffuse = props.diffuse,
         .specular = props.specular,
         .shininess = props.shininess,
-        .tex = pool_get(g.textures, mat.base_color).view.idx,
+        .tex = r_texture_descriptor_idx(mat.base_color),
       };
     }
-    gpu_st.cubemap = pool_get(g.textures, g.cur_cubemap).view.idx;
+    gpu_st.cubemap = r_texture_descriptor_idx(g.cur_cubemap);
   }
 
   u32 drawcall_count = 0;

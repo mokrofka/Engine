@@ -55,11 +55,11 @@ struct R_TextureDesc {
 struct R_Texture {
   Gfx_Image image;
   Gfx_View view;
+  b32 is_ready;
 };
 
 struct R_MeshDesc {
   String name;
-  b32 async;
   Slice<R_Vertex> vertices;
   Slice<u32> indices;
   f32 bounds_min;
@@ -115,6 +115,13 @@ struct R_Gradient {
 struct R_Glyph {
   Rng2u rect;
   f32 xoff, yoff, xadvance;
+};
+
+struct R_FontDesc {
+  String name;
+  u32 font_height;
+  b32 async;
+  u8* data;
 };
 
 struct R_Font {
@@ -194,11 +201,26 @@ struct R_Camera {
   f32 ortho_size;
 };
 
-struct R_AsyncView {
-  Gfx_Image image;
-  Gfx_View view;
+enum R_PushToGpuType {
+  R_PushToGpuType_Texture,
+  R_PushToGpuType_Mesh,
+};
+
+struct R_PuhsToGpu {
+  R_PushToGpuType type;
+  R_TextureId texture_id;
+  R_MeshId mesh_id;
+  u32 stage_off;
+  Gfx_ImageDesc image_desc;
+  Gfx_ViewDesc view_desc;
+  Gfx_Mesh mesh;
+  R_Texture texture;
   u32 counter;
-  R_TextureId tex;
+};
+
+struct R_WaitingFont {
+  R_FontId id;
+  R_Font font;
 };
 
 struct R_State {
@@ -226,13 +248,11 @@ struct R_State {
   Gfx_PipelineState prev_pip_state;
   Gfx_Sampler com_sampler;
 
-  R_FontId my_font;
-  R_FontId raylib_font;
-
   R_RenderTarget world_rt;
 
   Gfx_Buffer cpu_vert_reg;
   R_Vertex* cpu_vertices;
+  Mutex vert_index_buffer_mutex;
   Gfx_Buffer vert_reg;
   Gfx_Buffer index_reg;
 
@@ -240,12 +260,18 @@ struct R_State {
   Array<R_Vertex, R_MaxDebugLines> draw_lines_persistent;
   Array<R_UI_Rect, R_MaxDebugLines> draw_rects;
 
-  Queue<R_AsyncView, 16> async_view;
-  Mutex async_mutex;
+  Mutex push_to_gpu_queue_mutex;
+  Queue<R_PuhsToGpu, 32> push_to_gpu_queue;
+  Queue<R_PuhsToGpu, 32> finished_gpu_queue;
+  Mutex waiting_fonts_mutex;
+  Array<R_WaitingFont, 32> waiting_fonts;
+
+  R_TextureId cur_cubemap;
+
   R_TextureId dummy_texture;
   R_TextureId dummy_cubemap;
-  R_TextureId dummy_mesh;
-  R_TextureId cur_cubemap;
+  R_MeshId dummy_mesh;
+  R_FontId dummy_font;
 
   Gfx_Buffer gpu_state_buf;
   Gfx_Buffer gpu_entities_buf;
@@ -276,13 +302,22 @@ void r_destroy_render_target(R_RenderTarget rt);
 void r_recreate_render_target(R_RenderTarget* rt, v2u size);
 Gfx_Attachments r_render_target_to_attachments(R_RenderTarget rt);
 
-R_TextureDesc r_load_image(String name);
+R_TextureDesc r_load_texture(String name);
 R_TextureDesc r_load_cubemap(String dir);
 R_MeshDesc r_load_mesh(String name);
 R_TextureId r_make_texture(R_TextureDesc desc);
+R_TextureId r_make_dummy_texture(R_TextureDesc desc);
 R_MeshId r_make_mesh(R_MeshDesc desc);
+R_MeshId r_make_dummy_mesh(R_MeshDesc desc);
+u32 r_make_pipeline_state(Gfx_PipelineState s);
+R_MaterialId r_make_material(R_Material mat);
+Gfx_Pipeline r_make_pipeline(String name, Gfx_PipelineDesc desc);
+Gfx_Pipeline r_make_pipeline2(String name, Gfx_PipelineDesc2 desc);
+R_FontId r_make_font(R_FontDesc desc);
+R_FontId r_make_dummy_font(R_FontDesc desc);
 
-Gfx_Mesh r_upload_mesh(R_MeshDesc desc);
+b32 r_texture_is_ready(R_TextureId id);
+
 void r_readback_texture(R_TextureId t, u8* dst);
 u32 r_texture_descriptor_idx(R_TextureId id);
 void r_set_cubemap(R_TextureId cubemap);
@@ -291,21 +326,12 @@ void r_update_texture(R_TextureId t, u8* data);
 void r_update_mesh(R_MeshId mesh, R_MeshDesc desc);
 void r_destroy_texture(R_TextureId t);
 void r_destroy_mesh(R_MeshId mesh);
-
-// TODO: primitives gen, drawing
-
-u32 r_make_pipeline_state(Gfx_PipelineState s);
-R_MaterialId r_material_make(R_Material mat);
-
 void r_material_destroy(R_MaterialId mat);
 
-void r_shader_reload(String name);
-Gfx_Pipeline r_make_pipeline(String name, Gfx_PipelineDesc desc);
-Gfx_Pipeline r_make_pipeline2(String name, Gfx_PipelineDesc2 desc);
+void r_reload_shader(String name);
 void r_shaders_compile(Allocator arena);
 void r_shaders_compile_join();
 
-R_FontId r_load_font(String name, u32 size);
 void r_apply_state(Gfx_PipelineState s);
 
 void r_init();

@@ -236,6 +236,7 @@ u32 prev_pow2(u32 n);
 #define _DefSet(val, def) if (val == 0) val = def
 
 #define Loop(it, c)                      for (i32 it = 0; it < c; ++it)
+#define LoopNoInc(it, c)                 for (i32 it = 0; it < c;)
 #define LoopReverse(it, count)           for (i32 it = (count) - 1; it >= 0; --it)
 #define LoopOff(it, li, hi)              for (i32 it = (li); it < (hi); ++it)
 #define LoopArr(it, c)                   for (i32 it = 0; it < c.count; ++it)
@@ -621,7 +622,7 @@ struct Slice {
     u64 count;
     u64 size;
   };
-  T& operator[](u64 idx) {
+  NO_DEBUG T& operator[](u64 idx) {
     Assert(idx < count);
     return data[idx];
   }

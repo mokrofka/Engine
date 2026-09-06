@@ -2452,7 +2452,7 @@ void watch_update() {
           String shader_filepath = push_strf(scratch, "%s/%s", g.shader_dir, shader_name_slang);
           String shader_compiled_filepath = push_strf(scratch, "%s/%s", g.shader_compiled_dir, name);
           os_file_path_copy_mtime(shader_filepath, shader_compiled_filepath);
-          r_shader_reload(shader_name);
+          r_reload_shader(shader_name);
         } break;
         InvalidDefaultCase;
       }
@@ -2956,7 +2956,7 @@ void init_game() {
   g.arena = arena_make(.name = "game arena");
   g.gpa = alloc_make(g.arena);
   g.moving_cubes = array_make(ThingId, g.gpa);
-  // g.font = r_font_load("arial.ttf", 512);
+  g.font = r_make_font({.name = "arial.ttf", .font_height = 32});
 
   R_MeshDesc triangle_mesh = {.vertices = slice(triangle_vertices)};
   mesh_set(Mesh_Triangle, r_make_mesh(triangle_mesh));
@@ -2978,7 +2978,7 @@ void init_game() {
   {
     GlobalState& g = *st;
     var load_mesh = [&](MeshEnum enum_name, String name) {
-      R_MeshId id = r_make_mesh({.name = name, .async = false});
+      R_MeshId id = r_make_mesh({.name = name});
       g.meshes_ids[enum_name] = id;
       String str = push_str_copy(g.arena, name);
       map_set(g.str_to_mesh, str, id);
@@ -2988,8 +2988,6 @@ void init_game() {
     load_mesh(Mesh_MonkeyGlb, "monkey.glb");
     load_mesh(Mesh_CubeGlft, "cube.gltf");
     load_mesh(Mesh_Barrack, "castle.gltf");
-    // m_load(Mesh_Barrack, "castle.obj");
-    // m_load(Mesh_GreeMan, "greenman.glb");
 
     var load_tex = [&](TextureEnum enum_name, String name) {
       R_TextureId id = r_make_texture({.name = name, .async = true});
@@ -3002,9 +3000,7 @@ void init_game() {
     load_tex(Texture_Container, "container.jpg");
     load_tex(Texture_Barrack, "castle_diffuse.png");
     load_tex(Texture_Bricks, "bricks.png");
-    // load_tex(Texture_Orange, "16x16.png");
-    // load_tex(Texture_Container, "16x16.png");
-    // load_tex(Texture_Barrack, "16x16.png");
+    load_tex(Texture_Dummy, "dummy.png");
     
     u32 size = 32;
     // u8* data = push_buffer_zero(g.arena, size*size*4);
@@ -3017,7 +3013,7 @@ void init_game() {
           data[i*size + j] = u32_from_rgba(v4(1,1,0,1));
         }
       }
-      }
+    }
     
     // MemSet(data, 255, size*size*4);
     g.textures_ids[Texture_Black] = r_make_texture({
@@ -3036,14 +3032,30 @@ void init_game() {
       .async = false,
       .data = (u8*)data,
     });
-    g.textures_ids[Texture_Black2] = r_make_texture({
-      .name = "16x16.png",
-      .width = size,
-      .height = size,
-      // .pixel_format = Gfx_PixelFormat_R8,
-      .async = false,
-      .data = (u8*)data,
-    });
+    {
+      u32 size = 8;
+      u8* data = push_buffer_zero(g.arena, size*size*4);
+      Loop (i, size) {
+        Loop (j, size) {
+          if ((j+i) % 2 == 0) {
+            data[i*size + j] = 255;
+          } else {
+            data[i*size + j] = 100;
+          }
+        }
+      }
+      g.textures_ids[Texture_Black2] = r_make_texture({
+        .width = size,
+        .height = size,
+        // .pixel_format = Gfx_PixelFormat_R8,
+        // .async = ,
+        // .blocking = false,
+        .pixel_format = Gfx_PixelFormat_R8,
+        .data = (u8*)data,
+      });
+      // st->r.my_font = r_make_font({"arial.ttf", 32});
+      // st->r.my_font1 = r_make_font({"arial.ttf", 16});
+    }
 
     var default_state = r_make_pipeline_state({
       .depth = {
@@ -3060,13 +3072,19 @@ void init_game() {
     });
 
     var load_mat = [&](MaterialEnum enum_name, R_Material desc) {
-      R_MaterialId id = r_material_make(desc);
+      R_MaterialId id = r_make_material(desc);
       g.materials_ids[enum_name] = id;
       String str = push_str_copy(g.arena, materials_strs[enum_name]);
       map_set(g.str_to_material, str, id);
       g.material_to_str[id.idx] = str;
     };
 
+    load_mat(Material_Dummy, {
+      .type = ShaderType::Texture,
+      .batch = default_state,
+      .props = default_material_props(),
+      .base_color = get_texture(Texture_Dummy),
+    });
     load_mat(Material_Orange, {
       .type = ShaderType::Texture,
       .batch = default_state,
@@ -3486,6 +3504,7 @@ void update_game() {
       r_draw_line(e.pos, e.pos + quat_up(e.rot)*2, ColorGreen);
       r_draw_line(e.pos, e.pos + quat_forward(e.rot)*2, ColorBlue);
       r_draw_mesh_trs(get_mesh(Mesh_Cube), get_material(Material_Container), g.pos_target, quat_identity(), v3(0.2));
+      r_draw_mesh(st->r.dummy_mesh, get_material(Material_Dummy), v3(-5,0,0));
 
       f32 line_len = 5;
       v3 pos = v3(0,0.1,0);
@@ -3572,14 +3591,15 @@ void update_game() {
     // r_draw_quad(rng2_make(v2(400), v2(400,400)), ColorCyan);
     // r_draw_rect_gradient(rng2_make(v2(300), v2(100)), {v4(1,0,0,1), v4(0,1,0,1), v4(0,0,1,1), v4()});
     // r_draw_rect(rng2_make(v2(600), v2(100)), ColorWhite);
-    r_draw_texture(rng2_make(v2(600, 50), v2(200)), get_texture(Texture_Bricks));
+    r_draw_texture(rng2_make(v2(600, 50), v2(100)), get_texture(Texture_Bricks));
     r_draw_texture(rng2_make(v2(800), v2(100)), get_texture(Texture_Orange));
-    r_draw_texture(rng2_make(v2(100,400), v2(400)), get_texture(Texture_Black));
-    r_draw_texture(rng2_make(v2(400,400), v2(200)), get_texture(Texture_Black1));
-    r_draw_texture(rng2_make(v2(700,400), v2(200)), get_texture(Texture_Black2));
-    r_draw_text_ext(st->r.my_font, v2(300), "I'm a hobbit from Shire!", ColorOrange, 64);
-    r_draw_rect(rng2_make(v2(100), v2(200)), ColorGreyDark);
-    r_draw_text_ext(st->r.my_font, v2(100, 100+32), "I'm a button", ColorWhite, 32);
+    r_draw_texture(rng2_make(v2(100,400), v2(100)), get_texture(Texture_Black));
+    r_draw_texture(rng2_make(v2(400,400), v2(100)), get_texture(Texture_Black1));
+    r_draw_texture(rng2_make(v2(700,400), v2(100)), get_texture(Texture_Black2));
+    r_draw_text_ext(st->r.dummy_font, v2(300), "I'm a hobbit from Shire!", ColorOrange, 64);
+    r_draw_text_ext(g.font, v2(500, 400), "New font!", ColorOrange, 64);
+    r_draw_rect(rng2_make(v2(100), v2(130)), ColorGreyDark);
+    r_draw_text_ext(st->r.dummy_font, v2(100, 100+32), "I'm a button", ColorWhite, 32);
     // r_draw_text_ext(st->r.my_font, os_mouse_pos(), "I'm a button", ColorWhite, 32);
     // if (time_on_interval(0.3)) {
     //   Info("%f %f", os_mouse_pos().x, os_mouse_pos().y);
