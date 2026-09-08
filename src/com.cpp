@@ -2624,9 +2624,31 @@ void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser
 	}
 }
 
+template<typename T> void foo(T x) { x.foo(); }
+
 void init() {
 	Scratch scratch;
 	var& g = *st;
+
+	struct X {
+		u32 x;
+		void foo(){
+			Info("%i", x);
+		}
+	};
+
+	{
+		u32 seq = 1;
+		u32 read = 0;
+		i32 dif = (i32)seq - (i32)read+1;
+		Info("%i", dif);
+	}
+	u32 i = 0;
+	X a = {i};
+	foo(a);
+	// a();
+
+	// std::thread(x)
 
 	u32 x = 30;
 	// u32 expected = 10;
