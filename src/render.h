@@ -261,7 +261,7 @@ struct R_State {
 	Array<R_UI_Rect, R_MaxDebugLines> draw_rects;
 
 	Mutex push_to_gpu_queue_mutex;
-	Queue<R_PuhsToGpu, 32> push_to_gpu_queue;
+	QueueSPSC<R_PuhsToGpu, 32> push_to_gpu_queue;
 	Queue<R_PuhsToGpu, 32> finished_gpu_queue;
 	Mutex waiting_fonts_mutex;
 	Array<R_WaitingFont, 32> waiting_fonts;

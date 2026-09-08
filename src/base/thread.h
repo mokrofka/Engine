@@ -6,7 +6,7 @@ const u32 Thread_MaxTasks = 1024;
 const u32 Thread_MaxCounters = 1024;
 const u32 Thread_NumWorkers = 4;
 
-MakeId(WaitGroup);
+struct WaitGroup { u32 idx; };
 
 enum TaskPriority {
 	TaskPriority_High,

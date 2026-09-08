@@ -37,7 +37,7 @@ struct MemState {
 global MemState mem_track;
 extern thread_local TCTX tctx;
 
-void mem_track_init() { mem_track.mutex = os_mutex_make(); }
+void mem_track_init() { /*mem_track.mutex = os_mutex_make();*/ }
 void mem_track_end() { ArrayZero(mem_track.infos_alocs_per_frame); }
 AllocatorInfoList mem_track_info() { return mem_track.roots; }
 
@@ -72,11 +72,12 @@ AllocatorInfo* mem_track_make(Allocator parent_alloc, AllocatorType type, String
 	LockScope(mem_track.mutex);
 	if (parent) {
 		dll_list_push_back((*parent), info);
-		++parent->child_count;
+		parent->child_count++;
 	} else {
 		dll_list_push_back(mem_track.roots, info);
-		++mem_track.roots.count;
+		mem_track.roots.count++;
 	}
+
 	return info;
 }
 
@@ -85,10 +86,10 @@ void mem_track_destroy(AllocatorInfo* info) {
 		LockScope(mem_track.mutex);
 		if (info->parent) {
 			dll_list_remove((*info->parent), info);
-			--info->parent->child_count;
+			info->parent->child_count--;
 		} else {
 			dll_list_remove(mem_track.roots, info);
-			--mem_track.roots.count;
+			mem_track.roots.count--;
 		}
 	}
 }

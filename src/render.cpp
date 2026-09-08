@@ -739,9 +739,9 @@ void r_init() {
 	g.arena = arena;
 	g.gpa = alloc_make(g.arena);
 	g.scale = 1;
-	g.push_to_gpu_queue_mutex = os_mutex_make();
-	g.vert_index_buffer_mutex = os_mutex_make();
-	g.waiting_fonts_mutex = os_mutex_make();
+	// g.push_to_gpu_queue_mutex = os_mutex_make();
+	// g.vert_index_buffer_mutex = os_mutex_make();
+	// g.waiting_fonts_mutex = os_mutex_make();
 
 	gfx_init({.cpu_mem_size = MB(100), .gpu_mem_size = MB(10), .image_mem_size = MB(10)});
 
@@ -872,7 +872,7 @@ void r_end() {
 	// Push to gpu
 	{
 		LockScope(g.push_to_gpu_queue_mutex);
-		Loop (i, g.push_to_gpu_queue.count) {
+		Loop (i, queue_count(g.push_to_gpu_queue)) {
 			var push = queue_pop(g.push_to_gpu_queue);
 			switch (push.type) {
 				InvalidDefaultCase;
@@ -919,7 +919,7 @@ void r_end() {
 
 	// Update dummies
 	{
-		Loop (i, g.finished_gpu_queue.count) {
+		Loop (i, queue_count(g.finished_gpu_queue)) {
 			if (queue_front(g.finished_gpu_queue).counter <= gfx_ready_counter()) {
 				var slot = queue_pop(g.finished_gpu_queue);
 				switch (slot.type) {

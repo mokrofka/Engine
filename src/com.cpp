@@ -1490,12 +1490,14 @@ void debug_prof_view() {
 						}
 						cursor_pos.y += 30;
 						draw_threads(scroll_state);
-						u32 idx = (st->current_frame-1) % ArrayCount(prof.frames_times);
+						// u32 idx = (st->current_frame-1) % ArrayCount(prof.frames_times);
 						Slice<ProfAnchor> slices[ArrayCount(prof.prof_threads)] = {};
 						LoopArray (i, prof.prof_threads) {
-							slices[i] = slice(prof.prof_threads[i].recorded_anchors[idx]);
+							// slices[i] = slice(prof.prof_threads[i].recorded_anchors[idx]);
+							slices[i] = slice(prof.prof_threads[i].recorded_anchors[0]);
 						}
-						ProfFrameTime time = prof.frames_times[idx];
+						// ProfFrameTime time = prof.frames_times[idx];
+						ProfFrameTime time = prof.frames_times[0];
 						draw_frame_graph(slice(slices), time, 0, scroll_state);
 						ImGui::EndTabItem();
 					} break;
@@ -1713,7 +1715,7 @@ void debug_prof_view() {
 								LoopReverse (i, sorted_children.count) {
 									array_push(stack, {sorted_children[i], 1});
 								}
-								while (stack.count) {
+								for (;stack.count;) {
 									StackEntry entry = array_pop(stack);
 									var child = entry.node;
 									UI_Item item = {
@@ -1849,25 +1851,6 @@ void debug_prof_view() {
 	}
 
 	prof_win.active_tab = prof_win.future_active_tab;
-}
-
-void sa() {
-	if (0) {
-		Info("he");
-	}
-	if (1) {
-		Info("be");
-	}
-}
-
-void bar() {
-	Info("hello");
-}
-
-void foo() {
-	if (1) {
-		Info("hello");
-	}
 }
 
 R_MeshDesc load_obj(Allocator arena, String name) {
@@ -2641,18 +2624,6 @@ void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser
 	}
 }
 
-void x_foo(u32 a, u32 b) {
-	printf("%i, %i", a, b);
-}
-
-// #define X(a, ...) X_IMPL(a, ##__VA_ARGS__, 3)
-// #define X_IMPL(a, value, ...) x_foo(a, value)
-
-// #define X_1(a) x_foo(a, 3)
-// #define X_2(a, value) x_foo(a, value)
-// #define X_SELECT(_1, _2, NAME, ...) NAME
-// #define X(...) X_SELECT(__VA_ARGS__, X_2, X_1)(__VA_ARGS__)
-
 void init() {
 	Scratch scratch;
 	var& g = *st;
@@ -2662,9 +2633,9 @@ void init() {
 	// atomic_cmp_swap(&x, &expected, 20);
 
 	u32 old = atomic_load(&x);
-	while (!atomic_cmp_swap(&x, &old, old+1)) {
+	while (!atomic_cmp_swap(&x, &old, old + 1)) {
 	}
-
+	
 	cpu_find_frequency();
 	os_gfx_init();
 	prof_init(g.arena);
@@ -3452,19 +3423,6 @@ void update_game() {
 			var& cube2 = get_thing(g.cube2);
 			var& cube3 = get_thing(g.cube3);
 			var& cube4 = get_thing(g.cube4);
-			// var& cube5 = get_thing(g.cube5);
-			// local f32 deg = 0;
-			// ImGui::DragFloat("angel", &deg);
-			// ImGui::Text("cube5 - cub4 %f", Deg(cube5.angle - cube4.angle));
-			// cube4.angle = Rad(deg);
-			// ImGui::Text("cube4 wrap_pi %f", Deg(wrap_pi(cube4.angle)));
-			// ImGui::Text("cube4 wrap_2pi %f", Deg(wrap_2pi(cube4.angle)));
-			// ImGui::Text("wrap_pi(cube5 - cub4) %f", Deg(wrap_pi(cube5.angle - cube4.angle)));
-			// ImGui::Text("wrap_2pi(cube5 - cub4) %f", Deg(wrap_2pi(cube5.angle - cube4.angle)));
-			// cube3.pos = v3_lerp(cube3.pos, 0.50 * dt, cam.pos);
-			// cube3.pos += (cam.pos - cube3.pos)*0.50 * dt;
-			// a = (a, 0.01*dt, b);
-
 
 			// f32 t = 1.0f - Pow(0.5f, dt);
 			// f32 t = 1.0f - Exp(-111.9 * dt);
@@ -3472,8 +3430,13 @@ void update_game() {
 			// cube3.pos.x += (cube2.pos.x - cube3.pos.x) * t;
 
 			cube3.pos.x = exp_decay(cube3.pos.x, cube2.pos.x, 1.1f, dt);
-
 			ImGui::DragFloat3("drag", cube4.pos.v, 0.1);
+			// Mutex2 m = {};
+			// mutex_lock(m);
+			// mutex_lock(m);
+			// Mutex mutex = os_mutex_make();
+			// os_mutex_lock(mutex);
+			// os_mutex_lock(mutex);
 		}
 
 		ImGui::End();

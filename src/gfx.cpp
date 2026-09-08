@@ -2859,7 +2859,7 @@ void gfx_init(Gfx_Environment environment) {
 	Gfx_State& g = st->gfx;
 	g.environment = environment;
 	g.arena = arena_make(.name = "gfx arena");
-	g.stage_buffer_reserve_mutex = os_mutex_make();
+	// g.stage_buffer_reserve_mutex = os_mutex_make();
 
 #if VulkanUseAllocator
 	g._allocator = vk_allocator_create();
@@ -3048,9 +3048,9 @@ void gfx_begin() {
 			++g.stage_cmd_ready_counter;
 			g.stage_cmd_busy = false;
 		}
-		if (g.stage_cmd_queue.count) {
+		if (queue_count(g.stage_cmd_queue)) {
 			vk_cmd_begin(g.upload_cmd);
-			Loop (i, g.stage_cmd_queue.count) {
+			Loop (i, queue_count(g.stage_cmd_queue)) {
 				var stage_cmd = queue_pop(g.stage_cmd_queue);
 				switch (stage_cmd.type) {
 					InvalidDefaultCase;
