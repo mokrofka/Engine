@@ -10,7 +10,7 @@ struct ThreadPool {
 	Arena arena;
 	Thread threads[Thread_NumWorkers];
 
-	Queue<Task, Thread_MaxTasks> tasks[TaskPriority_COUNT];
+	QueueMPMC<Task, Thread_MaxTasks> tasks[TaskPriority_COUNT];
 	u32 wg_write;
 	WaitGroupSlot wg_slots[Thread_MaxCounters];
 
@@ -55,7 +55,7 @@ WaitGroup thread_push(TaskDesc desc) {
 		.priority = desc.priority,
 	};
 	{
-		LockScope(g.task_mutex);
+		// LockScope(g.task_mutex);
 		queue_push(g.tasks[desc.priority], t);
 	}
 	if (atomic_load(&g.working_num) < Thread_NumWorkers) {
@@ -74,7 +74,7 @@ WaitGroup thread_push_batch(Slice<TaskDesc> tasks) {
 	Loop(i, tasks.count) count_by_prio[tasks[i].priority]++;
 	WaitGroup wg = thread_wg_make(tasks.count);
 	{
-		LockScope(g.task_mutex);
+		// LockScope(g.task_mutex);
 		Loop(i, tasks.count) {
 			Task t = {.fn = tasks[i].fn, .ctx = tasks[i].ctx, .wg = wg, .priority = tasks[i].priority};
 			queue_push(g.tasks[tasks[i].priority], t);
@@ -90,10 +90,22 @@ WaitGroup thread_push_batch(Slice<TaskDesc> tasks) {
 
 Task thread_pop_locked() {
 	var& g = thread_pool;
-	LockScope(g.task_mutex);
-	TaskPriority prio = queue_count(g.tasks[TaskPriority_High]) ? TaskPriority_High : TaskPriority_Low;
-	Task t = queue_pop(g.tasks[prio]);
-	return t;
+	// LockScope(g.task_mutex);
+	// TaskPriority prio = queue_count(g.tasks[TaskPriority_High]) ? TaskPriority_High : TaskPriority_Low;
+	// Task t = queue_pop(g.tasks[prio]);
+	var res = queue_pop(g.tasks[TaskPriority_High]);
+	if (!res.ok) {
+		res = queue_pop(g.tasks[TaskPriority_Low]);
+		Assert(res.ok);
+	}
+	return res.value;
+	// var t = or_else(queue_pop(g.tasks[TaskPriority_High]), 
+	// 	or_else(queue_pop(g.tasks[TaskPriority_Low]), InvalidPath; return Task{};);
+	// );
+// if (!)
+//     if (!queue_pop(low, &t))
+//         return false;
+// 	return t;
 }
 
 Task thread_pop() {
@@ -173,6 +185,9 @@ void thread_pool_init() {
 	var& g = thread_pool;
 	g.arena = arena_make();
 	g.working_num = Thread_NumWorkers;
+	for (var& q : g.tasks) {
+		q = queue_mpmc_make<Task, Thread_MaxTasks>();
+	}
 	Loop (i, Thread_NumWorkers) {
 		g.threads[i] = os_thread_make(thread_worker, null);
 	}

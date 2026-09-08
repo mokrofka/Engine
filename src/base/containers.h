@@ -714,8 +714,8 @@ template<typename T, i32 N> u32 queue_count(Queue<T, N>& q) { return q.write - q
 
 template<typename T, i32 N> struct QueueSPSC {
 	static constexpr u32 cap = N;
-	u32 read;
-	u32 write;
+	alignas(64) u32 read;
+	alignas(64) u32 write;
 	T data[N];
 };
 
@@ -739,6 +739,55 @@ template<typename T, i32 N> T queue_front(QueueSPSC<T, N>& q) {
 	return q.data[(q.read) % q.cap];
 }
 template<typename T, i32 N> u32 queue_count(QueueSPSC<T, N>& q) { return atomic_load(&q.write) - atomic_load(&q.read); }
+
+template<typename T, i32 N> struct QueueMPMC {
+	static constexpr u32 cap = N;
+	struct Slot {
+		T elem;
+		u64 seq;
+	};
+	alignas(64) u32 read;
+	alignas(64) u32 write;
+	Slot data[N];
+};
+
+template<typename T, i32 N> QueueMPMC<T, N> queue_mpmc_make() {
+	QueueMPMC<T, N> res = {};
+	Loop (i, N) {
+		res.data[i].seq = i;
+	}
+	return res;
+}
+template<typename T, i32 N> b32 queue_push(QueueMPMC<T, N>& q, T elem) {
+	For {
+		u32 write = atomic_load(&q.write);
+		var& slot = q.data[write % q.cap];
+		u64 seq = atomic_load(&slot.seq);
+		i64 dif = (i64)seq - (i64)write;
+		if (dif == 0) {
+			if (atomic_cmp_swap(&q.write, &write, write+1)) {
+				slot.elem = elem;
+				atomic_store(&slot.seq, write+1);
+				return true;
+			}
+		} else if (dif < 0) return false; // full
+	}
+}
+template<typename T, i32 N> ResultOk<T> queue_pop(QueueMPMC<T, N>& q) {
+	For {
+		u32 read = atomic_load(&q.read);
+		var& slot = q.data[read % q.cap];
+		u64 seq = atomic_load(&slot.seq);
+		i64 dif = (i64)seq - (i64)(read+1);
+		if (dif == 0) {
+			if (atomic_cmp_swap(&q.read, &read, read+1)) {
+				T res = slot.elem;
+				atomic_store(&slot.seq, read + N);
+				return {res, true};
+			}
+		} else if (dif < 0) return {}; // empty
+	}
+}
 
 ////////////////////////////////////////////////////////////////////////
 // SparseSet
