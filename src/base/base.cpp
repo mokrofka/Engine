@@ -39,12 +39,12 @@ b32 PtrMatch(void* a, void* b)      { return (u8*)a == (u8*)b; }
 
 u32 clz(u64 v)                     { return __builtin_clzll(v); }
 u32 ctz(u64 v)                     { return __builtin_ctzll(v); }
-u32 count_bits_set(u64 v)          { return __builtin_popcountll(v); }
-u32 most_significant_bitu32(u32 v) { return 31 - clz(v); }
-u64 most_significant_bitu64(u64 v) { return 63 - clz(v); }
+u32 count_ones(u64 v)              { return __builtin_popcountll(v); }
+u32 most_significant_bit(u32 v)    { return 31 - clz(v); }
+u64 most_significant_bit(u64 v)    { return 63 - clz(v); }
 u32 remove_lowest_bit(u64 v)       { return v & (v - 1);}
-u32 remove_highest_bitu32(u32 v)   { return v ^ (1u << most_significant_bitu32(v)); }
-u64 remove_highest_bitu64(u64 v)   { return v ^ (1u << most_significant_bitu64(v)); }
+u32 remove_highest_bit(u32 v)      { return v ^ (1 << most_significant_bit(v)); }
+u64 remove_highest_bit(u64 v)      { return v ^ (1 << most_significant_bit(v)); }
 
 b32 bit_has(u64 x, u64 pos)       { return x & (1 << pos); }
 u64 flag_clear(u64 x, u64 f)      { return x & ~f; }
@@ -168,6 +168,8 @@ u8* Restrict _coroutine_var(Coroutine* co, u32 size) {
 
 ////////////////////////////////////////////////////////////////////////
 // Simd
+
+void cpu_relax() { __builtin_ia32_pause(); }
 
 f32x4 simd_load(void* p)                    { return {_mm_loadu_ps((f32*)p)}; }
 void simd_store(f32x4 x, void* p)           { _mm_storeu_ps((f32*)p, x.p); }

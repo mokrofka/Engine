@@ -7,6 +7,7 @@ ColumnLimit: 0
 BreakBeforeBraces: Attach
 PointerAlignment: Left
 IndentPPDirectives: BeforeHash
-AlignAfterOpenBracket: BlockIndent
+AlignAfterOpenBracket: DontAlign
 AllowShortIfStatementsOnASingleLine: true
 IndentCaseLabels: true
+AllowShortCaseLabelsOnASingleLine: true

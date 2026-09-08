@@ -16,11 +16,12 @@
 #include <sys/time.h>
 #include <sys/uio.h>
 #include <sys/wait.h>
+#include <sys/syscall.h>
+#include <linux/futex.h>
 #include <time.h>
 #include <unistd.h>
 
-_LockScope::_LockScope(Mutex mutex_) {
-	mutex = mutex_;
+_LockScope::_LockScope(Mutex& mutex_) : mutex(mutex_) {
 	os_mutex_lock(mutex);
 }
 _LockScope::~_LockScope() {
@@ -85,7 +86,7 @@ struct OS_State {
 
 global OS_State os_st;
 
-OS_LNX_Entity* os_lnx_entity_alloc(OS_LNX_EntityType type) {
+OS_LNX_Entity* os_lnx_entity_push(OS_LNX_EntityType type) {
 	OS_LNX_Entity* entity = 0;
 	entity = os_st.entity_free;
 	if (entity) {
@@ -98,7 +99,7 @@ OS_LNX_Entity* os_lnx_entity_alloc(OS_LNX_EntityType type) {
 	return entity;
 }
 
-void os_lnx_entity_release(OS_LNX_Entity* entity) {
+void os_lnx_entity_remove(OS_LNX_Entity* entity) {
 	sll_stack_push(os_st.entity_free, entity);
 }
 
@@ -556,7 +557,7 @@ void* os_thread_entry(void* ctx) {
 }
 
 Thread os_thread_make(ThreadEntryPointFn* func, void* ptr) {
-	OS_LNX_Entity* entity = os_lnx_entity_alloc(LNX_EntityType_Thread);
+	OS_LNX_Entity* entity = os_lnx_entity_push(LNX_EntityType_Thread);
 	entity->thread.func = func;
 	entity->thread.ptr = ptr;
 	pthread_create(&entity->thread.handle, null, os_thread_entry, entity);
@@ -577,133 +578,82 @@ void os_thread_detach(Thread handle) {
 ///////////////////////////////////
 // Sync primitives
 
-Mutex os_mutex_make() {
-	OS_LNX_Entity* entity = os_lnx_entity_alloc(LNX_EntityType_Mutex);
-	pthread_mutex_init(&entity->mutex, null);
-	Mutex handle = {(u64)entity};
-	return handle;
+void futex_syscall(Futex* uaddr, u32 futex_op, u32 val, timespec* timeout, u32* uaddr2, u32 val3) {
+	syscall(SYS_futex, uaddr, futex_op, val, timeout, uaddr2, val3);
 }
 
-void os_mutex_destroy(Mutex mutex) {
-	OS_LNX_Entity* entity = (OS_LNX_Entity*)mutex.v;
-	pthread_mutex_destroy(&entity->mutex);
-	os_lnx_entity_release(entity);
+void os_futex_wait(Futex& futex, u32 expect_val) {
+	futex_syscall(&futex, FUTEX_WAIT_PRIVATE, expect_val, null, null, 0);
 }
 
-void os_mutex_lock(Mutex mutex) {
-	OS_LNX_Entity* entity = (OS_LNX_Entity*)mutex.v;
-	pthread_mutex_lock(&entity->mutex);
+void os_futex_wake(Futex& futex, u32 num_waiters) {
+	futex_syscall(&futex, FUTEX_WAKE_PRIVATE, num_waiters, null, null, 0);
 }
 
-void os_mutex_unlock(Mutex mutex) {
-	OS_LNX_Entity* entity = (OS_LNX_Entity*)mutex.v;
-	pthread_mutex_unlock(&entity->mutex);
+#define UNLOCKED 0
+#define LOCKED_NO_WAIT 1
+#define LOCKED_WAIT 2
+void os_mutex_lock(Mutex& m) {
+	u32 c = UNLOCKED;
+	if (atomic_cmp_swap(&m.futex, &c, LOCKED_NO_WAIT)) return;
+	do {
+		if (c == LOCKED_WAIT || atomic_cmp_swap_old(&m.futex, LOCKED_NO_WAIT, LOCKED_WAIT) != UNLOCKED) {
+			os_futex_wait(m.futex, LOCKED_WAIT);
+		}
+		c = UNLOCKED;
+	} while (!atomic_cmp_swap(&m.futex, &c, LOCKED_WAIT));
 }
 
-b32 os_mutex_try_lock(Mutex mutex) {
-	OS_LNX_Entity* entity = (OS_LNX_Entity*)mutex.v;
-	int res = pthread_mutex_trylock(&entity->mutex);
-	return res == 0;
+b32 os_mutex_try_lock(Mutex& m) {
+	if (atomic_cmp_set(&m.futex, UNLOCKED, LOCKED_NO_WAIT)) return true;
+	return false;
 }
 
-RWMutex os_rw_mutex_make() {
-	OS_LNX_Entity* entity = os_lnx_entity_alloc(LNX_EntityType_Mutex);
-	pthread_rwlock_init(&entity->rwmutex, null);
-	RWMutex handle = {(u64)entity};
-	return handle;
+void os_mutex_unlock(Mutex& m) {
+	if (atomic_dec(&m.futex) != LOCKED_NO_WAIT) {
+		atomic_store(&m.futex, UNLOCKED);
+		os_futex_wake(m.futex, 1);
+	}
 }
 
-void os_rw_mutex_destroy(RWMutex mutex) {
-	OS_LNX_Entity* entity = (OS_LNX_Entity*)mutex.v;
-	pthread_rwlock_destroy(&entity->rwmutex);
+void os_cond_wait(CondVar& c, Mutex& m) {
+	u32 state = atomic_load_explicit(&c.futex, AtomicRelaxed);
+	os_mutex_unlock(m);
+	os_futex_wait(c.futex, state);
+	os_mutex_lock(m);
 }
 
-void os_rw_mutex_read_lock(RWMutex mutex) {
-	OS_LNX_Entity* entity = (OS_LNX_Entity*)mutex.v;
-	pthread_rwlock_rdlock(&entity->rwmutex);
+void os_cond_wake_one(CondVar& c) {
+	atomic_inc_explicit(&c.futex, AtomicRelease);
+	os_futex_wake(c.futex, 1);
+}
+ 
+void os_cond_wake_all(CondVar& c) {
+	atomic_inc_explicit(&c.futex, AtomicRelease);
+	os_futex_wake(c.futex, U32_MAX);
 }
 
-void os_rw_mutex_write_lock(RWMutex mutex) {
-	OS_LNX_Entity* entity = (OS_LNX_Entity*)mutex.v;
-	pthread_rwlock_wrlock(&entity->rwmutex);
+void os_sem_wait(Semaphore& s) {
+	For {
+		u32 v = atomic_load(&s.futex);
+		for (;v > 0;) {
+			if (atomic_cmp_swap(&s.futex, &v, v - 1)) return;
+		}
+		os_futex_wait(s.futex, 0);
+	}
 }
 
-void os_rw_mutex_unlock(RWMutex mutex) {
-	OS_LNX_Entity* entity = (OS_LNX_Entity*)mutex.v;
-	pthread_rwlock_unlock(&entity->rwmutex);
+b32 os_sem_try_wait(Semaphore& s) {
+	u32 v = atomic_load(&s.futex);
+	for (;v > 0;) {
+		if (atomic_cmp_swap(&s.futex, &v, v - 1)) return true;
+	}
+	return false;
 }
 
-CondVar os_cond_var_make() {
-	OS_LNX_Entity* entity = os_lnx_entity_alloc(LNX_EntityType_Mutex);
-	pthread_cond_init(&entity->cv, null);
-	CondVar handle = {(u64)entity};
-	return handle;
-}
-
-void os_cond_var_destroy(CondVar cv) {
-	OS_LNX_Entity *entity = (OS_LNX_Entity*)cv.v;
-	pthread_cond_destroy(&entity->cv);
-}
-
-void os_cond_var_wait(CondVar cv, Mutex mutex) {
-	OS_LNX_Entity* cv_entity = (OS_LNX_Entity*)cv.v;
-	OS_LNX_Entity* mutex_entity = (OS_LNX_Entity*)mutex.v;
-	pthread_cond_wait(&cv_entity->cv, &mutex_entity->mutex);
-}
-
-void os_cond_var_wake_one(CondVar cv) {
-	OS_LNX_Entity* cv_entity = (OS_LNX_Entity*)cv.v;
-	pthread_cond_signal(&cv_entity->cv);
-}
-
-void os_cond_var_wake_all(CondVar cv) {
-	OS_LNX_Entity* cv_entity = (OS_LNX_Entity*)cv.v;
-	pthread_cond_broadcast(&cv_entity->cv);
-}
-
-Semaphore os_semaphore_make(u32 count) {
-	OS_LNX_Entity* s_entity = os_lnx_entity_alloc(LNX_EntityType_Semaphore);
-	sem_init(&s_entity->semaphore, 0, count);
-	Semaphore handle = {(u64)s_entity};
-	return handle;
-}
-
-void os_semaphore_destroy(Semaphore semaphore) {
-	OS_LNX_Entity* entity = (OS_LNX_Entity*)semaphore.v;
-	sem_destroy(&entity->semaphore);
-}
-
-void os_semaphore_take(Semaphore semaphore) {
-	OS_LNX_Entity* entity = (OS_LNX_Entity*)semaphore.v;
-	sem_wait(&entity->semaphore);
-}
-
-b32 os_semaphore_try_take(Semaphore semaphore) {
-	OS_LNX_Entity* entity = (OS_LNX_Entity*)semaphore.v;
-	int res = sem_trywait(&entity->semaphore);
-	return res == 0;
-}
-
-void os_semaphore_drop(Semaphore semaphore) {
-	OS_LNX_Entity* s_entity = (OS_LNX_Entity*)semaphore.v;
-	sem_post(&s_entity->semaphore);
-}
-
-Barrier os_barrier_make(u64 count) {
-	OS_LNX_Entity* entity = os_lnx_entity_alloc(LNX_EntityType_Barrier);
-	pthread_barrier_init(&entity->barrier, null, count);
-	Barrier handle = {(u64)entity};
-	return handle;
-}
-
-void os_barrier_destroy(Barrier barrier) {
-	OS_LNX_Entity* entity = (OS_LNX_Entity*)barrier.v;
-	pthread_barrier_destroy(&entity->barrier);
-}
-
-void os_barrier_wait(Barrier barrier) {
-	OS_LNX_Entity* entity = (OS_LNX_Entity*)barrier.v;
-	pthread_barrier_wait(&entity->barrier);
+void os_sem_post(Semaphore& s) {
+	atomic_inc(&s.futex);
+	os_futex_wake(s.futex, 1);
 }
 
 ////////////////////////////////////////////////////////////////////////

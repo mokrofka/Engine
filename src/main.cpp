@@ -20,10 +20,9 @@ i32 main(i32 count, char* args[]) {
 	com = update;
 #endif
 
-	while (true) {
+	For {
 		com(&state);
 		os_lib_close(lib);
-
 		os_sleep_ms(10);
 		lib = os_lib_open(state.lib_path);
 		Assign(com, os_lib_get_proc(lib, "update"));

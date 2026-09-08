@@ -60,15 +60,19 @@ struct OS_Watch{
 
 typedef void ThreadEntryPointFn(void* p);
 struct Thread { u64 v; };
-struct Mutex { u64 v; };
+// struct Mutex { u64 v; };
 struct RWMutex { u64 v; };
-struct CondVar { u64 v; };
-struct Semaphore { u64 v; };
+// struct CondVar { u64 v; };
 struct Barrier { u64 v; };
 
+typedef u32 Futex;
+struct Mutex { Futex futex; };
+struct CondVar { Futex futex; };
+struct Semaphore { Futex futex; };
+
 struct _LockScope {
-	Mutex mutex;
-	_LockScope(Mutex mutex_);
+	Mutex& mutex;
+	_LockScope(Mutex& mutex_);
 	~_LockScope();
 };
 #define LockScope(m) _LockScope Glue(_lock_scope, __LINE__)(m)
@@ -95,7 +99,6 @@ String os_get_environment(String name);
 
 ///////////////////////////////////
 // Memory
-
 u8*  os_reserve(u64 size);
 b32  os_commit(void* ptr, u64 size);
 void os_decommit(void* ptr, u64 size);
@@ -103,7 +106,6 @@ void os_release(void* ptr, u64 size);
 
 //////////////////////////////////////////////////////////////////////////
 // Files
-
 OS_Handle      os_file_open(String path, OS_AccessFlags flags);
 void           os_file_close(OS_Handle file);
 u64            os_file_read(OS_Handle file, Slice<u8> out_data);
@@ -157,33 +159,20 @@ void os_thread_detach(Thread handle);
 
 ///////////////////////////////////
 // Sync primitives
-Mutex os_mutex_make();
-void  os_mutex_destroy(Mutex mutex);
-void  os_mutex_lock(Mutex mutex);
-void  os_mutex_unlock(Mutex mutex);
-b32   os_mutex_try_lock(Mutex mutex); // returns 1 on success
+void os_futex_wait(Futex& futex, u32 expect_val);
+void os_futex_wake(Futex& futex, u32 num_waiters);
 
-RWMutex os_rw_mutex_make();
-void os_rw_mutex_destroy(RWMutex mutex);
-void os_rw_mutex_read_lock(RWMutex mutex);
-void os_rw_mutex_write_lock(RWMutex mutex);
-void os_rw_mutex_unlock(RWMutex mutex);
+void os_mutex_lock(Mutex& mutex);
+b32  os_mutex_try_lock(Mutex& mutex); // returns 1 on success
+void os_mutex_unlock(Mutex& mutex);
 
-CondVar os_cond_var_make();
-void    os_cond_var_destroy(CondVar cv);
-void    os_cond_var_wait(CondVar cv, Mutex mutex);
-void    os_cond_var_wake_one(CondVar cv);
-void    os_cond_var_wake_all(CondVar cv);
+void os_cond_wait(CondVar& cv, Mutex& mutex);
+void os_cond_wake_one(CondVar& cv);
+void os_cond_wake_all(CondVar& cv);
 
-Semaphore os_semaphore_make(u32 count);
-void      os_semaphore_destroy(Semaphore semaphore);
-void      os_semaphore_take(Semaphore semaphore);
-b32       os_semaphore_try_take(Semaphore semaphore); // returns 1 on success
-void      os_semaphore_drop(Semaphore semaphore);
-
-Barrier   os_barrier_make(u32 count);
-void      os_barrier_destroy(Barrier barrier);
-void      os_barrier_wait(Barrier barrier);
+void os_sem_wait(Semaphore& s);
+b32 os_sem_try_wait(Semaphore& s);
+void os_sem_post(Semaphore& s);
 
 ////////////////////////////////////////////////////////////////////////
 // Lib

@@ -172,9 +172,9 @@ b32 PtrMatch(void* a, void* b);
 
 u32 clz(u64 val);
 u32 ctz(u64 val);
-u32 count_bits_set(u64 val);
-u32 most_significant_bitu32(u32 size);
-u64 most_significant_bitu64(u64 size);
+u32 count_ones(u64 val);
+u32 most_significant_bit(u32 size);
+u64 most_significant_bit(u64 size);
 u32 remove_lowest_bit(u64 v);
 
 #define Bit(x) (1 << (x))
@@ -231,11 +231,11 @@ u32 prev_pow2(u32 n);
 #define _Glue(A,B)     A##B
 #define Glue(A,B)      _Glue(A,B)
 #define Scope(...)     ({__VA_ARGS__})
-#define Scope1(...)     [&]{__VA_ARGS__}()
 #define _Def(val, def)    											(((val) == 0) ? (def) : (val))
 #define _DefSet(val, def) 											if (val == 0) val = def
 #define _DefIfSet(val, expr, def) if (expr) val = def
 
+#define For for(;;)
 #define Loop(it, c)                      for (i32 it = 0; it < c; ++it)
 #define LoopNoInc(it, c)                 for (i32 it = 0; it < c;)
 #define LoopReverse(it, count)           for (i32 it = (count) - 1; it >= 0; --it)
@@ -280,43 +280,48 @@ void DebugTrap();
 #define AtomicAcquire __ATOMIC_ACQUIRE
 #define AtomicRelease __ATOMIC_RELEASE
 
-#define atomic_inc(x, ...)       _atomic_inc((x), ##__VA_ARGS__, AtomicSeqCst)
-#define atomic_dec(x, ...)       _atomic_dec((x), ##__VA_ARGS__, AtomicSeqCst)
-#define atomic_add(x, v, ...)    _atomic_add((x), (v), ##__VA_ARGS__, AtomicSeqCst)
-#define atomic_sub(x, v, ...)    _atomic_sub((x), (v), ##__VA_ARGS__, AtomicSeqCst)
-#define atomic_load(x, ...)      _atomic_load((x), ##__VA_ARGS__, AtomicSeqCst)
-#define atomic_store(x, v, ...)  _atomic_store((x), (v), ##__VA_ARGS__, AtomicSeqCst)
-#define atomic_or(x, v, ...)     _atomic_or((x), (v), ##__VA_ARGS__, AtomicSeqCst)
-#define atomic_and(x, v, ...)    _atomic_and((x), (v), ##__VA_ARGS__, AtomicSeqCst)
-#define atomic_xor(x, v, ...)    _atomic_xor((x), (v), ##__VA_ARGS__, AtomicSeqCst)
-#define atomic_swap(x, v, ...)   _atomic_swap((x), (v), ##__VA_ARGS__, AtomicSeqCst)
-#define atomic_cmp_swap(x, expect, v, ...) _atomic_cmp_swap((x), (expect), (v), ##__VA_ARGS__, AtomicSeqCst, AtomicSeqCst)
+#define atomic_inc_explicit(x, order)       __atomic_fetch_add((x), 1, (order))
+#define atomic_dec_explicit(x, order)       __atomic_fetch_sub((x), 1, (order))
+#define atomic_add_explicit(x, v, order)    __atomic_fetch_add((x), (v), (order))
+#define atomic_sub_explicit(x, v, order)    __atomic_fetch_sub((x), (v), (order))
+#define atomic_load_explicit(x, order)      __atomic_load_n((x), (order))
+#define atomic_store_explicit(x, v, order)  __atomic_store_n((x), (v), (order))
+#define atomic_or_explicit(x, v, order)     __atomic_fetch_or((x), (v), (order))
+#define atomic_and_explicit(x, v, order)    __atomic_fetch_and((x), (v), (order))
+#define atomic_nand_explicit(x, v, order)   __atomic_fetch_nand((x), (v), (order))
+#define atomic_xor_explicit(x, v, order)    __atomic_fetch_xor((x), (v), (order))
+#define atomic_swap_explicit(x, v, order)   __atomic_exchange_n((x), (v), (order))
+#define atomic_cmp_swap_explicit(x, expect, v, success_order, failure_order) __atomic_compare_exchange_n((x), (expect), (v), 0, (success_order), (failure_order))
 
-#define _atomic_inc(x, order, ...)      __atomic_fetch_add((x), 1, order)
-#define _atomic_dec(x, order, ...)      __atomic_fetch_sub((x), 1, order)
-#define _atomic_add(x, v, order, ...)   __atomic_fetch_add((x), (v), order)
-#define _atomic_sub(x, v, order, ...)   __atomic_fetch_sub((x), (v), order)
-#define _atomic_load(x, order, ...)     __atomic_load_n((x), order)
-#define _atomic_store(x, v, order, ...) __atomic_store_n((x), (v), order)
-#define _atomic_or(x, v, order, ...)    __atomic_fetch_or((x), (v), order)
-#define _atomic_and(x, v, order, ...)   __atomic_fetch_and((x), (v), order)
-#define _atomic_xor(x, v, order, ...)   __atomic_fetch_xor((x), (v), order)
-#define _atomic_swap(x, v, order, ...)  __atomic_exchange_n((x), (v), order)
-#define _atomic_cmp_swap(x, expect, v, success, failure, ...) __atomic_compare_exchange_n((x), (expect), (v), 0, (success), (failure))
+#define atomic_inc(x)      __atomic_fetch_add((x), 1, AtomicSeqCst)
+#define atomic_dec(x)      __atomic_fetch_sub((x), 1, AtomicSeqCst)
+#define atomic_add(x, v)   __atomic_fetch_add((x), (v), AtomicSeqCst)
+#define atomic_sub(x, v)   __atomic_fetch_sub((x), (v), AtomicSeqCst)
+#define atomic_load(x)     __atomic_load_n((x), AtomicSeqCst)
+#define atomic_store(x, v) __atomic_store_n((x), (v), AtomicSeqCst)
+#define atomic_or(x, v)    __atomic_fetch_or((x), (v), AtomicSeqCst)
+#define atomic_and(x, v)   __atomic_fetch_and((x), (v), AtomicSeqCst)
+#define atomic_nand(x, v)  __atomic_fetch_nand((x), (v), AtomicSeqCst)
+#define atomic_xor(x, v)   __atomic_fetch_xor((x), (v), AtomicSeqCst)
+#define atomic_swap(x, v)  __atomic_exchange_n((x), (v), AtomicSeqCst)
+#define atomic_cmp_swap(x, expect, v) __atomic_compare_exchange_n((x), (expect), (v), 0, (AtomicSeqCst), (AtomicSeqCst))
+
+inline b32 atomic_cmp_set(u32* x, u32 expect, u32 v) { return atomic_cmp_swap(x, &expect, v); }
+inline u32 atomic_cmp_swap_old(u32* x, u32 expect, u32 v) { u32 res = expect; atomic_cmp_swap(x, &res, v); return res; }
 
 ////////////////////////////////////////////////////////////////////////
 // Doulby Linked List
 #define DLL_push_back(first, last, n, next, prev)     \
 	((n)->prev = (last),                                \
-		(n)->next = null,                                  \
-		((last) ? ((last)->next = (n)) : ((first) = (n))), \
-		(last) = (n))
+	 (n)->next = null,                                  \
+	 ((last) ? ((last)->next = (n)) : ((first) = (n))), \
+	 (last) = (n))
 
 #define DLL_push_front(first, last, n, next, prev)     \
 	((n)->next = (first),                                \
-		(n)->prev = null,                                   \
-		((first) ? ((first)->prev = (n)) : ((last) = (n))), \
-		(first) = (n))
+	 (n)->prev = null,                                   \
+	 ((first) ? ((first)->prev = (n)) : ((last) = (n))), \
+	 (first) = (n))
 
 #define DLL_remove(first, last, n, next, prev) \
 	(((n)->prev ? ((n)->prev->next = (n)->next)  \
@@ -703,6 +708,8 @@ u8* Restrict _coroutine_var(Coroutine* co, u32 size);
 // Simd
 
 #include <smmintrin.h>
+
+void cpu_relax();
 
 union f32x4 {
 	__m128 p;

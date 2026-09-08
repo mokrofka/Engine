@@ -688,45 +688,57 @@ template<typename T, typename Handle> DpoolIter<T,Handle> pool_begin(DpoolLinkLi
 // Queue
 template<typename T, i32 N> struct Queue {
 	static constexpr u32 cap = N;
-	u32 count;
-	u32 first;
+	u32 read;
+	u32 write;
 	T data[N];
 };
 
 template<typename T, i32 N> void queue_push(Queue<T, N>& q, T elem) {
-	Assert(q.count < q.cap);
-	u32 idx = (q.first + q.count++) % q.cap;
-	q.data[idx] = elem;
-}
-template<typename T, i32 N> void queue_push_front(Queue<T, N>& q, T elem) {
-	Assert(q.count < q.cap);
-	q.first = (q.first + q.cap - 1) % q.cap;
-	q.data[q.first] = elem;
-	++q.count;
+	Assert(q.write - q.read <= q.cap);
+	q.data[q.write++ % q.cap] = elem;
 }
 template<typename T, i32 N> T queue_pop(Queue<T, N>& q) {
-	Assert(q.count > 0);
-	T res = q.data[q.first];
-	q.first = (q.first + 1) % q.cap;
-	--q.count;
-	return res;
-}
-template<typename T, i32 N> T queue_pop_back(Queue<T, N>& q) {
-	Assert(q.count > 0);
-	--q.count;
-	u32 idx = (q.first + q.count) % q.cap;
-	T res = q.data[idx];
+	Assert(q.write != q.read);
+	T res = q.data[q.read++ % q.cap];
 	return res;
 }
 template<typename T, i32 N> T queue_back(Queue<T, N>& q) {
-	Assert(q.count);
-	u32 idx = (q.first + q.count - 1) % q.cap;
-	return q.data[idx];
+	Assert(q.write - q.read > 0);
+	return q.data[(q.write-1) % q.cap];
 }
 template<typename T, i32 N> T queue_front(Queue<T, N>& q) {
-	Assert(q.count);
-	return q.data[q.first];
+	Assert(q.write - q.read > 0);
+	return q.data[(q.read) % q.cap];
 }
+template<typename T, i32 N> u32 queue_count(Queue<T, N>& q) { return q.write - q.read; }
+
+template<typename T, i32 N> struct QueueSPSC {
+	static constexpr u32 cap = N;
+	u32 read;
+	u32 write;
+	T data[N];
+};
+
+template<typename T, i32 N> void queue_push(QueueSPSC<T, N>& q, T elem) {
+	Assert(q.write - atomic_load(&q.read) < q.cap);
+	q.data[q.write % q.cap] = elem;
+	atomic_inc_explicit(&q.write, AtomicRelease);
+}
+template<typename T, i32 N> T queue_pop(QueueSPSC<T, N>& q) {
+	Assert(atomic_load(&q.write) != q.read);
+	T res = q.data[q.read % q.cap];
+	atomic_inc_explicit(&q.read, AtomicRelease);
+	return res;
+}
+template<typename T, i32 N> T queue_back(QueueSPSC<T, N>& q) {
+	Assert(atomic_load(&q.write) - atomic_load(&q.read) > 0);
+	return q.data[(q.write-1) % q.cap];
+}
+template<typename T, i32 N> T queue_front(QueueSPSC<T, N>& q) {
+	Assert(atomic_load(&q.write) - atomic_load(&q.read) > 0);
+	return q.data[(q.read) % q.cap];
+}
+template<typename T, i32 N> u32 queue_count(QueueSPSC<T, N>& q) { return atomic_load(&q.write) - atomic_load(&q.read); }
 
 ////////////////////////////////////////////////////////////////////////
 // SparseSet
