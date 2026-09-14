@@ -424,7 +424,7 @@ struct Gfx_StageBufferCmd {
 #if BUILD_DEBUG
 	#define VK_CHECK(expr)                 \
 		{                                     \
-			if (expr != VK_SUCCESS) {           \
+			if(expr != VK_SUCCESS) {           \
 				Error("%s", vk_result_str(expr)); \
 				InvalidPath;                      \
 			}                                   \

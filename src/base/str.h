@@ -63,9 +63,8 @@ b32 char_is_number_cont(u8 c);
 ////////////////////////////////////////////////////////////////////////
 // String Constructors
 
-String str_make(u8* str, u64 size);
 String str_make(Slice<u8> str);
-#define S(str) str_make((u8*)str, sizeof(str)-1)
+#define S(str) String((u8*)str, sizeof(str)-1)
 String str_range(u8* first, u8* one_past_last);
 
 ////////////////////////////////////////////////////////////////////////
@@ -81,7 +80,6 @@ b32 str_match(String str0, String str1);
 b32 str_matchi(String str0, String str1);
 u64 str_find_needle(String string, String needle);
 b32 str_ends_with(String string, String end);
-b32 equal(String a, String b);
 
 ////////////////////////////////////////////////////////////////////////
 // String Slicing

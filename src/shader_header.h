@@ -111,6 +111,7 @@ struct Glue(Gpu, UI_Rect) {
 	u32 flags;
 	f32 corner_radius;
 	f32 edge_softness;
+	f32 border_thickness;
 };
 
 

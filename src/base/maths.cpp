@@ -1,5 +1,7 @@
 #include "base_impl.h"
 
+global thread_local u64 _seed = HASH_DEFAULT_SEED;
+
 v2::v2(const v2u& v):x(v.x),y(v.y){}
 
 f32 deg2rad(f32 degrees) { return degrees * PI / 180.0f; }
@@ -55,49 +57,93 @@ u32 u32_from_rgba(v4 rgba) {
 // Hash
 
 u64 squirrel3(u64 x) {
-	x *= 0x9E3779B185EBCA87ULL;
-	x ^= (x >> 8);
-	x += 0xC2B2AE3D27D4EB4FULL;
-	x ^= (x << 8);
-	x *= 0x27D4EB2F165667C5ULL;
-	x ^= (x >> 8);
+	x *= 0X9e3779b185ebca87ULL;
+	x ^= x >> 8;
+	x += 0Xc2b2ae3d27d4eb4fULL;
+	x ^= x << 8;
+	x *= 0X27d4eb2f165667c5ULL;
+	x ^= x >> 8;
 	return x;
 }
 
-u64 str_hash_FNV(String str) {
-	u32 hash = 0x811c9dc5;
-	Loop (i, str.size) {
-		hash = (*str.str++ ^ hash) * 0x01000193;
-	}
-	return hash;
+u32 xorshift32(u32 x) {
+	x ^= x << 13;
+	x ^= x >> 17;
+	x ^= x << 5;
+	return x;
 }
 
-u64 hash_memory(void* data, u64 size) {
-	u8*p = (u8*)data;
-	uint64_t h = 1469598103934665603ull;
-	Loop (i, size) {
-		h ^= p[i];
-		h *= 1099511628211ull;
-	}
-	return h;
+// u64 hash_bytes(void* data, u64 size) {
+// 	u8*p = (u8*)data;
+// 	uint64_t h = 1469598103934665603ull;
+// 	Loop(i, size) {
+// 		h ^= p[i];
+// 		h *= 1099511628211ull;
+// 	}
+// 	return h;
+// }
+
+intern u64 wyr8(u8* p) { u64 v; MemCopy(&v, p, 8); return v; }
+intern u64 wyr4(u8* p) { u32 v; MemCopy(&v, p, 4); return v; }
+intern u64 wyr3(u8* p, u64 k) { return ((u64)p[0] << 16) | ((u64)p[k >> 1] << 8) | p[k - 1]; }
+
+intern u64 wymix(u64 a, u64 b) {
+	__uint128_t r = (__uint128_t)a * b;
+	return (u64)r ^ (u64)(r >> 64);
 }
 
-u64 hash(u64 x) { return squirrel3(x); }
-u64 hash(String str) { return str_hash_FNV(str); }
+const u64 wyp0 = 0xa0761d6478bd642full, wyp1 = 0xe7037ed1a0b428dbull, wyp2 = 0x8ebc6af09c88c6e3ull, wyp3 = 0x589965cc75374cc3ull;
+
+// wyhash (https://github.com/wangyi-fudan/wyhash)
+u64 hash_bytes(void* data, u64 size, u64 seed) {
+	u8* p = (u8*)data;
+	seed ^= wymix(seed ^ wyp0, wyp1);
+	u64 a, b;
+	if(size <= 16) {
+		if(size >= 4) {
+			a = (wyr4(p) << 32) | wyr4(p + ((size >> 3) << 2));
+			b = (wyr4(p + size - 4) << 32) | wyr4(p + size - 4 - ((size >> 3) << 2));
+		} else if(size > 0) {
+			a = wyr3(p, size);
+			b = 0;
+		} else {
+			a = b = 0;
+		}
+	} else {
+		u64 i = size;
+		if(i > 48) {
+			u64 see1 = seed, see2 = seed;
+			do {
+				seed = wymix(wyr8(p) ^ wyp1, wyr8(p + 8) ^ seed);
+				see1 = wymix(wyr8(p + 16) ^ wyp2, wyr8(p + 24) ^ see1);
+				see2 = wymix(wyr8(p + 32) ^ wyp3, wyr8(p + 40) ^ see2);
+				p += 48;
+				i -= 48;
+			} while(i > 48);
+			seed ^= see1 ^ see2;
+		}
+		while(i > 16) {
+			seed = wymix(wyr8(p) ^ wyp1, wyr8(p + 8) ^ seed);
+			i -= 16;
+			p += 16;
+		}
+		a = wyr8(p + i - 16);
+		b = wyr8(p + i - 8);
+	}
+	a ^= wyp1;
+	b ^= seed;
+	__uint128_t r = (__uint128_t)a * b;
+	return wymix((u64)r ^ wyp0 ^ size, (u64)(r >> 64) ^ wyp1);
+}
+
+u64 hash(u64 x, u64 seed) { return squirrel3(x + seed); }
+u64 hash(String x, u64 seed) { return hash_bytes(x.str, x.size, seed); }
 
 ////////////////////////////////////////////////////////////////////////
 // Random
 
-u32 xorshift32(u32* seed) {
-	u32 x = *seed;
-	x ^= x << 13;
-	x ^= x >> 17;
-	x ^= x << 5;
-	return *seed = x;
-}
-
-global thread_local u32 _seed = 0x95123512;
-u32 rand_u32()                              { return xorshift32(&_seed); }
+u64 rand_u64()																														{ return squirrel3(++_seed); }
+u32 rand_u32()                              { return rand_u64(); }
 u32 rand_u32_rng(u32 min, u32 max)          { return (rand_u32() % (max - min + 1)) + min; }
 i32 rand_i32()                              { return rand_u32(); }
 i32 rand_i32_rng(i32 min, i32 max)          { return (i32)(rand_u32() % (u32)(max - min + 1)) + min; }
@@ -115,7 +161,7 @@ u32 rand_get_seed()                         { return _seed; }
 // Misc
 i32 ipow(i32 base, u32 exponent) {
 	i32 res = 1;
-	Loop (i, exponent) {
+	Loop(i, exponent) {
 		res *= base;
 	}
 	return res;
@@ -132,20 +178,19 @@ f32 wrap_f32(f32 min, f32 x, f32 max) {
 	f32 res = x - (max - min)*Floor((x - min)/(max - min));
 	return res;
 }
-f32 Lerp(f32 a, f32 t, f32 b)      { return (1 - t)*a + t*b; }
+f32 Lerp(f32 a, f32 t, f32 b)      { return t*(b - a) + a; }
 f32 LerpClamp(f32 a, f32 t, f32 b) { return Lerp(a, Clamp01(t), b); }
 f32 unlerp(f32 a, f32 x, f32 b)    { return (x - a) / (b - a); }
-f64 unlerp(f64 a, f64 x, f64 b) { return (x - a) / (b - a); }
-f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max)    { return (x - old_min) / (old_max - old_min) * (new_max - new_min) + new_min; }
-f32 remap(f32 x, f32 old_max, f32 new_max)                              { return x / old_max * new_max; }
-f64 remap(f64 x, f64 old_min, f64 old_max, f64 new_min, f64 new_max) { return (x - old_min) / (old_max - old_min) * (new_max - new_min) + new_min; }
-f32 remap_clamped(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max) {
+f64 unlerp(f64 a, f64 x, f64 b)    { return (x - a) / (b - a); }
+f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max) { return Lerp(new_min, unlerp(old_min, x, old_max), new_max); }
+f32 remap(f32 x, f32 old_max, f32 new_max)                           { return x / old_max * new_max; }
+f64 remap(f64 x, f64 old_min, f64 old_max, f64 new_min, f64 new_max) { return Lerp(new_min, unlerp(old_min, x, old_max), new_max); }
+f32 remap_clamp(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max) {
 	return remap(Clamp(old_min, x, old_max), old_min, old_max, new_min, new_max);
 }
-f32 remap01(f32 t, f32 lo, f32 hi) { return lo + t * (hi - lo); }
 f32 approach(f32 from, f32 to, f32 step) {
 	f32 d = to - from;
-	if (Abs(d) <= step) {
+	if(Abs(d) <= step) {
 		return to;
 	}
 	return from + Sign(d)*step;
@@ -157,7 +202,7 @@ f32 exp_decay(f32 x, f32 target, f32 decay, f32 dt) {
 
 f32 wrap_2pi(f32 a) {
 	a = Mod(a, 2 * PI);
-	if (a < 0)
+	if(a < 0)
 		a += 2 * PI;
 	return a;
 }
@@ -168,15 +213,15 @@ f32 angle_delta_cw(f32 from, f32 to)  { return wrap_2pi(to - from); }
 f32 angle_delta_ccw(f32 from, f32 to) { return wrap_2pi(from - to); }
 f32 angle_delta_longest(f32 from, f32 to) {
 	f32 d = wrap_pi(to - from);
-	if (d > 0)
+	if(d > 0)
 		return d - 2*PI;
-	else if (d < 0)
+	else if(d < 0)
 		return d + 2*PI;
 	return 0;
 }
 f32 angle_approach(f32 from, f32 to, f32 step) {
 	f32 d = angle_delta(from, to);
-	if (Abs(d) <= step)
+	if(Abs(d) <= step)
 		return to;
 	return from + Sign(d)*step;
 }
@@ -271,17 +316,17 @@ v2  v2_rotate(v2 v, f32 rad)                    { f32 s, c; SinCos(rad, &s, &c);
 v2  v2_rotate_around(v2 v, v2 pivot, f32 rad)   { return v2_rotate(v - pivot, rad) + pivot; }
 
 v2 v2_approach(v2 current, v2 target, f32 step) {
-	if (v2_length_sqr(current - target) <= Square(step)) return target;
+	if(v2_length_sqr(current - target) <= Square(step)) return target;
 	return current + v2_norm(target - current) * step;
 }
 v2 v2_clamp_length(f32 min, v2 v, f32 max) {
 	v2 res = v;
 	f32 len = v2_length_sqr(v);
-	if (len > 0.0f) {
+	if(len > 0.0f) {
 		len = Sqrt(len);
 		f32 scale = 1;
-		if (len < min) scale = min/len;
-		else if (len > min) scale = max/len;
+		if(len < min) scale = min/len;
+		else if(len > min) scale = max/len;
 		res *= scale;
 	}
 	return res;
@@ -349,17 +394,17 @@ f32 v3_angle(v3 a, v3 b)             { return Atan2(v3_length(v3_cross(a, b)), v
 v3  v3_bounce(v3 vel, v3 n, f32 restitution) { return vel - v3_project_on_norm(vel, n) * (1.0f + restitution); }
 
 v3 v3_approach(v3 current, v3 target, f32 step) {
-	if (v3_length_sqr(current - target) <= Square(step)) return target;
+	if(v3_length_sqr(current - target) <= Square(step)) return target;
 	return current + v3_norm(target - current) * step;
 }
 v3 v3_clamp_length(f32 min, v3 v, f32 max) {
 	v3 res = v;
 	f32 len = v3_length_sqr(v);
-	if (len > 0.0f) {
+	if(len > 0.0f) {
 		len = Sqrt(len);
 		f32 scale = 1;
-		if (len < min) scale = min/len;
-		else if (len > min) scale = max/len;
+		if(len < min) scale = min/len;
+		else if(len > min) scale = max/len;
 		res *= scale;
 	}
 	return res;
@@ -394,11 +439,11 @@ v3 v3_barycentric(v3 v, v3 a, v3 b, v3 c) {
 v3 v3_perpendicular(v3 v) {
 	v3 cardinal_axis = v3(1,0,0);
 	f32 min = Abs(v.x);
-	if (Abs(v.y) < min) {
+	if(Abs(v.y) < min) {
 		min = Abs(v.y);
 		cardinal_axis = v3(0,1,0);
 	}
-	if (Abs(v.z) < min) {
+	if(Abs(v.z) < min) {
 		min = Abs(v.z);
 		cardinal_axis = v3(0,0,1);
 	}
@@ -420,7 +465,7 @@ v3 v3_refract(v3 v, v3 n, f32 r) {
 	f32 v_tangent_len_sqr = 1 - Square(v_norm_len);
 	f32 r_tangent_len_sqr = Square(r)*(v_tangent_len_sqr); // Snell's law: n1sin(theta1) = n2sin(theta2), r = n1/n2, v_tangent_len = sin(theta), r_tangent = r*v_tangent
 	f32 r_norm_len_sqr = 1 - r_tangent_len_sqr;
-	if (r_norm_len_sqr < 0) {
+	if(r_norm_len_sqr < 0) {
 		return v3_reflect(v, n);
 	}
 	f32 r_norm_len = Sqrt(r_norm_len_sqr);
@@ -558,13 +603,13 @@ v4 quat_slerp(v4 a, f32 t, v4 b) {
 	f32 dot = v4_dot(a, b);
 
 	// take shortest path
-	if (dot < 0.0f) {
+	if(dot < 0.0f) {
 		b = -b;
 		dot = -dot;
 	}
 
 	// if very close → use lerp (avoid division by zero)
-	if (dot > 0.9995f) {
+	if(dot > 0.9995f) {
 		v4 r = {
 			a.x + t * (b.x - a.x),
 			a.y + t * (b.y - a.y),
@@ -590,7 +635,7 @@ v4 quat_slerp(v4 a, f32 t, v4 b) {
 }
 
 v4 quat_nlerp(v4 a, f32 t, v4 b) {
-	if (v4_dot(a, b) < 0) {
+	if(v4_dot(a, b) < 0) {
 		b = -b;
 	}
 	v4 res = quat_norm(v4_lerp(a, t, b));
@@ -599,14 +644,14 @@ v4 quat_nlerp(v4 a, f32 t, v4 b) {
 
 v4 quat_rotate_towards(v4 a, v4 b, f32 max_rad) {
 	f32 d = v4_dot(a, b);
-	if (d < 0.f) {
+	if(d < 0.f) {
 		b.x = -b.x;
 		b.y = -b.y;
 		b.z = -b.z;
 		b.w = -b.w;
 		d = -d;
 	}
-	if (d > 0.9995f) return b;
+	if(d > 0.9995f) return b;
 	f32 angle = Acos(d) * 2.f;
 	f32 t = (max_rad >= angle) ? 1.f : max_rad / angle;
 	return quat_slerp(a, t, b);
@@ -616,12 +661,12 @@ v4 quat_from_to(v3 a, v3 b) {
 	a = v3_norm(a);
 	b = v3_norm(b);
 	f32 dot = v3_dot(a, b);
-	if (dot > 0.9999f)
+	if(dot > 0.9999f)
 		return quat_identity();
-	if (dot < -0.9999f) {
+	if(dot < -0.9999f) {
 		// we do this since v3_cross(a, -a) == v3() and quat will be invalid
 		v3 axis = v3_cross(v3(1, 0, 0), a);
-		if (v3_dot(axis, axis) < 0.0001f) {
+		if(v3_dot(axis, axis) < 0.0001f) {
 			axis = v3_cross(v3(0, 1, 0), a);
 		}
 		axis = v3_norm(axis);
@@ -655,19 +700,19 @@ v4 quat_look_rotation(v3 dir, v3 up) {
 	f32 m20=f.x, m21=f.y, m22=f.z;
 	f32 tr = m00+m11+m22;
 	v4 q = {};
-	if (tr > 0.f) {
+	if(tr > 0.f) {
 		f32 s = 0.5f / Sqrt(tr+1.f);
 		q.x = (m12 - m21) * s;
 		q.y = (m20 - m02) * s;
 		q.z = (m01 - m10) * s;
 		q.w = 0.25f / s;
-	} else if (m00 > m11 && m00 > m22) {
+	} else if(m00 > m11 && m00 > m22) {
 		f32 s = 2.f * Sqrt(1.f + m00 - m11 - m22);
 		q.x = 0.25f * s;
 		q.y = (m01 + m10) / s;
 		q.z = (m20 + m02) / s;
 		q.w = (m12 - m21) / s;
-	} else if (m11 > m22) {
+	} else if(m11 > m22) {
 		f32 s = 2.f * Sqrt(1.f + m11 - m00 - m22);
 		q.x = (m01 + m10) / s;
 		q.y = 0.25f * s;
@@ -688,8 +733,8 @@ v4 quat_look_rotation(v3 dir, v3 up) {
 
 m2x2 operator*(m2x2 a, m2x2 b) {
 	m2x2 res = {};
-	Loop (y, 2) {
-		Loop (x, 2) {
+	Loop(y, 2) {
+		Loop(x, 2) {
 			res.v[y][x] = a.v[0][x] * b.v[y][0] +
 																	a.v[1][x] * b.v[y][1];
 		}
@@ -745,8 +790,8 @@ m2x2 m2x2_inverse(m2x2 m) {
 }
 
 m2x2 m2x2_scale_all_elements(m2x2 mat, f32 scale) {
-	Loop (y, 2) {
-		Loop (x, 2) {
+	Loop(y, 2) {
+		Loop(x, 2) {
 			mat.v[y][x] *= scale;
 		}
 	}
@@ -852,8 +897,8 @@ m3x2 m3x2_inverse(m3x2 a) {
 
 m3x3 operator*(m3x3 a, m3x3 b) {
 	m3x3 res = {};
-	Loop (j, 3) {
-		Loop (i, 3) {
+	Loop(j, 3) {
+		Loop(i, 3) {
 			res.v[j][i] = b.v[j][0] * a.v[0][i] +
 																	b.v[j][1] * a.v[1][i] +
 																	b.v[j][2] * a.v[2][i];
@@ -1130,8 +1175,8 @@ v3 m4x4_left(m4x4 matrix) {
 
 m4x4 operator*(m4x4 a, m4x4 b) {
 	m4x4 res = {};
-	Loop (y, 4) {
-		Loop (x, 4) {
+	Loop(y, 4) {
+		Loop(x, 4) {
 			res.v[y][x] = a.v[0][x] * b.v[y][0] +
 																	a.v[1][x] * b.v[y][1] +
 																	a.v[2][x] * b.v[y][2] +
@@ -1211,8 +1256,8 @@ m4x4 m4x4_transform(v3 scale, v3 pos, v4 q) {
 }
 
 m4x4 m4x4_scale_all_elements(m4x4 mat, f32 scale) {
-	Loop (y, 4) {
-		Loop (x, 4) {
+	Loop(y, 4) {
+		Loop(x, 4) {
 			mat.v[y][x] *= scale;
 		}
 	}
@@ -1265,7 +1310,7 @@ m4x4 m4x4_rotate_xyz(v3 rad) {
 
 m4x4 m4x4_rotate_around_axis(v3 axis, f32 rad) {
 	f32 len_sqr = v3_length_sqr(axis);
-	if ((len_sqr != 1.0f) && (len_sqr != 0.0f)) {
+	if((len_sqr != 1.0f) && (len_sqr != 0.0f)) {
 		axis = v3_norm(axis);
 	}
 	f32 sine;
@@ -1376,7 +1421,7 @@ m4x4 m4x4_inverse(m4x4 m) {
 	v4 sign_b = { -1, +1, -1, +1 };
 	
 	m4x4 inverse;
-	Loop (i, 4) {
+	Loop(i, 4) {
 			inverse.v[0][i] = inv0.v[i] * sign_a.v[i];
 			inverse.v[1][i] = inv1.v[i] * sign_b.v[i];
 			inverse.v[2][i] = inv2.v[i] * sign_a.v[i];
@@ -1494,6 +1539,7 @@ b32 rng1_contains(Rng1 r, f32 x)       { return (r.min <= x && x < r.max); }
 f32 rng1_dim(Rng1 r)                   { return r.max - r.min; }
 Rng1 rng1_union(Rng1 a, Rng1 b)        { return Rng1(Min(a.min, b.min), Max(a.max, b.max)); }
 Rng1 rng1_intersect(Rng1 a, Rng1 b)    { return Rng1(Max(a.min, b.min), Min(a.max, b.max)); }
+b32 rng1_overlaps(Rng1 a, Rng1 b)      { return a.min < b.max && b.min < a.max; }
 f32 rng1_clamp(Rng1 r, f32 x)          { return Clamp(r.min, x, r.max); }
 
 Rng1 rng1_subrng(Rng1 r, Rng1 sub)   { return Rng1(r.min + sub.min, r.min+sub.min + rng1_dim(sub)); }
@@ -1516,6 +1562,7 @@ f32 rng2_width(Rng2 r)              { return r.x1 - r.x0; }
 f32 rng2_height(Rng2 r)             { return r.y1 - r.y0; }
 Rng2 rng2_union(Rng2 a, Rng2 b)     { return Rng2(v2(Min(a.min.x, b.min.x), Min(a.min.y, b.min.y)), v2(Max(a.max.x, b.max.x), Max(a.max.y, b.max.y))); }
 Rng2 rng2_intersect(Rng2 a, Rng2 b) { return Rng2(v2(Max(a.min.x, b.min.x), Max(a.min.y, b.min.y)), v2(Min(a.max.x, b.max.x), Min(a.max.y, b.max.y))); }
+b32 rng2_overlaps(Rng2 a, Rng2 b)   { return (a.min.x < b.max.x && b.min.x < a.max.x) && (a.min.y < b.max.y && b.min.y < a.max.y); }
 v2 rng2_clamp(Rng2 r, v2 x)         { return v2(Clamp(r.min.x, x.x, r.max.x), Clamp(r.min.y, x.y, r.max.y)); }
 
 Rng2 rng2_make(v2 min, v2 size)             { return Rng2(min, min+size); }
@@ -1546,6 +1593,7 @@ Rng3 rng3_intersect(Rng3 a, Rng3 b) {
 	return Rng3(v3(Max(a.min.x, b.min.x), Max(a.min.y, b.min.y), Max(a.min.z, b.min.z)),
 													v3(Min(a.max.x, b.max.x), Min(a.max.y, b.max.y), Min(a.max.z, b.max.z)));
 }
+b32 rng3_overlaps(Rng3 a, Rng3 b) { return (a.min.x < b.max.x && b.min.x < a.max.x) && (a.min.y < b.max.y && b.min.y < a.max.y) && (a.min.z < b.max.z && b.min.z < a.max.z); }
 v3 rng3_clamp(Rng3 r, v3 x) { return v3(Clamp(r.min.x, x.x, r.max.x), Clamp(r.min.y, x.y, r.max.y), Clamp(r.min.z, x.z, r.max.z)); }
 
 Rng3 rng3_make(v3 min, v3 size)             { return Rng3(min, min+size); }
@@ -1577,7 +1625,7 @@ f32 smootherstep(f32 t) { return t * t * t * (t * (t * 6 - 15) + 10); }
 f32 ease_quad_in(f32 t)     { return Square(t); }
 f32 ease_quad_out(f32 t)    { return -(t * (t - 2)); }
 f32 ease_quad_in_out(f32 t) {
-	if (t < 0.5f)
+	if(t < 0.5f)
 		return 2 * t * t;
 	else
 		return -2*t*t + 4*t - 1;
@@ -1586,7 +1634,7 @@ f32 ease_quad_in_out(f32 t) {
 f32 ease_cube_in(f32 t)     { return Cube(t); }
 f32 ease_cube_out(f32 t)    { f32 f = t - 1; return Cube(f) + 1; }
 f32 ease_cube_in_out(f32 t) {
-	if (t < 0.5f)
+	if(t < 0.5f)
 		return 4 * t * t * t;
 	else {
 		f32 f = 2*t - 2;
@@ -1597,7 +1645,7 @@ f32 ease_cube_in_out(f32 t) {
 f32 ease_quart_in(f32 t)     { return Cube(t) * t; }
 f32 ease_quart_out(f32 t)    { f32 f = (t - 1); return Cube(f) * (1 - t) + 1; }
 f32 ease_quart_in_out(f32 t) {
-	if (t < 0.5f)
+	if(t < 0.5f)
 		return 8 * t * t * t * t;
 	else {
 		f32 f = t - 1;
@@ -1608,7 +1656,7 @@ f32 ease_quart_in_out(f32 t) {
 f32 ease_quint_in(f32 t)     { return Cube(t) * Square(t); }
 f32 ease_quint_out(f32 t)    { f32 f = (t - 1); return Cube(f) * Square(f) + 1; }
 f32 ease_quint_in_out(f32 t) {
-	if (t < 0.5f)
+	if(t < 0.5f)
 		return 16 * t * t * t * t * t;
 	else {
 		f32 f = 2 * t - 2;
@@ -1623,7 +1671,7 @@ f32 ease_sin_in_out(f32 t) { return (1 - Cos(t * PI)) / 2; }
 f32 ease_circ_in(f32 t) { return 1 - Sqrt(1 - Square(t)); }
 f32 ease_circ_out(f32 t) { return Sqrt((2 - t) * t); }
 f32 ease_circ_in_out(f32 t) {
-	if (t < 0.5) {
+	if(t < 0.5) {
 		return 0.5 * (1 - Sqrt(1 - 4 * (t * t)));
 	} else {
 		return 0.5 * (Sqrt(-((2 * t) - 3) * ((2 * t) - 1)) + 1);
@@ -1633,8 +1681,8 @@ f32 ease_circ_in_out(f32 t) {
 f32 ease_exp_in(f32 t)  { return (t == 0.0) ? t : Pow(2, 10 * (t - 1)); }
 f32 ease_exp_out(f32 t) { return (t == 1.0) ? t : 1 - Pow(2, -10 * t); }
 f32 ease_exp_in_out(f32 t) {
-	if (t == 0.0 || t == 1.0) return t;
-	if (t < 0.5) {
+	if(t == 0.0 || t == 1.0) return t;
+	if(t < 0.5) {
 		return 0.5 * Pow(2, (20 * t) - 10);
 	} else {
 		return -0.5 * Pow(2, (-20 * t) + 10) + 1;
@@ -1644,7 +1692,7 @@ f32 ease_exp_in_out(f32 t) {
 f32 ease_elastic_in(f32 t) { return Sin(13 * PI/2 * t) * Pow(2, 10 * (t - 1));}
 f32 ease_elastic_out(f32 t) {	return Sin(-13 * PI/2 * (t + 1)) * Pow(2, -10 * t) + 1;}
 f32 ease_elastic_in_out(f32 t) {
-	if (t < 0.5) {
+	if(t < 0.5) {
 		return 0.5 * Sin(13 * PI/2 * (2 * t)) * Pow(2, 10 * ((2 * t) - 1));
 	} else {
 		return 0.5 * (Sin(-13 * PI/2 * ((2 * t - 1) + 1)) * Pow(2, -10 * (2 * t - 1)) + 2);
@@ -1654,7 +1702,7 @@ f32 ease_elastic_in_out(f32 t) {
 f32 ease_back_in(f32 t) { return t * t * t - t * Sin(t * PI); }
 f32 ease_back_out(f32 t) { f32 f = (1 - t); return 1 - (f * f * f - f * Sin(f * PI));	}
 f32 ease_back_in_out(f32 t) {
-	if (t < 0.5) {
+	if(t < 0.5) {
 		f32 f = 2 * t;
 		return 0.5 * (f * f * f - f * Sin(f * PI));
 	} else {
@@ -1665,23 +1713,21 @@ f32 ease_back_in_out(f32 t) {
 
 f32 ease_bounce_in(f32 t) { return 1 - ease_bounce_out(1 - t); }
 f32 ease_bounce_out(f32 t) {
-	if (t < 4 / 11.0) {
+	if(t < 4 / 11.0) {
 		return (121 * t * t) / 16.0;
-	} else if (t < 8 / 11.0) {
+	} else if(t < 8 / 11.0) {
 		return (363 / 40.0 * t * t) - (99 / 10.0 * t) + 17 / 5.0;
-	} else if (t < 9 / 10.0) {
+	} else if(t < 9 / 10.0) {
 		return (4356 / 361.0 * t * t) - (35442 / 1805.0 * t) + 16061 / 1805.0;
 	} else {
 		return (54 / 5.0 * t * t) - (513 / 25.0 * t) + 268 / 25.0;
 	}
 }
 f32 ease_bounce_in_out(f32 t) {
-	if (t < 0.5) {
+	if(t < 0.5) {
 		return 0.5 * ease_bounce_in(t * 2);
 	} else {
 		return 0.5 * ease_bounce_out(t * 2 - 1) + 0.5;
 	}
 }
 
-u64 hash(v3u v) { return hash(v.x)+hash(v.y)+hash(v.z); }
-b32 equal(v3u a, v3u b) { return a == b;};

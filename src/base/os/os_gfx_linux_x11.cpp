@@ -61,7 +61,9 @@ struct X11State {
 global X11State gfx_st;
 
 Key lnx_x11_keycode_translate(u32 keysym) {
-	switch (keysym) {
+	switch(keysym) {
+		default: return Key_COUNT;
+		
 		// Control keys
 		case XK_BackSpace:    return Key_Backspace;
 		case XK_Return:       return Key_Enter;
@@ -155,14 +157,12 @@ Key lnx_x11_keycode_translate(u32 keysym) {
 		case XK_bracketleft:  return Key_LBracket;
 		case XK_bracketright: return Key_RBracket;
 		case XK_backslash:    return Key_Backslash;
-
-		default: return Key_COUNT;
 	}
 }
 
 u32 os_key_to_character(Key key, OS_Modifiers modifiers) {
-	if (!flag_has(modifiers, OS_Modifier_Shift)) {
-		switch (key) {
+	if(!flag_has(modifiers, OS_Modifier_Shift)) {
+		switch(key) {
 			default: return 0;
 			case Key_Space: return ' ';
 			case Key_0: return '0';
@@ -214,8 +214,8 @@ u32 os_key_to_character(Key key, OS_Modifiers modifiers) {
 			case Key_Backslash: return '\\';
 		}
 	}
-	if (flag_has(modifiers, OS_Modifier_Shift)) {
-		switch (key) {
+	if(flag_has(modifiers, OS_Modifier_Shift)) {
+		switch(key) {
 			default: return 0;
 			case Key_Space: return ' ';
 			case Key_0: return ')';
@@ -274,8 +274,8 @@ void os_gfx_init() {
 	X11State& g = gfx_st;
 	g.arena = arena_make(.name = "gfx arena");
 	g.gpa = alloc_make(g.arena);
-	g.input_events = array_make(OS_InputEvent, g.gpa);
-	g.xcb_events = array_make(xcb_generic_event_t*, g.gpa);
+	g.input_events = array_make<OS_InputEvent>(g.gpa);
+	g.xcb_events = array_make<xcb_generic_event_t*>(g.gpa);
 
 	i32 screen_number;
 	g.connection = xcb_connect(null, &screen_number);
@@ -318,7 +318,7 @@ void os_gfx_init() {
 	var intern_ = [](String name)->xcb_atom_t {
 		xcb_intern_atom_cookie_t cookie = xcb_intern_atom(gfx_st.connection, 0, name.size, (const char*)name.str);
 		xcb_intern_atom_reply_t* reply = xcb_intern_atom_reply(gfx_st.connection, cookie, null);
-		if (!reply) return XCB_NONE;
+		if(!reply) return XCB_NONE;
 		xcb_atom_t atom = reply->atom;
 		return atom;
 	};
@@ -374,17 +374,17 @@ void os_pump_messages() {
 	g.input.mouse_y_delta = 0;
 
 	u32 i = 0;
-	while (true) {
+	while(true) {
 		xcb_generic_event_t* event = xcb_poll_for_event(g.connection);
-		if (event) {
-		} else if (i < g.xcb_events.count) {
+		if(event) {
+		} else if(i < g.xcb_events.count) {
 			event = g.xcb_events[i++];
 		} else {
 			break;
 		}
-		if ((event->response_type & 0x7f) == XCB_GE_GENERIC) {
+		if((event->response_type & 0x7f) == XCB_GE_GENERIC) {
 			xcb_ge_generic_event_t* ge = (xcb_ge_generic_event_t*)event;
-			if (ge->event_type == XCB_INPUT_RAW_MOTION) {
+			if(ge->event_type == XCB_INPUT_RAW_MOTION) {
 				xcb_input_raw_motion_event_t* motion = (xcb_input_raw_motion_event_t*)ge;
 				u32* mask = (u32*)((u8*)motion + sizeof(*motion));
 				i32* values = (i32*)(mask + motion->valuators_len);
@@ -395,36 +395,36 @@ void os_pump_messages() {
 				// Info("%i %i", dx, dy);
 			}
 		}
-		switch (event->response_type & ~0x80) {
+		switch(event->response_type & ~0x80) {
 			case XCB_KEY_PRESS: {
 				xcb_key_press_event_t* kp = (xcb_key_press_event_t*)event;
 				xcb_keysym_t sym = xcb_key_symbols_get_keysym(g.key_symbols, kp->detail, 0);
 				Key key = lnx_x11_keycode_translate(sym);
-				if (os_key_is_down(key)) {
+				if(os_key_is_down(key)) {
 					break;
 				}
 				g.input.keyboard_current.keys[key] = true;
 				b32 modifier_changed = false;
 				// Info("pressed %u", kp->time);
-				if (key == Key_Shift) {
-					if (!flag_has(g.modifiers, OS_Modifier_Shift)) {
+				if(key == Key_Shift) {
+					if(!flag_has(g.modifiers, OS_Modifier_Shift)) {
 						modifier_changed = true;
 					}
 					g.modifiers |= OS_Modifier_Shift;
 				}
-				if (key == Key_Alt) {
-					if (!flag_has(g.modifiers, OS_Modifier_Alt)) {
+				if(key == Key_Alt) {
+					if(!flag_has(g.modifiers, OS_Modifier_Alt)) {
 						modifier_changed = true;
 					}
 					g.modifiers |= OS_Modifier_Alt;
 				}
-				if (key == Key_Ctrl) {
-					if (!flag_has(g.modifiers, OS_Modifier_Ctrl)) {
+				if(key == Key_Ctrl) {
+					if(!flag_has(g.modifiers, OS_Modifier_Ctrl)) {
 						modifier_changed = true;
 					}
 					g.modifiers |= OS_Modifier_Ctrl;
 				}
-				if (modifier_changed) {
+				if(modifier_changed) {
 					OS_InputEvent event = {
 						.type = OS_EventType_Modifier,
 						.modifier = g.modifiers,
@@ -438,7 +438,7 @@ void os_pump_messages() {
 					.modifier = g.modifiers,
 				};
 				array_push(g.input_events, event);
-			} break;
+			}break;
 			case XCB_KEY_RELEASE: {
 				xcb_key_release_event_t* kp = (xcb_key_release_event_t*)event;
 				xcb_keysym_t sym = xcb_key_symbols_get_keysym(g.key_symbols, kp->detail, 0);
@@ -446,25 +446,25 @@ void os_pump_messages() {
 				g.input.keyboard_current.keys[key] = false;
 				b32 modifier_changed = false;
 				// Info("released %u", kp->time);
-				if (key == Key_Shift) {
-					if (flag_has(g.modifiers, OS_Modifier_Shift)) {
+				if(key == Key_Shift) {
+					if(flag_has(g.modifiers, OS_Modifier_Shift)) {
 						modifier_changed = true;
 					}
 					g.modifiers = flag_clear(g.modifiers, OS_Modifier_Shift);
 				}
-				if (key == Key_Alt) {
-					if (flag_has(g.modifiers, OS_Modifier_Alt)) {
+				if(key == Key_Alt) {
+					if(flag_has(g.modifiers, OS_Modifier_Alt)) {
 						modifier_changed = true;
 					}
 					g.modifiers = flag_clear(g.modifiers, OS_Modifier_Alt);
 				}
-				if (key == Key_Ctrl) {
-					if (flag_has(g.modifiers, OS_Modifier_Ctrl)) {
+				if(key == Key_Ctrl) {
+					if(flag_has(g.modifiers, OS_Modifier_Ctrl)) {
 						modifier_changed = true;
 					}
 					g.modifiers = flag_clear(g.modifiers, OS_Modifier_Ctrl);
 				}
-				if (modifier_changed) {
+				if(modifier_changed) {
 					OS_InputEvent event = {
 						.type = OS_EventType_Modifier,
 						.modifier = g.modifiers,
@@ -478,21 +478,21 @@ void os_pump_messages() {
 					.modifier = g.modifiers,
 				};
 				array_push(g.input_events, event);
-			} break;
+			}break;
 			case XCB_CONFIGURE_NOTIFY: {
 				xcb_configure_notify_event_t* cfg = (xcb_configure_notify_event_t*)event;
-				if (!cfg->width || !cfg->height) {
+				if(!cfg->width || !cfg->height) {
 					return;
 				}
 				g.win_width = cfg->width;
 				g.win_height = cfg->height;
-			} break;
+			}break;
 			case XCB_CLIENT_MESSAGE: {
 				xcb_client_message_event_t* cm = (xcb_client_message_event_t*)event;
-				if (cm->data.data32[0] == g.wm_delete_window) {
+				if(cm->data.data32[0] == g.wm_delete_window) {
 					g.should_close = true;
 				}
-			} break;
+			}break;
 			case XCB_BUTTON_PRESS: {
 				#define XK_MouseLeft 1
 				#define XK_MouseMiddle 2
@@ -507,7 +507,7 @@ void os_pump_messages() {
 				///////////////////////////////////
 				// Button
 				b32 was_button = false;
-				switch (bp->detail) {
+				switch(bp->detail) {
 					case XK_MouseLeft: g.input.mouse_current.buttons[MouseButton_Left] = true; event.mouse_button = MouseButton_Left; was_button = true; break;
 					case XK_MouseMiddle: g.input.mouse_current.buttons[MouseButton_Middle] = true; event.mouse_button = MouseButton_Middle; was_button = true; break;
 					case XK_MouseRight: g.input.mouse_current.buttons[MouseButton_Right] = true; event.mouse_button = MouseButton_Right; was_button = true; break;
@@ -517,8 +517,8 @@ void os_pump_messages() {
 
 				///////////////////////////////////
 				// Scroll
-				if (!was_button) {
-					switch (bp->detail) {
+				if(!was_button) {
+					switch(bp->detail) {
 						case XK_WheelUp: ; event.scroll = 1; break;
 						case XK_WheelDown: event.scroll = -1; break;
 						case XK_WheelRight: g.input.wheel_horizontal = 1; break;
@@ -529,12 +529,12 @@ void os_pump_messages() {
 				}
 
 				array_push(g.input_events, event);
-			} break;
+			}break;
 			case XCB_BUTTON_RELEASE: {
 				xcb_button_press_event_t* bp = (xcb_button_press_event_t*)event;
 				OS_InputEvent event = {};
-				if (bp->detail >= XK_MouseLeft && bp->detail <= XK_MouseRight) {
-					switch (bp->detail) {
+				if(bp->detail >= XK_MouseLeft && bp->detail <= XK_MouseRight) {
+					switch(bp->detail) {
 						case XK_MouseLeft: g.input.mouse_current.buttons[MouseButton_Left] = false; event.mouse_button = MouseButton_Left; break;
 						case XK_MouseMiddle: g.input.mouse_current.buttons[MouseButton_Middle] = false; event.mouse_button = MouseButton_Middle; break;
 						case XK_MouseRight: g.input.mouse_current.buttons[MouseButton_Right] = false; event.mouse_button = MouseButton_Right; break;
@@ -543,7 +543,7 @@ void os_pump_messages() {
 					event.is_pressed = false;
 				}
 				array_push(g.input_events, event);
-			} break;
+			}break;
 			case XCB_MOTION_NOTIFY: {
 				xcb_motion_notify_event_t* motion = (xcb_motion_notify_event_t*)event;
 				g.input.mouse_current.x = motion->event_x;
@@ -552,7 +552,7 @@ void os_pump_messages() {
 				event.x = g.input.mouse_current.x;
 				event.y = g.input.mouse_current.y;
 				array_push(g.input_events, event);
-			} break;
+			}break;
 			case XCB_SELECTION_REQUEST: {
 				xcb_selection_request_event_t* req = (xcb_selection_request_event_t*)event;
 				xcb_selection_notify_event_t notify = {
@@ -564,7 +564,7 @@ void os_pump_messages() {
 					.target = req->target,
 					.property = req->property,
 				};
-				if (req->target == g.clipboard.targets_atom) {
+				if(req->target == g.clipboard.targets_atom) {
 					xcb_atom_t supported[] = {
 						g.clipboard.utf8_atom,
 						g.clipboard.targets_atom
@@ -572,12 +572,12 @@ void os_pump_messages() {
 					xcb_change_property(g.connection, XCB_PROP_MODE_REPLACE, req->requestor, req->property, XCB_ATOM_ATOM, 32, ArrayCount(supported), supported);
 					notify.property = req->property;
 				}
-				if (req->target == g.clipboard.utf8_atom) {
+				if(req->target == g.clipboard.utf8_atom) {
 					xcb_change_property(g.connection, XCB_PROP_MODE_REPLACE, req->requestor, req->property, req->target, 8, g.clipboard.str_to_write.size, g.clipboard.str_to_write.str);
 				}
 				xcb_send_event(g.connection, 0, req->requestor, XCB_EVENT_MASK_NO_EVENT, (char*)&notify);
 				xcb_flush(g.connection);
-			} break;
+			}break;
 		}
 	}
 	array_clear(g.xcb_events);
@@ -613,12 +613,12 @@ String os_clipboard_text_get() {
 	xcb_flush(g.connection);
 
 	xcb_generic_event_t* event;
-	while (true) {
+	while(true) {
 		event = xcb_wait_for_event(g.connection);
 		u8 type = event->response_type & ~0x80;
-		if (type == XCB_SELECTION_REQUEST) {
+		if(type == XCB_SELECTION_REQUEST) {
 			xcb_window_t owner = xcb_get_selection_owner_reply(g.connection, xcb_get_selection_owner(g.connection, g.clipboard.atom), null)->owner;
-			if (g.window != owner) {
+			if(g.window != owner) {
 				goto add_event;
 			}
 			xcb_selection_request_event_t* req = (xcb_selection_request_event_t*)event;
@@ -631,7 +631,7 @@ String os_clipboard_text_get() {
 				.target = req->target,
 				.property = req->property,
 			};
-			if (req->target == g.clipboard.targets_atom) {
+			if(req->target == g.clipboard.targets_atom) {
 				xcb_atom_t supported[] = {
 					g.clipboard.utf8_atom,
 					g.clipboard.targets_atom
@@ -639,24 +639,24 @@ String os_clipboard_text_get() {
 				xcb_change_property(g.connection, XCB_PROP_MODE_REPLACE, req->requestor, req->property, XCB_ATOM_ATOM, 32, ArrayCount(supported), supported);
 				notify.property = req->property;
 			}
-			if (req->target == g.clipboard.utf8_atom) {
+			if(req->target == g.clipboard.utf8_atom) {
 				xcb_change_property(g.connection, XCB_PROP_MODE_REPLACE, req->requestor, req->property, req->target, 8, g.clipboard.str_to_write.size, g.clipboard.str_to_write.str);
 			}
 			xcb_send_event(g.connection, 0, req->requestor, XCB_EVENT_MASK_NO_EVENT, (char*)&notify);
 			xcb_flush(g.connection);
 		}
-		else if (type == XCB_SELECTION_NOTIFY) {
+		else if(type == XCB_SELECTION_NOTIFY) {
 			xcb_selection_notify_event_t* notify = (xcb_selection_notify_event_t*)event;
-			if (notify->property == XCB_NONE) {
+			if(notify->property == XCB_NONE) {
 				break;
 			}
 			xcb_get_property_cookie_t cookie = xcb_get_property(g.connection, 0, g.window, notify->property, XCB_GET_PROPERTY_TYPE_ANY, 0, 4096);
 			xcb_get_property_reply_t* reply = xcb_get_property_reply(g.connection, cookie, null);
-			if (reply) {
+			if(reply) {
 				u8* data = (u8*)xcb_get_property_value(reply);
 				u32 len = xcb_get_property_value_length(reply);
 				dstr_clear(g.clipboard.str_to_read);
-				dstr_push(g.clipboard.str_to_read, str_make(data, len));
+				dstr_push(g.clipboard.str_to_read, String(data, len));
 			}
 			break;
 		}

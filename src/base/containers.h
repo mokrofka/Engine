@@ -13,7 +13,6 @@ inline u32 generation_bitmask(u32 gen) { return gen & Bit(32 - INDEX_BITS) - 1; 
 
 ////////////////////////////////////////////////////////////////////////
 // Array
-
 template<typename T, i32 N> struct Array {
 	u32 count;
 	static constexpr i32 cap = N;
@@ -40,7 +39,7 @@ template<typename T, i32 N> u32 array_push(Array<T, N>& arr, T a) {
 }
 template<typename T, i32 N, typename ... Args> void array_push(Array<T, N>& arr, Args... args) {
 	var list = {args...};
-	for (T x : list) {
+	for(T x : list) {
 		array_push(arr, x);
 	}
 }
@@ -59,17 +58,19 @@ template<typename T, i32 N> void array_clear(Array<T, N>& arr) {
 template<typename T, i32 N> T array_pop(Array<T, N>& arr) {
 	return arr.data[--arr.count];
 }
+template<typename T, i32 N> T array_back(Array<T, N>& arr) {
+	return arr.data[arr.count-1];
+}
 template<typename T, i32 N> b32 array_exists(Array<T, N>& arr, T a, b32(*fn)(T a, T b) = equal) {
-	Loop (i, arr.count) {
+	Loop(i, arr.count) {
 		T x = arr[i];
-		if (fn(x, a)) return true;
+		if(fn(x, a)) return true;
 	}
 	return false;
 }
 
 ///////////////////////////////////
 // Darray
-
 template <typename T> struct Darray {
 	u32 count;
 	u32 cap;
@@ -82,18 +83,17 @@ template <typename T> struct Darray {
 };
 
 template<typename T> Slice<T> NO_DEBUG slice(Darray<T>& arr) { return {arr.data, arr.count}; }
-#define array_make(T, alloc) _array_make<T>(alloc)
-template<typename T> Darray<T> _array_make(Allocator alloc) {
+template<typename T> Darray<T> array_make(Allocator alloc) {
 	Darray<T> res = {
 		.alloc = alloc,
 	};
 	return res;
 }
 template<typename T> void array_destroy(Darray<T>& arr) {
-	if (arr.data) { mem_free(arr.alloc, arr.data); } 
+	if(arr.data) { mem_free(arr.alloc, arr.data); } 
 }
 template<typename T> void array_grow(Darray<T>& arr, u32 elem_count) {
-	if (arr.data) {
+	if(arr.data) {
 		u32 old_cap = arr.cap;
 		arr.cap = Max(arr.cap * DEFAULT_RESIZE_FACTOR, arr.count + elem_count);
 		arr.data = mem_realloc_array(arr.alloc, arr.data, old_cap, arr.cap);
@@ -103,10 +103,10 @@ template<typename T> void array_grow(Darray<T>& arr, u32 elem_count) {
 	}
 }
 template<typename T> void array_reserve(Darray<T>& arr, u32 min_cap) {
-	if (arr.cap >= min_cap) return;
+	if(arr.cap >= min_cap) return;
 	u32 old_cap = arr.cap;
 	u32 new_cap = Max(old_cap * DEFAULT_RESIZE_FACTOR, min_cap);
-	if (arr.data) {
+	if(arr.data) {
 		arr.data = mem_realloc_array(arr.alloc, arr.data, old_cap, new_cap);
 	} else {
 		arr.data = push_array(arr.alloc, T, new_cap);
@@ -124,13 +124,13 @@ template<typename T> T array_clone(Darray<T>& arr, Allocator alloc) {
 	return result;
 }
 template<typename T> u32 array_push_empty(Darray<T>& arr) {
-	if (arr.count >= arr.cap) {
+	if(arr.count >= arr.cap) {
 		array_grow(arr, 0);
 	}
 	return arr.count++;
 }
 template<typename T> u32 array_push(Darray<T>& arr, T a) {
-	if (arr.count >= arr.cap) {
+	if(arr.count >= arr.cap) {
 		array_grow(arr, 0);
 	}
 	arr.data[arr.count] = a;
@@ -138,12 +138,12 @@ template<typename T> u32 array_push(Darray<T>& arr, T a) {
 }
 template<typename T, typename...Args> void array_push(Darray<T>& arr, Args...args) {
 	var list = { args... };
-	for (T x : list) {
+	for(T x : list) {
 		array_push(arr, x);
 	}
 }
 template<typename T> void array_push_elems(Darray<T>& arr, Slice<T> elems) {
-	if (arr.count + elems.count >= arr.cap) {
+	if(arr.count + elems.count >= arr.cap) {
 		array_grow(arr, elems.count);
 	}
 	MemCopyArray(arr.data + arr.count, elems.data, elems.count);
@@ -163,15 +163,15 @@ template<typename T> T array_back(Darray<T>& arr) {
 	return arr.data[arr.count-1];
 }
 template<typename T> b32 array_exists(Darray<T>& arr, T a, b32(*fn)(T a, T b) = equal) {
-	Loop (i, arr.count) {
+	Loop(i, arr.count) {
 		T x = arr[i];
-		if (fn(x, a)) return true;
+		if(fn(x, a)) return true;
 	}
 	return false;
 }
 template<typename T> b32 array_exists_at(Darray<T>& arr, T a, u32* out_idx, b32(*fn)(T a, T b) = equal) {
-	Loop (i, arr.count) {
-		if (fn(arr.data[i], a)) {
+	Loop(i, arr.count) {
+		if(fn(arr.data[i], a)) {
 			*out_idx = i;
 			return true;
 		}
@@ -181,7 +181,6 @@ template<typename T> b32 array_exists_at(Darray<T>& arr, T a, u32* out_idx, b32(
 
 ////////////////////////////////////////////////////////////////////////
 // ArrayHandler
-
 template<typename T, i32 N, typename Handle> struct ArrayHandler {
 	static constexpr i32 cap = N;
 	u32 count;
@@ -223,7 +222,6 @@ template<typename T, i32 N, typename Handle> void array_handler_clear(ArrayHandl
 
 ///////////////////////////////////
 // DarrayHandler
-
 template <typename T, typename Handle> struct DarrayHandler {
 	u32 count;
 	u32 cap;
@@ -234,8 +232,7 @@ template <typename T, typename Handle> struct DarrayHandler {
 	u32* generations;
 };
 
-#define array_handler_make(T, H, alloc) _array_handler_make<T, H>(alloc)
-template<typename T, typename Handle> DarrayHandler<T, Handle> _array_handler_make(Allocator alloc) {
+template<typename T, typename Handle> DarrayHandler<T, Handle> array_handler_make(Allocator alloc) {
 	DarrayHandler<T, Handle> res = {
 		.alloc = alloc,
 	};
@@ -248,7 +245,7 @@ template<typename T, typename Handle> T& array_handler_get(DarrayHandler<T, Hand
 	return a.data[idx];
 }
 template<typename T, typename Handle> void array_handler_grow(DarrayHandler<T, Handle>& a) {
-	if (a.data) {
+	if(a.data) {
 		u32 cap_old = a.cap;
 		a.cap *= DEFAULT_RESIZE_FACTOR;
 		SoA_Field fields[] = {
@@ -272,7 +269,7 @@ template<typename T, typename Handle> void array_handler_grow(DarrayHandler<T, H
 	}
 }
 template<typename T, typename Handle> Handle array_handler_push(DarrayHandler<T, Handle>& a, T elem) {
-	if (a.count >= a.cap) {
+	if(a.count >= a.cap) {
 		array_handler_grow(a);
 	}
 	u32 idx = a.count++;
@@ -297,6 +294,84 @@ template<typename T, typename Handle> void array_handler_clear(DarrayHandler<T, 
 }
 
 ////////////////////////////////////////////////////////////////////////
+// SparseSet
+template<i32 N> struct SparseSet {
+	u32 count;
+	u32 sparse[N];
+	u32 dense[N];
+};
+
+template<i32 N> void sparse_set_push(SparseSet<N>& a, u32 id) {
+	Assert(a.count < N);
+	a.sparse[id] = a.count;
+	a.dense[a.count] = id;
+	a.count++;
+}
+template<i32 N> void sparse_set_remove(SparseSet<N>& a, u32 id) {
+	u32 idx_removed = a.sparse[id];
+	u32 idx_last = a.count - 1;
+	u32 last_entity = a.dense[idx_last];
+	a.sparse[last_entity] = idx_removed;
+	a.dense[idx_removed] = last_entity;
+	--a.count;
+}
+
+template<typename T> struct NodeIter {
+	T* nodes;
+	u32 idx;
+	operator b32()    { return idx != 0; }
+	void operator++() { idx = nodes[idx].next; }
+	T& operator*()    { return nodes[idx]; }
+};
+template<typename T> NodeIter<T> node_iter_begin(T* nodes, u32 first) { return {nodes, first}; }
+template<typename T, typename Handle> struct HNodeIter {
+	T* nodes;
+	Handle id;
+	operator b32()    { return id.idx != 0; }
+	void operator++() { id = nodes[id.idx].next; }
+	T& operator*()    { return nodes[id.idx]; }
+};
+template<typename T, typename Handle> HNodeIter<T,Handle> node_iter_begin(T* nodes, Handle first) { return {nodes, first}; }
+
+////////////////////////////////////////////////////////////////////////
+// PoolPtr
+template<typename T, i32 N> struct PoolPtr {
+	static_assert(sizeof(T) >= 4);
+	u32 head;
+	static constexpr i32 cap = N;
+	u32 max_idx;
+	T data[N];
+};
+
+template<typename T, i32 N> T* pool_push_empty(PoolPtr<T, N>& p) {
+	u32 idx = p.head;
+	if(idx > 0) {
+		p.head = *(u32*)&p.data[idx];
+	} else {
+		idx = ++p.max_idx;
+		Assert(idx < p.cap);
+	}
+	return &p.data[idx];
+}
+template<typename T, i32 N> T* pool_push(PoolPtr<T, N>& p, T a) {
+	T* res = pool_push_empty(p);
+	*res = a;
+	return res;
+}
+template<typename T, i32 N> void pool_remove(PoolPtr<T, N>& p, T* ptr) {
+	i64 idx = ptr - p.data;
+	Assert(idx > 0 && idx < p.cap);
+
+	*(u32*)ptr = p.head;
+	p.head = idx;
+}
+template<typename T, i32 N> void pool_clear(PoolPtr<T, N>& p) {
+	p.head = 0;
+	p.max_idx = 0;
+	ArrayZero(p.data);
+}
+
+////////////////////////////////////////////////////////////////////////
 // Poolu32
 template<typename T, i32 N> struct Poolu32 {
 	static_assert(sizeof(T) >= 4);
@@ -307,12 +382,12 @@ template<typename T, i32 N> struct Poolu32 {
 };
 
 template<typename T, i32 N> T& pool_get(Poolu32<T, N>& p, u32 idx) {
-	Assert(pool_is_valid_handle(p, idx));
+	Assert(idx > 0);
 	return p.data[idx];
 }
 template<typename T, i32 N> u32 pool_push_empty(Poolu32<T, N>& p) {
 	u32 idx = p.head;
-	if (idx > 0) {
+	if(idx > 0) {
 		p.head = *(u32*)&p.data[idx];
 	} else {
 		idx = ++p.max_idx;
@@ -335,24 +410,6 @@ template<typename T, i32 N> u32 pool_clear(Poolu32<T, N>& p) {
 	ArrayZero(p.data);
 }
 
-///////////////////////////////////
-// Iter
-template <typename T, i32 N> struct Poolu32Iter {
-	Poolu32<T, N>* pool;
-	u32 idx;
-	operator bool() const { return idx != 0; }
-	Poolu32Iter& operator++() {
-		idx = pool->data[idx].next;
-		return *this;
-	}
-	T& operator*() {
-		return pool->data[idx];
-	}
-};
-template<typename T, i32 N> Poolu32Iter<T,N> pool_begin(Poolu32<T,N>& pool, u32 first) {
-	return {&pool, first};
-}
-
 ////////////////////////////////////////////////////////////////////////
 // Pool
 template<typename T, i32 N, typename Handle> struct Pool {
@@ -370,7 +427,7 @@ template<typename T, i32 N, typename Handle> T& pool_get(Pool<T, N, Handle>& p, 
 }
 template<typename T, i32 N, typename Handle> Handle pool_push_empty(Pool<T, N, Handle>& p) {
 	u32 idx = p.head;
-	if (idx > 0) {
+	if(idx > 0) {
 		p.head = *(u32*)&p.data[idx];
 	} else {
 		idx = ++p.max_idx;
@@ -386,9 +443,13 @@ template<typename T, i32 N, typename Handle> Handle pool_push(Pool<T, N, Handle>
 }
 template<typename T, i32 N, typename Handle> void pool_remove(Pool<T, N, Handle>& p, Handle h) {
 	Assert(pool_is_valid_handle(p, h));
-	++p.gens[h.idx];
+	p.gens[h.idx]++;
 	*(u32*)&p.data[h.idx] = p.head;
 	p.head = h.idx;
+}
+template<typename T, i32 N, typename Handle> Handle pool_get_handle(Pool<T, N, Handle>& p, u32 idx) {
+	Handle res = {idx, p.gens[idx]};
+	return res;
 }
 template<typename T, i32 N, typename Handle> u32 pool_clear(Pool<T, N, Handle>& p) {
 	p.head = 0;
@@ -396,11 +457,8 @@ template<typename T, i32 N, typename Handle> u32 pool_clear(Pool<T, N, Handle>& 
 	ArrayZero(p.data);
 	ArrayZero(p.gens);
 }
-template<typename T, i32 N, typename Handle> b32 pool_is_valid_handle(Pool<T, N, Handle>& p, Handle h) {
-	if (h.idx <= 0 || h.idx > p.max_idx) {
-		return false;
-	}
-	if (p.gens[h.idx] != h.gen) {
+template <typename T, i32 N, typename Handle> b32 pool_is_valid_handle(Pool<T, N, Handle>& p, Handle h) {
+	if(h.idx <= 0 || p.gens[h.idx] != h.gen) {
 		return false;
 	}
 	return true;
@@ -423,8 +481,7 @@ template<typename T, typename Handle> struct Dpool {
 	} *data;
 };
 
-#define pool_make(T, H, alloc) _pool_make<T, H>(alloc)
-template<typename T, typename Handle> Dpool<T, Handle> _pool_make(Allocator alloc) {
+template<typename T, typename Handle> Dpool<T, Handle> pool_make(Allocator alloc) {
 	Dpool<T, Handle> res = {
 		.alloc = alloc,
 	};
@@ -435,7 +492,7 @@ template<typename T, typename Handle> T& pool_get(Dpool<T, Handle>& p, Handle h)
 	return p.data[h.idx].elem;
 }
 template<typename T, typename Handle> void pool_grow(Dpool<T, Handle>& p) {
-	if (p.data) {
+	if(p.data) {
 		u32 cap_old = p.cap;
 		p.cap *= DEFAULT_RESIZE_FACTOR;
 		SoA_Field fields[] = {
@@ -452,11 +509,11 @@ template<typename T, typename Handle> void pool_grow(Dpool<T, Handle>& p) {
 }
 template<typename T, typename Handle> Handle pool_push_empty(Dpool<T, Handle>& p) {
 	u32 idx = p.head;
-	if (idx > 0) {
+	if(idx > 0) {
 		p.head = p.data[idx].next_free;
 	} else {
 		idx = ++p.max_idx;
-		if (idx >= p.cap) {
+		if(idx >= p.cap) {
 			pool_grow(p);
 		}
 	}
@@ -470,7 +527,7 @@ template<typename T, typename Handle> Handle pool_push(Dpool<T, Handle>& p, T a)
 }
 template<typename T, typename Handle> void pool_remove(Dpool<T, Handle>& p, Handle h) {
 	pool_is_valid_handle(p, h);
-	++p.data[h.idx].gen;
+	p.data[h.idx].gen++;
 	p.data[h.idx].next_free = p.head;
 	p.head = h.idx;
 }
@@ -480,208 +537,45 @@ template<typename T, typename Handle> u32 pool_clear(Dpool<T, Handle>& p) {
 	MemZeroArray(p.data, p.max_idx);
 }
 template<typename T, typename Handle> b32 pool_is_valid_handle(Dpool<T, Handle>& p, Handle h) {
-	if (h.idx <= 0 || h.idx > p.max_idx) {
+	if(h.idx <= 0 || h.idx > p.max_idx) {
 		return false;
 	}
-	if (p.data[h.idx].gen != h.gen) {
+	if(p.data[h.idx].gen != h.gen) {
 		return false;
 	}
 	return true;
 }
 
 ///////////////////////////////////
-// PoolLinkList
-template<typename T, i32 N, typename Handle> struct PoolLinkList {
-	static_assert(sizeof(T) >= 4);
-	u32 head;
-	static constexpr i32 cap = N;
-	u32 first;
-	u32 last;
-	u32 max_idx;
-	T data[N];
-	struct {
-		u32 next;
-		u32 prev;
-	} nodes[N];
-	u32 gens[N];
+// PoolIterative
+template<typename T, i32 N, typename Handle> struct PoolIterative {
+	Pool<T, N, Handle> pool;
+	SparseSet<N> set;
 };
 
-template<typename T, i32 N, typename Handle> T& pool_get(PoolLinkList<T, N, Handle>& p, Handle h) {
-	Assert(pool_is_valid_handle(p, h));
-	return p.data[h.idx];
+template <typename T, i32 N, typename Handle> struct PoolIterativeIter {
+	PoolIterative<T, N, Handle>* pool;
+	u32 idx;
+	operator b32()    { if(idx < pool->set.count) { return true; } return false; }
+	T& operator*()    { return pool->pool.data[pool->set.dense[idx]]; }
+	void operator++() { idx++; }
+	Handle id()       { return pool_get_handle(pool->pool, pool->set.dense[idx]); }
+};
+template<typename T, i32 N, typename Handle> PoolIterativeIter<T,N,Handle> pool_begin(PoolIterative<T,N,Handle>& pool) {
+	return {&pool};
 }
-template<typename T, i32 N, typename Handle> Handle pool_push(PoolLinkList<T, N, Handle>& p) {
-	u32 idx = p.head;
-	if (idx > 0) {
-		p.head = *(u32*)&p.data[idx];
-	} else {
-		idx = ++p.max_idx;
-		Assert(idx < p.cap);
-	}
-	idll_list_push_back(p.nodes, p, idx);
-	Handle res = {idx, p.gens[idx]};
-	return res;
+
+template<typename T, i32 N, typename Handle> T& pool_get(PoolIterative<T, N, Handle>& p, Handle h) {
+	return pool_get(p.pool, h);
 }
-template<typename T, i32 N, typename Handle> Handle pool_push(PoolLinkList<T, N, Handle>& p, T a) {
-	Handle h = pool_push(p);
-	p.data[h.idx] = a;
+template<typename T, i32 N, typename Handle> Handle pool_push(PoolIterative<T, N, Handle>& p, T a) {
+	Handle h = pool_push(p.pool, a);
+	sparse_set_push(p.set, h.idx);
 	return h;
 }
-template<typename T, i32 N, typename Handle> void pool_remove(PoolLinkList<T, N, Handle>& p, Handle h) {
-	Assert(pool_is_valid_handle(p, h));
-	++p.gens[h.idx];
-	*(u32*)&p.data[h.idx] = p.head;
-	p.head = h.idx;
-	idll_list_remove(p.nodes, p, h.idx);
-}
-template<typename T, i32 N, typename Handle> Handle pool_get_handle(PoolLinkList<T, N, Handle>& p, u32 idx) {
-	Handle res = {idx, p.gens[idx]};
-	return res;
-}
-template<typename T, i32 N, typename Handle> void pool_clear(PoolLinkList<T, N, Handle>& p) {
-	p.head = 0;
-	p.max_idx = 0;
-	MemZeroArray(p.data, p.max_idx);
-}
-template<typename T, i32 N, typename Handle> b32 pool_is_valid_handle(PoolLinkList<T, N, Handle>& p, Handle h) {
-	if (h.idx <= 0 || h.idx > p.max_idx) {
-		return false;
-	}
-	if (p.gens[h.idx] != h.gen) {
-		return false;
-	}
-	return true;
-}
-
-///////////////////////////////////
-// Iter
-template <typename T, i32 N, typename Handle> struct PoolIter {
-	PoolLinkList<T, N, Handle>* pool;
-	u32 idx;
-	operator bool() const { return idx != 0; }
-	PoolIter& operator++() {
-		idx = pool->nodes[idx].next;
-		return *this;
-	}
-	T& operator*() {
-		return pool->data[idx];
-	}
-	Handle handle() { return pool_get_handle(*pool, idx); }
-};
-template<typename T, i32 N, typename Handle> PoolIter<T,N,Handle> pool_begin(PoolLinkList<T,N,Handle>& pool) {
-		return {&pool, pool.first};
-}
-
-///////////////////////////////////
-// DpoolLinkList
-template<typename T, typename Handle>
-struct DpoolLinkList {
-	static_assert(sizeof(T) >= 4);
-	u32 head;
-	u32 cap;
-	Allocator alloc;
-	u32 first;
-	u32 last;
-	u32 max_idx;
-	struct {
-		union {
-			T elem;
-			u32 next_free;
-		};
-		u32 next;
-		u32 prev;
-		u32 gen;
-	} *data;
-};
-
-#define pool_linklist_make(T, H, alloc) _pool_linklist_make<T, H>(alloc)
-template<typename T, typename Handle> DpoolLinkList<T, Handle> _pool_linklist_make(Allocator alloc) {
-	DpoolLinkList<T, Handle> res = {
-		.alloc = alloc,
-	};
-	return res;
-}
-template<typename T, typename Handle> T& pool_get(DpoolLinkList<T, Handle>& p, Handle h) {
-	Assert(pool_is_valid_handle(p, h));
-	return p.data[h.idx].elem;
-}
-template<typename T, typename Handle> void pool_grow(DpoolLinkList<T, Handle>& p) {
-	if (p.data) {
-		u32 cap_old = p.cap;
-		p.cap *= DEFAULT_RESIZE_FACTOR;
-		SoA_Field fields[] = {
-				SoA_push_field(p.data),
-		};
-		mem_realloc_soa_zero(p.alloc, cap_old, p.cap, slice(fields));
-	} else {
-		p.cap = DEFAULT_CAPACITY;
-		SoA_Field fields[] = {
-			SoA_push_field(p.data),
-		};
-		mem_alloc_soa_zero(p.alloc, p.cap, slice(fields));
-	}
-}
-template<typename T, typename Handle> Handle pool_push(DpoolLinkList<T, Handle>& p) {
-	u32 idx = p.head;
-	if (idx > 0) {
-		p.head = p.data[idx].next_free;
-	} else {
-		idx = ++p.max_idx;
-		if (idx >= p.cap) {
-			pool_grow(p);
-		}
-	}
-	idll_list_push_back(p.data, p, idx);
-	Handle res = {idx, p.data[idx].gen};
-	return res;
-}
-template<typename T, typename Handle> Handle pool_push(DpoolLinkList<T, Handle>& p, T a) {
-	Handle h = pool_push(p);
-	p.data[h.idx].elem = a;
-	return h;
-}
-template<typename T, typename Handle> void pool_remove(DpoolLinkList<T, Handle>& p, Handle h) {
-	pool_is_valid_handle(p, h);
-	++p.data[h.idx].gen;
-	p.data[h.idx].next_free = p.head;
-	p.head = h.idx;
-	idll_list_remove(p.data, p, h.idx);
-}
-template<typename T, typename Handle> Handle pool_get_handle(DpoolLinkList<T, Handle>& p, u32 idx) {
-	Handle res = {idx, p.data[idx].gen};
-	return res;
-}
-template<typename T, typename Handle> void pool_clear(DpoolLinkList<T, Handle>& p) {
-	p.head = 0;
-	p.max_idx = 0;
-	MemZeroArray(p.data, p.max_idx);
-}
-template<typename T, typename Handle> b32 pool_is_valid_handle(DpoolLinkList<T, Handle>& p, Handle h) {
-	if (h.idx <= 0 || h.idx > p.max_idx) {
-		return false;
-	}
-	if (p.data[h.idx].gen != h.gen) {
-		return false;
-	}
-	return true;
-}
-
-///////////////////////////////////
-// Iter
-template <typename T, typename Handle> struct DpoolIter {
-	DpoolLinkList<T, Handle>* pool;
-	u32 idx;
-	operator bool() const { return idx != 0; }
-	DpoolIter& operator++() {
-		idx = pool->data[idx].next;
-		return *this;
-	}
-	T& operator*() {
-		return pool->data[idx].elem;
-	}
-};
-template<typename T, typename Handle> DpoolIter<T,Handle> pool_begin(DpoolLinkList<T,Handle>& pool) {
-	return {&pool, pool.first};
+template<typename T, i32 N, typename Handle> void pool_remove(PoolIterative<T, N, Handle>& p, Handle h) {
+	sparse_set_remove(p.set, h.idx);
+	pool_remove(p.pool, h);
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -753,7 +647,7 @@ template<typename T, i32 N> struct QueueMPMC {
 
 template<typename T, i32 N> QueueMPMC<T, N> queue_mpmc_make() {
 	QueueMPMC<T, N> res = {};
-	Loop (i, N) {
+	Loop(i, N) {
 		res.data[i].seq = i;
 	}
 	return res;
@@ -764,13 +658,13 @@ template<typename T, i32 N> b32 queue_push(QueueMPMC<T, N>& q, T elem) {
 		var& slot = q.data[write % q.cap];
 		u64 seq = atomic_load(&slot.seq);
 		i64 dif = (i64)seq - (i64)write;
-		if (dif == 0) {
-			if (atomic_cmp_swap(&q.write, &write, write+1)) {
+		if(dif == 0) {
+			if(atomic_cmp_swap(&q.write, &write, write+1)) {
 				slot.elem = elem;
 				atomic_store(&slot.seq, write+1);
 				return true;
 			}
-		} else if (dif < 0) return false; // full
+		} else if(dif < 0) return false; // full
 	}
 }
 template<typename T, i32 N> ResultOk<T> queue_pop(QueueMPMC<T, N>& q) {
@@ -779,227 +673,95 @@ template<typename T, i32 N> ResultOk<T> queue_pop(QueueMPMC<T, N>& q) {
 		var& slot = q.data[read % q.cap];
 		u64 seq = atomic_load(&slot.seq);
 		i64 dif = (i64)seq - (i64)(read+1);
-		if (dif == 0) {
-			if (atomic_cmp_swap(&q.read, &read, read+1)) {
+		if(dif == 0) {
+			if(atomic_cmp_swap(&q.read, &read, read+1)) {
 				T res = slot.elem;
 				atomic_store(&slot.seq, read + N);
 				return {res, true};
 			}
-		} else if (dif < 0) return {}; // empty
+		} else if(dif < 0) return {}; // empty
 	}
 }
 
 ////////////////////////////////////////////////////////////////////////
-// SparseSet
-
-// template <typename T>
-// struct SparseSet {
-//   u32 count;
-//   u32 cap;
-//   u32 sparse_count;
-//   Allocator alloc;
-//   u32* sparse;
-//   u32* dense;
-//   T* data;
-//   SparseSet() = default;
-//   SparseSet(Allocator alloc_) { *this = {}; alloc = alloc_; }
-//   void init(Allocator alloc_) { *this = {}; alloc = alloc_; }
-//   void deinit() { if (data) { mem_free(alloc, sparse); mem_free(alloc, dense); }; }
-//   T* begin() { return data; }
-//   T* end()   { return data + count; }
-//   T& get(u32 handle) {
-//     Assert(handle < cap);
-//     DebugDo(Assert(sparse[handle] != INVALID_ID));
-//     u32 idx = sparse[handle];
-//     return data[idx];
-//   }
-//   void add(u32 handle) {
-//     if (count >= cap) {
-//       grow();
-//     }
-//     if (handle >= sparse_count) {
-//       grow_max_index(handle);
-//     }
-//     sparse[handle] = count;
-//     dense[count] = handle;
-//     ++count;
-//   }
-//   void add(u32 handle, T element) {
-//     if (count >= cap) {
-//       grow();
-//     }
-//     if (handle >= sparse_count) {
-//       grow_max_index(handle);
-//     }
-//     sparse[handle] = count;
-//     dense[count] = handle;
-//     data[count] = element;
-//     ++count;
-//   }
-//   void remove(u32 handle) {
-//     DebugDo(Assert(sparse[handle] != INVALID_ID));
-//     u32 idx_removed = sparse[handle];
-//     u32 idx_last = count - 1;
-//     data[idx_removed] = data[idx_last];
-//     u32 last_entity = dense[idx_last];
-//     sparse[last_entity] = idx_removed;
-//     dense[idx_removed] = last_entity;
-//     --count;
-//     DebugDo(sparse[handle] = INVALID_ID);
-//   }
-//   void grow() {
-//     if (data) {
-//       u32 cap_old = cap;
-//       cap *= DEFAULT_RESIZE_FACTOR;
-//       SoA_Field fields[] = {
-//         SoA_push_field(&dense, u32),
-//         SoA_push_field(&data, T),
-//       };
-//       mem_realloc_soa(alloc, cap_old, cap, slice(fields));
-//     }
-//     else {
-//       cap = DEFAULT_CAPACITY;
-//       SoA_Field fields[] = {
-//         SoA_push_field(&dense, u32),
-//         SoA_push_field(&data, T),
-//       };
-//       mem_alloc_soa(alloc, cap, slice(fields));
-//       sparse = push_array(alloc, u32, cap);
-//     }
-//   }
-//   void grow_max_index(u32 handle) {
-//     u32 modifier = CeilIntDiv(handle+1, sparse_count); // +1 since hanlde is idx in array
-//     u32 old_count = sparse_count;
-//     sparse_count *= modifier;
-//     sparse = mem_realloc_array(alloc, sparse, old_count, sparse_count);
-//   }
-// };
-
-// // it returns stable indexes and iterate through them
-// struct SparseSetIndex {
-//   u32 count;
-//   u32 cap;
-//   u32 sparse_count;
-//   Allocator alloc;
-//   u32* sparse;
-//   u32* dense;
-//   SparseSetIndex() = default;
-//   SparseSetIndex(Allocator alloc_);
-//   void init(Allocator alloc_);
-//   void deinit();
-//   u32* begin();
-//   u32* end();
-//   void add(u32 id);
-//   void remove(u32 id);
-//   void grow();
-//   void grow_max_index(u32 id);
-// };
-
-// struct DarrayIndexHandler {
-//   u32 count;
-//   u32 cap;
-//   Allocator alloc;
-//   u32* sparse;
-//   u32* dense;
-//   u32* begin();
-//   u32* end();
-//   DarrayIndexHandler() = default;
-//   DarrayIndexHandler(Allocator alloc_);
-//   void init(Allocator alloc_);
-//   void deinit();
-//   u32 add();
-//   void remove(u32 id);
-//   void grow();
-// };
-
-////////////////////////////////////////////////////////////////////////
 // IdPool
+template<i32 N> struct IdPool {
+	u32 count;
+	static constexpr i32 cap = N;
+	u32 ids[N];
+};
 
-struct IdPool {
+template<i32 N> void id_pool_init(IdPool<N>& p)            { Loop(i, p.cap) p.ids[i] = i; }
+template<i32 N> u32 id_pool_push(IdPool<N>& p)             { Assert(p.count <= p.cap); return p.ids[p.count++]; }
+template<i32 N> void id_pool_remove(IdPool<N>& p, u32 id)  { p.ids[--p.count] = id; }
+template<i32 N> void id_pool_clear(IdPool<N>& p)           { Loop(i, p.cap) p.ids[i] = i; p.count = 0; }
+
+struct DidPool {
 	u32 count;
 	u32 cap;
 	u32* ids;
 	Allocator alloc;
 };
 
-IdPool id_pool_make(Allocator alloc);
-u32 id_pool_push(IdPool& p);
-void id_pool_remove(IdPool& p, u32 id);
-void id_pool_destroy(IdPool& p);
-void id_pool_clear(IdPool& p);
-
-template<i32 N> struct StaticIdPool {
-	u32 count;
-	static constexpr i32 cap = N;
-	u32 ids[N];
-};
-
-template<i32 N> void id_pool_init(StaticIdPool<N>& p)            { Loop (i, p.cap) p.ids[i] = i; }
-template<i32 N> u32 id_pool_push(StaticIdPool<N>& p)             { Assert(p.count <= p.cap); return p.ids[p.count++]; }
-template<i32 N> void id_pool_remove(StaticIdPool<N>& p, u32 id)  { p.ids[--p.count] = id; }
-template<i32 N> void id_pool_clear(StaticIdPool<N>& p)           { Loop (i, p.cap) p.ids[i] = i; p.count = 0; }
+DidPool id_pool_make(Allocator alloc);
+u32 id_pool_push(DidPool& p);
+void id_pool_remove(DidPool& p, u32 id);
+void id_pool_destroy(DidPool& p);
+void id_pool_clear(DidPool& p);
 
 ////////////////////////////////////////////////////////////////////////
-// Map
-
+// Map (hope u64 won't be collide)
 enum MapSlot : u8 {
 	MapSlot_Empty,
 	MapSlot_Occupied,
 	MapSlot_Deleted
 };
-template<typename T> struct MapResult {
-	T value;
-	b32 ok;
-};
-template<typename Key, typename V, i32 N> struct Map {
+template<typename V, i32 N> struct Map {
 	u32 count;
 	static constexpr u32 cap = N;
 	V data[N];
-	Key keys[N];
+	u64 hashes[N];
 	MapSlot is_occupied[N];
 };
 
-template<typename Key, typename V, i32 N> V* map_set(Map<Key, V, N>& m, Key key, V val) {
+template<typename V, i32 N> V* map_set(Map<V, N>& m, u64 hash, V val) {
 	Assert(m.count < m.cap);
-	u64 hash_idx = hash(key);
-	u64 idx = mod_pow2(hash_idx, m.cap);
-	while (m.is_occupied[idx] == MapSlot_Occupied) {
-		if (equal(m.keys[idx], key)) break;
+	u64 idx = mod_pow2(hash, m.cap);
+	while(m.is_occupied[idx] == MapSlot_Occupied) {
+		if(m.hashes[idx] == hash) break;
 		idx = mod_pow2(idx + 1, m.cap);
 	}
-	m.keys[idx] = key;
+	m.hashes[idx] = hash;
 	m.data[idx] = val;
 	m.is_occupied[idx] = MapSlot_Occupied;
-	++m.count;
+	m.count++;
 	return &m.data[idx];
 }
-template<typename Key, typename V, i32 N> MapResult<V> map_get(Map<Key, V, N>& m, Key key) {
-	u64 hash_idx = hash(key);
-	u64 idx = mod_pow2(hash_idx, m.cap);
-	Loop (i, m.cap) {
-		if ((m.is_occupied[idx] == MapSlot_Occupied) && (equal(m.keys[idx], key))) {
+template<typename V, i32 N> ResultOk<V> map_get(Map<V, N>& m, u64 hash) {
+	u64 idx = mod_pow2(hash, m.cap);
+	Loop(i, m.cap) {
+		if((m.is_occupied[idx] == MapSlot_Occupied) && (m.hashes[idx] == hash)) {
 			return {m.data[idx], true};
 		} 
-		else if (m.is_occupied[idx] == MapSlot_Empty) {
+		else if(m.is_occupied[idx] == MapSlot_Empty) {
 			break;
 		}
 		idx = mod_pow2(idx + 1, m.cap);
 	}
 	return {};
 }
-template<typename Key, typename V, i32 N> void map_remove(Map<Key, V, N>& m, Key key) {
-	u64 hash_idx = hash(key);
-	u64 idx = mod_pow2(hash_idx, m.cap);
-	Loop (i, m.cap) {
-		if ((m.is_occupied[idx] == MapSlot_Occupied) && (equal(m.keys[idx] == key))) {
+template<typename V, i32 N> void map_remove(Map<V, N>& m, u64 hash) {
+	u64 idx = mod_pow2(hash, m.cap);
+	Loop(i, m.cap) {
+		if((m.is_occupied[idx] == MapSlot_Occupied) && (m.hashes[idx] == hash)) {
 			m.is_occupied[idx] = MapSlot_Deleted;
-			--m.count;
+			m.count--;
 			return;
 		}
 		idx = mod_pow2(idx + 1, m.cap);
 	}
 }
-template<typename Key, typename V, i32 N> void map_clear(Map<Key, V, N>& m, Key key) {
+template<typename V, i32 N> void map_clear(Map<V, N>& m, u64 hash) {
 	m.count = 0;
 	u8* start = (u8*)m.data;
 	u8* end = Offset(m.is_occupied, m.cap * sizeof(MapSlot));
@@ -1008,95 +770,90 @@ template<typename Key, typename V, i32 N> void map_clear(Map<Key, V, N>& m, Key 
 
 ///////////////////////////////////
 // Dmap
-template<typename Key, typename V> struct Dmap {
+template<typename V> struct Dmap {
 	static constexpr f32 LF = 0.8;
 	u32 count;
 	u32 cap;
 	Allocator alloc;
 	V* data;
-	Key* keys;
+	u64* hashes;
 	MapSlot* is_occupied;
 };
 
-#define map_make(K, V, alloc) _map_make<K, V>(alloc)
-template<typename Key, typename V> Dmap<Key, V> _map_make(Allocator alloc) {
-	Dmap<Key, V> res = {
+template<typename V> Dmap<V> map_make(Allocator alloc) {
+	Dmap<V> res = {
 		.alloc = alloc,
 	};
 	return res;
 }
-template<typename Key, typename V> void map_grow(Dmap<Key, V>& m) {
-	if (m.data) {
+template<typename V> void map_grow(Dmap<V>& m) {
+	if(m.data) {
 		V* old_data = m.data;
-		Key* old_keys = m.keys;
+		u64* old_hashes = m.hashes;
 		MapSlot* old_is_occupied = m.is_occupied;
 		u32 old_cap = m.cap;
 		m.cap *= DEFAULT_RESIZE_FACTOR;
 		SoA_Field fields[] = {
 			SoA_push_field(m.data),
-			SoA_push_field(m.keys),
+			SoA_push_field(m.hashes),
 			SoA_push_field(m.is_occupied),
 		};
 		mem_alloc_soa(m.alloc, m.cap, slice(fields));
-		Loop (i, old_cap) {
-			if (old_is_occupied[i] == MapSlot_Occupied) {
-				map_set(m, old_keys[i], old_data[i]);
+		Loop(i, old_cap) {
+			if(old_is_occupied[i] == MapSlot_Occupied) {
+				map_set(m, old_hashes[i], old_data[i]);
 			}
 		}
 		mem_free(m.alloc, old_data, mem_soa_size(old_cap, slice(fields)));
-	}
-	else {
+	} else {
 		m.cap = DEFAULT_CAPACITY;
 		SoA_Field fields[] = {
 			SoA_push_field(m.data),
-			SoA_push_field(m.keys),
+			SoA_push_field(m.hashes),
 			SoA_push_field(m.is_occupied),
 		};
 		mem_alloc_soa(m.alloc, m.cap, slice(fields));
 	}
 }
-template<typename Key, typename V> V* map_set(Dmap<Key, V>& m, Key key, V val) {
-	if (m.count >= m.cap*m.LF) { map_grow(m); }
-	u64 hash_idx = hash(key);
-	u64 idx = mod_pow2(hash_idx, m.cap);
-	while (m.is_occupied[idx] == MapSlot_Occupied) {
-		if (equal(m.keys[idx], key)) break;
+template<typename V> V* map_set(Dmap<V>& m, u64 hash, V val) {
+	if(m.count >= m.cap*m.LF) { map_grow(m); }
+	u64 idx = mod_pow2(hash, m.cap);
+	while(m.is_occupied[idx] == MapSlot_Occupied) {
+		if(m.hashes[idx] == hash) break;
 		idx = mod_pow2(idx + 1, m.cap);
 	}
-	m.keys[idx] = key;
+	m.hashes[idx] = hash;
 	m.data[idx] = val;
 	m.is_occupied[idx] = MapSlot_Occupied;
-	++m.count;
+	m.count++;
 	return &m.data[idx];
 }
-template<typename Key, typename V> MapResult<V> map_get(Dmap<Key, V>& m, Key key) {
-	if (!m.data) return {};
-	u64 hash_idx = hash(key);
-	u64 idx = mod_pow2(hash_idx, m.cap);
-	Loop (i, m.cap) {
-		if ((m.is_occupied[idx] == MapSlot_Occupied) && (equal(m.keys[idx], key))) {
+template<typename V> ResultOk<V> map_get(Dmap<V>& m, u64 hash) {
+	if(!m.data) return {};
+	u64 idx = mod_pow2(hash, m.cap);
+	Loop(i, m.cap) {
+		if((m.is_occupied[idx] == MapSlot_Occupied) && (m.hashes[idx] == hash)) {
 			return {m.data[idx], true};
 		} 
-		else if (m.is_occupied[idx] == MapSlot_Empty) {
+		else if(m.is_occupied[idx] == MapSlot_Empty) {
 			break;
 		}
 		idx = mod_pow2(idx + 1, m.cap);
 	}
 	return {};
 }
-template<typename Key, typename V> void map_remove(Dmap<Key, V>& m, Key key) {
-	u64 hash_idx = hash(key);
-	u64 idx = mod_pow2(hash_idx, m.cap);
-	Loop (i, m.cap) {
-		if ((m.is_occupied[idx] == MapSlot_Occupied) && (equal(m.keys[idx] == key))) {
+template<typename V> void map_remove(Dmap<V>& m, u64 hash) {
+	u64 idx = mod_pow2(hash, m.cap);
+	Loop(i, m.cap) {
+		if((m.is_occupied[idx] == MapSlot_Occupied) && (m.hashes[idx] == hash)) {
 			m.is_occupied[idx] = MapSlot_Deleted;
-			--m.count;
+			m.count--;
 			return;
 		}
 		idx = mod_pow2(idx + 1, m.cap);
 	}
 }
-template<typename Key, typename V> void map_clear(Dmap<Key, V>& m, Key key) {
+template<typename V> void map_clear(Dmap<V>& m) {
 	m.count = 0;
 	u8* start = (u8*)m.data;
 	u8* end = Offset(m.is_occupied, m.cap * sizeof(MapSlot));
@@ -1109,10 +866,10 @@ template<typename Key, typename V> void map_clear(Dmap<Key, V>& m, Key key) {
 ///////////////////////////////////
 // Insert
 template<typename T, typename Cmp> void sort_insert(Slice<T> slice, Cmp cmp) {
-	for (i32 i = 1; i < slice.count; ++i) {
+	for(i32 i = 1; i < slice.count; i++) {
 		T key = slice[i];
 		i32 j = i - 1;
-		while (j >= 0 && cmp(key, slice[j])) {
+		while(j >= 0 && cmp(key, slice[j])) {
 			slice[j + 1] = slice[j];
 			j--;
 		}
@@ -1125,8 +882,8 @@ template<typename T, typename Cmp> void sort_insert(Slice<T> slice, Cmp cmp) {
 template<typename T, typename Cmp> i32 _lomuto_partition(T* arr, i32 low, i32 high, Cmp cmp) {
 	T pivot = arr[high];
 	i32 i = low;
-	for (i32 j = low; j < high; ++j) {
-		if (cmp(arr[j], pivot)) {
+	for(i32 j = low; j < high; j++) {
+		if(cmp(arr[j], pivot)) {
 			Swap(arr[i], arr[j]);
 			i++;
 		}
@@ -1135,7 +892,7 @@ template<typename T, typename Cmp> i32 _lomuto_partition(T* arr, i32 low, i32 hi
 	return i;
 }
 template<typename T, typename Cmp> void _quick_sort(Slice<T> arr, i32 low, i32 high, Cmp cmp) {
-	if (low < high) {
+	if(low < high) {
 		i32 p = _lomuto_partition(arr.data, low, high, cmp);
 		_quick_sort(arr, low, p - 1, cmp);
 		_quick_sort(arr, p + 1, high, cmp);
@@ -1149,31 +906,35 @@ template<typename T, typename Cmp> void _merge(T* arr, T* tmp, u32 left, u32 mid
 	u32 i = left;
 	u32 j = mid + 1;
 	u32 k = left;
-	while (i <= mid && j <= right) {
-		if (arr[i] <= arr[j]) {
+	while(i <= mid && j <= right) {
+		if(!cmp(arr[j], arr[i])) {
 			tmp[k++] = arr[i++];
 		} else {
 			tmp[k++] = arr[j++];
 		}
 	}
-	while (i <= mid) {
+	while(i <= mid) {
 		tmp[k++] = arr[i++];
 	}
-	while (j <= right) {
+	while(j <= right) {
 		tmp[k++] = arr[j++];
 	}
-	for (u32 x = left; x <= right; ++x) {
+	for(u32 x = left; x <= right; ++x) {
 		arr[x] = tmp[x];
 	}
 }
 template<typename T, typename Cmp> void _merge_sort(T* arr, T* tmp, u32 left, u32 right, Cmp cmp) {
-	if (left >= right) return;
+	if(left >= right) return;
 	u32 mid = left + (right - left) / 2;
 	_merge_sort(arr, tmp, left, mid, cmp);
 	_merge_sort(arr, tmp, mid + 1, right, cmp);
 	_merge(arr, tmp, left, mid, right, cmp);
 }
-template<typename T, typename Cmp> void sort_merge(Allocator alloc, Slice<T> arr, Cmp cmp) { Slice tmp = push_slice(alloc, T, arr.count); _merge_sort(arr.data, tmp.data, 0, arr.count-1, cmp); }
+template<typename T, typename Cmp> void sort_merge(Allocator alloc, Slice<T> arr, Cmp cmp) {
+	if(arr.count < 2) return;
+	Slice tmp = push_slice(alloc, T, arr.count);
+	_merge_sort(arr.data, tmp.data, 0, arr.count-1, cmp);
+}
 
 ///////////////////////////////////
 // Radix
@@ -1189,8 +950,8 @@ void sort_radix(Allocator alloc, Slice<SortEntry> arr);
 ////////////////////////////////////////////////////////////////////////
 // List sort
 template<typename T, typename Cmp> Slice<T> sort_list_insert(Allocator arena, T first, Cmp cmp) {
-	var sorted_arr = array_make(T, arena);
-	for (T it = first; it != 0; it = it->next) {
+	var sorted_arr = array_make<T>(arena);
+	for(T it = first; it != 0; it = it->next) {
 		array_push(sorted_arr, it);
 	}
 	sort_insert(slice(sorted_arr), cmp);

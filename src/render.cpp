@@ -2,70 +2,10 @@
 #include "stb_image.h"
 #include "stb_truetype.h"
 
-static R_Vertex dummy_vertices[] = {
-	// Body - front
-	{{-1, -1, +1}, { 0,  0, +1}, {0, 0}, {0.8, 0.8, 0.8, 1}},
-	{{+1, -1, +1}, { 0,  0, +1}, {1, 0}, {0.8, 0.8, 0.8, 1}},
-	{{+1, +1, +1}, { 0,  0, +1}, {1, 1}, {0.8, 0.8, 0.8, 1}},
-	{{-1, +1, +1}, { 0,  0, +1}, {0, 1}, {0.8, 0.8, 0.8, 1}},
-
-	// Body - back
-	{{+1, -1, -1}, { 0,  0, -1}, {0, 0}, {0.8, 0.8, 0.8, 1}},
-	{{-1, -1, -1}, { 0,  0, -1}, {1, 0}, {0.8, 0.8, 0.8, 1}},
-	{{-1, +1, -1}, { 0,  0, -1}, {1, 1}, {0.8, 0.8, 0.8, 1}},
-	{{+1, +1, -1}, { 0,  0, -1}, {0, 1}, {0.8, 0.8, 0.8, 1}},
-
-	// Body - right
-	{{+1, -1, +1}, {+1,  0,  0}, {0, 0}, {0.8, 0.8, 0.8, 1}},
-	{{+1, -1, -1}, {+1,  0,  0}, {1, 0}, {0.8, 0.8, 0.8, 1}},
-	{{+1, +1, -1}, {+1,  0,  0}, {1, 1}, {0.8, 0.8, 0.8, 1}},
-	{{+1, +1, +1}, {+1,  0,  0}, {0, 1}, {0.8, 0.8, 0.8, 1}},
-
-	// Body - left
-	{{-1, -1, -1}, {-1,  0,  0}, {0, 0}, {0.8, 0.8, 0.8, 1}},
-	{{-1, -1, +1}, {-1,  0,  0}, {1, 0}, {0.8, 0.8, 0.8, 1}},
-	{{-1, +1, +1}, {-1,  0,  0}, {1, 1}, {0.8, 0.8, 0.8, 1}},
-	{{-1, +1, -1}, {-1,  0,  0}, {0, 1}, {0.8, 0.8, 0.8, 1}},
-
-	// Roof - front
-	{{-1, +1, +1}, {0, 0.707, 0.707}, {0, 0}, {1, 0.2, 0.1, 1}},
-	{{+1, +1, +1}, {0, 0.707, 0.707}, {1, 0}, {1, 0.2, 0.1, 1}},
-	{{ 0, +2, +1}, {0, 0.707, 0.707}, {0.5, 1}, {1, 0.2, 0.1, 1}},
-
-	// Roof - back
-	{{+1, +1, -1}, {0, 0.707, -0.707}, {0, 0}, {0.8, 0.1, 0.1, 1}},
-	{{-1, +1, -1}, {0, 0.707, -0.707}, {1, 0}, {0.8, 0.1, 0.1, 1}},
-	{{ 0, +2, -1}, {0, 0.707, -0.707}, {0.5, 1}, {0.8, 0.1, 0.1, 1}},
-
-	// Roof - right
-	{{+1, +1, +1}, {0.707, 0.707, 0}, {0, 0}, {1, 0.3, 0.1, 1}},
-	{{+1, +1, -1}, {0.707, 0.707, 0}, {1, 0}, {1, 0.3, 0.1, 1}},
-	{{ 0, +2,  0}, {0.707, 0.707, 0}, {0.5, 1}, {1, 0.3, 0.1, 1}},
-
-	// Roof - left
-	{{-1, +1, -1}, {-0.707, 0.707, 0}, {0, 0}, {0.9, 0.2, 0.1, 1}},
-	{{-1, +1, +1}, {-0.707, 0.707, 0}, {1, 0}, {0.9, 0.2, 0.1, 1}},
-	{{ 0, +2,  0}, {-0.707, 0.707, 0}, {0.5, 1}, {0.9, 0.2, 0.1, 1}},
-};
-
-static u32 dummy_indices[] = {
-	// Body
-	0, 1, 2,  0, 2, 3,
-	4, 5, 6,  4, 6, 7,
-	8, 9,10,  8,10,11,
-	12,13,14, 12,14,15,
-
-	// Roof
-	16,17,18,
-	19,20,21,
-	22,23,24,
-	25,26,27,
-};
-
 R_DrawBatch r_make_draw_batch(Allocator alloc, Gfx_Pipeline pip) {
 	R_DrawBatch res = {
-		.draws = array_make(R_DrawCall, alloc),
-		.unindexed_draws = array_make(R_DrawCall, alloc),
+		.draws = array_make<R_DrawCall>(alloc),
+		.unindexed_draws = array_make<R_DrawCall>(alloc),
 	};
 	return res;
 }
@@ -73,19 +13,19 @@ R_DrawBatch r_make_draw_batch(Allocator alloc, Gfx_Pipeline pip) {
 R_Attachment r_make_attachment(R_AttachmentDesc desc) {
 	R_Attachment res = {.type = desc.type};
 	Gfx_ImageUsage usage = 0;
-	switch (desc.type) {
+	switch(desc.type) {
 		InvalidDefaultCase;
 		case R_AttachmentType_Color: usage = Gfx_ImageUsage_ColorAttachment; break;
 		case R_AttachmentType_Resolve: usage = Gfx_ImageUsage_ResolveAttachment; break;
 		case R_AttachmentType_Depth: usage = Gfx_ImageUsage_DepthStencilAttachment; break;
 	}
-	Loop (i, st->gfx.images_in_flight) {
+	Loop(i, st->gfx.images_in_flight) {
 		res.images[i] = gfx_make_image({
 			.usage = usage,
 			.width = desc.size.x,
 			.height = desc.size.y
 		});
-		switch (desc.type) {
+		switch(desc.type) {
 			InvalidDefaultCase;
 			case R_AttachmentType_Color: res.views[i] = gfx_make_view({Gfx_ViewType_ColorAttachment, res.images[i]}); break;
 			case R_AttachmentType_Resolve: res.views[i] = gfx_make_view({Gfx_ViewType_ResolveAttachment, res.images[i]}); break;
@@ -95,7 +35,7 @@ R_Attachment r_make_attachment(R_AttachmentDesc desc) {
 	return res;
 }
 void r_destroy_attachment(R_Attachment attachment) {
-	Loop (i, st->gfx.images_in_flight) {
+	Loop(i, st->gfx.images_in_flight) {
 		gfx_destroy_image(attachment.images[i]);
 		gfx_destroy_view(attachment.views[i]);
 	}
@@ -107,25 +47,25 @@ void r_recreate_attachment(R_Attachment* attachment, v2u size) {
 
 R_RenderTarget r_make_render_target(R_RenderTargetUsage usage, v2u size) {
 	R_RenderTarget res = {.attachments = usage};
-	if (flag_has(usage, R_RenderTargetUsage_Color)) {
+	if(flag_has(usage, R_RenderTargetUsage_Color)) {
 		res.color = r_make_attachment({.type = R_AttachmentType_Color, .size = size});
 	}
-	if (flag_has(usage, R_RenderTargetUsage_Resolve)) {
+	if(flag_has(usage, R_RenderTargetUsage_Resolve)) {
 		res.resolve = r_make_attachment({.type = R_AttachmentType_Resolve, .size = size});
 	}
-	if (flag_has(usage, R_RenderTargetUsage_Depth)) {
+	if(flag_has(usage, R_RenderTargetUsage_Depth)) {
 		res.depth = r_make_attachment({.type = R_AttachmentType_Depth, .size = size});
 	}
 	return res;
 }
 void r_destroy_render_target(R_RenderTarget rt) {
-	if (flag_has(rt.attachments, R_RenderTargetUsage_Color)) {
+	if(flag_has(rt.attachments, R_RenderTargetUsage_Color)) {
 		r_destroy_attachment(rt.color);
 	}
-	if (flag_has(rt.attachments, R_RenderTargetUsage_Resolve)) {
+	if(flag_has(rt.attachments, R_RenderTargetUsage_Resolve)) {
 		r_destroy_attachment(rt.resolve);
 	}
-	if (flag_has(rt.attachments, R_RenderTargetUsage_Depth)) {
+	if(flag_has(rt.attachments, R_RenderTargetUsage_Depth)) {
 		r_destroy_attachment(rt.depth);
 	}
 }
@@ -135,13 +75,13 @@ void r_recreate_render_target(R_RenderTarget* rt, v2u size) {
 }
 Gfx_Attachments r_render_target_to_attachments(R_RenderTarget rt) {
 	Gfx_Attachments att = {};
-	if (flag_has(rt.attachments, R_RenderTargetUsage_Color)) {
+	if(flag_has(rt.attachments, R_RenderTargetUsage_Color)) {
 		att.color = rt.color.views[st->gfx.current_image_idx];
 	}
-	if (flag_has(rt.attachments, R_RenderTargetUsage_Resolve)) {
+	if(flag_has(rt.attachments, R_RenderTargetUsage_Resolve)) {
 		att.resolve = rt.resolve.views[st->gfx.current_image_idx];
 	}
-	if (flag_has(rt.attachments, R_RenderTargetUsage_Depth)) {
+	if(flag_has(rt.attachments, R_RenderTargetUsage_Depth)) {
 		att.depth_stencil = rt.depth.views[st->gfx.current_image_idx];
 	}
 	return att;
@@ -182,11 +122,11 @@ R_MeshDesc r_load_mesh(String name) {
 	String filepath = push_strf(scratch, "%s/%s", st->models_dir, name);
 	String format = str_skip_last_dot(name);
 	R_MeshDesc res = {};
-	if (str_match(format, "glb")) {
+	if(str_match(format, "glb")) {
 		res = load_gltf(scratch, filepath, true);
-	} else if (str_match(format, "gltf")) {
+	} else if(str_match(format, "gltf")) {
 		res = load_gltf(scratch, filepath, false);
-	} else if (str_match(format, "obj")) {
+	} else if(str_match(format, "obj")) {
 		res = load_obj(scratch, filepath);
 	} else {
 		InvalidPath;
@@ -209,14 +149,14 @@ R_TextureId r_make_texture(R_TextureDesc desc) {
 		Ctx& ctx = *(Ctx*)in;
 		var& g = st->r;
 		var desc = ctx.desc;
-		if (desc.name.size) {
+		if(desc.name.size) {
 			R_TextureDesc loaded = desc.is_cube ? r_load_cubemap(desc.name) : r_load_texture(desc.name);
 			desc.width = loaded.width;
 			desc.height = loaded.height;
 			ArrayCopy(desc.cube, loaded.cube);
 		}
 		Slice<Slice<u8>> data = push_slice(scratch, Slice<u8>, 6);
-		Loop (i, 6) {
+		Loop(i, 6) {
 			data[i] = Slice(desc.cube[i], desc.width * desc.height * gfx_pixelformat_bytesize(desc.pixel_format));
 		}
 		u32 stage_offset = desc.is_cube ? gfx_push_stage_buffers(data) : gfx_push_stage_buffer(data[0]);
@@ -234,7 +174,7 @@ R_TextureId r_make_texture(R_TextureDesc desc) {
 			},
 		});
 	};
-	if (desc.name.size) {
+	if(desc.name.size) {
 		var& ctx = thread_push_ctx(Ctx);
 		ctx = {
 			.desc = desc,
@@ -253,7 +193,7 @@ R_TextureId r_make_texture(R_TextureDesc desc) {
 
 R_TextureId r_make_dummy_texture(R_TextureDesc desc) {
 	var& g = st->r;
-	if (desc.name.size) {
+	if(desc.name.size) {
 		R_TextureDesc loaded = desc.is_cube ? r_load_cubemap(desc.name) : r_load_texture(desc.name);
 		desc.width = loaded.width;
 		desc.height = loaded.height;
@@ -288,18 +228,17 @@ R_MeshId r_make_mesh(R_MeshDesc desc) {
 		Ctx& ctx = *(Ctx*)in;
 		var& g = st->r;
 		var desc = ctx.desc;
-		if (desc.name.size) {
+		if(desc.name.size) {
 			desc = r_load_mesh(desc.name);
 		}
 		os_mutex_lock(g.vert_index_buffer_mutex);
 		u64 vert_buf_off = gfx_push_buffer(g.vert_reg, slice_size(desc.vertices));
 		u64 index_buf_off = gfx_push_buffer(g.index_reg, slice_size(desc.indices));
 		os_mutex_unlock(g.vert_index_buffer_mutex);
-
 		u32 base_vert = vert_buf_off / sizeof(R_Vertex);
 		u32 stage_offset = gfx_push_stage_buffer(slice_to_bytes(desc.vertices));
 		u32 base_index = 0;
-		if (desc.indices.count) {
+		if(desc.indices.count) {
 			base_index = index_buf_off / sizeof(u32);
 			gfx_push_stage_buffer(slice_to_bytes(desc.indices));
 		}
@@ -316,7 +255,7 @@ R_MeshId r_make_mesh(R_MeshDesc desc) {
 			.stage_off = stage_offset,
 		});
 	};
-	if (desc.name.size) {
+	if(desc.name.size) {
 		var& ctx = thread_push_ctx(Ctx);
 		ctx = {
 			.desc = desc,
@@ -335,14 +274,14 @@ R_MeshId r_make_mesh(R_MeshDesc desc) {
 
 R_MeshId r_make_dummy_mesh(R_MeshDesc desc) {
 	var& g = st->r;
-	if (desc.name.size) {
+	if(desc.name.size) {
 		desc = r_load_mesh(desc.name);
 	}
 	u64 buf_offset = gfx_push_buffer(g.vert_reg, slice_size(desc.vertices));
 	u32 base_vert = buf_offset / sizeof(R_Vertex);
 	gfx_update_buffer(g.vert_reg, buf_offset, slice_to_bytes(desc.vertices));
 	u32 base_index = 0;
-	if (desc.indices.count) {
+	if(desc.indices.count) {
 		u64 buf_offset = gfx_push_buffer(g.index_reg, slice_size(desc.indices));
 		base_index = buf_offset / sizeof(u32);
 		gfx_update_buffer(g.index_reg, buf_offset, slice_to_bytes(desc.indices));
@@ -366,7 +305,7 @@ u32 r_make_pipeline_state(Gfx_PipelineState s) {
 
 R_MaterialId r_make_material(R_Material mat) {
 	var& g = st->r;
-	if (!mat.base_color.idx) {
+	if(!mat.base_color.idx) {
 		mat.base_color = g.dummy_texture;
 	}
 	R_MaterialId res = pool_push(g.materials, mat);
@@ -376,11 +315,11 @@ R_MaterialId r_make_material(R_Material mat) {
 Gfx_Pipeline r_make_pipeline(String name, Gfx_PipelineDesc desc) {
 	Scratch scratch;
 	var& g = st->r;
-	u32 module_idx = or_else(map_get(g.shader_to_module_idx, name),
+	u32 module_idx = or_else(map_get(g.shader_to_module_idx, hash(name)),
 		Slice code = os_file_path_read_all(scratch, push_strf(scratch, "%s/%s.spv", st->shader_compiled_dir, name));
 		R_ShaderModuleWithPipelines entry = {.shd = gfx_make_shader(code)};
 		u32 idx = array_push(g.shader_modules, entry);
-		map_set(g.shader_to_module_idx, name, idx);
+		map_set(g.shader_to_module_idx, hash(name), idx);
 		idx;
 	);
 	desc.shader = g.shader_modules[module_idx].shd;
@@ -393,11 +332,11 @@ Gfx_Pipeline r_make_pipeline(String name, Gfx_PipelineDesc desc) {
 Gfx_Pipeline r_make_pipeline2(String name, Gfx_PipelineDesc2 desc) {
 	Scratch scratch;
 	var& g = st->r;
-	u32 module_idx = or_else(map_get(g.shader_to_module_idx, name),
+	u32 module_idx = or_else(map_get(g.shader_to_module_idx, hash(name)),
 		Slice code = os_file_path_read_all(scratch, push_strf(scratch, "%s/%s.spv", st->shader_compiled_dir, name));
 		R_ShaderModuleWithPipelines entry = {.shd = gfx_make_shader(code)};
 		u32 idx = array_push(g.shader_modules, entry);
-		map_set(g.shader_to_module_idx, name, idx);
+		map_set(g.shader_to_module_idx, hash(name), idx);
 		idx;
 	);
 	desc.shader = g.shader_modules[module_idx].shd;
@@ -450,8 +389,8 @@ R_FontId r_make_font(R_FontDesc desc) {
 		}
 		LockScope(g.waiting_fonts_mutex);
 		array_push(g.waiting_fonts, {
-				.id = ctx.font_id,
-				.font = font,
+			.id = ctx.font_id,
+			.font = font,
 		});
 	});
 	return res;
@@ -539,12 +478,12 @@ void r_reload_shader(String name) {
 	Scratch scratch;
 	R_State& g = st->r;
 	Info("reload '%s' shader", name);
-	var module_idx = map_get(g.shader_to_module_idx, name);
+	var module_idx = map_get(g.shader_to_module_idx, hash(name));
 	Assert(module_idx.ok);
 	R_ShaderModuleWithPipelines entry = g.shader_modules[module_idx.value];
 	Slice code = os_file_path_read_all(scratch, push_strf(scratch, "%s/%s.spv", st->shader_compiled_dir, name));
 	gfx_update_shader(entry.shd, code);
-	Loop (i, entry.pipelines.count) {
+	Loop(i, entry.pipelines.count) {
 		Gfx_Pipeline pip = entry.pipelines[i];
 		// gfx_update_pipeline(pip, gfx_query_pipeline_desc(pip));
 		gfx_update_pipeline2(pip, gfx_query_pipeline_desc2(pip));
@@ -557,20 +496,18 @@ void r_shaders_compile(Allocator arena) {
 	String shader_dir = st->shader_dir;
 	String compiled_shader_dir = st->shader_compiled_dir;
 	String saved_time_stamps = push_strf(scratch, "%s/%s", cur_dir, String("saved_time_stamps_for_shad"));
-
-	if (!os_directory_path_exist(shader_dir)) {
+	if(!os_directory_path_exist(shader_dir)) {
 		os_directory_make(shader_dir);
 	}
-	if (!os_directory_path_exist(compiled_shader_dir)) {
+	if(!os_directory_path_exist(compiled_shader_dir)) {
 		os_directory_make(compiled_shader_dir);
 	}
-
 	String com_path = push_strf(scratch, "%s/%s", shader_dir, String("com.slang"));
 	String lib_path = push_strf(scratch, "%s/%s", shader_dir, String("lib.slang"));
 	String header_path = push_strf(scratch, "%s/../src/shader_header.h", os_cur_directory());
-	DenseTime com_modified = os_file_path_mtime(com_path);
-	DenseTime lib_modified = os_file_path_mtime(lib_path);
-	DenseTime header_modified = os_file_path_mtime(header_path);
+	u64 com_modified = os_file_path_mtime(com_path);
+	u64 lib_modified = os_file_path_mtime(lib_path);
+	u64 header_modified = os_file_path_mtime(header_path);
 	FileProperties time_stamp_file_props = os_file_path_properties(saved_time_stamps);
 
 	///////////////////////////////////
@@ -581,16 +518,16 @@ void r_shaders_compile(Allocator arena) {
 		u64 header_modified;
 	};
 	b32 recompile = false;
-	if (time_stamp_file_props.size == 0) {
+	if(time_stamp_file_props.size == 0) {
 		recompile = true;
 	} else {
 		Slice buf = os_file_path_read_all(scratch, saved_time_stamps);
 		FileData* data = (FileData*)buf.data;
-		if (com_modified != data->com_modified || lib_modified != data->lib_modified || header_modified != data->header_modified) {
+		if(com_modified != data->com_modified || lib_modified != data->lib_modified || header_modified != data->header_modified) {
 			recompile = true;
 		}
 	}
-	if (recompile) {
+	if(recompile) {
 		FileData data = {
 			.com_modified = com_modified,
 			.lib_modified = lib_modified,
@@ -607,18 +544,18 @@ void r_shaders_compile(Allocator arena) {
 		String shader_name;
 		OS_Handle pid;
 	};
-	var files = array_make(File, scratch);
+	var files = array_make<File>(scratch);
 	Slice infos = os_file_iter_directory(scratch, shader_dir, OS_FileIterFlag_SkipFolders);
-	Loop (i, infos.count) {
+	Loop(i, infos.count) {
 		String name = infos[i].name;
 		String file_path = push_strf(scratch, "%s/%s", shader_dir, name);
 		String shader_name = str_chop_last_dot(name);
 		String compiled_file_path = push_strf(scratch, "%s/%s.spv", compiled_shader_dir, shader_name);
-		if (str_match(name, "com.slang") || str_match(name, "lib.slang")) {
+		if(str_match(name, "com.slang") || str_match(name, "lib.slang")) {
 			continue;
 		}
 		FileProperties compiled_props = os_file_path_properties(compiled_file_path);
-		if (infos[i].props.modified != compiled_props.modified || recompile) {
+		if(infos[i].props.modified != compiled_props.modified || recompile) {
 			File f = {
 				.file_path = file_path,
 				.compiled_file_path = compiled_file_path,
@@ -631,12 +568,12 @@ void r_shaders_compile(Allocator arena) {
 	///////////////////////////////////
 	// Compilation
 	R_State& g = st->r;
-	var file_names = array_make(String, arena);
+	var file_names = array_make<String>(arena);
 	g.shader_module_compilation_pids = push_slice(st->arena, OS_Handle, files.count);
 	g.shaders_to_compile = push_slice(st->arena, String, files.count);
-	Loop (i, files.count) {
+	Loop(i, files.count) {
 		File& f = files[i];
-		var arr = array_make(String, scratch);
+		var arr = array_make<String>(scratch);
 		array_push(arr, S("slangc"), f.file_path, S("-target"), S("spirv"), S("-O0"), S("-g3"), S("-o"), f.compiled_file_path);
 		g.shader_module_compilation_pids[i] = os_process_make(slice(arr));
 		Debug("%s", f.file_path);
@@ -648,7 +585,7 @@ void r_shaders_compile(Allocator arena) {
 void r_shaders_compile_join() {
 	Scratch scratch;
 	R_State& g = st->r;
-	Loop (i, g.shaders_to_compile.count) {
+	Loop(i, g.shaders_to_compile.count) {
 		os_process_join(g.shader_module_compilation_pids[i]);
 		String shader_file_path = push_strf(scratch, "%s/%s.slang", st->shader_dir, g.shaders_to_compile[i]);
 		String compiled_file_path = push_strf(scratch, "%s/%s.spv", st->shader_compiled_dir, g.shaders_to_compile[i]);
@@ -680,7 +617,7 @@ void r_apply_state_raw(Gfx_PipelineState s = {}) {
 	gfx_apply_depth_write(s.depth.write_enabled);
 	gfx_apply_depth_compare(s.depth.compare);
 	gfx_apply_color_blend_enable(s.blend.enabled);
-	if (s.blend.enabled) {
+	if(s.blend.enabled) {
 		gfx_apply_color_blend_equation(s.blend);
 	}
 	gfx_apply_color_blend_mask(s.blend);
@@ -689,42 +626,42 @@ void r_apply_state_raw(Gfx_PipelineState s = {}) {
 void r_apply_state(Gfx_PipelineState s) {
 	var& g = st->r;
 	r_default_pipeline_state(&s);
-	if (g.cur_pip.idx != g.prev_pip.idx) {
+	if(g.cur_pip.idx != g.prev_pip.idx) {
 		g.prev_pip = g.cur_pip;
 		r_apply_state_raw(s);
 	} else {
 		var& prev = g.prev_pip_state;
-		if (s.primitive_type != prev.primitive_type) {
+		if(s.primitive_type != prev.primitive_type) {
 			gfx_apply_primitive_type(s.primitive_type);
 		}
-		if (s.cull_mode != prev.cull_mode) {
+		if(s.cull_mode != prev.cull_mode) {
 			gfx_apply_cull_mode(s.cull_mode);
 		}
-		if (s.face_winding != prev.face_winding) {
+		if(s.face_winding != prev.face_winding) {
 			gfx_apply_face_winding(s.face_winding);
 		}
-		if (s.depth.test_disable != prev.depth.test_disable) {
+		if(s.depth.test_disable != prev.depth.test_disable) {
 			gfx_apply_depth_test(s.depth.test_disable);
 		}
-		if (s.depth.write_enabled != prev.depth.write_enabled) {
+		if(s.depth.write_enabled != prev.depth.write_enabled) {
 			gfx_apply_depth_write(s.depth.write_enabled);
 		}
-		if (s.depth.compare != prev.depth.compare) {
+		if(s.depth.compare != prev.depth.compare) {
 			gfx_apply_depth_compare(s.depth.compare);
 		}
-		if (s.depth.write_enabled != prev.depth.write_enabled) {
+		if(s.depth.write_enabled != prev.depth.write_enabled) {
 			gfx_apply_color_blend_enable(s.blend.enabled);
 		}
-		if (s.blend.enabled) {
+		if(s.blend.enabled) {
 			Gfx_BlendState b = s.blend;
 			Gfx_BlendState pb = prev.blend;
-			if (b.src_factor_rgb != pb.src_factor_rgb || b.dst_factor_rgb != pb.dst_factor_rgb || b.op_rgb != pb.op_rgb ||
-							b.src_factor_alpha != pb.src_factor_alpha || b.dst_factor_alpha != pb.dst_factor_alpha || b.op_alpha != pb.op_alpha)
+			if(b.src_factor_rgb != pb.src_factor_rgb || b.dst_factor_rgb != pb.dst_factor_rgb || b.op_rgb != pb.op_rgb ||
+						b.src_factor_alpha != pb.src_factor_alpha || b.dst_factor_alpha != pb.dst_factor_alpha || b.op_alpha != pb.op_alpha)
 			{
 				gfx_apply_color_blend_equation(s.blend);
 			}
 		}
-		if (s.blend.write_mask != prev.blend.write_mask) {
+		if(s.blend.write_mask != prev.blend.write_mask) {
 			gfx_apply_color_blend_mask(s.blend);
 		}
 	}
@@ -742,7 +679,6 @@ void r_init() {
 	// g.push_to_gpu_queue_mutex = os_mutex_make();
 	// g.vert_index_buffer_mutex = os_mutex_make();
 	// g.waiting_fonts_mutex = os_mutex_make();
-
 	gfx_init({.cpu_mem_size = MB(100), .gpu_mem_size = MB(10), .image_mem_size = MB(10)});
 
 	///////////////////////////////////
@@ -797,9 +733,9 @@ void r_init() {
 		g.gpu_state->p = st->gfx.cpu_buf_address;
 	}
 
+	// Misc
 	g.world_rt = r_make_render_target(R_RenderTargetUsage_Color | R_RenderTargetUsage_Resolve | R_RenderTargetUsage_Depth, os_window_size());
 	g.com_sampler = gfx_make_sampler({});
-
 	{
 		ProfBlock("Waiting for compiling shaders");
 		r_shaders_compile_join();
@@ -819,7 +755,7 @@ void r_init() {
 			.height = dum.width,
 			.is_cube = true,
 		};
-		Loop (i, 6) {
+		Loop(i, 6) {
 			cube.cube[i] = (u8*)dum.data;
 		}
 		g.dummy_cubemap = r_make_dummy_texture(cube);
@@ -839,9 +775,7 @@ void r_init() {
 	{
 		g.ui_rect_pip = r_make_pipeline2("ui_rect", {});
 	}
-
 	Info("Renderer initialized");
-
 }
 
 void r_shutdown() {
@@ -862,7 +796,7 @@ void r_end() {
 	g.prev_pip = {};
 
 	// Resize?
-	if (st->gfx.swapchain_resized || g.old_scale != g.scale) {
+	if(st->gfx.swapchain_resized || g.old_scale != g.scale) {
 		g.old_scale = g.scale;
 		gfx_idle();
 		v2u win_size = os_window_size();
@@ -872,9 +806,9 @@ void r_end() {
 	// Push to gpu
 	{
 		LockScope(g.push_to_gpu_queue_mutex);
-		Loop (i, queue_count(g.push_to_gpu_queue)) {
+		Loop(i, queue_count(g.push_to_gpu_queue)) {
 			var push = queue_pop(g.push_to_gpu_queue);
-			switch (push.type) {
+			switch(push.type) {
 				InvalidDefaultCase;
 				case R_PushToGpuType_Texture: {
 					Gfx_Image image = gfx_make_image(push.image_desc);
@@ -890,7 +824,7 @@ void r_end() {
 					};
 					push.counter = counter;
 					queue_push(g.finished_gpu_queue, push);
-				} break;
+				}break;
 				case R_PushToGpuType_Mesh: {
 					var mesh = push.mesh;
 					u32 vert_size = mesh.vert_count*sizeof(R_Vertex);
@@ -901,7 +835,7 @@ void r_end() {
 						.size = vert_size,
 						.buf_offset = push.mesh.base_vert*sizeof(R_Vertex),
 					});
-					if (mesh.index_count) {
+					if(mesh.index_count) {
 						gfx_push_stage_buffer_cmd({
 							.type = Gfx_CmdType_Mesh,
 							.stage_offset = push.stage_off + vert_size,
@@ -912,35 +846,36 @@ void r_end() {
 					}
 					push.counter = counter;
 					queue_push(g.finished_gpu_queue, push);
-				} break;
+				}break;
 			}
 		}
 	}
 
-	// Update dummies
+	// Update dummies?
 	{
-		Loop (i, queue_count(g.finished_gpu_queue)) {
-			if (queue_front(g.finished_gpu_queue).counter <= gfx_ready_counter()) {
+		Loop(i, queue_count(g.finished_gpu_queue)) {
+			if(queue_front(g.finished_gpu_queue).counter <= gfx_ready_counter()) {
 				var slot = queue_pop(g.finished_gpu_queue);
-				switch (slot.type) {
+				switch(slot.type) {
 					InvalidDefaultCase;
 					case R_PushToGpuType_Texture: {
 						var& t = pool_get(g.textures, slot.texture_id);
 						t = slot.texture;
 						t.is_ready = true;
-					} break;
+					}break;
 					case R_PushToGpuType_Mesh: {
 						var& t = pool_get(g.meshes, slot.mesh_id);
 						t = slot.mesh;
-					} break;
+					}break;
 				}
 			} else break;
 		} 
 
+		// Update font?
 		LockScope(g.waiting_fonts_mutex);
-		LoopNoInc (i, g.waiting_fonts.count) {
+		LoopNoInc(i, g.waiting_fonts.count) {
 			var slot = g.waiting_fonts[i];
-			if (r_texture_is_ready(slot.font.texture)) {
+			if(r_texture_is_ready(slot.font.texture)) {
 				pool_get(g.fonts, slot.id) = slot.font;
 				array_swap_remove(g.waiting_fonts, i);
 			} else {
@@ -949,6 +884,7 @@ void r_end() {
 		}
 	}
 
+	// Write to shaders
 	{
 		var& gpu_st = *g.gpu_state;
 		gpu_st.projection_view = st->projection * st->view;
@@ -956,7 +892,7 @@ void r_end() {
 		gpu_st.view = st->view;
 		gpu_st.ambient_color = st->ambient_color;
 		u32 idx = 0;
-		LoopIter (it, pool_begin(g.materials)) {
+		LoopIter(it, pool_begin(g.materials)) {
 			var& mat = *it;
 			mat.idx = idx;
 			R_MaterialProps props = mat.props;
@@ -971,10 +907,9 @@ void r_end() {
 		gpu_st.cubemap = r_texture_descriptor_idx(g.cur_cubemap);
 	}
 
-	u32 drawcall_count = 0;
-
 	///////////////////////////////////
 	// World
+	u32 drawcall_count = 0;
 	{
 		gfx_begin_pass({.attachments = r_render_target_to_attachments(g.world_rt)});
 		{
@@ -983,11 +918,11 @@ void r_end() {
 			gfx_bind_vert(g.vert_reg);
 			gfx_bind_index(g.index_reg);
 			r_bind_pipeline(g.uber_pip);
-			for (var& batch : g.batches) {
+			for(var& batch : g.batches) {
 				r_apply_state(batch.state);
 				var emit_batch = [&](Slice<R_DrawCall> pushes, b32 indexed) {
 					u32 base = gfx_begin_indirect();
-					Loop (i, pushes.count) {
+					Loop(i, pushes.count) {
 						R_DrawCall draw = pushes[i];
 						m4x4 model = m4x4_transform(draw.scale, draw.pos, draw.rot);
 						// m4x4 model = m4x4_from_quat(draw.rot) * m4x4_translate(draw.pos) * m4x4_scale(draw.scale);
@@ -1003,9 +938,9 @@ void r_end() {
 						gfx_push_indirect_mesh(mesh, drawcall_count++);
 					}
 					Gfx_IndirectDrawCall draw = gfx_end_indirect(base);
-					if (draw.count) {
+					if(draw.count) {
 						vk_push_constants({draw.base});
-						if (indexed) {
+						if(indexed) {
 								gfx_draw_indexed_indirect(draw);
 						} else {
 								gfx_draw_indirect(draw);
@@ -1020,7 +955,7 @@ void r_end() {
 
 			// Debug drawing
 			gfx_bind_vert(g.cpu_vert_reg);
-			if (g.draw_lines.count) {
+			if(g.draw_lines.count) {
 				MemCopyArray(g.cpu_vertices, g.draw_lines.data, g.draw_lines.count);
 				r_apply_state({
 					.primitive_type = Gfx_PrimitiveType_Line,
@@ -1041,7 +976,7 @@ void r_end() {
 				gfx_draw(0, g.draw_lines.count);
 				array_clear(g.draw_lines);
 			}
-			// if (g.draw_lines_persistent.count) {
+			// if(g.draw_lines_persistent.count) {
 			//   gfx_bind_pipeline(g.uber_pip_debug_line);
 			//   gfx_draw(g.draw_base_persistent_lines, g.draw_lines_persistent.count);
 			// }
@@ -1055,8 +990,8 @@ void r_end() {
 
 			// UI drawing
 			gfx_apply_viewport(rng2_make(v2(), os_window_size()));
-			if (g.draw_rects.count) {
-				LoopArr (i, g.draw_rects) {
+			if(g.draw_rects.count) {
+				Loop(i, g.draw_rects.count) {
 					var rect = g.draw_rects[i];
 					g.gpu_ui_rects[i] = {
 						.dst_p0 = rect.dst_p0,
@@ -1068,6 +1003,7 @@ void r_end() {
 						.edge_softness = rect.edge_softness,
 						.texture = rect.texture,
 						.flags = rect.flags,
+						.border_thickness = rect.border_thickness,
 					};
 					ArrayCopy(g.gpu_ui_rects[i].colors, rect.colors);
 				}
@@ -1121,7 +1057,7 @@ void r_draw_mesh(R_MeshId mesh, R_MaterialId mat, v3 pos) {
 		.mat = mat,
 		.type = material.type,
 	};
-	if (pool_get(g.meshes, mesh).index_count) {
+	if(pool_get(g.meshes, mesh).index_count) {
 		array_push(g.batches[batch_idx].draws, cmd);
 	} else {
 		array_push(g.batches[batch_idx].unindexed_draws, cmd);
@@ -1140,7 +1076,7 @@ void r_draw_mesh_trs(R_MeshId mesh, R_MaterialId mat, v3 pos, v4 rot, v3 scale) 
 		.mat = mat,
 		.type = material.type,
 	};
-	if (pool_get(g.meshes, mesh).index_count) {
+	if(pool_get(g.meshes, mesh).index_count) {
 		array_push(g.batches[batch_idx].draws, cmd);
 	} else {
 		array_push(g.batches[batch_idx].unindexed_draws, cmd);
@@ -1161,7 +1097,7 @@ void r_draw_entity(ThingId id) {
 		.mat = e.mat,
 		.type = material.type,
 	};
-	if (pool_get(g.meshes, e.mesh).index_count) {
+	if(pool_get(g.meshes, e.mesh).index_count) {
 		array_push(g.batches[batch_idx].draws, cmd);
 	} else {
 		array_push(g.batches[batch_idx].unindexed_draws, cmd);
@@ -1186,10 +1122,8 @@ void r_draw_line_persistent(v3 a, v3 b, v4 color) {
 
 void r_draw_grid(v3 center, u32 slices, f32 spacing, v4 color) {
 	var& lines = st->r.draw_lines;
-
 	f32 half = slices * spacing * 0.5f;
-
-	for (u32 i = 0; i <= slices; ++i) {
+	for(u32 i = 0; i <= slices; i++) {
 		f32 t = i * spacing - half;
 
 		// Horizontal line
@@ -1231,13 +1165,46 @@ void r_draw_cuboid(Rng3 rng, v4 color) {
 	r_draw_line(p100, p110, color);
 }
 
+void r_draw_rect(Rng2 rect, v4 color, f32 corner_radius, f32 border_thickness, f32 edge_softness) {
+	var& g = st->r;
+	R_UI_Rect vert = {
+		.dst_p0 = rect.min,
+		.dst_p1 = rect.max,
+		.corner_radius = corner_radius,
+		.border_thickness = border_thickness,
+		.edge_softness = edge_softness,
+	};
+	for(v4& x : vert.colors) x = color;
+	array_push(g.draw_rects, vert);
+}
+
+void r_draw_texture(Rng2 dst, Rng2 src, R_TextureId tex, v4 color, f32 corner_radius, f32 border_thickness, f32 edge_softness) {
+	var& g = st->r;
+	var t = pool_get(g.textures, tex);
+	var desc = gfx_query_image_desc(t.image);
+	v2 tex_size = v2(desc.width, desc.height);
+	R_UI_Rect vert = {
+		.dst_p0 = dst.min,
+		.dst_p1 = dst.max,
+		.src_p0 = src.min,
+		.src_p1 = src.max,
+		.corner_radius = corner_radius,
+		.border_thickness = border_thickness,
+		.edge_softness = edge_softness,
+		.tex_size = tex_size,
+		.texture = r_texture_descriptor_idx(tex),
+	};
+	for(v4& x : vert.colors) x = ColorWhite;
+	array_push(g.draw_rects, vert);
+}
+
 void r_draw_rect(Rng2 rect, v4 color) {
 	var& g = st->r;
 	R_UI_Rect vert = {
 		.dst_p0 = rect.min,
 		.dst_p1 = rect.max,
 	};
-	for (v4& x : vert.colors) x = color;
+	for(v4& x : vert.colors) x = color;
 	array_push(g.draw_rects, vert);
 }
 
@@ -1249,7 +1216,7 @@ void r_draw_rect_rounded(Rng2 rect, v4 color, f32 corner_radius, f32 edge_softne
 		.corner_radius = corner_radius,
 		.edge_softness = edge_softness,
 	};
-	for (v4& x : vert.colors) x = color;
+	for(v4& x : vert.colors) x = color;
 	array_push(g.draw_rects, vert);
 }
 
@@ -1266,6 +1233,17 @@ void r_draw_rect_gradient(Rng2 rect, R_Gradient grad) {
 	array_push(g.draw_rects, vert);
 }
 
+void r_draw_rect_thickborders(Rng2 rect, v4 color, f32 thick) {
+	var& g = st->r;
+	R_UI_Rect vert = {
+		.dst_p0 = rect.min,
+		.dst_p1 = rect.max,
+		.border_thickness = thick,
+	};
+	for(v4& x : vert.colors) x = color;
+	array_push(g.draw_rects, vert);
+}
+
 void r_draw_texture(Rng2 rect, R_TextureId tex) {
 	var& g = st->r;
 	var t = pool_get(g.textures, tex);
@@ -1279,7 +1257,7 @@ void r_draw_texture(Rng2 rect, R_TextureId tex) {
 		.tex_size = tex_size,
 		.texture = r_texture_descriptor_idx(tex),
 	};
-	for (v4& x : vert.colors) x = ColorWhite;
+	for(v4& x : vert.colors) x = ColorWhite;
 	array_push(g.draw_rects, vert);
 }
 
@@ -1304,19 +1282,14 @@ void r_draw_text_ext(R_FontId font, v2 pos, String str, v4 color, u32 font_heigh
 	v2 tex_size = v2(desc.width, desc.height);
 	v2 cursor = pos;
 	f32 scale = (f32)font_height / fo.font_height;
-	Loop (i, str.size) {
+	Loop(i, str.size) {
 		u8 c = str.str[i];
 		var glyph = fo.glyphs[c - 32];
-
-		// screen pos
 		f32 y0 = cursor.y + glyph.yoff * scale;
 		f32 x0 = cursor.x + glyph.xoff * scale;
 		f32 x1 = x0 + rng2u_width(glyph.rect) * scale;
 		f32 y1 = y0 + rng2u_height(glyph.rect) * scale;
-
-		// advance cursor
 		cursor.x += glyph.xadvance * scale;
-
 		R_UI_Rect rect = {
 			.dst_p0 = v2(x0,y0),
 			.dst_p1 = v2(x1,y1),
@@ -1326,7 +1299,7 @@ void r_draw_text_ext(R_FontId font, v2 pos, String str, v4 color, u32 font_heigh
 			.texture = r_texture_descriptor_idx(fo.texture),
 			.flags = GpuUI_RectFlag_IsFont,
 		};
-		for (v4& col : rect.colors) col = color;
+		for(v4& col : rect.colors) col = color;
 		array_push(g.draw_rects, rect);
 	}
 }
@@ -1338,7 +1311,8 @@ void r_draw_text_ext(R_FontId font, v2 pos, String str, v4 color, u32 font_heigh
 #include "imgui/imgui_impl_vulkan.h"
 
 ImGuiKey imgui_keycode_translate(Key key) {
-	switch (key) {
+	switch(key) {
+		default: return ImGuiKey_None;
 		case Key_Tab:         return ImGuiKey_Tab;
 		case Key_Left:        return ImGuiKey_LeftArrow;
 		case Key_Right:       return ImGuiKey_RightArrow;
@@ -1436,13 +1410,11 @@ ImGuiKey imgui_keycode_translate(Key key) {
 		case Key_Backslash:   return ImGuiKey_Backslash;
 		case Key_RBracket:    return ImGuiKey_RightBracket;
 		case Key_Apostrophe:  return ImGuiKey_Apostrophe;
-
-		default: return ImGuiKey_None;
 	}
 }
 
 u32 imgui_mouse_button_translate(MouseButton button) {
-	switch (button) {
+	switch(button) {
 		InvalidDefaultCase;
 		case MouseButton_Left:   return ImGuiMouseButton_Left;
 		case MouseButton_Right:  return ImGuiMouseButton_Right;
@@ -1459,56 +1431,56 @@ void imgui_impl_new_frame() {
 	v2u win_size = os_window_size();
 	io.DisplaySize = ImVec2(win_size.x, win_size.y);
 	Slice<OS_InputEvent> events = os_get_input_events();
-	if (last_key_event.is_pressed) {
+	if(last_key_event.is_pressed) {
 		_timer_type_repeat_delay.acc += time_dt;
-		if (_timer_type_repeat_delay.acc >= _timer_type_repeat_delay.interval) {
-			if (time_on_interval(1.0/20)) {
+		if(_timer_type_repeat_delay.acc >= _timer_type_repeat_delay.interval) {
+			if(time_on_interval(1.0/20)) {
 				io.AddInputCharacter(os_key_to_character(last_key_event.key, last_key_event.modifier));
 			}
 		}
 	}
-	Loop (i, events.count) {
+	Loop(i, events.count) {
 		OS_InputEvent event = events[i];
-		switch (event.type) {
+		switch(event.type) {
 			case OS_EventType_Key: {
-				if (event.key < Key_COUNT && event.key != Key_Super) {
+				if(event.key < Key_COUNT && event.key != Key_Super) {
 					last_key_event = event;
 					_timer_type_repeat_delay.acc = 0;
 				}
 				ImGuiKey key = imgui_keycode_translate(event.key);
 				io.AddKeyEvent(key, event.is_pressed);
 				// Info("%u %u", event.key, event.is_pressed);
-				if (event.is_pressed) {
+				if(event.is_pressed) {
 					io.AddInputCharacter(os_key_to_character(event.key, event.modifier));
 				}
-			} break;
+			}break;
 			case OS_EventType_MouseButton: {
 				io.AddMouseButtonEvent(imgui_mouse_button_translate(event.mouse_button), event.is_pressed);
-			} break;
+			}break;
 			case OS_EventType_MouseMove: {
 				io.AddMousePosEvent(event.x, event.y);
-			} break;
+			}break;
 			case OS_EventType_Scroll: {
 				io.AddMouseWheelEvent(0, event.scroll);
-			} break;
+			}break;
 			case OS_EventType_Modifier: {
-				if (flag_has(event.modifier, OS_Modifier_Shift)) {
+				if(flag_has(event.modifier, OS_Modifier_Shift)) {
 					io.AddKeyEvent(ImGuiMod_Shift, true);
 					// Info("mod shift true");
 				} else {
 					io.AddKeyEvent(ImGuiMod_Shift, false);
 					// Info("mod shift false");
 				}
-				if (flag_has(event.modifier, OS_Modifier_Alt)) {
+				if(flag_has(event.modifier, OS_Modifier_Alt)) {
 					io.AddKeyEvent(ImGuiMod_Alt, true);
 				} else {
 					io.AddKeyEvent(ImGuiMod_Alt, false);
 				}
-				if (flag_has(event.modifier, OS_Modifier_Ctrl)) {
+				if(flag_has(event.modifier, OS_Modifier_Ctrl)) {
 					io.AddKeyEvent(ImGuiMod_Ctrl, true);
 				} else {
 					io.AddKeyEvent(ImGuiMod_Ctrl, false);
-				} break;
+				}break;
 			}
 		}
 	}
@@ -1522,11 +1494,9 @@ void imgui_init() {
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	ImGuiStyle& style = ImGui::GetStyle();
 	style.FontScaleDpi = 1.3;
-
 	ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
 	platform_io.Platform_GetClipboardTextFn = imgui_platform_get_clipboard_text;
 	platform_io.Platform_SetClipboardTextFn = imgui_platform_set_clipboard_text;
-
 	VkDescriptorPoolSize pool_sizes[] = {
 		{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
 	};

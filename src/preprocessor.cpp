@@ -10,20 +10,20 @@ i32 main(i32 count, char* args[]) {
 	Slice tokens = tokens_from_str(scratch, str_make(buf));
 	Parser p = parser_make(tokens);
 	var string = dstr_make(scratch);
-	while (!tok_is_end(p)) {
+	while(!tok_is_end(p)) {
 		Token tok = tok_advance(p);
-		switch (tok.type) {
-			default:{} break;
+		switch(tok.type) {
+			default:break;
 			case TokenType_Identifier: {
-				if (str_match(tok.str, "Introspect")) {
+				if(str_match(tok.str, "Introspect")) {
 					tok_ident_require(p, "struct");
 					Token struct_name = tok_require(p, TokenType_Identifier);
 					dstr_push(string, push_strf(scratch, "MemberDefinition members_of_%s[] = {\n", struct_name.str));
 					tok_require(p, TokenType_OpenBrace);
-					while (!tok_match(p, TokenType_CloseBrace)) {
+					while(!tok_match(p, TokenType_CloseBrace)) {
 						Token field_type = tok_require(p, TokenType_Identifier);
 						// b32 is_pointer = false;
-						// if (tok_peek(p).type == TokenType_Asterisk) {
+						// if(tok_peek(p).type == TokenType_Asterisk) {
 						//   tok_advance(p);
 						//   is_pointer = true;
 						// }
@@ -34,7 +34,7 @@ i32 main(i32 count, char* args[]) {
 					}
 					dstr_push(string, String("};\n"));
 				}
-			} break;
+			}break;
 		}
 	}
 	os_file_write(file, dstr_slice(string));

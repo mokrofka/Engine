@@ -108,7 +108,7 @@ u64 ring_write(RingBuffer& ring, void* src, u64 src_size) {
 	u64 first = Min(ring.size - offset, src_size);
 	u64 second = src_size - first;
 	MemCopy(ring.base + offset, src, first);
-	if (second) {
+	if(second) {
 		MemCopy(ring.base, Offset(src, first), second);
 	}
 	ring.write_pos += src_size;
@@ -121,7 +121,7 @@ u64 ring_read(RingBuffer& ring, void* dst, u64 dst_size) {
 	u64 first = Min(ring.size - offset, dst_size);
 	u64 second = dst_size - first;
 	MemCopy(dst, ring.base+offset, first);
-	if (second) {
+	if(second) {
 		MemCopy(Offset(dst, first), ring.base, second);
 	}
 	ring.read_pos += dst_size;
@@ -133,7 +133,7 @@ u64 ring_write_nowrap(RingBuffer& ring, void* src, u64 src_size, u64 align) {
 	u64 offset = AlignUp(ring.write_pos, align) % ring.size;
 	u64 tail = ring.size - offset;
 	b32 wrap = src_size > tail;
-	if (wrap) {
+	if(wrap) {
 		ring.write_pos += tail;
 		offset = 0;
 	}
@@ -147,7 +147,7 @@ u64 ring_read_nowrap(RingBuffer& ring, void* dst, u64 dst_size) {
 	u64 offset = ring.read_pos % ring.size;
 	u64 tail = ring.size - offset;
 	b32 wrap = dst_size > tail;
-	if (wrap) {
+	if(wrap) {
 		ring.read_pos += tail;
 		offset = 0;
 	}
@@ -352,13 +352,13 @@ f32x4 simd_clamp01(f32x4 x)                 { return simd_clamp(simd_zero(), x, 
 // }
 
 // void coro_destroy(Coro *co) {
-//   if (!co) return;
+//   if(!co) return;
 //   free(co->stack_mem);
 //   free(co);
 // }
 
 // Coro *coro_current(void) {
-//   if (!g_current) g_current = &g_thread_ctx;
+//   if(!g_current) g_current = &g_thread_ctx;
 //   return g_current;
 // }
 
@@ -393,7 +393,7 @@ f32x4 simd_clamp01(f32x4 x)                 { return simd_clamp(simd_zero(), x, 
 
 // void example(void* ctx) {
 //   u32* i = (u32*)ctx;
-//   Loop (c, *i) {
+//   Loop(c, *i) {
 //     // Info("from coroutine %i", c);
 //     printf("example %i\n", *i);
 //     coro_yield();
@@ -421,8 +421,8 @@ f32x4 simd_clamp01(f32x4 x)                 { return simd_clamp(simd_zero(), x, 
 //   u64 word_i;
 //   u64 word;
 //   operator bool() {
-//     while (word == 0) {
-//       if (word_i >= bitset_word_count(*bits))
+//     while(word == 0) {
+//       if(word_i >= bitset_word_count(*bits))
 //         return false;
 //       word = bits->words[word_i];
 //       ++word_i;
@@ -446,8 +446,8 @@ f32x4 simd_clamp01(f32x4 x)                 { return simd_clamp(simd_zero(), x, 
 // }
 
 // template<i32 N> b32 bit_iter_next(BitSetIter<N>* it, ThingId* out) {
-//   while (it->word == 0) {
-//     if (it->word_i >= bitset_word_count(*it->bits))
+//   while(it->word == 0) {
+//     if(it->word_i >= bitset_word_count(*it->bits))
 //       return false;
 //     it->word = it->bits->words[it->word_i];
 //     ++it->word_i;
@@ -540,7 +540,7 @@ f32x4 simd_clamp01(f32x4 x)                 { return simd_clamp(simd_zero(), x, 
 //       Node* last;
 //     };
 //     List list = {};
-//     Loop (i, 10) {
+//     Loop(i, 10) {
 //       Node* n = push_struct(scratch, Node);
 //       n->i = i;
 //       dll_list_push_back(list, n);

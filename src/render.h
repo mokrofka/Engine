@@ -13,12 +13,6 @@ const u32 R_MaxDebugLines = KB(1);
 
 #include "shader_header.h"
 
-MakeId(R_TextureId)
-MakeId(R_MeshId)
-MakeId(R_MaterialId)
-MakeId(R_FontId)
-MakeId(R_LightId)
-
 struct R_UI_Rect {
 	v2 dst_p0;
 	v2 dst_p1;
@@ -30,6 +24,7 @@ struct R_UI_Rect {
 	u32 flags;
 	f32 corner_radius;
 	f32 edge_softness;
+	f32 border_thickness;
 };
 
 struct Image {
@@ -231,8 +226,8 @@ struct R_State {
 	f32 old_scale;
 	
 	Array<R_ShaderModuleWithPipelines, Gfx_MaxShaders> shader_modules;
-	Map<String, u32, Gfx_MaxShaders> shader_to_module_idx;
-	PoolLinkList<R_Material, R_MaxMaterials, R_MaterialId> materials;
+	Map<u32, Gfx_MaxShaders> shader_to_module_idx;
+	PoolIterative<R_Material, R_MaxMaterials, R_MaterialId> materials;
 	Array<R_DrawBatch, 8> batches;
 
 	Pool<Gfx_Mesh, R_MaxMeshes, R_MeshId> meshes;
@@ -347,9 +342,12 @@ void r_draw_line(v3 a, v3 b, v4 color);
 void r_draw_line_persistent(v3 a, v3 b, v4 color);
 void r_draw_grid(v3 center, u32 slices, f32 spacing, v4 color);
 void r_draw_cuboid(Rng3 rng, v4 color);
+void r_draw_rect(Rng2 rect, v4 color, f32 corner_radius, f32 border_thickness, f32 edge_softness);
+void r_draw_texture(Rng2 dst, Rng2 src, R_TextureId tex, v4 color, f32 corner_radius, f32 border_thickness, f32 edge_softness);
 void r_draw_rect(Rng2 rect, v4 color);
 void r_draw_rect_rounded(Rng2 rect, v4 color, f32 corner_radius, f32 edge_softness);
 void r_draw_rect_gradient(Rng2 rect, R_Gradient grad);
+void r_draw_rect_thickborders(Rng2 rect, v4 color, f32 thick);
 void r_draw_texture(Rng2 rect, R_TextureId tex);
 void r_draw_rect_outline(Rng2 rect, u32 thickness, v4 color);
 void r_draw_text_ext(R_FontId font, v2 pos, String str, v4 color, u32 font_height);

@@ -19,7 +19,6 @@ typedef double f64;
 typedef u8  b8;
 typedef i32 b32;
 
-typedef u64 DenseTime;
 typedef va_list VaList;
 
 #if _WIN64
@@ -232,24 +231,24 @@ u32 prev_pow2(u32 n);
 #define Glue(A,B)      _Glue(A,B)
 #define Scope(...)     ({__VA_ARGS__})
 #define _Def(val, def)    											(((val) == 0) ? (def) : (val))
-#define _DefSet(val, def) 											if (val == 0) val = def
-#define _DefIfSet(val, expr, def) if (expr) val = def
+#define _DefSet(val, def) 											if(val == 0) val = def
+#define _DefIfSet(val, expr, def) if(expr) val = def
 
-#define For for(;;)
-#define Loop(it, c)                      for (i32 it = 0; it < c; ++it)
-#define LoopNoInc(it, c)                 for (i32 it = 0; it < c;)
-#define LoopReverse(it, count)           for (i32 it = (count) - 1; it >= 0; --it)
-#define LoopOff(it, li, hi)              for (i32 it = (li); it < (hi); ++it)
-#define LoopArr(it, c)                   for (i32 it = 0; it < c.count; ++it)
-#define LoopArray(it, array)             for (i32 it = 0; it < ArrayCount(array); ++it)
-#define LoopEnum(it, type)               for (type it = (type)0; it < type##_COUNT; it = (type)(it+1))
-#define LoopEnumNonZero(it, type)        for (type it = (type)1; it < type##_COUNT; it = (type)(it+1))
-#define LoopRange(it, range)             for (i32 it = (range).min; it < (range).max; ++it)
-#define LoopNode(it, first)              for (var* it = first; it != 0; it = it->next)
-#define LoopNodeReverse(it, last)        for (var* it = last; it != 0; it = it->prev)
-#define LoopHNode(it, first, arr)        for (var it = first; it.idx != 0; it = (arr)[it.idx].next)
-#define LoopINode(it, first, arr)        for (var it = first; it != 0; it = (arr)[it].next)
-#define LoopIter(it, foo)                for (var it = foo; it; ++it)
+#define For 																						for(;;)
+#define Loop(it, c)               for(i32 it = 0; it < c; ++it)
+#define LoopNoInc(it, c)          for(i32 it = 0; it < c;)
+#define LoopReverse(it, count)    for(i32 it = (count) - 1; it >= 0; --it)
+#define LoopOff(it, li, hi)       for(i32 it = (li); it < (hi); ++it)
+// #define LoopArr(it, c)            for(i32 it = 0; it < c.count; ++it)
+#define LoopArray(it, array)      for(i32 it = 0; it < ArrayCount(array); ++it)
+#define LoopEnum(it, type)        for(type it = (type)0; it < type##_COUNT; it = (type)(it+1))
+#define LoopEnumNonZero(it, type) for(type it = (type)1; it < type##_COUNT; it = (type)(it+1))
+#define LoopRange(it, range)      for(i32 it = (range).min; it < (range).max; ++it)
+#define LoopNode(it, first)       for(var* it = first; it != 0; it = it->next)
+#define LoopNodeReverse(it, last) for(var* it = last; it != 0; it = it->prev)
+#define LoopHNode(it, first, arr) for(var it = first; it.idx != 0; it = (arr)[it.idx].next)
+#define LoopINode(it, first, arr) for(var it = first; it != 0; it = (arr)[it].next)
+#define LoopIter(it, begin) 						for(var it = begin; it; ++it)
 
 ////////////////////////////////////////////////////////////////////////
 // Asserts
@@ -368,11 +367,11 @@ inline u32 atomic_cmp_swap_old(u32* x, u32 expect, u32 v) { u32 res = expect; at
 #define dll_pop_back(first, last, n)   DLL_pop_back(first, last, n, next, prev)
 #define dll_pop_front(first, last, n)  DLL_pop_front(first, last, n, next, prev)
 
-#define dll_list_push_back(list, n)  DLL_push_back(list.first, list.last, n, next, prev)
-#define dll_list_push_front(list, n) DLL_push_front(list.first, list.last, n, next, prev)
-#define dll_list_remove(list, n)     DLL_remove(list.first, list.last, n, next, prev)
-#define dll_list_pop_back(list, n)   DLL_pop_back(list.first, list.last, n, next, prev)
-#define dll_list_pop_front(list, n)  DLL_pop_front(list.first, list.last, n, next, prev)
+#define dll_list_push_back(list, n)  DLL_push_back((list)->first, (list)->last, n, next, prev)
+#define dll_list_push_front(list, n) DLL_push_front((list)->first, (list)->last, n, next, prev)
+#define dll_list_remove(list, n)     DLL_remove((list)->first, (list)->last, n, next, prev)
+#define dll_list_pop_back(list, n)   DLL_pop_back((list)->first, (list)->last, n, next, prev)
+#define dll_list_pop_front(list, n)  DLL_pop_front((list)->first, (list)->last, n, next, prev)
 
 #define sll_stack_push(first, n)       SLL_stack_push(first, n, next)
 #define sll_stack_pop(first)           SLL_stack_pop(first, next)
@@ -480,80 +479,79 @@ template<typename F> struct _Defer {
 	~_Defer() { f(); }
 };
 #define defer(code) auto Glue(_defer_, __LINE__) = _Defer([&](){ code; })
-#define DeferLoop(begin, end) for (int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
-#define DeferLoopIf(begin, end) for (int _i_ = (begin); _i_; _i_ = false, (end))
+#define DeferLoop(begin, end) for(int _i_ = ((begin), 1); _i_; _i_ = 0, (end))
+#define DeferLoopIf(begin, end) for(int _i_ = (begin); _i_; _i_ = false, (end))
 
 template<typename T> struct ResultOk {
 	T value;
 	b32 ok;
 };
-
 template<typename T, typename Err = b32> struct ResultErr {
 	T value;
-	Err ok;
+	Err err;
 };
 
 ///////////////////////////////////
 // or_else
-#define OrElse(value, ok, expr, fallback)     \
-		Scope(                                      \
-				var _temp = (expr);                       \
-				_temp.ok ? _temp.value : Scope(fallback); \
-		)
+#define OrElse(value, ok, expr, fallback)   \
+	Scope(                                     \
+		var _temp = (expr);                       \
+		_temp.ok ? _temp.value : Scope(fallback); \
+	)
 #define or_else(expr, fallback) OrElse(value, ok, expr, fallback)
-#define OrElseErr(value, err, expr, fallback)   \
-		Scope(                                        \
-				var _temp = (expr);                         \
-				!_temp.err ? _temp.value : Scope(fallback); \
-		)
+#define OrElseErr(value, err, expr, fallback) \
+	Scope(                                       \
+		var _temp = (expr);                         \
+		!_temp.err ? _temp.value : Scope(fallback); \
+	)
 #define or_else_err(expr, fallback) OrElseErr(value, err, expr, fallback)
 
 ///////////////////////////////////
 // or_return
 #define OrReturn(value, ok, expr) \
-		Scope(                          \
-				var _temp = (expr);           \
-				if (!_temp.ok) return {};     \
-				_temp.value;                  \
-		)
+	Scope(                           \
+		var _temp = (expr);             \
+		if(!_temp.ok) return {};       \
+		_temp.value;                    \
+	)
 #define or_return(expr) OrReturn(value, ok, expr)
-#define OrReturnErr(value, err, expr)          \
-		Scope(                                       \
-				var _temp = (expr);                        \
-				if (!_temp.err) return {.err = _temp.err}; \
-				_temp.value;                               \
-		)
+#define OrReturnErr(value, err, expr)        \
+	Scope(                                      \
+		var _temp = (expr);                        \
+		if(!_temp.err) return {.err = _temp.err}; \
+		_temp.value;                               \
+	)
 #define or_return_err(expr) OrReturn(value, err, expr)
 
 ///////////////////////////////////
 // or_continue
 #define OrContinue(value, ok, expr) \
-		Scope(                            \
-				var _temp = (expr);             \
-				if (!_temp.ok) continue;        \
-				_temp.value;                    \
-		)
+	Scope(                             \
+		var _temp = (expr);               \
+		if(!_temp.ok) continue;          \
+		_temp.value;                      \
+	)
 #define or_continue(expr) OrContinue(value, ok, expr)
-#define OrContinueErr(value, err, expr)   \
-		Scope(                                  \
-				var _temp = (expr);                   \
-				if (_temp.err) continue; _temp.value; \
-		)
+#define OrContinueErr(value, err, expr) \
+	Scope(                                 \
+		var _temp = (expr);                   \
+		if(_temp.err) continue; _temp.value; \
+	)
 #define or_continue_err(expr) OrContinueErr(value, err, expr)
 
 ///////////////////////////////////
 // or_break
-#define OrBreak(value, ok, expr)       \
-		Scope(                               \
-				var _temp = (expr);                \
-				if (!_temp.ok) break; _temp.value; \
-		)
+#define OrBreak(value, ok, expr)     \
+	Scope(                              \
+		var _temp = (expr);                \
+		if(!_temp.ok) break; _temp.value; \
+	)
 #define or_break(expr) OrBreak(value, ok, expr)
-#define OrBreakErr(value, err, expr)   \
-		Scope(                               \
-				var _temp = (expr);                \
-				if (_temp.err) break; _temp.value; \
-		)
+#define OrBreakErr(value, err, expr) \
+	Scope(                              \
+		var _temp = (expr);                \
+		if(_temp.err) break; _temp.value; \
+	)
 #define or_break_err(expr) OrBreakErr(value, err, expr)
 
 ////////////////////////////////////////////////////////////////////////
@@ -664,6 +662,7 @@ struct String {
 	u64 size;
 	String() = default;
 	NO_DEBUG String(const char* str_);
+	NO_DEBUG String(u8* str, u64 size):str(str),size(size){}
 };
 
 struct String64 {
@@ -696,13 +695,13 @@ struct Coroutine {
 u8* Restrict _coroutine_var(Coroutine* co, u32 size);
 #define co_var(co, T) *(T*)_coroutine_var(co, sizeof(T))
 
-#define co_begin(co)          do { co->flag = 0; switch (co->line[co->index]) { default: 
+#define co_begin(co)          do { co->flag = 0; switch(co->line[co->index]) { default: 
 #define co_case(co, name)     case __LINE__: name: co->line[co->index] = __LINE__;
-#define co_wait(co, time, dt) do { case __LINE__: co->line[co->index] = __LINE__; co->elapsed += dt; do { if (co->elapsed < time) { co->flag = 1; goto __co_end; } else { co->elapsed = 0; } } while (0); } while (0)
-#define co_exit(co)           do { co->flag = 1; goto __co_end; } while (0)
-#define co_yield(co)          do { co->line[co->index] = __LINE__; co_exit(co); case __LINE__:; } while (0)
-#define co_call(co, ...)      co->flag = 0; case __LINE__: Assert(co->index < CoroutineMaxDepth); co->line[co->index++] = __LINE__; __VA_ARGS__; co->index--; do { if (co->flag) { goto __co_end; } else { case __LINE__ + CoroutineCaseOffset: co->line[co->index] = __LINE__ + CoroutineCaseOffset; } } while (0)
-#define co_end(co)            } co->line[co->index] = 0; __co_end:; co->stack_pointer = 0; } while (0)
+#define co_wait(co, time, dt) do { case __LINE__: co->line[co->index] = __LINE__; co->elapsed += dt; do { if(co->elapsed < time) { co->flag = 1; goto __co_end; } else { co->elapsed = 0; } } while(0); } while(0)
+#define co_exit(co)           do { co->flag = 1; goto __co_end; } while(0)
+#define co_yield(co)          do { co->line[co->index] = __LINE__; co_exit(co); case __LINE__:; } while(0)
+#define co_call(co, ...)      co->flag = 0; case __LINE__: Assert(co->index < CoroutineMaxDepth); co->line[co->index++] = __LINE__; __VA_ARGS__; co->index--; do { if(co->flag) { goto __co_end; } else { case __LINE__ + CoroutineCaseOffset: co->line[co->index] = __LINE__ + CoroutineCaseOffset; } } while(0)
+#define co_end(co)            } co->line[co->index] = 0; __co_end:; co->stack_pointer = 0; } while(0)
 
 ////////////////////////////////////////////////////////////////////////
 // Simd

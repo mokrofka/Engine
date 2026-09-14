@@ -13,7 +13,7 @@ IndirectCursor w;
 
 void gfx_push_indirect(Gfx_Mesh mesh, u32 id, u32 instance_count = 1) {
   VK_DrawCall info = {};
-  if (mesh.index_count) {
+  if(mesh.index_count) {
     info.index_draw_command = (VkDrawIndexedIndirectCommand){
       .indexCount = mesh.index_count,
       .instanceCount = instance_count,
@@ -93,21 +93,21 @@ void instanced_drawcall() {
 
   {
     u32* indices = gfx_indirect_indices();
-    Loop (i, 100) {
+    Loop(i, 100) {
       indices[i] = entities0[i];
     }
     gfx_push_indirect_instanced(mesh0, 100);
   }
   {
     u32* indices = gfx_indirect_indices();
-    Loop (i, 100) {
+    Loop(i, 100) {
       indices[i] = entities1[i];
     }
     gfx_push_indirect(mesh1, 100);
   }
   {
     u32* indices = gfx_indirect_indices();
-    Loop (i, 100) {
+    Loop(i, 100) {
       indices[i] = entities2[i];
     }
     gfx_push_indirect(mesh2, 100);
@@ -243,7 +243,7 @@ u64 write(Writer* w, Slice<u8> data) {
 
 void mem_copy_push(void* dst, Slice<Slice<u8>> slices) {
   u64 offset = 0;
-  Loop (i, slices.count) {
+  Loop(i, slices.count) {
     u64 size = slice_size(slices[i]);
     MemCopy(Offset(dst, size), slices[i].data, size);
     offset += size;
@@ -310,7 +310,7 @@ struct List {
 void list_push_front(List* list, Node* n) {
   n->next = list->first;
   n->prev = null;
-  if (list->first) {
+  if(list->first) {
     list->first->prev = n;
   } else {
     list->last = n;
@@ -321,7 +321,7 @@ void list_push_front(List* list, Node* n) {
 void list_push(List* list, Node* n) {
   n->prev = list->last;
   n->next = null;
-  if (list->last) {
+  if(list->last) {
     list->last->next = n;
   } else {
     list->first = n;
@@ -330,13 +330,13 @@ void list_push(List* list, Node* n) {
   ++list->count;
 }
 void list_remove(List* list, Node* n) {
-  if (n == null) return;
-  if (n->prev) {
+  if(n == null) return;
+  if(n->prev) {
     n->prev->next = n->next;
   } else {
     list->first = n->next;
   }
-  if (n->next) {
+  if(n->next) {
     n->next->prev = n->prev;
   } else {
     list->last = n->prev;
@@ -345,9 +345,9 @@ void list_remove(List* list, Node* n) {
 }
 Node* list_pop_front(List* list) {
 	Node* n = list->first;
-	if (n == null) return null;
+	if(n == null) return null;
   list->first = n->next;
-  if (list->first) {
+  if(list->first) {
     list->first->prev = null;
   } else {
     list->last = null;
@@ -357,9 +357,9 @@ Node* list_pop_front(List* list) {
 }
 Node* list_pop(List* list) {
 	Node* n = list->last;
-	if (n == null) return null;
+	if(n == null) return null;
   list->last = n->prev;
-  if (list->last) {
+  if(list->last) {
     list->last->next = null;
   } else {
     list->first = null;
@@ -370,7 +370,7 @@ Node* list_pop(List* list) {
 
 void sll_queue_push(List* list, Node* n) {
   n->next = null;
-  if (list->last) {
+  if(list->last) {
     list->last->next = n;
   } else {
     list->first = n;
@@ -380,9 +380,9 @@ void sll_queue_push(List* list, Node* n) {
 }
 Node* sll_queue_pop(List* list) {
   Node* n = list->first;
-  if (!n) return null;
+  if(!n) return null;
   list->first = n->next;
-  if (list->first == null) {
+  if(list->first == null) {
     list->last = null;
   }
   --list->count;
@@ -412,7 +412,7 @@ template<typename T> void list_push_front(T* arr, ListIdx* list, u32 n) {
   NodeIdx& node = arr[n].node;
   node.next = list->first;
   node.prev = 0;
-  if (list->first) {
+  if(list->first) {
     arr[list->first].node.prev = n;
   } else {
     list->last = n;
@@ -424,7 +424,7 @@ template<typename T> void list_push(T* arr, ListIdx* list, u32 n) {
   NodeIdx& node = arr[n].node;
   node.next = list->last;
   node.prev = 0;
-  if (list->last) {
+  if(list->last) {
     arr[list->last].node.next = n;
   } else {
     list->first = n;
@@ -433,14 +433,14 @@ template<typename T> void list_push(T* arr, ListIdx* list, u32 n) {
   ++list->count;
 }
 template<typename T> void list_remove(T* arr, ListIdx* list, u32 n) {
-  if (n == 0) return;
+  if(n == 0) return;
   NodeIdx& node = arr[n].node;
-  if (node.prev) {
+  if(node.prev) {
     arr[node.prev].node.next = node.next;
   } else {
     list->first = node.next;
   }
-  if (node.next) {
+  if(node.next) {
     arr[node.next].node.prev = node.prev;
   } else {
     list->last = node.prev;
@@ -449,10 +449,10 @@ template<typename T> void list_remove(T* arr, ListIdx* list, u32 n) {
 }
 template<typename T> u32 list_pop_front(T* arr, ListIdx* list) {
 	u32 n = list->first;
-	if (n == 0) return 0;
+	if(n == 0) return 0;
   NodeIdx& node = arr[n].node;
   list->first = node.next;
-  if (list->first) {
+  if(list->first) {
     arr[list->first].node.prev = 0;
   } else {
     list->last = 0;
@@ -462,10 +462,10 @@ template<typename T> u32 list_pop_front(T* arr, ListIdx* list) {
 }
 template<typename T> u32 list_pop(T* arr, ListIdx* list) {
 	u32 n = list->last;
-	if (n == 0) return 0;
+	if(n == 0) return 0;
   NodeIdx& node = arr[n].node;
   list->last = node.prev;
-  if (list->last) {
+  if(list->last) {
     arr[list->last].node.next = 0;
   } else {
     list->first = 0;
@@ -475,7 +475,7 @@ template<typename T> u32 list_pop(T* arr, ListIdx* list) {
 }
 
 #define ListIdxFor(it, T, arr, list)                      \
-  for (T& it = *ContainerOf(&arr[(list).first], T, node); \
+  for(T& it = *ContainerOf(&arr[(list).first], T, node); \
        it.node.next != 0;                                 \
        it = *ContainerOf(&arr[it.node.next], T, node))
 
@@ -484,7 +484,7 @@ template<typename T, typename L, typename H> void list_push_front(T* p,  L* list
   NodeIdx& node = p->data[n].node;
   node.next = list->first;
   node.prev = 0;
-  if (list->first) {
+  if(list->first) {
     arr[list->first].node.prev = n;
   } else {
     list->last = n;
@@ -627,3 +627,5 @@ struct StructuredBuffer : [[Block]] {
 }
 
 with with row major flag, matrices are column major and with column major, matrices are row major?
+
+

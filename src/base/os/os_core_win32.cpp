@@ -77,7 +77,7 @@ void os_toggle_fullscreen() {
   local i32 fullscreen_switch;
   fullscreen_switch = (fullscreen_switch+1) % 2;
   HWND hwnd = (HWND)st.window.hwnd;
-  if (fullscreen_switch) {
+  if(fullscreen_switch) {
     GetWindowPlacement(hwnd, &window_position);
     SetWindowPos(hwnd, null, 0, 0, st.screen_width,st.screen_height, NoFlags);
   } else {
@@ -121,7 +121,7 @@ void os_window_create(WindowConfig config) {
 
 void os_pump_messages() {
   MSG message;
-  while (PeekMessageA(&message, null, 0, 0, PM_REMOVE)) {
+  while(PeekMessageA(&message, null, 0, 0, PM_REMOVE)) {
     TranslateMessage(&message);
     DispatchMessageA(&message);
   }
@@ -213,7 +213,7 @@ OS_Handle os_file_open(String path, OS_AccessFlags flags) {
   if(flags & OS_AccessFlag_Append)     {creation_disposition = OPEN_ALWAYS; access_flags |= FILE_APPEND_DATA; }
   
   HANDLE file = CreateFileA((char*)path_c.str, access_flags, share_mode, null, creation_disposition, NoFlags, null);
-  if (file == INVALID_HANDLE_VALUE) {
+  if(file == INVALID_HANDLE_VALUE) {
     return {};
   }
 
@@ -237,7 +237,7 @@ OS_Handle os_directory_open(String path) {
       FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
       null);
 
-  if (handle == INVALID_HANDLE_VALUE) {
+  if(handle == INVALID_HANDLE_VALUE) {
     Error("Failed to open directory handle. Error: %u\n", GetLastError());
     return 0;
   }
@@ -257,7 +257,7 @@ void os_directory_watch(OS_Handle dir_handle, u32 id) {
       &overlapped[id],
       null);
 
-  if (!success) {
+  if(!success) {
     Error("ReadDirectoryChangesW failed. Error: %u", GetLastError());
     return;
   }
@@ -270,10 +270,10 @@ String os_directory_watch_pop_name(Arena* arena, OS_Handle dir, u32 id) {
     filename = push_str_wchar(arena, info->FileName, info->FileNameLength / 2);
     Debug("Shader changed: %s", filename);
 
-    if (info->NextEntryOffset == 0)
+    if(info->NextEntryOffset == 0)
       break;
     info = (FILE_NOTIFY_INFORMATION*)((BYTE*)info + info->NextEntryOffset);
-  } while (true);
+  } while(true);
 
   // NOTE: first ReadDirectoryChangesW - rearm overlapped dinge
   DWORD bytes_returned;
@@ -314,15 +314,15 @@ void os_file_close(OS_Handle file) {
 u64 os_file_read(OS_Handle file, u64 size, u8* out_data) {
   HANDLE win32_handle = (HANDLE)file;
   DWORD bytes_read;
-  if (file == 0) { return 0; }
+  if(file == 0) { return 0; }
   ReadFile(win32_handle, out_data, size, &bytes_read, null);
-  if (bytes_read != size) { return 0; }
+  if(bytes_read != size) { return 0; }
   return bytes_read;
 }
 
 u64 os_file_write(OS_Handle file, u64 size, void* data) {
   DWORD bytes_wrote;
-  if (file == 0) { return 0; };
+  if(file == 0) { return 0; };
   WriteFile((HANDLE)file, data, size, &bytes_wrote, 0);
   return bytes_wrote;
 }
@@ -378,7 +378,7 @@ String os_exe_filename(Arena* arena) {
 }
 
 b32 os_file_compare_time(u64 new_write_time, u64 last_write_time) {
-  if (CompareFileTime((FILETIME*)&new_write_time, (FILETIME*)&last_write_time) != 0) {
+  if(CompareFileTime((FILETIME*)&new_write_time, (FILETIME*)&last_write_time) != 0) {
     return true; // is changed
   }
   return false;
@@ -405,9 +405,9 @@ VoidProc* os_lib_get_proc(OS_Handle lib, String name) {
 PROCESS_INFORMATION pi;
 b32 is_process_alive;
 void os_process_create(String cmd) {
-  if (is_process_alive) {
+  if(is_process_alive) {
     DWORD result = WaitForSingleObject(pi.hProcess, 0); // check immediately
-    if (result == WAIT_OBJECT_0) {
+    if(result == WAIT_OBJECT_0) {
       // Process finished
       is_process_alive = false;
       CloseHandle(pi.hProcess);
@@ -432,7 +432,7 @@ void os_process_create(String cmd) {
       &si,              // Pointer to STARTUPINFO
       &pi);             // Pointer to PROCESS_INFORMATION
 
-  if (!success) {
+  if(!success) {
     Error("CreateProcess failed (%u).\n", GetLastError());
   }
   is_process_alive = true;
@@ -444,7 +444,7 @@ LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARA
 intern LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARAM l_param) {
   ImGui_ImplWin32_WndProcHandler(hwnd, msg, w_param, l_param);
   
-  switch (msg) {
+  switch(msg) {
     case WM_ERASEBKGND: {
       // Notfy the OS that erasing will be handled by the application to prevent flicker.
       return 1;
@@ -460,7 +460,7 @@ intern LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param
 
     //    EndPaint(hwnd, &ps);
 
-    // } break;
+    // }break;
     case WM_CLOSE: {
       st.window_closed_callback();
       return true;
@@ -471,10 +471,10 @@ intern LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param
     }
     case WM_WINDOWPOSCHANGING: {
 
-    } break;
+    }break;
 
     // case WM_WINDOWPOSCHANGING: {
-    //   if (GetKeyState(VK_SHIFT) & 0x8000) {
+    //   if(GetKeyState(VK_SHIFT) & 0x8000) {
     //     WINDOWPOS* NewPos = (WINDOWPOS*)l_param;
 
     //     RECT WindowRect;
@@ -496,13 +496,13 @@ intern LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param
     //     i32 NewCx = (RenderWidth * (NewPos->cy - HeightAdd)) / RenderHeight;
     //     i32 NewCy = (RenderHeight * (NewPos->cx - WidthAdd)) / RenderWidth;
 
-    //     if (Abs(cast(f32)NewPos->cx - NewCx) < Abs(cast(f32)NewPos->cy - NewCy)) {
+    //     if(Abs(cast(f32)NewPos->cx - NewCx) < Abs(cast(f32)NewPos->cy - NewCy)) {
     //       NewPos->cx = NewCx + WidthAdd;
     //     } else {
     //       NewPos->cy = NewCy + HeightAdd;
     //     }
     //   }
-    // } break;
+    // }break;
 
     // case WM_WINDOWPOSCHANGED: {
     //   // TODO(casey): For now, we are setting the window styles in here
@@ -514,7 +514,7 @@ intern LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param
 
     //   b32 BecomingFullscreen = false;
     //   MONITORINFO MonitorInfo = {sizeof(MonitorInfo)};
-    //   if (GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTOPRIMARY), &MonitorInfo)) {
+    //   if(GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTOPRIMARY), &MonitorInfo)) {
     //     i32 MonWidth = (MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left);
     //     i32 MonHeight = (MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top);
     //     BecomingFullscreen = ((MonitorInfo.rcMonitor.left == NewPos->x) &&
@@ -528,10 +528,10 @@ intern LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param
     //   DWORD WindowedStyle = OldStyle | WS_OVERLAPPEDWINDOW;
     //   DWORD NewStyle = (BecomingFullscreen) ? FullscreenStyle : WindowedStyle;
 
-    //   if (NewStyle != OldStyle) {
+    //   if(NewStyle != OldStyle) {
     //     SetWindowLong(hwnd, GWL_STYLE, NewStyle);
     //   }
-    // } break;
+    // }break;
 
     case WM_SIZE: {
       // Get the updated size.
@@ -542,13 +542,13 @@ intern LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param
       
       Window* w = &st.window;
 
-      if (width != w->width || height != w->height) {
+      if(width != w->width || height != w->height) {
         w->resizing = true;
         w->width = width;
         w->height = height;
         st.window_resized_callback(&st.window);
       }
-    } break;
+    }break;
     
     case WM_MOUSEMOVE: // within client area
     case WM_NCMOUSEMOVE: { // within non-client area
@@ -556,7 +556,7 @@ intern LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param
       u32 y = GET_Y_LPARAM(l_param);
       
       st.process_mouse_move(x, y);
-    } break;
+    }break;
     case WM_KEYDOWN:
     case WM_SYSKEYDOWN:
     case WM_KEYUP:
@@ -568,27 +568,27 @@ intern LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param
       // shift alt ctrl
       b32 is_extended = (HIWORD(l_param) & KF_EXTENDED) == KF_EXTENDED;
       // Keypress only determines if _any_ alt/ctrl/shift key is pressed. Determine which one if so.
-      if (w_param == VK_MENU) {
+      if(w_param == VK_MENU) {
         key = is_extended ? Key_RAlt : Key_LAlt;
-      } else if (w_param == VK_SHIFT) {
+      } else if(w_param == VK_SHIFT) {
         // Annoyingly, KF_EXTENDED is not set for shift keys.
         u32 left_shift = MapVirtualKey(VK_LSHIFT, MAPVK_VK_TO_VSC);
         u32 scancode = ((l_param & (0xFF << 16)) >> 16);
         key = scancode == left_shift ? Key_LShift : Key_RShift;
-      } else if (w_param == VK_CONTROL) {
+      } else if(w_param == VK_CONTROL) {
         key = is_extended ? Key_RControl : Key_LControl;
       }
       
       // Pass to the input subsytem for processing.
       st.process_key(key, pressed);
-    } break;
+    }break;
     case WM_LBUTTONDOWN:
     case WM_MBUTTONDOWN:
     case WM_RBUTTONDOWN:
     case WM_LBUTTONUP:
     case WM_MBUTTONUP:
     case WM_RBUTTONUP: {
-    } break;
+    }break;
   }
   
   return DefWindowProcA(hwnd, msg, w_param, l_param);

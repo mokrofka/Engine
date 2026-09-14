@@ -66,6 +66,7 @@ struct UI_VSOutput {
 	f32 edge_softness;
 	u32 texture;
 	u32 flags;
+	f32 border_thickness;
 };
 
 struct PushConstants {

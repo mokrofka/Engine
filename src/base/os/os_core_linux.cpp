@@ -35,7 +35,7 @@ void cpu_find_frequency() {
 	u64 cpu_start = cpu_now();
 	u64 start_ns = os_now_ns();
 	u64 ns_elapsed = 0;
-	while (ns_elapsed < Million(1)) {
+	while(ns_elapsed < Million(1)) {
 		ns_elapsed = os_now_ns() - start_ns;
 	}
 	u64 cpu_elapsed = cpu_now() - cpu_start;
@@ -89,7 +89,7 @@ global OS_State os_st;
 OS_LNX_Entity* os_lnx_entity_push(OS_LNX_EntityType type) {
 	OS_LNX_Entity* entity = 0;
 	entity = os_st.entity_free;
-	if (entity) {
+	if(entity) {
 		sll_stack_pop(os_st.entity_free);
 	} else {
 		entity = &os_st.entities[os_st.entities.count];
@@ -142,7 +142,7 @@ void os_sleep_us(u64 us) {
 
 void os_console_write(String message, u32 color) {
 	String color_str;
-	switch (color) {
+	switch(color) {
 		case 0: color_str = "\x1b[0m";  break; // Reset
 		case 1: color_str = "\x1b[90m"; break; // Gray
 		case 2: color_str = "\x1b[36m"; break; // Cyan
@@ -200,7 +200,7 @@ OS_Handle os_file_open(String path, OS_AccessFlags flags) {
 	else if(flags & OS_AccessFlag_Read) {
 		lnx_flags = O_RDONLY;
 	}
-	if (flags & OS_AccessFlag_Trunc) {
+	if(flags & OS_AccessFlag_Trunc) {
 		lnx_flags |= O_TRUNC;
 	}
 	if(flags & OS_AccessFlag_Append) {
@@ -210,32 +210,32 @@ OS_Handle os_file_open(String path, OS_AccessFlags flags) {
 		lnx_flags |= O_CREAT;
 	}
 	int fd = open((char*)path_c.str, lnx_flags, 0755);
-	// if (fd == -1) {
+	// if(fd == -1) {
 	//   String str = strerror(errno);
 	//   Info("%s", str);
 	// }
 	OS_Handle handle = {};
-	if (fd != -1) {
+	if(fd != -1) {
 		handle.v = fd;
 	}
 	return handle;
 }
 
 void os_file_close(OS_Handle file) {
-	if (file.v == 0) { return; }
+	if(file.v == 0) { return; }
 	int fd = file.v;
 	close(fd); 
 }
 
 u64 os_file_read(OS_Handle file, Slice<u8> out_data) {
-	if (file.v == 0) { return 0; }
+	if(file.v == 0) { return 0; }
 	int fd = file.v;
 	u64 read_result = read(fd, out_data.data, out_data.size);
 	return read_result;
 }
 
 u64 os_file_write(OS_Handle file, Slice<u8> data) {
-	if (file.v == 0) { return 0; }
+	if(file.v == 0) { return 0; }
 	int fd = file.v;
 	u64 size_written = write(fd, data.data, data.size);
 	return size_written;
@@ -247,13 +247,13 @@ u64 os_file_size(OS_Handle file) {
 }
 
 FileProperties os_file_properties(OS_Handle file) {
-	if (file.v == 0) { return {}; }
+	if(file.v == 0) { return {}; }
 	Scratch scratch;
 	struct stat fd_stat = {};
 	int fd = file.v;
 	int fstat_result = fstat(fd, &fd_stat);
 	FileProperties props = {};
-	if (fstat_result != -1) {
+	if(fstat_result != -1) {
 		props = os_lnx_file_properties_from_stat(fd_stat);
 	}
 	return props;
@@ -264,7 +264,7 @@ b32 os_file_path_exists(String path) {
 	String path_c = push_str_copy(scratch, path);
 	struct stat fd_stat = {};
 	int stat_result = stat((char*)path_c.str, &fd_stat);
-	if (stat_result != -1) {
+	if(stat_result != -1) {
 		return true;
 	}
 	return false;
@@ -274,7 +274,7 @@ b32 os_file_path_copy(String src, String dst) {
 	b32 result = 0;
 	OS_Handle src_h = os_file_open(src, OS_AccessFlag_Read);
 	OS_Handle dst_h = os_file_open(dst, OS_AccessFlag_Write);
-	if (src_h.v != 0 && dst_h.v != 0) {
+	if(src_h.v != 0 && dst_h.v != 0) {
 		FileProperties props = os_file_properties(src_h);
 		int src_fd = src_h.v;
 		int dst_fd = dst_h.v;
@@ -325,7 +325,7 @@ u64 os_file_path_write_all(String path, Slice<u8> data) {
 	return write_size;
 }
 
-DenseTime os_file_path_mtime(String path) {
+u64 os_file_path_mtime(String path) {
 	return os_file_path_properties(path).modified;
 }
 
@@ -349,7 +349,7 @@ OS_Handle os_directory_open(String path) {
 	String path_c = push_str_copy(scratch, path);
 	DIR* dir = opendir((char*)path_c.str);
 	OS_Handle result = {};
-	if (dir != null) {
+	if(dir != null) {
 		result.v = (u64)dir;
 	}
 	return result;
@@ -357,10 +357,10 @@ OS_Handle os_directory_open(String path) {
 
 OS_Handle os_directory_make(String path) {
 	Scratch scratch;
-	Loop (i, path.size) {
-		if (char_is_slash(path.str[i])) {
+	Loop(i, path.size) {
+		if(char_is_slash(path.str[i])) {
 			String parent_dir = push_str_copy(scratch, str_prefix(path, i));
-			if (!os_directory_path_exist(parent_dir)) {
+			if(!os_directory_path_exist(parent_dir)) {
 				mkdir((char*)parent_dir.str, S_IRWXU);
 			}
 		}
@@ -368,7 +368,7 @@ OS_Handle os_directory_make(String path) {
 	OS_Handle result = {};
 	String path_c = push_str_copy(scratch, path);
 	int fd = mkdir((char*)path_c.str, S_IRWXU);
-	if (fd != -1) {
+	if(fd != -1) {
 		result.v = fd;
 	}
 	return result;
@@ -380,7 +380,7 @@ b32 os_directory_path_exist(String path) {
 	os_file_path_properties(path);
 	struct stat st;
 	b32 success = stat((char*)path_c.str, &st);
-	if (success == 0 && S_ISDIR(st.st_mode)) {
+	if(success == 0 && S_ISDIR(st.st_mode)) {
 		return true;
 	}
 	return false;
@@ -407,19 +407,19 @@ OS_Handle os_watch_attach(OS_Watch watch, String name) {
 	Scratch scratch;
 	String name_c = push_str_copy(scratch, name);
 	int lnx_flags = 0;
-	if (watch.flags & OS_WatchFlag_Create) {
+	if(watch.flags & OS_WatchFlag_Create) {
 		lnx_flags |= IN_CREATE;
 	}
-	if (watch.flags & OS_WatchFlag_Delete) {
+	if(watch.flags & OS_WatchFlag_Delete) {
 		lnx_flags |= IN_DELETE;
 	}
-	if (watch.flags & OS_WatchFlag_Modify) {
+	if(watch.flags & OS_WatchFlag_Modify) {
 		lnx_flags |= IN_MODIFY;
 	}
 	int watch_fd = watch.handle.v;
 	int fd = inotify_add_watch(watch_fd, (char*)name_c.str, lnx_flags);
 	OS_Handle result = {};
-	if (fd != -1) {
+	if(fd != -1) {
 		result.v = fd;
 	}
 	return result;
@@ -434,14 +434,14 @@ void os_watch_deattach(OS_Watch watch, OS_Handle attached) {
 Slice<String> os_watch_check(Allocator arena, OS_Watch watch) {
 	Slice buf = push_buffer_slice(arena, KB(1));
 	u64 read_size = os_file_read(watch.handle, buf);
-	if (read_size == -1) {
+	if(read_size == -1) {
 		return {};
 	}
-	var strs = array_make(String, arena);
+	var strs = array_make<String>(arena);
 	int offset = 0;
-	while (offset < read_size) {
+	while(offset < read_size) {
 		struct inotify_event* event = (struct inotify_event*)&buf[offset];
-		if (event->len) {
+		if(event->len) {
 			array_push(strs, event->name);
 		}
 		offset += sizeof(struct inotify_event) + event->len;
@@ -466,18 +466,18 @@ b32 os_file_iter_next(Allocator arena, OS_FileIter* iter, OS_FileInfo* info_out)
 	Scratch scratch(arena);
 	b32 good = 0;
 	OS_LNX_FileIter* lnx_iter = (OS_LNX_FileIter*)iter->memory;
-	while (true) {
+	while(true) {
 		// get next entry
 		lnx_iter->dp = readdir(lnx_iter->dir);
 		good = (lnx_iter->dp != 0);
-		if (!good) {
+		if(!good) {
 			return false;
 		}
 
 		// filter
 		b32 filtered = 0;
 		struct stat fd_stat;
-		if (good) {
+		if(good) {
 			String full_path = push_strf(scratch, "%s/%s", lnx_iter->path, String(lnx_iter->dp->d_name));
 			stat((char*)full_path.str, &fd_stat);
 			filtered = ((S_ISDIR(fd_stat.st_mode) && iter->flags & OS_FileIterFlag_SkipFolders) ||
@@ -487,7 +487,7 @@ b32 os_file_iter_next(Allocator arena, OS_FileIter* iter, OS_FileInfo* info_out)
 		}
 
 		// write output
-		if (good && !filtered) {
+		if(good && !filtered) {
 			info_out->name = push_str_copy(arena, String(lnx_iter->dp->d_name));
 			info_out->props = os_lnx_file_properties_from_stat(fd_stat);
 			break;
@@ -502,9 +502,9 @@ void os_file_iter_end(OS_FileIter *iter) {
 }
 
 Slice<OS_FileInfo> os_file_iter_directory(Allocator arena, String path, OS_FileIterFlags flags) {
-	var file_pathes = array_make(OS_FileInfo, arena);
+	var file_pathes = array_make<OS_FileInfo>(arena);
 	OS_FileIter* it = os_file_iter_begin(arena, path, flags);
-	for (OS_FileInfo info = {}; os_file_iter_next(arena, it, &info);) {
+	for(OS_FileInfo info = {}; os_file_iter_next(arena, it, &info);) {
 		array_push(file_pathes, info);
 	}
 	os_file_iter_end(it);
@@ -519,12 +519,12 @@ OS_Handle os_process_make(Slice<String> arr) {
 	OS_Handle handle = {};
 	char** argv = push_array(scratch, char*, arr.count + 1);
 	argv[arr.count] = null;
-	Loop (i, arr.count) {
+	Loop(i, arr.count) {
 		argv[i] = (char*)arr[i].str;
 	}
 	pid_t pid = 0;
 	int spawn_code = posix_spawnp(&pid, argv[0], null, null, argv, null);
-	if (spawn_code == 0) {
+	if(spawn_code == 0) {
 		handle.v = spawn_code;
 	}
 	return handle;
@@ -595,22 +595,22 @@ void os_futex_wake(Futex& futex, u32 num_waiters) {
 #define LOCKED_WAIT 2
 void os_mutex_lock(Mutex& m) {
 	u32 c = UNLOCKED;
-	if (atomic_cmp_swap(&m.futex, &c, LOCKED_NO_WAIT)) return;
+	if(atomic_cmp_swap(&m.futex, &c, LOCKED_NO_WAIT)) return;
 	do {
-		if (c == LOCKED_WAIT || atomic_cmp_swap_old(&m.futex, LOCKED_NO_WAIT, LOCKED_WAIT) != UNLOCKED) {
+		if(c == LOCKED_WAIT || atomic_cmp_swap_old(&m.futex, LOCKED_NO_WAIT, LOCKED_WAIT) != UNLOCKED) {
 			os_futex_wait(m.futex, LOCKED_WAIT);
 		}
 		c = UNLOCKED;
-	} while (!atomic_cmp_swap(&m.futex, &c, LOCKED_WAIT));
+	} while(!atomic_cmp_swap(&m.futex, &c, LOCKED_WAIT));
 }
 
 b32 os_mutex_try_lock(Mutex& m) {
-	if (atomic_cmp_set(&m.futex, UNLOCKED, LOCKED_NO_WAIT)) return true;
+	if(atomic_cmp_set(&m.futex, UNLOCKED, LOCKED_NO_WAIT)) return true;
 	return false;
 }
 
 void os_mutex_unlock(Mutex& m) {
-	if (atomic_dec(&m.futex) != LOCKED_NO_WAIT) {
+	if(atomic_dec(&m.futex) != LOCKED_NO_WAIT) {
 		atomic_store(&m.futex, UNLOCKED);
 		os_futex_wake(m.futex, 1);
 	}
@@ -636,8 +636,8 @@ void os_cond_wake_all(CondVar& c) {
 void os_sem_wait(Semaphore& s) {
 	For {
 		u32 v = atomic_load(&s.futex);
-		for (;v > 0;) {
-			if (atomic_cmp_swap(&s.futex, &v, v - 1)) return;
+		for(;v > 0;) {
+			if(atomic_cmp_swap(&s.futex, &v, v - 1)) return;
 		}
 		os_futex_wait(s.futex, 0);
 	}
@@ -645,8 +645,8 @@ void os_sem_wait(Semaphore& s) {
 
 b32 os_sem_try_wait(Semaphore& s) {
 	u32 v = atomic_load(&s.futex);
-	for (;v > 0;) {
-		if (atomic_cmp_swap(&s.futex, &v, v - 1)) return true;
+	for(;v > 0;) {
+		if(atomic_cmp_swap(&s.futex, &v, v - 1)) return true;
 	}
 	return false;
 }
@@ -696,13 +696,14 @@ typedef struct VkDebugUtilsMessengerCallbackDataEXT {
 } VkDebugUtilsMessengerCallbackDataEXT;
 typedef b32 VkBool32;
 VkBool32 vk_debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity, VkDebugUtilsMessageTypeFlagsEXT message_types, const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data) {
-	switch (message_severity) {
+	switch(message_severity) {
+		default:break;
 		case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT: {
 			Trace(String(callback_data->pMessage));
-		} break;
+		}break;
 		case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT: {
 			Info(String(callback_data->pMessage));
-		} break;
+		}break;
 		case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: {
 			String skip_warnings[] = {
 				"vkCreateGraphicsPipelines(): pCreateInfos[0].pVertexInputState Vertex attribute at location",
@@ -710,20 +711,19 @@ VkBool32 vk_debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severi
 				"(Warning - This VUID has now been reported 10 times, which is the duplicate_message_limit value, this will be the last time reporting it).",
 				"vkCreateGraphicsPipelines(): pCreateInfos[0] (SPIR-V Interface) [EntryPoint \"vs_main\", VK_SHADER_STAGE_VERTEX_BIT] has an Output value declared at Location",
 			};
-			for (var skip : skip_warnings) {
+			for(var skip : skip_warnings) {
 				String warn = callback_data->pMessage;
-				if (warn.size >= skip.size) {
-					if (str_match(str_prefix(warn, skip.size), skip)) {
+				if(warn.size >= skip.size) {
+					if(str_match(str_prefix(warn, skip.size), skip)) {
 						return false;
 					}
 				}
 			}
 			Warn(String(callback_data->pMessage));
-		} break;
+		}break;
 		case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: {
 			Error(String(callback_data->pMessage));
-		} break;
-		default:
+		}break;
 	}
 	return false;
 }

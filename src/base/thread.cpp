@@ -37,9 +37,9 @@ WaitGroup thread_wg_make(u32 count) {
 void thread_decrement_wg(WaitGroup wg) {
 	var& g = thread_pool;
 	var& slot = g.wg_slots[wg.idx];
-	if (atomic_dec(&slot.count) == 1) {
+	if(atomic_dec(&slot.count) == 1) {
 		atomic_store(&slot.is_done, 1);
-		if (atomic_load(&slot.waiting_count) > 0) {
+		if(atomic_load(&slot.waiting_count) > 0) {
 			os_futex_wake(slot.is_done, U32_MAX);
 		}
 	}
@@ -58,7 +58,7 @@ WaitGroup thread_push(TaskDesc desc) {
 		// LockScope(g.task_mutex);
 		queue_push(g.tasks[desc.priority], t);
 	}
-	if (atomic_load(&g.working_num) < Thread_NumWorkers) {
+	if(atomic_load(&g.working_num) < Thread_NumWorkers) {
 		os_sem_post(g.tasks_available);
 	} else {
 		atomic_inc(&g.tasks_available.futex);
@@ -82,7 +82,7 @@ WaitGroup thread_push_batch(Slice<TaskDesc> tasks) {
 	}
 	atomic_add(&g.tasks_available.futex, tasks.count);
 	atomic_add(&g.remaining_tasks, tasks.count);
-	if (atomic_load(&g.working_num) < tasks.count) {
+	if(atomic_load(&g.working_num) < tasks.count) {
 		os_futex_wake(g.tasks_available.futex, U32_MAX);
 	}
 	return wg;
@@ -94,18 +94,11 @@ Task thread_pop_locked() {
 	// TaskPriority prio = queue_count(g.tasks[TaskPriority_High]) ? TaskPriority_High : TaskPriority_Low;
 	// Task t = queue_pop(g.tasks[prio]);
 	var res = queue_pop(g.tasks[TaskPriority_High]);
-	if (!res.ok) {
+	if(!res.ok) {
 		res = queue_pop(g.tasks[TaskPriority_Low]);
 		Assert(res.ok);
 	}
 	return res.value;
-	// var t = or_else(queue_pop(g.tasks[TaskPriority_High]), 
-	// 	or_else(queue_pop(g.tasks[TaskPriority_Low]), InvalidPath; return Task{};);
-	// );
-// if (!)
-//     if (!queue_pop(low, &t))
-//         return false;
-// 	return t;
 }
 
 Task thread_pop() {
@@ -119,7 +112,7 @@ Task thread_pop() {
 
 intern ResultOk<Task> thread_try_pop() {
 	var& g = thread_pool;
-	if (os_sem_try_wait(g.tasks_available)) return {thread_pop_locked(), true};
+	if(os_sem_try_wait(g.tasks_available)) return {thread_pop_locked(), true};
 	return {};
 }
 
@@ -130,8 +123,8 @@ intern void thread_worker(void* ctx) {
 		Task t = thread_pop();
 		ProfBlock("working", t.priority == TaskPriority_High ? ProfType_Worker : ProfType_Async);
 		t.fn(t.ctx);
-		if (atomic_dec(&g.remaining_tasks) == 1) {
-			if (atomic_load(&g.is_waiting_remaning_tasks) == 1) {
+		if(atomic_dec(&g.remaining_tasks) == 1) {
+			if(atomic_load(&g.is_waiting_remaning_tasks) == 1) {
 				os_futex_wake(g.is_waiting_remaning_tasks, 1);
 			}
 		}
@@ -143,9 +136,9 @@ void thread_wg_wait(WaitGroup wg) {
 	ProfFunc;
 	var& g = thread_pool;
 	var& slot = g.wg_slots[wg.idx];
-	for (;atomic_load(&slot.is_done) == 0;) {
-		var [t, ok] = thread_try_pop();
-		if (ok) {
+	while(atomic_load(&slot.is_done) == 0) {
+		var[t, ok] = thread_try_pop();
+		if(ok) {
 			ProfBlock("Working", ProfType_Worker);
 			t.fn(t.ctx);
 			atomic_dec(&g.remaining_tasks);
@@ -160,7 +153,7 @@ void thread_wg_wait(WaitGroup wg) {
 void thread_wait_remanings() {
 	var& g = thread_pool;
 	atomic_store(&g.is_waiting_remaning_tasks, 1);
-	if (atomic_load(&g.remaining_tasks)) {
+	if(atomic_load(&g.remaining_tasks)) {
 		os_futex_wait(g.is_waiting_remaning_tasks, 1);
 	}
 	atomic_store(&g.is_waiting_remaning_tasks, 0);
@@ -170,7 +163,7 @@ u8* _thread_push_ctx(u64 size, u64 align) {
 	var& g = thread_pool;
 	os_mutex_lock(g.ctx_mutex);
 	g.ctx_write = AlignUp(g.ctx_write, align) % sizeof(g.ctx_buffer);
-	if (g.ctx_write+size > sizeof(g.ctx_buffer)) {
+	if(g.ctx_write + size > sizeof(g.ctx_buffer)) {
 		g.ctx_write = 0;
 	}
 	u8* res = &g.ctx_buffer[g.ctx_write];
@@ -185,11 +178,10 @@ void thread_pool_init() {
 	var& g = thread_pool;
 	g.arena = arena_make();
 	g.working_num = Thread_NumWorkers;
-	for (var& q : g.tasks) {
+	for(var& q : g.tasks) {
 		q = queue_mpmc_make<Task, Thread_MaxTasks>();
 	}
-	Loop (i, Thread_NumWorkers) {
+	Loop(i, Thread_NumWorkers) {
 		g.threads[i] = os_thread_make(thread_worker, null);
 	}
 }
-
