@@ -19,7 +19,7 @@ intern Temp tctx_get_scratch() {
 intern Temp tctx_get_scratch_conflict(Allocator conflict) {
 	Arena* arena_conflict = (Arena*)conflict.ctx;
 	Arena* arena_result = {};
-	if (arena_conflict == &tctx.arenas[0]) {
+	if(arena_conflict == &tctx.arenas[0]) {
 		arena_result = &tctx.arenas[1];
 	} else {
 		Assert(arena_conflict == &tctx.arenas[1]);

@@ -52,12 +52,12 @@ u8* _thread_push_ctx(u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
 void thread_pool_init();
 
 template<typename T, typename F> void thread_parallel_for(u32 chunk_size, Slice<T> s, F fn) {
-	if (s.count == 0) return;
+	if(s.count == 0) return;
 	Scratch scratch;
 	u32 task_count = div_ceil(s.count, chunk_size);
 	var tasks = push_slice_zero(scratch, TaskDesc, task_count);
 	u32 task_id = 0;
-	for (u32 i = 0; i < s.count; i += chunk_size) {
+	for(u32 i = 0; i < s.count; i += chunk_size) {
 		struct TaskCtx {
 			Slice<T> s;
 			F fn;
@@ -70,7 +70,7 @@ template<typename T, typename F> void thread_parallel_for(u32 chunk_size, Slice<
 			TaskCtx data = *(TaskCtx*)ctx;
 			data.fn(data.s);
 		};
-		++task_id;
+		task_id++;
 	}
 	WaitGroup wg = thread_push_batch(tasks);
 	thread_wg_wait(wg);

@@ -17,8 +17,6 @@ VS_Entry UI_VSOutput vs_main(u32 vert_id : SV_VertexID, u32 inst_id : SV_Instanc
 	v2 src_center = (in.src_p1 + in.src_p0) / 2;
 	v2 src_pos = vertices[vert_id] * src_half_size + src_center;
 
-	// printf("tex: %u, x: %v2f", in.texture, cur_texture_size);
-
 	UI_VSOutput o;
 	o.vert = v4(2 * dst_pos.x / st.res.x - 1, 2 * dst_pos.y / st.res.y - 1, 0, 1);
 	o.uv = v2(src_pos.x / in.tex_size.x, src_pos.y / in.tex_size.y);
@@ -29,6 +27,7 @@ VS_Entry UI_VSOutput vs_main(u32 vert_id : SV_VertexID, u32 inst_id : SV_Instanc
 	o.dst_half_size = dst_half_size;
 	o.corner_radius = in.corner_radius;
 	o.edge_softness = in.edge_softness;
+	o.border_thickness = in.border_thickness;
 
 	o.flags = in.flags;
 	o.texture = in.texture;
@@ -41,36 +40,36 @@ f32 rounded_rect_sdf(v2 sample_pos, v2 rect_center, v2 rect_half_size, f32 r) {
 }
 
 FS_Entry v4 fs_main(UI_VSOutput in) {
+	v4 sample = v4(1);
 	// Font?
-	if (flag_has(in.flags, GpuUI_RectFlag_IsFont)) {
+	if(flag_has(in.flags, GpuUI_RectFlag_IsFont)) {
 		f32 r = textures[in.texture].Sample(samplers[1], in.uv).r;
-		if (r < 0.1) discard;
-		v4 color = in.color * r;
-		return color;
+		if(r < 0.7) discard;
+		sample = r;
 	}
-
 	// Texture?
-	if (in.texture > 0) {
-		// return v4(in.uv, 0, 1);
-
-		// u32 tex_idx = NonUniformResourceIndex(in.texture);
-		// v4 sampled = textures[tex_idx].Sample(samplers[1], in.uv);
-		v4 sampled = textures[in.texture].Sample(samplers[1], in.uv);
-		// v4 sampled = textures[15].Sample(samplers[1], in.uv);
-		v4 color = v4_hadamard(in.color, sampled);
-		return color;
+	else {
+		if(in.texture > 0) {
+			sample = textures[in.texture].Sample(samplers[1], in.uv);
+		}
 	}
 
 	f32 softness = in.edge_softness;
 	v2 softness_padding = v2(max(0, softness*2-1));
-
-	// sample distance
 	f32 dist = rounded_rect_sdf(in.dst_pos, in.dst_center, in.dst_half_size-softness_padding, in.corner_radius);
-
-	// map distance => a blend factor
 	f32 sdf_factor = 1.f - smoothstep(0, 2*softness, dist);
 
-	v4 color = in.color * sdf_factor;
+	f32 border_factor = 1;
+	if(in.border_thickness != 0) {
+		v2 interior_half_size = in.dst_half_size - v2(in.border_thickness);
+		f32 interior_radius_reduce_f = min(interior_half_size.x/in.dst_half_size.x, interior_half_size.y/in.dst_half_size.y);
+		f32 interior_corner_radius = in.corner_radius * Square(interior_radius_reduce_f);
+		f32 inside_d = rounded_rect_sdf(in.dst_pos, in.dst_center, interior_half_size-softness_padding, interior_corner_radius);
+		f32 inside_f = smoothstep(0, 2*softness, inside_d);
+		border_factor = inside_f;
+	}
+
+	v4 color = in.color * sample * sdf_factor * border_factor;
 	return color;
 }
 

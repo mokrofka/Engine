@@ -11,15 +11,14 @@ global v2 positions[] = {
 global v2 tex_coords[] = {
 	{0.0, 0.0},
 	{0.0, 2.0},
-	{2.0, 0.0}
+	{2.0, 0.0},
 };
-
 
 VS_Entry VSOutput vs_main(Vertex in, u32 vert_id : SV_VertexID, u32 draw_id : SV_DrawIndex, u32 inst_id : SV_InstanceID) {
 	u32 drawcall_idx = push.idx + draw_id;
 	DrawCall draw = drawcalls[drawcall_idx];
 	VSOutput o;
-	switch (draw.type) {
+	switch(draw.type) {
 		case ShaderType::Cube: {
 			m4x4 view = st.view;
 			view[0][3] = 0;
@@ -28,31 +27,31 @@ VS_Entry VSOutput vs_main(Vertex in, u32 vert_id : SV_VertexID, u32 draw_id : SV
 			v4 pos = st.projection * view * v4(in.pos, 1);
 			o.pos = v4(pos.xy, pos.w, pos.w);
 			o.color = v4(in.pos, 1);
-		} break;
+		}break;
 		case ShaderType::E_Color: {
 			o.pos = st.projection_view * draw.model * v4(in.pos, 1.0);
-		} break;
+		}break;
 		case ShaderType::Texture: {
 			o.pos = st.projection_view * draw.model * v4(in.pos, 1.0);
 			// o.pos = st.projection_view * draw.m * v4(in.pos, 1.0);
 			o.uv = in.uv;
-		} break;
+		}break;
 		case ShaderType::VertColor: {
 			o.pos = st.projection_view * draw.model * v4(in.pos, 1.0);
 			o.color = in.color;
-		} break;
+		}break;
 		case ShaderType::Line: {
 			o.pos = st.projection_view * v4(in.pos, 1);
 			o.color = in.color;
-		} break;
+		}break;
 		case ShaderType::Screen: {
 			o.pos = v4(positions[vert_id], 0, 1);
 			o.uv = tex_coords[vert_id];
-		} break;
+		}break;
 		case ShaderType::SoftwareRender: {
 			o.pos = v4(positions[vert_id], 0, 1);
 			o.uv = tex_coords[vert_id];
-		} break;
+		}break;
 	}
 	o.id = drawcall_idx;
 	return o;
@@ -61,33 +60,33 @@ VS_Entry VSOutput vs_main(Vertex in, u32 vert_id : SV_VertexID, u32 draw_id : SV
 FS_Entry v4 fs_main(VSOutput in) {
 	v4 o = {};
 	DrawCall draw = drawcalls[in.id];
-	switch (draw.type) {
+	switch(draw.type) {
 		case ShaderType::Cube: {
 			o = cube_texture[st.cubemap].Sample(samplers[1], in.color.xyz);
-		} break;
+		}break;
 		case ShaderType::E_Color: {
 			o = drawcalls[in.id].color;
-		} break;
+		}break;
 		case ShaderType::Texture: {
 			u32 tex = materials[draw.mat].tex;
 			o = textures[tex].Sample(samplers[1], in.uv);
 			o = v4_hadamard(o, v4(1));
-		} break;
+		}break;
 		case ShaderType::VertColor: {
 			o = in.color;
-		} break;
+		}break;
 		case ShaderType::Line: {
 			o = in.color;
-		} break;
+		}break;
 		case ShaderType::Screen: {
 			o = textures[draw.cur_resolve_idx].Sample(samplers[1], in.uv);
-		} break;
+		}break;
 		case ShaderType::SoftwareRender: {
 			f32 x = in.pos.x;
 			f32 y = in.pos.y;
 			o = rgba_from_u32(software_render[(u32)(y * st.res.x + x)]);
-			if (o.w < 0.1) discard;
-		} break;
+			if(o.w < 0.1) discard;
+		}break;
 	}
 	return o;
 }

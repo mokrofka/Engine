@@ -4,6 +4,7 @@
 #include "types.h"
 #include "gfx.h"
 #include "render.h"
+#include "ui.h"
 
 // TODO:
 // dummy assets/null 
@@ -210,7 +211,7 @@ enum WatchOp {
 
 struct WatchFile {
 	String path;
-	DenseTime modified;
+	u64 modified;
 	WatchOp op;
 };
 
@@ -312,20 +313,18 @@ Introspect struct Thing {
 	f32 angle;
 };
 
-struct UI_State {
-	u32 hotitem;
-	u32 activeitem;
-	b32 mouse_down;
+// struct UI_State {
+// 	u32 hotitem;
+// 	u32 activeitem;
+// 	b32 mouse_down;
 
-	u32 kbditem;
-	u32 last_widget;
-	b32 tab;
-	b32 enter;
-	b32 up;
-	b32 down;
-};
-
-#include "ui.h"
+// 	u32 kbditem;
+// 	u32 last_widget;
+// 	b32 tab;
+// 	b32 enter;
+// 	b32 up;
+// 	b32 down;
+// };
 
 typedef u32 ThingState;
 enum {
@@ -354,9 +353,9 @@ struct GlobalState {
 	String shader_compiled_dir;
 	String models_dir;
 	String textures_dir;
-	Map<String, R_TextureId, R_MaxTextures> str_to_texture;
-	Map<String, R_MeshId, R_MaxMeshes> str_to_mesh;
-	Map<String, R_MaterialId, R_MaxMaterials> str_to_material;
+	Map<R_TextureId, R_MaxTextures> str_to_texture;
+	Map<R_MeshId, R_MaxMeshes> str_to_mesh;
+	Map<R_MaterialId, R_MaxMaterials> str_to_material;
 	Array<String, R_MaxTextures> texture_to_str;
 	Array<String, R_MaxMeshes> mesh_to_str;
 	Array<String, R_MaxMaterials> material_to_str;
@@ -369,18 +368,18 @@ struct GlobalState {
 	UI_State ui;
 	// UI_State0* ui0;
 
-	#define Alot KB(1)
-	Array<m4x4, Alot> m4x4_buf;
-	Array<m4x3, Alot> m4x3_buf;
 	Camera cam;
 	R_Camera r_cam;
 	b32 fps_camera;
 
 	u32 entities_count;
-	PoolLinkList<Thing, MaxEntities, ThingId> entities;
+	// PoolLinkList<Thing, MaxEntities, ThingId> entities;
+	// Pool<Thing, MaxEntities, ThingId> entities;
+	// SparseSet<MaxEntities> active_entities;
+	PoolIterative<Thing, MaxEntities, ThingId> entities;
 
 	Darray<ThingId> moving_cubes;
-	Map<String, ThingId, 32> find_entity;
+	Map<ThingId, 32> find_entity;
 
 	ThingId axis_attached_to_cam_id;
 	ThingId monkey0;
@@ -426,11 +425,11 @@ b32 time_on_between_interval(f32 interval, f32 offset = 0);
 f64 time_since(f64 timestamp);
 f64 time_until(f64 timestamp);
 
-void ui_draw_rect(Rng2 rect, v4 color);
-b32 ui_button(u32 id, v2 pos);
-b32 ui_slider(u32 id, v2 pos, i32 max, i32& v);
-void ui_begin();
-void ui_end();
+// void ui_draw_rect(Rng2 rect, v4 color);
+// b32 ui_button(u32 id, v2 pos);
+// b32 ui_slider(u32 id, v2 pos, i32 max, i32& v);
+// void ui_begin();
+// void ui_end();
 
 ImGui_DrawList imgui_get_window_drawlist();
 void imgui_draw_rect(ImGui_DrawList draw, Rng2 rect, v4 col, f32 rounding = 0, ImDrawFlags flags = 0, f32 thickness = 1);
@@ -505,6 +504,8 @@ R_MeshDesc generate_grid(Allocator arena, u32 size, f32 step);
 // ThingId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing = {});
 ThingId make_thing(ThingDesc desc);
 void destroy_thing(ThingId id);
+PoolIterativeIter<Thing, MaxEntities, ThingId> things_begin();
+HNodeIter<Thing, ThingId> thing_node_begin(ThingId first);
 void select_obj();
 void save_game_state();
 void load_game_state();

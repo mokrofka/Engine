@@ -11,3 +11,4 @@ AlignAfterOpenBracket: DontAlign
 AllowShortIfStatementsOnASingleLine: true
 IndentCaseLabels: true
 AllowShortCaseLabelsOnASingleLine: true
+SpaceBeforeParens: Never

@@ -3,6 +3,7 @@
 #include "gfx.cpp"
 #include "render.cpp"
 #include "tokenizer.cpp"
+#include "ui.cpp"
 
 #include "generated.h"
 
@@ -102,7 +103,7 @@ intern void test_arena_alloc() {
 	Array<u8*, TEST_SAMPLES> arr = {};
 	Array<u32, TEST_SAMPLES> sizes = {};
 	Array<u32, TEST_SAMPLES> values = {};
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		u32 size = rand_u32_rng(8, KB(1));
 		u64 align = ArrayRand(test_alignments);
 		arr[i] = push_buffer(arena, size, align);
@@ -110,11 +111,11 @@ intern void test_arena_alloc() {
 		values[i] = rand_u32_rng(0, 255);
 		MemSet(arr[i], values[i], size);
 	}
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		u8* buf = arr[i];
 		u32 size = sizes[i];
 		u32 value = values[i];
-		Loop (j, size) {
+		Loop(j, size) {
 			AssertAlways(buf[j] == value);
 		}
 	}
@@ -128,7 +129,7 @@ intern void test_arena_list_alloc() {
 	Array<u32, TEST_SAMPLES> sizes = {};
 	Array<u32, TEST_SAMPLES> values = {};
 
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		u32 size = rand_u32_rng(8, KB(1));
 		u64 align = ArrayRand(test_alignments);
 		arr[i] = push_buffer(arena, size, align);
@@ -136,17 +137,17 @@ intern void test_arena_list_alloc() {
 		values[i] = rand_u32_rng(0, 255);
 		MemSet(arr[i], values[i], size);
 	}
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		u8* buf = arr[i];
 		u32 size = sizes[i];
 		u32 value = values[i];
-		Loop (j, size) {
+		Loop(j, size) {
 			AssertAlways(buf[j] == value);
 		}
 	}
 	alloc_arena_list_clear(arena);
 
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		u32 size = rand_u32_rng(8, KB(1));
 		u64 align = ArrayRand(test_alignments);
 		arr[i] = push_buffer(arena, size, align);
@@ -154,11 +155,11 @@ intern void test_arena_list_alloc() {
 		values[i] = rand_u32_rng(0, 255);
 		MemSet(arr[i], values[i], size);
 	}
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		u8* buf = arr[i];
 		u32 size = sizes[i];
 		u32 value = values[i];
-		Loop (j, size) {
+		Loop(j, size) {
 			AssertAlways(buf[j] == value);
 		}
 	}
@@ -176,7 +177,7 @@ intern void test_seglist_alloc() {
 	};
 	Array<Mem, TEST_SAMPLES> arr = {};
 
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		u64 size = rand_u32_rng(8, KB(1));
 		u64 align = ArrayRand(test_alignments);
 		array_push(arr, {mem_alloc(alloc, size, align), size});
@@ -185,12 +186,12 @@ intern void test_seglist_alloc() {
 	Array<u32, TEST_SAMPLES> indices = {};
 	Loop(i, TEST_SAMPLES) array_push(indices, i);
 	rand_shuffle(slice(indices));
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		mem_free(alloc, arr[indices[i]].data, arr[indices[i]].size);
 	}
 
 	array_clear(arr);
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		u64 size = rand_u32_rng(8, KB(1));
 		u64 align = ArrayRand(test_alignments);
 		array_push(arr, {mem_alloc(alloc, size, align), size});
@@ -199,7 +200,7 @@ intern void test_seglist_alloc() {
 	array_clear(indices);
 	Loop(i, TEST_SAMPLES) array_push(indices, i);
 	rand_shuffle(slice(indices));
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		mem_free(alloc, arr[indices[i]].data, arr[indices[i]].size);
 	}
 	arena_destroy(arena);
@@ -211,7 +212,7 @@ intern void test_gpu_seglist_alloc() {
 	alloc = gpu_alloc_seglist_make(scratch);
 	Array<GpuMemId, TEST_SAMPLES> arr = {};
 
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		u64 size = rand_u32_rng(8, KB(1));
 		u64 align = ArrayRand(test_alignments);
 		array_push(arr, gpu_alloc_seglist_alloc(alloc, size, align));
@@ -219,12 +220,12 @@ intern void test_gpu_seglist_alloc() {
 	Array<u32, TEST_SAMPLES> indices = {};
 	Loop(i, TEST_SAMPLES) array_push(indices, i);
 	rand_shuffle(slice(indices));
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		gpu_alloc_seglist_free(alloc, arr[indices[i]]);
 	}
 
 	array_clear(arr);
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		u64 size = rand_u32_rng(8, KB(1));
 		u64 align = ArrayRand(test_alignments);
 		array_push(arr, gpu_alloc_seglist_alloc(alloc, size, align));
@@ -232,7 +233,7 @@ intern void test_gpu_seglist_alloc() {
 	array_clear(indices);
 	Loop(i, TEST_SAMPLES) array_push(indices, i);
 	rand_shuffle(slice(indices));
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		gpu_alloc_seglist_free(alloc, arr[indices[i]]);
 	}
 }
@@ -246,41 +247,41 @@ intern void test_object_pool() {
 		u32 a;
 		u32 b;
 	};
-	var pool = pool_make(A, OpaqueId, scratch);
+	var pool = pool_make<A, OpaqueId>(scratch);
 	Array<A, TEST_SAMPLES> values = {};
 	Array<OpaqueId, TEST_SAMPLES> handlers = {};
 
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		values[i].a = rand_u32_rng(0, TEST_SAMPLES);
 		values[i].b = rand_u32_rng(0, TEST_SAMPLES);
 	};
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		handlers[i] = pool_push(pool, values[i]);
 	}
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		AssertAlways(MemMatchStruct(&values[i], &pool_get(pool, handlers[i])));
 	}
 	Array<u32, TEST_SAMPLES> indices = {};
 	Loop(i, TEST_SAMPLES) array_push(indices, i);
 	rand_shuffle(slice(indices));
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		pool_remove(pool, handlers[i]);
 	}
 
 	array_clear(indices);
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		values[i].a = rand_u32_rng(0, TEST_SAMPLES);
 		values[i].b = rand_u32_rng(0, TEST_SAMPLES);
 	};
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		handlers[i] = pool_push(pool, values[i]);
 	}
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		AssertAlways(MemMatchStruct(&values[i], &pool_get(pool, handlers[i])));
 	}
 	Loop(i, TEST_SAMPLES) array_push(indices, i);
 	rand_shuffle(slice(indices));
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		pool_remove(pool, handlers[i]);
 	}
 }
@@ -291,18 +292,18 @@ intern void test_object_pool_linklist() {
 		u32 a;
 		u32 b;
 	};
-	var pool = pool_linklist_make(A, OpaqueId, scratch);
+	PoolIterative<A, TEST_SAMPLES+1, OpaqueId> pool = {};
 	Array<A, TEST_SAMPLES> values = {};
 	Array<OpaqueId, TEST_SAMPLES> handlers = {};
 
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		values[i].a = rand_u32_rng(0, TEST_SAMPLES);
 		values[i].b = rand_u32_rng(0, TEST_SAMPLES);
 	};
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		handlers[i] = pool_push(pool, values[i]);
 	}
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		AssertAlways(MemMatchStruct(&values[i], &pool_get(pool, handlers[i])));
 	}
 	Array<u32, TEST_SAMPLES> indices = {};
@@ -313,21 +314,21 @@ intern void test_object_pool_linklist() {
 	LoopIter (it, pool_begin(pool)) {
 		A elem = *it;
 		AssertAlways(elem.a == values[i].a && elem.a == values[i].a);
-		++i;
+		i++;
 	}
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		pool_remove(pool, handlers[i]);
 	}
 
 	array_clear(indices);
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		values[i].a = rand_u32_rng(0, TEST_SAMPLES);
 		values[i].b = rand_u32_rng(0, TEST_SAMPLES);
 	};
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		handlers[i] = pool_push(pool, values[i]);
 	}
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		AssertAlways(MemMatchStruct(&values[i], &pool_get(pool, handlers[i])));
 	}
 	Loop(i, TEST_SAMPLES) array_push(indices, i);
@@ -337,9 +338,9 @@ intern void test_object_pool_linklist() {
 	LoopIter (it, pool_begin(pool)) {
 		A elem = *it;
 		AssertAlways(elem.a == values[i].a && elem.a == values[i].a);
-		++i;
+		i++;
 	}
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		pool_remove(pool, handlers[i]);
 	}
 }
@@ -350,41 +351,41 @@ intern void test_handle_darray() {
 		u32 a;
 		u32 b;
 	};
-	var arr = array_handler_make(A, OpaqueId, scratch);
+	var arr = array_handler_make<A, OpaqueId>(scratch);
 	Array<A, TEST_SAMPLES> values = {};
 	Array<OpaqueId, TEST_SAMPLES> handlers = {};
 
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		values[i].a = rand_u32_rng(0, TEST_SAMPLES);
 		values[i].b = rand_u32_rng(0, TEST_SAMPLES);
 	};
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		handlers[i] = array_handler_push(arr, values[i]);
 	}
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		AssertAlways(MemMatchStruct(&values[i], &array_handler_get(arr, handlers[i])));
 	}
 	Array<u32, TEST_SAMPLES> indices = {};
-	Loop (i, TEST_SAMPLES) array_push(indices, i);
+	Loop(i, TEST_SAMPLES) array_push(indices, i);
 	rand_shuffle(slice(indices));
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		array_handler_remove(arr, handlers[indices[i]]);
 	}
 
 	array_clear(indices);
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		values[i].a = rand_u32_rng(0, TEST_SAMPLES);
 		values[i].b = rand_u32_rng(0, TEST_SAMPLES);
 	};
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		handlers[i] = array_handler_push(arr, values[i]);
 	}
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		AssertAlways(MemMatchStruct(&values[i], &array_handler_get(arr, handlers[i])));
 	}
 	Loop(i, TEST_SAMPLES) array_push(indices, i);
 	rand_shuffle(slice(indices));
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		array_handler_remove(arr, handlers[indices[i]]);
 	}
 }
@@ -392,64 +393,64 @@ intern void test_handle_darray() {
 intern void test_id_pool() {
 	Scratch scratch;
 	{
-		IdPool id_pool = id_pool_make(scratch);
+		DidPool id_pool = id_pool_make(scratch);
 		Array<u32, TEST_SAMPLES> arr = {};
-		Loop (i, TEST_SAMPLES) {
+		Loop(i, TEST_SAMPLES) {
 			u32 id = id_pool_push(id_pool);
 			array_push(arr, id);
 		}
 		rand_shuffle(slice(arr));
-		Loop (i, arr.count) {
+		Loop(i, arr.count) {
 			id_pool_remove(id_pool, arr[i]);
 		}
 		Array<u32, TEST_SAMPLES> new_arr = {};
-		Loop (i, arr.count) {
+		Loop(i, arr.count) {
 			u32 id = id_pool_push(id_pool);
 			array_push(new_arr, id);
 		}
-		Loop (i, arr.count) {
+		Loop(i, arr.count) {
 			b32 exists = false;
-			Loop (j, arr.count) {
-				if (id_idx(arr[i]) == id_idx(new_arr[j])) {
+			Loop(j, arr.count) {
+				if(id_idx(arr[i]) == id_idx(new_arr[j])) {
 					AssertAlways(exists == false);
 					exists = true;
 				}
 			}
 			AssertAlways(exists);
 		}
-		Loop (i, arr.count) {
+		Loop(i, arr.count) {
 			id_pool_remove(id_pool, new_arr[i]);
 		}
 	}
 
 	{
-		StaticIdPool<TEST_SAMPLES> static_id_pool = {};
+		IdPool<TEST_SAMPLES> static_id_pool = {};
 		id_pool_init(static_id_pool);
 		Array<u32, TEST_SAMPLES> arr = {};
-		Loop (i, TEST_SAMPLES) {
+		Loop(i, TEST_SAMPLES) {
 			u32 id = id_pool_push(static_id_pool);
 			array_push(arr, id);
 		}
 		rand_shuffle(slice(arr));
-		Loop (i, arr.count) {
+		Loop(i, arr.count) {
 			id_pool_remove(static_id_pool, arr[i]);
 		}
 		Array<u32, TEST_SAMPLES> new_arr = {};
-		Loop (i, arr.count) {
+		Loop(i, arr.count) {
 			u32 id = id_pool_push(static_id_pool);
 			array_push(new_arr, id);
 		}
-		Loop (i, arr.count) {
+		Loop(i, arr.count) {
 			b32 exists = false;
-			Loop (j, arr.count) {
-				if (id_idx(arr[i]) == id_idx(new_arr[j])) {
+			Loop(j, arr.count) {
+				if(id_idx(arr[i]) == id_idx(new_arr[j])) {
 					AssertAlways(exists == false);
 					exists = true;
 				}
 			}
 			AssertAlways(exists);
 		}
-		Loop (i, arr.count) {
+		Loop(i, arr.count) {
 			id_pool_remove(static_id_pool, new_arr[i]);
 		}
 	}
@@ -475,7 +476,7 @@ intern void test_profiler_der() {
 intern void test_profiler_die(i32 i) {
 	ProfFunc;
 	os_sleep_ms(1);
-	if (--i) {
+	if(--i) {
 		test_profiler_die(i);
 	}
 }
@@ -485,7 +486,7 @@ intern void test_profiler_die(i32 i) {
 //   String label_c = push_str_copy(scratch, anchor.label);
 //   f64 percent = 100.0 * ((f64)anchor.tsc_elapsed_exclusive / (f64)total_tsc_elapsed);
 //   print("  %s[%u64]: %u64 (%.2f%%)", label_c.str, anchor.hit_count, anchor.tsc_elapsed_exclusive, percent);
-//   if (anchor.tsc_elapsed_inclusive != anchor.tsc_elapsed_exclusive) {
+//   if(anchor.tsc_elapsed_inclusive != anchor.tsc_elapsed_exclusive) {
 //     f64 percent_with_children = 100.0 * ((f64)anchor.tsc_elapsed_inclusive / (f64)total_tsc_elapsed);
 //     print(", %.2f%% w/children", percent_with_children);
 //   }
@@ -495,13 +496,13 @@ intern void test_profiler_die(i32 i) {
 // intern void test_profiler_print() {
 	// u64 cpu_freq = cpu_frequency();
 	// u64 total_cpu_elapsed = g_st->profiler.prev_tsc_elapsed;
-	// if (cpu_freq) {
+	// if(cpu_freq) {
 	//   print("\nTotal time: %0.4fms (CPU freq %lu)\n", 1000.0 * (f64)total_cpu_elapsed / (f64)cpu_freq, cpu_freq);
 	// }
 	// Slice<ProfileAnchor> anchors = profiler_get_current_frame_anchors();
-	// Loop (anchor_idx, anchors.count) {
+	// Loop(anchor_idx, anchors.count) {
 	//   ProfileAnchor anchor = anchors[anchor_idx];
-	//   if (anchor.tsc_elapsed_inclusive) {
+	//   if(anchor.tsc_elapsed_inclusive) {
 	//     test_profile_print_time_elapsed(total_cpu_elapsed, anchor);
 	//   }
 	// }
@@ -567,13 +568,13 @@ void test_sort() {
 	Slice<u32> arrs[ArrayCount(counts)];
 	LoopArray (i, counts) {
 		arrs[i] = push_slice(scratch, u32, counts[i]);
-		Loop (j, counts[i]) {
+		Loop(j, counts[i]) {
 			arrs[i][j] = rand_i32();
 		}
 	}
 	print("\n/////////////////\n");
 	Info("\nQuick test:");
-	Loop (i, 2) {
+	Loop(i, 2) {
 		LoopArray (i, counts) {
 			Info("Count %i", counts[i]);
 			rand_shuffle(arrs[i]);
@@ -585,7 +586,7 @@ void test_sort() {
 		}
 	}
 	Info("\nmerge test:");
-	Loop (i, 2) {
+	Loop(i, 2) {
 		LoopArray (i, counts) {
 			Scratch scratch;
 			Info("Count %i", counts[i]);
@@ -598,13 +599,13 @@ void test_sort() {
 		}
 	}
 	Info("\nradix test:");
-	Loop (i, 2) {
+	Loop(i, 2) {
 		LoopArray (i, counts) {
 			Scratch scratch;
 			Info("Count %i", counts[i]);
 			rand_shuffle(arrs[i]);
 			Slice<SortEntry> entries = push_slice(scratch, SortEntry, counts[i]);
-			Loop (j, counts[i]) {
+			Loop(j, counts[i]) {
 				entries[j] = {arrs[i][j], (u32)j};
 			}
 			{
@@ -627,7 +628,7 @@ void test_alloc() {
 	};
 	Array<AllocCtx, TEST_SAMPLES> arr = {};
 
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		u64 size = rand_u32_rng(8, KB(1));
 		u64 align = ArrayRand(test_alignments);
 		array_push(arr, {mem_alloc(alloc, size, align), size});
@@ -636,12 +637,12 @@ void test_alloc() {
 	Array<u32, TEST_SAMPLES> indices = {};
 	Loop(i, TEST_SAMPLES) array_push(indices, i);
 	rand_shuffle(slice(indices));
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		mem_free(alloc, arr[indices[i]].data, arr[indices[i]].size);
 	}
 
 	array_clear(arr);
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		u64 size = rand_u32_rng(8, KB(1));
 		u64 align = ArrayRand(test_alignments);
 		array_push(arr, {mem_alloc(alloc, size, align), size});
@@ -650,7 +651,7 @@ void test_alloc() {
 	array_clear(indices);
 	Loop(i, TEST_SAMPLES) array_push(indices, i);
 	rand_shuffle(slice(indices));
-	Loop (i, TEST_SAMPLES) {
+	Loop(i, TEST_SAMPLES) {
 		mem_free(alloc, arr[indices[i]].data, arr[indices[i]].size);
 	}
 }
@@ -683,28 +684,28 @@ void test_js() {
 
 		JsParser p = js_parse_make(scratch, d);
 		JsObj root = js_parse(&p).obj;
-		Loop (i, root.fields.count) {
+		Loop(i, root.fields.count) {
 			var [k, v] = root.fields[i];
-			if (str_match(k, "name")) {
+			if(str_match(k, "name")) {
 				res.name = push_str_copy(scratch, v->str);
 			}
-			else if (str_match(k, "visible")) {
+			else if(str_match(k, "visible")) {
 				res.visible = v->boolean;
 			}
-			else if (str_match(k, "pos")) {
-				Loop (i, v->array.count) {
+			else if(str_match(k, "pos")) {
+				Loop(i, v->array.count) {
 					res.pos.v[i] = v->array[i]->number;
 				}
 			}
-			else if (str_match(k, "material")) {
+			else if(str_match(k, "material")) {
 				JsObj material = v->obj;
-				Loop (i, material.fields.count) {
+				Loop(i, material.fields.count) {
 					var [k, v] = material.fields[i];
-					if (str_match(k, "color")) {
-						Loop (i, v->array.count) {
+					if(str_match(k, "color")) {
+						Loop(i, v->array.count) {
 							res.material.color.v[i] = v->array[i]->number;
 						}
-					} else if (str_match(k, "roughness")) {
+					} else if(str_match(k, "roughness")) {
 						res.material.roughness = v->number;
 					}
 				}
@@ -720,13 +721,13 @@ void test_js() {
 		b32 visible = js_get_bool(root, "visible");
 		Info("%u", visible);
 		Slice pos = js_get_array(root, "pos");
-		Loop (i, pos.count) {
+		Loop(i, pos.count) {
 			Info("%f", pos[i]->number);
 		}
 		{
 			JsObj material = js_get_obj(root, "material");
 			Slice color = js_get_array(material, "color");
-			Loop (i, color.count) {
+			Loop(i, color.count) {
 				Info("%f", color[i]->number);
 			}
 			f64 roughness = js_get_number(material, "roughness");
@@ -742,12 +743,12 @@ void test_js() {
 		JsVal visible = js_get_val(root, "visible");
 		Info("%u", visible.boolean);
 		JsVal pos = js_get_val(root, "pos");
-		Loop (i, pos.array.count) {
+		Loop(i, pos.array.count) {
 			Info("%f", pos.array[i]->number);
 		}
 		JsVal material = js_get_val(root, "material");
 		JsVal color = js_get_val(material, "color");
-		Loop (i, color.array.count) {
+		Loop(i, color.array.count) {
 			Info("%f", color.array[i]->number);
 		}
 		JsVal roughness = js_get_val(material, "roughness");
@@ -861,155 +862,155 @@ b32 time_on_between_interval(f32 interval, f32 offset) { return time_on_between_
 f64 time_since(f64 timestamp) { return time_now - timestamp; }
 f64 time_until(f64 timestamp) { return timestamp - time_now; }
 
-#define GEN_ID (__LINE__)
+// #define GEN_ID (__LINE__)
 
-void ui_draw_rect(Rng2 rect, v4 color) {
-	r_draw_rect(rect, color);
-}
+// void ui_draw_rect(Rng2 rect, v4 color) {
+// 	r_draw_rect(rect, color);
+// }
 
-b32 ui_button(u32 id, v2 pos) {
-	var& g = st->ui;
-	v2 button_size = v2(64, 48);
-	v2 active_off = v2(2,2);
-	v2 shadow_off = v2(8,8);
-	if (rng2_contains(rng2_make(pos, button_size), os_mouse_pos())) {
-		g.hotitem = id;
-		if (g.activeitem == 0 && g.mouse_down) {
-			g.activeitem = id;
-		}
-	}
+// b32 ui_button(u32 id, v2 pos) {
+// 	var& g = st->ui;
+// 	v2 button_size = v2(64, 48);
+// 	v2 active_off = v2(2,2);
+// 	v2 shadow_off = v2(8,8);
+// 	if(rng2_contains(rng2_make(pos, button_size), os_mouse_pos())) {
+// 		g.hotitem = id;
+// 		if(g.activeitem == 0 && g.mouse_down) {
+// 			g.activeitem = id;
+// 		}
+// 	}
 
-	if (g.kbditem == 0) {
-		g.kbditem = id;
-	}
-	if (g.kbditem == id) {
-		ui_draw_rect(rng2_make(pos-v2(6,6), v2(84,68)), ColorRed);
-	}
+// 	if(g.kbditem == 0) {
+// 		g.kbditem = id;
+// 	}
+// 	if(g.kbditem == id) {
+// 		ui_draw_rect(rng2_make(pos-v2(6,6), v2(84,68)), ColorRed);
+// 	}
 
-	ui_draw_rect(rng2_make(pos + shadow_off, button_size), ColorBlack);
-	if (g.hotitem == id) {
-		if (g.activeitem == id) {
-			ui_draw_rect(rng2_make(pos + active_off, button_size), ColorWhite);
-		} else {
-			ui_draw_rect(rng2_make(pos, button_size), ColorWhite);
-		}
-	} else {
-		ui_draw_rect(rng2_make(pos, button_size), ColorGrey);
-	}
+// 	ui_draw_rect(rng2_make(pos + shadow_off, button_size), ColorBlack);
+// 	if(g.hotitem == id) {
+// 		if(g.activeitem == id) {
+// 			ui_draw_rect(rng2_make(pos + active_off, button_size), ColorWhite);
+// 		} else {
+// 			ui_draw_rect(rng2_make(pos, button_size), ColorWhite);
+// 		}
+// 	} else {
+// 		ui_draw_rect(rng2_make(pos, button_size), ColorGrey);
+// 	}
 
-	if (g.kbditem == id) {;
-		if (g.tab) {
-			g.kbditem = 0;
-			if (os_key_modifiers() & OS_Modifier_Shift) {
-				g.kbditem = g.last_widget;
-			}
-			g.tab = false;
-		}
-		if (g.enter) {
-			g.enter = false;
-			return true;
-		}
-	}
-	g.last_widget = id;
+// 	if(g.kbditem == id) {;
+// 		if(g.tab) {
+// 			g.kbditem = 0;
+// 			if(os_key_modifiers() & OS_Modifier_Shift) {
+// 				g.kbditem = g.last_widget;
+// 			}
+// 			g.tab = false;
+// 		}
+// 		if(g.enter) {
+// 			g.enter = false;
+// 			return true;
+// 		}
+// 	}
+// 	g.last_widget = id;
 
-	if (!g.mouse_down && g.hotitem == id && g.activeitem == id) {
-		return true;
-	}
-	return false;
-}
+// 	if(!g.mouse_down && g.hotitem == id && g.activeitem == id) {
+// 		return true;
+// 	}
+// 	return false;
+// }
 
-b32 ui_slider(u32 id, v2 pos, i32 max, i32& value) {
-	var& g = st->ui;
+// b32 ui_slider(u32 id, v2 pos, i32 max, i32& value) {
+// 	var& g = st->ui;
 
-	i32 track_height = 256;
-	i32 knob_size = 16;
-	i32 padding = 8;
+// 	i32 track_height = 256;
+// 	i32 knob_size = 16;
+// 	i32 padding = 8;
 
-	i32 ypos = remap(value, max, track_height - knob_size - padding);
+// 	i32 ypos = remap(value, max, track_height - knob_size - padding);
 
-	if (rng2_contains(rng2_make(pos+v2(padding), v2(knob_size,track_height-padding)), os_mouse_pos())) {
-		g.hotitem = id;
-		if (g.activeitem == 0 && g.mouse_down) {
-			g.activeitem = id;
-		}
-	}
+// 	if(rng2_contains(rng2_make(pos+v2(padding), v2(knob_size,track_height-padding)), os_mouse_pos())) {
+// 		g.hotitem = id;
+// 		if(g.activeitem == 0 && g.mouse_down) {
+// 			g.activeitem = id;
+// 		}
+// 	}
 
-	if (g.kbditem == 0) {
-		g.kbditem = id;
-	}
-	if (g.kbditem == id) {
-		ui_draw_rect(rng2_make(pos-v2(4,4), v2(40,280)), ColorRed);
-	}
+// 	if(g.kbditem == 0) {
+// 		g.kbditem = id;
+// 	}
+// 	if(g.kbditem == id) {
+// 		ui_draw_rect(rng2_make(pos-v2(4,4), v2(40,280)), ColorRed);
+// 	}
 
-	ui_draw_rect(rng2_make(pos, v2(knob_size*2,track_height)), rgba_from_u32(0x777777));
-	if (g.activeitem == id || g.hotitem == id) {
-		ui_draw_rect(rng2_make(pos + v2(padding) + v2(0,ypos), v2(knob_size)), ColorWhite);
-	} else {
-		ui_draw_rect(rng2_make(pos + v2(padding) + v2(0,ypos), v2(knob_size)), rgba_from_u32(0xaaaaaa));
-	}
+// 	ui_draw_rect(rng2_make(pos, v2(knob_size*2,track_height)), rgba_from_u32(0x777777));
+// 	if(g.activeitem == id || g.hotitem == id) {
+// 		ui_draw_rect(rng2_make(pos + v2(padding) + v2(0,ypos), v2(knob_size)), ColorWhite);
+// 	} else {
+// 		ui_draw_rect(rng2_make(pos + v2(padding) + v2(0,ypos), v2(knob_size)), rgba_from_u32(0xaaaaaa));
+// 	}
 
-	if (g.kbditem == id) {;
-		if (g.tab) {
-			g.kbditem = 0;
-			if (os_key_modifiers() & OS_Modifier_Shift) {
-				g.kbditem = g.last_widget;
-			}
-			g.tab = false;
-		}
-		if (g.up) {
-			if (value > 0) {
-				--value;
-				return true;
-			}
-			g.up = false;
-		}
-		if (g.down) {
-			if (value < max) {
-				++value;
-				return true;
-			}
-			g.down = false;
-		}
-	}
-	g.last_widget = id;
+// 	if(g.kbditem == id) {;
+// 		if(g.tab) {
+// 			g.kbditem = 0;
+// 			if(os_key_modifiers() & OS_Modifier_Shift) {
+// 				g.kbditem = g.last_widget;
+// 			}
+// 			g.tab = false;
+// 		}
+// 		if(g.up) {
+// 			if(value > 0) {
+// 				--value;
+// 				return true;
+// 			}
+// 			g.up = false;
+// 		}
+// 		if(g.down) {
+// 			if(value < max) {
+// 				value++;
+// 				return true;
+// 			}
+// 			g.down = false;
+// 		}
+// 	}
+// 	g.last_widget = id;
 
-	if (g.activeitem == id) {
-		i32 mousepos = Clamp(0, os_mouse_pos().y - (pos.y + padding), track_height-1);
-		i32 v = remap(mousepos, track_height-1, max);
-		if (v != value) {
-			value = v;
-			return 1;
-		}
-	}
+// 	if(g.activeitem == id) {
+// 		i32 mousepos = Clamp(0, os_mouse_pos().y - (pos.y + padding), track_height-1);
+// 		i32 v = remap(mousepos, track_height-1, max);
+// 		if(v != value) {
+// 			value = v;
+// 			return 1;
+// 		}
+// 	}
 
-	return 0;
-}
+// 	return 0;
+// }
 
-void ui_begin() {
-	var& g = st->ui;
-	g.mouse_down = os_mouse_is_button_down(MouseButton_Left);
-	g.hotitem = 0;
-	g.enter = os_key_is_down(Key_Enter);
-	g.tab = os_key_is_down(Key_Tab);
-	g.down = os_key_is_down(Key_Down);
-	g.up = os_key_is_down(Key_Up);
-}
+// void ui_begin() {
+// 	var& g = st->ui;
+// 	g.mouse_down = os_mouse_is_button_down(MouseButton_Left);
+// 	g.hotitem = 0;
+// 	g.enter = os_key_is_down(Key_Enter);
+// 	g.tab = os_key_is_down(Key_Tab);
+// 	g.down = os_key_is_down(Key_Down);
+// 	g.up = os_key_is_down(Key_Up);
+// }
 
-void ui_end() {
-	var& g = st->ui;
-	if (g.activeitem == 0 && g.mouse_down) {
-		g.activeitem = -1;
-	} else {
-		g.activeitem = 0;
-	}
-	if (g.tab) {
-		g.kbditem = 0;
-	}
-	g.enter = false;
-	g.tab = false;
-	g.down = false;
-	g.up = false;
-}
+// void ui_end() {
+// 	var& g = st->ui;
+// 	if(g.activeitem == 0 && g.mouse_down) {
+// 		g.activeitem = -1;
+// 	} else {
+// 		g.activeitem = 0;
+// 	}
+// 	if(g.tab) {
+// 		g.kbditem = 0;
+// 	}
+// 	g.enter = false;
+// 	g.tab = false;
+// 	g.down = false;
+// 	g.up = false;
+// }
 
 ImGui_DrawList imgui_get_window_drawlist() {
 	ImGui_DrawList res = {
@@ -1066,7 +1067,7 @@ void imgui_begin_tab_item(String str) {
 }
 
 Rng2 debug_window_get_rect(DebugWindow win) {
-	if (win.fullscreen) {
+	if(win.fullscreen) {
 		return rng2_make(v2(), v2_of_v2u(os_window_size()));
 	} else {
 		return rng2_make(win.pos, win.size);
@@ -1074,8 +1075,8 @@ Rng2 debug_window_get_rect(DebugWindow win) {
 }
 
 void debug_window_apply_state(DebugWindow& win) {
-	if (win.toggle_fullscreen) {
-		if (!win.fullscreen) {
+	if(win.toggle_fullscreen) {
+		if(!win.fullscreen) {
 			win.fullscreen = true;
 			ImGui::SetNextWindowPos(ImVec2(0, 0));
 			ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
@@ -1091,7 +1092,7 @@ void debug_window_apply_state(DebugWindow& win) {
 }
 
 void debug_window_track_state(DebugWindow& win) {
-	if (!win.fullscreen) {
+	if(!win.fullscreen) {
 		win.pos = ImGui::GetWindowPos();
 		win.size = ImGui::GetWindowSize();
 	}
@@ -1131,11 +1132,11 @@ void debug_init() {
 
 void debug_update() {
 	DebugState& g = st->debug;
-	if (key_pressed(Key_F1)) g.prof_win.win.open = !g.prof_win.win.open;
-	if (key_pressed(Key_F2)) g.imgui_demo_open = !g.imgui_demo_open;
-	if (key_pressed(Key_F3)) g.game_win.open = !g.game_win.open;
+	if(key_pressed(Key_F1)) g.prof_win.win.open = !g.prof_win.win.open;
+	if(key_pressed(Key_F2)) g.imgui_demo_open = !g.imgui_demo_open;
+	if(key_pressed(Key_F3)) g.game_win.open = !g.game_win.open;
 
-	if (g.imgui_demo_open) ImGui::ShowDemoWindow();
+	if(g.imgui_demo_open) ImGui::ShowDemoWindow();
 
 	debug_prof_view();
 	debug_game();
@@ -1145,11 +1146,11 @@ void debug_game() {
 	Scratch scratch;
 	var& g = *st;
 	DebugWindow& win = st->debug.game_win;
-	if (win.open) {
+	if(win.open) {
 		debug_window_apply_state(win);
 		ImGui::Begin("Game");
-		if (ImGui::IsWindowHovered()) {
-			if (key_pressed(Key_V)) {
+		if(ImGui::IsWindowHovered()) {
+			if(key_pressed(Key_V)) {
 				debug_window_toggle_fullscreen(win);
 			}
 		}
@@ -1167,14 +1168,14 @@ void debug_game() {
 			imgui_text(push_str_copy(scratch, dumb_struct(scratch, slice(members_of_Entity), &e, e.flags)));
 		}
 
-		if (ImGui::Button("save state")) {
+		if(ImGui::Button("save state")) {
 			save_game_state();
 		}
-		if (ImGui::Button("load state")) {
+		if(ImGui::Button("load state")) {
 			load_game_state();
 		}
-		if (ImGui::Button("clear moving cubes")) {
-			Loop (i, g.moving_cubes.count) {
+		if(ImGui::Button("clear moving cubes")) {
+			Loop(i, g.moving_cubes.count) {
 				ThingId e =  g.moving_cubes[i];
 				destroy_thing(e);
 			}
@@ -1215,35 +1216,35 @@ void debug_prof_view() {
 	u64 tsc_elapsed = tsc_end - tsc_start;
 	ProfColors colors = prof_win.colors;
 
-	if (key_pressed(Key_H)) {
+	if(key_pressed(Key_H)) {
 		ImGui::SetNextWindowFocus(); 
 	}
 
-	if (prof_win.win.open) {
+	if(prof_win.win.open) {
 		f32 thread_name_text_size = 20;
 		f32 time_bar_text_size = 15;
 
 		debug_window_apply_state(prof_win.win);
 
-		if (ImGui::Begin("Profiler", null, prof_win.win.flags)) {
+		if(ImGui::Begin("Profiler", null, prof_win.win.flags)) {
 			debug_window_track_state(prof_win.win);
 
 			Rng2 win_rect = debug_window_get_rect(prof_win.win);
 			ImGui::PushClipRect(win_rect.min, win_rect.max, false);
 
-			if (key_pressed(Key_1)) prof_win.future_active_tab = ProfileTabActive_Root;
-			if (key_pressed(Key_2)) prof_win.future_active_tab = ProfileTabActive_Frames;
-			if (key_pressed(Key_3)) prof_win.future_active_tab = ProfileTabActive_Time;
-			if (key_pressed(Key_4)) prof_win.future_active_tab = ProfileTabActive_LaunchTime;
-			if (key_pressed(Key_5)) prof_win.future_active_tab = ProfileTabActive_Memory;
-			if (key_pressed(Key_P)) prof.paused = !prof.paused;
-			if (ImGui::IsWindowHovered()) {
-				if (key_pressed(Key_V)) {
+			if(key_pressed(Key_1)) prof_win.future_active_tab = ProfileTabActive_Root;
+			if(key_pressed(Key_2)) prof_win.future_active_tab = ProfileTabActive_Frames;
+			if(key_pressed(Key_3)) prof_win.future_active_tab = ProfileTabActive_Time;
+			if(key_pressed(Key_4)) prof_win.future_active_tab = ProfileTabActive_LaunchTime;
+			if(key_pressed(Key_5)) prof_win.future_active_tab = ProfileTabActive_Memory;
+			if(key_pressed(Key_P)) prof.paused = !prof.paused;
+			if(ImGui::IsWindowHovered()) {
+				if(key_pressed(Key_V)) {
 					debug_window_toggle_fullscreen(prof_win.win);
 				}
 			}
 
-			if (ImGui::BeginTabBar("MyTabBar")) {
+			if(ImGui::BeginTabBar("MyTabBar")) {
 				ImGui_DrawList draw = imgui_get_window_drawlist();
 				v2 cursor_pos = ImGui::GetCursorScreenPos();
 				v2 mouse_pos = os_mouse_pos();
@@ -1263,8 +1264,8 @@ void debug_prof_view() {
 
 				var draw_frame_graph = [&](Slice<Slice<ProfAnchor>> slices, ProfFrameTime time, f32 width_off, ScrollState scroll_state, b32 wrap = false) {
 					Scratch scratch;
-					var items = array_make(UI_Item, scratch);
-					Loop (i, slices.count) {
+					var items = array_make<UI_Item>(scratch);
+					Loop(i, slices.count) {
 						var anchors = slices[i];
 
 						///////////////////////////////////
@@ -1279,18 +1280,18 @@ void debug_prof_view() {
 								u64 var_tsc_start = anchor.tsc_start;
 								
 								// Handle async anchors
-								if (wrap) {
-									if (!anchor.was_poped) {
+								if(wrap) {
+									if(!anchor.was_poped) {
 										var_tsc_elapsed_incl = tsc_end - anchor.tsc_start;
 										anchor.tsc_elapsed_incl = var_tsc_elapsed_incl;
 									}
-									if (anchor.tsc_start < tsc_start) {
+									if(anchor.tsc_start < tsc_start) {
 										var_tsc_start = tsc_start;
 										anchor.tsc_start = var_tsc_start;
 									}
 								}
 								else {
-									if (!anchor.was_poped) {
+									if(!anchor.was_poped) {
 										break;
 									}
 								}
@@ -1315,20 +1316,20 @@ void debug_prof_view() {
 					// Anchors and thread offsets
 					f32 height_off = 0;
 					f32 thread_height_off = 200;
-					Loop (i, items.count) {
+					Loop(i, items.count) {
 						UI_Item& item = items[i];
-						switch (item.type) {
+						switch(item.type) {
 							case UI_ItemType_Bar: {
 								item.rect = rng2_shift(item.rect, v2(width_off, height_off));
-							} break;
+							}break;
 							case UI_ItemType_NextThread: {
 								height_off += thread_height_off;
-							} break;
+							}break;
 						}
 					}
 
 					// Scroll
-					Loop (i, items.count) {
+					Loop(i, items.count) {
 						Rng2& rect = items[i].rect;
 						rect = rng2_shift(rect, cursor_pos);
 						rect = rng2_scale(rect, scroll_state.scale);
@@ -1337,36 +1338,36 @@ void debug_prof_view() {
 
 					///////////////////////////////////
 					// Drawing
-					Loop (i, items.count) {
+					Loop(i, items.count) {
 						UI_Item item = items[i];
-						switch (item.type) {
-							default:{}break;
+						switch(item.type) {
+							default:break;
 							case UI_ItemType_Bar: {
 								v4 color = {};
 								String str = {};
 								ProfAnchor anchor = item.anchor;
 								Rng2 rect = item.rect;
-								switch (anchor.type) {
+								switch(anchor.type) {
 									case ProfType_Default: {
 										color = colors.work;
 										str = "work";
-									} break;
+									}break;
 									case ProfType_Sleep: {
 										color = colors.sleep;
 										str = "sleep";
-									} break;
+									}break;
 									case ProfType_Worker: {
 										color = colors.job;
 										str = "job";
-									} break;
+									}break;
 									case ProfType_Async: {
 										color = colors.async;
 										str = "async";
-									} break;
+									}break;
 								}
 								imgui_draw_rect_filled(draw, rect, color);
 								imgui_draw_rect(draw, rect, ColorGreyLight);
-								if (rng2_contains(rect, mouse_pos)) {
+								if(rng2_contains(rect, mouse_pos)) {
 									ImGui::BeginTooltip();
 									imgui_text("Label: %s", anchor.label);
 									imgui_text("Percent: %f%%", rng2_dim(rect).x / avail_size.x * 100);
@@ -1380,11 +1381,11 @@ void debug_prof_view() {
 								{
 									String str = push_strf(scratch, "%s %.3f", anchor.label, tsc_to_ms(anchor.tsc_elapsed_incl));
 									v2 text_size = imgui_calc_text_size(str);
-									if (rng2_dim(rect).x < 30.1 || scroll_state.scale.y < 0.3) {
+									if(rng2_dim(rect).x < 30.1 || scroll_state.scale.y < 0.3) {
 										continue;
 									}
 									v2 text_pos = {};
-									if (text_size.x > rng2_dim(rect).x) {
+									if(text_size.x > rng2_dim(rect).x) {
 										text_pos.x = rect.min.x;
 										text_pos.y = rect.min.y + (rng2_dim(rect).y - text_size.y) * 0.5;
 									} else {
@@ -1394,7 +1395,7 @@ void debug_prof_view() {
 									imgui_draw_text(draw, debug.font, time_bar_text_size, text_pos, ColorWhite, str);
 									imgui_draw_pop_clip_rect(draw);
 								}
-							} break;
+							}break;
 						}
 					}
 				};
@@ -1418,7 +1419,7 @@ void debug_prof_view() {
 						imgui_draw_text(draw, debug.font, thread_name_text_size, text_pos, ColorWhite, str);
 					}
 					{
-						Loop (i, Thread_NumWorkers) {
+						Loop(i, Thread_NumWorkers) {
 							thread_height_offset += thread_height;
 							String str = push_strf(scratch, "Worker %i", i);
 							v2 text_pos = v2(0, thread_height_offset + text_off_above) + cursor_pos;
@@ -1437,34 +1438,34 @@ void debug_prof_view() {
 					String str = push_strf(scratch, name);
 					imgui_begin_tab_item(str);
 					Rng2 tab_rect = Rng2(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
-					// if (str_match(name, "root")) {
+					// if(str_match(name, "root")) {
 					//   Debug("root");
 					//   Info("min: %f %f", tab_rect.min.x, tab_rect.min.y);
 					//   Info("max: %f %f", tab_rect.max.x, tab_rect.max.y);
 					// }
-					// if (str_match(name, "frames")) {
+					// if(str_match(name, "frames")) {
 					//   Debug("frames");
 					//   Info("min: %f %f", tab_rect.min.x, tab_rect.min.y);
 					//   Info("max: %f %f", tab_rect.max.x, tab_rect.max.y);
 					// }
-					// if (str_match(name, "time")) {
+					// if(str_match(name, "time")) {
 					//   Debug("time");
 					//   Info("min: %f %f", tab_rect.min.x, tab_rect.min.y);
 					//   Info("max: %f %f", tab_rect.max.x, tab_rect.max.y);
 					// }
-					// if (str_match(name, "launch")) {
+					// if(str_match(name, "launch")) {
 					//   Debug("launch");
 					//   Info("min: %f %f", tab_rect.min.x, tab_rect.min.y);
 					//   Info("max: %f %f", tab_rect.max.x, tab_rect.max.y);
 					// }
-					// if (str_match(name, "memory")) {
+					// if(str_match(name, "memory")) {
 					//   Debug("memory");
 					//   Info("min: %f %f", tab_rect.min.x, tab_rect.min.y);
 					//   Info("max: %f %f", tab_rect.max.x, tab_rect.max.y);
 					// }
-					if (os_mouse_is_button_pressed(MouseButton_Left)) {
-						if (rng2_contains(tab_rect, mouse_pos)) {
-							switch (tab) {
+					if(os_mouse_is_button_pressed(MouseButton_Left)) {
+						if(rng2_contains(tab_rect, mouse_pos)) {
+							switch(tab) {
 								case ProfileTabActive_Root: prof_win.future_active_tab = ProfileTabActive_Root; break;
 								case ProfileTabActive_Frames: prof_win.future_active_tab = ProfileTabActive_Frames; break;
 								case ProfileTabActive_Time: prof_win.future_active_tab = ProfileTabActive_Time; break;
@@ -1482,10 +1483,10 @@ void debug_prof_view() {
 				tab_mouse_click_handle("time", ProfileTabActive_Time);
 				tab_mouse_click_handle("launch", ProfileTabActive_LaunchTime);
 				tab_mouse_click_handle("memory", ProfileTabActive_Memory);
-				switch (prof_win.active_tab) {
+				switch(prof_win.active_tab) {
 					case ProfileTabActive_Root: {
 						ScrollState& scroll_state = prof_win.root_scroll_state;
-						if (ImGui::IsWindowHovered()) {
+						if(ImGui::IsWindowHovered()) {
 							scroll_state_update(scroll_state, ScrollType_PowClamp);
 						}
 						cursor_pos.y += 30;
@@ -1500,17 +1501,17 @@ void debug_prof_view() {
 						ProfFrameTime time = prof.frames_times[0];
 						draw_frame_graph(slice(slices), time, 0, scroll_state);
 						ImGui::EndTabItem();
-					} break;
+					}break;
 					case ProfileTabActive_Frames: {
 						ScrollState& scroll_state = prof_win.frames_scroll_state;
-						if (ImGui::IsWindowHovered()) {
+						if(ImGui::IsWindowHovered()) {
 							scroll_state_update(scroll_state, ScrollType_PowClamp);
 						}
 						f32 width_size = avail_size.x;
 
 						///////////////////////////////////
 						// Little bars
-						Loop (i, ArrayCount(prof.frames_times)) {
+						Loop(i, ArrayCount(prof.frames_times)) {
 							ProfFrameTime frame_time = prof.frames_times[i];
 							f32 max_height = 40;
 							f32 max_ms = 30;
@@ -1519,23 +1520,23 @@ void debug_prof_view() {
 							v2 size = v2(avail_size.x / ArrayCount(prof.frames_times), height);
 							v2 min = cursor_pos + v2(i*size.x, -height + max_height);
 							Rng2 rect = rng2_make(min, size);
-							if (rng2_contains(rect, mouse_pos)) {
+							if(rng2_contains(rect, mouse_pos)) {
 								ImGui::BeginTooltip();
 								ImGui::Text("frame: %i", i);
 								ImGui::EndTooltip();
-								if (os_mouse_is_button_pressed(MouseButton_Left)) {
+								if(os_mouse_is_button_pressed(MouseButton_Left)) {
 									prof_win.frames_scroll_state.offset.x = -width_size * i;
 									prof_win.frames_scroll_state.scale = v2(1);
 								}
 							}
-							if (i == st->current_frame % ArrayCount(prof.frames_times)) {
+							if(i == st->current_frame % ArrayCount(prof.frames_times)) {
 								imgui_draw_rect_filled(draw, rect, colors.current_frame);
 							}
 							else {
 								v4 color = colors.frame_ok;
-								if (rng1_contains(Rng1(17, 21), frame_ms)) {
+								if(rng1_contains(Rng1(17, 21), frame_ms)) {
 									color = colors.frame_warn;
-								} else if (frame_ms > 20) {
+								} else if(frame_ms > 20) {
 									color = colors.frame_bad;
 								}
 								imgui_draw_rect_filled(draw, rect, color);
@@ -1548,7 +1549,7 @@ void debug_prof_view() {
 						// Draw lines and current rect
 						{
 							f32 width_offset = 0;
-							Loop (i, ArrayCount(prof.frames_times)) {
+							Loop(i, ArrayCount(prof.frames_times)) {
 								f32 line_height = 1000;
 								f32 thick = 1;
 								v2 base = cursor_pos + v2(width_offset, 0);
@@ -1561,7 +1562,7 @@ void debug_prof_view() {
 								p2 = p2 * scroll_state.scale.x + scroll_state.offset;
 								p3 = p3 * scroll_state.scale.x + scroll_state.offset;
 								imgui_draw_line(draw, p0, p1, ColorGrey3, thick);
-								if (i == st->current_frame % ArrayCount(prof.frames_times)) {
+								if(i == st->current_frame % ArrayCount(prof.frames_times)) {
 									imgui_draw_rect_filled(draw, Rng2(p0, p3), v4(0.4,0.4,0.4,0.4));
 								}
 								width_offset += width_size;
@@ -1581,12 +1582,12 @@ void debug_prof_view() {
 							draw_frame_graph(slice(slices), time, j * width_size, scroll_state);
 						}
 						ImGui::EndTabItem();
-					} break;
+					}break;
 					case ProfileTabActive_Time: {
 						var sorted_anchors = slice_clone(scratch, anchors);
 						sort_insert(sorted_anchors, [](ProfAnchor a, ProfAnchor b) { return a.tsc_elapsed_excl > b.tsc_elapsed_excl; });
 
-						Loop (i, anchors.count) {
+						Loop(i, anchors.count) {
 							ImGui::PushID(i);
 							ProfAnchor anchor = sorted_anchors[i];
 							f64 width_exclusive_percent = (f64)anchor.tsc_elapsed_excl / tsc_elapsed;
@@ -1612,10 +1613,10 @@ void debug_prof_view() {
 							ImGui::PopID();
 						}
 						ImGui::EndTabItem();
-						} break;
+						}break;
 					case ProfileTabActive_LaunchTime: {
 						ScrollState& scroll_state = prof_win.launch_time_scroll_state;
-						if (ImGui::IsWindowHovered()) {
+						if(ImGui::IsWindowHovered()) {
 							scroll_state_update(scroll_state, ScrollType_PowClamp);
 						}
 
@@ -1628,10 +1629,10 @@ void debug_prof_view() {
 						ProfFrameTime time = prof.launch_time;
 						draw_frame_graph(slice(slices), time, 0, scroll_state, true);
 						ImGui::EndTabItem();
-					} break;
+					}break;
 					case ProfileTabActive_Memory: {
 						ScrollState& scroll_state = prof_win.mem_scroll_state;
-						if (ImGui::IsWindowHovered()) {
+						if(ImGui::IsWindowHovered()) {
 							scroll_state_update(scroll_state);
 						}
 						enum UI_ItemType {
@@ -1647,11 +1648,11 @@ void debug_prof_view() {
 							AllocatorInfo* info;
 							u32 mem_level;
 						};
-						var items = array_make(UI_Item, scratch);
+						var items = array_make<UI_Item>(scratch);
 						AllocatorInfoList infos = mem_track_info();
 						var infos_sorted = sort_list_insert(scratch, infos.first, [](var a, var b) { return a->pos > b->pos; });
 						f64 mem_usage = 0;
-						Loop (i, infos_sorted.count) {
+						Loop(i, infos_sorted.count) {
 							AllocatorInfo* x = infos_sorted[i];
 							mem_usage += x->cap;
 						}
@@ -1672,18 +1673,18 @@ void debug_prof_view() {
 							}
 
 							b32 level_drawn[ArrayCount(mem_levels)] = {};
-							Loop (i, infos_sorted.count) {
+							Loop(i, infos_sorted.count) {
 								var& info = *infos_sorted[i];
 		
 								//  Mem level
 								u32 mem_level = 0;
 								LoopArray (i, mem_levels) {
-									if (info.pos < mem_levels[i]) {
+									if(info.pos < mem_levels[i]) {
 										mem_level = i;
 										break;
 									}
 								}
-								if (!level_drawn[mem_level]) {
+								if(!level_drawn[mem_level]) {
 									level_drawn[mem_level] = true;
 									UI_Item item = {
 										.type = UI_ItemType_MemLevel,
@@ -1710,12 +1711,12 @@ void debug_prof_view() {
 									AllocatorInfo* node;
 									u32 depth;
 								};
-								var stack = array_make(StackEntry, scratch);
+								var stack = array_make<StackEntry>(scratch);
 								Slice sorted_children = sort_list_insert(scratch, info.first, [](var a, var b) { return a->pos > b->pos; });
 								LoopReverse (i, sorted_children.count) {
 									array_push(stack, {sorted_children[i], 1});
 								}
-								for (;stack.count;) {
+								while(stack.count) {
 									StackEntry entry = array_pop(stack);
 									var child = entry.node;
 									UI_Item item = {
@@ -1730,8 +1731,8 @@ void debug_prof_view() {
 									);
 									array_push(items, item);
 									layout_next(curs, row_h * 0.6);
-									if (child->first) {
-										++depth;
+									if(child->first) {
+										depth++;
 										Slice sorted_children = sort_list_insert(scratch, child->first, [](var a, var b) { return a->pos > b->pos; });
 										LoopReverse (i, sorted_children.count) {
 											array_push(stack, {sorted_children[i], entry.depth + 1});
@@ -1741,7 +1742,7 @@ void debug_prof_view() {
 							}
 						}
 
-						Loop (i, items.count) {
+						Loop(i, items.count) {
 							UI_Item& item = items[i];
 							item.rect = rng2_shift(item.rect, cursor_pos);
 							item.rect = rng2_scale(item.rect, scroll_state.scale);
@@ -1754,11 +1755,11 @@ void debug_prof_view() {
 
 						///////////////////////////////////
 						// Drawing
-						Loop (i, items.count) {
+						Loop(i, items.count) {
 							UI_Item item = items[i];
 							AllocatorInfo& info = *item.info;
 
-							switch (item.type) {
+							switch(item.type) {
 								case UI_ItemType_MemUsage: {
 									MemFormatSize mem_fmt = mem_format_size(mem_usage);
 									MemFormatSize os_commited_fmt = mem_format_size(os_commited_size());
@@ -1768,7 +1769,7 @@ void debug_prof_view() {
 										os_address_reserved_fmt.size, os_address_reserved_fmt.format,
 										mem_fmt.size, mem_fmt.format);
 									imgui_draw_text(draw, cursor_pos, ColorWhite, mem_usage_str);
-								} break;
+								}break;
 								case UI_ItemType_MemLevel: {
 									MemFormatSize mem_fmt = mem_format_size(mem_levels[item.mem_level]);
 									String str = push_strf(scratch, "%.0f%s", mem_fmt.size, mem_fmt.format);
@@ -1778,7 +1779,7 @@ void debug_prof_view() {
 									Rng2 pad_text_rect = rng2_pad(text_rect, 5);
 									imgui_draw_rect_filled(draw, pad_text_rect, v4(0.3, 3.5, 0.5, 0.5));
 									imgui_draw_text(draw, text_rect.min, ColorWhite, str);
-								} break;
+								}break;
 								case UI_ItemType_Arena: {
 									f32 t_w = rng2_dim(item.rect).x;
 									f32 t_pos = info.pos / mem_levels[item.mem_level];
@@ -1805,13 +1806,13 @@ void debug_prof_view() {
 									imgui_draw_text(draw, excl_rect.min, ColorWhite, name_str);
 									imgui_draw_text(draw, rng2_subrng_x01(item.rect, Rng1(0.2, 1)).min, ColorWhite, mem_str);
 									
-									if (rng2_contains(rng2_union(incl_rect, excl_rect), mouse_pos)) {
+									if(rng2_contains(rng2_union(incl_rect, excl_rect), mouse_pos)) {
 										ImGui::BeginTooltip();
 										imgui_text(push_strf(scratch, "inclusive: %.2f%s", pos.size, pos.format));
 										imgui_text(push_strf(scratch, "exclusive: %.2f%s", pos_exclusive.size, pos_exclusive.format));
 										ImGui::EndTooltip();
 									}
-								} break;
+								}break;
 								case UI_ItemType_Child: {
 									f32 t_w = rng2_dim(item.rect).x;
 									f32 t_pos = info.pos / mem_levels[item.mem_level];
@@ -1837,11 +1838,11 @@ void debug_prof_view() {
 									String child_meta_str = push_strf(scratch, "%.2f%s pos, %.2f%s cap, alloc count: %u, free count: %u, current alloc count: %u", pos.size, pos.format, cap.size, cap.format, info.allocs_count, info.frees_count, info.allocs_count-info.frees_count);
 									imgui_draw_text(draw, child_rect.min, ColorWhite, child_name_str);
 									imgui_draw_text(draw, rng2_subrng_x01(child_rect, Rng1(0.3, 1)).min, ColorWhite, child_meta_str);
-								} break;
+								}break;
 							}
 						}
 						ImGui::EndTabItem();
-					} break;
+					}break;
 				}
 				ImGui::EndTabBar();
 			}
@@ -1855,11 +1856,11 @@ void debug_prof_view() {
 
 R_MeshDesc load_obj(Allocator arena, String name) {
 	Scratch scratch(arena);
-	var positions = array_make(v3, scratch);
-	var normals = array_make(v3, scratch);
-	var uvs = array_make(v2, scratch);
-	var indexes = array_make(v3u, scratch);
-	if (1) {
+	var positions = array_make<v3>(scratch);
+	var normals = array_make<v3>(scratch);
+	var uvs = array_make<v2>(scratch);
+	var indexes = array_make<v3u>(scratch);
+	if(1) {
 		Info("hello");
 	}
 
@@ -1879,20 +1880,20 @@ R_MeshDesc load_obj(Allocator arena, String name) {
 		u32 cursor;
 	};
 	var word_lexer_next = [](WordLexer& l) {
-		while (l.cursor < l.str.size && char_is_ws(l.str.str[l.cursor])) {
-			++l.cursor;
+		while(l.cursor < l.str.size && char_is_ws(l.str.str[l.cursor])) {
+			l.cursor++;
 		}
 		u32 word_base = l.cursor;
-		while (l.cursor < l.str.size && !char_is_ws(l.str.str[l.cursor])) {
-			++l.cursor;
+		while(l.cursor < l.str.size && !char_is_ws(l.str.str[l.cursor])) {
+			l.cursor++;
 		}
-		String res = str_make(l.str.str + word_base, l.cursor - word_base);
+		String res = {l.str.str + word_base, l.cursor - word_base};
 		return res;
 	};
 	WordLexer l = {os_file_path_read_all_str(scratch, name)};
-	for (String word = {}; (word = word_lexer_next(l)).size;) {
+	for(String word = {}; (word = word_lexer_next(l)).size;) {
 		// Info("%s", word);
-		if (word.str[0] == 'v' && word.str[1] == ' ') {
+		if(word.str[0] == 'v' && word.str[1] == ' ') {
 			v3 pos = {
 			 f32_from_str(word_lexer_next(l)),
 			 f32_from_str(word_lexer_next(l)),
@@ -1900,7 +1901,7 @@ R_MeshDesc load_obj(Allocator arena, String name) {
 			};
 			array_push(positions, pos);
 			// Info("%f %f %f", pos.x, pos.y, pos.z);
-		} else if (word.str[0] == 'v' && word.str[1] == 'n') {
+		} else if(word.str[0] == 'v' && word.str[1] == 'n') {
 			v3 norm = {
 				f32_from_str(word_lexer_next(l)),
 				f32_from_str(word_lexer_next(l)),
@@ -1908,27 +1909,27 @@ R_MeshDesc load_obj(Allocator arena, String name) {
 			};
 			array_push(normals, norm);
 			// Info("%f %f %f", norm.x, norm.y, norm.z);
-		} else if (word.str[0] == 'v' && word.str[1] == 't') {
+		} else if(word.str[0] == 'v' && word.str[1] == 't') {
 			v2 uv = {
 				f32_from_str(word_lexer_next(l)),
 				f32_from_str(word_lexer_next(l)),
 			};
 			array_push(uvs, uv);
 			// Info("%f %f", uv.x, uv.y);
-		} else if (word.str[0] == 'f' && word.str[1] == ' ') {
-			Loop (i, 3) {
+		} else if(word.str[0] == 'f' && word.str[1] == ' ') {
+			Loop(i, 3) {
 				v3u raw = {};
 				String word = word_lexer_next(l);
 				u32 cursor = 0;
 				String r = {};
-				Loop (i, 3) {
+				Loop(i, 3) {
 					u32 num_base = cursor;
-					while (cursor < word.size && char_is_digit(word.str[cursor])) {
-						++cursor;
+					while(cursor < word.size && char_is_digit(word.str[cursor])) {
+						cursor++;
 					}
-					r = str_make(word.str+num_base, cursor - num_base);
+					r = {word.str+num_base, cursor - num_base};
 					raw.v[i] = u64_from_str(r) - 1;
-					++cursor;
+					cursor++;
 				}
 				// Info("%u %u %u", raw.x, raw.y, raw.z);
 				v3u v = {raw.x, raw.z, raw.y};
@@ -1937,13 +1938,14 @@ R_MeshDesc load_obj(Allocator arena, String name) {
 		}
 	}
 
-	var vertices = array_make(R_Vertex, arena);
-	var final_indices = array_make(u32, arena);
-	var map = map_make(v3u, u32, scratch);
-	Loop (i, indexes.count) {
+	var vertices = array_make<R_Vertex>(arena);
+	var final_indices = array_make<u32>(arena);
+	var map = map_make<u32>(scratch);
+	Loop(i, indexes.count) {
 		v3u idx = indexes[i];
-		var [value, ok] = map_get(map, idx);
-		if (ok) {
+		u64 h = hash_bytes(&idx, sizeof(v3u));
+		var[value, ok] = map_get(map, h);
+		if(ok) {
 			array_push(final_indices, value);
 		} else {
 			R_Vertex v = {
@@ -1954,7 +1956,7 @@ R_MeshDesc load_obj(Allocator arena, String name) {
 			u32 new_index = vertices.count;
 			array_push(vertices, v);
 			array_push(final_indices, new_index);
-			map_set(map, idx, new_index);
+			map_set(map, h, new_index);
 		} 
 	}
 	R_MeshDesc mesh = {
@@ -1976,7 +1978,7 @@ R_MeshDesc load_gltf(Allocator arena, String path, b32 is_glb) {
 
 	String json = {};
 	Slice<u8> cursor = {};
-	if (is_glb) {
+	if(is_glb) {
 		struct FileHeader {
 			u32 magic;
 			u32 version;
@@ -1989,17 +1991,17 @@ R_MeshDesc load_gltf(Allocator arena, String path, b32 is_glb) {
 		cursor = os_file_path_read_all(scratch, path);
 
 		FileHeader* header = (FileHeader*)cursor.data;
-		Assert(str_match(str_make((u8*)&header->magic, 4), "glTF"));
+		Assert(str_match(String((u8*)&header->magic, 4), "glTF"));
 		cursor = slice_skip(cursor, sizeof(FileHeader));
 
 		ChunkHeader* json_chunk = (ChunkHeader*)cursor.data;
-		Assert(str_match(str_make((u8*)&json_chunk->chunk_type, 4), "JSON"));
+		Assert(str_match(String((u8*)&json_chunk->chunk_type, 4), "JSON"));
 		cursor = slice_skip(cursor, sizeof(ChunkHeader));
 		json = str_make(slice_prefix(cursor, json_chunk->chunk_length));
 		cursor = slice_skip(cursor, json_chunk->chunk_length);
 
 		ChunkHeader* bin_chunk = (ChunkHeader*)cursor.data;
-		Assert(str_match(str_make((u8*)&bin_chunk->chunk_type, 3), "BIN"));
+		Assert(str_match(String((u8*)&bin_chunk->chunk_type, 3), "BIN"));
 		cursor = slice_skip(cursor, sizeof(ChunkHeader));
 
 	} else {
@@ -2083,10 +2085,10 @@ R_MeshDesc load_gltf(Allocator arena, String path, b32 is_glb) {
 
 	Slice vertices = push_slice(arena, R_Vertex, gltf.pos_accessor.count);
 	Slice indices = push_slice(arena, u32, gltf.indices_accessor.count);
-	Loop (i, indices.count) {
+	Loop(i, indices.count) {
 		indices[i] = indices_u16[i];
 	}
-	Loop (i, vertices.count) {
+	Loop(i, vertices.count) {
 		vertices[i] = {
 			.pos = pos[i],
 			.norm = norm[i],
@@ -2108,17 +2110,17 @@ JsParser js_parse_make(Allocator arena, String str) {
 	return res;
 }
 u8 js_peek(JsParser* p) {
-	if (p->cursor >= p->str.size) return 0;
+	if(p->cursor >= p->str.size) return 0;
 	return p->str.str[p->cursor];
 }
 b32 js_at_end(JsParser* p) {
 	return p->cursor >= p->str.size;
 }
 void js_advance(JsParser* p) {
-	++p->cursor;
+	p->cursor++;
 }
 void js_skip_ws(JsParser* p) {
-	while (char_is_ws(js_peek(p))) {
+	while(char_is_ws(js_peek(p))) {
 		js_advance(p);
 	}
 }
@@ -2126,7 +2128,7 @@ String js_parse_str(JsParser* p) {
 	Assert(js_peek(p) == '\"');
 	js_advance(p);
 	u32 start = p->cursor;
-	while (js_peek(p) != '\"' && !js_at_end(p)) {
+	while(js_peek(p) != '\"' && !js_at_end(p)) {
 		js_advance(p);
 	}
 	Assert(js_peek(p) == '\"'); 
@@ -2136,23 +2138,23 @@ String js_parse_str(JsParser* p) {
 }
 f64 js_parse_number(JsParser* p) {
 	u32 start = p->cursor;
-	// while (char_is_number_cont(js_peek(p))) {
+	// while(char_is_number_cont(js_peek(p))) {
 	//   js_advance(p);
 	// }
-	if (js_peek(p) == '-')
+	if(js_peek(p) == '-')
 		js_advance(p);
-	while (char_is_digit(js_peek(p)))
+	while(char_is_digit(js_peek(p)))
 		js_advance(p);
-	if (js_peek(p) == '.') {
+	if(js_peek(p) == '.') {
 		js_advance(p);
-		while (char_is_digit(js_peek(p)))
+		while(char_is_digit(js_peek(p)))
 			js_advance(p);
 	}
-	if (js_peek(p) == 'e' || js_peek(p) == 'E') {
+	if(js_peek(p) == 'e' || js_peek(p) == 'E') {
 		js_advance(p);
-		if (js_peek(p) == '+' || js_peek(p) == '-')
+		if(js_peek(p) == '+' || js_peek(p) == '-')
 			js_advance(p);
-		while (char_is_digit(js_peek(p)))
+		while(char_is_digit(js_peek(p)))
 			js_advance(p);
 	}
 	String str = str_substr(p->str, Rng1u(start, p->cursor));
@@ -2161,7 +2163,7 @@ f64 js_parse_number(JsParser* p) {
 }
 JsVal js_parse(JsParser* p) {
 	js_skip_ws(p);
-	switch (js_peek(p)) {
+	switch(js_peek(p)) {
 		default:   return { .type = JsType_Number, .number = js_parse_number(p) };
 		case '\"': return { .type = JsType_Str, .str = js_parse_str(p), };
 		case 't': p->cursor += 4; return { .type = JsType_Bool, .boolean = true, };
@@ -2169,16 +2171,16 @@ JsVal js_parse(JsParser* p) {
 		case 'n': p->cursor += 4; return { .type = JsType_Null, };
 		case '[': {
 			js_advance(p);
-			var arr = array_make(JsVal*, p->arena);
-			while (true) {
+			var arr = array_make<JsVal*>(p->arena);
+			while(true) {
 				js_skip_ws(p);
-				if (js_peek(p) == ']') {
+				if(js_peek(p) == ']') {
 					js_advance(p);
 					break;
 				}
 				JsVal* val = push_struct(p->arena, JsVal);
 				*val = js_parse(p);
-				// switch (val->type) {
+				// switch(val->type) {
 				//   case JsType_Null: Info("null"); break;
 				//   case JsType_Bool: Info("bool: %u", val->boolean); break;
 				//   case JsType_Number: Info("num: %f", val->number); break;
@@ -2188,7 +2190,7 @@ JsVal js_parse(JsParser* p) {
 				// }
 				array_push(arr, val);
 				js_skip_ws(p);
-				if (js_peek(p) == ',') {
+				if(js_peek(p) == ',') {
 					js_advance(p);
 				}
 			}
@@ -2197,13 +2199,13 @@ JsVal js_parse(JsParser* p) {
 				.array = slice(arr),
 			};
 			return res;
-		} break;
+		}break;
 		case '{': {
 			js_advance(p);
-			var fields = array_make(JsField, p->arena);
-			while (true) {
+			var fields = array_make<JsField>(p->arena);
+			while(true) {
 				js_skip_ws(p);
-				if (js_peek(p) == '}') {
+				if(js_peek(p) == '}') {
 					js_advance(p);
 					break;
 				}
@@ -2213,7 +2215,7 @@ JsVal js_parse(JsParser* p) {
 				js_advance(p);
 				JsVal* val = push_struct(p->arena, JsVal);
 				*val = js_parse(p);
-				// switch (val->type) {
+				// switch(val->type) {
 				//   case JsType_Null: Info("null"); break;
 				//   case JsType_Bool: Info("bool: %u", val->boolean); break;
 				//   case JsType_Number: Info("num: %f", val->number); break;
@@ -2223,7 +2225,7 @@ JsVal js_parse(JsParser* p) {
 				// }
 				array_push(fields, {.key = key, .val = val});
 				js_skip_ws(p);
-				if (js_peek(p) == ',') {
+				if(js_peek(p) == ',') {
 					js_advance(p);
 				}
 			}
@@ -2232,14 +2234,14 @@ JsVal js_parse(JsParser* p) {
 				.obj = slice(fields),
 			};
 			return res;
-		} break;
+		}break;
 	}
 }
 
 JsVal js_get_val(JsVal val, String key) {
-	Loop (i, val.obj.fields.count) {
+	Loop(i, val.obj.fields.count) {
 		JsField& field = val.obj.fields[i];
-		if (str_match(field.key, key)) {
+		if(str_match(field.key, key)) {
 			// Assert(field.val->type == JsType_Obj);
 			return *field.val;
 		}
@@ -2247,9 +2249,9 @@ JsVal js_get_val(JsVal val, String key) {
 	return {};
 }
 b32 js_get_bool(JsObj obj, String key) {
-	Loop (i, obj.fields.count) {
+	Loop(i, obj.fields.count) {
 		JsField& field = obj.fields[i];
-		if (str_match(field.key, key)) {
+		if(str_match(field.key, key)) {
 			Assert(field.val->type == JsType_Bool);
 			return field.val->boolean;
 		}
@@ -2257,9 +2259,9 @@ b32 js_get_bool(JsObj obj, String key) {
 	return {};
 }
 f64 js_get_number(JsObj obj, String key) {
-	Loop (i, obj.fields.count) {
+	Loop(i, obj.fields.count) {
 		JsField& field = obj.fields[i];
-		if (str_match(field.key, key)) {
+		if(str_match(field.key, key)) {
 			Assert(field.val->type == JsType_Number);
 			return field.val->number;
 		}
@@ -2267,9 +2269,9 @@ f64 js_get_number(JsObj obj, String key) {
 	return {};
 }
 String js_get_str(JsObj obj, String key) {
-	Loop (i, obj.fields.count) {
+	Loop(i, obj.fields.count) {
 		JsField& field = obj.fields[i];
-		if (str_match(field.key, key)) {
+		if(str_match(field.key, key)) {
 			Assert(field.val->type == JsType_Str);
 			return field.val->str;
 		}
@@ -2277,9 +2279,9 @@ String js_get_str(JsObj obj, String key) {
 	return {};
 }
 Slice<JsVal*> js_get_array(JsObj obj, String key) {
-	Loop (i, obj.fields.count) {
+	Loop(i, obj.fields.count) {
 		JsField& field = obj.fields[i];
-		if (str_match(field.key, key)) {
+		if(str_match(field.key, key)) {
 			Assert(field.val->type == JsType_Array);
 			return field.val->array;
 		}
@@ -2287,9 +2289,9 @@ Slice<JsVal*> js_get_array(JsObj obj, String key) {
 	return {};
 }
 JsObj js_get_obj(JsObj obj, String key) {
-	Loop (i, obj.fields.count) {
+	Loop(i, obj.fields.count) {
 		JsField& field = obj.fields[i];
-		if (str_match(field.key, key)) {
+		if(str_match(field.key, key)) {
 			Assert(field.val->type == JsType_Obj);
 			return field.val->obj;
 		}
@@ -2298,26 +2300,26 @@ JsObj js_get_obj(JsObj obj, String key) {
 }
 
 b32 key_pressed(Key key) {
-	if (os_key_is_pressed(key)) {
-		if (!st->input.consumed[key]) return true;
+	if(os_key_is_pressed(key)) {
+		if(!st->input.consumed[key]) return true;
 	}
 	return false;
 }
 b32 key_pressed_consume(Key key) {
-	if (key_pressed(key)) {
+	if(key_pressed(key)) {
 		key_consume(key);
 		return true;
 	}
 	return false;
 }
 b32 key_down(Key key) {
-	if (os_key_is_down(key)) {
-		if (!st->input.consumed[key]) return true;
+	if(os_key_is_down(key)) {
+		if(!st->input.consumed[key]) return true;
 	}
 	return false;
 }
 b32 key_down_consume(Key key) {
-	if (key_down(key)) {
+	if(key_down(key)) {
 		key_consume(key);
 		return true;
 	}
@@ -2337,19 +2339,19 @@ ScrollState scroll_state_make(f32 scale) {
 
 void scroll_state_update(ScrollState& s, ScrollType type) {
 	f32 wheel = os_mouse_wheel();
-	if (wheel) {
-		if (os_key_is_down(Key_Ctrl)) {
+	if(wheel) {
+		if(os_key_is_down(Key_Ctrl)) {
 			v2 mouse = os_mouse_pos();
 			f32 sensity = 1.3;
 			f32 zoom = (wheel > 0) ? sensity : 1.0f/sensity;
-			switch (type) {
+			switch(type) {
 				case ScrollType_Default: {
 					// we have: mouse == world * scale + offset;
 					v2 world = (mouse - s.offset) / s.scale_level;
 					s.scale_level *= zoom;
 					s.offset = mouse - world * s.scale_level;
 					s.scale = v2(s.scale_level);
-				} break;
+				}break;
 				case ScrollType_PowClamp: {
 					v2 world = {
 						(mouse.x - s.offset.x) / s.scale.x,
@@ -2362,7 +2364,7 @@ void scroll_state_update(ScrollState& s, ScrollType type) {
 					f32 ratio = t * 0.3;
 					s.scale.x = s.scale.y * ratio;
 
-					if (s.scale.y > 1) {
+					if(s.scale.y > 1) {
 						f32 inv = 1.0f / s.scale_level;
 						f32 target = inv / (1.0f + inv);
 						s.scale.y = Lerp(1.0f, 0.3f, target);
@@ -2371,7 +2373,7 @@ void scroll_state_update(ScrollState& s, ScrollType type) {
 					s.offset.x = mouse.x - world.x * s.scale.x;
 					s.offset.y = mouse.y - world.y * s.scale.y;
 
-				} break;
+				}break;
 			}
 		}
 		else {
@@ -2380,9 +2382,9 @@ void scroll_state_update(ScrollState& s, ScrollType type) {
 	}
 
 	f32 scroll_h = os_mouse_wheel_horizontal();
-	if (scroll_h) {
+	if(scroll_h) {
 		f32 sensity = 100;
-		if (os_key_is_down(Key_Shift)) {
+		if(os_key_is_down(Key_Shift)) {
 			sensity *= 3;
 		}
 		s.offset.x += scroll_h * sensity;
@@ -2416,25 +2418,25 @@ void watch_directory_add(String watch_name, WatchOp op, OS_WatchFlags flags) {
 void watch_update() {
 	WatchState& g = st->watch;
 	Scratch scratch;
-	Loop (i, g.watches.count) {
+	Loop(i, g.watches.count) {
 		WatchFile& x = g.watches[i];
 		FileProperties props = os_file_path_properties(x.path);
-		if (props.modified > x.modified) {
-			switch (x.op) {
+		if(props.modified > x.modified) {
+			switch(x.op) {
 				case WatchOp_NotifyHotreload: {
 					st->should_hotreload = true;
-				} break;
+				}break;
 				InvalidDefaultCase;
 			}
 			x.modified = props.modified;
 		}
 	}
-	Loop (i, g.directories.count) {
+	Loop(i, g.directories.count) {
 		WatchDirectory x = g.directories[i];
 		Slice strs = os_watch_check(scratch, x.watch);
-		Loop (i, strs.count) {
+		Loop(i, strs.count) {
 			String name = strs[i];
-			switch (x.op) {
+			switch(x.op) {
 				case WatchOp_RecompileShader: {
 					GlobalState& g = *st;
 					Scratch scratch;
@@ -2449,7 +2451,7 @@ void watch_update() {
 					str_list_push(scratch, list, "-o");
 					str_list_push(scratch, list, shader_compiled_filepath);
 					os_process_make(list);
-				} break;
+				}break;
 				case WatchOp_ShaderReload: {
 					GlobalState& g = *st;
 					String shader_name = str_chop_last_dot(name);
@@ -2458,7 +2460,7 @@ void watch_update() {
 					String shader_compiled_filepath = push_strf(scratch, "%s/%s", g.shader_compiled_dir, name);
 					os_file_path_copy_mtime(shader_filepath, shader_compiled_filepath);
 					r_reload_shader(shader_name);
-				} break;
+				}break;
 				InvalidDefaultCase;
 			}
 		}
@@ -2491,69 +2493,69 @@ void mesh_set(MeshEnum mesh_enum, R_MeshId id) {
 	GlobalState& g = *st;
 	g.meshes_ids[mesh_enum] = id;
 	String str = push_str_copy(g.arena, meshes_strs[mesh_enum]);
-	map_set(g.str_to_mesh, str, id);
+	map_set(g.str_to_mesh, hash(str), id);
 	g.mesh_to_str[id.idx] = str;
 }
 
 void push_child_thing(ThingId parent, ThingId id) {
 	var& g = *st;
-	hdll_list_push_back(g.entities.data, get_thing(parent), id);
+	hdll_list_push_back(g.entities.pool.data, get_thing(parent), id);
 }
 
 String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, EntityFlags flags) {
 	Scratch scratch(arena);
 	var string = dstr_make(arena);
-	Loop (i, members.count) {
+	Loop(i, members.count) {
 		MemberDefinition member = members[i];
 		u8* member_ptr = Offset(ptr, member.offset);
-		switch (members[i].type) {
-			default:{} break;
+		switch(members[i].type) {
+			default:break;
 			case MetaType_u32: {
 				dstr_push(string, push_strf(scratch, "%s %u\n", member.name, *(u32*)member_ptr));
-			} break;
+			}break;
 			case MetaType_i32: {
 				dstr_push(string, push_strf(scratch, "%s %u\n", member.name, *(i32*)member_ptr));
-			} break;
+			}break;
 			case MetaType_b32: {
 				dstr_push(string, push_strf(scratch, "%s %u\n", member.name, *(b32*)member_ptr));
-			} break;
+			}break;
 			case MetaType_f32: {
 				dstr_push(string, push_strf(scratch, "%s %f\n", member.name, *(f32*)member_ptr));
-			} break;
+			}break;
 			case MetaType_v2: {
 				v2 v = *(v2*)member_ptr;
 				dstr_push(string, push_strf(scratch, "%s %f %f\n", member.name, v.x, v.y));
-			} break;
+			}break;
 			case MetaType_v3: {
 				v3 v = *(v3*)member_ptr;
 				dstr_push(string, push_strf(scratch, "%s %f %f %f\n", member.name, v.x, v.y, v.z));
-			} break;
+			}break;
 			case MetaType_v4: {
 				v4 v = *(v4*)member_ptr;
 				dstr_push(string, push_strf(scratch, "%s %f %f %f %f\n", member.name, v.x, v.y, v.z, v.w));
-			} break;
+			}break;
 			case MetaType_Rng3: {
 				Rng3 v = *(Rng3*)member_ptr;
 				dstr_push(string, push_strf(scratch, "%s %f %f %f %f %f %f\n", member.name, v.min.x,v.min.y,v.min.z, v.max.x,v.max.y,v.max.z));
-			} break;
+			}break;
 			case MetaType_MeshId: {
 				R_MeshId v = *(R_MeshId*)member_ptr;
 				dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->mesh_to_str[v.idx]));
-			} break;
+			}break;
 			case MetaType_MaterialId: {
 				R_MaterialId v = *(R_MaterialId*)member_ptr;
 				dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->material_to_str[v.idx]));
-			} break;
+			}break;
 			case MetaType_String: {
-				if (flag_has(flags, EntityFlag_Referenced)) {
+				if(flag_has(flags, EntityFlag_Referenced)) {
 					String v = *(String*)member_ptr;
 					dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, v));
 				}
-			} break;
+			}break;
 			case MetaType_EntityFlags: {
 				EntityFlags v = *(EntityFlags*)member_ptr;
 				dstr_push(string, push_strf(scratch, "%s %u\n", member.name, v));
-			} break;
+			}break;
 		}
 	}
 	return string;
@@ -2561,103 +2563,73 @@ String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, 
 
 void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser) {
 	Parser& p = *parser;
-	while (!tok_match(p, TokenType_CloseBrace)) {
+	while(!tok_match(p, TokenType_CloseBrace)) {
 		MemberDefinition member = {};
 		Token ident_token = tok_advance(p);
-		if (ident_token.type == TokenType_Identifier) {
-			Loop (i, members.count) {
-				if (str_match(members[i].name, ident_token.str)) {
+		if(ident_token.type == TokenType_Identifier) {
+			Loop(i, members.count) {
+				if(str_match(members[i].name, ident_token.str)) {
 					member = members[i];
 					break;
 				}
 			}
 		}
 		u8* mem = Offset(ptr, member.offset);
-		switch (member.type) {
-			default:{} break;
+		switch(member.type) {
+			default:break;
 			case MetaType_u32: {
 				Token tok = tok_advance(p);
 				*(u32*)mem = u32_from_str(tok.str);
-			} break;
+			}break;
 			case MetaType_i32: {
 				*(u32*)mem = parse_i32(p);
-			} break;
+			}break;
 			case MetaType_b32: {
 				Token tok = tok_advance(p);
 				*(u32*)mem = u32_from_str(tok.str);
-			} break;
+			}break;
 			case MetaType_f32: {
 				*(f32*)mem = parse_f32(p);
-			} break;
+			}break;
 			case MetaType_v2: {
 				*(v2*)mem = v2(parse_f32(p), parse_f32(p));
-			} break;
+			}break;
 			case MetaType_v3: {
 				*(v3*)mem = v3(parse_f32(p), parse_f32(p), parse_f32(p));
-			} break;
+			}break;
 			case MetaType_v4: {
 				*(v4*)mem = v4(parse_f32(p), parse_f32(p), parse_f32(p), parse_f32(p));
-			} break;
+			}break;
 			case MetaType_Rng3: {
 				*(Rng3*)mem = Rng3(v3(parse_f32(p), parse_f32(p), parse_f32(p)), v3(parse_f32(p), parse_f32(p), parse_f32(p)));
-			} break;
+			}break;
 			case MetaType_MeshId: {
 				Token tok = tok_require(p, TokenType_String);
-				var [mesh, ok] = map_get(st->str_to_mesh, tok.str);
+				var [mesh, ok] = map_get(st->str_to_mesh, hash(tok.str));
 				Assert(ok);
 				*(R_MeshId*)mem = mesh;
-			} break;
+			}break;
 			case MetaType_MaterialId: {
 				Token tok = tok_require(p, TokenType_String);
-				var [material, ok] = map_get(st->str_to_material, tok.str);
+				var [material, ok] = map_get(st->str_to_material, hash(tok.str));
 				Assert(ok);
 				*(R_MaterialId*)mem = material;
-			} break;
+			}break;
 			case MetaType_String: {
 				Token tok = tok_require(p, TokenType_String);
 				*(String*)mem = push_str_copy(st->arena, tok.str);
-			} break;
+			}break;
 			case MetaType_EntityFlags: {
 				*(EntityFlags*)mem = parse_u32(p);
-			} break;
+			}break;
 		}
 	}
 }
-
-template<typename T> void foo(T x) { x.foo(); }
 
 void init() {
 	Scratch scratch;
 	var& g = *st;
 
-	struct X {
-		u32 x;
-		void foo(){
-			Info("%i", x);
-		}
-	};
-
-	{
-		u32 seq = 1;
-		u32 read = 0;
-		i32 dif = (i32)seq - (i32)read+1;
-		Info("%i", dif);
-	}
-	u32 i = 0;
-	X a = {i};
-	foo(a);
-	// a();
-
-	// std::thread(x)
-
-	u32 x = 30;
-	// u32 expected = 10;
-	// atomic_cmp_swap(&x, &expected, 20);
-
-	u32 old = atomic_load(&x);
-	while (!atomic_cmp_swap(&x, &old, old + 1)) {
-	}
-	
 	cpu_find_frequency();
 	os_gfx_init();
 	prof_init(g.arena);
@@ -2682,6 +2654,7 @@ void init() {
 		init_game();
 		watch_directory_add(g.shader_dir, WatchOp_RecompileShader);
 		watch_directory_add(g.shader_compiled_dir, WatchOp_ShaderReload);
+		ui_init();
 
 		// g.ui0 = ui_init();
 	}
@@ -2690,7 +2663,7 @@ void init() {
 
 shared_function void update(HotReloadData* data) {
 	Scratch scratch;
-if (data->ctx == null) {
+if(data->ctx == null) {
 		Arena arena = arena_make(.name = "common arena");
 		data->ctx = st = push_struct_zero(arena, GlobalState);
 		st->arena = arena;
@@ -2703,7 +2676,7 @@ if (data->ctx == null) {
 		watch_add(data->lib_path, WatchOp_NotifyHotreload);
 #endif
 	}
-	if (!st) {
+	if(!st) {
 		st = (GlobalState*)data->ctx;
 		st->should_hotreload = false;
 	}
@@ -2714,12 +2687,12 @@ if (data->ctx == null) {
 	u64 target_fps = Billion(1) / 60;
 	u64 prev_ns = os_now_ns();
 
-	while (!os_window_should_close()) {
+	while(!os_window_should_close()) {
 		// co_test(&g.co, get_dt());
-		if (st->should_hotreload) {
+		if(st->should_hotreload) {
 			goto hotreload;
 		}
-		// if (time_on_interval(get_time(), get_dt(), 0.1, 0)) {
+		// if(time_on_interval(get_time(), get_dt(), 0.1, 0)) {
 		//   Info("ye");
 		// }
 
@@ -2732,21 +2705,21 @@ if (data->ctx == null) {
 			time_now += time_dt;
 			prev_ns = now_ns;
 			r_begin();
-			// ui_begin();
+			ui_begin_frame();
 			update_game();
-			// ui_end();
+			ui_end_frame();
 			r_end();
 			watch_update();
 
 			u64 frame_duration = os_now_ns() - now_ns;
-			if (frame_duration < target_fps) {
+			if(frame_duration < target_fps) {
 				u64 sleep_time = target_fps - frame_duration;
 				ProfBlock("main sleep", ProfType_Sleep);
 				os_sleep_ms(sleep_time / Million(1));
 			}
 		}
 		prof_end(g.current_frame);
-		++g.current_frame;
+		g.current_frame++;
 		arena_clear(st->frame_arena);
 		mem_track_end();
 	}
@@ -2768,9 +2741,9 @@ R_MeshDesc generate_sphere(Allocator arena) {
 	var indices = push_slice(arena, u32, index_count);
 	f32 lat_step_angle = PI / lat_steps;
 	f32 lon_step_angle = 2*PI / lon_steps;
-	for (u32 i = 0; i < lat_steps; ++i) {
+	for(u32 i = 0; i < lat_steps; i++) {
 		f32 lat_angle = -PI/2 + i*lat_step_angle;
-		for (u32 j = 0; j < lon_steps; ++j) {
+		for(u32 j = 0; j < lon_steps; j++) {
 			f32 lon_angle = j * lon_step_angle;
 			R_Vertex vert = {
 				.pos.x = Cos(lat_angle) * Cos(lon_angle),
@@ -2786,8 +2759,8 @@ R_MeshDesc generate_sphere(Allocator arena) {
 		return i * lon_steps + j;
 	};
 	u32 k = 0;
-	for (u32 i = 0; i < lat_steps - 1; ++i) {
-		for (u32 j = 0; j < lon_steps; ++j) {
+	for(u32 i = 0; i < lat_steps - 1; i++) {
+		for(u32 j = 0; j < lon_steps; j++) {
 			u32 next_j = (j + 1) % lon_steps; // wrap around
 			u32 v0 = idx(i, j);
 			u32 v1 = idx(i, next_j);
@@ -2802,7 +2775,7 @@ R_MeshDesc generate_sphere(Allocator arena) {
 		}
 	}
 	// u32 north_pole_index = vert_count - 1; // last vertex
-	// for (u32 j = 0; j < lon_steps; ++j) {
+	// for(u32 j = 0; j < lon_steps; ++j) {
 	//   u32 next_j = (j + 1) % lon_steps;
 	//   indices[k++] = idx(lat_steps - 2, j); // last row before pole
 	//   indices[k++] = north_pole_index;      // pole
@@ -2818,12 +2791,12 @@ R_MeshDesc generate_sphere(Allocator arena) {
 R_MeshDesc generate_grid(Allocator arena, u32 size, f32 step) {
 	var vertices = push_slice(arena, R_Vertex, size*4);
 	v3 pos_offset = v3(-(i32)size/2, 0, -(i32)size/2);
-	for (i32 i = 0; i < size; ++i) {
+	for(i32 i = 0; i < size; i++) {
 		vertices[i*2].pos = pos_offset + v3(0, 0, i*step);
 		vertices[i*2+1].pos = pos_offset + v3(size*step, 0, i*step);
 	}
 	var vertical_vertices = slice_skip(vertices, size*2);
-	for (i32 i = 0; i < size; ++i) {
+	for(i32 i = 0; i < size; i++) {
 		vertical_vertices[i*2].pos = pos_offset + v3(i*step, 0, 0);
 		vertical_vertices[i*2+1].pos = pos_offset + v3(i*step, 0, size*step);
 	}
@@ -2840,7 +2813,7 @@ R_MeshDesc generate_grid(Allocator arena, u32 size, f32 step) {
 //   v3 t2 = v3_greater(tMin, tMax);
 //   f32 tNear = Max3(t1.x, t1.y, t1.z);
 //   f32 tFar = Min3(t2.x, t2.y, t2.z);
-//   if (tNear > tFar) {
+//   if(tNear > tFar) {
 //     return false;
 //   }
 //   return true;
@@ -2889,14 +2862,26 @@ ThingId make_thing(ThingDesc desc) {
 		.color = desc.color,
 	};
 	ThingId id = pool_push(g.entities, e);
-	++g.entities_count;
+	// sparse_set_push(g.active_entities, id.idx);
+	g.entities_count++;
 	return id;
 }
 
 void destroy_thing(ThingId id) {
 	var& g = *st;
 	pool_remove(g.entities, id);
+	// sparse_set_remove(g.active_entities, id.idx);
 	--g.entities_count;
+}
+
+PoolIterativeIter<Thing, MaxEntities, ThingId> things_begin() {
+	var& g = *st;
+	return {&g.entities};
+}
+
+HNodeIter<Thing, ThingId> thing_node_begin(ThingId first) {
+	var& g = *st;
+	return {g.entities.pool.data, first};
 }
 
 void select_obj() {
@@ -2926,7 +2911,8 @@ void save_game_state() {
 		dstr_push(data, "}\n");
 	}
 	{
-		LoopIter (it, pool_begin(g.entities)) {
+		// LoopIter (it, pool_begin(g.entities)) {
+		LoopIter(it, things_begin()) {
 			Thing& e = *it;
 			dstr_push(data, "Entity {\n");
 			dstr_push(data, dumb_struct(scratch, slice(members_of_Entity), &e, e.flags));
@@ -2943,37 +2929,38 @@ void load_game_state() {
 	var& g = *st;
 	Scratch scratch;
 	Slice data = os_file_path_read_all(scratch, push_strf(scratch, "%s/saved", os_cur_directory(), String("saved")));
-	Slice tokens = tokens_from_str(scratch, str_make(data.data, data.size));
+	Slice tokens = tokens_from_str(scratch, String(data.data, data.size));
 	Parser p = parser_make(tokens);
 
 	{
-		LoopIter (it, pool_begin(g.entities)) {
-			ThingId e_id = it.handle();
+		// LoopIter (it, pool_begin(g.entities)) {
+		LoopIter(it, things_begin()) {
+			ThingId e_id = it.id();
 			destroy_thing(e_id);
 		}
 	}
 
-	while (!tok_is_end(p)) {
+	while(!tok_is_end(p)) {
 		Token tok = tok_advance(p);
-		switch (tok.type) {
-			default:{} break;
+		switch(tok.type) {
+			default:break;
 			case TokenType_Identifier: {
-				if (str_match(tok.str, "Camera")) {
+				if(str_match(tok.str, "Camera")) {
 					dumb_struct_load(slice(members_of_Camera), &g.cam, &p);
-				} else if (str_match(tok.str, "Entity")) {
+				} else if(str_match(tok.str, "Entity")) {
 					ThingId id = make_thing({});
 					Thing& e = get_thing(id);
 					dumb_struct_load(slice(members_of_Entity), &e, &p);
-					if (flag_has(e.flags, EntityFlag_Referenced)) {
-						if (str_match("monkey", e.name)) {
+					if(flag_has(e.flags, EntityFlag_Referenced)) {
+						if(str_match("monkey", e.name)) {
 							g.monkey0 = id;
-						} else if (str_match("axis_attached_to_cam", e.name)) {
+						} else if(str_match("axis_attached_to_cam", e.name)) {
 							g.axis_attached_to_cam_id = id;
-						} else if (str_match("rotating_cube", e.name)) {
+						} else if(str_match("rotating_cube", e.name)) {
 							g.cube0 = id;
 						} 
 					}
-				} else if (str_match(tok.str, "e")) {
+				} else if(str_match(tok.str, "e")) {
 					ThingId e_id = make_thing({});
 					Thing& e = get_thing(e_id);
 					dumb_struct_load(slice(members_of_Entity), &e, &p);
@@ -2990,7 +2977,7 @@ void init_game() {
 	Scratch scratch;
 	g.arena = arena_make(.name = "game arena");
 	g.gpa = alloc_make(g.arena);
-	g.moving_cubes = array_make(ThingId, g.gpa);
+	g.moving_cubes = array_make<ThingId>(g.gpa);
 	g.font = r_make_font({.name = "arial.ttf", .font_height = 32});
 
 	R_MeshDesc triangle_mesh = {.vertices = slice(triangle_vertices)};
@@ -3016,7 +3003,7 @@ void init_game() {
 			R_MeshId id = r_make_mesh({.name = name});
 			g.meshes_ids[enum_name] = id;
 			String str = push_str_copy(g.arena, name);
-			map_set(g.str_to_mesh, str, id);
+			map_set(g.str_to_mesh, hash(str), id);
 			g.mesh_to_str[id.idx] = str;
 		};
 		load_mesh(Mesh_Cube, "cube_ok_uv.glb");
@@ -3028,7 +3015,7 @@ void init_game() {
 			R_TextureId id = r_make_texture({.name = name, .async = true});
 			g.textures_ids[enum_name] = id;
 			String str = push_str_copy(g.arena, name);
-			map_set(g.str_to_texture, str, id);
+			map_set(g.str_to_texture, hash(str), id);
 			g.texture_to_str[id.idx] = str;
 		};
 		load_tex(Texture_Orange, "orange_lines_512.png");
@@ -3040,9 +3027,9 @@ void init_game() {
 		u32 size = 32;
 		// u8* data = push_buffer_zero(g.arena, size*size*4);
 		u32* data = push_array_zero(g.arena, u32, size*size);
-		Loop (i, size) {
-			Loop (j, size) {
-				if ((j+i) % 2 == 0) {
+		Loop(i, size) {
+			Loop(j, size) {
+				if((j+i) % 2 == 0) {
 					data[i*size + j] = u32_from_rgba(v4(0,1,0,1));
 				} else {
 					data[i*size + j] = u32_from_rgba(v4(1,1,0,1));
@@ -3070,9 +3057,9 @@ void init_game() {
 		{
 			u32 size = 8;
 			u8* data = push_buffer_zero(g.arena, size*size*4);
-			Loop (i, size) {
-				Loop (j, size) {
-					if ((j+i) % 2 == 0) {
+			Loop(i, size) {
+				Loop(j, size) {
+					if((j+i) % 2 == 0) {
 						data[i*size + j] = 255;
 					} else {
 						data[i*size + j] = 100;
@@ -3110,7 +3097,7 @@ void init_game() {
 			R_MaterialId id = r_make_material(desc);
 			g.materials_ids[enum_name] = id;
 			String str = push_str_copy(g.arena, materials_strs[enum_name]);
-			map_set(g.str_to_material, str, id);
+			map_set(g.str_to_material, hash(str), id);
 			g.material_to_str[id.idx] = str;
 		};
 
@@ -3197,7 +3184,7 @@ void init_game() {
 		g.axis_attached_to_cam_id = make_thing(desc);
 	}
 #if 1
-	Loop (i, 10) {
+	Loop(i, 10) {
 		// Handle<StaticEntity> e = entity_static_create(Mesh_Cube, Material_Orange);
 		// u32 range = KB(1);
 		// e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
@@ -3232,16 +3219,16 @@ void init_game() {
 		// e.pos().z = -100;
 	}
 	{
-		// Loop (i, KB(1)) {
+		// Loop(i, KB(1)) {
 		//   Handle<Entity> e = entity_create(Mesh_Cube, Material_Screen);
 		//   u32 range = 100;
 		//   e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
 		// }
 	}
 	{
-		// Loop (i, KB(400)) {
-		// Loop (i, MB(1)-KB(1)) {
-		Loop (i, 0) {
+		// Loop(i, KB(400)) {
+		// Loop(i, MB(1)-KB(1)) {
+		Loop(i, 0) {
 			var desc = default_thing_desc();
 			desc.mat = Material_Container;
 			u32 range = KB(1);
@@ -3251,7 +3238,7 @@ void init_game() {
 		}
 	}
 
-	Loop (i, 0) {
+	Loop(i, 0) {
 		MeshEnum meshes[] = {
 			Mesh_MonkeyGlb,
 			Mesh_Triangle,
@@ -3298,12 +3285,12 @@ void init_game() {
 		desc.mat = Material_Container;
 		desc.pos = v3(3,3,10);
 		g.cube_root = make_thing(desc);
-		Loop (i, 4) {
+		Loop(i, 4) {
 			var desc = default_thing_desc();
 			desc.mat = Material_Container;
 			var child_id = make_thing(desc);
 			push_child_thing(g.cube_root, child_id);
-			Loop (i, 4) {
+			Loop(i, 4) {
 				var new_child_id = make_thing(desc);
 				push_child_thing(child_id, new_child_id);
 			}
@@ -3333,7 +3320,79 @@ void init_game() {
 
 void update_game() {
 	ProfFunc;
+	Scratch scratch;
 	var& g = *st;
+	ui_push_font(g.font);
+
+	// DeferLoop(Info("begin"), Info("end")) {
+	// 	// struct A {
+	// 	// 	A() {Info("hello");}
+	// 	// 	~A() {Info("bye");}
+	// 	// };
+	// 	// A a;
+	// 	goto l;
+	// 	Info("?");
+	// }
+	// Info("no skip");
+	// l:
+	// Info("was skip");
+
+	{
+		b32 check = 0;
+		local f32 f = 0;
+
+		// ui_spacer(ui_size_pct(0.2, 1));
+		// UI_Parent("yep", UI_Axis2_Y) {
+		// 	ui_label("Settings");
+		// 	ui_label(push_strf(scratch, "Settings1%f", f));
+		// 	ui_spacer(ui_size_px(40, 1));
+		// 	UI_Signal btn = ui_button("Click me##btn1");
+		// 	if(btn.clicked) {
+		// 		r_draw_rect(rng2_make(v2(250),v2(200)), ColorWhite);
+		// 	}
+		// 	// ui_checkbox("Dark mode##dm", &check);
+		// 	// ui_spacer(ui_size_px(4, 1));
+		// 	ui_slider("Volume##vol", &f, 0.0f, 1.0f);
+		// }
+		// ui_panel_begin_sized("main_panel##mp", UI_Axis2_Y, ui_size_px(200, 1), ui_size_children(1));
+		ui_panel_begin("main_panel##mp", UI_Axis2_Y);
+		{
+			var sig = ui_label("Settings");
+			ui_spacer(ui_size_px(100));
+			UI_Parent("bam", UI_Axis2_X) {
+				ui_label("cool");
+				ui_label("cool1");
+				ui_label("cool2");
+				ui_label("cool3");
+			}
+			
+			ui_label(push_strf(scratch, "Settings1%f", f));
+			ui_spacer(ui_size_px(40));
+			UI_Signal btn = ui_button("Click me##btn1");
+			if(btn.clicked || sig.pressed) {
+				r_draw_rect(rng2_make(v2(250),v2(200)), ColorWhite);
+			}
+			// ui_checkbox("Dark mode##dm", &check);
+			// ui_spacer(ui_size_px(4, 1));
+			ui_slider("Volume##vol", &f, 0.0f, 1.0f);
+		}
+		ui_panel_end();
+
+		ui_panel_begin_sized("main_panel1##mp", UI_Axis2_Y, ui_size_px(200), ui_size_children());
+		{
+			ui_label("Settings");
+			ui_label(push_strf(scratch, "Settings1%f", f));
+			ui_spacer(ui_size_px(40));
+			UI_Signal btn = ui_button("Click me##btn1");
+			if(btn.clicked) {
+				r_draw_rect(rng2_make(v2(250),v2(200)), ColorWhite);
+			}
+			// ui_checkbox("Dark mode##dm", &check);
+			// ui_spacer(ui_size_px(4, 1));
+			ui_slider("Volume##vol", &f, 0.0f, 1.0f);
+		}
+		ui_panel_end();
+	}
 
 	ArrayZero(st->input.consumed);
 	debug_update();
@@ -3341,7 +3400,7 @@ void update_game() {
 	// Test jobs
 	{
 		ProfBlock("push jobs");
-		Loop (i, 2) {
+		Loop(i, 2) {
 			thread_push({.fn = [](void* ctx) {os_sleep_ms(rand_u32()%4);}, .priority = TaskPriority_Low});
 		}
 		WaitGroup id0 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
@@ -3364,11 +3423,11 @@ void update_game() {
 
 	///////////////////////////////////
 	// Hotkeys
-	if (os_key_is_down(Key_Escape)) {
+	if(os_key_is_down(Key_Escape)) {
 		os_window_close();
 	}
-	if (os_key_is_pressed(Key_U)) {
-		if (g.fps_camera) {
+	if(os_key_is_pressed(Key_U)) {
+		if(g.fps_camera) {
 			os_cursor_unlock();
 		} else {
 			os_cursor_lock();
@@ -3386,47 +3445,47 @@ void update_game() {
 		projection = m4x4_perspective(deg2rad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
 
 		f32 rotation_speed = 180.0f * time_dt;
-		if (os_key_is_down(Key_A)) {
+		if(os_key_is_down(Key_A)) {
 			cam.yaw += rotation_speed;
 		}
-		if (os_key_is_down(Key_D)) {
+		if(os_key_is_down(Key_D)) {
 			cam.yaw -= rotation_speed;
 		}
-		if (os_key_is_down(Key_R)) {
+		if(os_key_is_down(Key_R)) {
 			cam.pitch += rotation_speed;
 		}
-		if (os_key_is_down(Key_F)) {
+		if(os_key_is_down(Key_F)) {
 			cam.pitch -= rotation_speed;
 		}
-		if (g.fps_camera) {
+		if(g.fps_camera) {
 			f32 rot_speed = 10;
 			cam.pitch -= os_mouse_dt().y * time_dt * rot_speed;
 			cam.yaw -= os_mouse_dt().x * time_dt * rot_speed;
 		}
 		f32 speed = 1;
 		v3 mov = {};
-		if (os_key_is_down(Key_W)) {
+		if(os_key_is_down(Key_W)) {
 			mov += m4x4_forward(view);
 		}
-		if (os_key_is_down(Key_S)) {
+		if(os_key_is_down(Key_S)) {
 			mov += m4x4_backward(view);
 		}
-		if (os_key_is_down(Key_Q)) {
+		if(os_key_is_down(Key_Q)) {
 			mov += m4x4_left(view);
 		}
-		if (os_key_is_down(Key_E)) {
+		if(os_key_is_down(Key_E)) {
 			mov += m4x4_right(view);
 		}
-		if (os_key_is_down(Key_Space)) {
+		if(os_key_is_down(Key_Space)) {
 			mov.y += 1.0f;
 		}
-		if (os_key_is_down(Key_X)) {
+		if(os_key_is_down(Key_X)) {
 			mov.y -= 1.0f;
 		}
-		if (os_key_is_down(Key_Shift)) {
+		if(os_key_is_down(Key_Shift)) {
 			speed *= 10;
 		}
-		if (os_key_is_down(Key_LAlt)) {
+		if(os_key_is_down(Key_LAlt)) {
 			speed *= 0.1;
 		}
 		mov *= cam.accel * speed;
@@ -3437,11 +3496,12 @@ void update_game() {
 		cam.vel -= cam.vel * cam.vel_friction * dt;
 		// cam.vel.y -= 9 * dt;
 
-		ImGui::Begin("cam");
-		// ImGui::DragFloat("accel", &cam.accel, 0, 0, 3000);
-		ImGui::DragFloat("vel fric", &cam.vel_friction, 0.1, 0, 100);
-
-		{
+		#define ImGuiWindow(...) DeferLoop(ImGui::Begin(__VA_ARGS__), ImGui::End()) if (_i_)
+		ImGuiWindow("cam") {
+			// ImGui::Begin("cam");
+			// ImGui::DragFloat("accel", &cam.accel, 0, 0, 3000);
+			ImGui::DragFloat("vel fric", &cam.vel_friction, 0.1, 0, 100);
+	
 			var& cube2 = get_thing(g.cube2);
 			var& cube3 = get_thing(g.cube3);
 			var& cube4 = get_thing(g.cube4);
@@ -3459,9 +3519,8 @@ void update_game() {
 			// Mutex mutex = os_mutex_make();
 			// os_mutex_lock(mutex);
 			// os_mutex_lock(mutex);
+			// ImGui::End();
 		}
-
-		ImGui::End();
 
 		// cam.pos -= v3(0,1,0) * 10 * time_dt;
 		// cam.pitch = Clamp(-89.0f, cam.pitch, 89.0f);
@@ -3478,7 +3537,7 @@ void update_game() {
 		view = m4x4_look_at(cam.pos, cam.pos + cam.dir, quat_up(quat));
 	}
 
-	// if (os_mouse_is_button_pressed(MouseButton_Left)) {
+	// if(os_mouse_is_button_pressed(MouseButton_Left)) {
 		// select_obj();
 		// v3 dir = ray_from_screen();
 		// Ray ray = ray_from_screen(os_mouse_get_pos(), os_get_window_size(), g.cam.pos, st->view, st->projection);
@@ -3544,12 +3603,12 @@ void update_game() {
 			var& my = get_thing(g.cube_root);
 			my.pos.z += time_dt * 1;
 			u32 i = 1;
-			LoopHNode (it, my.first, g.entities.data) {
-				var& child = get_thing(it);
+			LoopIter(it, thing_node_begin(my.first)) {
+				var& child = *it;
 				child.pos = my.pos + v3(0,3,0)*i++;
 				u32 j = 1;
-				LoopHNode (i, child.first, g.entities.data) {
-					var& new_child = get_thing(i);
+				LoopIter(it, thing_node_begin(child.first)) {
+					var& new_child = *it;
 					new_child.pos = child.pos + v3(3,0,0)*j;
 					++j;
 				}
@@ -3572,7 +3631,7 @@ void update_game() {
 	}
 
 	// Random creating
-	Loop (i, 0) {
+	Loop(i, 0) {
 		MeshEnum meshes[] = {
 			// Mesh_MonkeyGlb,
 			// Mesh_Triangle,
@@ -3593,7 +3652,7 @@ void update_game() {
 	}
 
 	// Moving cubes
-	Loop (i, g.moving_cubes.count) {
+	Loop(i, g.moving_cubes.count) {
 		Thing& e = get_thing(g.moving_cubes[i]);
 		e.pos += e.vel * time_dt;
 		v3 center = {0, 0, 0};
@@ -3605,8 +3664,9 @@ void update_game() {
 
 	///////////////////////////////////
 	// Drawing things
-	LoopIter (it, pool_begin(g.entities)) {
-		ThingId e_id = it.handle();
+	// LoopIter (it, pool_begin(g.entities)) {
+	LoopIter(it, things_begin()) {
+		ThingId e_id = it.id();
 		// Entity& e = pool_get(g.entities, e_id);
 		// r_draw_mesh(e.mesh, e.mat, e.pos);
 		r_draw_entity(e_id);
@@ -3615,9 +3675,6 @@ void update_game() {
 	///////////////////////////////////
 	// Rect text
 	{
-		// r_draw_quad(rng2_make(v2(400), v2(400,400)), ColorCyan);
-		// r_draw_rect_gradient(rng2_make(v2(300), v2(100)), {v4(1,0,0,1), v4(0,1,0,1), v4(0,0,1,1), v4()});
-		// r_draw_rect(rng2_make(v2(600), v2(100)), ColorWhite);
 		r_draw_texture(rng2_make(v2(600, 50), v2(100)), get_texture(Texture_Bricks));
 		r_draw_texture(rng2_make(v2(800), v2(100)), get_texture(Texture_Orange));
 		r_draw_texture(rng2_make(v2(100,400), v2(100)), get_texture(Texture_Black));
@@ -3628,21 +3685,33 @@ void update_game() {
 		r_draw_rect(rng2_make(v2(100), v2(130)), ColorGreyDark);
 		r_draw_text_ext(st->r.dummy_font, v2(100, 100+32), "I'm a button", ColorWhite, 32);
 		// r_draw_text_ext(st->r.my_font, os_mouse_pos(), "I'm a button", ColorWhite, 32);
-		// if (time_on_interval(0.3)) {
+		// if(time_on_interval(0.3)) {
 		//   Info("%f %f", os_mouse_pos().x, os_mouse_pos().y);
 		// }
 		// r_draw_rect_gradient(rng2_make(v2(500), v2(100)), {v4(1,1,1,0.0), v4(0,0,0,0.3), v4(1,1,1,0.3), v4()});
 		Rng2 rect = rng2_make(v2(100), v2(100));
-		r_draw_rect_rounded(rng2_pad(rect, 10), ColorGrey, 20, 8.9);
-		if (rng2_contains(rect, os_mouse_pos())) {
-			if (os_mouse_is_button_down(MouseButton_Left)) {
-				r_draw_rect(rect, ColorBlack);
-			} else {
-				r_draw_rect(rect, ColorGrey);
-			}
-		} else {
-			// r_draw_rect(rect, ColorGrey1);
-		}
+		r_draw_rect_rounded(rng2_pad(rect, 10), ColorGrey, 20, 9.1);
+
+		r_draw_rect(rng2_pad(rng2_make(v2(100,240), v2(100)), -5), ColorGrey, 30, 0, 3);
+		r_draw_rect(rng2_make(v2(100,240), v2(100)), ColorGrey, 3, 5, 3);
+		r_draw_texture(rng2_make(v2(200, 240), v2(100)), rng2_make(v2(0), v2(1024)), get_texture(Texture_Bricks), ColorGrey, 8, 0, 8);
+
+		// f32 font_height = 64;
+		// String t = "Let's see";
+		// f32 w = ui_text_width(t, g.font, font_height);
+		// String t1 = push_strf(scratch, "%s %f", t, w);
+		// r_draw_text_ext(g.font, v2(0,200), t1, ColorWhite, font_height);
+		// r_draw_rect(rng2_make(v2(0,200-font_height), v2(w, font_height)), v4(1,0.4,0.4,0.7));
+
+		// if(rng2_contains(rect, os_mouse_pos())) {
+		// 	if(os_mouse_is_button_down(MouseButton_Left)) {
+		// 		r_draw_rect(rect, ColorBlack);
+		// 	} else {
+		// 		r_draw_rect(rect, ColorGrey);
+		// 	}
+		// } else {
+		// 	// r_draw_rect(rect, ColorGrey1);
+		// }
 	}
 
 	///////////////////////////////////
@@ -3652,10 +3721,10 @@ void update_game() {
 		// static F32 volume = 0.3f;
 		// S32 click_count = 0;
 
-		UI_Input input = {0};
+		// UI_Input input = {0};
 		// input.mouse_pos = (UI_Vec2){ script[f].x, script[f].y };
 		// input.mouse_down[0] = script[f].down;
-		input.dt = 1.0f / 60.0f;
+		// input.dt = 1.0f / 60.0f;
 
 		// printf("================ frame %d: %s ================\n", f, script[f].note);
 		// input.mouse_pos = bit_cast(UI_Vec2, os_mouse_pos());
@@ -3688,7 +3757,7 @@ void update_game() {
 		//     ui_spacer(ui_size_px(4, 1));
 
 		//     UI_Signal btn = ui_button(str8_lit("Click me##btn1"));
-		//     if (btn.clicked) click_count++;
+		//     if(btn.clicked) click_count++;
 
 		//     ui_checkbox(str8_lit("Dark mode##dm"), &dark_mode);
 
@@ -3698,23 +3767,23 @@ void update_game() {
 		//   ui_panel_end();
 		// }
 		// ui_end_frame();
-		// Loop (i, ui_state->draw_cmd_count) {
+		// Loop(i, ui_state->draw_cmd_count) {
 		//   UI_DrawCmd cmd = ui_state->draw_cmds[i];
 		//   Rng2 rect = Transmute(Rng2, cmd.rect);
 		//   v4 color = Transmute(v4, cmd.color);
 		//   String str = Transmute(String, cmd.text.str);
-		//   switch (cmd.kind) {
+		//   switch(cmd.kind) {
 		//     case UI_DrawCmd_Rect: {
-		//       if (cmd.filled) {
+		//       if(cmd.filled) {
 		//         ui_draw_rect(rect, color);
 		//       } else {
 		//         r_draw_rect_outline(rect, 2, color);
 		//       }
-		//     } break;
+		//     }break;
 		//     case UI_DrawCmd_Text: {
 		//       // u32 a = 1;
 		//       r_draw_text(v2(cmd.rect.x0, cmd.rect.y0), str, color);
-		//     } break;
+		//     }break;
 		//     default: break;
 		//   }
 		// }

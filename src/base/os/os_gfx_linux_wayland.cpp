@@ -51,7 +51,8 @@ global WaylandState wl_st;
 #undef global // because of: wl_registry_listener.global;
 
 intern u32 lnx_keycode_translate(u32 code) {
-	switch (code) {
+	switch(code) {
+		default: NotImplemented;
 		// Control keys
 		case KEY_BACKSPACE:   return Key_Backspace;
 		case KEY_ENTER:       return Key_Enter;
@@ -158,13 +159,11 @@ intern u32 lnx_keycode_translate(u32 code) {
 		#define WL_RBUTTON 273
 		case WL_LBUTTON: return MouseKey_Left;
 		case WL_RBUTTON: return MouseKey_Right;
-
-		default: NotImplemented; return {};
 	}
 }
 
 intern void wl_seat_capabilities(void* data, wl_seat* seat, u32 capabilities) {
-	if (capabilities & WL_SEAT_CAPABILITY_KEYBOARD && !wl_st.keyboard) {
+	if(capabilities & WL_SEAT_CAPABILITY_KEYBOARD && !wl_st.keyboard) {
 		wl_st.keyboard = wl_seat_get_keyboard(seat);
 		wl_st.keyboard_listener = {
 			.keymap = [](void* data, wl_keyboard* keyboard, u32 format, i32 fd, u32 size){},
@@ -179,7 +178,7 @@ intern void wl_seat_capabilities(void* data, wl_seat* seat, u32 capabilities) {
 		wl_keyboard_add_listener(wl_st.keyboard, &wl_st.keyboard_listener, data);
 	}
 
-	if (capabilities & WL_SEAT_CAPABILITY_POINTER && !wl_st.pointer) {
+	if(capabilities & WL_SEAT_CAPABILITY_POINTER && !wl_st.pointer) {
 		wl_st.pointer = wl_seat_get_pointer(seat);
 		wl_st.pointer_listener = {
 			.enter = [](void* data, struct wl_pointer* wl_pointer, u32 serial, struct wl_surface* surface, wl_fixed_t surface_x, wl_fixed_t surface_y){},
@@ -200,10 +199,10 @@ intern void wl_seat_capabilities(void* data, wl_seat* seat, u32 capabilities) {
 }
 
 intern void wl_registry_global_handler(void* data, wl_registry* registry, u32 name, const char* interface, u32 version) {
-	if (str_match(interface, wl_compositor_interface.name)) {
+	if(str_match(interface, wl_compositor_interface.name)) {
 		wl_st.compositor = (wl_compositor*)wl_registry_bind(registry, name, &wl_compositor_interface, version);
 	}
-	else if (str_match(interface, wl_seat_interface.name)) {
+	else if(str_match(interface, wl_seat_interface.name)) {
 		wl_st.seat = (wl_seat*)wl_registry_bind(registry, name, &wl_seat_interface, 1);
 		wl_st.seat_listener = {
 			.capabilities = wl_seat_capabilities,
@@ -211,7 +210,7 @@ intern void wl_registry_global_handler(void* data, wl_registry* registry, u32 na
 		};
 		wl_seat_add_listener(wl_st.seat, &wl_st.seat_listener, null);
 	}
-	else if (str_match(interface, xdg_wm_base_interface.name)) {
+	else if(str_match(interface, xdg_wm_base_interface.name)) {
 		wl_st.xdg_wm_base = (xdg_wm_base*)wl_registry_bind(registry, name, &xdg_wm_base_interface, 1);
 		wl_st.xdg_wm_base_listener = {
 			.ping = [](void* data, xdg_wm_base* shell, u32 serial){ xdg_wm_base_pong(shell, serial); },
@@ -244,7 +243,7 @@ void os_gfx_init() {
 		wl_st.xdg_toplevel = xdg_surface_get_toplevel(wl_st.xdg_surface);
 		wl_st.xdg_toplevel_listener = {
 			.configure = [](void* data, xdg_toplevel* top, i32 width, i32 height, wl_array* stat) {
-				if (!width || !height) {
+				if(!width || !height) {
 					return;
 				}
 				wl_st.width = width;

@@ -8,6 +8,11 @@
 
 MakeId(OpaqueId)
 MakeId(ThingId)
+MakeId(R_TextureId)
+MakeId(R_MeshId)
+MakeId(R_MaterialId)
+MakeId(R_FontId)
+MakeId(R_LightId)
 
 const u32 MaxEntities = KB(1);
 

@@ -109,6 +109,7 @@ union v4 {
 		f32 z;
 		f32 w;
 	};
+	v3 xyz;
 	f32 v[4];
 	v4() = default;
 	NO_DEBUG explicit v4(f32 s):x(s),y(s),z(s){};
@@ -242,18 +243,18 @@ u32 u32_from_rgba(v4 rgba);
 
 ////////////////////////////////////////////////////////////////////////
 // Hash
+#define HASH_DEFAULT_SEED 0x9E3779B97F4A7C15ULL
 
 u64 squirrel3(u64 x);
-u64 str_hash_FNV(String str);
-u64 hash_memory(void* data, u64 size);
-u64 hash(u64 x);
-u64 hash(String str);
+u32 xorshift32(u32 x);
+
+u64 hash(u64 x, u64 seed = HASH_DEFAULT_SEED);
+u64 hash(String x, u64 seed = HASH_DEFAULT_SEED);
+u64 hash_bytes(void *data, u64 size, u64 seed = HASH_DEFAULT_SEED);
 
 ////////////////////////////////////////////////////////////////////////
 // Random
-
-u32 xorshift32(u32* seed);
-
+NO_DEBUG u64 rand_u64();
 NO_DEBUG u32 rand_u32();
 NO_DEBUG u32 rand_u32_rng(u32 min, u32 max);
 NO_DEBUG i32 rand_i32();
@@ -268,7 +269,7 @@ NO_DEBUG b32 rand_b32();
 NO_DEBUG void rand_set_seed();
 NO_DEBUG u32 rand_get_seed();
 template<typename T> void rand_shuffle(Slice<T> data) {
-	Loop (i, data.count) {
+	Loop(i, data.count) {
 		u32 j = rand_u32_rng(i, data.count - 1);
 		Swap(data[i], data[j]);
 	}
@@ -276,7 +277,6 @@ template<typename T> void rand_shuffle(Slice<T> data) {
 
 ////////////////////////////////////////////////////////////////////////
 // Misc
-
 i32 ipow(i32 base, u32 exponent);
 
 f32 safe_divn(f32 a, f32 b, f32 n);
@@ -292,8 +292,7 @@ f32 norm(f32 min, f32 x, f32 max);
 f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
 f32 remap(f32 x, f32 old_max, f32 new_max);
 f64 remap(f64 x, f64 old_min, f64 old_max, f64 new_min, f64 new_max);
-f32 remap_clamped(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
-f32 remap01(f32 t, f32 lo, f32 hi);
+f32 remap_clamp(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
 f32 approach(f32 from, f32 to, f32 step);
 
 f32 exp_decay(f32 x, f32 target, f32 decay, f32 dt);
@@ -310,7 +309,6 @@ v3 v3_bezier2(v3 p0, v3 p1, v3 p2, f32 t);
 
 ////////////////////////////////////////////////////////////////////////
 // Vector2
-
 NO_DEBUG v2  operator+(v2 a, v2 b);
 NO_DEBUG v2  operator-(v2 a, v2 b);
 NO_DEBUG v2  operator*(v2 v, f32 scalar);
@@ -649,6 +647,7 @@ b32 rng1_contains(Rng1 r, f32 x);
 f32 rng1_dim(Rng1 r);
 Rng1 rng1_union(Rng1 a, Rng1 b);
 Rng1 rng1_intersect(Rng1 a, Rng1 b);
+b32 rng1_overlaps(Rng1 a, Rng1 b);
 f32 rng1_clamp(Rng1 r, f32 v);
 
 f32 rng1_lerp(Rng1 r, f32 t);
@@ -669,6 +668,7 @@ f32 rng2_width(Rng2 r);
 f32 rng2_height(Rng2 r);
 Rng2 rng2_union(Rng2 a, Rng2 b);
 Rng2 rng2_intersect(Rng2 a, Rng2 b);
+b32 rng2_overlaps(Rng2 a, Rng2 b);
 v2 rng2_clamp(Rng2 r, v2 x);
 
 Rng2 rng2_make(v2 min, v2 size);             
@@ -753,5 +753,3 @@ f32 ease_bounce_in(f32 t);
 f32 ease_bounce_out(f32 t);
 f32 ease_bounce_in_out(f32 t);
 
-u64 hash(v3u v);
-b32 equal(v3u a, v3u b);

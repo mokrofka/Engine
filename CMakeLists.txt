@@ -3,111 +3,111 @@ set(CMAKE_CXX_STANDARD 23)
 project(Engine)
 
 # options
-  set(binary_dir "${CMAKE_SOURCE_DIR}/bin")
-  set(hotreload true)
-  set(X11_use true)
-  set(sanitize_address true)
-  set(dev_build true)
-  set(profile true)
+set(binary_dir "${CMAKE_SOURCE_DIR}/bin")
+set(hotreload true)
+set(X11_use true)
+set(sanitize_address true)
+set(dev_build true)
+set(profile true)
 
-  message("hotreload: ${hotreload}")
-  message("binary path: ${binary_dir}")
-  message("sanitizer: ${sanitize_address}")
-  message("dev build: ${dev_build}")
+message("hotreload: ${hotreload}")
+message("binary path: ${binary_dir}")
+message("sanitizer: ${sanitize_address}")
+message("dev build: ${dev_build}")
 
 # binary output
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${binary_dir}")
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${binary_dir}")
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${binary_dir}")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${binary_dir}")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${binary_dir}")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${binary_dir}")
 # .lib output
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG "${binary_dir}")
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${binary_dir}")
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO "${binary_dir}")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG "${binary_dir}")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${binary_dir}")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO "${binary_dir}")
 # .dll output
-  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG "${binary_dir}")
-  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE "${binary_dir}")
-  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO "${binary_dir}")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG "${binary_dir}")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE "${binary_dir}")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO "${binary_dir}")
 
 # Compiler
-  add_compile_options(-Wunused-variable -Wuninitialized -Wno-unused-const-variable -Wno-gnu-alignof-expression -Wno-c99-designator -fno-exceptions -fno-rtti -mavx)
-  message("Compiler: ${CMAKE_CXX_COMPILER_ID}")
+add_compile_options(-Wunused-variable -Wuninitialized -Wno-unused-const-variable -Wno-gnu-alignof-expression -Wno-c99-designator -fno-exceptions -fno-rtti -mavx -g)
+message("Compiler: ${CMAKE_CXX_COMPILER_ID}")
 
 # Sanitizer
-  if (sanitize_address)
-    add_compile_definitions(ASAN_ENABLED=1)
-    add_link_options(-fsanitize=address)
-  endif()
+if (sanitize_address)
+	add_compile_definitions(ASAN_ENABLED=1)
+	add_link_options(-fsanitize=address)
+endif()
 
 # Linker
-  add_link_options("-fuse-ld=lld" "-rdynamic")
-  message("Linker path: ${CMAKE_LINKER}")
+add_link_options("-fuse-ld=lld" "-rdynamic")
+message("Linker path: ${CMAKE_LINKER}")
 
 # Build
-  if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    add_compile_definitions(BUILD_DEBUG=1)
-  elseif (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-    add_compile_options(-flto -ffast-math)
-  endif()
-  message("Build: ${CMAKE_BUILD_TYPE}")
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+	add_compile_definitions(BUILD_DEBUG=1)
+elseif (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+	add_compile_options(-flto -ffast-math)
+endif()
+message("Build: ${CMAKE_BUILD_TYPE}")
 
-  if (X11_use)
-    add_compile_definitions(GFX_X11=1)
-  endif()
-  if (profile)
-    add_compile_definitions(PROFILE_BUILD)
-  endif()
-  include_directories(src)
-  include_directories(vendor)
-  
-  set(game_source src/com.cpp)
-  set(exe_source src/main.cpp vendor/vendor_impl.cpp)
-  set(X11_libs -lxcb -lxcb-xkb -lxcb-keysyms -lxcb-xinput)
+if (X11_use)
+	add_compile_definitions(GFX_X11=1)
+endif()
+if (profile)
+	add_compile_definitions(PROFILE_BUILD)
+endif()
+include_directories(src)
+include_directories(vendor)
 
-  if (dev_build) # reduce build time in release build
-    add_compile_definitions(DEAR_IMGUI=1)
-    set_source_files_properties(
-      vendor/vendor_impl.cpp
-      PROPERTIES
-      COMPILE_OPTIONS "-O0;-g"
-    )
-  else()
-    add_link_options("-nostdlib++") # imgui depends on it
-  endif()
+set(game_source src/com.cpp)
+set(exe_source src/main.cpp vendor/vendor_impl.cpp)
+set(X11_libs -lxcb -lxcb-xkb -lxcb-keysyms -lxcb-xinput)
 
-  add_executable(exe)
+if (dev_build) # reduce build time in release build
+	add_compile_definitions(DEAR_IMGUI=1)
+	set_source_files_properties(
+		vendor/vendor_impl.cpp
+		PROPERTIES
+		COMPILE_OPTIONS "-O0;-g"
+	)
+else()
+	add_link_options("-nostdlib++") # imgui depends on it
+endif()
+
+add_executable(exe)
 
 # Hotreload
-  if (hotreload)
-    add_compile_definitions(HOTRELOAD_BUILD=1)
+if (hotreload)
+	add_compile_definitions(HOTRELOAD_BUILD=1)
 
-    # Game
-    add_library(game SHARED ${game_source})
+	# Game
+	add_library(game SHARED ${game_source})
 
-    # Exe
-    target_sources(exe PRIVATE ${exe_source})
-    if (UNIX)
-      if (X11_use)
-        target_link_libraries(exe ${X11_libs})
-      endif()
-        target_link_libraries(exe wayland-client.so)
-    endif()
+	# Exe
+	target_sources(exe PRIVATE ${exe_source})
+	if (UNIX)
+		if (X11_use)
+			target_link_libraries(exe ${X11_libs})
+		endif()
+			target_link_libraries(exe wayland-client.so)
+	endif()
 
 # One Exe
-  else()
-    target_sources(exe PRIVATE
-      ${game_source}
-      ${exe_source}
-    )
-    if (UNIX)
-      if (X11_use)
-        target_link_libraries(exe ${X11_libs})
-      else()
-        target_link_libraries(exe wayland-client.so)
-      endif()
-    elseif (WIN32)
-      set_target_properties(exe PROPERTIES WIN32_EXECUTABLE true)
-    endif()
-  endif()
+else()
+	target_sources(exe PRIVATE
+		${game_source}
+		${exe_source}
+	)
+	if (UNIX)
+		if (X11_use)
+			target_link_libraries(exe ${X11_libs})
+		else()
+			target_link_libraries(exe wayland-client.so)
+		endif()
+	elseif (WIN32)
+		set_target_properties(exe PROPERTIES WIN32_EXECUTABLE true)
+	endif()
+endif()
 
 # add_executable(compiling_shaders 
 #   src/base/base_impl.cpp

@@ -6,12 +6,10 @@ i32 main(i32 count, char* args[]) {
 	mem_track_init();
 	tctx_init();
 	os_init(args[0]);
-
 	Scratch scratch;
 	HotReloadData state = {};
 	void (*com)(HotReloadData* data) = {};
 	OS_Handle lib = {};
-
 #if HOTRELOAD_BUILD
 	state.lib_path = push_str_cat(scratch, os_cur_directory(), "/libgame.so");
 	lib = os_lib_open(state.lib_path);
@@ -19,7 +17,6 @@ i32 main(i32 count, char* args[]) {
 #else
 	com = update;
 #endif
-
 	For {
 		com(&state);
 		os_lib_close(lib);

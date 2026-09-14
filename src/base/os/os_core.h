@@ -12,8 +12,8 @@ enum {
 
 struct FileProperties {
 	u64 size;
-	DenseTime modified;
-	DenseTime created;
+	u64 modified;
+	u64 created;
 	FilePropertyFlags flags;
 };
 
@@ -119,7 +119,7 @@ b32            os_file_path_exists(String path);
 b32            os_file_path_copy(String src, String dst);
 void           os_file_path_copy_mtime(String src, String dst);
 FileProperties os_file_path_properties(String path);
-DenseTime      os_file_path_mtime(String path);
+u64      os_file_path_mtime(String path);
 void           os_file_path_rename(String path, String new_name);
 void           os_file_path_remove(String path);
 void           os_file_path_move(String src, String dst);
