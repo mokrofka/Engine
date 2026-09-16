@@ -14,7 +14,7 @@ global v2 tex_coords[] = {
 	{2.0, 0.0},
 };
 
-VS_Entry VSOutput vs_main(Vertex in, u32 vert_id : SV_VertexID, u32 draw_id : SV_DrawIndex, u32 inst_id : SV_InstanceID) {
+VS_Entry VSOutput vs_main(Vertex in, u32 vert_id: SV_VertexID, u32 draw_id: SV_DrawIndex, u32 inst_id: SV_InstanceID) {
 	u32 drawcall_idx = push.idx + draw_id;
 	DrawCall draw = drawcalls[drawcall_idx];
 	VSOutput o;

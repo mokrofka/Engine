@@ -110,13 +110,13 @@ Task thread_pop() {
 	return thread_pop_locked();
 }
 
-intern ResultOk<Task> thread_try_pop() {
+ResultOk<Task> thread_try_pop() {
 	var& g = thread_pool;
 	if(os_sem_try_wait(g.tasks_available)) return {thread_pop_locked(), true};
 	return {};
 }
 
-intern void thread_worker(void* ctx) {
+void thread_worker(void* ctx) {
 	var& g = thread_pool;
 	tctx_init();
 	For {

@@ -49,7 +49,7 @@ String64::operator String() { return String(str, size); }
 
 u64 cstr_length(const void* c) {
 	u8* p = (u8*)c;
-	for(; *p != 0; p++);
+	for(;*p != 0; p++);
 	return (u64)(p - (u8*)c);
 }
 
@@ -165,7 +165,7 @@ void w_byte(Writer* w, u8 b) {
 	w->pos += 1;
 }
 
-intern u32 my_sprintf(u8* buf, String fmt, VaList argc) {
+u32 my_sprintf(u8* buf, String fmt, VaList argc) {
 	Writer w = {buf, 0};
 	for(u8 *p = fmt.str, *end = p + fmt.size; p < end; p++) {
 		if(*p != '%') { w_byte(&w, *p); continue; }
@@ -543,7 +543,7 @@ f64 f64_from_str(String str) {
 	}
 
 	// Integer part
-	for(; j < str.size; j++) {
+	for(;j < str.size; j++) {
 		u8 ch = str.str[j];
 		if(ch == '.' || ch == 'e' || ch == 'E')
 			break; x = x * 10 + (ch - '0');
@@ -552,7 +552,7 @@ f64 f64_from_str(String str) {
 	// Fractional part
 	if(j < str.size && str.str[j] == '.') {
 		j++;
-		for(; j < str.size; j++) {
+		for(;j < str.size; j++) {
 			u8 ch = str.str[j];
 			if(ch == 'e' || ch == 'E')
 				break;
@@ -575,7 +575,7 @@ f64 f64_from_str(String str) {
 			}
 		}
 		i32 exp = 0;
-		for(; j < str.size; j++) {
+		for(;j < str.size; j++) {
 			exp = exp * 10 + (str.str[j] - '0');
 		}
 		if(exp_negative)
@@ -597,7 +597,7 @@ f32 f32_from_str(String str) { return f64_from_str(str); };
 
 u8* str_find_last_slash(String s) {
 	u8* p = s.str + s.size - 1;
-	for(; p >= s.str; --p) {
+	for(;p >= s.str; --p) {
 		if(char_is_slash(*p)) return p;
 	}
 	return s.str - 1;
@@ -617,7 +617,7 @@ String str_chop_past_last_slash(String s) {
 
 String str_skip_slash(String s) {
 	u8* p = s.str;
-	for(; p < s.str+s.size; p++) {
+	for(;p < s.str+s.size; p++) {
 		if(char_is_slash(*p)) {
 			p++;
 			return String(p, u32(s.str + s.size - p));
@@ -639,7 +639,7 @@ String str_skip_last_slash(String s) {
 String str_chop_last_dot(String s) {
 	String res = s;
 	u32 p = s.size;
-	for(; p > 0;) {
+	while(p > 0) {
 		p -= 1;
 		if(s.str[p] == '.') {
 			res = str_prefix(s, p);
@@ -651,7 +651,7 @@ String str_chop_last_dot(String s) {
 
 String str_skip_last_dot(String s) {
 	u8* ptr = s.str + s.size - 1;
-	for(; ptr >= s.str; --ptr) {
+	for(;ptr >= s.str; --ptr) {
 		if(*ptr == '.') {
 			break;
 		}

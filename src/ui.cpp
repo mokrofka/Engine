@@ -88,7 +88,7 @@ UI_Box* ui_box_make(UI_BoxFlags flags, UI_Size size_x, UI_Size size_y, String st
 	box->background_color = ui_current_bg_color();
 	box->text_color = g.style.text_color;
 	box->border_color = g.style.border_color;
-	box->last_frame_touched = st->current_frame;
+	box->last_frame_touched = current_frame;
 	return box;
 }
 
@@ -98,8 +98,8 @@ UI_Box* ui_box_from_key(u64 key) {
 		UI_Box* b = push_struct(g.frame_arena, UI_Box);
 		*b = {};
 		return b;
-	} 
-	var [b, ok] = map_get(g.box_map, key);
+	}
+	var[b, ok] = map_get(g.box_map, key);
 	if(!ok) {
 		b = pool_push(g.boxes, {.key = key});
 		map_set(g.box_map, key, b);
@@ -117,7 +117,7 @@ void ui_prune_stale_boxes() {
 	Loop(i, g.active_boxes.count) {
 		u32 idx = g.active_boxes.dense[i];
 		UI_Box* b = &g.boxes.data[idx];
-		if(st->current_frame - b->last_frame_touched > UI_STALE_FRAMES) {
+		if(current_frame - b->last_frame_touched > UI_STALE_FRAMES) {
 			sparse_set_remove(g.active_boxes, idx);
 			pool_remove(g.boxes, b);
 			map_remove(g.box_map, b->key);

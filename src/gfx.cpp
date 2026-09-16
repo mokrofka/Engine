@@ -1230,7 +1230,7 @@ void vk_loader_load_device() {
 }
 
 VkBool32 vk_debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity, VkDebugUtilsMessageTypeFlagsEXT message_types, const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data);
-intern void vk_instance_init() {
+void vk_instance_init() {
 	Scratch scratch;
 	Gfx_State& g = st->gfx;
 	VkApplicationInfo app_info = {
@@ -1318,7 +1318,7 @@ intern void vk_instance_init() {
 #endif
 }
 
-intern void vk_device_init() {
+void vk_device_init() {
 	Scratch scratch;
 	Gfx_State& g = st->gfx;
 

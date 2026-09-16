@@ -63,7 +63,7 @@ AllocatorInfo* mem_track_make(Allocator parent_alloc, AllocatorType type, String
 	MemZeroStruct(info);
 	
 	info->type = type;
-	info->thread_idx = tctx_get_id();
+	info->thread_idx = tctx_id();
 	str_copy(info->name, name);
 	str_copy(info->file, file);
 	info->line = line;
@@ -143,6 +143,7 @@ Arena _arena_make(ArenaParams params) {
 	Arena result = {
 		.base = base,
 		.cap = reserve_size,
+		.lock = params.lock,
 	};
 #if MEM_TRACK
 	result.info = mem_track_make({}, AllocatorType_Arena, params.name, params.file, params.line);
@@ -182,7 +183,8 @@ void arena_clear(Arena& arena) {
 	arena.pos = 0;
 }
 
-intern u8* arena_alloc(Arena* arena, u64 size, u64 align) {
+u8* arena_alloc(Arena* arena, u64 size, u64 align) {
+	if(arena->lock) os_mutex_lock(arena->mutex);
 	u64 pos = AlignUp(arena->pos, align);
 	u64 pad = pos - arena->pos;
 	if(pos + size > arena->cmt) {
@@ -203,22 +205,23 @@ intern u8* arena_alloc(Arena* arena, u64 size, u64 align) {
 #if MEM_TRACK
 	mem_track_on_alloc(arena->info, size);
 #endif
+	if(arena->lock) os_mutex_unlock(arena->mutex);
 	return result;
 }
 
-intern u8* arena_alloc_zero(Arena* arena, u64 size, u64 align) {
+u8* arena_alloc_zero(Arena* arena, u64 size, u64 align) {
 	u8* result = arena_alloc(arena, size, align);
 	MemZero(result, size);
 	return result;
 }
 
-intern u8* arena_realloc(Arena* arena, void* ptr, u64 old_size, u64 new_size, u64 align) {
+u8* arena_realloc(Arena* arena, void* ptr, u64 old_size, u64 new_size, u64 align) {
 	u8* result = arena_alloc(arena, new_size, align);
 	MemCopy(result, ptr, old_size);
 	return result;
 }
 
-intern u8* arena_realloc_zero(Arena* arena, void* ptr, u64 old_size, u64 new_size, u64 align) {
+u8* arena_realloc_zero(Arena* arena, void* ptr, u64 old_size, u64 new_size, u64 align) {
 	u8* result = arena_alloc(arena, new_size, align);
 	MemCopy(result, ptr, old_size);
 	MemZero(Offset(result, old_size), new_size - old_size);
@@ -262,7 +265,7 @@ void alloc_arena_list_clear(ArenaList& arena) {
 	arena.current = arena.first;
 }
 
-intern ArenaBlock* arena_list_new_block(ArenaList* arena) {
+ArenaBlock* arena_list_new_block(ArenaList* arena) {
 	ArenaBlock* b = (ArenaBlock*)mem_alloc(arena->alloc, sizeof(ArenaBlock) + ARENA_LIST_BLOCK_SIZE);
 	*b = {
 		.cap = ARENA_LIST_BLOCK_SIZE,
@@ -273,7 +276,7 @@ intern ArenaBlock* arena_list_new_block(ArenaList* arena) {
 	return b;
 }
 
-intern u8* arena_list_alloc(ArenaList* arena, u64 size, u64 align) {
+u8* arena_list_alloc(ArenaList* arena, u64 size, u64 align) {
 	Assert(AlignUp(size, align) <= KB(64));
 	if(!arena->current) {
 		arena->first = arena->current = arena_list_new_block(arena);
@@ -297,19 +300,19 @@ intern u8* arena_list_alloc(ArenaList* arena, u64 size, u64 align) {
 	return result;
 }
 
-intern u8* arena_list_alloc_zero(ArenaList* arena, u64 size, u64 align) {
+u8* arena_list_alloc_zero(ArenaList* arena, u64 size, u64 align) {
 	u8* result = arena_list_alloc(arena, size, align);
 	MemZero(result, size);
 	return result;
 }
 
-intern u8* arena_list_realloc(ArenaList* arena, void* ptr, u64 old_size, u64 new_size, u64 align) {
+u8* arena_list_realloc(ArenaList* arena, void* ptr, u64 old_size, u64 new_size, u64 align) {
 	u8* result = arena_list_alloc(arena, new_size, align);
 	MemCopy(result, ptr, old_size);
 	return result;
 }
 
-intern u8* arena_list_realloc_zero(ArenaList* arena, void* ptr, u64 old_size, u64 new_size, u64 align) {
+u8* arena_list_realloc_zero(ArenaList* arena, void* ptr, u64 old_size, u64 new_size, u64 align) {
 	u8* result = arena_list_alloc(arena, new_size, align);
 	MemCopy(result, ptr, old_size);
 	MemZero(Offset(result, old_size), new_size - old_size);
@@ -332,6 +335,7 @@ Alloc::operator Allocator() { return {.type = AllocatorType_Alloc, .ctx = this};
 Alloc _alloc_make(Allocator alloc, AllocParams params) {
 	Alloc res = {
 		.alloc = alloc,
+		.lock = params.lock,
 	};
 #if MEM_TRACK
 	res.info = mem_track_make(alloc, AllocatorType_Alloc, params.name, params.file, params.line);
@@ -399,17 +403,20 @@ void intern_free_align(Alloc* alloc, void*ptr, u64 size) {
 
 // mem block: align_pad -> header -> mem -> u32 tail guard
 u8* alloc_alloc(Alloc* alloc, u64 size, u64 align) {
-	#if BUILD_DEBUG
+	if(alloc->lock) os_mutex_lock(alloc->mutex);
+	u8* res = null;
+#if BUILD_DEBUG
 	u64 alloc_size = size + sizeof(u32);
-	u8* res = intern_alloc_align(alloc, alloc_size, align);
+	res = intern_alloc_align(alloc, alloc_size, align);
 	AllocHeader* h = OffsetBackStruct(res, AllocHeader);
 	h->head_guard = MEM_ALLOC_HEADER_GUARD;
 	h->size = size;
 	*OffsetAs(res, u32, size) = MEM_ALLOC_TAIL_GUARD;
+#else
+	res = intern_alloc_align(alloc, size, align);
+#endif
+	if(alloc->lock) os_mutex_unlock(alloc->mutex);
 	return res;
-	#else
-	return intern_alloc_align(alloc, size, align);
-	#endif
 }
 
 u8* alloc_alloc_zero(Alloc* alloc, u64 size, u64 align)  {
@@ -419,7 +426,8 @@ u8* alloc_alloc_zero(Alloc* alloc, u64 size, u64 align)  {
 }
 
 void alloc_free(Alloc* alloc, void* ptr, u64 size) {
-	#if BUILD_DEBUG
+	if(alloc->lock) os_mutex_lock(alloc->mutex);
+#if BUILD_DEBUG
 	AllocHeader* h = OffsetBackStruct(ptr, AllocHeader);
 	Assert(h->head_guard == MEM_ALLOC_HEADER_GUARD);
 	Assert(h->size == size);
@@ -427,9 +435,10 @@ void alloc_free(Alloc* alloc, void* ptr, u64 size) {
 	Assert(*tail == MEM_ALLOC_TAIL_GUARD);
 	h->head_guard = MEM_DEALLOC_HEADER_GUARD;
 	intern_free_align(alloc, ptr, size + sizeof(u32));
-	#else
+#else
 	intern_free_align(alloc, ptr, size);
-	#endif
+#endif
+	if(alloc->lock) os_mutex_unlock(alloc->mutex);
 }
 
 u8* alloc_realloc(Alloc* alloc, void* ptr, u64 old_size, u64 new_size, u64 align) {

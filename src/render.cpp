@@ -1439,8 +1439,7 @@ void imgui_impl_new_frame() {
 			}
 		}
 	}
-	Loop(i, events.count) {
-		OS_InputEvent event = events[i];
+	for(var event : events) {
 		switch(event.type) {
 			case OS_EventType_Key: {
 				if(event.key < Key_COUNT && event.key != Key_Super) {
@@ -1498,7 +1497,7 @@ void imgui_init() {
 	platform_io.Platform_GetClipboardTextFn = imgui_platform_get_clipboard_text;
 	platform_io.Platform_SetClipboardTextFn = imgui_platform_set_clipboard_text;
 	VkDescriptorPoolSize pool_sizes[] = {
-		{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
+		{VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
 	};
 	VkDescriptorPoolCreateInfo pool_info = {
 		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
@@ -1547,6 +1546,24 @@ void imgui_end_frame() {
 	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), st->gfx.render_cmds[st->gfx.current_frame_idx]);
 	ImGui::UpdatePlatformWindows();
 	ImGui::RenderPlatformWindowsDefault();
+}
+
+ImTextureID imgui_add_texture(R_TextureId id) {
+	var vkview = pool_get(st->gfx.views, pool_get(st->r.textures, id).view);
+	return (ImTextureID)ImGui_ImplVulkan_AddTexture(vkview.h, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+}
+
+ImTextureID imgui_get_texture(R_TextureId id) {
+	var& g = st->r;
+	var& tex = pool_get(g.textures, id);
+	if(tex.imgui_is_ready) {
+	} else if(r_texture_is_ready(id)) {
+		tex.imgui_id = imgui_add_texture(id);
+		tex.imgui_is_ready = true;
+	} else {
+		return st->imgui_dummy;
+	}
+	return tex.imgui_id;
 }
 
 #endif

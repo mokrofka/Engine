@@ -51,6 +51,8 @@ struct R_Texture {
 	Gfx_Image image;
 	Gfx_View view;
 	b32 is_ready;
+	ImTextureID imgui_id;
+	b32 imgui_is_ready;
 };
 
 struct R_MeshDesc {
@@ -355,6 +357,8 @@ void r_draw_text_ext(R_FontId font, v2 pos, String str, v4 color, u32 font_heigh
 void imgui_init();
 void imgui_begin_frame();
 void imgui_end_frame();
+ImTextureID imgui_add_texture(R_TextureId id);
+ImTextureID imgui_get_texture(R_TextureId id);
 
 
 

@@ -50,7 +50,7 @@ struct WaylandState {
 global WaylandState wl_st;
 #undef global // because of: wl_registry_listener.global;
 
-intern u32 lnx_keycode_translate(u32 code) {
+u32 lnx_keycode_translate(u32 code) {
 	switch(code) {
 		default: NotImplemented;
 		// Control keys
@@ -162,7 +162,7 @@ intern u32 lnx_keycode_translate(u32 code) {
 	}
 }
 
-intern void wl_seat_capabilities(void* data, wl_seat* seat, u32 capabilities) {
+void wl_seat_capabilities(void* data, wl_seat* seat, u32 capabilities) {
 	if(capabilities & WL_SEAT_CAPABILITY_KEYBOARD && !wl_st.keyboard) {
 		wl_st.keyboard = wl_seat_get_keyboard(seat);
 		wl_st.keyboard_listener = {
@@ -198,7 +198,7 @@ intern void wl_seat_capabilities(void* data, wl_seat* seat, u32 capabilities) {
 	}
 }
 
-intern void wl_registry_global_handler(void* data, wl_registry* registry, u32 name, const char* interface, u32 version) {
+void wl_registry_global_handler(void* data, wl_registry* registry, u32 name, const char* interface, u32 version) {
 	if(str_match(interface, wl_compositor_interface.name)) {
 		wl_st.compositor = (wl_compositor*)wl_registry_bind(registry, name, &wl_compositor_interface, version);
 	}

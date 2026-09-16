@@ -56,7 +56,7 @@ struct VSOutput {
 };
 
 struct UI_VSOutput {
-	v4 vert : SV_Position;
+	v4 vert: SV_Position;
 	v2 uv;
 	v4 color;
 	v2 dst_pos;

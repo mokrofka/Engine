@@ -610,8 +610,7 @@ b32 os_mutex_try_lock(Mutex& m) {
 }
 
 void os_mutex_unlock(Mutex& m) {
-	if(atomic_dec(&m.futex) != LOCKED_NO_WAIT) {
-		atomic_store(&m.futex, UNLOCKED);
+	if (atomic_swap(&m.futex, UNLOCKED) == LOCKED_WAIT) {
 		os_futex_wake(m.futex, 1);
 	}
 }
@@ -636,7 +635,7 @@ void os_cond_wake_all(CondVar& c) {
 void os_sem_wait(Semaphore& s) {
 	For {
 		u32 v = atomic_load(&s.futex);
-		for(;v > 0;) {
+		while(v > 0) {
 			if(atomic_cmp_swap(&s.futex, &v, v - 1)) return;
 		}
 		os_futex_wait(s.futex, 0);
@@ -645,7 +644,7 @@ void os_sem_wait(Semaphore& s) {
 
 b32 os_sem_try_wait(Semaphore& s) {
 	u32 v = atomic_load(&s.futex);
-	for(;v > 0;) {
+	while(v > 0) {
 		if(atomic_cmp_swap(&s.futex, &v, v - 1)) return true;
 	}
 	return false;

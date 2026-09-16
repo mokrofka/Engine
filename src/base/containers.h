@@ -80,6 +80,8 @@ template <typename T> struct Darray {
 		Assert(idx < cap);
 		return data[idx];
 	}
+	T* begin() { return data; }
+	T* end()   { return data + count; }
 };
 
 template<typename T> Slice<T> NO_DEBUG slice(Darray<T>& arr) { return {arr.data, arr.count}; }

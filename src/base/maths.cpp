@@ -83,11 +83,11 @@ u32 xorshift32(u32 x) {
 // 	return h;
 // }
 
-intern u64 wyr8(u8* p) { u64 v; MemCopy(&v, p, 8); return v; }
-intern u64 wyr4(u8* p) { u32 v; MemCopy(&v, p, 4); return v; }
-intern u64 wyr3(u8* p, u64 k) { return ((u64)p[0] << 16) | ((u64)p[k >> 1] << 8) | p[k - 1]; }
+u64 wyr8(u8* p) { u64 v; MemCopy(&v, p, 8); return v; }
+u64 wyr4(u8* p) { u32 v; MemCopy(&v, p, 4); return v; }
+u64 wyr3(u8* p, u64 k) { return ((u64)p[0] << 16) | ((u64)p[k >> 1] << 8) | p[k - 1]; }
 
-intern u64 wymix(u64 a, u64 b) {
+u64 wymix(u64 a, u64 b) {
 	__uint128_t r = (__uint128_t)a * b;
 	return (u64)r ^ (u64)(r >> 64);
 }
@@ -182,11 +182,12 @@ f32 Lerp(f32 a, f32 t, f32 b)      { return t*(b - a) + a; }
 f32 LerpClamp(f32 a, f32 t, f32 b) { return Lerp(a, Clamp01(t), b); }
 f32 unlerp(f32 a, f32 x, f32 b)    { return (x - a) / (b - a); }
 f64 unlerp(f64 a, f64 x, f64 b)    { return (x - a) / (b - a); }
-f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max) { return Lerp(new_min, unlerp(old_min, x, old_max), new_max); }
-f32 remap(f32 x, f32 old_max, f32 new_max)                           { return x / old_max * new_max; }
-f64 remap(f64 x, f64 old_min, f64 old_max, f64 new_min, f64 new_max) { return Lerp(new_min, unlerp(old_min, x, old_max), new_max); }
-f32 remap_clamp(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max) {
-	return remap(Clamp(old_min, x, old_max), old_min, old_max, new_min, new_max);
+f32 remap(f32 x, f32 from_min, f32 from_max, f32 to_min, f32 to_max) { return Lerp(to_min, unlerp(from_min, x, from_max), to_max); }
+f32 remap(f32 x, f32 from_max, f32 to_max)                           { return x / from_max * to_max; }
+f64 remap(f64 x, f64 from_min, f64 from_max, f64 to_min, f64 to_max) { return Lerp(to_min, unlerp(from_min, x, from_max), to_max); }
+f32 remap(f64 x, f64 from_max, f64 to_max)																											{ return x / from_max * to_max; }
+f32 remap_clamp(f32 x, f32 from_min, f32 from_max, f32 to_min, f32 to_max) {
+	return remap(Clamp(from_min, x, from_max), from_min, from_max, to_min, to_max);
 }
 f32 approach(f32 from, f32 to, f32 step) {
 	f32 d = to - from;
@@ -1542,10 +1543,11 @@ Rng1 rng1_intersect(Rng1 a, Rng1 b)    { return Rng1(Max(a.min, b.min), Min(a.ma
 b32 rng1_overlaps(Rng1 a, Rng1 b)      { return a.min < b.max && b.min < a.max; }
 f32 rng1_clamp(Rng1 r, f32 x)          { return Clamp(r.min, x, r.max); }
 
-Rng1 rng1_subrng(Rng1 r, Rng1 sub)   { return Rng1(r.min + sub.min, r.min+sub.min + rng1_dim(sub)); }
-Rng1 rng1_subrng01(Rng1 r, Rng1 sub) { f32 w = rng1_dim(r); return Rng1(r.min + w*sub.min, r.min + w*sub.max); }
 f32 rng1_lerp(Rng1 r, f32 t)         { return Lerp(r.min, t, r.max); } 
 f32 rng1_unlerp(Rng1 r, f32 x)       { return unlerp(r.min, x, r.max); }
+f32 rng1_remap(f32 x, Rng1 from, Rng1 to) { return remap(x, from.min,from.max, to.min,to.max); }
+Rng1 rng1_subrng(Rng1 r, Rng1 sub)   { return Rng1(r.min + sub.min, r.min+sub.min + rng1_dim(sub)); }
+Rng1 rng1_subrng01(Rng1 r, Rng1 sub) { f32 w = rng1_dim(r); return Rng1(r.min + w*sub.min, r.min + w*sub.max); }
 
 ///////////////////////////////////
 // Dim2
@@ -1564,18 +1566,84 @@ Rng2 rng2_union(Rng2 a, Rng2 b)     { return Rng2(v2(Min(a.min.x, b.min.x), Min(
 Rng2 rng2_intersect(Rng2 a, Rng2 b) { return Rng2(v2(Max(a.min.x, b.min.x), Max(a.min.y, b.min.y)), v2(Min(a.max.x, b.max.x), Min(a.max.y, b.max.y))); }
 b32 rng2_overlaps(Rng2 a, Rng2 b)   { return (a.min.x < b.max.x && b.min.x < a.max.x) && (a.min.y < b.max.y && b.min.y < a.max.y); }
 v2 rng2_clamp(Rng2 r, v2 x)         { return v2(Clamp(r.min.x, x.x, r.max.x), Clamp(r.min.y, x.y, r.max.y)); }
+Rng1 rng2_rng_x(Rng2 r)													{ return Rng1(r.min.x,r.max.x); }
+Rng1 rng2_rng_y(Rng2 r)													{ return Rng1(r.min.y,r.max.y); }
 
+Rng2 rng2_lerp(Rng2 a, f32 t, Rng2 b) { return Rng2(v2_lerp(a.min, t, b.min), v2_lerp(a.max, t, b.max)); }
+v2 rng2_remap(v2 p, Rng2 from, Rng2 to) {
+	return v2(
+		rng1_remap(p.x, rng2_rng_x(from), rng2_rng_x(to)),
+		rng1_remap(p.y, rng2_rng_y(from), rng2_rng_y(to))
+	);
+}
+Rng2 rng2_remap_rng(Rng2 r, Rng2 from, Rng2 to) {
+	return Rng2(rng2_remap(r.min, from, to), rng2_remap(r.max, from, to));
+}
 Rng2 rng2_make(v2 min, v2 size)             { return Rng2(min, min+size); }
 Rng2 rng2_make_centered(v2 pos, v2 halfdim) { return Rng2(pos - halfdim, pos + halfdim); }
 Rng2 rng2_scale_centered(Rng2 r, v2 scale)  { v2 halfdim = rng2_dim(r)/2; v2 c = rng2_center(r); return Rng2(c - v2_hadamard(halfdim, scale), c + v2_hadamard(halfdim, scale)); }
 Rng2 rng2_scale(Rng2 r, v2 scale)           { return Rng2(v2_hadamard(r.min, scale), v2_hadamard(r.max, scale)); }
-
-Rng2 rng2_subrng_x(Rng2 r, Rng1 sub)      { return Rng2(v2(r.min.x + sub.min, r.min.y), v2(r.min.x+sub.min + rng1_dim(sub), r.max.y)); }
-Rng2 rng2_subrng_y(Rng2 r, Rng1 sub)      { return Rng2(v2(r.min.x, r.min.y + sub.min), v2(r.min.x, r.max.y+sub.min + rng1_dim(sub))); }
-Rng2 rng2_subrng_x01(Rng2 r, Rng1 sub)    { f32 w = rng2_dim(r).x; return Rng2(v2(r.min.x + w*sub.min, r.min.y), v2(r.min.x + w*sub.max, r.max.y)); }
-Rng2 rng2_subrng_y01(Rng2 r, Rng1 sub)    { f32 w = rng2_dim(r).y; return Rng2(v2(r.min.x, r.min.y + w*sub.min), v2(r.min.x, r.max.y + w*sub.max)); }
-
+Rng2 rng2_subrng_x(Rng2 r, Rng1 sub)        { return Rng2(v2(r.min.x + sub.min, r.min.y), v2(r.min.x+sub.min + rng1_dim(sub), r.max.y)); }
+Rng2 rng2_subrng_y(Rng2 r, Rng1 sub)        { return Rng2(v2(r.min.x, r.min.y + sub.min), v2(r.min.x, r.max.y+sub.min + rng1_dim(sub))); }
+Rng2 rng2_subrng_x01(Rng2 r, Rng1 sub)      { f32 w = rng2_dim(r).x; return Rng2(v2(r.min.x + w*sub.min, r.min.y), v2(r.min.x + w*sub.max, r.max.y)); }
+Rng2 rng2_subrng_y01(Rng2 r, Rng1 sub)      { f32 w = rng2_dim(r).y; return Rng2(v2(r.min.x, r.min.y + w*sub.min), v2(r.min.x, r.max.y + w*sub.max)); }
+Rng2 rng2_cut_left(Rng2* r, f32 amount) {
+	f32 x = Min(r->min.x + amount, r->max.x);
+	Rng2 cut = Rng2(r->min, v2(x, r->max.y));
+	r->min.x = x;
+	return cut;
+}
+Rng2 rng2_cut_right(Rng2* r, f32 amount) {
+	f32 x = Max(r->max.x - amount, r->min.x);
+	Rng2 cut = Rng2(v2(x, r->min.y), r->max);
+	r->max.x = x;
+	return cut;
+}
+Rng2 rng2_cut_top(Rng2* r, f32 amount) {
+	f32 y = Min(r->min.y + amount, r->max.y);
+	Rng2 cut = Rng2(r->min, v2(r->max.x, y));
+	r->min.y = y;
+	return cut;
+}
+Rng2 rng2_cut_bottom(Rng2* r, f32 amount) {
+	f32 y = Max(r->max.y - amount, r->min.y);
+	Rng2 cut = Rng2(v2(r->min.x, y), r->max);
+	r->max.y = y;
+	return cut;
+}
+void rng2_split_x(Rng2 r, f32 t, Rng2* left, Rng2* right) {
+	f32 x = rng1_lerp({r.min.x, r.max.x}, t);
+	*left = Rng2(r.min, v2(x,r.max.y));
+	*right = Rng2(v2(x,r.min.y), r.max);
+}
+void rng2_split_y(Rng2 r, f32 t, Rng2* top, Rng2* bottom) {
+	f32 y = rng1_lerp({r.min.y, r.max.y}, t);
+	*top = Rng2(r.min, v2(r.max.x,y));
+	*bottom = Rng2(v2(r.min.x,y), r.max);
+}
+Rng2 rng2_col(Rng2 r, i32 idx, i32 count) {
+	f32 col_w = rng2_dim(r).x / count;
+	v2 min = r.min+v2(col_w*idx,0);
+	v2 max = v2(min.x+col_w, r.max.y);
+	return Rng2(min, max);
+}
+Rng2 rng2_row(Rng2 r, i32 idx, i32 count) {
+	f32 col_h = rng2_dim(r).y / count;
+	v2 min = r.min+v2(0, col_h*idx);
+	v2 max = v2(r.max.x, min.y+col_h);
+	return Rng2(min, max);
+}
+Rng2 rng2_grid_cell(Rng2 r, i32 row, i32 col, i32 rows, i32 cols) {
+ Rng2 row_rect = rng2_row(r, row, rows);
+ return rng2_col(row_rect, col, cols);
+}
 Rng2 rng2_align_dim_at_center(Rng2 r, v2 size) { v2 c = rng2_center(r); v2 half = size/2; return Rng2(c - half, c + half); }
+Rng2 rng2_aspect_fit(Rng2 r, Rng2 fit) {
+	v2 rd = rng2_dim(r), fd = rng2_dim(fit);
+	f32 scale = Min(rd.x / fd.x, rd.y / fd.y);
+	v2 size = v2(fd.x * scale, fd.y * scale);
+	return rng2_align_dim_at_center(r, size);
+}
 // NOTE: define prefix, postfix, skip, chop operations?
 
 ///////////////////////////////////
