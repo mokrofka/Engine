@@ -16,14 +16,12 @@ enum ProfType {
 struct ProfAnchor {
 	ProfType type;
 	u64 tsc_elapsed_excl; // without children
-	u64 tsc_elapsed_incl; // with children
 	// u64 hit_count;
 	String label;
 	String func;
 	u32 depth;
 	u64 tsc_start;
 	u64 tsc_end;
-	b32 was_poped;
 };
 
 enum ProfEventType {
@@ -58,8 +56,6 @@ struct ProfFrame {
 };
 
 struct ProfThread {
-	Arena arena;
-	Alloc gpa;
 	Darray<ProfEvent> events[2];
 	Darray<ProfAnchor> recorded_anchors[ProfRecordHistoryNum];
 	Darray<ProfAnchor> launch_anchors;
@@ -67,20 +63,22 @@ struct ProfThread {
 };
 
 struct ProfState {
+	Arena arena;
+	Alloc gpa;
 	ProfFrameTime current_frame_time;
 	ProfFrameTime frames_times[ProfRecordHistoryNum];
 	ProfFrameTime launch_time;
 	ProfThread prof_threads[Thread_NumWorkers+1];
-	u32 current_buf;
+	u32 current_write;
 	b32 paused;
 };
 
+extern ProfState profiler_st;
+
 void prof_init(Allocator arena);
-ProfState& prof_get();
-void prof_begin(u32 current_frame);
-void prof_end(u32 current_frame);
-ProfFrame prof_get_prev_frame(u32 current_frame);
-ProfThread& prof_get_prof_thread();
+void prof_begin();
+void prof_end();
+ProfFrame prof_get_prev_frame();
 void prof_launch_begin();
 void prof_launch_end();
 

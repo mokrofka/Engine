@@ -629,3 +629,166 @@ struct StructuredBuffer : [[Block]] {
 with with row major flag, matrices are column major and with column major, matrices are row major?
 
 
+
+// struct UI_State {
+// 	u32 hotitem;
+// 	u32 activeitem;
+// 	b32 mouse_down;
+
+// 	u32 kbditem;
+// 	u32 last_widget;
+// 	b32 tab;
+// 	b32 enter;
+// 	b32 up;
+// 	b32 down;
+// };
+
+// #define GEN_ID (__LINE__)
+
+// void ui_draw_rect(Rng2 rect, v4 color) {
+// 	r_draw_rect(rect, color);
+// }
+
+// b32 ui_button(u32 id, v2 pos) {
+// 	var& g = st->ui;
+// 	v2 button_size = v2(64, 48);
+// 	v2 active_off = v2(2,2);
+// 	v2 shadow_off = v2(8,8);
+// 	if(rng2_contains(rng2_make(pos, button_size), os_mouse_pos())) {
+// 		g.hotitem = id;
+// 		if(g.activeitem == 0 && g.mouse_down) {
+// 			g.activeitem = id;
+// 		}
+// 	}
+
+// 	if(g.kbditem == 0) {
+// 		g.kbditem = id;
+// 	}
+// 	if(g.kbditem == id) {
+// 		ui_draw_rect(rng2_make(pos-v2(6,6), v2(84,68)), ColorRed);
+// 	}
+
+// 	ui_draw_rect(rng2_make(pos + shadow_off, button_size), ColorBlack);
+// 	if(g.hotitem == id) {
+// 		if(g.activeitem == id) {
+// 			ui_draw_rect(rng2_make(pos + active_off, button_size), ColorWhite);
+// 		} else {
+// 			ui_draw_rect(rng2_make(pos, button_size), ColorWhite);
+// 		}
+// 	} else {
+// 		ui_draw_rect(rng2_make(pos, button_size), ColorGrey);
+// 	}
+
+// 	if(g.kbditem == id) {;
+// 		if(g.tab) {
+// 			g.kbditem = 0;
+// 			if(os_key_modifiers() & OS_Modifier_Shift) {
+// 				g.kbditem = g.last_widget;
+// 			}
+// 			g.tab = false;
+// 		}
+// 		if(g.enter) {
+// 			g.enter = false;
+// 			return true;
+// 		}
+// 	}
+// 	g.last_widget = id;
+
+// 	if(!g.mouse_down && g.hotitem == id && g.activeitem == id) {
+// 		return true;
+// 	}
+// 	return false;
+// }
+
+// b32 ui_slider(u32 id, v2 pos, i32 max, i32& value) {
+// 	var& g = st->ui;
+
+// 	i32 track_height = 256;
+// 	i32 knob_size = 16;
+// 	i32 padding = 8;
+
+// 	i32 ypos = remap(value, max, track_height - knob_size - padding);
+
+// 	if(rng2_contains(rng2_make(pos+v2(padding), v2(knob_size,track_height-padding)), os_mouse_pos())) {
+// 		g.hotitem = id;
+// 		if(g.activeitem == 0 && g.mouse_down) {
+// 			g.activeitem = id;
+// 		}
+// 	}
+
+// 	if(g.kbditem == 0) {
+// 		g.kbditem = id;
+// 	}
+// 	if(g.kbditem == id) {
+// 		ui_draw_rect(rng2_make(pos-v2(4,4), v2(40,280)), ColorRed);
+// 	}
+
+// 	ui_draw_rect(rng2_make(pos, v2(knob_size*2,track_height)), rgba_from_u32(0x777777));
+// 	if(g.activeitem == id || g.hotitem == id) {
+// 		ui_draw_rect(rng2_make(pos + v2(padding) + v2(0,ypos), v2(knob_size)), ColorWhite);
+// 	} else {
+// 		ui_draw_rect(rng2_make(pos + v2(padding) + v2(0,ypos), v2(knob_size)), rgba_from_u32(0xaaaaaa));
+// 	}
+
+// 	if(g.kbditem == id) {;
+// 		if(g.tab) {
+// 			g.kbditem = 0;
+// 			if(os_key_modifiers() & OS_Modifier_Shift) {
+// 				g.kbditem = g.last_widget;
+// 			}
+// 			g.tab = false;
+// 		}
+// 		if(g.up) {
+// 			if(value > 0) {
+// 				--value;
+// 				return true;
+// 			}
+// 			g.up = false;
+// 		}
+// 		if(g.down) {
+// 			if(value < max) {
+// 				value++;
+// 				return true;
+// 			}
+// 			g.down = false;
+// 		}
+// 	}
+// 	g.last_widget = id;
+
+// 	if(g.activeitem == id) {
+// 		i32 mousepos = Clamp(0, os_mouse_pos().y - (pos.y + padding), track_height-1);
+// 		i32 v = remap(mousepos, track_height-1, max);
+// 		if(v != value) {
+// 			value = v;
+// 			return 1;
+// 		}
+// 	}
+
+// 	return 0;
+// }
+
+// void ui_begin() {
+// 	var& g = st->ui;
+// 	g.mouse_down = os_mouse_is_button_down(MouseButton_Left);
+// 	g.hotitem = 0;
+// 	g.enter = os_key_is_down(Key_Enter);
+// 	g.tab = os_key_is_down(Key_Tab);
+// 	g.down = os_key_is_down(Key_Down);
+// 	g.up = os_key_is_down(Key_Up);
+// }
+
+// void ui_end() {
+// 	var& g = st->ui;
+// 	if(g.activeitem == 0 && g.mouse_down) {
+// 		g.activeitem = -1;
+// 	} else {
+// 		g.activeitem = 0;
+// 	}
+// 	if(g.tab) {
+// 		g.kbditem = 0;
+// 	}
+// 	g.enter = false;
+// 	g.tab = false;
+// 	g.down = false;
+// 	g.up = false;
+// }

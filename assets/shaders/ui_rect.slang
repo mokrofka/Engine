@@ -44,7 +44,6 @@ FS_Entry v4 fs_main(UI_VSOutput in) {
 	// Font?
 	if(flag_has(in.flags, GpuUI_RectFlag_IsFont)) {
 		f32 r = textures[in.texture].Sample(samplers[1], in.uv).r;
-		if(r < 0.7) discard;
 		sample = r;
 	}
 	// Texture?

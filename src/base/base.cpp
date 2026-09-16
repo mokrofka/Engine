@@ -1,7 +1,8 @@
 #include "base_impl.h"
 
-Extern f32 time_dt;
-Extern f32 time_now;
+Global f32 time_dt;
+Global f32 time_now;
+Global u32 current_frame;
 
 ////////////////////////////////////////////////////////////////////////
 // Basic
@@ -89,10 +90,10 @@ void DebugTrap() { __builtin_debugtrap(); }
 ////////////////////////////////////////////////////////////////////////
 // Types
 
-void bitset_set(BitSet& bits, u64 idx)   { bits.words[idx >> 6] |= Bit(idx & 63); }
-void bitset_clear(BitSet& bits, u64 idx) { bits.words[idx >> 6] &= ~Bit(idx & 63); }
-b32 bitset_get(BitSet& bits, u64 idx)    { return (bits.words[idx >> 6] >> (idx & 63)) & 1; }
-u64 bitset_word_count(BitSet& bits)      { return (bits.bit_count + 63) / 64; }
+void bit_array_set(BitArrayD& bits, u64 idx)   { bits.words[idx >> 6] |= Bit(idx & 63); }
+void bit_array_clear(BitArrayD& bits, u64 idx) { bits.words[idx >> 6] &= ~Bit(idx & 63); }
+b32 bit_array_get(BitArrayD& bits, u64 idx)    { return (bits.words[idx >> 6] >> (idx & 63)) & 1; }
+u64 bit_array_word_count(BitArrayD& bits)      { return (bits.bit_count + 63) / 64; }
 
 RingBuffer ring_make(void* base, u64 size) {
 	RingBuffer res = {

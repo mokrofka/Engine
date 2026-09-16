@@ -292,6 +292,7 @@ f32 norm(f32 min, f32 x, f32 max);
 f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
 f32 remap(f32 x, f32 old_max, f32 new_max);
 f64 remap(f64 x, f64 old_min, f64 old_max, f64 new_min, f64 new_max);
+f32 remap(f64 x, f64 old_max, f64 new_max);
 f32 remap_clamp(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
 f32 approach(f32 from, f32 to, f32 step);
 
@@ -652,6 +653,9 @@ f32 rng1_clamp(Rng1 r, f32 v);
 
 f32 rng1_lerp(Rng1 r, f32 t);
 f32 rng1_unlerp(Rng1 r, f32 x);
+f32 rng1_remap(f32 x, Rng1 from, Rng1 to);
+Rng1 rng1_subrng(Rng1 r, Rng1 sub);
+Rng1 rng1_subrng01(Rng1 r, Rng1 sub);
 
 ///////////////////////////////////
 // Dim2
@@ -670,17 +674,31 @@ Rng2 rng2_union(Rng2 a, Rng2 b);
 Rng2 rng2_intersect(Rng2 a, Rng2 b);
 b32 rng2_overlaps(Rng2 a, Rng2 b);
 v2 rng2_clamp(Rng2 r, v2 x);
+Rng1 rng2_rng_x(Rng2 r);
+Rng1 rng2_rng_y(Rng2 r);
 
+Rng2 rng2_lerp(Rng2 a, f32 t, Rng2 b);
+v2 rng2_remap(v2 p, Rng2 from, Rng2 to);
+Rng2 rng2_remap_rng(Rng2 r, Rng2 from, Rng2 to);
 Rng2 rng2_make(v2 min, v2 size);             
 Rng2 rng2_make_centered(v2 pos, v2 halfdim); 
 Rng2 rng2_scale_centered(Rng2 r, v2 scale);  
 Rng2 rng2_scale(Rng2 r, v2 scale);           
-
 Rng2 rng2_subrng_x(Rng2 r, Rng1 x);
 Rng2 rng2_subrng_y(Rng2 r, Rng1 y);
 Rng2 rng2_subrng_x01(Rng2 r, Rng1 sub);
 Rng2 rng2_subrng_y01(Rng2 r, Rng1 sub);
+Rng2 rng2_cut_left(Rng2* r, f32 amount);
+Rng2 rng2_cut_right(Rng2* r, f32 amount);
+Rng2 rng2_cut_top(Rng2* r, f32 amount);
+Rng2 rng2_cut_bottom(Rng2* r, f32 amount);
+void rng2_split_x(Rng2 r, f32 t, Rng2* left, Rng2* right);
+void rng2_split_y(Rng2 r, f32 t, Rng2* top, Rng2* bottom);
+Rng2 rng2_col(Rng2 r, i32 idx, i32 count);
+Rng2 rng2_row(Rng2 r, i32 idx, i32 count);
+Rng2 rng2_grid_cell(Rng2 r, i32 row, i32 col, i32 rows, i32 cols);
 Rng2 rng2_align_dim_at_center(Rng2 r, v2 size);
+Rng2 rng2_aspect_fit(Rng2 r, Rng2 fit);
 
 ///////////////////////////////////
 // Dim3

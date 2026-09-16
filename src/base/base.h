@@ -99,7 +99,7 @@ typedef va_list VaList;
 #define intern static
 #define global static
 #define local  static
-#define Extern
+#define Global
 
 const u64 U8_MAX  = 0xFF;
 const u64 U16_MAX = 0xFFFF;
@@ -557,6 +557,11 @@ template<typename T, typename Err = b32> struct ResultErr {
 ////////////////////////////////////////////////////////////////////////
 // Types
 
+typedef u32 Futex;
+struct Mutex { Futex futex; };
+struct CondVar { Futex futex; };
+struct Semaphore { Futex futex; };
+
 const u32 DEFAULT_CAPACITY = 8;
 const u32 DEFAULT_RESIZE_FACTOR = 2;
 
@@ -568,31 +573,25 @@ const u32 DEFAULT_RESIZE_FACTOR = 2;
 		u32 gen;        \
 	};
 
-struct BitSet {
+struct BitArrayD {
 	u64* words;
 	u64 bit_count;
 };
 
-void bitset_set(BitSet& bits, u64 idx);
-void bitset_clear(BitSet& bits, u64 idx);
-b32 bitset_get(BitSet& bits, u64 idx);
-u64 bitset_word_count(BitSet& bits);
+void bit_array_set(BitArrayD& bits, u64 idx);
+void bit_array_clear(BitArrayD& bits, u64 idx);
+b32 bit_array_get(BitArrayD& bits, u64 idx);
+u64 bit_array_word_count(BitArrayD& bits);
 
-template<i32 N> struct BitSetS {
+template<i32 N> struct BitArray {
 	u64 words[N];
 	u64 bit_count;
 };
 
-template<i32 N> void bitset_set(BitSetS<N>& bits, u64 idx)   { bits.words[idx >> 6] |= Bit(idx & 63); }
-template<i32 N> void bitset_clear(BitSetS<N>& bits, u64 idx) { bits.words[idx >> 6] &= ~Bit(idx & 63); }
-template<i32 N> b32 bitset_get(BitSetS<N>& bits, u64 idx)    { return (bits.words[idx >> 6] >> (idx & 63)) & 1; }
-template<i32 N> u64 bitset_word_count(BitSetS<N>& bits)      { return (bits.bit_count + 63) / 64; }
-
-template<i32 N> struct BitSetIter {
-	BitSetS<N>* bits;
-	u64 word_i;
-	u64 word;
-};
+template<i32 N> void bit_array_set(BitArray<N>& bits, u64 idx)   { bits.words[idx >> 6] |= Bit(idx & 63); }
+template<i32 N> void bit_array_clear(BitArray<N>& bits, u64 idx) { bits.words[idx >> 6] &= ~Bit(idx & 63); }
+template<i32 N> b32 bit_array_get(BitArray<N>& bits, u64 idx)    { return (bits.words[idx >> 6] >> (idx & 63)) & 1; }
+template<i32 N> u64 bit_array_word_count(BitArray<N>& bits)      { return (bits.bit_count + 63) / 64; }
 
 struct Region {
 	union {
@@ -768,6 +767,7 @@ f32x4 simd_clamp01(f32x4 x);
 
 extern f32 time_dt;
 extern f32 time_now;
+extern u32 current_frame;
 
 // #define X(a, ...) X_IMPL(a, ##__VA_ARGS__, 3)
 // #define X_IMPL(a, value, ...) x_foo(a, value)

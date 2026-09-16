@@ -35,7 +35,7 @@ f32 delta_time;
 global OS_State st;
 
 void entry_point();
-intern LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARAM l_param);
+LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARAM l_param);
 
 KAPI void os_init() {
   global_allocator_init();
@@ -441,7 +441,7 @@ void os_process_create(String cmd) {
 ///////////////////////////////////////////////////////////////////////////
 // WinProc
 LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-intern LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARAM l_param) {
+LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARAM l_param) {
   ImGui_ImplWin32_WndProcHandler(hwnd, msg, w_param, l_param);
   
   switch(msg) {

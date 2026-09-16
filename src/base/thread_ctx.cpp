@@ -3,7 +3,7 @@
 global thread_local TCTX tctx;
 global u32 _next_thread_id;
 
-u32 tctx_get_id() { return tctx.id; }
+u32 tctx_id() { return tctx.id; }
 
 void tctx_init() {
 	tctx.arenas[0] = arena_make();
@@ -11,12 +11,12 @@ void tctx_init() {
 	tctx.id = atomic_inc(&_next_thread_id);
 }
 
-intern Temp tctx_get_scratch() {
+Temp tctx_get_scratch() {
 	Arena* arena = &tctx.arenas[0];
 	return temp_begin(arena);
 }
 
-intern Temp tctx_get_scratch_conflict(Allocator conflict) {
+Temp tctx_get_scratch_conflict(Allocator conflict) {
 	Arena* arena_conflict = (Arena*)conflict.ctx;
 	Arena* arena_result = {};
 	if(arena_conflict == &tctx.arenas[0]) {

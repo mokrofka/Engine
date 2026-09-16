@@ -16,7 +16,8 @@
 // thread safe allocator
 // glb loader
 // obj mouse selection
-// play around atomic queues, futex
+// profiler
+
 
 #define MESH_LIST \
 	X(Cube) \
@@ -29,13 +30,6 @@
 	X(GreeMan) \
 	X(Barrack) \
 
-enum MeshEnum {
-#define X(name) Glue(Mesh_, name),
-	MESH_LIST
-#undef X
-	Mesh_COUNT,
-};
-
 #define TEXTURE_LIST \
 	X(Dummy) \
 	X(Orange) \
@@ -46,13 +40,6 @@ enum MeshEnum {
 	X(Black2) \
 	X(Bricks) \
 
-enum TextureEnum {
-#define X(name) Glue(Texture_, name),
-	TEXTURE_LIST
-#undef X
-	Texture_COUNT,
-};
-
 #define MATERIAL_LIST \
 	X(Dummy) \
 	X(Orange) \
@@ -60,6 +47,20 @@ enum TextureEnum {
 	X(Axis) \
 	X(Line) \
 	X(Barrack) \
+
+enum MeshEnum {
+#define X(name) Glue(Mesh_, name),
+	MESH_LIST
+#undef X
+	Mesh_COUNT,
+};
+
+enum TextureEnum {
+#define X(name) Glue(Texture_, name),
+	TEXTURE_LIST
+#undef X
+	Texture_COUNT,
+};
 
 enum MaterialEnum {
 #define X(name) Glue(Material_, name),
@@ -139,29 +140,9 @@ struct ProfColors {
 	v4 mem_cap;
 };
 
-struct ProfWindow {
-	DebugWindow win;
-	ScrollState root_scroll_state;
-	ScrollState frames_scroll_state;
-	ScrollState launch_time_scroll_state;
-	ScrollState mem_scroll_state;
-	ProfTabActive active_tab;
-	ProfTabActive future_active_tab;
-	f32 frame_avg_time;
-	f32 frame_min_time;
-	f32 frame_max_time;
-	ProfColors colors;
-};
-
-struct DebugState {
-	ProfWindow prof_win;
-	DebugWindow game_win;
-	b32 imgui_demo_open;
-	ImFont* font;
-};
-
-struct ImGui_DrawList {
-	ImDrawList* draw;
+struct ImGuiImage {
+	ImTextureRef h;
+	b32 loaded;
 };
 
 enum JsType {
@@ -313,19 +294,6 @@ Introspect struct Thing {
 	f32 angle;
 };
 
-// struct UI_State {
-// 	u32 hotitem;
-// 	u32 activeitem;
-// 	b32 mouse_down;
-
-// 	u32 kbditem;
-// 	u32 last_widget;
-// 	b32 tab;
-// 	b32 enter;
-// 	b32 up;
-// 	b32 down;
-// };
-
 typedef u32 ThingState;
 enum {
 	ThingState_OnFire = Bit(0),
@@ -337,7 +305,6 @@ struct GlobalState {
 	Arena arena;
 	Arena frame_arena;
 	Alloc gpa;
-	u32 current_frame;
 	b32 should_hotreload;
 	m4x4 view;
 	m4x4 projection;
@@ -364,9 +331,22 @@ struct GlobalState {
 	InputState input;
 	R_State r;
 	Gfx_State gfx;
-	DebugState debug;
 	UI_State ui;
-	// UI_State0* ui0;
+
+	struct {
+		DebugWindow win;
+		ScrollState root_scroll_state;
+		ScrollState frames_scroll_state;
+		ScrollState launch_time_scroll_state;
+		ScrollState mem_scroll_state;
+		ProfTabActive active_tab;
+		f32 frame_avg_time;
+		f32 frame_min_time;
+		f32 frame_max_time;
+		ProfColors colors;
+	} prof_win;
+	DebugWindow game_win;
+	b32 imgui_demo_open;
 
 	Camera cam;
 	R_Camera r_cam;
@@ -395,6 +375,7 @@ struct GlobalState {
 	v3 pos_target;
 
 	Coroutine co;
+	ImTextureID imgui_dummy;
 };
 
 extern GlobalState* st;
@@ -431,26 +412,22 @@ f64 time_until(f64 timestamp);
 // void ui_begin();
 // void ui_end();
 
-ImGui_DrawList imgui_get_window_drawlist();
-void imgui_draw_rect(ImGui_DrawList draw, Rng2 rect, v4 col, f32 rounding = 0, ImDrawFlags flags = 0, f32 thickness = 1);
-void imgui_draw_rect_filled(ImGui_DrawList draw, Rng2 rect, v4 col, f32 rounding = 0, ImDrawFlags flags = 0);
-void imgui_draw_push_clip_rect(ImGui_DrawList draw, Rng2 rect);
-void imgui_draw_pop_clip_rect(ImGui_DrawList draw);
-void imgui_draw_line(ImGui_DrawList draw, v2 p0, v2 p1, v4 col, f32 thickness = 1);
-void imgui_draw_text(ImGui_DrawList draw, v2 pos, v4 col, String fmt, ...);
-void imgui_draw_text(ImGui_DrawList draw, ImFont* font, f32 font_size, v2 pos, v4 col, String fmt, ...);
+void imgui_draw_rect(ImDrawList* draw, Rng2 rect, v4 col, f32 rounding = 0, ImDrawFlags flags = 0, f32 thickness = 1);
+void imgui_draw_rect_filled(ImDrawList* draw, Rng2 rect, v4 col, f32 rounding = 0, ImDrawFlags flags = 0);
+void imgui_draw_push_clip_rect(ImDrawList* draw, Rng2 rect);
+void imgui_draw_pop_clip_rect(ImDrawList* draw);
+void imgui_draw_line(ImDrawList* draw, v2 p0, v2 p1, v4 col, f32 thickness = 1);
+void imgui_draw_text(ImDrawList* draw, v2 pos, v4 col, String fmt, ...);
+void imgui_draw_text(ImDrawList* draw, f32 font_size, v2 pos, v4 col, String fmt, ...); struct ImGuiDrawText_Params {f32 font_size; v2 pos; v4 col = ColorWhite;};
 void imgui_text(String fmt, ...);
 v2 imgui_calc_text_size(String str);
-void imgui_begin_tab_item(String str);
 
 Rng2 debug_window_get_rect(DebugWindow win);
 void debug_window_apply_state(DebugWindow& win);
 void debug_window_track_state(DebugWindow& win);
 void debug_window_toggle_fullscreen(DebugWindow& win);
-void debug_init();
-void debug_update();
-void debug_game();
-void debug_prof_view();
+void ui_dev_init();
+void ui_dev_update();
 
 R_MeshDesc load_obj(Allocator arena, String name);
 R_MeshDesc load_gltf(Allocator arena, String path, b32 is_glb);

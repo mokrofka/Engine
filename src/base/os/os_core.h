@@ -65,11 +65,6 @@ struct RWMutex { u64 v; };
 // struct CondVar { u64 v; };
 struct Barrier { u64 v; };
 
-typedef u32 Futex;
-struct Mutex { Futex futex; };
-struct CondVar { Futex futex; };
-struct Semaphore { Futex futex; };
-
 struct _LockScope {
 	Mutex& mutex;
 	_LockScope(Mutex& mutex_);

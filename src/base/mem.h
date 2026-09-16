@@ -97,6 +97,7 @@ struct ArenaParams {
 	u32 line;
 	u64 reserve_size;
 	u64 commit_size;
+	b32 lock;
 };
 
 struct Arena {
@@ -107,6 +108,8 @@ struct Arena {
 	u64 pos;
 	u64 cmt;
 	u64 cap;
+	b32 lock;
+	Mutex mutex;
 	operator Allocator();
 };
 
@@ -157,6 +160,7 @@ struct AllocParams {
 	String name;
 	String file;
 	u32 line;
+	b32 lock;
 };
 
 struct Alloc {
@@ -165,6 +169,8 @@ struct Alloc {
 #endif
 	Allocator alloc;
 	MemNode pools[32];
+	b32 lock;
+	Mutex mutex;
 	operator Allocator();
 };
 
