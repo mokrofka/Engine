@@ -98,7 +98,7 @@ struct Glue(Gpu, SpotLight) {
 	f32 outer_cutoff;
 };
 
-global const u32 GpuUI_RectFlag_IsFont = Bit(0);
+global const u32 GpuUI_RectFlag_IsFont = 1<<0;
 
 struct Glue(Gpu, UI_Rect) {
 	alignas(8) v2 dst_p0;

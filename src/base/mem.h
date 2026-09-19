@@ -1,7 +1,6 @@
 #pragma once
 #include "base.h"
 
-#define MEM_TRACK 1
 
 const u32 MEM_DEFAULT_ALIGNMENT = sizeof(void*);
 
@@ -28,8 +27,8 @@ u8*  mem_realloc(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 ali
 u8*  mem_realloc_zero(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 align = MEM_DEFAULT_ALIGNMENT);
 void mem_free(Allocator alloc, void* ptr, u64 size);
 
-template<typename T> T* mem_realloc_array(Allocator a, T* ptr, u32 old_c, u32 c)      { return (T*)mem_realloc(a, ptr, sizeof(T)*old_c, sizeof(T)*c, alignof(T)); }
-template<typename T> T* mem_realloc_array_zero(Allocator a, T* ptr, u32 old_c, u32 c) { return (T*)mem_realloc_zero(a, ptr, sizeof(T)*old_c, sizeof(T)*c, alignof(T)); }
+#define mem_realloc_array(a, ptr, old_c, c)      (decltype(ptr))mem_realloc((a), (ptr), sizeof(*(ptr))*(old_c), sizeof(*(ptr))*(c), alignof(*(ptr)))
+#define mem_realloc_array_zero(a, ptr, old_c, c) (decltype(ptr))mem_realloc_zero((a), (ptr), sizeof(*(ptr))*(old_c), sizeof(*(ptr))*(c), alignof(*(ptr)))
 
 #define push_buffer(a, z, ...)           mem_alloc(a,      z, ##__VA_ARGS__)
 #define push_buffer_zero(a, z, ...)      mem_alloc_zero(a, z, ##__VA_ARGS__)
@@ -121,10 +120,6 @@ void  arena_clear(Arena& arena);
 struct Temp {
 	Arena* arena;
 	u64 pos;
-
-#if MEM_TRACK
-	u64 temp_exclusive_pos;
-#endif
 };
 
 Temp temp_begin(Arena* arena);
@@ -236,12 +231,7 @@ u8* mem_realloc_soa(Allocator alloc, u32 old_count, u32 new_count, Slice<SoA_Fie
 u8* mem_alloc_soa_zero(Allocator alloc, u32 count, Slice<SoA_Field> fields);
 u8* mem_realloc_soa_zero(Allocator alloc, u32 old_count, u32 new_count, Slice<SoA_Field> fields);
 
-u8* offset_ptr_push(void*& offset, u64 size, u64 align = 1);
-#define offset_ptr_push_struct(a, T)  (T*)offset_ptr_push(a, sizeof(T), alignof(T))
-#define offset_ptr_push_array(a, T, c)(T*)offset_ptr_push(a, sizeof(T)*(c), alignof(T))
 u64 offset_push(u64& offset, u64 size, u64 align = 1);
-#define offset_push_struct(a, T)          offset_push(a, sizeof(T), alignof(T))
-#define offset_push_array(a, T, c)        offset_push(a, sizeof(T)*(c), alignof(T))
 
 struct MemFormatSize {
 	String format;

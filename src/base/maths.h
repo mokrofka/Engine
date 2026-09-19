@@ -11,8 +11,6 @@ const f32 MachineEpsilon = 1.1920929e-7f;
 
 f32 deg2rad(f32 degrees);
 f32 rad2deg(f32 radians);
-f32 Rad(f32 deg);
-f32 Deg(f32 rad);
 
 ///////////////////////////////////
 // v2
@@ -243,7 +241,7 @@ u32 u32_from_rgba(v4 rgba);
 
 ////////////////////////////////////////////////////////////////////////
 // Hash
-#define HASH_DEFAULT_SEED 0x9E3779B97F4A7C15ULL
+#define HASH_DEFAULT_SEED 0x9E3779B97F4A7C15ull
 
 u64 squirrel3(u64 x);
 u32 xorshift32(u32 x);
@@ -274,6 +272,7 @@ template<typename T> void rand_shuffle(Slice<T> data) {
 		Swap(data[i], data[j]);
 	}
 }
+template<typename T> T rand_choice(Slice<T> s) { return s[rand_u32()%s.count]; }
 
 ////////////////////////////////////////////////////////////////////////
 // Misc
@@ -587,7 +586,7 @@ m4x4 m4x4_identity();
 m4x4 m4x4_translate(v3 pos);
 m4x4 m4x4_scale(v3 scale);
 m4x4 m4x4_scale_translate(v3 scale, v3 pos);
-m4x4 m4x4_transform(v3 scale, v3 pos, v4 q);
+m4x4 m4x4_transform(v3 pos, v3 scale, v4 q);
 m4x4 m4x4_scale_all_elements(m4x4 mat, f32 scale);
 m4x4 m4x4_rotate_x(f32 rad);
 m4x4 m4x4_rotate_y(f32 rad);
@@ -656,6 +655,7 @@ f32 rng1_unlerp(Rng1 r, f32 x);
 f32 rng1_remap(f32 x, Rng1 from, Rng1 to);
 Rng1 rng1_subrng(Rng1 r, Rng1 sub);
 Rng1 rng1_subrng01(Rng1 r, Rng1 sub);
+f32 rng1_align_center(Rng1 r, f32 size);
 
 ///////////////////////////////////
 // Dim2
@@ -665,6 +665,7 @@ f32 rng2u_height(Rng2u r);
 
 Rng2 rng2_shift(Rng2 r, v2 x);
 Rng2 rng2_pad(Rng2 r, f32 x);
+Rng2 rng2_pad(Rng2 r, v2 x);
 v2 rng2_center(Rng2 r);
 b32 rng2_contains(Rng2 r, v2 x);
 v2 rng2_dim(Rng2 r);
@@ -699,6 +700,13 @@ Rng2 rng2_row(Rng2 r, i32 idx, i32 count);
 Rng2 rng2_grid_cell(Rng2 r, i32 row, i32 col, i32 rows, i32 cols);
 Rng2 rng2_align_dim_at_center(Rng2 r, v2 size);
 Rng2 rng2_aspect_fit(Rng2 r, Rng2 fit);
+Rng2 rng2_top(Rng2 r, f32 height);
+Rng2 rng2_bottom(Rng2 r, f32 height);
+Rng2 rng2_left(Rng2 r, f32 width);
+Rng2 rng2_right(Rng2 r, f32 width);
+
+// void view2_pan(View2 *v, v2 data_delta);
+// void view2_zoom(View2 *v, v2 data_center, v2 factor);
 
 ///////////////////////////////////
 // Dim3

@@ -1,13 +1,11 @@
-#include "base_impl.h"
+#include "lib.h"
 
 global thread_local u64 _seed = HASH_DEFAULT_SEED;
 
 v2::v2(const v2u& v):x(v.x),y(v.y){}
 
-f32 deg2rad(f32 degrees) { return degrees * PI / 180.0f; }
-f32 rad2deg(f32 radians) { return radians * 180.0f / PI; }
-f32 Rad(f32 deg) { return deg * PI / 180.0f; }
-f32 Deg(f32 rad) { return rad * 180.0f / PI; }
+f32 deg2rad(f32 degrees) { return degrees * PI / 180.f; }
+f32 rad2deg(f32 radians) { return radians * 180.f / PI; }
 
 f32 Sin(f32 x)                         { return __builtin_sinf(x); }
 f32 Cos(f32 x)                         { return __builtin_cosf(x); }
@@ -38,30 +36,31 @@ f32 round_to(f32 x, f32 step) { return Round(x / step) * step; }
 // Color
 
 v4 rgba_from_u32(u32 hex) {
-	v4 result = v4(((hex >>  0) & 0xff) / 255.f,
-																((hex >>  8) & 0xff) / 255.f,
-																((hex >> 16) & 0xff) / 255.f,
-																((hex >> 24) & 0xff) / 255.f);
-	return result;
+	v4 res = v4(
+		((hex >> 0) & 0xff) / 255.f,
+		((hex >> 8) & 0xff) / 255.f,
+		((hex >> 16) & 0xff) / 255.f,
+		((hex >> 24) & 0xff) / 255.f);
+	return res;
 }
 u32 u32_from_rgba(v4 rgba) {
-	u32 result = 0;
-	result |= ((u32)((u8)(rgba.x*255.f))) <<  0;
-	result |= ((u32)((u8)(rgba.y*255.f))) <<  8;
-	result |= ((u32)((u8)(rgba.z*255.f))) << 16;
-	result |= ((u32)((u8)(rgba.w*255.f))) << 24;
-	return result;
+	u32 res =
+		((u32)((u8)(rgba.x * 255.f))) << 0 |
+		((u32)((u8)(rgba.y * 255.f))) << 8 |
+		((u32)((u8)(rgba.z * 255.f))) << 16 |
+		((u32)((u8)(rgba.w * 255.f))) << 24;
+	return res;
 }
 
 ////////////////////////////////////////////////////////////////////////
 // Hash
 
 u64 squirrel3(u64 x) {
-	x *= 0X9e3779b185ebca87ULL;
+	x *= 0X9e3779b185ebca87ull;
 	x ^= x >> 8;
-	x += 0Xc2b2ae3d27d4eb4fULL;
+	x += 0Xc2b2ae3d27d4eb4full;
 	x ^= x << 8;
-	x *= 0X27d4eb2f165667c5ULL;
+	x *= 0X27d4eb2f165667c5ull;
 	x ^= x >> 8;
 	return x;
 }
@@ -148,7 +147,7 @@ u32 rand_u32_rng(u32 min, u32 max)          { return (rand_u32() % (max - min + 
 i32 rand_i32()                              { return rand_u32(); }
 i32 rand_i32_rng(i32 min, i32 max)          { return (i32)(rand_u32() % (u32)(max - min + 1)) + min; }
 f32 rand_f32_01()                           { return rand_u32() / (f32)U32_MAX; }
-f32 rand_f32_11()                           { return rand_f32_01()*2.0f - 1.0f; }
+f32 rand_f32_11()                           { return rand_f32_01()*2.f - 1.f; }
 f32 rand_f32()                              { return rand_f32_01()*2*U16_MAX - U16_MAX; }
 f32 rand_f32_rng(f32 min, f32 max)          { return rand_f32_01()*(max - min) + min ; }
 f32 rand_f32_centered(f32 base, f32 radius) { return rand_f32_rng(base-radius, base+radius); }
@@ -267,16 +266,16 @@ v3  v2_to_v3(v2 v, f32 a)           { return v3(v.x, v.y, a); }
 v4  v2_to_v4(v2 v, f32 a, f32 b)    { return v4(v.x, v.y, a, b); }
 v2  v2_of_v2i(v2i v)                { return v2(v.x, v.y); }
 v2  v2_of_v2u(v2u v)                { return v2(v.x, v.y); }
-v2  v2_up()                         { return v2(0.0f, 1.0f); }
-v2  v2_down()                       { return v2(0.0f, -1.0f); }
-v2  v2_left()                       { return v2(-1.0f, 0.0f); }
-v2  v2_right()                      { return v2(1.0f, 0.0f); }
+v2  v2_up()                         { return v2(0, 1); }
+v2  v2_down()                       { return v2(0, -1); }
+v2  v2_left()                       { return v2(-1, 0); }
+v2  v2_right()                      { return v2(1, 0); }
 v2  v2_abs(v2 v)                    { return v2(Abs(v.x), Abs(v.y)); }
 v2  v2_min(v2 a, v2 b)              { return v2(Min(a.x,b.x), Min(a.y,b.y)); }
 v2  v2_max(v2 a, v2 b)              { return v2(Max(a.x,b.x), Max(a.y,b.y)); }
 v2  v2_clamp(v2 min, v2 v, v2 max)  { return v2(Clamp(min.x, v.x, max.x), Clamp(min.y, v.y, max.y)); }
 v2  v2_sign(v2 v)                   { return v2(Sign(v.x), Sign(v.y)) ; }
-v2  v2_invert(v2 v)                 { return v2(1.0f/v.x, 1.0f/v.y); }
+v2  v2_invert(v2 v)                 { return v2(1/v.x, 1/v.y); }
 v2b v2_greater(v2 a, v2 b)          { return v2b(a.x>b.x, a.y>b.y); }
 v2b v2_less(v2 a, v2 b)             { return v2b(a.x<b.x, a.y<b.y); }
 b32 v2_greater_all(v2 a, v2 b)      { return a.x>b.x && a.y>b.y; }
@@ -287,7 +286,7 @@ v2  v2_rand_rng(v2 a, v2 b)         { return v2(rand_f32_rng(a.x, b.x), rand_f32
 
 f32 v2_length(v2 v)                             { return Sqrt(v2_length_sqr(v)); }
 f32 v2_length_sqr(v2 v)                         { return Square(v.x) + Square(v.y); }
-v2  v2_norm(v2 v)                               { return v * (1.0f/v2_length(v)); }
+v2  v2_norm(v2 v)                               { return v * (1/v2_length(v)); }
 f32 v2_distance(v2 a, v2 b)                     { return v2_length(a - b); }
 f32 v2_distance_sqr(v2 a, v2 b)                 { return v2_length_sqr(a - b); }
 f32 v2_dot(v2 a, v2 b)                          { return a.x*b.x + a.y*b.y; }
@@ -323,7 +322,7 @@ v2 v2_approach(v2 current, v2 target, f32 step) {
 v2 v2_clamp_length(f32 min, v2 v, f32 max) {
 	v2 res = v;
 	f32 len = v2_length_sqr(v);
-	if(len > 0.0f) {
+	if(len > 0) {
 		len = Sqrt(len);
 		f32 scale = 1;
 		if(len < min) scale = min/len;
@@ -354,18 +353,18 @@ b32 operator==(v3u a, v3u b)       { return a.x == b.x && a.y == b.y && a.z == b
 
 v3  v3_of_v4(v4 v)                  { return v3(v.x, v.y, v.z); }
 v4  v3_to_v4(v3 v, f32 a)           { return v4(v.x, v.y, v.z, a); }
-v3  v3_up()                         { return v3(0.0f, 1.0f, 0.0f); }
-v3  v3_down()                       { return v3(0.0f, -1.0f, 0.0f); }
-v3  v3_left()                       { return v3(-1.0f, 0.0f, 0.0f); }
-v3  v3_right()                      { return v3(1.0f, 0.0f, 0.0f); }
-v3  v3_forward()                    { return v3(0.0f, 0.0f, 1.0f); }
-v3  v3_back()                       { return v3(0.0f, 0.0f, -1.0f); }
+v3  v3_up()                         { return v3(0, 1, 0); }
+v3  v3_down()                       { return v3(0, -1, 0); }
+v3  v3_left()                       { return v3(-1, 0, 0); }
+v3  v3_right()                      { return v3(1, 0, 0); }
+v3  v3_forward()                    { return v3(0, 0, 1); }
+v3  v3_back()                       { return v3(0, 0, -1); }
 v3  v3_abs(v3 v)                    { return v3(Abs(v.x), Abs(v.y), Abs(v.z)); }
 v3  v3_min(v3 a, v3 b)              { return v3(Min(a.x,b.x), Min(a.y,b.y), Min(a.z,b.z)); }
 v3  v3_max(v3 a, v3 b)              { return v3(Max(a.x,b.x), Max(a.y,b.y), Max(a.z,b.z)); }
 v3  v3_clamp(v3 min, v3 v, v3 max)  { return v3(Clamp(min.x, v.x, max.x), Clamp(min.y, v.y, max.y), Clamp(min.z, v.z, max.z)); }
 v3  v3_sign(v3 v)                   { return v3(Sign(v.x), Sign(v.y), Sign(v.z)); }
-v3  v3_invert(v3 v)                 { return v3(1.0f/v.x, 1.0f/v.y, 1.0f/v.z); }
+v3  v3_invert(v3 v)                 { return v3(1/v.x, 1/v.y, 1/v.z); }
 b32 v3_equal(v3 a, v3 b)            { return a.x == b.x && a.y == b.y && a.z == b.z; }
 v3b v3_greater(v3 a, v3 b)          { return v3b(a.x>b.x, a.y>b.y, a.z>b.z); }
 v3b v3_less(v3 a, v3 b)             { return v3b(a.x<b.x, a.y<b.y, a.z<b.z); }
@@ -745,11 +744,11 @@ m2x2 operator*(m2x2 a, m2x2 b) {
 m2x2& operator*=(m2x2& a, m2x2 b) { return a = b * a; }
 
 v2 operator*(m2x2 mat, v2 v) {
-	v2 result = {
+	v2 res = {
 		mat.v[0][0]*v.x + mat.v[1][0]*v.y,
 		mat.v[0][1]*v.x + mat.v[1][1]*v.y,
 	};
-	return result;
+	return res;
 }
 
 m2x2 m2x2_identity() {
@@ -1189,13 +1188,13 @@ m4x4 operator*(m4x4 a, m4x4 b) {
 m4x4& operator*=(m4x4& a, m4x4 b) { return a = b * a; }
 
 v4 operator*(m4x4 mat, v4 v) {
-	v4 result = {
+	v4 res = {
 		mat.v[0][0]*v.x + mat.v[0][1]*v.y + mat.v[0][2]*v.z + mat.v[0][3]*v.w,
 		mat.v[1][0]*v.x + mat.v[1][1]*v.y + mat.v[1][2]*v.z + mat.v[1][3]*v.w,
 		mat.v[2][0]*v.x + mat.v[2][1]*v.y + mat.v[2][2]*v.z + mat.v[2][3]*v.w,
 		mat.v[3][0]*v.x + mat.v[3][1]*v.y + mat.v[3][2]*v.z + mat.v[3][3]*v.w,
 	};
-	return result;
+	return res;
 }
 
 m4x4 m4x4_identity() {
@@ -1238,7 +1237,7 @@ m4x4 m4x4_scale_translate(v3 scale, v3 pos) {
 	return res;
 }
 
-m4x4 m4x4_transform(v3 scale, v3 pos, v4 q) {
+m4x4 m4x4_transform(v3 pos, v3 scale, v4 q) {
 	m4x4 r = m4x4_from_quat(q);
 	r.v[0][0] *= scale.x;
 	r.v[0][1] *= scale.x;
@@ -1310,10 +1309,7 @@ m4x4 m4x4_rotate_xyz(v3 rad) {
 }
 
 m4x4 m4x4_rotate_around_axis(v3 axis, f32 rad) {
-	f32 len_sqr = v3_length_sqr(axis);
-	if((len_sqr != 1.0f) && (len_sqr != 0.0f)) {
-		axis = v3_norm(axis);
-	}
+	axis = v3_norm(axis);
 	f32 sine;
 	f32 cosine;
 	SinCos(rad, &sine, &cosine);
@@ -1341,7 +1337,7 @@ m4x4 m4x4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 f
 // NOTE: I use camera looking at -Z direction since I found it's more intuitive
 m4x4 m4x4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far) {
 	f32 fov = Tan(fov_radians/2.0f);
-	// mat4 result = {
+	// mat4 res = {
 	//   1/(fov*aspect_ratio), 0,                       0,                    0,
 	//   0,                    1/fov,                   0,                    0,
 	//   0,                    0,                       Far/(Far-Near),       1,
@@ -1543,11 +1539,12 @@ Rng1 rng1_intersect(Rng1 a, Rng1 b)    { return Rng1(Max(a.min, b.min), Min(a.ma
 b32 rng1_overlaps(Rng1 a, Rng1 b)      { return a.min < b.max && b.min < a.max; }
 f32 rng1_clamp(Rng1 r, f32 x)          { return Clamp(r.min, x, r.max); }
 
-f32 rng1_lerp(Rng1 r, f32 t)         { return Lerp(r.min, t, r.max); } 
-f32 rng1_unlerp(Rng1 r, f32 x)       { return unlerp(r.min, x, r.max); }
+f32 rng1_lerp(Rng1 r, f32 t)         					{ return Lerp(r.min, t, r.max); } 
+f32 rng1_unlerp(Rng1 r, f32 x)       					{ return unlerp(r.min, x, r.max); }
 f32 rng1_remap(f32 x, Rng1 from, Rng1 to) { return remap(x, from.min,from.max, to.min,to.max); }
-Rng1 rng1_subrng(Rng1 r, Rng1 sub)   { return Rng1(r.min + sub.min, r.min+sub.min + rng1_dim(sub)); }
-Rng1 rng1_subrng01(Rng1 r, Rng1 sub) { f32 w = rng1_dim(r); return Rng1(r.min + w*sub.min, r.min + w*sub.max); }
+Rng1 rng1_subrng(Rng1 r, Rng1 sub)   					{ return Rng1(r.min + sub.min, r.min+sub.min + rng1_dim(sub)); }
+Rng1 rng1_subrng01(Rng1 r, Rng1 sub) 					{ f32 w = rng1_dim(r); return Rng1(r.min + w*sub.min, r.min + w*sub.max); }
+f32 rng1_align_center(Rng1 r, f32 size) 		{ return r.min + (rng1_dim(r) - size) / 2.f; }
 
 ///////////////////////////////////
 // Dim2
@@ -1555,8 +1552,9 @@ Rng1 rng1_subrng01(Rng1 r, Rng1 sub) { f32 w = rng1_dim(r); return Rng1(r.min + 
 f32 rng2u_width(Rng2u r) { return r.x1 - r.x0; }
 f32 rng2u_height(Rng2u r) { return r.y1 - r.y0; }
 
-Rng2 rng2_shift(Rng2 r, v2 x)       { return Rng2(r.min + x, r.max + x);}
-Rng2 rng2_pad(Rng2 r, f32 x)        { return Rng2(r.min - v2(x), r.max + v2(x));}
+Rng2 rng2_shift(Rng2 r, v2 x)       { return Rng2(r.min + x, r.max + x); }
+Rng2 rng2_pad(Rng2 r, f32 x)        { return Rng2(r.min - v2(x), r.max + v2(x)); }
+Rng2 rng2_pad(Rng2 r, v2 x)									{ return Rng2(r.min - x, r.max + x); }
 v2 rng2_center(Rng2 r)              { return v2((r.min + r.max)/2); }
 b32 rng2_contains(Rng2 r, v2 x)     { return (r.min.x <= x.x && x.x < r.max.x && r.min.y <= x.y && x.y < r.max.y); }
 v2 rng2_dim(Rng2 r)                 { return v2(r.max.x - r.min.x, r.max.y - r.min.y); }
@@ -1644,6 +1642,23 @@ Rng2 rng2_aspect_fit(Rng2 r, Rng2 fit) {
 	v2 size = v2(fd.x * scale, fd.y * scale);
 	return rng2_align_dim_at_center(r, size);
 }
+Rng2 rng2_top(Rng2 r, f32 height) {
+	Rng2 res = {r.min, {r.max.x, r.min.y + height}};
+	return res;
+}
+Rng2 rng2_bottom(Rng2 r, f32 height) {
+	Rng2 res = {{r.min.x, r.max.y - height}, r.max};
+	return res;
+}
+Rng2 rng2_left(Rng2 r, f32 width) {
+	Rng2 res = {r.min, {r.min.x + width, r.max.y}};
+	return res;
+}
+Rng2 rng2_right(Rng2 r, f32 width) {
+	Rng2 res = {{r.max.x - width, r.min.y}, r.max};
+	return res;
+}
+
 // NOTE: define prefix, postfix, skip, chop operations?
 
 ///////////////////////////////////

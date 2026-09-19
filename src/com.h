@@ -1,10 +1,13 @@
 #pragma once
 #include "lib.h"
-#include "tokenizer.h"
 #include "types.h"
 #include "gfx.h"
 #include "render.h"
-#include "ui.h"
+#include "meta.h"
+
+#define STBI_NO_STDIO
+#include "stb_image.h"
+#include "stb_truetype.h"
 
 // TODO:
 // dummy assets/null 
@@ -16,8 +19,7 @@
 // thread safe allocator
 // glb loader
 // obj mouse selection
-// profiler
-
+// gpu profiler, memory
 
 #define MESH_LIST \
 	X(Cube) \
@@ -69,26 +71,8 @@ enum MaterialEnum {
 	Material_COUNT,
 };
 
-enum MetaType {
-	MetaType_Null,
-	MetaType_u32,
-	MetaType_i32,
-	MetaType_b32,
-	MetaType_f32,
-	MetaType_v2,
-	MetaType_v3,
-	MetaType_v4,
-	MetaType_Rng2,
-	MetaType_Rng3,
-	MetaType_MeshId,
-	MetaType_MaterialId,
-	MetaType_RenderId,
-	MetaType_String,
-	MetaType_EntityFlags
-};
-
 struct MemberDefinition {
-	MetaType type;
+	u32 type;
 	String name;
 	u64 offset;
 };
@@ -202,12 +186,6 @@ struct WatchDirectory {
 	WatchOp op;
 };
 
-struct WatchState {
-	Allocator arena;
-	Array<WatchFile, 128> watches;
-	Array<WatchDirectory, 128> directories;
-};
-
 Introspect struct Camera {
 	v3 pos;
 	v3 dir;
@@ -254,29 +232,17 @@ struct ThingList {
 };
 
 Introspect struct Thing {
-	u32 nextidx;
-	u32 previdx;
 	ThingId parent;
 	ThingId next;
 	ThingId prev;
-	union {
-		ThingList list;
-		struct {
-			ThingId first;
-			ThingId last;
-		};
-	};
+	ThingId first;
+	ThingId last;
 	String name;
 	EntityFlags flags;
 	ThingFlags tflags;
-	union {
-		Transform trans;
-		struct {
-			v3 pos;
-			v4 rot;
-			v3 scale;
-		};
-	};
+	v3 pos;
+	v4 rot;
+	v3 scale;
 	Rng3 aabb;
 	v3 vel;
 	R_MeshId mesh;
@@ -296,9 +262,130 @@ Introspect struct Thing {
 
 typedef u32 ThingState;
 enum {
-	ThingState_OnFire = Bit(0),
-	ThingState_Flying = Bit(1),
-	ThingState_Poisoned = Bit(2),
+	ThingState_OnFire = 1<<0,
+	ThingState_Flying = 1<<1,
+	ThingState_Poisoned = 1<<2,
+};
+
+enum UI_SizeType {
+	UI_SizeType_Null,
+	UI_SizeType_Pixels,
+	UI_SizeType_TextContent,
+	UI_SizeType_PercentOfParent,
+	UI_SizeType_ChildrenSum,
+};
+
+struct UI_Size {
+	UI_SizeType type;
+	f32 value;
+	// f32 strictness;
+};
+
+enum UI_Axis2 {
+	UI_Axis2_X,
+	UI_Axis2_Y,
+	UI_Axis2_COUNT,
+};
+
+typedef u32 UI_BoxFlags;
+enum {
+	UI_BoxFlag_Clickable 						= 1<<1,
+	UI_BoxFlag_DrawText 							= 1<<2,
+	UI_BoxFlag_DrawBorder 					= 1<<2,
+	UI_BoxFlag_DrawBackground 	= 1<<3,
+	UI_BoxFlag_HotAnimation 			= 1<<4,
+	UI_BoxFlag_ActiveAnimation = 1<<5,
+};
+
+struct UI_Box {
+	UI_Box *first, *last, *next, *prev, *parent;
+
+	u64 key;
+	u64 last_frame_touched;
+
+	UI_BoxFlags flags;
+	String string;
+	UI_Size semantic_size[UI_Axis2_COUNT];
+	UI_Axis2 child_layout_axis;
+	v4 background_color;
+	v4 text_color;
+	v4 border_color;
+
+	f32 computed_size[UI_Axis2_COUNT];
+	f32 computed_rel_position[UI_Axis2_COUNT];
+	Rng2 rect;
+
+	f32 hot_t;
+	f32 active_t;
+};
+
+struct UI_Signal {
+	UI_Box* box;
+	b32 hovering;
+	b32 pressed;
+	b32 released;
+	b32 clicked;
+	b32 dragging;
+	v2 drag_delta;
+};
+
+struct UI_Input {
+	v2 mouse_pos;
+	b32 mouse_down[3];
+	f32 dt;
+};
+
+enum UI_DrawCmdType {
+	UI_DrawCmdType_Rect,
+	UI_DrawCmdType_Text
+};
+
+struct UI_DrawCmd {
+	UI_DrawCmdType kind;
+	Rng2 rect;
+	v4 color;
+	b32 filled;
+	String text;
+};
+
+struct UI_Style {
+	R_FontId font;
+	f32 padding;
+	f32 gap;
+	f32 line_height;
+	f32 text_pad;
+	v4 bg_color;
+	v4 text_color;
+	v4 border_color;
+	v4 hot_color;
+	v4 active_color;
+	v4 accent_color;
+};
+
+#define UI_MAX_PARENT_STACK 64
+#define UI_MAX_COLOR_STACK 64
+#define UI_KEY_TABLE_SIZE 32
+#define UI_STALE_FRAMES 2
+
+struct UI_State {
+	Arena frame_arena;
+
+	Map<UI_Box*, UI_KEY_TABLE_SIZE> box_map;
+	PoolPtr<UI_Box, UI_KEY_TABLE_SIZE> boxes;
+	SparseSet<UI_KEY_TABLE_SIZE> active_boxes;
+	UI_Box* root;
+
+	Array<UI_Box*, UI_MAX_PARENT_STACK> parent_stack;
+	Array<v4, UI_MAX_COLOR_STACK> bg_color_stack;
+
+	u64 hot_key;
+	u64 active_key;
+
+	UI_Input input;
+	UI_Input prev_input;
+
+	Array<UI_DrawCmd, KB(4)> draw_cmds;
+	UI_Style style;
 };
 
 struct GlobalState {
@@ -327,11 +414,16 @@ struct GlobalState {
 	Array<String, R_MaxMeshes> mesh_to_str;
 	Array<String, R_MaxMaterials> material_to_str;
 
-	WatchState watch;
 	InputState input;
 	R_State r;
 	Gfx_State gfx;
 	UI_State ui;
+
+	Slice<OS_Handle> shader_module_compilation_pids;
+	Slice<String> shaders_to_compile;
+
+	Array<WatchFile, 128> watches;
+	Array<WatchDirectory, 128> watch_directories;
 
 	struct {
 		DebugWindow win;
@@ -358,7 +450,7 @@ struct GlobalState {
 	// SparseSet<MaxEntities> active_entities;
 	PoolIterative<Thing, MaxEntities, ThingId> entities;
 
-	Darray<ThingId> moving_cubes;
+	DArray<ThingId> moving_cubes;
 	Map<ThingId, 32> find_entity;
 
 	ThingId axis_attached_to_cam_id;
@@ -426,8 +518,8 @@ Rng2 debug_window_get_rect(DebugWindow win);
 void debug_window_apply_state(DebugWindow& win);
 void debug_window_track_state(DebugWindow& win);
 void debug_window_toggle_fullscreen(DebugWindow& win);
-void ui_dev_init();
-void ui_dev_update();
+void dev_init();
+void dev_update();
 
 R_MeshDesc load_obj(Allocator arena, String name);
 R_MeshDesc load_gltf(Allocator arena, String path, b32 is_glb);
@@ -445,6 +537,20 @@ f64 js_get_number(JsObj obj, String key);
 String js_get_str(JsObj obj, String key);
 Slice<JsVal*> js_get_array(JsObj obj, String key);
 JsObj js_get_obj(JsObj obj, String key);
+
+Slice<Token> tokens_from_str(Allocator arena, String string);
+Parser parser_make(Slice<Token> tokens);
+Token tok_peek(Parser& p);
+Token tok_prev(Parser& p);
+Token tok_advance(Parser& p);
+b32 tok_match(Parser& p, TokenType type);
+b32 tok_match_name(Parser& p, String name);
+Token tok_expect(Parser& p, TokenType type);
+Token tok_expect_name(Parser& p, String name);
+f32 parse_f32(Parser& p);
+f32 parse_u32(Parser& p);
+f32 parse_i32(Parser& p);
+v3 parse_v3(Parser& p);
 
 b32 key_pressed(Key key);
 b32 key_pressed_consume(Key key);
@@ -488,6 +594,54 @@ void save_game_state();
 void load_game_state();
 void init_game();
 void update_game();
+
+String ui_display_string(String full);
+String ui_hash_string(String full);
+u64 ui_key_from_string(String str, u64 seed);
+f32 ui_text_measure(String text, R_FontId font, f32 font_height);
+
+UI_Size ui_size_px(f32 v);
+UI_Size ui_size_text();
+UI_Size ui_size_pct(f32 v);
+UI_Size ui_size_children();
+UI_Size ui_size_null();
+
+void ui_push_parent(UI_Box* box);
+void ui_pop_parent();
+UI_Box* ui_top_parent();
+void ui_push_font(R_FontId id);
+void ui_push_bg_color(v4 color);
+void ui_pop_bg_color();
+v4 ui_current_bg_color();
+
+UI_Box* ui_box_make(UI_BoxFlags flags, UI_Size size_x, UI_Size size_y, String string);
+UI_Box* ui_box_from_key(u64 key);
+void ui_prune_stale_boxes();
+
+void ui_init();
+void ui_begin_frame();
+void ui_end_frame();
+
+void ui_layout_standalone(UI_Box* box);
+void ui_layout_upward(UI_Box* box);
+void ui_layout_downward(UI_Box* box);
+void ui_layout_positions(UI_Box* box);
+
+void ui_build_draw_cmds(UI_Box* box);
+
+f32 ui_animate_towards(f32 current, f32 target, f32 dt, f32 rate_per_sec);
+UI_Signal ui_signal_from_box(UI_Box* box);
+
+UI_Signal ui_label(String string);
+UI_Signal ui_button(String string);
+b32 ui_checkbox(String string, b32* value);
+f32 ui_slider(String string, f32* value, f32 min, f32 max);
+void ui_spacer(UI_Size size_along_parent_axis);
+UI_Box* ui_panel_begin_sized(String string, UI_Axis2 child_layout_axis, UI_Size size_x, UI_Size size_y);
+UI_Box* ui_panel_begin(String string, UI_Axis2 child_layout_axis);
+void ui_panel_end();
+
+#define UI_Parent(str, axis) DeferLoop(ui_panel_begin(str, axis), ui_pop_parent())
 
 
 

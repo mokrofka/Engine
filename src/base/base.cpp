@@ -1,4 +1,11 @@
-#include "base_impl.h"
+#include "containers.cpp"
+#include "maths.cpp"
+#include "str.cpp"
+#include "thread_ctx.cpp"
+#include "mem.cpp"
+#include "thread.cpp"
+#include "profiler.cpp"
+#include "os/os_impl.cpp"
 
 Global f32 time_dt;
 Global f32 time_now;
@@ -24,11 +31,11 @@ u64 AlignDown(u64 x, u64 a)         { return x & ~(a - 1); }
 u64 AlignPadUp(u64 x, u64 a)        { return -x & (a - 1); }
 u64 AlignPadDown(u64 x, u64 a)      { return x & (a - 1); }
 b32 IsAligned(u64 x, u64 a)         { return ((a - 1) & x) == 0; }
-u8* PtrAlignUp(void* x, u64 a)      { return (u8*)AlignUp(u64(x), a); }
-u8* PtrAlignDown(void* x, u64 a)    { return (u8*)AlignDown(u64(x), a); }
-u8* PtrAlignPadUp(void* x, u64 a)   { return (u8*)AlignPadUp(u64(x), a); }
-u8* PtrAlignPadDown(void* x, u64 a) { return (u8*)AlignPadDown(u64(x), a); }
-b32 PtrIsAligned(void* x, u64 a)    { return  IsAligned(u64(x), a); }
+u8* AlignUpPtr(void* x, u64 a)      { return (u8*)AlignUp(u64(x), a); }
+u8* AlignDownPtr(void* x, u64 a)    { return (u8*)AlignDown(u64(x), a); }
+u8* AlignPadUpPtr(void* x, u64 a)   { return (u8*)AlignPadUp(u64(x), a); }
+u8* AlignPadDownPtr(void* x, u64 a) { return (u8*)AlignPadDown(u64(x), a); }
+b32 IsAlignedPtr(void* x, u64 a)    { return  IsAligned(u64(x), a); }
 b32 IsPow2(u64 x)                   { return ((x - 1) & x) == 0; }
 u8* Offset(void* x, u64 a)          { return (u8*)x + a; }
 u8* OffsetBack(void* x, u64 a)      { return (u8*)x - a; }
@@ -39,9 +46,11 @@ b32 PtrMatch(void* a, void* b)      { return (u8*)a == (u8*)b; }
 // Bits
 
 u32 clz(u64 v)                     { return __builtin_clzll(v); }
+u32 clz_u32(u32 v)																	{ return __builtin_clz(v); }
 u32 ctz(u64 v)                     { return __builtin_ctzll(v); }
+u32 ctz_u32(u32 v)																	{ return __builtin_ctz(v); }
 u32 count_ones(u64 v)              { return __builtin_popcountll(v); }
-u32 most_significant_bit(u32 v)    { return 31 - clz(v); }
+u32 most_significant_bit(u32 v)    { return 31 - clz_u32(v); }
 u64 most_significant_bit(u64 v)    { return 63 - clz(v); }
 u32 remove_lowest_bit(u64 v)       { return v & (v - 1);}
 u32 remove_highest_bit(u32 v)      { return v ^ (1 << most_significant_bit(v)); }
@@ -61,7 +70,7 @@ u64 div_pow2(u64 x, u64 b)   { return x >> ctz(b); }
 u64 div_ceil(u64 x, u64 b)   { return (x + b - 1) / b; }
 u64 round_up(u64 x, u64 a)   { return div_ceil(x, a) * a; }
 u64 round_down(u64 x, u64 a) { return x / a * a; }
-u64 compose_64(u64 a, u64 b) { return (a << 32) | b; }
+u64 compose_64(u32 a, u32 b) { return ((u64)a << 32) | b; }
 u32 next_pow2(u32 v) {
 	v--;
 	v |= v >> 1;
@@ -157,9 +166,6 @@ u64 ring_read_nowrap(RingBuffer& ring, void* dst, u64 dst_size) {
 	return offset;
 }
 
-////////////////////////////////////////////////////////////////////////
-// Coroutine
-
 u8* Restrict _coroutine_var(Coroutine* co, u32 size) {
 	Assert(co->stack_pointer + size < CoroutineStackSize);
 	u8* res = co->stack + co->stack_pointer;
@@ -171,6 +177,139 @@ u8* Restrict _coroutine_var(Coroutine* co, u32 size) {
 // Simd
 
 void cpu_relax() { __builtin_ia32_pause(); }
+
+///////////////////////////////////
+// xmmintrin.h
+#define __DEFAULT_FN_ATTRS __attribute__((__always_inline__, __nodebug__, __min_vector_width__(128)))
+#define __DEFAULT_FN_ATTRS_CONSTEXPR
+
+static __inline__ __m128 __DEFAULT_FN_ATTRS _mm_loadu_ps(const float* __p) {
+	struct __loadu_ps {
+		__m128_u __v;
+	} __attribute__((__packed__, __may_alias__));
+	return ((const struct __loadu_ps*)__p)->__v;
+}
+static __inline__ void __DEFAULT_FN_ATTRS _mm_storeu_ps(float *__p, __m128 __a) {
+	struct __storeu_ps {
+		__m128_u __v;
+	} __attribute__((__packed__, __may_alias__));
+	((struct __storeu_ps*)__p)->__v = __a;
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS_CONSTEXPR _mm_set1_ps(float __w) {
+	return __extension__(__m128){__w, __w, __w, __w};
+}
+static __m128 __DEFAULT_FN_ATTRS_CONSTEXPR _mm_setr_ps(float __z, float __y, float __x, float __w) {
+	return __extension__(__m128){__z, __y, __x, __w};
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS_CONSTEXPR _mm_setzero_ps(void) {
+	return __extension__(__m128){0.0f, 0.0f, 0.0f, 0.0f};
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS_CONSTEXPR _mm_add_ps(__m128 __a, __m128 __b) {
+	return (__m128)((__v4sf)__a + (__v4sf)__b);
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS_CONSTEXPR _mm_sub_ps(__m128 __a, __m128 __b) {
+	return (__m128)((__v4sf)__a - (__v4sf)__b);
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS_CONSTEXPR _mm_mul_ps(__m128 __a, __m128 __b) {
+	return (__m128)((__v4sf)__a * (__v4sf)__b);
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS_CONSTEXPR _mm_div_ps(__m128 __a, __m128 __b) {
+	return (__m128)((__v4sf)__a / (__v4sf)__b);
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS_CONSTEXPR _mm_xor_ps(__m128 __a, __m128 __b) {
+	return (__m128)((__v4su)__a ^ (__v4su)__b);
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS_CONSTEXPR _mm_and_ps(__m128 __a, __m128 __b) {
+	return (__m128)((__v4su)__a & (__v4su)__b);
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS_CONSTEXPR _mm_or_ps(__m128 __a, __m128 __b) {
+	return (__m128)((__v4su)__a | (__v4su)__b);
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS _mm_cmplt_ps(__m128 __a, __m128 __b) {
+	return (__m128)__builtin_ia32_cmpltps((__v4sf)__a, (__v4sf)__b);
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS _mm_cmple_ps(__m128 __a, __m128 __b) {
+	return (__m128)__builtin_ia32_cmpleps((__v4sf)__a, (__v4sf)__b);
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS _mm_cmpgt_ps(__m128 __a, __m128 __b) {
+	return (__m128)__builtin_ia32_cmpltps((__v4sf)__b, (__v4sf)__a);
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS _mm_cmpge_ps(__m128 __a, __m128 __b) {
+	return (__m128)__builtin_ia32_cmpleps((__v4sf)__b, (__v4sf)__a);
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS _mm_cmpeq_ps(__m128 __a, __m128 __b) {
+	return (__m128)__builtin_ia32_cmpeqps((__v4sf)__a, (__v4sf)__b);
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS _mm_cmpneq_ps(__m128 __a, __m128 __b) {
+	return (__m128)__builtin_ia32_cmpneqps((__v4sf)__a, (__v4sf)__b);
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS_CONSTEXPR _mm_min_ps(__m128 __a, __m128 __b) {
+	return __builtin_ia32_minps((__v4sf)__a, (__v4sf)__b);
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS_CONSTEXPR _mm_max_ps(__m128 __a, __m128 __b) {
+	return __builtin_ia32_maxps((__v4sf)__a, (__v4sf)__b);
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS_CONSTEXPR _mm_andnot_ps(__m128 __a, __m128 __b) {
+	return (__m128)(~(__v4su)__a & (__v4su)__b);
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS _mm_sqrt_ps(__m128 __a) {
+	return __builtin_elementwise_sqrt(__a);
+}
+static __inline__ int __DEFAULT_FN_ATTRS_CONSTEXPR _mm_movemask_ps(__m128 __a) {
+	return __builtin_ia32_movmskps((__v4sf)__a);
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS_CONSTEXPR _mm_unpacklo_ps(__m128 __a, __m128 __b) {
+  return __builtin_shufflevector((__v4sf)__a, (__v4sf)__b, 0, 4, 1, 5);
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS_CONSTEXPR _mm_unpackhi_ps(__m128 __a, __m128 __b) {
+	return __builtin_shufflevector((__v4sf)__a, (__v4sf)__b, 2, 6, 3, 7);
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS_CONSTEXPR _mm_movelh_ps(__m128 __a, __m128 __b) {
+	return __builtin_shufflevector((__v4sf)__a, (__v4sf)__b, 0, 1, 4, 5);
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS_CONSTEXPR _mm_movehl_ps(__m128 __a, __m128 __b) {
+  return __builtin_shufflevector((__v4sf)__a, (__v4sf)__b, 6, 7, 2, 3);
+}
+
+///////////////////////////////////
+// smmintrin.h
+static __inline__ __m128 __DEFAULT_FN_ATTRS_CONSTEXPR _mm_blendv_ps(__m128 __V1, __m128 __V2, __m128 __M) {
+	return (__m128)__builtin_ia32_blendvps((__v4sf)__V1, (__v4sf)__V2, (__v4sf)__M);
+}
+
+#define _MM_FROUND_TO_NEAREST_INT 0x00
+#define _MM_FROUND_TO_NEG_INF 0x01
+#define _MM_FROUND_TO_POS_INF 0x02
+#define _MM_FROUND_TO_ZERO 0x03
+#define _MM_FROUND_CUR_DIRECTION 0x04
+
+#define _MM_FROUND_RAISE_EXC 0x00
+#define _MM_FROUND_NO_EXC 0x08
+
+#define _MM_FROUND_NINT (_MM_FROUND_RAISE_EXC | _MM_FROUND_TO_NEAREST_INT)
+#define _MM_FROUND_FLOOR (_MM_FROUND_RAISE_EXC | _MM_FROUND_TO_NEG_INF)
+#define _MM_FROUND_CEIL (_MM_FROUND_RAISE_EXC | _MM_FROUND_TO_POS_INF)
+#define _MM_FROUND_TRUNC (_MM_FROUND_RAISE_EXC | _MM_FROUND_TO_ZERO)
+#define _MM_FROUND_RINT (_MM_FROUND_RAISE_EXC | _MM_FROUND_CUR_DIRECTION)
+#define _MM_FROUND_NEARBYINT (_MM_FROUND_NO_EXC | _MM_FROUND_CUR_DIRECTION)
+
+#define _mm_round_ps(X, M) ((__m128)__builtin_ia32_roundps((__v4sf)(__m128)(X), (M)))
+#define _mm_floor_ps(X) _mm_round_ps((X), _MM_FROUND_FLOOR)
+
+///////////////////////////////////
+// emmintrin.h
+static __inline__ __m128i __DEFAULT_FN_ATTRS_CONSTEXPR _mm_castps_si128(__m128 __a) {
+	return (__m128i)__a;
+}
+static __inline__ __m128 __DEFAULT_FN_ATTRS_CONSTEXPR _mm_castsi128_ps(__m128i __a) {
+	return (__m128)__a;
+}
+static __inline__ __m128i __DEFAULT_FN_ATTRS_CONSTEXPR _mm_set_epi32(int __i3, int __i2, int __i1, int __i0) {
+  return __extension__(__m128i)(__v4si){__i0, __i1, __i2, __i3};
+}
+static __inline__ __m128i __DEFAULT_FN_ATTRS_CONSTEXPR _mm_set1_epi32(int __i) {
+	return _mm_set_epi32(__i, __i, __i, __i);
+}
 
 f32x4 simd_load(void* p)                    { return {_mm_loadu_ps((f32*)p)}; }
 void simd_store(f32x4 x, void* p)           { _mm_storeu_ps((f32*)p, x.p); }
@@ -225,6 +364,36 @@ f32x4 simd_sign_of(f32x4 a)                 { return simd_splat(1) | simd_sign_b
 f32x4 simd_clamp(f32x4 a, f32x4 x, f32x4 b) { return simd_min(simd_max(a, x), b); }
 f32x4 simd_clamp01(f32x4 x)                 { return simd_clamp(simd_zero(), x, simd_splat(1)); }
 
+void _log_output(LogLevel level, String fmt, ...) {
+	Scratch scratch;
+	String level_strings[] = {"[TRACE]: ", "[DEBUG]: ", "[INFO]:  ", "[WARN]:  ", "[ERROR]: "};
+	VaList argc;
+	va_start(argc, fmt);
+	String formatted = push_strfv(scratch, fmt, argc);
+	va_end(argc);
+	String out_message = push_strf(scratch, "%s%s\n", level_strings[level-1], formatted);
+	os_console_write(out_message, level);
+}
+
+void print(String fmt, ...) {
+	Scratch scratch;
+	VaList argc;
+	va_start(argc, fmt);
+	String formatted = push_strfv(scratch, fmt, argc);
+	va_end(argc);
+	String out_message = push_strf(scratch, "%s", formatted);
+	os_console_write(out_message, 0);
+}
+
+void println(String fmt, ...) {
+	Scratch scratch;
+	VaList argc;
+	va_start(argc, fmt);
+	String formatted = push_strfv(scratch, fmt, argc);
+	va_end(argc);
+	String out_message = push_strf(scratch, "%s\n", formatted);
+	os_console_write(out_message, 0);
+}
 
 // struct CoroCtx {
 //   void *stack_pointer;

@@ -56,10 +56,10 @@ struct ProfFrame {
 };
 
 struct ProfThread {
-	Darray<ProfEvent> events[2];
-	Darray<ProfAnchor> recorded_anchors[ProfRecordHistoryNum];
-	Darray<ProfAnchor> launch_anchors;
-	Darray<ProfAnchor> long_anchors;
+	DArray<ProfEvent> events[2];
+	DArray<ProfAnchor> recorded_anchors[ProfRecordHistoryNum];
+	DArray<ProfAnchor> launch_anchors;
+	DArray<ProfAnchor> delayed_anchors;
 };
 
 struct ProfState {

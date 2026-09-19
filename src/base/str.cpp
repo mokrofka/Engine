@@ -1,4 +1,4 @@
-#include "base_impl.h"
+#include "lib.h"
 
 read_only u64 pow10[] = {
 	1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000,

@@ -1,4 +1,4 @@
-#include "base_impl.h"
+#include "lib.h"
 
 struct WaitGroupSlot {
 	u32 count;
@@ -73,12 +73,9 @@ WaitGroup thread_push_batch(Slice<TaskDesc> tasks) {
 	u32 count_by_prio[TaskPriority_COUNT] = {};
 	Loop(i, tasks.count) count_by_prio[tasks[i].priority]++;
 	WaitGroup wg = thread_wg_make(tasks.count);
-	{
-		// LockScope(g.task_mutex);
-		Loop(i, tasks.count) {
-			Task t = {.fn = tasks[i].fn, .ctx = tasks[i].ctx, .wg = wg, .priority = tasks[i].priority};
-			queue_push(g.tasks[tasks[i].priority], t);
-		}
+	Loop(i, tasks.count) {
+		Task t = {.fn = tasks[i].fn, .ctx = tasks[i].ctx, .wg = wg, .priority = tasks[i].priority};
+		queue_push(g.tasks[tasks[i].priority], t);
 	}
 	atomic_add(&g.tasks_available.futex, tasks.count);
 	atomic_add(&g.remaining_tasks, tasks.count);
@@ -90,14 +87,9 @@ WaitGroup thread_push_batch(Slice<TaskDesc> tasks) {
 
 Task thread_pop_locked() {
 	var& g = thread_pool;
-	// LockScope(g.task_mutex);
-	// TaskPriority prio = queue_count(g.tasks[TaskPriority_High]) ? TaskPriority_High : TaskPriority_Low;
-	// Task t = queue_pop(g.tasks[prio]);
 	var res = queue_pop(g.tasks[TaskPriority_High]);
-	if(!res.ok) {
-		res = queue_pop(g.tasks[TaskPriority_Low]);
-		Assert(res.ok);
-	}
+	if(!res.ok) res = queue_pop(g.tasks[TaskPriority_Low]);
+	Assert(res.ok);
 	return res.value;
 }
 

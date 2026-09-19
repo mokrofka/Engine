@@ -1,11 +1,11 @@
-#include "base/base_impl.cpp"
+#include "base/base.cpp"
 
 shared_function void update(HotReloadData* data);
 
 i32 main(i32 count, char* args[]) {
 	mem_track_init();
 	tctx_init();
-	os_init(args[0]);
+	os_init(Slice(args, count));
 	Scratch scratch;
 	HotReloadData state = {};
 	void (*com)(HotReloadData* data) = {};

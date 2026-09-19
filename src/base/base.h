@@ -1,25 +1,18 @@
 #pragma once
-#include <stdint.h>
-#include <stdarg.h>
-#include <initializer_list>
 
-typedef uint8_t  u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint64_t u64;
+#define MEM_GUARD 1
+#define MEM_TRACK 1
+#define PROFILE_BUILD 1
+#define DEV_BUILD 1
 
-typedef int8_t  i8;
-typedef int16_t i16;
-typedef int32_t	i32;
-typedef int64_t i64;
+// template<typename _Tp> struct _TypeIdentity { typedef _Tp type; };
+// template<typename _Tp> using TypeIdentity = _TypeIdentity<_Tp>::type;
 
-typedef float  f32;
-typedef double f64;
-
-typedef u8  b8;
-typedef i32 b32;
-
-typedef va_list VaList;
+typedef __builtin_va_list VaList;
+#define va_start(ap, param) __builtin_va_start(ap, param)
+#define va_end(ap) 									__builtin_va_end(ap)
+#define va_arg(ap, type) 			__builtin_va_arg(ap, type)
+#define va_copy(dest, src)  __builtin_va_copy(dest, src)
 
 #if _WIN64
 	#define OS_WINDOWS 1
@@ -39,6 +32,26 @@ typedef va_list VaList;
 	#define ARCH_X64 1
 #elif __aarch64__ || _M_ARM64
 	#define ARCH_ARM64 1
+#endif
+
+#if OS_LINUX
+	typedef __UINT8_TYPE__  u8;
+	typedef __UINT16_TYPE__ u16;
+	typedef __UINT32_TYPE__ u32;
+	typedef __UINT64_TYPE__ u64;
+
+	typedef __INT8_TYPE__  i8;
+	typedef __INT16_TYPE__ i16;
+	typedef __INT32_TYPE__ i32;
+	typedef __INT64_TYPE__ i64;
+
+	typedef float  f32;
+	typedef double f64;
+
+	typedef u8  b8;
+	typedef i32 b32;
+#else 
+	#error OS not supported
 #endif
 
 ////////////////////////////////////////////////////////////////////////
@@ -101,27 +114,25 @@ typedef va_list VaList;
 #define local  static
 #define Global
 
-const u64 U8_MAX  = 0xFF;
-const u64 U16_MAX = 0xFFFF;
-const u64 U32_MAX = 0xFFFFFFFF;
-const u64 U64_MAX = 0xFFFFFFFFFFFFFFFF;
-const u64 INVALID_ID = U32_MAX;
-const u64 PAGE_SIZE = 4096;
+#define U8_MAX  0xFF
+#define U16_MAX 0xFFFF
+#define U32_MAX 0xFFFFFFFF
+#define U64_MAX 0xFFFFFFFFFFFFFFFF
+#define PAGE_SIZE 4096
 
 template<typename T> void Swap(T& a, T& b) {
 	T temp = a;
 	a = b;
 	b = temp;
 }
-template<typename T> b32 equal(T a, T b) { return a == b; }
 
-NO_DEBUG constexpr u64 KB(u64 x) { return x << 10; }
-NO_DEBUG constexpr u64 MB(u64 x) { return x << 20; }
-NO_DEBUG constexpr u64 GB(u64 x) { return x << 30; }
-NO_DEBUG constexpr u64 TB(u64 x) { return x << 40; }
-NO_DEBUG constexpr u64 Thousand(u64 x) { return x * 1000; }
-NO_DEBUG constexpr u64 Million(u64 x)  { return x * 1000000; }
-NO_DEBUG constexpr u64 Billion(u64 x)  { return x * 1000000000; }
+#define KB(x) ((x) << 10)
+#define MB(x) ((x) << 20)
+#define GB(x) ((x) << 30)
+#define TB(x) ((x) << 40)
+#define Thousand(x) ((x) * 1000)
+#define Million(x)  ((x) * 1000000)
+#define Billion(x)  ((x) * 1000000000)
 NO_DEBUG f32 BytesToKB(u64 x);
 NO_DEBUG f32 BytesToMB(u64 x);
 NO_DEBUG f32 BytesToGB(u64 x);
@@ -143,23 +154,23 @@ void MemZero(void *d, u64 size);
 void MemCopy(void* d, void* s, u64 size);
 b32  MemMatch(void* a, void* b, u64 size);
 
-template<typename T> void MemZeroStruct(T* x)                { MemZero(x, sizeof(*x)); };
-template<typename T> void MemZeroArray(T* x, u64 c)          { MemZero(x, sizeof(*x) * c); };
-template<typename T> void MemCopyStruct(T* d, T* s)          { MemCopy(d, s, sizeof(*d)); }
-template<typename T> void MemCopyArray(T* d, T* s, u64 c)    { MemCopy(d, s, sizeof(*d) * c); }
-template<typename T> b32  MemMatchStruct(T* a, T* b)         { return MemMatch(a, b, sizeof(*a)); }
-template<typename T> b32  MemMatchArray(T* a, T* b, u64 c)   { return MemMatch(a, b, sizeof(*a) * c); }
+#define MemZeroStruct(x)       MemZero((x), sizeof(*(x)))
+#define MemZeroArray(x, c)     MemZero((x), sizeof(*(x)) * (c))
+#define MemCopyStruct(d, s)    MemCopy((d), (s), sizeof(*(d)))
+#define MemCopyArray(d, s, c)  MemCopy((d), (s), sizeof(*(d)) * (c))
+#define MemMatchStruct(a, b)   MemMatch((a), (b), sizeof(*(a)))
+#define MemMatchArray(a, b, c) MemMatch((a), (b), sizeof(*(a)) * (c))
 
 u64 AlignUp(u64 x, u64 a);
 u64 AlignDown(u64 x, u64 a);
 u64 AlignPadUp(u64 x, u64 a);
 u64 AlignPadDown(u64 x, u64 a);
 b32 IsAligned(u64 x, u64 a);
-u8* PtrAlignUp(void* x, u64 a);
-u8* PtrAlignDown(void* x, u64 a);
-u8* PtrAlignPadUp(void* x, u64 a);
-u8* PtrAlignPadDown(void* x, u64 a);
-b32 PtrIsAligned(void* x, u64 a);
+u8* AlignUpPtr(void* x, u64 a);
+u8* AlignDownPtr(void* x, u64 a);
+u8* AlignPadUpPtr(void* x, u64 a);
+u8* AlignPadDownPtr(void* x, u64 a);
+b32 IsAlignedPtr(void* x, u64 a);
 b32 IsPow2(u64 x);
 u8* Offset(void* x, u64 a);
 u8* OffsetBack(void* x, u64 a);
@@ -169,9 +180,11 @@ b32 PtrMatch(void* a, void* b);
 ////////////////////////////////////////////////////////////////////////
 // Bits
 
-u32 clz(u64 val);
-u32 ctz(u64 val);
-u32 count_ones(u64 val);
+u32 clz(u64 v);
+u32 clz_u32(u32 v);
+u32 ctz(u64 v);
+u32 ctz_u32(u32 v);
+u32 count_ones(u64 v);
 u32 most_significant_bit(u32 size);
 u64 most_significant_bit(u64 size);
 u32 remove_lowest_bit(u64 v);
@@ -206,15 +219,15 @@ u64 div_pow2(u64 x, u64 b);
 u64 div_ceil(u64 x, u64 b);
 u64 round_up(u64 x, u64 a);
 u64 round_down(u64 x, u64 a);
-u64 compose_64(u64 a, u64 b);
+u64 compose_64(u32 a, u32 b);
 u32 next_pow2(u32 v);
 u32 prev_pow2(u32 n);
 
-#define is_finite(x)  __builtin_isfinite((x))
-#define is_nan(x)     __builtin_isnan((x))
-#define is_inf(x)     __builtin_isinf((x))
-#define Restrict      __restrict
-#define Unreachable   __builtin_unreachable()
+#define is_finite(x)   __builtin_isfinite((x))
+#define is_nan(x)      __builtin_isnan((x))
+#define is_inf(x)      __builtin_isinf((x))
+#define Restrict       __restrict
+#define Unreachable    __builtin_unreachable()
 #define bit_cast(T, x) __builtin_bit_cast(T, (x))
 
 ////////////////////////////////////////////////////////////////////////
@@ -230,8 +243,8 @@ u32 prev_pow2(u32 n);
 #define _Glue(A,B)     A##B
 #define Glue(A,B)      _Glue(A,B)
 #define Scope(...)     ({__VA_ARGS__})
-#define _Def(val, def)    											(((val) == 0) ? (def) : (val))
-#define _DefSet(val, def) 											if(val == 0) val = def
+#define _Def(val, def)    								(((val) == 0) ? (def) : (val))
+#define _DefSet(val, def) 								if(val == 0) val = def
 #define _DefIfSet(val, expr, def) if(expr) val = def
 
 #define For 																						for(;;)
@@ -239,7 +252,6 @@ u32 prev_pow2(u32 n);
 #define LoopNoInc(it, c)          for(i32 it = 0; it < c;)
 #define LoopReverse(it, count)    for(i32 it = (count) - 1; it >= 0; --it)
 #define LoopOff(it, li, hi)       for(i32 it = (li); it < (hi); ++it)
-// #define LoopArr(it, c)            for(i32 it = 0; it < c.count; ++it)
 #define LoopArray(it, array)      for(i32 it = 0; it < ArrayCount(array); ++it)
 #define LoopEnum(it, type)        for(type it = (type)0; it < type##_COUNT; it = (type)(it+1))
 #define LoopEnumNonZero(it, type) for(type it = (type)1; it < type##_COUNT; it = (type)(it+1))
@@ -554,9 +566,6 @@ template<typename T, typename Err = b32> struct ResultErr {
 	)
 #define or_break_err(expr) OrBreakErr(value, err, expr)
 
-////////////////////////////////////////////////////////////////////////
-// Types
-
 typedef u32 Futex;
 struct Mutex { Futex futex; };
 struct CondVar { Futex futex; };
@@ -566,12 +575,6 @@ const u32 DEFAULT_CAPACITY = 8;
 const u32 DEFAULT_RESIZE_FACTOR = 2;
 
 #define Introspect
-
-#define MakeId(T) \
-	struct T {       \
-		u32 idx;        \
-		u32 gen;        \
-	};
 
 struct BitArrayD {
 	u64* words;
@@ -636,7 +639,7 @@ template<typename T> struct Slice {
 		Assert(idx < count);
 		return data[idx];
 	}
-	NO_DEBUG Slice(T* data_, u64 count_) { data = data_; count = count_; }
+	NO_DEBUG Slice(T* data, u64 count):data(data), count(count){}
 	Slice() = default;
 	T* begin() { return data; }
 	T* end() { return data + count; }
@@ -705,9 +708,16 @@ u8* Restrict _coroutine_var(Coroutine* co, u32 size);
 ////////////////////////////////////////////////////////////////////////
 // Simd
 
-#include <smmintrin.h>
+// #include <smmintrin.h>
 
 void cpu_relax();
+
+typedef float __v4sf __attribute__((__vector_size__(16)));
+typedef unsigned int __v4su __attribute__((__vector_size__(16)));
+typedef f32 __m128 __attribute__((__vector_size__(16), __aligned__(16)));
+typedef f32 __m128_u __attribute__((__vector_size__(16), __aligned__(1)));
+typedef int __v4si __attribute__((__vector_size__(16)));
+typedef long long __m128i __attribute__((__vector_size__(16), __aligned__(16)));
 
 union f32x4 {
 	__m128 p;
@@ -764,6 +774,54 @@ f32x4 simd_clamp01(f32x4 x);
 
 #define SimdShuffle(a, b, c, d) (((d) << 6) | ((c) << 4) | ((b) << 2) | (a))
 #define simd_shuffle(a, b, imm) f32x4(_mm_shuffle_ps(a.p, b.p, imm))
+
+#define LOG_TRACE_ENABLED 1
+#define LOG_DEBUG_ENABLED 1
+#define LOG_INFO_ENABLED 1
+#define LOG_WARN_ENABLED 1
+#define LOG_ERROR_ENABLED 1
+
+enum LogLevel {
+	LogLevel_Trace = 1,
+	LogLevel_Debug,
+	LogLevel_Info,
+	LogLevel_Warn,
+	LogLevel_Error,
+};
+
+void _log_output(LogLevel level, String fmt, ...); // with \n
+void print(String fmt, ...);
+void println(String fmt, ...);
+
+#if LOG_TRACE_ENABLED
+	#define Trace(message, ...) _log_output(LogLevel_Trace, message, ##__VA_ARGS__)
+#else
+	#define Trace(message, ...)
+#endif
+
+#if LOG_DEBUG_ENABLED
+	#define Debug(message, ...) _log_output(LogLevel_Debug, message, ##__VA_ARGS__)
+#else
+	#define Debug(message, ...)
+#endif
+
+#if LOG_INFO_ENABLED
+	#define Info(message, ...) _log_output(LogLevel_Info, message, ##__VA_ARGS__)
+#else
+	#define Info(message, ...)
+#endif
+
+#if LOG_WARN_ENABLED
+	#define Warn(message, ...) _log_output(LogLevel_Warn, message, ##__VA_ARGS__)
+#else
+	#define Warn(message, ...)
+#endif
+
+#if LOG_ERROR_ENABLED
+	#define Error(message, ...) _log_output(LogLevel_Error, message, ##__VA_ARGS__);
+#else
+	#define Error(message, ...)
+#endif
 
 extern f32 time_dt;
 extern f32 time_now;

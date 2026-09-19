@@ -28,7 +28,9 @@
 		
 #elif OS_LINUX
 	#if GFX_X11
-		#include <xcb/xcb.h>
+		typedef u32 xcb_window_t;
+		typedef struct xcb_connection_t xcb_connection_t;
+		typedef u32 xcb_visualid_t;
 		#include <vulkan/vulkan_xcb.h>
 		void vk_surface_create() {
 			Gfx_State& g = st->gfx;
@@ -46,7 +48,7 @@
 			VK_CHECK(vkCreateXcbSurfaceKHR(g.instance, &surfaceInfo, g.allocator, &g.surface));
 			Info("Vulkan XCB surface created");
 		}
-	#define VK_SURFACE_NAME VK_KHR_XCB_SURFACE_EXTENSION_NAME
+		#define VK_SURFACE_NAME VK_KHR_XCB_SURFACE_EXTENSION_NAME
 
 	#else
 		#include <vulkan/vulkan_wayland.h>
@@ -870,7 +872,7 @@ VkPipeline vk_pipeline_create(Gfx_PipelineDesc desc) {
 			.layout = g.pipeline_layout,
 		};
 		VkPipeline res;
-		VK_CHECK(g.CreateComputePipelines(vkdevice, VK_NULL_HANDLE, 1, &pip_create_info, 0, &res));
+		VK_CHECK(g.CreateComputePipelines(vkdevice, null, 1, &pip_create_info, 0, &res));
 		return res;
 	}
 	
@@ -931,7 +933,7 @@ VkPipeline vk_pipeline_create(Gfx_PipelineDesc desc) {
 	VkPipelineInputAssemblyStateCreateInfo input_assembly_state = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
 		.topology = vk_primitive_topology(desc.primitive_type),
-		.primitiveRestartEnable = VK_FALSE,
+		.primitiveRestartEnable = false,
 	};
 	
 	// Viewport
@@ -944,8 +946,8 @@ VkPipeline vk_pipeline_create(Gfx_PipelineDesc desc) {
 	// Rasterizer
 	VkPipelineRasterizationStateCreateInfo rasterizer_state = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-		.depthClampEnable = VK_FALSE,
-		.rasterizerDiscardEnable = VK_FALSE,
+		.depthClampEnable = false,
+		.rasterizerDiscardEnable = false,
 		.polygonMode = VK_POLYGON_MODE_FILL,
 		.cullMode = vk_cullmode(desc.cull_mode),
 		.frontFace = vk_frontface(desc.face_winding),
@@ -1056,7 +1058,7 @@ VkPipeline vk_pipeline_create(Gfx_PipelineDesc desc) {
 		.layout = g.pipeline_layout,
 	};
 	VkPipeline res;
-	VK_CHECK(g.CreateGraphicsPipelines(vkdevice, VK_NULL_HANDLE, 1, &pipeline_info, g.allocator, &res));
+	VK_CHECK(g.CreateGraphicsPipelines(vkdevice, null, 1, &pipeline_info, g.allocator, &res));
 	return res;
 }
 
@@ -1113,7 +1115,7 @@ VkPipeline vk_pipeline_create2(Gfx_PipelineDesc2 desc) {
 
 	VkPipelineInputAssemblyStateCreateInfo input_assembly_state = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-		.primitiveRestartEnable = VK_FALSE,
+		.primitiveRestartEnable = false,
 	};
 
 	// Viewport
@@ -1126,8 +1128,8 @@ VkPipeline vk_pipeline_create2(Gfx_PipelineDesc2 desc) {
 	// Rasterizer
 	VkPipelineRasterizationStateCreateInfo rasterizer_state = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-		.depthClampEnable = VK_FALSE,
-		.rasterizerDiscardEnable = VK_FALSE,
+		.depthClampEnable = false,
+		.rasterizerDiscardEnable = false,
 		.polygonMode = VK_POLYGON_MODE_FILL,
 		.lineWidth = 1.0f,
 	};
@@ -1203,7 +1205,7 @@ VkPipeline vk_pipeline_create2(Gfx_PipelineDesc2 desc) {
 		.layout = g.pipeline_layout,
 	};
 	VkPipeline res;
-	VK_CHECK(g.CreateGraphicsPipelines(vkdevice, VK_NULL_HANDLE, 1, &pipeline_info, g.allocator, &res));
+	VK_CHECK(g.CreateGraphicsPipelines(vkdevice, null, 1, &pipeline_info, g.allocator, &res));
 	return res;
 }
 
@@ -1240,7 +1242,8 @@ void vk_instance_init() {
 	var required_validation_layer_names = array_make<const char*>(scratch);
 	var required_extensions = array_make<const char*>(scratch);
 	const char* VK1_SURFACE_NAME = "VK_KHR_xcb_surface";
-	array_push(required_extensions, VK_KHR_SURFACE_EXTENSION_NAME, VK1_SURFACE_NAME);
+	array_push(required_extensions, VK_KHR_SURFACE_EXTENSION_NAME);
+	array_push(required_extensions, VK1_SURFACE_NAME);
 
 #if BUILD_DEBUG
 	// Validation layer
@@ -1435,12 +1438,14 @@ void vk_device_init() {
 		const u32 queue_count = 3;
 		Array<u32, queue_count> indices = {};
 		array_push(indices, g.device.graphics_queue_family_idx);
-		if(!array_exists(indices, g.device.transfer_queue_family_idx)) {
-			array_push(indices, g.device.transfer_queue_family_idx);
+		b32 transfer_has = false;
+		b32 compute_has = false;
+		for(u32 x : indices) {
+			if(x == g.device.transfer_queue_family_idx) transfer_has = true;
+			if(x == g.device.compute_queue_family_idx) compute_has = true;
 		}
-		if(!array_exists(indices, g.device.compute_queue_family_idx)) {
-			array_push(indices, g.device.compute_queue_family_idx);
-		}
+		if(!transfer_has) array_push(indices, g.device.transfer_queue_family_idx);
+		if(!compute_has) array_push(indices, g.device.compute_queue_family_idx);
 		Array<VkDeviceQueueCreateInfo, queue_count> queue_create_infos = {};
 		Loop(i, indices.count) {
 			f32 queue_priority = 1.0f;

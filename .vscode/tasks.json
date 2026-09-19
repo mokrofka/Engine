@@ -1,30 +1,43 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "Compile shaders",
-      "type": "process",
-      "command": "${workspaceFolder}/bin/compiling_shaders",
-      "args": ["../assets/shaders", "../assets/shaders/compiled"],
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      }
-    },
-    {
-      "label": "Preprocessor",
-      "type": "process",
-      "command": "${workspaceFolder}/bin/preprocessor",
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      }
-    },
-    {
-      "label": "Build",
-      "type": "shell",
-      "command": "ninja -C build",
-      "group": "build",
-    }
-  ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Compile shaders",
+			"type": "process",
+			"command": "${workspaceFolder}/bin/exe",
+			"args": ["compile_shaders"],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "Preprocessor",
+			"type": "process",
+			"command": "${workspaceFolder}/bin/exe",
+			"args": ["preprocessor"],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "Build",
+			"type": "shell",
+			"command": "ninja -C build",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "Build preprocessor",
+			"type": "shell",
+			"command": "clang++ -std=c++23 -Wno-gnu-alignof-expression -Wno-c99-designator -mavx src/preprocessor.cpp -o bin/preprocessor -g",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		}
+	]
 }

@@ -4,7 +4,6 @@
 #define IM_VEC2_CLASS_EXTRA                        \
 	constexpr ImVec2(const v2& f) : x(f.x), y(f.y) {} \
 	operator v2() const { return v2(x, y); }
-
 #include "imgui/imgui.h"
 
 #define ImGuiWindow(str, ...) 						DeferLoop(ImGui::Begin(str, null, ##__VA_ARGS__), ImGui::End()) if (_i_)
@@ -28,13 +27,13 @@ struct _ImGuiDrawPushClipRect {
 };
 #define ImGuiDrawPushClipRect(draw, rect) _ImGuiDrawPushClipRect Glue(_Clip, __LINE__)(draw, rect)
 
-MakeId(OpaqueId)
-MakeId(ThingId)
-MakeId(R_TextureId)
-MakeId(R_MeshId)
-MakeId(R_MaterialId)
-MakeId(R_FontId)
-MakeId(R_LightId)
+struct OpaqueId {u32 idx; u32 gen;};
+struct ThingId {u32 idx; u32 gen;};
+struct R_TextureId {u32 idx; u32 gen;};
+struct R_MeshId {u32 idx; u32 gen;};
+struct R_MaterialId {u32 idx; u32 gen;};
+struct R_FontId {u32 idx; u32 gen;};
+struct R_LightId {u32 idx; u32 gen;};
 
 const u32 MaxEntities = KB(1);
 

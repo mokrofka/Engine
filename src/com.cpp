@@ -2,8 +2,7 @@
 
 #include "gfx.cpp"
 #include "render.cpp"
-#include "tokenizer.cpp"
-#include "ui.cpp"
+#include "meta.cpp"
 
 #include "generated.h"
 
@@ -180,7 +179,7 @@ void test_alloc() {
 		MemZero(arr[i].data, size);
 	}
 	Array<u32, TEST_SAMPLES> indices = {};
-	Loop(i, TEST_SAMPLES) array_push(indices, i);
+	Loop(i, TEST_SAMPLES) array_push(indices, (u32)i);
 	rand_shuffle(slice(indices));
 	Loop(i, TEST_SAMPLES) {
 		mem_free(alloc, arr[indices[i]].data, arr[indices[i]].size);
@@ -194,7 +193,7 @@ void test_alloc() {
 		MemZero(arr[i].data, size);
 	}
 	array_clear(indices);
-	Loop(i, TEST_SAMPLES) array_push(indices, i);
+	Loop(i, TEST_SAMPLES) array_push(indices, (u32)i);
 	rand_shuffle(slice(indices));
 	Loop(i, TEST_SAMPLES) {
 		mem_free(alloc, arr[indices[i]].data, arr[indices[i]].size);
@@ -213,7 +212,7 @@ void test_gpu_seglist_alloc() {
 		array_push(arr, gpu_alloc_seglist_alloc(alloc, size, align));
 	}
 	Array<u32, TEST_SAMPLES> indices = {};
-	Loop(i, TEST_SAMPLES) array_push(indices, i);
+	Loop(i, TEST_SAMPLES) array_push(indices, (u32)i);
 	rand_shuffle(slice(indices));
 	Loop(i, TEST_SAMPLES) {
 		gpu_alloc_seglist_free(alloc, arr[indices[i]]);
@@ -226,7 +225,7 @@ void test_gpu_seglist_alloc() {
 		array_push(arr, gpu_alloc_seglist_alloc(alloc, size, align));
 	}
 	array_clear(indices);
-	Loop(i, TEST_SAMPLES) array_push(indices, i);
+	Loop(i, TEST_SAMPLES) array_push(indices, (u32)i);
 	rand_shuffle(slice(indices));
 	Loop(i, TEST_SAMPLES) {
 		gpu_alloc_seglist_free(alloc, arr[indices[i]]);
@@ -254,7 +253,7 @@ void test_object_pool() {
 		AssertAlways(MemMatchStruct(&values[i], &pool_get(pool, handlers[i])));
 	}
 	Array<u32, TEST_SAMPLES> indices = {};
-	Loop(i, TEST_SAMPLES) array_push(indices, i);
+	Loop(i, TEST_SAMPLES) array_push(indices, (u32)i);
 	rand_shuffle(slice(indices));
 	Loop(i, TEST_SAMPLES) {
 		pool_remove(pool, handlers[i]);
@@ -271,7 +270,7 @@ void test_object_pool() {
 	Loop(i, TEST_SAMPLES) {
 		AssertAlways(MemMatchStruct(&values[i], &pool_get(pool, handlers[i])));
 	}
-	Loop(i, TEST_SAMPLES) array_push(indices, i);
+	Loop(i, TEST_SAMPLES) array_push(indices, (u32)i);
 	rand_shuffle(slice(indices));
 	Loop(i, TEST_SAMPLES) {
 		pool_remove(pool, handlers[i]);
@@ -299,7 +298,7 @@ void test_object_pool_linklist() {
 		AssertAlways(MemMatchStruct(&values[i], &pool_get(pool, handlers[i])));
 	}
 	Array<u32, TEST_SAMPLES> indices = {};
-	Loop(i, TEST_SAMPLES) array_push(indices, i);
+	Loop(i, TEST_SAMPLES) array_push(indices, (u32)i);
 	rand_shuffle(slice(indices));
 
 	u32 i = 0;
@@ -323,7 +322,7 @@ void test_object_pool_linklist() {
 	Loop(i, TEST_SAMPLES) {
 		AssertAlways(MemMatchStruct(&values[i], &pool_get(pool, handlers[i])));
 	}
-	Loop(i, TEST_SAMPLES) array_push(indices, i);
+	Loop(i, TEST_SAMPLES) array_push(indices, (u32)i);
 	rand_shuffle(slice(indices));
 	i = 0;
 	
@@ -337,55 +336,55 @@ void test_object_pool_linklist() {
 	}
 }
 
-void test_handle_darray() {
-	Scratch scratch;
-	struct A {
-		u32 a;
-		u32 b;
-	};
-	var arr = array_handler_make<A, OpaqueId>(scratch);
-	Array<A, TEST_SAMPLES> values = {};
-	Array<OpaqueId, TEST_SAMPLES> handlers = {};
+// void test_handle_darray() {
+// 	Scratch scratch;
+// 	struct A {
+// 		u32 a;
+// 		u32 b;
+// 	};
+// 	var arr = array_handler_make<A, OpaqueId>(scratch);
+// 	Array<A, TEST_SAMPLES> values = {};
+// 	Array<OpaqueId, TEST_SAMPLES> handlers = {};
 
-	Loop(i, TEST_SAMPLES) {
-		values[i].a = rand_u32_rng(0, TEST_SAMPLES);
-		values[i].b = rand_u32_rng(0, TEST_SAMPLES);
-	};
-	Loop(i, TEST_SAMPLES) {
-		handlers[i] = array_handler_push(arr, values[i]);
-	}
-	Loop(i, TEST_SAMPLES) {
-		AssertAlways(MemMatchStruct(&values[i], &array_handler_get(arr, handlers[i])));
-	}
-	Array<u32, TEST_SAMPLES> indices = {};
-	Loop(i, TEST_SAMPLES) array_push(indices, i);
-	rand_shuffle(slice(indices));
-	Loop(i, TEST_SAMPLES) {
-		array_handler_remove(arr, handlers[indices[i]]);
-	}
+// 	Loop(i, TEST_SAMPLES) {
+// 		values[i].a = rand_u32_rng(0, TEST_SAMPLES);
+// 		values[i].b = rand_u32_rng(0, TEST_SAMPLES);
+// 	};
+// 	Loop(i, TEST_SAMPLES) {
+// 		handlers[i] = array_handler_push(arr, values[i]);
+// 	}
+// 	Loop(i, TEST_SAMPLES) {
+// 		AssertAlways(MemMatchStruct(&values[i], &array_handler_get(arr, handlers[i])));
+// 	}
+// 	Array<u32, TEST_SAMPLES> indices = {};
+// 	Loop(i, TEST_SAMPLES) array_push(indices, i);
+// 	rand_shuffle(slice(indices));
+// 	Loop(i, TEST_SAMPLES) {
+// 		array_handler_remove(arr, handlers[indices[i]]);
+// 	}
 
-	array_clear(indices);
-	Loop(i, TEST_SAMPLES) {
-		values[i].a = rand_u32_rng(0, TEST_SAMPLES);
-		values[i].b = rand_u32_rng(0, TEST_SAMPLES);
-	};
-	Loop(i, TEST_SAMPLES) {
-		handlers[i] = array_handler_push(arr, values[i]);
-	}
-	Loop(i, TEST_SAMPLES) {
-		AssertAlways(MemMatchStruct(&values[i], &array_handler_get(arr, handlers[i])));
-	}
-	Loop(i, TEST_SAMPLES) array_push(indices, i);
-	rand_shuffle(slice(indices));
-	Loop(i, TEST_SAMPLES) {
-		array_handler_remove(arr, handlers[indices[i]]);
-	}
-}
+// 	array_clear(indices);
+// 	Loop(i, TEST_SAMPLES) {
+// 		values[i].a = rand_u32_rng(0, TEST_SAMPLES);
+// 		values[i].b = rand_u32_rng(0, TEST_SAMPLES);
+// 	};
+// 	Loop(i, TEST_SAMPLES) {
+// 		handlers[i] = array_handler_push(arr, values[i]);
+// 	}
+// 	Loop(i, TEST_SAMPLES) {
+// 		AssertAlways(MemMatchStruct(&values[i], &array_handler_get(arr, handlers[i])));
+// 	}
+// 	Loop(i, TEST_SAMPLES) array_push(indices, i);
+// 	rand_shuffle(slice(indices));
+// 	Loop(i, TEST_SAMPLES) {
+// 		array_handler_remove(arr, handlers[indices[i]]);
+// 	}
+// }
 
 void test_id_pool() {
 	Scratch scratch;
 	{
-		DidPool id_pool = id_pool_make(scratch);
+		DIdPool id_pool = id_pool_make(scratch);
 		Array<u32, TEST_SAMPLES> arr = {};
 		Loop(i, TEST_SAMPLES) {
 			u32 id = id_pool_push(id_pool);
@@ -403,7 +402,7 @@ void test_id_pool() {
 		Loop(i, arr.count) {
 			b32 exists = false;
 			Loop(j, arr.count) {
-				if(id_idx(arr[i]) == id_idx(new_arr[j])) {
+				if(arr[i] == new_arr[j]) {
 					AssertAlways(exists == false);
 					exists = true;
 				}
@@ -435,7 +434,7 @@ void test_id_pool() {
 		Loop(i, arr.count) {
 			b32 exists = false;
 			Loop(j, arr.count) {
-				if(id_idx(arr[i]) == id_idx(new_arr[j])) {
+				if(arr[i] == new_arr[j]) {
 					AssertAlways(exists == false);
 					exists = true;
 				}
@@ -745,7 +744,7 @@ void test() {
 	test_gpu_seglist_alloc();
 	test_object_pool();
 	test_object_pool_linklist();
-	test_handle_darray();
+	// test_handle_darray();
 	test_id_pool();
 }
 
@@ -885,7 +884,7 @@ void debug_window_toggle_fullscreen(DebugWindow& win) {
 	win.toggle_fullscreen = 1;
 }
 
-void ui_dev_init() {
+void dev_init() {
 	var& g = *st;
 	g.prof_win = {
 		.root_scroll_state = scroll_state_make(1),
@@ -911,7 +910,7 @@ void ui_dev_init() {
 	};
 }
 
-void ui_dev_update() {
+void dev_update() {
 	Scratch scratch;
 	var& g = *st;
 	if(key_pressed(Key_F1)) g.prof_win.win.open = !g.prof_win.win.open;
@@ -938,12 +937,17 @@ void ui_dev_update() {
 			var draw = ImGui::GetWindowDrawList();
 			imgui_draw_rect_filled(draw, rng2_make(v2(0), v2(100)), ColorWhite);
 
+			ImGui::BeginChild("child", v2(200,200));
 			ImGui::Text("entities: %u", g.entities_count);
 			ImGui::Text("Camera:");
+			Loop(i,10) ImGuiPushID(i) {
+				ImGui::Text("ye");
+			}
+			ImGui::EndChild();
 			imgui_text(push_str_copy(scratch, dumb_struct(scratch, slice(members_of_Camera), &g.cam)));
 			ImGui::Separator();
 			Thing& e = get_thing(g.axis_attached_to_cam_id);
-			imgui_text(push_str_copy(scratch, dumb_struct(scratch, slice(members_of_Entity), &e, e.flags)));
+			imgui_text(push_str_copy(scratch, dumb_struct(scratch, slice(members_of_Thing), &e, e.flags)));
 
 			if(ImGui::Button("save state")) {
 				save_game_state();
@@ -966,6 +970,12 @@ void ui_dev_update() {
 	///////////////////////////////////
 	// Profiler
 	{
+		struct  {
+			f32 thread_name_text_size = 20;
+			f32 time_bar_text_size = 15;
+		}l;
+		NoOp(l);
+
 		ProfBlock("Profiler");
 		var& prof = profiler_st;
 		var& prof_win = st->prof_win;
@@ -973,7 +983,7 @@ void ui_dev_update() {
 		// Avg, min, max
 		u64 tsc_elapsed_sum = 0;
 		u64 tsc_elapsed_max = 0;
-		u64 tsc_elapsed_min = U32_MAX;
+		u64 tsc_elapsed_min = U64_MAX;
 		for(var frame : prof.frames_times) {
 			u64 elapsed = frame.tsc_end - frame.tsc_start;
 			tsc_elapsed_sum += elapsed;
@@ -983,10 +993,12 @@ void ui_dev_update() {
 		prof_win.frame_avg_time = tsc_to_ms(tsc_elapsed_sum / ProfRecordHistoryNum);
 		prof_win.frame_max_time = tsc_to_ms(tsc_elapsed_max);
 		prof_win.frame_min_time = tsc_to_ms(tsc_elapsed_min);
+
+		// Prev frame
 		ProfFrame prev_frame = prof_get_prev_frame();
-		u64 tsc_start = prev_frame.frame_time.tsc_start;
-		u64 tsc_end = prev_frame.frame_time.tsc_end;
-		u64 tsc_elapsed = tsc_end - tsc_start;
+		u64 prev_frame_tsc_start = prev_frame.frame_time.tsc_start;
+		u64 prev_frame_tsc_end = prev_frame.frame_time.tsc_end;
+		u64 prev_frame_tsc_elapsed = prev_frame_tsc_end - prev_frame_tsc_start;
 		ProfColors colors = prof_win.colors;
 		if(key_pressed(Key_H)) {
 			ImGui::SetNextWindowFocus(); 
@@ -1017,7 +1029,7 @@ void ui_dev_update() {
 					v2 win_pos = ImGui::GetWindowPos();
 					v2 avail_size = ImGui::GetWindowSize();
 					avail_size.x -= (cursor_pos - win_pos).x * 2;
-					imgui_text("%.1ffps %.1fms CPU %.1fGhz, Recording: %s", 1000 / tsc_to_ms(tsc_elapsed), tsc_to_ms(tsc_elapsed), (f64)cpu_frequency() / Billion(1), prof.paused ? S("off") : S("on"));
+					imgui_text("%.1ffps %.1fms CPU %.1fGhz, Recording: %s", 1000 / tsc_to_ms(prev_frame_tsc_elapsed), tsc_to_ms(prev_frame_tsc_elapsed), (f64)cpu_frequency() / Billion(1), prof.paused ? S("off") : S("on"));
 					imgui_text("avg %.1fms, max %.1f, min %.1f", prof_win.frame_avg_time, prof_win.frame_max_time, prof_win.frame_min_time);
 					f32 info_height = 60;
 					cursor_pos.y += info_height;
@@ -1208,10 +1220,8 @@ void ui_dev_update() {
 						draw_threads(scroll_state);
 						// u32 idx = (st->current_frame-1) % ArrayCount(prof.frames_times);
 						Slice<ProfAnchor> slices[ArrayCount(prof.prof_threads)] = {};
-						LoopArray (i, prof.prof_threads) {
+						LoopArray(i, slices) slices[i] = slice(prof.prof_threads[i].recorded_anchors[0]);
 							// slices[i] = slice(prof.prof_threads[i].recorded_anchors[idx]);
-							slices[i] = slice(prof.prof_threads[i].recorded_anchors[0]);
-						}
 						// ProfFrameTime time = prof.frames_times[idx];
 						ProfFrameTime time = prof.frames_times[0];
 						draw_frame_graph(slice(slices), time, 0, scroll_state);
@@ -1302,7 +1312,7 @@ void ui_dev_update() {
 						sort_insert(sorted_anchors, [](ProfAnchor a, ProfAnchor b) { return a.tsc_elapsed_excl > b.tsc_elapsed_excl; });
 						Loop(i, prev_frame.anchors.count) ImGuiPushID(i) {
 								ProfAnchor anchor = sorted_anchors[i];
-								f64 width_exclusive_percent = (f64)anchor.tsc_elapsed_excl / tsc_elapsed;
+								f64 width_exclusive_percent = (f64)anchor.tsc_elapsed_excl / prev_frame_tsc_elapsed;
 								f32 width_exclusive = avail_size.x * 0.8;
 								f32 height = 30;
 								width_exclusive *= width_exclusive_percent;
@@ -1987,6 +1997,38 @@ JsObj js_get_obj(JsObj obj, String key) {
 	return {};
 }
 
+f32 parse_f32(Parser& t) {
+	b32 negative = false;
+	if(tok_match(t, TokenType_Minus)) {
+		negative = true;
+	}
+	Token tok = tok_expect(t, TokenType_Number);
+	f32 v = f32_from_str(tok.str);
+	return negative ? -v : v;
+}
+f32 parse_u32(Parser& t) {
+	b32 negative = false;
+	if(tok_match(t, TokenType_Minus)) {
+		negative = true;
+	}
+	Token tok = tok_expect(t, TokenType_Number);
+	i32 v = u32_from_str(tok.str);
+	return negative ? -v : v;
+}
+f32 parse_i32(Parser& t) {
+	b32 negative = false;
+	if(tok_match(t, TokenType_Minus)) {
+		negative = true;
+	}
+	Token tok = tok_expect(t, TokenType_Number);
+	i32 v = i32_from_str(tok.str);
+	return negative ? -v : v;
+}
+
+v3 parse_v3(Parser& t) {
+	return v3( parse_f32(t), parse_f32(t), parse_f32(t));
+}
+
 b32 key_pressed(Key key) {
 	if(os_key_is_pressed(key)) {
 		if(!st->input.consumed[key]) return true;
@@ -2080,7 +2122,7 @@ void scroll_state_update(ScrollState& s, ScrollType type) {
 }
 
 void watch_add(String watch_name, WatchOp op) {
-	WatchState& g = st->watch;
+	var& g = *st;
 	FileProperties props = os_file_path_properties(watch_name);
 	WatchFile file_watch = {
 		.path = watch_name,
@@ -2091,8 +2133,8 @@ void watch_add(String watch_name, WatchOp op) {
 }
 
 void watch_directory_add(String watch_name, WatchOp op, OS_WatchFlags flags) {
-	WatchState& g = st->watch;
-	String dir_path = push_strf(g.arena, "%s", watch_name);
+	var& g = *st;
+	String dir_path = push_strf(st->arena, "%s", watch_name);
 	OS_Watch watch = os_watch_open(flags);
 	os_watch_attach(watch, dir_path);
 	WatchDirectory dir_watch = {
@@ -2100,11 +2142,11 @@ void watch_directory_add(String watch_name, WatchOp op, OS_WatchFlags flags) {
 		.watch = watch,
 		.op = op,
 	};
-	array_push(g.directories, dir_watch);
+	array_push(g.watch_directories, dir_watch);
 }
 
 void watch_update() {
-	WatchState& g = st->watch;
+	var& g = *st;
 	Scratch scratch;
 	Loop(i, g.watches.count) {
 		WatchFile& x = g.watches[i];
@@ -2119,12 +2161,11 @@ void watch_update() {
 			x.modified = props.modified;
 		}
 	}
-	Loop(i, g.directories.count) {
-		WatchDirectory x = g.directories[i];
-		Slice strs = os_watch_check(scratch, x.watch);
+	for(var dir : g.watch_directories) {
+		Slice strs = os_watch_check(scratch, dir.watch);
 		Loop(i, strs.count) {
 			String name = strs[i];
-			switch(x.op) {
+			switch(dir.op) {
 				case WatchOp_RecompileShader: {
 					GlobalState& g = *st;
 					Scratch scratch;
@@ -2226,24 +2267,24 @@ String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, 
 				Rng3 v = *(Rng3*)member_ptr;
 				dstr_push(string, push_strf(scratch, "%s %f %f %f %f %f %f\n", member.name, v.min.x,v.min.y,v.min.z, v.max.x,v.max.y,v.max.z));
 			}break;
-			case MetaType_MeshId: {
+			case MetaType_R_MeshId: {
 				R_MeshId v = *(R_MeshId*)member_ptr;
 				dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->mesh_to_str[v.idx]));
 			}break;
-			case MetaType_MaterialId: {
-				R_MaterialId v = *(R_MaterialId*)member_ptr;
-				dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->material_to_str[v.idx]));
-			}break;
+			// case MetaType_MaterialId: {
+			// 	R_MaterialId v = *(R_MaterialId*)member_ptr;
+			// 	dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->material_to_str[v.idx]));
+			// }break;
 			case MetaType_String: {
 				if(flag_has(flags, EntityFlag_Referenced)) {
 					String v = *(String*)member_ptr;
 					dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, v));
 				}
 			}break;
-			case MetaType_EntityFlags: {
-				EntityFlags v = *(EntityFlags*)member_ptr;
-				dstr_push(string, push_strf(scratch, "%s %u\n", member.name, v));
-			}break;
+			// case MetaType_EntityFlags: {
+			// 	EntityFlags v = *(EntityFlags*)member_ptr;
+			// 	dstr_push(string, push_strf(scratch, "%s %u\n", member.name, v));
+			// }break;
 		}
 	}
 	return string;
@@ -2291,25 +2332,25 @@ void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser
 			case MetaType_Rng3: {
 				*(Rng3*)mem = Rng3(v3(parse_f32(p), parse_f32(p), parse_f32(p)), v3(parse_f32(p), parse_f32(p), parse_f32(p)));
 			}break;
-			case MetaType_MeshId: {
-				Token tok = tok_require(p, TokenType_String);
-				var [mesh, ok] = map_get(st->str_to_mesh, hash(tok.str));
-				Assert(ok);
-				*(R_MeshId*)mem = mesh;
-			}break;
-			case MetaType_MaterialId: {
-				Token tok = tok_require(p, TokenType_String);
-				var [material, ok] = map_get(st->str_to_material, hash(tok.str));
-				Assert(ok);
-				*(R_MaterialId*)mem = material;
-			}break;
-			case MetaType_String: {
-				Token tok = tok_require(p, TokenType_String);
-				*(String*)mem = push_str_copy(st->arena, tok.str);
-			}break;
-			case MetaType_EntityFlags: {
-				*(EntityFlags*)mem = parse_u32(p);
-			}break;
+			// case MetaType_R_MeshId: {
+			// 	Token tok = tok_expect(p, TokenType_String);
+			// 	var [mesh, ok] = map_get(st->str_to_mesh, hash(tok.str));
+			// 	Assert(ok);
+			// 	*(R_MeshId*)mem = mesh;
+			// }break;
+			// case MetaType_MaterialId: {
+			// 	Token tok = tok_expect(p, TokenType_String);
+			// 	var [material, ok] = map_get(st->str_to_material, hash(tok.str));
+			// 	Assert(ok);
+			// 	*(R_MaterialId*)mem = material;
+			// }break;
+			// case MetaType_String: {
+			// 	Token tok = tok_expect(p, TokenType_String);
+			// 	*(String*)mem = push_str_copy(st->arena, tok.str);
+			// }break;
+			// case MetaType_EntityFlags: {
+			// 	*(EntityFlags*)mem = parse_u32(p);
+			// }break;
 		}
 	}
 }
@@ -2318,39 +2359,106 @@ void init() {
 	Scratch scratch;
 	var& g = *st;
 
-	Rng2 r = rng2_make(v2(10), v2(10));
-	Rng2 left, right;
-	rng2_split_x(r, 0.1, &left, &right);
+	g.asset_dir = push_strf(g.arena, "%s/%s", os_cur_directory(), String("../assets"));
+	g.shader_dir = push_str_cat(g.arena, g.asset_dir, "/shaders");
+	g.shader_compiled_dir = push_str_cat(g.arena, g.shader_dir, "/compiled");
+	g.models_dir = push_str_cat(g.arena, g.asset_dir, "/models");
+	g.textures_dir = push_str_cat(g.arena, g.asset_dir, "/textures");
 
-	// Rng2 res = rng2_col(r, 1, 5);
+	for(var s : os_args()) {
+		if(str_match(s, "compile_shaders")) {
+			u64 s = os_now_ns();
+			r_shaders_compile(scratch);
+			r_shaders_compile_join();
+			Info("took: %fms", f64(os_now_ns()-s) / Million(1));
+			os_exit(0);
+		} else if(str_match(s, "preprocessor")) {
+			Map<u8, 32> saved = {};
+			LoopEnumNonZero(i, MetaType) {
+				map_set(saved, hash(meta_type_str[i]), {});
+			}
+
+			String files[] = {
+				"com.h",
+				"types.h",
+			};
+			Array<String, ArrayCount(files)> buffers = {};
+			LoopArray(i, files) {
+				buffers[i] = os_file_path_read_all_str(scratch, push_strf(scratch, "%s/../src/%s", os_cur_directory(), files[i]));
+			}
+			
+			var string = dstr_make(scratch);
+			var enum_meta_type_string = dstr_make(scratch);
+			dstr_push(enum_meta_type_string, "enum {\n");
+			b32 first_enum_meta_type = true;
+
+			LoopArray(i, files) {
+				Slice tokens = tokens_from_str(scratch, buffers[i]);
+				Parser p = parser_make(tokens);
+				while(p.cur < p.tokens.count) {
+					Token tok = tok_advance(p);
+					if(tok.type == TokenType_Identifier) {
+						if(str_match(tok.str, "Introspect")) {
+							tok_expect_name(p, "struct");
+							Token struct_name = tok_expect(p, TokenType_Identifier);
+							dstr_push(string, push_strf(scratch, "MemberDefinition members_of_%s[] = {\n", struct_name.str));
+							tok_expect(p, TokenType_OpenBrace);
+							while(!tok_match(p, TokenType_CloseBrace)) {
+								Token field_type = tok_expect(p, TokenType_Identifier);
+								Token field_name = tok_expect(p, TokenType_Identifier);
+								if(tok_match(p, TokenType_OpenBracket)) {
+									tok_expect(p, TokenType_Number);
+									tok_expect(p, TokenType_CloseBracket);
+								}
+								tok_expect(p, TokenType_Semicolon);
+								String s = push_strf(scratch, "\t{MetaType_%s, \"%s\", OffsetOf(%s,%s)},\n", field_type.str, field_name.str, struct_name.str, field_name.str);
+								dstr_push(string, s);
+	
+								// Enum meta type
+								String meta_type = push_strf(scratch, "MetaType_%s", field_type.str);
+								u64 h = hash(meta_type);
+								if(var[_, ok] = map_get(saved, h); !ok) {
+									meta_type = push_strf(scratch, "\t%s", meta_type);
+									if(first_enum_meta_type) {
+										meta_type = push_strf(scratch, "%s = %u", meta_type, MetaType_COUNT);
+										first_enum_meta_type = false;
+									}
+									meta_type = push_strf(scratch, "%s,\n", meta_type);
+									map_set(saved, h, {});
+									dstr_push(enum_meta_type_string, meta_type);
+								}
+							}
+							dstr_push(string, String("};\n"));
+						}
+					}
+				}
+			}
+			dstr_push(enum_meta_type_string, "};\n");
+			dstr_push(enum_meta_type_string, string);
+			os_file_path_write_all(push_strf(scratch, "%s/../src/generated.h", os_cur_directory()), dstr_slice(enum_meta_type_string));
+			os_exit(0);
+		}
+	}
+
+	r_shaders_compile(scratch);
+
+	g.gpa = alloc_make(g.arena);
+	g.frame_arena = arena_make();
 
 	cpu_find_frequency();
-	os_gfx_init();
 	prof_init(g.arena);
 	prof_launch_begin();
-
 	{
 		ProfBlock("init");
+		os_gfx_init();
 		thread_pool_init();
 		test();
-
-		g.gpa = alloc_make(g.arena);
-		g.frame_arena = arena_make();
-		g.asset_dir = push_strf(g.arena, "%s/%s", os_cur_directory(), String("../assets"));
-		g.shader_dir = push_str_cat(g.arena, g.asset_dir, "/shaders");
-		g.shader_compiled_dir = push_str_cat(g.arena, g.shader_dir, "/compiled");
-		g.models_dir = push_str_cat(g.arena, g.asset_dir, "/models");
-		g.textures_dir = push_str_cat(g.arena, g.asset_dir, "/textures");
-		g.watch.arena = g.arena;
-		r_shaders_compile(scratch);
 		r_init();
-		ui_dev_init();
+		dev_init();
 		init_game();
 		watch_directory_add(g.shader_dir, WatchOp_RecompileShader);
 		watch_directory_add(g.shader_compiled_dir, WatchOp_ShaderReload);
 		ui_init();
-
-		// g.ui0 = ui_init();
 	}
 	prof_launch_end();
 }
@@ -2601,7 +2709,7 @@ void save_game_state() {
 	{
 		Thing e = get_thing(g.cube1);
 		dstr_push(data, "e {\n");
-		dstr_push(data, dumb_struct(scratch, slice(members_of_Entity), &e));
+		dstr_push(data, dumb_struct(scratch, slice(members_of_Thing), &e));
 		dstr_push(data, "}\n");
 	}
 	{
@@ -2609,7 +2717,7 @@ void save_game_state() {
 		LoopIter(it, things_begin()) {
 			Thing& e = *it;
 			dstr_push(data, "Entity {\n");
-			dstr_push(data, dumb_struct(scratch, slice(members_of_Entity), &e, e.flags));
+			dstr_push(data, dumb_struct(scratch, slice(members_of_Thing), &e, e.flags));
 			dstr_push(data, "}\n");
 		}
 	}
@@ -2634,7 +2742,7 @@ void load_game_state() {
 		}
 	}
 
-	while(!tok_is_end(p)) {
+	while(p.cur < p.tokens.count) {
 		Token tok = tok_advance(p);
 		switch(tok.type) {
 			default:break;
@@ -2644,7 +2752,7 @@ void load_game_state() {
 				} else if(str_match(tok.str, "Entity")) {
 					ThingId id = make_thing({});
 					Thing& e = get_thing(id);
-					dumb_struct_load(slice(members_of_Entity), &e, &p);
+					dumb_struct_load(slice(members_of_Thing), &e, &p);
 					if(flag_has(e.flags, EntityFlag_Referenced)) {
 						if(str_match("monkey", e.name)) {
 							g.monkey0 = id;
@@ -2657,7 +2765,7 @@ void load_game_state() {
 				} else if(str_match(tok.str, "e")) {
 					ThingId e_id = make_thing({});
 					Thing& e = get_thing(e_id);
-					dumb_struct_load(slice(members_of_Entity), &e, &p);
+					dumb_struct_load(slice(members_of_Thing), &e, &p);
 					g.cube1 = e_id;
 				}
 			}
@@ -2895,8 +3003,8 @@ void init_game() {
 			// Material_Screen,
 		};
 		var desc = default_thing_desc();
-		desc.mesh = meshes[rand_u32_rng(0, ArrayCount(meshes)-1)];
-		desc.mat = materials[rand_u32_rng(0, ArrayCount(materials)-1)];
+		desc.mesh = rand_choice(slice(meshes));
+		desc.mat = rand_choice(slice(materials));
 		u32 range = 100;
 		desc.pos = v3_rand_rng(-v3(range), v3(range));;
 		make_thing(desc);
@@ -2946,8 +3054,8 @@ void init_game() {
 			// Material_Screen,
 		};
 		var desc = default_thing_desc();
-		desc.mesh = meshes[rand_u32_rng(0, ArrayCount(meshes)-1)];
-		desc.mat = materials[rand_u32_rng(0, ArrayCount(materials)-1)];
+		desc.mesh = rand_choice(slice(meshes));
+		desc.mat = rand_choice(slice(materials));
 		u32 range = 100;
 		desc.pos = v3_rand_rng(-v3(range), v3(range));
 		var id = make_thing(desc);
@@ -3008,9 +3116,9 @@ void init_game() {
 		desc.pos += v3(0,3,0);
 		desc.mat = Material_Container;
 		g.cube4 = make_thing(desc);
-		get_thing(g.cube4).angle = Rad(-160);
+		get_thing(g.cube4).angle = deg2rad(-160);
 		g.cube5 = make_thing(desc);
-		get_thing(g.cube5).angle = Rad(160);
+		get_thing(g.cube5).angle = deg2rad(160);
 	}
 }
 
@@ -3019,7 +3127,7 @@ void update_game() {
 	Scratch scratch;
 	var& g = *st;
 	ArrayZero(st->input.consumed);
-	ui_dev_update();
+	dev_update();
 
 	// Test jobs
 	{
@@ -3412,4 +3520,392 @@ void update_game() {
 		// }
 	}
 }
+
+#define FONT_SIZE 24
+
+String ui_display_string(String full) {
+	u64 idx = str_find_needle(full, S("##"));
+	if(idx < full.size) return {full.str, idx};
+	return full;
+}
+
+String ui_hash_string(String full) {
+	u64 idx = str_find_needle(full, S("###"));
+	if(idx < full.size) return {full.str+idx, full.size-idx};
+	return full;
+}
+
+u64 ui_key_from_string(String str, u64 seed) {
+	String h = ui_hash_string(str);
+	if(h.size == 0) return 0;
+	return hash(h, seed);
+}
+
+f32 ui_text_measure(String text, R_FontId font, f32 font_height) {
+	var f = pool_get(st->r.fonts, font);
+	f32 width = 0;
+	Loop(i, text.size) {
+		u32 advance = f.glyphs[text.str[i]-32].xadvance;
+		width += advance;
+	}
+	f32 scale = font_height / f.font_height;
+	return width * scale;
+}
+
+UI_Size ui_size_px(f32 v) 	{ return {UI_SizeType_Pixels, v}; }
+UI_Size ui_size_text() 				{ return {UI_SizeType_TextContent, 0}; }
+UI_Size ui_size_pct(f32 v) { return {UI_SizeType_PercentOfParent, v}; }
+UI_Size ui_size_children() { return {UI_SizeType_ChildrenSum, 0}; }
+UI_Size ui_size_null()  			{ return {UI_SizeType_Null, 0}; }
+
+void ui_push_parent(UI_Box* box) {
+	var& g = st->ui;
+	array_push(g.parent_stack, box);
+}
+
+void ui_pop_parent() {
+	var& g = st->ui;
+	array_pop(g.parent_stack);
+}
+
+UI_Box* ui_top_parent() {
+	var& g = st->ui;
+	return g.parent_stack.count > 0 ? array_back(g.parent_stack) : null;
+}
+
+void ui_push_font(R_FontId id) {
+	var& g = st->ui;
+	g.style.font = id;
+}
+
+void ui_push_bg_color(v4 color) {
+	var& g = st->ui;
+	array_push(g.bg_color_stack, color);
+}
+
+void ui_pop_bg_color() {
+	var& g = st->ui;
+	array_pop(g.bg_color_stack);
+}
+
+v4 ui_current_bg_color() {
+	var& g = st->ui;
+	return g.bg_color_stack.count > 0 ? array_back(g.bg_color_stack) : g.style.bg_color;
+}
+
+UI_Box* ui_box_make(UI_BoxFlags flags, UI_Size size_x, UI_Size size_y, String string) {
+	var& g = st->ui;
+	UI_Box* parent = ui_top_parent();
+	u64 seed = parent ? parent->key : 0;
+	u64 key = ui_key_from_string(string, seed);
+	UI_Box* box = ui_box_from_key(key);
+	box->first = box->last = box->next = box->prev = null;
+	box->parent = parent;
+	if(parent) dll_list_push_back(parent, box);
+	box->flags = flags;
+	box->string = string;
+	box->semantic_size[UI_Axis2_X] = size_x;
+	box->semantic_size[UI_Axis2_Y] = size_y;
+	box->child_layout_axis = UI_Axis2_X;
+	box->background_color = ui_current_bg_color();
+	box->text_color = g.style.text_color;
+	box->border_color = g.style.border_color;
+	box->last_frame_touched = current_frame;
+	return box;
+}
+
+UI_Box* ui_box_from_key(u64 key) {
+	var& g = st->ui;
+	if(key == 0) {
+		UI_Box* b = push_struct(g.frame_arena, UI_Box);
+		*b = {};
+		return b;
+	}
+	var[b, ok] = map_get(g.box_map, key);
+	if(!ok) {
+		b = pool_push(g.boxes, {.key = key});
+		map_set(g.box_map, key, b);
+		u64 d = b - g.boxes.data;
+		if(d < UI_KEY_TABLE_SIZE) {
+			sparse_set_push(g.active_boxes, d);
+		}
+	}
+	Assert(b > g.boxes.data && b <= g.boxes.data+g.boxes.max_idx);
+	return b;
+}
+
+void ui_prune_stale_boxes() {
+	var& g = st->ui;
+	Loop(i, g.active_boxes.count) {
+		u32 idx = g.active_boxes.dense[i];
+		UI_Box* b = &g.boxes.data[idx];
+		if(current_frame - b->last_frame_touched > UI_STALE_FRAMES) {
+			sparse_set_remove(g.active_boxes, idx);
+			pool_remove(g.boxes, b);
+			map_remove(g.box_map, b->key);
+		}
+	}
+}
+
+void ui_init() {
+	var& g = st->ui;
+	g.frame_arena = arena_make();
+	g.style.padding = 8.0f;
+	g.style.gap = 4.0f;
+	g.style.line_height = 18.0f;
+	g.style.text_pad = 6.0f;
+	g.style.bg_color = v4(0.16f, 0.16f, 0.18f, 1.0f);
+	g.style.text_color = v4(0.92f, 0.92f, 0.92f, 1.0f);
+	g.style.border_color = v4(0.30f, 0.30f, 0.33f, 1.0f);
+	g.style.hot_color = v4(0.26f, 0.26f, 0.30f, 1.0f);
+	g.style.active_color = v4(0.35f, 0.45f, 0.75f, 1.0f);
+	g.style.accent_color = v4(0.30f, 0.55f, 0.90f, 1.0f);
+}
+
+void ui_begin_frame() {
+	var& g = st->ui;
+	g.prev_input = g.input;
+	g.input = {
+		.dt = time_dt,
+		.mouse_pos = os_mouse_pos(),
+		.mouse_down[0] = os_mouse_is_button_down(MouseButton_Left),
+		.mouse_down[1] = os_mouse_is_button_down(MouseButton_Right),
+		.mouse_down[2] = os_mouse_is_button_down(MouseButton_Middle),
+	};
+	arena_clear(g.frame_arena);
+	array_clear(g.draw_cmds);
+	g.root = ui_box_make(0, ui_size_px(os_window_width()), ui_size_px(os_window_height()), "###root");
+	g.root->child_layout_axis = UI_Axis2_Y;
+	ui_push_parent(g.root);
+}
+
+void ui_end_frame() {
+	var& g = st->ui;
+	ui_pop_parent();
+	ui_layout_standalone(g.root);
+	ui_layout_upward(g.root);
+	ui_layout_downward(g.root);
+	g.root->rect = Rng2(v2(0, 0), v2(g.root->computed_size[UI_Axis2_X], g.root->computed_size[UI_Axis2_Y]));
+	ui_layout_positions(g.root);
+	ui_build_draw_cmds(g.root);
+	ui_prune_stale_boxes();
+}
+
+void ui_layout_standalone(UI_Box* box) {
+	var& g = st->ui;
+	LoopEnum(axis, UI_Axis2) {
+		UI_Size sz = box->semantic_size[axis];
+		if(sz.type == UI_SizeType_Pixels) {
+			box->computed_size[axis] = sz.value;
+		} else if(sz.type == UI_SizeType_TextContent) {
+			if(axis == UI_Axis2_X)
+				box->computed_size[axis] = ui_text_measure(ui_display_string(box->string), g.style.font, FONT_SIZE) + 2.0f * g.style.text_pad;
+			else
+				box->computed_size[axis] = g.style.line_height + 2.0f * g.style.text_pad;
+		}
+	}
+	LoopNode(it, box->first) {
+		ui_layout_standalone(it);
+	}
+}
+
+void ui_layout_upward(UI_Box* box) {
+	LoopEnum(axis, UI_Axis2) {
+		UI_Size sz = box->semantic_size[axis];
+		if(sz.type == UI_SizeType_PercentOfParent) {
+			f32 parent_size = box->parent ? box->parent->computed_size[axis] : box->computed_size[axis];
+			box->computed_size[axis] = parent_size * sz.value;
+		}
+	}
+	LoopNode(it, box->first) {
+		ui_layout_upward(it);
+	}
+}
+
+void ui_layout_downward(UI_Box* box) {
+	var& g = st->ui;
+	LoopNode(it, box->first) {
+		ui_layout_downward(it);
+	}
+	LoopEnum(axis, UI_Axis2) {
+		UI_Size sz = box->semantic_size[axis];
+		if(sz.type == UI_SizeType_ChildrenSum) {
+			f32 sum = 0, mx = 0;
+			u32 n = 0;
+			LoopNode(it, box->first) {
+				if(it->semantic_size[axis].type == UI_SizeType_PercentOfParent) continue;
+				sum += it->computed_size[axis];
+				mx = Max(mx, it->computed_size[axis]);
+				n++;
+			}
+			if(axis == box->child_layout_axis) {
+				f32 gaps = n > 1 ? (f32)(n - 1) * g.style.gap : 0;
+				box->computed_size[axis] = sum + gaps + 2.0f * g.style.padding;
+			} else {
+				box->computed_size[axis] = mx + 2.0f * g.style.padding;
+			}
+		}
+	}
+}
+
+void ui_layout_positions(UI_Box* box) {
+	var& g = st->ui;
+	f32 pad = g.style.padding;
+	f32 gap = g.style.gap;
+	f32 cursor = pad;
+	LoopNode(it, box->first) {
+		f32 main = cursor;
+		f32 cross = pad;
+		if(box->child_layout_axis == UI_Axis2_X) {
+			it->rect.x0 = box->rect.x0 + main;
+			it->rect.y0 = box->rect.y0 + cross;
+		} else {
+			it->rect.x0 = box->rect.x0 + cross;
+			it->rect.y0 = box->rect.y0 + main;
+		}
+		it->rect.x1 = it->rect.x0 + it->computed_size[UI_Axis2_X];
+		it->rect.y1 = it->rect.y0 + it->computed_size[UI_Axis2_Y];
+		cursor += it->computed_size[box->child_layout_axis] + gap;
+		ui_layout_positions(it);
+	}
+}
+
+void ui_build_draw_cmds(UI_Box* box) {
+	var& g = st->ui;
+	if(box->flags & UI_BoxFlag_DrawBackground) {
+		v4 color = box->background_color;
+		if((box->flags & UI_BoxFlag_ActiveAnimation) && box->active_t > 0.001f)
+			color = v3_to_v4(v3_lerp(color.xyz, box->active_t, g.style.active_color.xyz), 1);
+		else if((box->flags & UI_BoxFlag_HotAnimation) && box->hot_t > 0.001f)
+			color = v3_to_v4(v3_lerp(color.xyz, box->hot_t, g.style.hot_color.xyz), 1);
+		array_push(g.draw_cmds, {UI_DrawCmdType_Rect, box->rect, color, true});
+		r_draw_rect(box->rect, color, 0,0,0);
+	}
+	if(box->flags & UI_BoxFlag_DrawBorder) {
+		array_push(g.draw_cmds, {UI_DrawCmdType_Rect, box->rect, box->border_color});
+		r_draw_rect(box->rect, box->border_color, 0,4,0);
+	}
+	if(box->flags & UI_BoxFlag_DrawText) {
+		array_push(g.draw_cmds, {UI_DrawCmdType_Text, box->rect, box->text_color, false, ui_display_string(box->string)});
+		r_draw_text_ext(g.style.font, v2(box->rect.x0, box->rect.y1), box->string, box->text_color, FONT_SIZE);
+	}
+	LoopNode(it, box->first)
+		ui_build_draw_cmds(it);
+}
+
+f32 ui_animate_towards(f32 current, f32 target, f32 dt, f32 rate_per_sec) {
+	// f32 t = 1.0f - (f32)((f64)1.0 / (1.0 + rate_per_sec * dt)); /* simple, frame-rate-robust ease */
+	// return Lerp(current, Clamp01(t), target);
+	return exp_decay(current, target, rate_per_sec, dt);
+}
+
+UI_Signal ui_signal_from_box(UI_Box* box) {
+	var& g = st->ui;
+	UI_Signal sig = {};
+	sig.box = box;
+
+	if(!(box->flags & UI_BoxFlag_Clickable)) return sig;
+
+	/* Hit test against LAST FRAME's rect -- this frame's layout for
+	 * `box` hasn't run yet. This is the one-frame lag mentioned up top. */
+	b32 hovering = rng2_contains(box->rect, g.input.mouse_pos);
+	b32 mouse_down_now = g.input.mouse_down[0];
+	b32 mouse_down_prev = g.prev_input.mouse_down[0];
+	b32 mouse_pressed_edge = mouse_down_now && !mouse_down_prev;
+	b32 mouse_released_edge = !mouse_down_now && mouse_down_prev;
+
+	sig.hovering = hovering;
+
+	if(hovering)
+		g.hot_key = box->key;
+	else if(g.hot_key == box->key)
+		g.hot_key = 0;
+
+	if(hovering && mouse_pressed_edge) {
+		g.active_key = box->key;
+		sig.pressed = true;
+	}
+
+	b32 is_active = (g.active_key == box->key);
+	if(is_active && mouse_down_now) {
+		sig.dragging = true;
+		sig.drag_delta = g.input.mouse_pos - g.prev_input.mouse_pos;
+	}
+	if(is_active && mouse_released_edge) {
+		sig.released = true;
+		sig.clicked = hovering; /* only counts as a click if released back over the box */
+		g.active_key = 0;
+	}
+
+	f32 hot_target = (g.hot_key == box->key) ? 1.0f : 0.0f;
+	f32 active_target = (g.active_key == box->key) ? 1.0f : 0.0f;
+	box->hot_t = ui_animate_towards(box->hot_t, hot_target, g.input.dt, 10.0f);
+	box->active_t = ui_animate_towards(box->active_t, active_target, g.input.dt, 15.0f);
+
+	return sig;
+}
+
+UI_Signal ui_label(String string) {
+	UI_Box* box = ui_box_make(UI_BoxFlag_DrawText, ui_size_text(), ui_size_text(), string);
+	return ui_signal_from_box(box); /* not clickable -- returns an all-false signal */
+}
+
+UI_Signal ui_button(String string) {
+	UI_Box* box = ui_box_make(
+		UI_BoxFlag_Clickable | UI_BoxFlag_DrawBorder | UI_BoxFlag_DrawBackground |
+		UI_BoxFlag_DrawText | UI_BoxFlag_HotAnimation | UI_BoxFlag_ActiveAnimation,
+		ui_size_text(), ui_size_text(), string);
+	return ui_signal_from_box(box);
+}
+
+b32 ui_checkbox(String string, b32* value) {
+	var& g = st->ui;
+	UI_Box* box = ui_box_make(
+		UI_BoxFlag_Clickable | UI_BoxFlag_DrawBorder | UI_BoxFlag_DrawBackground |
+		UI_BoxFlag_HotAnimation | UI_BoxFlag_ActiveAnimation,
+		ui_size_px(20), ui_size_px(20), string);
+	UI_Signal sig = ui_signal_from_box(box);
+	if(sig.clicked) *value = !*value;
+	if(*value) box->background_color = g.style.accent_color;
+	return *value;
+}
+
+f32 ui_slider(String string, f32* value, f32 min, f32 max) {
+	var& g = st->ui;
+	UI_Box* track = ui_box_make(
+		UI_BoxFlag_Clickable | UI_BoxFlag_DrawBorder | UI_BoxFlag_DrawBackground |
+		UI_BoxFlag_HotAnimation | UI_BoxFlag_ActiveAnimation,
+		ui_size_pct(1.0f), ui_size_px(20), string);
+	UI_Signal sig = ui_signal_from_box(track);
+	if(sig.dragging || sig.pressed) {
+		f32 w = rng2_width(track->rect);
+		f32 t = w > 0.0f ? (g.input.mouse_pos.x - track->rect.x0) / w : 0.0f;
+		t = Clamp01(t);
+		*value = min + t * (max - min);
+	}
+	return *value;
+}
+
+void ui_spacer(UI_Size size_along_parent_axis) {
+	UI_Box* parent = ui_top_parent();
+	UI_Axis2 axis = parent ? parent->child_layout_axis : UI_Axis2_X;
+	UI_Size sizes[2] = {ui_size_px(0), ui_size_px(0)};
+	sizes[axis] = size_along_parent_axis;
+	ui_box_make(0, sizes[UI_Axis2_X], sizes[UI_Axis2_Y], {});
+}
+
+UI_Box* ui_panel_begin_sized(String string, UI_Axis2 child_layout_axis, UI_Size size_x, UI_Size size_y) {
+	UI_Box* box = ui_box_make(
+		UI_BoxFlag_DrawBackground | UI_BoxFlag_DrawBorder,
+		size_x, size_y, string);
+	box->child_layout_axis = child_layout_axis;
+	ui_push_parent(box);
+	return box;
+}
+
+UI_Box* ui_panel_begin(String string, UI_Axis2 child_layout_axis) {
+	return ui_panel_begin_sized(string, child_layout_axis, ui_size_children(), ui_size_children());
+}
+void ui_panel_end() { ui_pop_parent(); }
+
 

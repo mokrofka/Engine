@@ -1,5 +1,5 @@
 #pragma once
-#include "lib.h"
+#include "base/lib.h"
 
 #define TOKEN_TYPE_LIST    \
 	X(TokenType_Null)         \
@@ -23,14 +23,35 @@
 	X(TokenType_Identifier)   \
 	X(TokenType_Number)       \
 																											\
-	X(TokenType_Spacing)      \
-	X(TokenType_NewLine)      \
-	X(TokenType_Comment)
+	// X(TokenType_Spacing)      \
+	// X(TokenType_NewLine)      \
+	// X(TokenType_Comment)
 
 enum TokenType {
 #define X(name) name,
 	TOKEN_TYPE_LIST
 #undef X
+};
+
+#define MetaTypeLIST \
+	X(MetaType_Null) \
+	X(MetaType_u8) \
+	X(MetaType_u32) \
+	X(MetaType_i32) \
+	X(MetaType_b32) \
+	X(MetaType_f32) \
+	X(MetaType_String) \
+	X(MetaType_v2) \
+	X(MetaType_v3) \
+	X(MetaType_v4) \
+	X(MetaType_Rng2) \
+	X(MetaType_Rng3) \
+
+enum MetaType {
+	#define X(x) x,
+	MetaTypeLIST
+	#undef X
+	MetaType_COUNT,
 };
 
 struct Token {
@@ -40,31 +61,9 @@ struct Token {
 	u32 line;
 };
 
-Slice<Token> tokens_from_str(Allocator arena, String string);
-
 struct Parser {
 	Slice<Token> tokens;
-	u32 i;
+	u32 cur;
 };
 
-Parser parser_make(Slice<Token> tokens);
-
-b32 tok_is_trivia(TokenType type);
-void tok_skip_trivia(Parser& p);
-b32 tok_is_end(Parser& p);
-Token tok_peek(Parser& p);
-Token tok_prev(Parser& p);
-Token tok_advance(Parser& p);
-b32 tok_check(Parser& p, TokenType type);
-b32 tok_match(Parser& p, TokenType type);
-Token tok_require(Parser& p, TokenType type);
-b32 tok_ident_check(Parser& p, String name);
-b32 tok_ident_match(Parser& p, String name);
-Token tok_ident_require(Parser& p, String name);
-
-f32 parse_f32(Parser& p);
-f32 parse_u32(Parser& p);
-f32 parse_i32(Parser& p);
-
-v3 parse_v3(Parser& p);
 

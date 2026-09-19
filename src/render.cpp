@@ -1,6 +1,4 @@
 #include "com.h"
-#include "stb_image.h"
-#include "stb_truetype.h"
 
 R_DrawBatch r_make_draw_batch(Allocator alloc, Gfx_Pipeline pip) {
 	R_DrawBatch res = {
@@ -388,7 +386,7 @@ R_FontId r_make_font(R_FontDesc desc) {
 			};
 		}
 		LockScope(g.waiting_fonts_mutex);
-		array_push(g.waiting_fonts, {
+		queue_push(g.waiting_fonts, {
 			.id = ctx.font_id,
 			.font = font,
 		});
@@ -567,14 +565,15 @@ void r_shaders_compile(Allocator arena) {
 
 	///////////////////////////////////
 	// Compilation
-	R_State& g = st->r;
+	var& g = *st;
 	var file_names = array_make<String>(arena);
-	g.shader_module_compilation_pids = push_slice(st->arena, OS_Handle, files.count);
-	g.shaders_to_compile = push_slice(st->arena, String, files.count);
+	g.shader_module_compilation_pids = push_slice(arena, OS_Handle, files.count);
+	g.shaders_to_compile = push_slice(arena, String, files.count);
 	Loop(i, files.count) {
 		File& f = files[i];
 		var arr = array_make<String>(scratch);
-		array_push(arr, S("slangc"), f.file_path, S("-target"), S("spirv"), S("-O0"), S("-g3"), S("-o"), f.compiled_file_path);
+		String args[] = {S("slangc"), f.file_path, S("-target"), S("spirv"), S("-O0"), S("-g3"), S("-o"), f.compiled_file_path};
+		array_push_elems(arr, slice(args));
 		g.shader_module_compilation_pids[i] = os_process_make(slice(arr));
 		Debug("%s", f.file_path);
 		array_push(file_names, f.shader_name);
@@ -584,7 +583,7 @@ void r_shaders_compile(Allocator arena) {
 
 void r_shaders_compile_join() {
 	Scratch scratch;
-	R_State& g = st->r;
+	var& g = *st;
 	Loop(i, g.shaders_to_compile.count) {
 		os_process_join(g.shader_module_compilation_pids[i]);
 		String shader_file_path = push_strf(scratch, "%s/%s.slang", st->shader_dir, g.shaders_to_compile[i]);
@@ -676,9 +675,6 @@ void r_init() {
 	g.arena = arena;
 	g.gpa = alloc_make(g.arena);
 	g.scale = 1;
-	// g.push_to_gpu_queue_mutex = os_mutex_make();
-	// g.vert_index_buffer_mutex = os_mutex_make();
-	// g.waiting_fonts_mutex = os_mutex_make();
 	gfx_init({.cpu_mem_size = MB(100), .gpu_mem_size = MB(10), .image_mem_size = MB(10)});
 
 	///////////////////////////////////
@@ -805,7 +801,6 @@ void r_end() {
 
 	// Push to gpu
 	{
-		LockScope(g.push_to_gpu_queue_mutex);
 		Loop(i, queue_count(g.push_to_gpu_queue)) {
 			var push = queue_pop(g.push_to_gpu_queue);
 			switch(push.type) {
@@ -870,17 +865,16 @@ void r_end() {
 				}
 			} else break;
 		} 
+		struct A {
+			long a;
+		};
 
 		// Update font?
-		LockScope(g.waiting_fonts_mutex);
-		LoopNoInc(i, g.waiting_fonts.count) {
-			var slot = g.waiting_fonts[i];
-			if(r_texture_is_ready(slot.font.texture)) {
+		Loop(i, queue_count(g.waiting_fonts)) {
+			if(r_texture_is_ready(queue_front(g.waiting_fonts).font.texture)) {
+				var slot = queue_pop(g.waiting_fonts);
 				pool_get(g.fonts, slot.id) = slot.font;
-				array_swap_remove(g.waiting_fonts, i);
-			} else {
-				++i;
-			}
+			} else break;
 		}
 	}
 
@@ -924,7 +918,7 @@ void r_end() {
 					u32 base = gfx_begin_indirect();
 					Loop(i, pushes.count) {
 						R_DrawCall draw = pushes[i];
-						m4x4 model = m4x4_transform(draw.scale, draw.pos, draw.rot);
+						m4x4 model = m4x4_transform(draw.pos, draw.scale, draw.rot);
 						// m4x4 model = m4x4_from_quat(draw.rot) * m4x4_translate(draw.pos) * m4x4_scale(draw.scale);
 						// m4x4 model =  m4x4_translate(draw.pos) * m4x4_scale(draw.scale) * m4x4_from_quat(draw.rot);
 						var mat = pool_get(g.materials, draw.mat);
@@ -1307,7 +1301,7 @@ void r_draw_text_ext(R_FontId font, v2 pos, String str, v4 color, u32 font_heigh
 ////////////////////////////////////////////////////////////////////////
 // @Dear imgui
 
-#if DEAR_IMGUI
+#if BUILD_DEV
 #include "imgui/imgui_impl_vulkan.h"
 
 ImGuiKey imgui_keycode_translate(Key key) {

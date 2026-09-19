@@ -1,13 +1,13 @@
 #pragma once
-#include "base/base.h"
-#include "base/str.h"
-#include "base/mem.h"
+#include "../base.h"
+#include "../str.h"
+#include "../mem.h"
 
 struct OS_Handle { u64 v; };
 
 typedef u32 FilePropertyFlags;
 enum {
-	FilePropertyFlag_IsFolder = Bit(0),
+	FilePropertyFlag_IsFolder = 1<<0,
 };
 
 struct FileProperties {
@@ -19,10 +19,10 @@ struct FileProperties {
 
 typedef u32 OS_FileIterFlags;
 enum {
-	OS_FileIterFlag_SkipFolders     = Bit(0),
-	OS_FileIterFlag_SkipFiles       = Bit(1),
-	OS_FileIterFlag_SkipHiddenFiles = Bit(2),
-	OS_FileIterFlag_Done            = Bit(31),
+	OS_FileIterFlag_SkipFolders     = 1<<0,
+	OS_FileIterFlag_SkipFiles       = 1<<1,
+	OS_FileIterFlag_SkipHiddenFiles = 1<<2,
+	OS_FileIterFlag_Done            = 1<<31,
 };
 
 struct OS_FileIter {
@@ -37,20 +37,20 @@ struct OS_FileInfo {
 
 typedef u32 OS_AccessFlags;
 enum {
-	OS_AccessFlag_Read       = Bit(0),
-	OS_AccessFlag_Write      = Bit(1),
-	OS_AccessFlag_Trunc      = Bit(2),
-	OS_AccessFlag_Execute    = Bit(3),
-	OS_AccessFlag_Append     = Bit(4),
-	OS_AccessFlag_ShareRead  = Bit(5),
-	OS_AccessFlag_ShareWrite = Bit(6),
+	OS_AccessFlag_Read       = 1<<0,
+	OS_AccessFlag_Write      = 1<<1,
+	OS_AccessFlag_Trunc      = 1<<2,
+	OS_AccessFlag_Execute    = 1<<3,
+	OS_AccessFlag_Append     = 1<<4,
+	OS_AccessFlag_ShareRead  = 1<<5,
+	OS_AccessFlag_ShareWrite = 1<<6,
 };
 
 typedef u32 OS_WatchFlags;
 enum {
-	OS_WatchFlag_Create = Bit(0),
-	OS_WatchFlag_Delete = Bit(1),
-	OS_WatchFlag_Modify = Bit(2),
+	OS_WatchFlag_Create = 0<<0,
+	OS_WatchFlag_Delete = 0<<1,
+	OS_WatchFlag_Modify = 0<<2,
 };
 
 struct OS_Watch{
@@ -81,8 +81,9 @@ String os_cur_directory();
 String os_cur_binary_name();
 u64 os_commited_size();
 u64 os_reserved_size();
+Slice<String> os_args();
 
-void os_init(String name);
+void os_init(Slice<char*> args);
 void os_exit(i32 exit_code);
 
 u64 os_timer_frequency();

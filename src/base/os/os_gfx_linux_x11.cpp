@@ -1,4 +1,4 @@
-#include "../base_impl.h"
+#include "../lib.h"
 
 #if OS_LINUX && GFX_X11
 
@@ -53,8 +53,8 @@ struct X11State {
 		i32 mouse_x_delta;
 		i32 mouse_y_delta;
 	} input;
-	Darray<OS_InputEvent> input_events;
-	Darray<xcb_generic_event_t*> xcb_events;
+	DArray<OS_InputEvent> input_events;
+	DArray<xcb_generic_event_t*> xcb_events;
 	OS_Modifiers modifiers;
 };
 
