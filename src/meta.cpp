@@ -148,6 +148,10 @@ Token tok_peek(Parser& p) {
 	Assert(p.cur < p.tokens.count);
 	return p.tokens[p.cur];
 }
+Token tok_peek(Parser& p, u32 off) {
+	Assert(p.cur+off < p.tokens.count);
+	return p.tokens[p.cur+off];
+}
 Token tok_prev(Parser& p) {
 	return p.tokens[p.cur-1];
 }

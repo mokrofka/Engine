@@ -91,6 +91,12 @@ global String materials_strs[] = {
 #undef X
 };
 
+global String things_enum_strs[] = {
+#define X(name) [name] = Stringify(name),
+	THING_LIST
+#undef X
+};
+
 const u32 TEST_SAMPLES = 100;
 global i32 test_alignments[] = { 8, 16, 32, 64 };
 
@@ -937,13 +943,6 @@ void dev_update() {
 			var draw = ImGui::GetWindowDrawList();
 			imgui_draw_rect_filled(draw, rng2_make(v2(0), v2(100)), ColorWhite);
 
-			ImGui::BeginChild("child", v2(200,200));
-			ImGui::Text("entities: %u", g.entities_count);
-			ImGui::Text("Camera:");
-			Loop(i,10) ImGuiPushID(i) {
-				ImGui::Text("ye");
-			}
-			ImGui::EndChild();
 			imgui_text(push_str_copy(scratch, dumb_struct(scratch, slice(members_of_Camera), &g.cam)));
 			ImGui::Separator();
 			Thing& e = get_thing(g.axis_attached_to_cam_id);
@@ -1997,37 +1996,41 @@ JsObj js_get_obj(JsObj obj, String key) {
 	return {};
 }
 
-f32 parse_f32(Parser& t) {
+f32 parse_f32(Parser& p) {
 	b32 negative = false;
-	if(tok_match(t, TokenType_Minus)) {
+	if(tok_match(p, TokenType_Minus)) {
 		negative = true;
 	}
-	Token tok = tok_expect(t, TokenType_Number);
+	Token tok = tok_expect(p, TokenType_Number);
 	f32 v = f32_from_str(tok.str);
 	return negative ? -v : v;
 }
-f32 parse_u32(Parser& t) {
+f32 parse_u32(Parser& p) {
 	b32 negative = false;
-	if(tok_match(t, TokenType_Minus)) {
+	if(tok_match(p, TokenType_Minus)) {
 		negative = true;
 	}
-	Token tok = tok_expect(t, TokenType_Number);
+	Token tok = tok_expect(p, TokenType_Number);
 	i32 v = u32_from_str(tok.str);
 	return negative ? -v : v;
 }
-f32 parse_i32(Parser& t) {
+f32 parse_i32(Parser& p) {
 	b32 negative = false;
-	if(tok_match(t, TokenType_Minus)) {
+	if(tok_match(p, TokenType_Minus)) {
 		negative = true;
 	}
-	Token tok = tok_expect(t, TokenType_Number);
+	Token tok = tok_expect(p, TokenType_Number);
 	i32 v = i32_from_str(tok.str);
 	return negative ? -v : v;
 }
-
-v3 parse_v3(Parser& t) {
-	return v3( parse_f32(t), parse_f32(t), parse_f32(t));
+v3 parse_v3(Parser& p) {
+	return v3(parse_f32(p), parse_f32(p), parse_f32(p));
 }
+v4 parse_v4(Parser& p) {
+	return v4(parse_f32(p), parse_f32(p), parse_f32(p), parse_f32(p));
+}
+String write_v3(Allocator alloc, v3 v) { return push_strf(alloc, "%f %f %f", v.x, v.y, v.z); }
+String write_v4(Allocator alloc, v4 v) { return push_strf(alloc, "%f %f %f %f", v.x, v.y, v.z, v.w); }
 
 b32 key_pressed(Key key) {
 	if(os_key_is_pressed(key)) {
@@ -2214,7 +2217,7 @@ R_MaterialProps default_material_props() {
 	return props;
 }
 
-Thing& get_thing(ThingId id) { return pool_get(st->entities, id); }
+Thing& get_thing(ThingId id) { return pool_get(st->things, id); }
 R_MeshId get_mesh(MeshEnum mesh_enum) { return st->meshes_ids[mesh_enum]; }
 R_TextureId get_texture(TextureEnum tex_enum) { return st->textures_ids[tex_enum]; }
 R_MaterialId get_material(MaterialEnum id) { return st->materials_ids[id]; }
@@ -2228,16 +2231,15 @@ void mesh_set(MeshEnum mesh_enum, R_MeshId id) {
 
 void push_child_thing(ThingId parent, ThingId id) {
 	var& g = *st;
-	hdll_list_push_back(g.entities.pool.data, get_thing(parent), id);
+	hdll_list_push_back(g.things.pool.data, get_thing(parent), id);
 }
 
 String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, EntityFlags flags) {
 	Scratch scratch(arena);
 	var string = dstr_make(arena);
-	Loop(i, members.count) {
-		MemberDefinition member = members[i];
+	for(var member : members) {
 		u8* member_ptr = Offset(ptr, member.offset);
-		switch(members[i].type) {
+		switch(member.type) {
 			default:break;
 			case MetaType_u32: {
 				dstr_push(string, push_strf(scratch, "%s %u\n", member.name, *(u32*)member_ptr));
@@ -2267,24 +2269,18 @@ String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, 
 				Rng3 v = *(Rng3*)member_ptr;
 				dstr_push(string, push_strf(scratch, "%s %f %f %f %f %f %f\n", member.name, v.min.x,v.min.y,v.min.z, v.max.x,v.max.y,v.max.z));
 			}break;
+			case MetaType_String: {
+				String v = *(String*)member_ptr;
+				dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, v));
+			}break;
 			case MetaType_R_MeshId: {
 				R_MeshId v = *(R_MeshId*)member_ptr;
 				dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->mesh_to_str[v.idx]));
 			}break;
-			// case MetaType_MaterialId: {
-			// 	R_MaterialId v = *(R_MaterialId*)member_ptr;
-			// 	dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->material_to_str[v.idx]));
-			// }break;
-			case MetaType_String: {
-				if(flag_has(flags, EntityFlag_Referenced)) {
-					String v = *(String*)member_ptr;
-					dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, v));
-				}
+			case MetaType_R_MaterialId: {
+				R_MaterialId v = *(R_MaterialId*)member_ptr;
+				dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->material_to_str[v.idx]));
 			}break;
-			// case MetaType_EntityFlags: {
-			// 	EntityFlags v = *(EntityFlags*)member_ptr;
-			// 	dstr_push(string, push_strf(scratch, "%s %u\n", member.name, v));
-			// }break;
 		}
 	}
 	return string;
@@ -2649,21 +2645,37 @@ R_MeshDesc generate_grid(Allocator arena, u32 size, f32 step) {
 
 ThingId make_thing(ThingDesc desc) {
 	var& g = *st;
-	_DefSet(desc.mesh, Mesh_Cube);
-	_DefSet(desc.mat, Material_Orange);
+	// _DefSet(desc.mesh, Mesh_Cube);
+	// _DefSet(desc.mat, Material_Orange);
 	_DefIfSet(desc.rot, v4_equal(desc.rot, v4()), quat_identity());
 	_DefIfSet(desc.scale, v3_equal(desc.scale, v3()), v3(1));
 	_DefSet(desc.color, u32_from_rgba(ColorWhite));
+	R_MeshId mesh_id = {};
+	if(desc.mesh) {
+		mesh_id = get_mesh(desc.mesh);
+	} else if(desc.mesh_id.idx) {
+		mesh_id = desc.mesh_id;
+	} else {
+		mesh_id = get_mesh(Mesh_Cube);
+	}
+	R_MaterialId mat_id = {};
+	if(desc.mat) {
+		mat_id = get_material(desc.mat);
+	} else if(desc.mat_id.idx) {
+		mat_id = desc.mat_id;
+	} else {
+		mat_id = get_material(Material_Orange);
+	}
 	Thing e = {
 		.pos = desc.pos,
 		.rot = desc.rot,
 		.scale = desc.scale,
-		.mesh = get_mesh(desc.mesh),
-		.mat = get_material(desc.mat),
+		.mesh = mesh_id,
+		.mat = mat_id,
 		.aabb = Rng3(v3(-1), v3(1)),
 		.color = desc.color,
 	};
-	ThingId id = pool_push(g.entities, e);
+	ThingId id = pool_push(g.things, e);
 	// sparse_set_push(g.active_entities, id.idx);
 	g.entities_count++;
 	return id;
@@ -2671,19 +2683,19 @@ ThingId make_thing(ThingDesc desc) {
 
 void destroy_thing(ThingId id) {
 	var& g = *st;
-	pool_remove(g.entities, id);
+	pool_remove(g.things, id);
 	// sparse_set_remove(g.active_entities, id.idx);
 	--g.entities_count;
 }
 
 PoolIterativeIter<Thing, MaxEntities, ThingId> things_begin() {
 	var& g = *st;
-	return {&g.entities};
+	return {&g.things};
 }
 
 HNodeIter<Thing, ThingId> thing_node_begin(ThingId first) {
 	var& g = *st;
-	return {g.entities.pool.data, first};
+	return {g.things.pool.data, first};
 }
 
 void select_obj() {
@@ -2700,77 +2712,153 @@ void select_obj() {
 void save_game_state() {
 	Scratch scratch;
 	var& g = *st;
-
 	Dstring data = dstr_make(scratch);
-	dstr_push(data, "Camera {\n");
-	dstr_push(data, dumb_struct(scratch, slice(members_of_Camera), &g.cam));
-	dstr_push(data, "}\n");
 
 	{
-		Thing e = get_thing(g.cube1);
-		dstr_push(data, "e {\n");
-		dstr_push(data, dumb_struct(scratch, slice(members_of_Thing), &e));
+		var& cam = g.cam;
+		dstr_push(data, "Camera {\n");
+		dstr_pushf(data, "pos %s\n", write_v3(scratch, cam.pos));
+		dstr_pushf(data, "dir %f %f %f\n", write_v3(scratch, cam.dir));
+		dstr_pushf(data, "yaw %f\n", cam.yaw);
+		dstr_pushf(data, "pitch %f\n", cam.pitch);
+		dstr_pushf(data, "fov %f\n", cam.fov);
+		dstr_pushf(data, "accel %f\n", cam.accel);
+		dstr_pushf(data, "vel %s\n", write_v3(scratch, cam.vel));
+		dstr_pushf(data, "vel_friction %f\n", cam.vel_friction);
 		dstr_push(data, "}\n");
 	}
+
 	{
-		// LoopIter (it, pool_begin(g.entities)) {
-		LoopIter(it, things_begin()) {
-			Thing& e = *it;
-			dstr_push(data, "Entity {\n");
-			dstr_push(data, dumb_struct(scratch, slice(members_of_Thing), &e, e.flags));
+		dstr_push(data, "Things {\n");
+		u32 idx = 0;
+		LoopIter(i, things_begin()) {
+			Thing& e = *i;
+			e.serialized_idx = idx;
+			dstr_push(data, "{\n");
+			dstr_pushf(data, "pos %s\n", write_v3(scratch, e.pos));
+			dstr_pushf(data, "rot %s\n", write_v4(scratch, e.rot));
+			dstr_pushf(data, "scale %s\n", write_v3(scratch, e.scale));
+			dstr_pushf(data, "mesh \"%s\"\n", g.mesh_to_str[e.mesh.idx]);
+			dstr_pushf(data, "mat \"%s\"\n", g.material_to_str[e.mat.idx]);
 			dstr_push(data, "}\n");
+			idx++;
 		}
+		dstr_push(data, "}\n");
+		dstr_push(data, "ThingEnum {\n");
+		LoopEnumNonZero(i, ThingEnum) {
+			var id = g.thing_enums[i];
+			if(pool_is_valid_handle(g.things.pool, id)) {
+				var& t = get_thing(id);
+				dstr_pushf(data, "%s %u\n", things_enum_strs[i], t.serialized_idx);
+			}
+		}
+		dstr_push(data, "}\n");
 	}
 
-	OS_Handle file = os_file_open(push_strf(scratch, "%s/saved", os_cur_directory(), String("saved")), OS_AccessFlag_Write | OS_AccessFlag_Trunc);
-	os_file_write(file, dstr_slice(data));
-	os_file_close(file);
+	// {
+	// 	dstr_push(data, "Camera {\n");
+	// 	dstr_push(data, dumb_struct(scratch, slice(members_of_Camera), &g.cam));
+	// 	dstr_push(data, "}\n");
+	// }
+
+	// // Things
+	// dstr_push(data, "Things {\n");
+	// {
+	// 	Thing e = get_thing(g.cube1);
+	// 	dstr_push(data, "cube1 {\n");
+	// 	dstr_push(data, dumb_struct(scratch, slice(members_of_Thing), &e));
+	// 	dstr_push(data, "}\n");
+	// }
+	// dstr_push(data, "}\n");
+
+	// {
+	// 	LoopIter(it, things_begin()) {
+	// 		Thing& e = *it;
+	// 		dstr_push(data, "Thing {\n");
+	// 		dstr_push(data, dumb_struct(scratch, slice(members_of_Thing), &e, e.flags));
+	// 		dstr_push(data, "}\n");
+	// 	}
+	// }
+	os_file_path_write_all(push_strf(scratch, "%s/saved", os_cur_directory(), String("saved")), dstr_slice(data));
 }
 
 void load_game_state() {
 	var& g = *st;
 	Scratch scratch;
-	Slice data = os_file_path_read_all(scratch, push_strf(scratch, "%s/saved", os_cur_directory(), String("saved")));
-	Slice tokens = tokens_from_str(scratch, String(data.data, data.size));
-	Parser p = parser_make(tokens);
-
-	{
-		// LoopIter (it, pool_begin(g.entities)) {
-		LoopIter(it, things_begin()) {
-			ThingId e_id = it.id();
-			destroy_thing(e_id);
-		}
+	LoopIter(it, things_begin()) {
+		ThingId e_id = it.id();
+		destroy_thing(e_id);
 	}
-
+	pool_clear(g.things.pool);
+	String str = os_file_path_read_all_str(scratch, push_strf(scratch, "%s/saved", os_cur_directory(), String("saved")));
+	Slice tokens = tokens_from_str(scratch, str);
+	Parser p = parser_make(tokens);
 	while(p.cur < p.tokens.count) {
 		Token tok = tok_advance(p);
-		switch(tok.type) {
-			default:break;
-			case TokenType_Identifier: {
-				if(str_match(tok.str, "Camera")) {
-					dumb_struct_load(slice(members_of_Camera), &g.cam, &p);
-				} else if(str_match(tok.str, "Entity")) {
-					ThingId id = make_thing({});
-					Thing& e = get_thing(id);
-					dumb_struct_load(slice(members_of_Thing), &e, &p);
-					if(flag_has(e.flags, EntityFlag_Referenced)) {
-						if(str_match("monkey", e.name)) {
-							g.monkey0 = id;
-						} else if(str_match("axis_attached_to_cam", e.name)) {
-							g.axis_attached_to_cam_id = id;
-						} else if(str_match("rotating_cube", e.name)) {
-							g.cube0 = id;
-						} 
-					}
-				} else if(str_match(tok.str, "e")) {
-					ThingId e_id = make_thing({});
-					Thing& e = get_thing(e_id);
-					dumb_struct_load(slice(members_of_Thing), &e, &p);
-					g.cube1 = e_id;
+		if(tok.type == TokenType_Identifier) {
+			if(str_match(tok.str, "Camera")) {
+				var& cam = g.cam;
+				tok_expect(p, TokenType_OpenBrace);
+				tok_expect(p, TokenType_Identifier); cam.pos = parse_v3(p);
+				tok_expect(p, TokenType_Identifier); cam.dir = parse_v3(p);
+				tok_expect(p, TokenType_Identifier); cam.yaw = parse_f32(p);
+				tok_expect(p, TokenType_Identifier); cam.pitch = parse_f32(p);
+				tok_expect(p, TokenType_Identifier); cam.fov = parse_f32(p);
+				tok_expect(p, TokenType_Identifier); cam.accel = parse_f32(p);
+				tok_expect(p, TokenType_Identifier); cam.vel = parse_v3(p);
+				tok_expect(p, TokenType_Identifier); cam.vel_friction = parse_f32(p);
+				tok_expect(p, TokenType_CloseBrace);
+			} else if(str_match(tok.str, "Things")) {
+				tok_expect(p, TokenType_OpenBrace);
+				while(tok_match(p, TokenType_OpenBrace)) {
+					ThingDesc desc = {};
+					tok_expect(p, TokenType_Identifier); desc.pos = parse_v3(p);
+					tok_expect(p, TokenType_Identifier); desc.rot = parse_v4(p);
+					tok_expect(p, TokenType_Identifier); desc.scale = parse_v3(p);
+					tok_expect(p, TokenType_Identifier); desc.mesh_id = map_get(g.str_to_mesh, hash(tok_advance(p).str)).value;
+					tok_expect(p, TokenType_Identifier); desc.mat_id = map_get(g.str_to_material, hash(tok_advance(p).str)).value;
+					make_thing(desc);
+					tok_expect(p, TokenType_CloseBrace);
+				}
+				tok_expect(p, TokenType_CloseBrace);
+			} else if(str_match(tok.str, "ThingEnum")) {
+				tok_expect(p, TokenType_OpenBrace);
+				while(!tok_match(p, TokenType_CloseBrace)) {
+					var t = tok_expect(p, TokenType_Identifier);
+					u32 thing_idx = parse_u32(p) + 1;
+					u32 enum_idx = map_get(g.str_to_thing_enum, hash(t.str)).value;
+					g.thing_enums[enum_idx] = pool_get_handle(g.things.pool, thing_idx);
 				}
 			}
 		}
 	}
+
+	// while(p.cur < p.tokens.count) {
+	// 	Token tok = tok_advance(p);
+	// 	if(tok.type == TokenType_Identifier) {
+	// 		if(str_match(tok.str, "Camera")) {
+	// 			dumb_struct_load(slice(members_of_Camera), &g.cam, &p);
+	// 		} else if(str_match(tok.str, "Entity")) {
+	// 			ThingId id = make_thing({});
+	// 			Thing& e = get_thing(id);
+	// 			dumb_struct_load(slice(members_of_Thing), &e, &p);
+	// 			if(flag_has(e.flags, EntityFlag_Referenced)) {
+	// 				if(str_match("monkey", e.name)) {
+	// 					g.monkey0 = id;
+	// 				} else if(str_match("axis_attached_to_cam", e.name)) {
+	// 					g.axis_attached_to_cam_id = id;
+	// 				} else if(str_match("rotating_cube", e.name)) {
+	// 					g.cube0 = id;
+	// 				} 
+	// 			}
+	// 		} else if(str_match(tok.str, "e")) {
+	// 			ThingId e_id = make_thing({});
+	// 			Thing& e = get_thing(e_id);
+	// 			dumb_struct_load(slice(members_of_Thing), &e, &p);
+	// 			g.cube1 = e_id;
+	// 		}
+	// 	}
+	// }
 }
 
 void init_game() {
@@ -2781,6 +2869,10 @@ void init_game() {
 	g.gpa = alloc_make(g.arena);
 	g.moving_cubes = array_make<ThingId>(g.gpa);
 	g.font = r_make_font({.name = "arial.ttf", .font_height = 32});
+
+	LoopEnumNonZero(i, ThingEnum) {
+		map_set(g.str_to_thing_enum, hash(things_enum_strs[i]), (u32)i);
+	}
 
 	R_MeshDesc triangle_mesh = {.vertices = slice(triangle_vertices)};
 	mesh_set(Mesh_Triangle, r_make_mesh(triangle_mesh));
@@ -2960,12 +3052,14 @@ void init_game() {
 	}
 
 	g.cube0 = make_thing(default_thing_desc());
+	g.thing_enums[Thing_Cube0] = g.cube0;
 	var desc = default_thing_desc();
 	desc.mesh = Mesh_MonkeyGlb;
 	desc.mat = Material_Container;
 	desc.pos.x = 10;
 	desc.aabb = Rng3(v3(-1.2), v3(1.2));
 	g.monkey0 = make_thing(desc);
+	g.thing_enums[Thing_Monkey] = g.monkey0;
 	{
 		var desc = default_thing_desc();
 		desc.mesh = Mesh_Triangle;
@@ -3000,7 +3094,6 @@ void init_game() {
 		MaterialEnum materials[] = {
 			Material_Orange,
 			// Material_Container,
-			// Material_Screen,
 		};
 		var desc = default_thing_desc();
 		desc.mesh = rand_choice(slice(meshes));

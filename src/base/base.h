@@ -213,6 +213,7 @@ b32 flag_any(u64 x, u64 f);
 #define Cube(x)                ((x) * (x) * (x))
 #define Sign(x)                (((x) < 0) ? -1 : ((x) > 0) ? 1 : 0)
 #define Abs(x)                 (((x) < 0) ? -(x) : (x))
+#define InRange(a, x, b)							((a) <= (x) && (x) < (b))
 
 u64 mod_pow2(u64 x, u64 b);
 u64 div_pow2(u64 x, u64 b);
