@@ -1,15 +1,6 @@
 #pragma once
 #include "base.h"
-#include "logger.h"
 #include "mem.h"
-
-const u32 INDEX_BITS = 22;
-const u32 INDEX_MASK = (1u << INDEX_BITS) - 1;
-
-inline u32 id_idx(u32 h) { return h & INDEX_MASK; }
-inline u32 id_generation(u32 h) { return h >> INDEX_BITS; }
-inline u32 id_make(u32 generation, u32 idx) { return (generation << INDEX_BITS) | idx; }
-inline u32 generation_bitmask(u32 gen) { return gen & Bit(32 - INDEX_BITS) - 1; }
 
 ////////////////////////////////////////////////////////////////////////
 // Array
@@ -37,12 +28,6 @@ template<typename T, i32 N> u32 array_push(Array<T, N>& arr, T a) {
 	arr.data[arr.count] = a;
 	return arr.count++;
 }
-template<typename T, i32 N, typename ... Args> void array_push(Array<T, N>& arr, Args... args) {
-	var list = {args...};
-	for(T x : list) {
-		array_push(arr, x);
-	}
-}
 template<typename T, i32 N> void array_push_elems(Array<T, N>& arr, Slice<T> elems) {
 	Assert(arr.count + elems.count <= arr.cap);
 	MemCopyArray(arr.data + arr.count, elems.data, elems.count);
@@ -61,17 +46,10 @@ template<typename T, i32 N> T array_pop(Array<T, N>& arr) {
 template<typename T, i32 N> T array_back(Array<T, N>& arr) {
 	return arr.data[arr.count-1];
 }
-template<typename T, i32 N> b32 array_exists(Array<T, N>& arr, T a, b32(*fn)(T a, T b) = equal) {
-	Loop(i, arr.count) {
-		T x = arr[i];
-		if(fn(x, a)) return true;
-	}
-	return false;
-}
 
 ///////////////////////////////////
 // Darray
-template <typename T> struct Darray {
+template <typename T> struct DArray {
 	u32 count;
 	u32 cap;
 	Allocator alloc;
@@ -84,17 +62,17 @@ template <typename T> struct Darray {
 	T* end()   { return data + count; }
 };
 
-template<typename T> Slice<T> NO_DEBUG slice(Darray<T>& arr) { return {arr.data, arr.count}; }
-template<typename T> Darray<T> array_make(Allocator alloc) {
-	Darray<T> res = {
+template<typename T> Slice<T> NO_DEBUG slice(DArray<T>& arr) { return {arr.data, arr.count}; }
+template<typename T> DArray<T> array_make(Allocator alloc) {
+	DArray<T> res = {
 		.alloc = alloc,
 	};
 	return res;
 }
-template<typename T> void array_destroy(Darray<T>& arr) {
+template<typename T> void array_destroy(DArray<T>& arr) {
 	if(arr.data) { mem_free(arr.alloc, arr.data); } 
 }
-template<typename T> void array_grow(Darray<T>& arr, u32 elem_count) {
+template<typename T> void array_grow(DArray<T>& arr, u32 elem_count) {
 	if(arr.data) {
 		u32 old_cap = arr.cap;
 		arr.cap = Max(arr.cap * DEFAULT_RESIZE_FACTOR, arr.count + elem_count);
@@ -104,7 +82,7 @@ template<typename T> void array_grow(Darray<T>& arr, u32 elem_count) {
 		arr.data = push_array(arr.alloc, T, arr.cap);
 	}
 }
-template<typename T> void array_reserve(Darray<T>& arr, u32 min_cap) {
+template<typename T> void array_reserve(DArray<T>& arr, u32 min_cap) {
 	if(arr.cap >= min_cap) return;
 	u32 old_cap = arr.cap;
 	u32 new_cap = Max(old_cap * DEFAULT_RESIZE_FACTOR, min_cap);
@@ -115,8 +93,8 @@ template<typename T> void array_reserve(Darray<T>& arr, u32 min_cap) {
 	}
 	arr.cap = new_cap;
 }
-template<typename T> T array_clone(Darray<T>& arr, Allocator alloc) {
-	Darray<T> result = {
+template<typename T> T array_clone(DArray<T>& arr, Allocator alloc) {
+	DArray<T> result = {
 		.count = arr.count,
 		.cap = arr.cap,
 		.alloc = alloc,
@@ -125,175 +103,153 @@ template<typename T> T array_clone(Darray<T>& arr, Allocator alloc) {
 	MemCopyArray(result.data, arr.data, arr.count);
 	return result;
 }
-template<typename T> u32 array_push_empty(Darray<T>& arr) {
+template<typename T> u32 array_push_empty(DArray<T>& arr) {
 	if(arr.count >= arr.cap) {
 		array_grow(arr, 0);
 	}
 	return arr.count++;
 }
-template<typename T> u32 array_push(Darray<T>& arr, T a) {
+template<typename T> u32 array_push(DArray<T>& arr, T a) {
 	if(arr.count >= arr.cap) {
 		array_grow(arr, 0);
 	}
 	arr.data[arr.count] = a;
 	return arr.count++;
 }
-template<typename T, typename...Args> void array_push(Darray<T>& arr, Args...args) {
-	var list = { args... };
-	for(T x : list) {
-		array_push(arr, x);
-	}
-}
-template<typename T> void array_push_elems(Darray<T>& arr, Slice<T> elems) {
+template<typename T> void array_push_elems(DArray<T>& arr, Slice<T> elems) {
 	if(arr.count + elems.count >= arr.cap) {
 		array_grow(arr, elems.count);
 	}
 	MemCopyArray(arr.data + arr.count, elems.data, elems.count);
 	arr.count += elems.count;
 }
-template<typename T> void array_swap_remove(Darray<T>& arr, u32 idx) {
+template<typename T> void array_swap_remove(DArray<T>& arr, u32 idx) {
 	Assert(idx < arr.count);
 	arr.data[idx] = arr.data[--arr.count];
 }
-template<typename T> void array_clear(Darray<T>& arr) {
+template<typename T> void array_clear(DArray<T>& arr) {
 	arr.count = 0; 
 }
-template<typename T> T array_pop(Darray<T>& arr) {
+template<typename T> T array_pop(DArray<T>& arr) {
 	return arr.data[--arr.count];
 }
-template<typename T> T array_back(Darray<T>& arr) {
+template<typename T> T array_back(DArray<T>& arr) {
 	return arr.data[arr.count-1];
 }
-template<typename T> b32 array_exists(Darray<T>& arr, T a, b32(*fn)(T a, T b) = equal) {
-	Loop(i, arr.count) {
-		T x = arr[i];
-		if(fn(x, a)) return true;
-	}
-	return false;
-}
-template<typename T> b32 array_exists_at(Darray<T>& arr, T a, u32* out_idx, b32(*fn)(T a, T b) = equal) {
-	Loop(i, arr.count) {
-		if(fn(arr.data[i], a)) {
-			*out_idx = i;
-			return true;
-		}
-	}
-	return false;
-}
 
-////////////////////////////////////////////////////////////////////////
-// ArrayHandler
-template<typename T, i32 N, typename Handle> struct ArrayHandler {
-	static constexpr i32 cap = N;
-	u32 count;
-	u32 sparse[N];
-	u32 dense[N];
-	T data[N];
-	u32 generations[N];
-};
+// ////////////////////////////////////////////////////////////////////////
+// // ArrayHandler
+// template<typename T, i32 N, typename Handle> struct ArrayHandler {
+// 	static constexpr i32 cap = N;
+// 	u32 count;
+// 	u32 sparse[N];
+// 	u32 dense[N];
+// 	T data[N];
+// 	u32 generations[N];
+// };
 
-template<typename T, i32 N, typename Handle> T& array_handler_get(ArrayHandler<T, N, Handle>& a, Handle h) {
-	Assert(h.idx < a.count);
-	Assert(a.generations[h.idx]== id_generation(h.gen));
-	u32 idx = a.sparse[h.idx];
-	return a.data[idx];
-}
-template<typename T, i32 N, typename Handle> Handle array_handler_push(ArrayHandler<T, N, Handle>& a, T elem) {
-	Assert(a.count < a.cap);
-	u32 idx = a.count++;
-	a.sparse[idx] = idx;
-	a.dense[idx] = idx;
-	a.data[idx] = elem;
-	Handle res = {idx, a.generations[idx]};
-	return res;
-}
-template<typename T, i32 N, typename Handle> void array_handler_remove(ArrayHandler<T, N, Handle>& a, Handle h) {
-	Assert(h.idx < a.count);
-	Assert(a.generations[h.idx]++ == h.gen);
-	u32 idx_removed = a.sparse[h.idx];
-	u32 idx_last = a.count - 1;
-	a.data[idx_removed] = a.data[idx_last];
-	u32 last_entity = a.dense[idx_last];
-	a.sparse[last_entity] = idx_removed;
-	a.dense[idx_removed] = last_entity;
-	--a.count;
-}
-template<typename T, i32 N, typename Handle> void array_handler_clear(ArrayHandler<T, N, Handle>& arr) {
-	arr.count = 0;
-}
+// template<typename T, i32 N, typename Handle> T& array_handler_get(ArrayHandler<T, N, Handle>& a, Handle h) {
+// 	Assert(h.idx < a.count);
+// 	Assert(a.generations[h.idx]== id_generation(h.gen));
+// 	u32 idx = a.sparse[h.idx];
+// 	return a.data[idx];
+// }
+// template<typename T, i32 N, typename Handle> Handle array_handler_push(ArrayHandler<T, N, Handle>& a, T elem) {
+// 	Assert(a.count < a.cap);
+// 	u32 idx = a.count++;
+// 	a.sparse[idx] = idx;
+// 	a.dense[idx] = idx;
+// 	a.data[idx] = elem;
+// 	Handle res = {idx, a.generations[idx]};
+// 	return res;
+// }
+// template<typename T, i32 N, typename Handle> void array_handler_remove(ArrayHandler<T, N, Handle>& a, Handle h) {
+// 	Assert(h.idx < a.count);
+// 	Assert(a.generations[h.idx]++ == h.gen);
+// 	u32 idx_removed = a.sparse[h.idx];
+// 	u32 idx_last = a.count - 1;
+// 	a.data[idx_removed] = a.data[idx_last];
+// 	u32 last_entity = a.dense[idx_last];
+// 	a.sparse[last_entity] = idx_removed;
+// 	a.dense[idx_removed] = last_entity;
+// 	--a.count;
+// }
+// template<typename T, i32 N, typename Handle> void array_handler_clear(ArrayHandler<T, N, Handle>& arr) {
+// 	arr.count = 0;
+// }
 
-///////////////////////////////////
-// DarrayHandler
-template <typename T, typename Handle> struct DarrayHandler {
-	u32 count;
-	u32 cap;
-	Allocator alloc;
-	u32* sparse;
-	u32* dense;
-	T* data;
-	u32* generations;
-};
+// ///////////////////////////////////
+// // DarrayHandler
+// template <typename T, typename Handle> struct DarrayHandler {
+// 	u32 count;
+// 	u32 cap;
+// 	Allocator alloc;
+// 	u32* sparse;
+// 	u32* dense;
+// 	T* data;
+// 	u32* generations;
+// };
 
-template<typename T, typename Handle> DarrayHandler<T, Handle> array_handler_make(Allocator alloc) {
-	DarrayHandler<T, Handle> res = {
-		.alloc = alloc,
-	};
-	return res;
-}
-template<typename T, typename Handle> T& array_handler_get(DarrayHandler<T, Handle>& a, Handle h) {
-	Assert(h.idx < a.cap);
-	Assert(a.generations[h.idx] == h.gen);
-	u32 idx = a.sparse[h.idx];
-	return a.data[idx];
-}
-template<typename T, typename Handle> void array_handler_grow(DarrayHandler<T, Handle>& a) {
-	if(a.data) {
-		u32 cap_old = a.cap;
-		a.cap *= DEFAULT_RESIZE_FACTOR;
-		SoA_Field fields[] = {
-			SoA_push_field(a.sparse),
-			SoA_push_field(a.dense),
-			SoA_push_field(a.data),
-			SoA_push_field(a.generations),
-		};
-		mem_realloc_soa(a.alloc, cap_old, a.cap, slice(fields));
-		MemZeroArray(a.generations+cap_old, a.cap-cap_old);
-	} else {
-		a.cap = DEFAULT_CAPACITY;
-		SoA_Field fields[] = {
-			SoA_push_field(a.sparse),
-			SoA_push_field(a.dense),
-			SoA_push_field(a.data),
-			SoA_push_field(a.generations),
-		};
-		mem_alloc_soa(a.alloc, a.cap, slice(fields));
-		MemZeroArray(a.generations, a.cap);
-	}
-}
-template<typename T, typename Handle> Handle array_handler_push(DarrayHandler<T, Handle>& a, T elem) {
-	if(a.count >= a.cap) {
-		array_handler_grow(a);
-	}
-	u32 idx = a.count++;
-	a.sparse[idx] = idx;
-	a.dense[idx] = idx;
-	a.data[idx] = elem;
-	Handle res = {idx, a.generations[idx]};
-	return res;
-}
-template<typename T, typename Handle> void array_handler_remove(DarrayHandler<T, Handle>& a, Handle h) {
-	Assert(a.generations[h.idx]++ == h.gen);
-	u32 idx_removed = a.sparse[h.idx];
-	u32 idx_last = a.count - 1;
-	a.data[idx_removed] = a.data[idx_last];
-	u32 last_entity = a.dense[idx_last];
-	a.sparse[last_entity] = idx_removed;
-	a.dense[idx_removed] = last_entity;
-	--a.count;
-}
-template<typename T, typename Handle> void array_handler_clear(DarrayHandler<T, Handle>& arr) {
-	arr.count = 0;
-}
+// template<typename T, typename Handle> DarrayHandler<T, Handle> array_handler_make(Allocator alloc) {
+// 	DarrayHandler<T, Handle> res = {
+// 		.alloc = alloc,
+// 	};
+// 	return res;
+// }
+// template<typename T, typename Handle> T& array_handler_get(DarrayHandler<T, Handle>& a, Handle h) {
+// 	Assert(h.idx < a.cap);
+// 	Assert(a.generations[h.idx] == h.gen);
+// 	u32 idx = a.sparse[h.idx];
+// 	return a.data[idx];
+// }
+// template<typename T, typename Handle> void array_handler_grow(DarrayHandler<T, Handle>& a) {
+// 	if(a.data) {
+// 		u32 cap_old = a.cap;
+// 		a.cap *= DEFAULT_RESIZE_FACTOR;
+// 		SoA_Field fields[] = {
+// 			SoA_push_field(a.sparse),
+// 			SoA_push_field(a.dense),
+// 			SoA_push_field(a.data),
+// 			SoA_push_field(a.generations),
+// 		};
+// 		mem_realloc_soa(a.alloc, cap_old, a.cap, slice(fields));
+// 		MemZeroArray(a.generations+cap_old, a.cap-cap_old);
+// 	} else {
+// 		a.cap = DEFAULT_CAPACITY;
+// 		SoA_Field fields[] = {
+// 			SoA_push_field(a.sparse),
+// 			SoA_push_field(a.dense),
+// 			SoA_push_field(a.data),
+// 			SoA_push_field(a.generations),
+// 		};
+// 		mem_alloc_soa(a.alloc, a.cap, slice(fields));
+// 		MemZeroArray(a.generations, a.cap);
+// 	}
+// }
+// template<typename T, typename Handle> Handle array_handler_push(DarrayHandler<T, Handle>& a, T elem) {
+// 	if(a.count >= a.cap) {
+// 		array_handler_grow(a);
+// 	}
+// 	u32 idx = a.count++;
+// 	a.sparse[idx] = idx;
+// 	a.dense[idx] = idx;
+// 	a.data[idx] = elem;
+// 	Handle res = {idx, a.generations[idx]};
+// 	return res;
+// }
+// template<typename T, typename Handle> void array_handler_remove(DarrayHandler<T, Handle>& a, Handle h) {
+// 	Assert(a.generations[h.idx]++ == h.gen);
+// 	u32 idx_removed = a.sparse[h.idx];
+// 	u32 idx_last = a.count - 1;
+// 	a.data[idx_removed] = a.data[idx_last];
+// 	u32 last_entity = a.dense[idx_last];
+// 	a.sparse[last_entity] = idx_removed;
+// 	a.dense[idx_removed] = last_entity;
+// 	--a.count;
+// }
+// template<typename T, typename Handle> void array_handler_clear(DarrayHandler<T, Handle>& arr) {
+// 	arr.count = 0;
+// }
 
 ////////////////////////////////////////////////////////////////////////
 // SparseSet
@@ -460,7 +416,7 @@ template<typename T, i32 N, typename Handle> u32 pool_clear(Pool<T, N, Handle>& 
 	ArrayZero(p.gens);
 }
 template <typename T, i32 N, typename Handle> b32 pool_is_valid_handle(Pool<T, N, Handle>& p, Handle h) {
-	if(h.idx <= 0 || p.gens[h.idx] != h.gen) {
+	if(h.idx == 0 || p.gens[h.idx] != h.gen) {
 		return false;
 	}
 	return true;
@@ -468,81 +424,76 @@ template <typename T, i32 N, typename Handle> b32 pool_is_valid_handle(Pool<T, N
 
 ///////////////////////////////////
 // Dpool
-template<typename T, typename Handle> struct Dpool {
+template<typename T, typename Handle> struct DPool {
 	static_assert(sizeof(T) >= 4);
 	u32 head;
 	u32 cap;
 	u32 max_idx;
 	Allocator alloc;
-	struct  {
-		union {
-			T elem;
-			u32 next_free;
-		};
-		u32 gen;
-	} *data;
+	T* data;
+	u32* gens;
 };
 
-template<typename T, typename Handle> Dpool<T, Handle> pool_make(Allocator alloc) {
-	Dpool<T, Handle> res = {
+template<typename T, typename Handle> DPool<T, Handle> pool_make(Allocator alloc) {
+	DPool<T, Handle> res = {
 		.alloc = alloc,
 	};
 	return res;
 }
-template<typename T, typename Handle> T& pool_get(Dpool<T, Handle>& p, Handle h) {
+template<typename T, typename Handle> T& pool_get(DPool<T, Handle>& p, Handle h) {
 	Assert(pool_is_valid_handle(p, h));
-	return p.data[h.idx].elem;
+	return p.data[h.idx];
 }
-template<typename T, typename Handle> void pool_grow(Dpool<T, Handle>& p) {
+template<typename T, typename Handle> void pool_grow(DPool<T, Handle>& p) {
 	if(p.data) {
 		u32 cap_old = p.cap;
 		p.cap *= DEFAULT_RESIZE_FACTOR;
 		SoA_Field fields[] = {
 			SoA_push_field(p.data),
+			SoA_push_field(p.gens),
 		};
 		mem_realloc_soa_zero(p.alloc, cap_old, p.cap, slice(fields));
 	} else {
 		p.cap = DEFAULT_CAPACITY;
 		SoA_Field fields[] = {
 			SoA_push_field(p.data),
+			SoA_push_field(p.gens),
 		};
 		mem_alloc_soa_zero(p.alloc, p.cap, slice(fields));
 	}
 }
-template<typename T, typename Handle> Handle pool_push_empty(Dpool<T, Handle>& p) {
+template<typename T, typename Handle> Handle pool_push_empty(DPool<T, Handle>& p) {
 	u32 idx = p.head;
 	if(idx > 0) {
-		p.head = p.data[idx].next_free;
+		p.head = *(u32*)&p.data[idx];
 	} else {
 		idx = ++p.max_idx;
 		if(idx >= p.cap) {
 			pool_grow(p);
 		}
 	}
-	Handle res = {idx, p.data[idx].gen};
+	Handle res = {idx, p.gens[idx]};
 	return res;
 }
-template<typename T, typename Handle> Handle pool_push(Dpool<T, Handle>& p, T a) {
+template<typename T, typename Handle> Handle pool_push(DPool<T, Handle>& p, T a) {
 	Handle h = pool_push_empty(p);
-	p.data[h.idx].elem = a;
+	p.data[h.idx] = a;
 	return h;
 }
-template<typename T, typename Handle> void pool_remove(Dpool<T, Handle>& p, Handle h) {
-	pool_is_valid_handle(p, h);
-	p.data[h.idx].gen++;
-	p.data[h.idx].next_free = p.head;
+template<typename T, typename Handle> void pool_remove(DPool<T, Handle>& p, Handle h) {
+	Assert(pool_is_valid_handle(p, h));
+	p.gens[h.idx]++;
+	*(u32*)&p.data[h.idx] = p.head;
 	p.head = h.idx;
 }
-template<typename T, typename Handle> u32 pool_clear(Dpool<T, Handle>& p) {
+template<typename T, typename Handle> u32 pool_clear(DPool<T, Handle>& p) {
 	p.head = 0;
 	p.max_idx = 0;
 	MemZeroArray(p.data, p.max_idx);
+	MemZeroArray(p.gens, p.max_idx);
 }
-template<typename T, typename Handle> b32 pool_is_valid_handle(Dpool<T, Handle>& p, Handle h) {
-	if(h.idx <= 0 || h.idx > p.max_idx) {
-		return false;
-	}
-	if(p.data[h.idx].gen != h.gen) {
+template<typename T, typename Handle> b32 pool_is_valid_handle(DPool<T, Handle>& p, Handle h) {
+	if(h.idx == 0 || p.gens[h.idx] != h.gen) {
 		return false;
 	}
 	return true;
@@ -590,20 +541,19 @@ template<typename T, i32 N> struct Queue {
 };
 
 template<typename T, i32 N> void queue_push(Queue<T, N>& q, T elem) {
-	Assert(q.write - q.read <= q.cap);
+	Assert(q.write - q.read < q.cap);
 	q.data[q.write++ % q.cap] = elem;
 }
 template<typename T, i32 N> T queue_pop(Queue<T, N>& q) {
 	Assert(q.write != q.read);
-	T res = q.data[q.read++ % q.cap];
-	return res;
+	return q.data[q.read++ % q.cap];
 }
 template<typename T, i32 N> T queue_back(Queue<T, N>& q) {
-	Assert(q.write - q.read > 0);
+	Assert(q.write - q.read < q.cap);
 	return q.data[(q.write-1) % q.cap];
 }
 template<typename T, i32 N> T queue_front(Queue<T, N>& q) {
-	Assert(q.write - q.read > 0);
+	Assert(q.write != q.read);
 	return q.data[(q.read) % q.cap];
 }
 template<typename T, i32 N> u32 queue_count(Queue<T, N>& q) { return q.write - q.read; }
@@ -616,25 +566,41 @@ template<typename T, i32 N> struct QueueSPSC {
 };
 
 template<typename T, i32 N> void queue_push(QueueSPSC<T, N>& q, T elem) {
-	Assert(q.write - atomic_load(&q.read) < q.cap);
-	q.data[q.write % q.cap] = elem;
+	u32 write = atomic_load_explicit(&q.write, AtomicRelaxed);
+	u32 read = atomic_load_explicit(&q.read, AtomicAcquire);
+	// if(write - read >= q.cap) return false;
+	Assert(write - read < q.cap);
+	q.data[write % q.cap] = elem;
 	atomic_inc_explicit(&q.write, AtomicRelease);
+	// return true;
 }
 template<typename T, i32 N> T queue_pop(QueueSPSC<T, N>& q) {
-	Assert(atomic_load(&q.write) != q.read);
-	T res = q.data[q.read % q.cap];
+	u32 read = atomic_load_explicit(&q.read, AtomicRelaxed);
+	u32 write = atomic_load_explicit(&q.write, AtomicAcquire);   
+	// if (read == write) return {};
+	Assert(read != write);
+	T res = q.data[read % q.cap];
 	atomic_inc_explicit(&q.read, AtomicRelease);
+	// return {res, true};
 	return res;
 }
 template<typename T, i32 N> T queue_back(QueueSPSC<T, N>& q) {
-	Assert(atomic_load(&q.write) - atomic_load(&q.read) > 0);
+	u32 write = atomic_load_explicit(&q.write, AtomicRelaxed);
+	u32 read = atomic_load_explicit(&q.read, AtomicAcquire);
+	// if(write - read >= q.cap) return {};
+	Assert(write - read < q.cap);
+	// return {q.data[(q.write-1) % q.cap], true};
 	return q.data[(q.write-1) % q.cap];
 }
 template<typename T, i32 N> T queue_front(QueueSPSC<T, N>& q) {
-	Assert(atomic_load(&q.write) - atomic_load(&q.read) > 0);
+	u32 read = atomic_load_explicit(&q.read, AtomicRelaxed);
+	u32 write = atomic_load_explicit(&q.write, AtomicAcquire);   
+	// if(read == write) return {};
+	Assert(read != write);
+	// return {q.data[(q.read) % q.cap], true};
 	return q.data[(q.read) % q.cap];
 }
-template<typename T, i32 N> u32 queue_count(QueueSPSC<T, N>& q) { return atomic_load(&q.write) - atomic_load(&q.read); }
+template<typename T, i32 N> u32 queue_count(QueueSPSC<T, N>& q) { return atomic_load_explicit(&q.write, AtomicRelaxed) - atomic_load_explicit(&q.read, AtomicAcquire); }
 
 template<typename T, i32 N> struct QueueMPMC {
 	static constexpr u32 cap = N;
@@ -649,9 +615,7 @@ template<typename T, i32 N> struct QueueMPMC {
 
 template<typename T, i32 N> QueueMPMC<T, N> queue_mpmc_make() {
 	QueueMPMC<T, N> res = {};
-	Loop(i, N) {
-		res.data[i].seq = i;
-	}
+	Loop(i, N) res.data[i].seq = i;
 	return res;
 }
 template<typename T, i32 N> b32 queue_push(QueueMPMC<T, N>& q, T elem) {
@@ -698,18 +662,18 @@ template<i32 N> u32 id_pool_push(IdPool<N>& p)             { Assert(p.count <= p
 template<i32 N> void id_pool_remove(IdPool<N>& p, u32 id)  { p.ids[--p.count] = id; }
 template<i32 N> void id_pool_clear(IdPool<N>& p)           { Loop(i, p.cap) p.ids[i] = i; p.count = 0; }
 
-struct DidPool {
+struct DIdPool {
 	u32 count;
 	u32 cap;
 	u32* ids;
 	Allocator alloc;
 };
 
-DidPool id_pool_make(Allocator alloc);
-u32 id_pool_push(DidPool& p);
-void id_pool_remove(DidPool& p, u32 id);
-void id_pool_destroy(DidPool& p);
-void id_pool_clear(DidPool& p);
+DIdPool id_pool_make(Allocator alloc);
+u32 id_pool_push(DIdPool& p);
+void id_pool_remove(DIdPool& p, u32 id);
+void id_pool_destroy(DIdPool& p);
+void id_pool_clear(DIdPool& p);
 
 ////////////////////////////////////////////////////////////////////////
 // Map (hope u64 won't be collide)

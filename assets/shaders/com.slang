@@ -109,8 +109,8 @@ f32 Cube(f32 x)                       { return x * x * x; }
 f32 Sign(f32 x)                       { return x < 0 ? -1 : x > 0 ? 1 : 0; }
 f32 Abs(f32 x)                        { return x < 0 ? -x : x; }
 
-f32 deg2rad(f32 degrees) { return degrees * PI / 180.0f; }
-f32 rad2deg(f32 radians) { return radians * 180.0f / PI; }
+f32 deg2rad(f32 degrees) { return degrees * PI / 180; }
+f32 rad2deg(f32 radians) { return radians * 180 / PI; }
 
 f32 Lerp(f32 a, f32 t, f32 b)      { return (1 - t)*a + t*b; }
 f32 LerpClamp(f32 a, f32 t, f32 b) { return Lerp(a, Clamp01(t), b); }
@@ -132,10 +132,14 @@ v4 rgba_from_u32(u32 hex) {
 
 u32 u32_from_rgba(v4 rgba) {
 	u32 result = 0;
-	result |= ((u32)((u8)(rgba.x*255.f))) <<  0;
-	result |= ((u32)((u8)(rgba.y*255.f))) <<  8;
-	result |= ((u32)((u8)(rgba.z*255.f))) << 16;
-	result |= ((u32)((u8)(rgba.w*255.f))) << 24;
+	result |= ((u32)((u8)(rgba.x*255))) <<  0;
+	result |= ((u32)((u8)(rgba.y*255))) <<  8;
+	result |= ((u32)((u8)(rgba.z*255))) << 16;
+	result |= ((u32)((u8)(rgba.w*255))) << 24;
 	return result;
 }
+
+
+
+
 

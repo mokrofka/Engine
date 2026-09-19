@@ -1,11 +1,11 @@
 #pragma once
 #include "types.h"
 
-MakeId(Gfx_Image)
-MakeId(Gfx_Sampler)
-MakeId(Gfx_Shader)
-MakeId(Gfx_Pipeline)
-MakeId(Gfx_View)
+struct Gfx_Image {u32 idx; u32 gen;};
+struct Gfx_Sampler {u32 idx; u32 gen;};
+struct Gfx_Shader {u32 idx; u32 gen;};
+struct Gfx_Pipeline {u32 idx; u32 gen;};
+struct Gfx_View {u32 idx; u32 gen;};
 
 enum {
 	Gfx_NumFramesInFlight = 2,
@@ -225,11 +225,11 @@ enum Gfx_ImageType {
 
 typedef u32 Gfx_ImageUsage;
 enum {
-	Gfx_ImageUsage_StorageImage = Bit(0),
-	Gfx_ImageUsage_ColorAttachment = Bit(1),
-	Gfx_ImageUsage_ResolveAttachment = Bit(2),
-	Gfx_ImageUsage_DepthStencilAttachment = Bit(3),
-	Gfx_ImageUsage_Immutable = Bit(4),
+	Gfx_ImageUsage_StorageImage = 1<<0,
+	Gfx_ImageUsage_ColorAttachment = 1<<1,
+	Gfx_ImageUsage_ResolveAttachment = 1<<2,
+	Gfx_ImageUsage_DepthStencilAttachment = 1<<3,
+	Gfx_ImageUsage_Immutable = 1<<4,
 };
 
 struct Gfx_ImageDesc {
@@ -439,36 +439,36 @@ enum {
 	VK_Access_None = 0,
 
 	// Transfer
-	VK_Access_TransferDst = Bit(0),
-	VK_Access_TransferSrc = Bit(1),
+	VK_Access_TransferDst = 1<<0,
+	VK_Access_TransferSrc = 1<<1,
 
 	// Vertex
-	// VK_Access_VertBuffer = Bit(2),
-	// VK_Access_IndexBuffer = Bit(3),
+	// VK_Access_VertBuffer = 1<<2,
+	// VK_Access_IndexBuffer = 1<<3,
 
 	// Shader reads
-	VK_Access_StorageBuffer_RO = Bit(4),
-	VK_Access_StorageBuffer_RW = Bit(5),
-	VK_Access_Texture = Bit(6),
-	VK_Access_StorageImage_RO = Bit(7),
-	VK_Access_StorageImage_RW = Bit(8),
+	VK_Access_StorageBuffer_RO = 1<<4,
+	VK_Access_StorageBuffer_RW = 1<<5,
+	VK_Access_Texture = 1<<6,
+	VK_Access_StorageImage_RO = 1<<7,
+	VK_Access_StorageImage_RW = 1<<8,
 
 	// Shader stage
-	VK_Access_VertexShader = Bit(9),
-	VK_Access_FragmentShader = Bit(10),
-	VK_Access_ComputeShader = Bit(11),
+	VK_Access_VertexShader = 1<<9,
+	VK_Access_FragmentShader = 1<<10,
+	VK_Access_ComputeShader = 1<<11,
 
 	// Attachments
-	VK_Access_ColorAttachment = Bit(12),
-	VK_Access_ResolveAttachment = Bit(13),
-	VK_Access_DepthAttachment = Bit(14),
-	VK_Access_StencilAttachment = Bit(15),
-	VK_Access_DepthRead = Bit(16),
+	VK_Access_ColorAttachment = 1<<12,
+	VK_Access_ResolveAttachment = 1<<13,
+	VK_Access_DepthAttachment = 1<<14,
+	VK_Access_StencilAttachment = 1<<15,
+	VK_Access_DepthRead = 1<<16,
 
-	VK_Access_IndirectBuffer = Bit(18),
+	VK_Access_IndirectBuffer = 1<<18,
 
-	VK_Access_Discard = Bit(19),
-	VK_Access_Present = Bit(20),
+	VK_Access_Discard = 1<<19,
+	VK_Access_Present = 1<<20,
 };
 
 struct VK_Memory {

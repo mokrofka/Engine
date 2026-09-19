@@ -1,4 +1,4 @@
-#include "../base_impl.h"
+#include "../lib.h"
 
 #if OS_LINUX
 
@@ -75,6 +75,7 @@ struct OS_LNX_Entity {
 
 struct OS_State {
 	Arena arena;
+	Slice<String> args;
 	OS_LNX_Entity* entity_free;
 	Array<OS_LNX_Entity, 128> entities;
 	String binary_filepath;
@@ -108,12 +109,18 @@ String os_cur_directory()    { return os_st.binary_directory; }
 String os_cur_binary_name()  { return os_st.binary_name; }
 u64 os_commited_size()       { return os_st.mem_commited; }
 u64 os_reserved_size()       { return os_st.mem_address_space_reserve; }
+Slice<String> os_args()						{ return os_st.args; }
 
-void os_init(String name) {
-	os_st.arena = arena_make(.name = "os arena");
-	os_st.binary_filepath = name;
-	os_st.binary_directory = str_chop_last_slash(name);
-	os_st.binary_name = str_skip_last_slash(name);
+void os_init(Slice<char*> args) {
+	var& g = os_st;
+	g.arena = arena_make(.name = "os arena");
+	g.binary_filepath = args[0];
+	g.binary_directory = str_chop_last_slash(g.binary_filepath);
+	g.binary_name = str_skip_last_slash(g.binary_filepath);
+	g.args = push_slice(g.arena, String, args.count);
+	Loop(i, args.count) {
+		g.args[i] = args[i];
+	}
 }
 
 void os_exit(i32 exit_code) { _exit(exit_code); }
@@ -319,7 +326,7 @@ Slice<u8> os_file_path_read_all(Allocator arena, String path) {
 String os_file_path_read_all_str(Allocator arena, String path) { return str_make(os_file_path_read_all(arena, path)); }
 
 u64 os_file_path_write_all(String path, Slice<u8> data) {
-	OS_Handle file = os_file_open(path, OS_AccessFlag_Write);
+	OS_Handle file = os_file_open(path, OS_AccessFlag_Write | OS_AccessFlag_Trunc);
 	u64 write_size = os_file_write(file, data);
 	os_file_close(file);
 	return write_size;
@@ -442,7 +449,7 @@ Slice<String> os_watch_check(Allocator arena, OS_Watch watch) {
 	while(offset < read_size) {
 		struct inotify_event* event = (struct inotify_event*)&buf[offset];
 		if(event->len) {
-			array_push(strs, event->name);
+			array_push(strs, String(event->name));
 		}
 		offset += sizeof(struct inotify_event) + event->len;
 	}

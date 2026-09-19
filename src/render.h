@@ -9,7 +9,6 @@ const u32 R_MaxTextures   = 32;
 const u32 R_MaxCubemaps   = 32;
 const u32 R_MaxFonts      = 32;
 const u32 R_MaxDebugLines = KB(1);
-#define _Matrix4x3 m4x3
 
 #include "shader_header.h"
 
@@ -139,8 +138,8 @@ struct R_DrawCall {
 
 struct R_DrawBatch {
 	Gfx_PipelineState state;
-	Darray<R_DrawCall> draws;
-	Darray<R_DrawCall> unindexed_draws;
+	DArray<R_DrawCall> draws;
+	DArray<R_DrawCall> unindexed_draws;
 };
 
 struct R_DrawText {
@@ -176,9 +175,9 @@ struct R_AttachmentDesc {
 typedef u32 R_RenderTargetUsage;
 enum {
 	R_RenderTargetUsage_Default,
-	R_RenderTargetUsage_Color = Bit(0),
-	R_RenderTargetUsage_Resolve = Bit(1),
-	R_RenderTargetUsage_Depth = Bit(2),
+	R_RenderTargetUsage_Color = 1<<0,
+	R_RenderTargetUsage_Resolve = 1<<1,
+	R_RenderTargetUsage_Depth = 1<<2,
 };
 
 struct R_RenderTarget {
@@ -261,7 +260,7 @@ struct R_State {
 	QueueSPSC<R_PuhsToGpu, 32> push_to_gpu_queue;
 	Queue<R_PuhsToGpu, 32> finished_gpu_queue;
 	Mutex waiting_fonts_mutex;
-	Array<R_WaitingFont, 32> waiting_fonts;
+	QueueSPSC<R_WaitingFont, 32> waiting_fonts;
 
 	R_TextureId cur_cubemap;
 
@@ -285,9 +284,6 @@ struct R_State {
 	GpuDrawCall* gpu_drawcalls;
 	u32* gpu_software_render;
 	GpuUI_Rect* gpu_ui_rects;
-
-	Slice<OS_Handle> shader_module_compilation_pids;
-	Slice<String> shaders_to_compile;
 };
 
 R_DrawBatch r_make_draw_batch(Allocator alloc, Gfx_Pipeline pip);

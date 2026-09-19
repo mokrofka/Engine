@@ -1,6 +1,6 @@
 #pragma once
 #include "os_core.h"
-#include "base/maths.h"
+#include "../maths.h"
 
 enum Key {
 	// Control keys
@@ -122,9 +122,9 @@ enum MouseButton {
 
 typedef u32 OS_Modifiers;
 enum {
-	OS_Modifier_Ctrl  = Bit(0),
-	OS_Modifier_Shift = Bit(1),
-	OS_Modifier_Alt   = Bit(2),
+	OS_Modifier_Ctrl  = 1<<0,
+	OS_Modifier_Shift = 1<<1,
+	OS_Modifier_Alt   = 1<<2,
 };
 
 enum OS_EventKind {

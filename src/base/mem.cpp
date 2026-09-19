@@ -1,12 +1,10 @@
-#include "base_impl.h"
+#include "lib.h"
 
 const u32 MEM_ALLOC_HEADER_GUARD   = 0xA110C8;
 const u32 MEM_DEALLOC_HEADER_GUARD = 0xDE1E7E;
 const u32 MEM_ALLOC_GUARD          = 0xA1;
 const u32 MEM_DEALLOC_GUARD        = 0xDE;
 const u32 MEM_ALLOC_TAIL_GUARD     = 0xdeedbeef;
-
-#define MEM_GUARD 1
 
 #if MEM_GUARD
 	#define MemGuardAlloc(d, z)   MemSet(d, MEM_ALLOC_GUARD, z)
@@ -229,9 +227,6 @@ u8* arena_realloc_zero(Arena* arena, void* ptr, u64 old_size, u64 new_size, u64 
 }
 
 Temp temp_begin(Arena* arena) {
-#if MEM_TRACK
-	return Temp{arena, arena->pos, arena->info->children_size};
-#endif
 	return Temp{arena, arena->pos};
 };
 void temp_end(Temp temp) {
@@ -388,7 +383,7 @@ void intern_free(Alloc* alloc, void* ptr, u64 size) {
 u8* intern_alloc_align(Alloc* alloc, u64 size, u64 align) {
 	u64 alloc_size = align+sizeof(AllocHeader)+size;
 	u8* raw = intern_alloc(alloc, alloc_size);
-	u8* user = PtrAlignUp(raw+sizeof(AllocHeader), align);
+	u8* user = AlignUpPtr(raw+sizeof(AllocHeader), align);
 	AllocHeader* h = OffsetBackStruct(user, AllocHeader);
 	h->off = user - raw;
 	return user;
@@ -688,12 +683,6 @@ u8* mem_realloc_soa_zero(Allocator alloc, u32 old_count, u32 new_count, Slice<So
 	}
 	mem_free(alloc, old_ptr, old_size);
 	return buf;
-}
-
-u8* offset_ptr_push(void*& offset, u64 size, u64 align) {
-	u8* result = PtrAlignUp(offset, align);
-	offset = Offset(result, size);
-	return result;
 }
 
 u64 offset_push(u64& offset, u64 size, u64 align) {

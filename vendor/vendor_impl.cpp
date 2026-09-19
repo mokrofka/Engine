@@ -4,7 +4,7 @@
 #include "stb_image.h"
 
 #define IMGUI_DISABLE_STB_TRUETYPE_IMPLEMENTATION
-#if DEAR_IMGUI
+#if BUILD_DEV
 	#include "imgui/imgui_impl.cpp"
 #endif
 

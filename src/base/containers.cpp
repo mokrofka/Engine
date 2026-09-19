@@ -1,15 +1,15 @@
-#include "base_impl.h"
+#include "lib.h"
 
 ////////////////////////////////////////////////////////////////////////
 // IdPool
-DidPool id_pool_make(Allocator alloc) {
-	DidPool res = {
+DIdPool id_pool_make(Allocator alloc) {
+	DIdPool res = {
 		.alloc = alloc,
 	};
 	return res;
 }
-u32 id_pool_push(DidPool& p) {
-	if(p.count+1 >= p.cap) {
+u32 id_pool_push(DIdPool& p) {
+	if(p.count >= p.cap) {
 		if(p.ids) {
 			u32 old_cap = p.cap;
 			p.cap *= DEFAULT_RESIZE_FACTOR;
@@ -27,9 +27,9 @@ u32 id_pool_push(DidPool& p) {
 	}
 	return p.ids[p.count++];
 }
-void id_pool_remove(DidPool& p, u32 id) { p.ids[--p.count] = id; }
-void id_pool_destroy(DidPool& p) { if(p.ids) mem_free(p.alloc, p.ids, p.cap * sizeof(u32)); }
-void id_pool_clear(DidPool& p) { Loop(i, p.cap) p.ids[i] = i; p.count = 0; }
+void id_pool_remove(DIdPool& p, u32 id) { p.ids[--p.count] = id; }
+void id_pool_destroy(DIdPool& p) { if(p.ids) mem_free(p.alloc, p.ids, p.cap * sizeof(u32)); }
+void id_pool_clear(DIdPool& p) { Loop(i, p.cap) p.ids[i] = i; p.count = 0; }
 
 ///////////////////////////////////
 // Radix

@@ -1,6 +1,6 @@
-#include "../base_impl.h"
+#include "../lib.h"
 
-#if OS_LINUX && !GFX_X11
+#if OS_LINUX && GFX_WAYLAND
 
 #undef global
 #include <wayland-client.h>
