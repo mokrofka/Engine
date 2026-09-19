@@ -26,6 +26,7 @@ struct StringList {
 Slice<u8> dstr_slice(Dstring dstr);
 Dstring dstr_make(Allocator alloc);
 void dstr_push(Dstring& arr, String str);
+void dstr_pushf(Dstring& arr, String fmt, ...);
 void dstr_clear(Dstring& arr);
 
 u64 cstr_length(const void* c);
@@ -43,6 +44,7 @@ u32 f64_length(f64 x, u32 precision);
 u32 f32_write(u8* dest, f32 value, u32 precision);
 u32 f64_write(u8* dest, f64 value, u32 precision);
 void u64_hex_write(u8* dest, u64 value);
+u32 my_sprintf(u8* buf, String fmt, VaList argc);
 
 ////////////////////////////////////////////////////////////////////////
 // Character Classification & Conversion Functions

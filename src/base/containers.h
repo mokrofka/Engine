@@ -409,7 +409,7 @@ template<typename T, i32 N, typename Handle> Handle pool_get_handle(Pool<T, N, H
 	Handle res = {idx, p.gens[idx]};
 	return res;
 }
-template<typename T, i32 N, typename Handle> u32 pool_clear(Pool<T, N, Handle>& p) {
+template<typename T, i32 N, typename Handle> void pool_clear(Pool<T, N, Handle>& p) {
 	p.head = 0;
 	p.max_idx = 0;
 	ArrayZero(p.data);

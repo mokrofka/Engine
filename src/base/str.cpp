@@ -25,20 +25,36 @@ Dstring dstr_make(Allocator alloc) {
 	};
 	return res;
 }
-void dstr_push(Dstring& arr, String str) {
-	if(str.size + arr.size > arr.cap) {
+u8* dstr_alloc(Dstring& arr, u64 size) {
+	if(size + arr.size > arr.cap) {
 		if(arr.str) {
-			u32 modifier = div_ceil(str.size+arr.size, arr.cap);
+			u32 modifier = div_ceil(size+arr.size, arr.cap);
 			u32 old_cap = arr.cap;
 			arr.cap *= modifier;
 			arr.str = mem_realloc_array(arr.alloc, arr.str, old_cap, arr.cap);
 		} else {
-			arr.cap = Max(str.size, (u64)DEFAULT_CAPACITY);
+			arr.cap = Max(size, (u64)DEFAULT_CAPACITY);
 			arr.str = mem_alloc(arr.alloc, arr.cap);
 		}
 	}
-	MemCopy(arr.str+arr.size, str.str, str.size);
-	arr.size += str.size;
+	u8* res = arr.str+arr.size;
+	arr.size += size;
+	return res;
+}
+void dstr_push(Dstring& arr, String str) {
+	u8* dst = dstr_alloc(arr, str.size);
+	MemCopy(dst, str.str, str.size);
+}
+void dstr_pushf(Dstring& arr, String fmt, ...) {
+	VaList argc;
+	va_start(argc, fmt); 
+	u32 need_bytes = my_sprintf(null, fmt, argc);
+	va_end(argc);
+	u8* buf = dstr_alloc(arr, need_bytes);
+	va_start(argc, fmt); 
+	u32 final_size = my_sprintf(buf, fmt, argc);
+	va_end(argc);
+	String res = {buf, final_size};
 }
 void dstr_clear(Dstring&arr) {
 	arr.size = 0;

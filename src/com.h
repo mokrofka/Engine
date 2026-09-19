@@ -217,6 +217,8 @@ struct ThingDesc {
 	Rng3 aabb;
 	MeshEnum mesh;
 	MaterialEnum mat;
+	R_MeshId mesh_id;
+	R_MaterialId mat_id;
 };
 
 typedef u32 ThingFlags;
@@ -231,6 +233,9 @@ struct ThingList {
 	ThingId last;
 };
 
+#define FIELD
+#define UI_FIELD
+#define PUSH_FIELD
 Introspect struct Thing {
 	ThingId parent;
 	ThingId next;
@@ -258,6 +263,7 @@ Introspect struct Thing {
 	u8 buf3[64];
 	f32 modify3;
 	f32 angle;
+	u32 serialized_idx;
 };
 
 typedef u32 ThingState;
@@ -388,6 +394,19 @@ struct UI_State {
 	UI_Style style;
 };
 
+#define THING_LIST \
+	X(Thing_Cube0) \
+	X(Thing_Cube1) \
+	X(Thing_Monkey) \
+
+enum ThingEnum {
+	Thing_Null,
+#define X(x) x,
+	THING_LIST
+#undef X
+	ThingEnum_COUNT,
+};
+
 struct GlobalState {
 	Arena arena;
 	Arena frame_arena;
@@ -445,14 +464,13 @@ struct GlobalState {
 	b32 fps_camera;
 
 	u32 entities_count;
-	// PoolLinkList<Thing, MaxEntities, ThingId> entities;
-	// Pool<Thing, MaxEntities, ThingId> entities;
-	// SparseSet<MaxEntities> active_entities;
-	PoolIterative<Thing, MaxEntities, ThingId> entities;
+	PoolIterative<Thing, MaxEntities, ThingId> things;
 
 	DArray<ThingId> moving_cubes;
 	Map<ThingId, 32> find_entity;
 
+	ThingId thing_enums[ThingEnum_COUNT];
+	Map<u32, 32> str_to_thing_enum;
 	ThingId axis_attached_to_cam_id;
 	ThingId monkey0;
 	ThingId cube0;
@@ -551,6 +569,9 @@ f32 parse_f32(Parser& p);
 f32 parse_u32(Parser& p);
 f32 parse_i32(Parser& p);
 v3 parse_v3(Parser& p);
+v4 parse_v4(Parser& p);
+String write_v3(Allocator alloc, v3 v);
+String write_v4(Allocator alloc, v4 v);
 
 b32 key_pressed(Key key);
 b32 key_pressed_consume(Key key);
