@@ -1,6 +1,6 @@
 #include "lib.h"
 
-Global ProfState profiler_st;
+GlobalVar ProfState profiler_st;
 
 void prof_init(Allocator arena) {
 	var& g = profiler_st;
@@ -19,15 +19,25 @@ void prof_init(Allocator arena) {
 _ProfBlock::_ProfBlock(String label_, String func_, ProfType type_) {
 	var& g = profiler_st;
 	ProfThread& prof_thread = g.prof_threads[tctx_id()];
-	label = label_;
-	func = func_;
+	u32 label_idx = hash(label_) % ArrayCount(g.strs);
+	u32 func_idx = hash(func_) % ArrayCount(g.strs);
+	if(!bit_array_get(g.strs_exist, label_idx)) {
+		g.strs[label_idx] = push_str_copy(g.arena, label_);
+		bit_array_set(g.strs_exist, label_idx);
+	}
+	if(!bit_array_get(g.strs_exist, func_idx)) {
+		g.strs[func_idx] = push_str_copy(g.arena, func_);
+		bit_array_set(g.strs_exist, func_idx);
+	}
+	label = g.strs[label_idx];
+	func = g.strs[func_idx];
 	type = type_;
 	ProfEvent event = {
 		.type = ProfEventType_Push,
 		.prof_type = type_,
 		.tsc = cpu_now(),
-		.label = label_,
-		.func = func_,
+		.label = label,
+		.func = func,
 	};
 	array_push(prof_thread.events[atomic_load(&g.current_write)], event);
 }
@@ -47,6 +57,10 @@ _ProfBlock::~_ProfBlock() {
 
 void prof_begin() {
 	var& g = profiler_st;
+	for(var& prof_thread : g.prof_threads) {
+		Assert(prof_thread.events[0].count < 3000);
+		Assert(prof_thread.events[1].count < 3000);
+	}
 	for(var& prof_thread : g.prof_threads) array_clear(prof_thread.events[g.current_write]);
 	g.current_frame_time.tsc_start = cpu_now();
 }
@@ -62,7 +76,9 @@ void prof_end() {
 	};
 	u32 read_buf = atomic_xor(&g.current_write, 1);
 	for(var& prof_thread : g.prof_threads) {
-		var anchors = array_make<ProfAnchor>(scratch);
+		// var anchors = array_make<ProfAnchor>(scratch);
+		var& anchors = prof_thread.recorded_anchors[current_frame % ArrayCount(g.frames_times)];
+		array_clear(anchors);
 		u32 depth = 0;
 		var stack = array_make<u32>(scratch);
 
@@ -119,10 +135,10 @@ void prof_end() {
 
 		///////////////////////////////////
 		// Record anchors
-		var& write_anchors = prof_thread.recorded_anchors[current_frame % ArrayCount(g.frames_times)];
-		array_reserve(write_anchors, anchors.count);
-		MemCopyArray(write_anchors.data, anchors.data, anchors.count);
-		write_anchors.count = anchors.count;
+		// var& write_anchors = prof_thread.recorded_anchors[current_frame % ArrayCount(g.frames_times)];
+		// array_reserve(write_anchors, anchors.count);
+		// MemCopyArray(write_anchors.data, anchors.data, anchors.count);
+		// write_anchors.count = anchors.count;
 	}
 }
 

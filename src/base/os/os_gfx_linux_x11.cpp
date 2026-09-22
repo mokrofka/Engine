@@ -58,7 +58,7 @@ struct X11State {
 	OS_Modifiers modifiers;
 };
 
-global X11State gfx_st;
+global_var X11State gfx_st;
 
 Key lnx_x11_keycode_translate(u32 keysym) {
 	switch(keysym) {
@@ -272,7 +272,7 @@ u32 os_key_to_character(Key key, OS_Modifiers modifiers) {
 
 void os_gfx_init() {
 	X11State& g = gfx_st;
-	g.arena = arena_make(.name = "gfx arena");
+	g.arena = arena_make(.name = "os gfx arena");
 	g.gpa = alloc_make(g.arena);
 	g.input_events = array_make<OS_InputEvent>(g.gpa);
 	g.xcb_events = array_make<xcb_generic_event_t*>(g.gpa);
@@ -374,14 +374,12 @@ void os_pump_messages() {
 	g.input.mouse_y_delta = 0;
 
 	u32 i = 0;
-	while(true) {
+	For {
 		xcb_generic_event_t* event = xcb_poll_for_event(g.connection);
 		if(event) {
 		} else if(i < g.xcb_events.count) {
 			event = g.xcb_events[i++];
-		} else {
-			break;
-		}
+		} else break;
 		if((event->response_type & 0x7f) == XCB_GE_GENERIC) {
 			xcb_ge_generic_event_t* ge = (xcb_ge_generic_event_t*)event;
 			if(ge->event_type == XCB_INPUT_RAW_MOTION) {
@@ -503,31 +501,24 @@ void os_pump_messages() {
 				#define XK_WheelLeft 7
 				xcb_button_press_event_t* bp = (xcb_button_press_event_t*)event;
 				OS_InputEvent event = {};
-
-				///////////////////////////////////
-				// Button
-				b32 was_button = false;
 				switch(bp->detail) {
-					case XK_MouseLeft: g.input.mouse_current.buttons[MouseButton_Left] = true; event.mouse_button = MouseButton_Left; was_button = true; break;
-					case XK_MouseMiddle: g.input.mouse_current.buttons[MouseButton_Middle] = true; event.mouse_button = MouseButton_Middle; was_button = true; break;
-					case XK_MouseRight: g.input.mouse_current.buttons[MouseButton_Right] = true; event.mouse_button = MouseButton_Right; was_button = true; break;
+					InvalidDefaultCase;
+					case XK_MouseLeft: g.input.mouse_current.buttons[MouseButton_Left] = true; event.mouse_button = MouseButton_Left; goto mouse_button;
+					case XK_MouseMiddle: g.input.mouse_current.buttons[MouseButton_Middle] = true; event.mouse_button = MouseButton_Middle; goto mouse_button;
+					case XK_MouseRight: g.input.mouse_current.buttons[MouseButton_Right] = true; event.mouse_button = MouseButton_Right; goto mouse_button;
+					case XK_WheelUp: ; event.scroll = 1; goto scroll;
+					case XK_WheelDown: event.scroll = -1; goto scroll;
+					case XK_WheelRight: g.input.wheel_horizontal = 1; goto scroll;
+					case XK_WheelLeft: g.input.wheel_horizontal = -1; goto scroll;
 				}
+				mouse_button:
 				event.type = OS_EventType_MouseButton;
 				event.is_pressed = true;
-
-				///////////////////////////////////
-				// Scroll
-				if(!was_button) {
-					switch(bp->detail) {
-						case XK_WheelUp: ; event.scroll = 1; break;
-						case XK_WheelDown: event.scroll = -1; break;
-						case XK_WheelRight: g.input.wheel_horizontal = 1; break;
-						case XK_WheelLeft: g.input.wheel_horizontal = -1; break;
-					}
-					g.input.wheel = event.scroll;
-					event.type = OS_EventType_Scroll;
-				}
-
+				goto end;
+				scroll:
+				g.input.wheel = event.scroll;
+				event.type = OS_EventType_Scroll;
+				end:
 				array_push(g.input_events, event);
 			}break;
 			case XCB_BUTTON_RELEASE: {

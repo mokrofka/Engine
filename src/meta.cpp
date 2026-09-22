@@ -1,12 +1,12 @@
 #include "meta.h"
 
-global String tokens_str_names[] = {
+global_var String tokens_str_names[] = {
 #define X(name) Stringify(name),
 	TOKEN_TYPE_LIST
 #undef X
 };
 
-global String meta_type_str[] = {
+global_var String meta_type_str[] = {
 #define X(x) [x] = Stringify(x),
 	MetaTypeLIST
 #undef X

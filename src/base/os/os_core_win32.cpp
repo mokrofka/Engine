@@ -32,7 +32,7 @@ struct OS_State {
 
 f32 delta_time;
 
-global OS_State st;
+global_var OS_State st;
 
 void entry_point();
 LRESULT CALLBACK win32_process_message(HWND hwnd, u32 msg, WPARAM w_param, LPARAM l_param);
@@ -73,8 +73,8 @@ KAPI void os_init() {
 }
 
 void os_toggle_fullscreen() {
-  local WINDOWPLACEMENT window_position;
-  local i32 fullscreen_switch;
+  local_persist WINDOWPLACEMENT window_position;
+  local_persist i32 fullscreen_switch;
   fullscreen_switch = (fullscreen_switch+1) % 2;
   HWND hwnd = (HWND)st.window.hwnd;
   if(fullscreen_switch) {
@@ -155,7 +155,7 @@ void os_sleep(u64 ms) { Sleep(ms); }
 void os_hide_cursor() { }
 
 void os_cursor_update() {
-  local v2i center = {(i32)st.window.width / 2, (i32)st.window.height / 2};
+  local_persist v2i center = {(i32)st.window.width / 2, (i32)st.window.height / 2};
   v2i current_pos;
   GetCursorPos((POINT*)&current_pos);
   

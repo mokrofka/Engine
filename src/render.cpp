@@ -366,7 +366,7 @@ R_FontId r_make_font(R_FontDesc desc) {
 		stbtt_bakedchar characters_info[96];
 		u32 font_height = ctx.desc.font_height;
 		u32 pixels_size = 96 * Square(font_height);
-		u32 dim = Sqrt(pixels_size);
+		u32 dim = sqrt(pixels_size);
 		u32 width = round_up(dim, font_height);
 		u32 height = round_up(dim, font_height);
 		u8* pixels = push_buffer(g.arena, width*height);
@@ -402,7 +402,7 @@ R_FontId r_make_dummy_font(R_FontDesc desc) {
 	stbtt_bakedchar characters_info[96];
 	u32 font_height = desc.font_height;
 	u32 pixels_size = 96 * Square(font_height);
-	u32 dim = Sqrt(pixels_size);
+	u32 dim = sqrt(pixels_size);
 	u32 width = round_up(dim, font_height);
 	u32 height = round_up(dim, font_height);
 	u8* pixels = push_buffer(g.arena, width*height);

@@ -110,9 +110,9 @@ typedef __builtin_va_list VaList;
 #define var auto
 
 #define intern static
-#define global static
-#define local  static
-#define Global
+#define global_var static
+#define local_persist  static
+#define GlobalVar
 
 #define U8_MAX  0xFF
 #define U16_MAX 0xFFFF
@@ -161,21 +161,21 @@ b32  MemMatch(void* a, void* b, u64 size);
 #define MemMatchStruct(a, b)   MemMatch((a), (b), sizeof(*(a)))
 #define MemMatchArray(a, b, c) MemMatch((a), (b), sizeof(*(a)) * (c))
 
-u64 AlignUp(u64 x, u64 a);
-u64 AlignDown(u64 x, u64 a);
-u64 AlignPadUp(u64 x, u64 a);
-u64 AlignPadDown(u64 x, u64 a);
-b32 IsAligned(u64 x, u64 a);
-u8* AlignUpPtr(void* x, u64 a);
-u8* AlignDownPtr(void* x, u64 a);
-u8* AlignPadUpPtr(void* x, u64 a);
-u8* AlignPadDownPtr(void* x, u64 a);
-b32 IsAlignedPtr(void* x, u64 a);
-b32 IsPow2(u64 x);
+u64 align_up(u64 x, u64 a);
+u64 align_down(u64 x, u64 a);
+u64 align_pad_up(u64 x, u64 a);
+u64 align_pad_down(u64 x, u64 a);
+b32 is_aligned(u64 x, u64 a);
+u8* align_up_ptr(void* x, u64 a);
+u8* align_down_ptr(void* x, u64 a);
+u8* align_pad_up_ptr(void* x, u64 a);
+u8* align_pad_down_ptr(void* x, u64 a);
+b32 is_aligned_ptr(void* x, u64 a);
+b32 is_pow2(u64 x);
 u8* Offset(void* x, u64 a);
 u8* OffsetBack(void* x, u64 a);
-u64 PtrDiff(void* a, void* b);
-b32 PtrMatch(void* a, void* b);
+u64 ptr_diff(void* a, void* b);
+b32 ptr_match(void* a, void* b);
 
 ////////////////////////////////////////////////////////////////////////
 // Bits
@@ -189,7 +189,6 @@ u32 most_significant_bit(u32 size);
 u64 most_significant_bit(u64 size);
 u32 remove_lowest_bit(u64 v);
 
-#define Bit(x) (1 << (x))
 b32 bit_has(u64 x, u64 pos);
 u64 flag_clear(u64 x, u64 f);
 u64 flag_toggle(u64 x, u64 f);
@@ -235,7 +234,7 @@ u32 prev_pow2(u32 n);
 // Shenanigans
 
 #define ArrayCount(x)   (sizeof((x)) / sizeof((x)[0]))
-#define ArrayRand(arr)  arr[rand_u32_rng(0, ArrayCount(arr)-1)]
+#define ArrayRand(arr)  arr[rand_u32(0, ArrayCount(arr))]
 #define ArrayZero(arr)  MemZeroArray((arr), ArrayCount((arr)))
 #define ArrayCopy(d, s) MemCopyArray((d), (s), ArrayCount((s)))
 #define Assign(a,b)    (*((u8**)(&(a))) = (u8*)(b))
@@ -249,11 +248,12 @@ u32 prev_pow2(u32 n);
 #define _DefIfSet(val, expr, def) if(expr) val = def
 
 #define For 																						for(;;)
-#define Loop(it, c)               for(i32 it = 0; it < c; ++it)
+#define Loop(it, c)          					for(i32 it = 0; it < c; ++it)
 #define LoopNoInc(it, c)          for(i32 it = 0; it < c;)
-#define LoopReverse(it, count)    for(i32 it = (count) - 1; it >= 0; --it)
+#define LoopReverse(it, c)    				for(i32 it = (c) - 1; it >= 0; --it)
 #define LoopOff(it, li, hi)       for(i32 it = (li); it < (hi); ++it)
-#define LoopArray(it, array)      for(i32 it = 0; it < ArrayCount(array); ++it)
+#define LoopArray(it, array)        Loop(it, ArrayCount(array))
+#define LoopArrayReverse(it, array) LoopReverse(it, ArrayCount(array))
 #define LoopEnum(it, type)        for(type it = (type)0; it < type##_COUNT; it = (type)(it+1))
 #define LoopEnumNonZero(it, type) for(type it = (type)1; it < type##_COUNT; it = (type)(it+1))
 #define LoopRange(it, range)      for(i32 it = (range).min; it < (range).max; ++it)
@@ -588,13 +588,13 @@ b32 bit_array_get(BitArrayD& bits, u64 idx);
 u64 bit_array_word_count(BitArrayD& bits);
 
 template<i32 N> struct BitArray {
-	u64 words[N];
-	u64 bit_count;
+	u64 words[N/64];
+	static constexpr u64 bit_count = N * 64;
 };
 
-template<i32 N> void bit_array_set(BitArray<N>& bits, u64 idx)   { bits.words[idx >> 6] |= Bit(idx & 63); }
-template<i32 N> void bit_array_clear(BitArray<N>& bits, u64 idx) { bits.words[idx >> 6] &= ~Bit(idx & 63); }
-template<i32 N> b32 bit_array_get(BitArray<N>& bits, u64 idx)    { return (bits.words[idx >> 6] >> (idx & 63)) & 1; }
+template<i32 N> void bit_array_set(BitArray<N>& bits, u64 idx)   { bits.words[idx >> 6] |=   u64(1)<<(idx & 63); }
+template<i32 N> void bit_array_clear(BitArray<N>& bits, u64 idx) { bits.words[idx >> 6] &= ~(u64(1)<<(idx & 63)); }
+template<i32 N> b32 bit_array_get(BitArray<N>& bits, u64 idx)    { return (bits.words[idx >> 6] >> (idx & 63))&1; }
 template<i32 N> u64 bit_array_word_count(BitArray<N>& bits)      { return (bits.bit_count + 63) / 64; }
 
 struct Region {
@@ -618,17 +618,8 @@ struct RingBuffer {
 RingBuffer ring_make(void* base, u64 size);
 u64 ring_write(RingBuffer& ring, void* src, u64 src_size);
 u64 ring_read(RingBuffer& ring, void* dst, u64 dst_size);
-#define ring_write_struct(ring, ptr) ring_write((ring), (ptr), sizeof(*(ptr)))
-#define ring_read_struct(ring, ptr) ring_read((ring), (ptr), sizeof(*(ptr)))
-#define ring_write_array(ring, ptr, c) ring_write((ring), (ptr), (c) * sizeof(*(ptr)))
-#define ring_read_array(ring, ptr, c) ring_read((ring), (ptr), (c) * sizeof(*(ptr)))
-
-u64 ring_write_nowrap(RingBuffer& ring, void* src, u64 src_size, u64 align = 0);
+u64 ring_write_nowrap(RingBuffer& ring, void* src, u64 src_size);
 u64 ring_read_nowrap(RingBuffer& ring, void* dst, u64 read_size);
-#define ring_write_nowrap_struct(ring, ptr) ring_write_nowrap((ring), (ptr), sizeof(*(ptr)), alignof(*(ptr)))
-#define ring_read_nowrap_struct(ring, ptr) ring_read_nowrap((ring), (ptr), sizeof(*(ptr)))
-#define ring_write_nowrap_array(ring, ptr, c) ring_write_nowrap((ring), (ptr), (c) * sizeof(*(ptr)), alignof(*(ptr)))
-#define ring_read_nowrap_array(ring, ptr, c) ring_read_nowrap((ring), (ptr), (c) * sizeof(*(ptr)))
 
 template<typename T> struct Slice {
 	T* data;
@@ -824,9 +815,13 @@ void println(String fmt, ...);
 	#define Error(message, ...)
 #endif
 
+u64 cpu_now();
+void cpu_find_frequency();
+
 extern f32 time_dt;
 extern f32 time_now;
 extern u32 current_frame;
+extern u64 cpu_frequency;
 
 // #define X(a, ...) X_IMPL(a, ##__VA_ARGS__, 3)
 // #define X_IMPL(a, value, ...) x_foo(a, value)

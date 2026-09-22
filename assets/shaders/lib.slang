@@ -2,7 +2,7 @@
 import com;
 #endif
 
-#define global static
+#define global_var static
 
 #define KB(n) ((n) << 10)
 #define MB(n) ((n) << 20)

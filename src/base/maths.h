@@ -112,6 +112,7 @@ union v4 {
 	v4() = default;
 	NO_DEBUG explicit v4(f32 s):x(s),y(s),z(s){};
 	NO_DEBUG v4(f32 x, f32 y, f32 z, f32 w):x(x),y(y),z(z),w(w){}
+	NO_DEBUG v4(v3 v, f32 w):x(v.x),y(v.y),z(v.z),w(w){}
 };
 
 struct m2x2 { f32 v[2][2]; };
@@ -208,26 +209,26 @@ struct Ray {
 ////////////////////////////////////////////////////////////////////////
 // Float Ops
 
-NO_DEBUG f32 Sin(f32 x);
-NO_DEBUG f32 Cos(f32 x);
-NO_DEBUG f32 Tan(f32 x);
-NO_DEBUG f32 Asin(f32 x);
-NO_DEBUG f32 Acos(f32 x);
-NO_DEBUG f32 Atan2(f32 y, f32 x);
-NO_DEBUG f32 Sqrt(f32 x);
-NO_DEBUG f32 Pow(f32 a, f32 b);
-NO_DEBUG f32 Floor(f32 x);
-NO_DEBUG f32 Ceil(f32 x);
-NO_DEBUG f32 Round(f32 x);
-NO_DEBUG f32 Mod(f32 a, f32 b);
-NO_DEBUG f32 Exp(f32 x);
-NO_DEBUG f32 LogE(f32 x);
-NO_DEBUG f32 Log2(f32 x);
-NO_DEBUG f32 Log10(f32 x);
-NO_DEBUG void SinCos(f32 rad, f32* a, f32* b);
+NO_DEBUG f32 sin(f32 x);
+NO_DEBUG f32 cos(f32 x);
+NO_DEBUG f32 tan(f32 x);
+NO_DEBUG f32 asin(f32 x);
+NO_DEBUG f32 acos(f32 x);
+NO_DEBUG f32 atan2(f32 y, f32 x);
+NO_DEBUG f32 sqrt(f32 x);
+NO_DEBUG f32 pow(f32 a, f32 b);
+NO_DEBUG f32 floor(f32 x);
+NO_DEBUG f32 ceil(f32 x);
+NO_DEBUG f32 round(f32 x);
+NO_DEBUG f32 mod(f32 a, f32 b);
+NO_DEBUG f32 exp(f32 x);
+NO_DEBUG f32 loge(f32 x);
+NO_DEBUG f32 log2(f32 x);
+NO_DEBUG f32 log10(f32 x);
+NO_DEBUG void sincos(f32 rad, f32* a, f32* b);
 
-NO_DEBUG f32 SinD(f32 x);
-NO_DEBUG f32 CosD(f32 x);
+NO_DEBUG f32 sind(f32 x);
+NO_DEBUG f32 cosd(f32 x);
 
 f32 ceil_to(f32 x, f32 step);
 f32 floor_to(f32 x, f32 step);
@@ -254,13 +255,13 @@ u64 hash_bytes(void *data, u64 size, u64 seed = HASH_DEFAULT_SEED);
 // Random
 NO_DEBUG u64 rand_u64();
 NO_DEBUG u32 rand_u32();
-NO_DEBUG u32 rand_u32_rng(u32 min, u32 max);
+NO_DEBUG u32 rand_u32(u32 min, u32 max);
 NO_DEBUG i32 rand_i32();
-NO_DEBUG i32 rand_i32_rng(i32 min, i32 max);
+NO_DEBUG i32 rand_i32(i32 min, i32 max);
 NO_DEBUG f32 rand_f32_01();
 NO_DEBUG f32 rand_f32_11();
 NO_DEBUG f32 rand_f32();
-NO_DEBUG f32 rand_f32_rng(f32 min, f32 max);
+NO_DEBUG f32 rand_f32(f32 min, f32 max);
 NO_DEBUG f32 rand_f32_centered(f32 base, f32 radius);
 NO_DEBUG f32 rand_f32_signed(f32 magnitude);
 NO_DEBUG b32 rand_b32();
@@ -268,7 +269,7 @@ NO_DEBUG void rand_set_seed();
 NO_DEBUG u32 rand_get_seed();
 template<typename T> void rand_shuffle(Slice<T> data) {
 	Loop(i, data.count) {
-		u32 j = rand_u32_rng(i, data.count - 1);
+		u32 j = rand_u32(i, data.count);
 		Swap(data[i], data[j]);
 	}
 }
@@ -283,15 +284,14 @@ f32 safe_div0(f32 a, f32 b);
 f32 safe_div1(f32 a, f32 b);
 i32 wrap_i32(i32 min, i32 x, i32 max);
 f32 wrap_f32(f32 min, f32 x, f32 max);
-f32 Lerp(f32 a, f32 t, f32 b);
-f32 LerpClamp(f32 a, f32 t, f32 b);
+f32 lerp(f32 a, f32 t, f32 b);
+f32 lerp_clamp(f32 a, f32 t, f32 b);
 f32 unlerp(f32 a, f32 x, f32 b);
-f64 unlerp(f64 a, f64 x, f64 b);
-f32 norm(f32 min, f32 x, f32 max);
+f64 unlerp_f64(f64 a, f64 x, f64 b);
 f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
 f32 remap(f32 x, f32 old_max, f32 new_max);
-f64 remap(f64 x, f64 old_min, f64 old_max, f64 new_min, f64 new_max);
-f32 remap(f64 x, f64 old_max, f64 new_max);
+f64 remap_f64(f64 x, f64 old_min, f64 old_max, f64 new_min, f64 new_max);
+f64 remap_f64(f64 x, f64 old_max, f64 new_max);
 f32 remap_clamp(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max);
 f32 approach(f32 from, f32 to, f32 step);
 
@@ -348,7 +348,9 @@ NO_DEBUG b32 v2_greater_all(v2 a, v2 b);
 NO_DEBUG b32 v2_less_all(v2 a, v2 b);
 NO_DEBUG b32 v2_greater_any(v2 a, v2 b);
 NO_DEBUG b32 v2_less_any(v2 a, v2 b);
-NO_DEBUG v2  v2_rand_rng(v2 a, v2 b);
+NO_DEBUG v2  v2_rand(v2 a, v2 b);
+NO_DEBUG v2  v2_swizzle(v2 v, u32 x, u32 y);
+NO_DEBUG v3  v2_swizzle(v2 v, u32 x, u32 y, u32 z);
 
 NO_DEBUG f32 v2_length(v2 v);
 NO_DEBUG f32 v2_length_sqr(v2 v);
@@ -422,7 +424,9 @@ NO_DEBUG b32 v3_greater_all(v3 a, v3 b);
 NO_DEBUG b32 v3_less_all(v3 a, v3 b);
 NO_DEBUG b32 v3_greater_any(v3 a, v3 b);
 NO_DEBUG b32 v3_less_any(v3 a, v3 b);
-NO_DEBUG v3  v3_rand_rng(v3 a, v3 b);
+NO_DEBUG v3  v3_rand(v3 a, v3 b);
+NO_DEBUG v2  v3_swizzle(v3 v, u32 x, u32 y);
+NO_DEBUG v3  v3_swizzle(v3 v, u32 x, u32 y, u32 z);
 
 NO_DEBUG f32 v3_length(v3 v);
 NO_DEBUG f32 v3_length_sqr(v3 v);
@@ -677,10 +681,13 @@ b32 rng2_overlaps(Rng2 a, Rng2 b);
 v2 rng2_clamp(Rng2 r, v2 x);
 Rng1 rng2_rng_x(Rng2 r);
 Rng1 rng2_rng_y(Rng2 r);
+v2 rng2_bottom_left(Rng2 r);
 
 Rng2 rng2_lerp(Rng2 a, f32 t, Rng2 b);
 v2 rng2_remap(v2 p, Rng2 from, Rng2 to);
+v2 rng2_remap(v2 p, v2 from, Rng2 to);
 Rng2 rng2_remap_rng(Rng2 r, Rng2 from, Rng2 to);
+Rng2 rng2_remap_rng(Rng2 r, v2 from, Rng2 to);
 Rng2 rng2_make(v2 min, v2 size);             
 Rng2 rng2_make_centered(v2 pos, v2 halfdim); 
 Rng2 rng2_scale_centered(Rng2 r, v2 scale);  

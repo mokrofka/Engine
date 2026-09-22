@@ -6,62 +6,62 @@
 
 #include "generated.h"
 
-Global GlobalState* st;
+GlobalVar GlobalState* st;
 
 R_Vertex cube_vertices[] = {
 	// Front face (0, 0, 1)
-	{.pos = v3(-1.00, -1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0.0f, 0.0f)},
-	{.pos = v3( 1.00, -1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1.0f, 0.0f)},
-	{.pos = v3( 1.00,  1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1.0f, 1.0f)},
-	{.pos = v3( 1.00,  1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1.0f, 1.0f)},
-	{.pos = v3(-1.00,  1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0.0f, 1.0f)},
-	{.pos = v3(-1.00, -1.00,  1.00), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0.0f, 0.0f)},
+	{.pos = v3(-1, -1,  1), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0, 0)},
+	{.pos = v3( 1, -1,  1), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1, 0)},
+	{.pos = v3( 1,  1,  1), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1, 1)},
+	{.pos = v3( 1,  1,  1), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1, 1)},
+	{.pos = v3(-1,  1,  1), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0, 1)},
+	{.pos = v3(-1, -1,  1), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0, 0)},
 
 	// Back face (0, 0, -1)
-	{.pos = v3( 1.00, -1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0.0f, 0.0f)},
-	{.pos = v3(-1.00, -1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1.0f, 0.0f)},
-	{.pos = v3(-1.00,  1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1.0f, 1.0f)},
-	{.pos = v3(-1.00,  1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1.0f, 1.0f)},
-	{.pos = v3( 1.00,  1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0.0f, 1.0f)},
-	{.pos = v3( 1.00, -1.00, -1.00), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0.0f, 0.0f)},
+	{.pos = v3( 1, -1, -1), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0, 0)},
+	{.pos = v3(-1, -1, -1), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1, 0)},
+	{.pos = v3(-1,  1, -1), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1, 1)},
+	{.pos = v3(-1,  1, -1), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1, 1)},
+	{.pos = v3( 1,  1, -1), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0, 1)},
+	{.pos = v3( 1, -1, -1), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0, 0)},
 
 	// Left face (-1, 0, 0)
-	{.pos = v3(-1.00, -1.00, -1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
-	{.pos = v3(-1.00, -1.00,  1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
-	{.pos = v3(-1.00,  1.00,  1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
-	{.pos = v3(-1.00,  1.00,  1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
-	{.pos = v3(-1.00,  1.00, -1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
-	{.pos = v3(-1.00, -1.00, -1.00),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+	{.pos = v3(-1, -1, -1),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0, 0)},
+	{.pos = v3(-1, -1,  1),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1, 0)},
+	{.pos = v3(-1,  1,  1),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1, 1)},
+	{.pos = v3(-1,  1,  1),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1, 1)},
+	{.pos = v3(-1,  1, -1),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0, 1)},
+	{.pos = v3(-1, -1, -1),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0, 0)},
 
 	// Right face (1, 0, 0)
-	{.pos = v3(1.00, -1.00,  1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
-	{.pos = v3(1.00, -1.00, -1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
-	{.pos = v3(1.00,  1.00, -1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
-	{.pos = v3(1.00,  1.00, -1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
-	{.pos = v3(1.00,  1.00,  1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
-	{.pos = v3(1.00, -1.00,  1.00),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+	{.pos = v3(1, -1,  1),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0, 0)},
+	{.pos = v3(1, -1, -1),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1, 0)},
+	{.pos = v3(1,  1, -1),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1, 1)},
+	{.pos = v3(1,  1, -1),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1, 1)},
+	{.pos = v3(1,  1,  1),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0, 1)},
+	{.pos = v3(1, -1,  1),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0, 0)},
 
 	// Bottom face (0, -1, 0)
-	{.pos = v3(-1.00, -1.00, -1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
-	{.pos = v3( 1.00, -1.00, -1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
-	{.pos = v3( 1.00, -1.00,  1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
-	{.pos = v3( 1.00, -1.00,  1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
-	{.pos = v3(-1.00, -1.00,  1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
-	{.pos = v3(-1.00, -1.00, -1.00),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
+	{.pos = v3(-1, -1, -1),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0, 1)},
+	{.pos = v3( 1, -1, -1),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1, 1)},
+	{.pos = v3( 1, -1,  1),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1, 0)},
+	{.pos = v3( 1, -1,  1),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1, 0)},
+	{.pos = v3(-1, -1,  1),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0, 0)},
+	{.pos = v3(-1, -1, -1),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0, 1)},
 
 	// Top face (0, 1, 0)
-	{.pos = v3(-1.00,  1.00,  1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
-	{.pos = v3( 1.00,  1.00,  1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1.0f, 0.0f)},
-	{.pos = v3( 1.00,  1.00, -1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
-	{.pos = v3( 1.00,  1.00, -1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1.0f, 1.0f)},
-	{.pos = v3(-1.00,  1.00, -1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0.0f, 1.0f)},
-	{.pos = v3(-1.00,  1.00,  1.00), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0.0f, 0.0f)},
+	{.pos = v3(-1,  1,  1), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0, 0)},
+	{.pos = v3( 1,  1,  1), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1, 0)},
+	{.pos = v3( 1,  1, -1), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1, 1)},
+	{.pos = v3( 1,  1, -1), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1, 1)},
+	{.pos = v3(-1,  1, -1), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0, 1)},
+	{.pos = v3(-1,  1,  1), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0, 0)},
 };
 
 R_Vertex triangle_vertices[] = {
-	{.pos = v3( 0.0,   0.5, 0), .uv = v2(0.5, 0), .color = v4(1,0,0,1)},
-	{.pos = v3(-0.5,  -0.5, 0), .uv = v2(0.0, 1), .color = v4(0,1,0,1)},
-	{.pos = v3( 0.5,  -0.5, 0), .uv = v2(1.0, 1), .color = v4(0,0,1,1)},
+	{.pos = v3( 0.0f,   0.5f, 0), .uv = v2(0.5f, 0), .color = v4(1,0,0,1)},
+	{.pos = v3(-0.5f,  -0.5f, 0), .uv = v2(0.0f, 1), .color = v4(0,1,0,1)},
+	{.pos = v3( 0.5f,  -0.5f, 0), .uv = v2(1.0f, 1), .color = v4(0,0,1,1)},
 };
 
 R_Vertex axis_vertices[] = {
@@ -73,32 +73,32 @@ R_Vertex axis_vertices[] = {
 	{.pos = v3(0,0,1), .color = v4(0,0,1,1)},
 };
 
-global String meshes_strs[] = {
+global_var String meshes_strs[] = {
 #define X(name) [Glue(Mesh_, name)] = Stringify(name),
 	MESH_LIST
 #undef X
 };
 
-global String textures_strs[] = {
+global_var String textures_strs[] = {
 #define X(name) [Glue(Texture_, name)] = Stringify(name),
 	TEXTURE_LIST
 #undef X
 };
 
-global String materials_strs[] = {
+global_var String materials_strs[] = {
 #define X(name) [Glue(Material_, name)] = Stringify(name),
 	MATERIAL_LIST
 #undef X
 };
 
-global String things_enum_strs[] = {
+global_var String things_enum_strs[] = {
 #define X(name) [name] = Stringify(name),
 	THING_LIST
 #undef X
 };
 
 const u32 TEST_SAMPLES = 100;
-global i32 test_alignments[] = { 8, 16, 32, 64 };
+global_var i32 test_alignments[] = { 8, 16, 32, 64 };
 
 void test_arena_alloc() {
 	Arena arena = arena_make();
@@ -106,11 +106,11 @@ void test_arena_alloc() {
 	Array<u32, TEST_SAMPLES> sizes = {};
 	Array<u32, TEST_SAMPLES> values = {};
 	Loop(i, TEST_SAMPLES) {
-		u32 size = rand_u32_rng(8, KB(1));
+		u32 size = rand_u32(8, KB(1));
 		u64 align = ArrayRand(test_alignments);
 		arr[i] = push_buffer(arena, size, align);
 		sizes[i] = size;
-		values[i] = rand_u32_rng(0, 255);
+		values[i] = rand_u32(0, 255);
 		MemSet(arr[i], values[i], size);
 	}
 	Loop(i, TEST_SAMPLES) {
@@ -132,11 +132,11 @@ void test_arena_list_alloc() {
 	Array<u32, TEST_SAMPLES> values = {};
 
 	Loop(i, TEST_SAMPLES) {
-		u32 size = rand_u32_rng(8, KB(1));
+		u32 size = rand_u32(8, KB(1));
 		u64 align = ArrayRand(test_alignments);
 		arr[i] = push_buffer(arena, size, align);
 		sizes[i] = size;
-		values[i] = rand_u32_rng(0, 255);
+		values[i] = rand_u32(0, 255);
 		MemSet(arr[i], values[i], size);
 	}
 	Loop(i, TEST_SAMPLES) {
@@ -150,11 +150,11 @@ void test_arena_list_alloc() {
 	alloc_arena_list_clear(arena);
 
 	Loop(i, TEST_SAMPLES) {
-		u32 size = rand_u32_rng(8, KB(1));
+		u32 size = rand_u32(8, KB(1));
 		u64 align = ArrayRand(test_alignments);
 		arr[i] = push_buffer(arena, size, align);
 		sizes[i] = size;
-		values[i] = rand_u32_rng(0, 255);
+		values[i] = rand_u32(0, 255);
 		MemSet(arr[i], values[i], size);
 	}
 	Loop(i, TEST_SAMPLES) {
@@ -179,7 +179,7 @@ void test_alloc() {
 	Array<AllocCtx, TEST_SAMPLES> arr = {};
 
 	Loop(i, TEST_SAMPLES) {
-		u64 size = rand_u32_rng(8, KB(1));
+		u64 size = rand_u32(8, KB(1));
 		u64 align = ArrayRand(test_alignments);
 		array_push(arr, {mem_alloc(alloc, size, align), size});
 		MemZero(arr[i].data, size);
@@ -193,7 +193,7 @@ void test_alloc() {
 
 	array_clear(arr);
 	Loop(i, TEST_SAMPLES) {
-		u64 size = rand_u32_rng(8, KB(1));
+		u64 size = rand_u32(8, KB(1));
 		u64 align = ArrayRand(test_alignments);
 		array_push(arr, {mem_alloc(alloc, size, align), size});
 		MemZero(arr[i].data, size);
@@ -213,7 +213,7 @@ void test_gpu_seglist_alloc() {
 	Array<GpuMemId, TEST_SAMPLES> arr = {};
 
 	Loop(i, TEST_SAMPLES) {
-		u64 size = rand_u32_rng(8, KB(1));
+		u64 size = rand_u32(8, KB(1));
 		u64 align = ArrayRand(test_alignments);
 		array_push(arr, gpu_alloc_seglist_alloc(alloc, size, align));
 	}
@@ -226,7 +226,7 @@ void test_gpu_seglist_alloc() {
 
 	array_clear(arr);
 	Loop(i, TEST_SAMPLES) {
-		u64 size = rand_u32_rng(8, KB(1));
+		u64 size = rand_u32(8, KB(1));
 		u64 align = ArrayRand(test_alignments);
 		array_push(arr, gpu_alloc_seglist_alloc(alloc, size, align));
 	}
@@ -249,8 +249,8 @@ void test_object_pool() {
 	Array<OpaqueId, TEST_SAMPLES> handlers = {};
 
 	Loop(i, TEST_SAMPLES) {
-		values[i].a = rand_u32_rng(0, TEST_SAMPLES);
-		values[i].b = rand_u32_rng(0, TEST_SAMPLES);
+		values[i].a = rand_u32(0, TEST_SAMPLES);
+		values[i].b = rand_u32(0, TEST_SAMPLES);
 	};
 	Loop(i, TEST_SAMPLES) {
 		handlers[i] = pool_push(pool, values[i]);
@@ -267,8 +267,8 @@ void test_object_pool() {
 
 	array_clear(indices);
 	Loop(i, TEST_SAMPLES) {
-		values[i].a = rand_u32_rng(0, TEST_SAMPLES);
-		values[i].b = rand_u32_rng(0, TEST_SAMPLES);
+		values[i].a = rand_u32(0, TEST_SAMPLES);
+		values[i].b = rand_u32(0, TEST_SAMPLES);
 	};
 	Loop(i, TEST_SAMPLES) {
 		handlers[i] = pool_push(pool, values[i]);
@@ -294,8 +294,8 @@ void test_object_pool_linklist() {
 	Array<OpaqueId, TEST_SAMPLES> handlers = {};
 
 	Loop(i, TEST_SAMPLES) {
-		values[i].a = rand_u32_rng(0, TEST_SAMPLES);
-		values[i].b = rand_u32_rng(0, TEST_SAMPLES);
+		values[i].a = rand_u32(0, TEST_SAMPLES);
+		values[i].b = rand_u32(0, TEST_SAMPLES);
 	};
 	Loop(i, TEST_SAMPLES) {
 		handlers[i] = pool_push(pool, values[i]);
@@ -319,8 +319,8 @@ void test_object_pool_linklist() {
 
 	array_clear(indices);
 	Loop(i, TEST_SAMPLES) {
-		values[i].a = rand_u32_rng(0, TEST_SAMPLES);
-		values[i].b = rand_u32_rng(0, TEST_SAMPLES);
+		values[i].a = rand_u32(0, TEST_SAMPLES);
+		values[i].b = rand_u32(0, TEST_SAMPLES);
 	};
 	Loop(i, TEST_SAMPLES) {
 		handlers[i] = pool_push(pool, values[i]);
@@ -456,8 +456,8 @@ void test_id_pool() {
 void test_profiler_bar() {
 	ProfFunc;
 	{
-	ProfBlock("block in bar");
-	os_sleep_ms(1);
+		ProfBlock("block in bar");
+		os_sleep_ms(1);
 	}
 	os_sleep_ms(2);
 }
@@ -505,9 +505,9 @@ void test_profiler_die(i32 i) {
 void test_profiler() {
 	// profiler_begin();
 	test_profiler_bar();
-	test_profiler_bar();
-	test_profiler_der();
-	test_profiler_die(10);
+	// test_profiler_bar();
+	// test_profiler_der();
+	// test_profiler_die(10);
 }
 
 void test_sort() {
@@ -548,7 +548,7 @@ void test_sort() {
 		LoopArray (i, arr) {
 			entries[i] = {sort_i32_key_to_u32(arr[i]), (u32)i};
 		}
-		sort_radix(scratch, entries);
+		sort_radix(entries);
 		LoopArray (i, arr) {
 			print("%i ", arr[entries[i].idx]);
 		}
@@ -602,7 +602,7 @@ void test_sort() {
 			{
 				u64 s = cpu_now();
 				Scratch scratch;
-				sort_radix(scratch, entries);
+				sort_radix(entries);
 				Info("%fms", tsc_to_ms(cpu_now()-s));
 			}
 		}
@@ -754,7 +754,7 @@ void test() {
 	test_id_pool();
 }
 
-f64 tsc_to_ms(u64 tsc) { return (f64)tsc/cpu_frequency()*1000; }
+f64 tsc_to_ms(u64 tsc) { return (f64)tsc/cpu_frequency*1000; }
 b32 time_on_interval(f64 time, f32 delta, f32 interval, f32 offset) {
 	u32 last = (time - offset - delta) / interval;
 	u32 next = (time - offset) / interval;
@@ -774,27 +774,27 @@ f64 time_prev_interval(f64 time, f32 interval, f32 offset) {
 	return offset + prev * interval;
 }
 b32 time_on_time(f64 time, f64 timestamp, f64 dt)                  { return time >= timestamp && (time - dt) < timestamp; }
-b32 time_on_between_interval(f64 time, f32 interval, f32 offset)   { return Mod(time - offset, interval*2) >= interval; }
+b32 time_on_between_interval(f64 time, f32 interval, f32 offset)   { return mod(time - offset, interval*2) >= interval; }
 f32 time_percent(f64 time, f64 start, f64 duration)                { return (time - start) / duration; }
-f32 time_lerp_delta(f32 current, f32 target, f32 rate, f32 delta)  { return target + (current - target) * Exp(-rate * delta); }
+f32 time_lerp_delta(f32 current, f32 target, f32 rate, f32 delta)  { return target + (current - target) * exp(-rate * delta); }
 b32 time_on_frame_interval(u32 frame, u32 n, u32 offset = 0)       { return (frame + offset) % n == 0; }
 f64 time_saw_wave(f64 time, f32 interval, f32 offset) {
 	f64 t = (time - offset) / interval;
-	return t - Floor(t);
+	return t - floor(t);
 }
 f32 time_sine_wave(f64 time, f32 period) {
-	return Sin(time / period * 2.0f * PI);
+	return sin(time / period * 2.0f * PI);
 }
 f32 time_smooth_wave(f64 time, f32 period) {
 	f32 p = time_saw_wave(time, period, 0);
-	return 0.5f - 0.5f * Cos(p * 2.0f * PI);
+	return 0.5f - 0.5f * cos(p * 2.0f * PI);
 }
 f32 time_triangle_wave(f64 time, f32 period) {
 	f32 p = time_saw_wave(time, period, 0);
 	return (1.0f - Abs(2.0f * p - 1.0f));
 }
 b32 time_pulse_wave(f64 time, f32 period, f32 duration, f32 offset) {
-	return Mod(time - offset, period) < duration;
+	return mod(time - offset, period) < duration;
 }
 u32 time_frame(f64 time, f32 frame_duration, u32 frame_count) {
 	return u32(time / frame_duration) % frame_count;
@@ -813,16 +813,10 @@ f64 time_since(f64 timestamp) { return time_now - timestamp; }
 f64 time_until(f64 timestamp) { return timestamp - time_now; }
 
 void imgui_draw_rect(ImDrawList* draw, Rng2 rect, v4 col, f32 rounding, ImDrawFlags flags, f32 thickness) {
-	draw->AddRect(rect.min, rect.max, u32_from_rgba(col), rounding, flags, thickness);
+	draw->AddRect(rect.min, rect.max, u32_from_rgba(col), rounding, thickness, flags);
 }
 void imgui_draw_rect_filled(ImDrawList* draw, Rng2 rect, v4 col, f32 rounding, ImDrawFlags flags) {
 	draw->AddRectFilled(rect.min, rect.max, u32_from_rgba(col));
-}
-void imgui_draw_push_clip_rect(ImDrawList* draw, Rng2 rect) {
-	draw->PushClipRect(rect.min, rect.max, true);
-}
-void imgui_draw_pop_clip_rect(ImDrawList* draw) {
-	draw->PopClipRect();
 }
 void imgui_draw_line(ImDrawList* draw, v2 p0, v2 p1, v4 col, f32 thickness) {
 	draw->AddLine(p0, p1, u32_from_rgba(col));
@@ -853,13 +847,6 @@ void imgui_text(String fmt, ...) {
 }
 v2 imgui_calc_text_size(String str) {
 	return ImGui::CalcTextSize((char*)str.str, (char*)str.str+str.size);
-}
-Rng2 debug_window_get_rect(DebugWindow win) {
-	if(win.fullscreen) {
-		return rng2_make(v2(), v2_of_v2u(os_window_size()));
-	} else {
-		return rng2_make(win.pos, win.size);
-	}
 }
 
 void debug_window_apply_state(DebugWindow& win) {
@@ -898,6 +885,10 @@ void dev_init() {
 		.launch_time_scroll_state = scroll_state_make(1),
 		.mem_scroll_state = scroll_state_make(1),
 		.win.open = false,
+		.root_cam = {.zoom = 1, .zoom2 = v2(1)},
+		.frames_cam = {.zoom = 1, .zoom2 = v2(1)},
+		.launch_cam = {.zoom = 1, .zoom2 = v2(1)},
+		.mem_cam = {.zoom = 1, .zoom2 = v2(1)},
 	};
 	g.imgui_demo_open = false;
 	imgui_init();
@@ -919,50 +910,37 @@ void dev_init() {
 void dev_update() {
 	Scratch scratch;
 	var& g = *st;
-	if(key_pressed(Key_F1)) g.prof_win.win.open = !g.prof_win.win.open;
-	if(key_pressed(Key_F2)) g.imgui_demo_open = !g.imgui_demo_open;
-	if(key_pressed(Key_F3)) g.game_win.open = !g.game_win.open;
-
 	if(g.imgui_demo_open) ImGui::ShowDemoWindow();
+	if(os_key_is_pressed(Key_F1)) g.prof_win.win.open = !g.prof_win.win.open;
+	if(os_key_is_pressed(Key_F2)) g.imgui_demo_open = !g.imgui_demo_open;
+	if(os_key_is_pressed(Key_F3)) g.game_win.open = !g.game_win.open;
 
-	DebugWindow& win = st->game_win;
-	if(os_key_is_pressed(Key_P)) {
-		debug_window_toggle_fullscreen(win);
-	}
-	if(win.open) {
-		debug_window_apply_state(win);
-		ImGuiWindow("Game") {
-			if(ImGui::IsWindowHovered()) {
-				if(key_pressed(Key_V)) {
+	///////////////////////////////////
+	// Game
+	{
+		var& win = st->game_win;
+		if(win.open) {
+			debug_window_apply_state(win);
+			ImGuiWindow("Game") {
+				if(ImGui::IsWindowHovered() && os_key_is_pressed(Key_V)) {
 					debug_window_toggle_fullscreen(win);
 				}
-			}
-
-			// var list = imgui_get_window_drawlist();
-			// imgui_draw_rect_filled(list, rng2_make(v2(0), v2(100)), ColorWhite);
-			var draw = ImGui::GetWindowDrawList();
-			imgui_draw_rect_filled(draw, rng2_make(v2(0), v2(100)), ColorWhite);
-
-			imgui_text(push_str_copy(scratch, dumb_struct(scratch, slice(members_of_Camera), &g.cam)));
-			ImGui::Separator();
-			Thing& e = get_thing(g.axis_attached_to_cam_id);
-			imgui_text(push_str_copy(scratch, dumb_struct(scratch, slice(members_of_Thing), &e, e.flags)));
-
-			if(ImGui::Button("save state")) {
-				save_game_state();
-			}
-			if(ImGui::Button("load state")) {
-				load_game_state();
-			}
-			if(ImGui::Button("clear moving cubes")) {
-				Loop(i, g.moving_cubes.count) {
-					ThingId e =  g.moving_cubes[i];
-					destroy_thing(e);
+				if(ImGui::Button("save state")) {
+					save_game_state();
 				}
-				array_clear(g.moving_cubes);
+				if(ImGui::Button("load state")) {
+					load_game_state();
+				}
+				if(ImGui::Button("clear moving cubes")) {
+					Loop(i, g.moving_cubes.count) {
+						ThingId e =  g.moving_cubes[i];
+						destroy_thing(e);
+					}
+					array_clear(g.moving_cubes);
+				}
+				ImGui::SliderFloat3("target pos", g.pos_target.v, -10, 10);
+				ImGui::DragFloat3("cam pos", g.cam.pos.v);
 			}
-			ImGui::SliderFloat3("target pos", g.pos_target.v, -10, 10);
-			ImGui::DragFloat3("cam pos", g.cam.pos.v);
 		}
 	}
 
@@ -970,10 +948,14 @@ void dev_update() {
 	// Profiler
 	{
 		struct  {
+			f32 tabs_height = 30;
+			f32 top_bar_height = 48;
 			f32 thread_name_text_size = 20;
 			f32 time_bar_text_size = 15;
+			f32 bar_height = 30;
+			f32 thread_height_off = 200;
+			f32 bar_race_height = 10;
 		}l;
-		NoOp(l);
 
 		ProfBlock("Profiler");
 		var& prof = profiler_st;
@@ -999,46 +981,41 @@ void dev_update() {
 		u64 prev_frame_tsc_end = prev_frame.frame_time.tsc_end;
 		u64 prev_frame_tsc_elapsed = prev_frame_tsc_end - prev_frame_tsc_start;
 		ProfColors colors = prof_win.colors;
-		if(key_pressed(Key_H)) {
+		if(os_key_is_pressed(Key_H)) {
 			ImGui::SetNextWindowFocus(); 
 		}
 		if(prof_win.win.open) {
-			f32 thread_name_text_size = 20;
-			f32 time_bar_text_size = 15;
 			debug_window_apply_state(prof_win.win);
 			ImGuiWindow("Profiler", prof_win.win.flags) {
 				debug_window_track_state(prof_win.win);
-				Rng2 win_rect = debug_window_get_rect(prof_win.win);
-				ImGuiPushClipRect(win_rect);
-				if(key_pressed(Key_1)) prof_win.active_tab = ProfileTabActive_Root;
-				if(key_pressed(Key_2)) prof_win.active_tab = ProfileTabActive_Frames;
-				if(key_pressed(Key_3)) prof_win.active_tab = ProfileTabActive_Time;
-				if(key_pressed(Key_4)) prof_win.active_tab = ProfileTabActive_LaunchTime;
-				if(key_pressed(Key_5)) prof_win.active_tab = ProfileTabActive_Memory;
-				if(key_pressed(Key_P)) prof.paused = !prof.paused;
-				if(ImGui::IsWindowHovered()) {
-					if(key_pressed(Key_V)) {
-						debug_window_toggle_fullscreen(prof_win.win);
-					}
+				if(os_key_is_pressed(Key_1)) prof_win.active_tab = ProfileTabActive_Root;
+				if(os_key_is_pressed(Key_2)) prof_win.active_tab = ProfileTabActive_Frames;
+				if(os_key_is_pressed(Key_3)) prof_win.active_tab = ProfileTabActive_Time;
+				if(os_key_is_pressed(Key_4)) prof_win.active_tab = ProfileTabActive_LaunchTime;
+				if(os_key_is_pressed(Key_5)) prof_win.active_tab = ProfileTabActive_Memory;
+				if(os_key_is_pressed(Key_P)) prof.paused = !prof.paused;
+				if(ImGui::IsWindowHovered() && os_key_is_pressed(Key_V)) {
+					debug_window_toggle_fullscreen(prof_win.win);
 				}
+				var draw = ImGui::GetWindowDrawList();
+				Rng2 win_rect = rng2_make(ImGui::GetCursorScreenPos(), ImGui::GetContentRegionAvail());
+				ImGuiPushClipRect2(win_rect);
 				ImGuiBeginTabBar("MyTabBar") {
-					var draw = ImGui::GetWindowDrawList();
-					v2 cursor_pos = ImGui::GetCursorScreenPos();
-					v2 mouse_pos = os_mouse_pos();
-					v2 win_pos = ImGui::GetWindowPos();
-					v2 avail_size = ImGui::GetWindowSize();
-					avail_size.x -= (cursor_pos - win_pos).x * 2;
-					imgui_text("%.1ffps %.1fms CPU %.1fGhz, Recording: %s", 1000 / tsc_to_ms(prev_frame_tsc_elapsed), tsc_to_ms(prev_frame_tsc_elapsed), (f64)cpu_frequency() / Billion(1), prof.paused ? S("off") : S("on"));
+					rng2_cut_top(&win_rect, l.tabs_height);
+					var top_bar_rect = rng2_cut_top(&win_rect, l.top_bar_height);
+					var info_rect = win_rect;
+					ImGui::SetCursorScreenPos(top_bar_rect.min);
+					imgui_text("%.1ffps %.1fms CPU %.1fGhz, Recording: %s", 1000 / tsc_to_ms(prev_frame_tsc_elapsed), tsc_to_ms(prev_frame_tsc_elapsed), (f64)cpu_frequency / Billion(1), prof.paused ? S("off") : S("on"));
 					imgui_text("avg %.1fms, max %.1f, min %.1f", prof_win.frame_avg_time, prof_win.frame_max_time, prof_win.frame_min_time);
-					f32 info_height = 60;
-					cursor_pos.y += info_height;
+					// v2 cursor_pos = win_rect.min; // TODO: remove
+					v2 avail_size = ImGui::GetContentRegionAvail();
 
 					///////////////////////////////////
 					// Tab mouse click
 					var tab_mouse_click_handle = [&](ProfTabActive tab) {
 						Rng2 tab_rect = Rng2(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
 						if(os_mouse_is_button_pressed(MouseButton_Left)) {
-							if(rng2_contains(tab_rect, mouse_pos)) switch(tab) {
+							if(rng2_contains(tab_rect, os_mouse_pos())) switch(tab) {
 								case ProfileTabActive_Root: prof_win.active_tab = ProfileTabActive_Root; break;
 								case ProfileTabActive_Frames: prof_win.active_tab = ProfileTabActive_Frames; break;
 								case ProfileTabActive_Time: prof_win.active_tab = ProfileTabActive_Time; break;
@@ -1048,92 +1025,56 @@ void dev_update() {
 						}
 					};
 
-					///////////////////////////////////
-					// Flame graph drawer
-					enum UI_ItemType {
-						UI_ItemType_Bar,
-						UI_ItemType_NextThread,
+					var draw_thread_names = [&](Rng2 rect, Camera2 cam) {
+						f32 thread_height = 200;
+						f32 thread_height_offset = 0;
+						f32 text_height_off = -30;
+						String str = push_strf(scratch, "Main thread");
+						v2 text_pos = {0, text_height_off};
+						text_pos = {rect.min.x, world_to_screen2(cam, text_pos, rect.min).y};
+						imgui_draw_text(draw, l.thread_name_text_size, text_pos, ColorWhite, str);
+						Loop(i, Thread_NumWorkers) {
+							thread_height_offset += thread_height;
+							String str = push_strf(scratch, "Worker %i", i);
+							v2 text_pos = {0, thread_height_offset + text_height_off};
+							text_pos = {rect.min.x, world_to_screen2(cam, text_pos, rect.min).y};
+							imgui_draw_text(draw, l.thread_name_text_size, text_pos, ColorWhite, str);
+						}
 					};
-					struct UI_Item {
-						UI_ItemType type;
-						Rng2 rect;
-						ProfAnchor anchor;
-					};
-					var draw_frame_graph = [&](Slice<Slice<ProfAnchor>> slices, ProfFrameTime time, f32 width_off, ScrollState scroll_state, b32 wrap = false) {
+
+					var draw_frame_graph = [&](Rng2 info_rect, Slice<Slice<ProfAnchor>> slices, ProfFrameTime time, f32 width_off, Camera2 cam, b32 wrap = false) {
+						ProfFunc;
 						Scratch scratch;
-						var items = array_make<UI_Item>(scratch);
-						for(var anchors : slices) {
+						Loop(i, slices.count) {
+							var anchors = slices[i];
+							u64 tsc_elapsed = time.tsc_end - time.tsc_start;
+							for(var anchor : anchors) {
 
-							///////////////////////////////////
-							// Build rect layout
-							{
-								u64 tsc_start = time.tsc_start;
-								u64 tsc_end = time.tsc_end;
-								u64 tsc_elapsed = tsc_end - tsc_start;
-								for(var anchor : anchors) {
-									// u64 var_tsc_elapsed_incl = anchor.tsc_elapsed_incl;
-									u64 var_tsc_elapsed_incl = anchor.tsc_end - anchor.tsc_start;
-									u64 var_tsc_start = anchor.tsc_start;
-									
-									// Handle async anchors
-									if(wrap) {
-										if(anchor.tsc_end == 0) {
-											var_tsc_elapsed_incl = tsc_end - anchor.tsc_start;
-										}
-										if(anchor.tsc_start < tsc_start) {
-											var_tsc_start = tsc_start;
-											anchor.tsc_start = var_tsc_start;
-										}
-									} else {
-										if(anchor.tsc_end == 0) {
-											break;
-										}
+								// Handle async anchors
+								if(wrap) {
+									if(anchor.tsc_end == 0) {
+										anchor.tsc_elapsed_excl = time.tsc_end - anchor.tsc_start;
+										anchor.tsc_end = time.tsc_end;
 									}
-									f32 height = 30;
-									f32 height_off = anchor.depth * height;
-									f32 width = remap(var_tsc_elapsed_incl, tsc_elapsed, avail_size.x);
-									f32 width_off = remap(var_tsc_start, tsc_start, tsc_end, 0, avail_size.x);
-									Rng2 rect = rng2_make(v2(width_off, height_off), v2(width, height));
-									UI_Item item = {
-										.type = UI_ItemType_Bar,
-										.rect = rect,
-										.anchor = anchor,
-									};
-									array_push(items, item);
-								}
-							}
-							array_push(items, {.type = UI_ItemType_NextThread});
-						}
+									if(anchor.tsc_start < time.tsc_start) {
+										anchor.tsc_start = time.tsc_start;
+									}
+								} else if(anchor.tsc_end == 0) continue;
+								f64 width = remap_f64(anchor.tsc_end-anchor.tsc_start, tsc_elapsed, rng2_width(info_rect));
+								f64 start_off = remap_f64(anchor.tsc_start, time.tsc_start, time.tsc_end, 0, rng2_width(info_rect));
+								Rng2 item_rect = rng2_make(v2(start_off, anchor.depth*l.bar_height), v2(width, l.bar_height));
 
-						///////////////////////////////////
-						// Anchors and thread offsets
-						f32 height_off = 0;
-						f32 thread_height_off = 200;
-						for(var& item : items) switch(item.type) {
-							case UI_ItemType_Bar: {
-								item.rect = rng2_shift(item.rect, v2(width_off, height_off));
-							}break;
-							case UI_ItemType_NextThread: {
-								height_off += thread_height_off;
-							}break;
-						}
+								// Offset
+								item_rect = rng2_shift(item_rect, v2(width_off, l.thread_height_off * i));
 
-						// Scroll
-						for(var& item : items) {
-							item.rect = rng2_shift(item.rect, cursor_pos);
-							item.rect = rng2_scale(item.rect, scroll_state.scale);
-							item.rect = rng2_shift(item.rect, scroll_state.offset);
-						}
+								// To Screen
+								item_rect.min = world_to_screen2(cam, item_rect.min, info_rect.min);
+								item_rect.max = world_to_screen2(cam, item_rect.max, info_rect.min);
 
-						///////////////////////////////////
-						// Drawing
-						for(var& item : items) switch(item.type) {
-							default:break;
-							case UI_ItemType_Bar: {
+								///////////////////////////////////
+								// Draw
 								v4 color = {};
 								String str = {};
-								ProfAnchor anchor = item.anchor;
-								Rng2 rect = item.rect;
 								switch(anchor.type) {
 									case ProfType_Default: {
 										color = colors.work;
@@ -1152,11 +1093,12 @@ void dev_update() {
 										str = "async";
 									}break;
 								}
-								imgui_draw_rect_filled(draw, rect, color);
-								imgui_draw_rect(draw, rect, ColorGreyLight);
-								if(rng2_contains(rect, mouse_pos)) ImGuiBeginToolTip() {
+								// ProfBlock("draw");
+								imgui_draw_rect_filled(draw, item_rect, color);
+								imgui_draw_rect(draw, item_rect, ColorGreyLight);
+								if(rng2_contains(item_rect, os_mouse_pos())) ImGuiBeginToolTip() {
 									imgui_text("Label: %s", anchor.label);
-									imgui_text("Percent: %f%%", rng2_dim(rect).x / avail_size.x * 100);
+									imgui_text("Percent: %f%%", rng2_dim(item_rect).x / avail_size.x * 100);
 									imgui_text("Time: %fms", tsc_to_ms(anchor.tsc_end - anchor.tsc_start));
 									imgui_text("Time exclusive: %fms", tsc_to_ms(anchor.tsc_elapsed_excl));
 									imgui_text("Type: %s", str);
@@ -1165,388 +1107,291 @@ void dev_update() {
 								// Text
 								str = push_strf(scratch, "%s %.3f", anchor.label, tsc_to_ms(anchor.tsc_end - anchor.tsc_start));
 								v2 text_size = imgui_calc_text_size(str);
-								if(rng2_dim(rect).x < 30.1 || scroll_state.scale.y < 0.3) {
+								if(rng2_dim(item_rect).x < 30.1 || cam.zoom2.y < 0.3) {
 									continue;
 								}
 								v2 text_pos = {};
-								if(text_size.x > rng2_dim(rect).x) {
-									text_pos.x = rect.min.x;
-									text_pos.y = rect.min.y + (rng2_dim(rect).y - text_size.y) * 0.5;
+								if(text_size.x > rng2_dim(item_rect).x) {
+									text_pos.x = item_rect.min.x;
+									text_pos.y = rng1_align_center(rng2_rng_y(item_rect), text_size.y);
 								} else {
-									text_pos = rng2_align_dim_at_center(rect, text_size).min;
+									text_pos = rng2_align_dim_at_center(item_rect, text_size).min;
 								}
-								ImGuiDrawPushClipRect(draw, rect);
-								imgui_draw_text(draw, time_bar_text_size, text_pos, ColorWhite, str);
-							}break;
-						}
-					};
-
-					///////////////////////////////////
-					// Thread names drawer
-					var draw_threads = [&](ScrollState scroll_state) {
-						f32 thread_height = 200;
-						f32 thread_height_offset = 0;
-						f32 text_off_above = -40;
-						{
-							String str = push_strf(scratch, "Main thread");
-							v2 text_pos = (v2(0, text_off_above) + cursor_pos);
-							text_pos.y *= scroll_state.scale.y;
-							text_pos.y += scroll_state.offset.y;
-							imgui_draw_text(draw, thread_name_text_size, text_pos, ColorWhite, str);
-						}
-						{
-							Loop(i, Thread_NumWorkers) {
-								thread_height_offset += thread_height;
-								String str = push_strf(scratch, "Worker %i", i);
-								v2 text_pos = v2(0, thread_height_offset + text_off_above) + cursor_pos;
-								text_pos.y *= scroll_state.scale.y;
-								text_pos.y += scroll_state.offset.y;
-								imgui_draw_text(draw, thread_name_text_size, text_pos, ColorWhite, str);
+								ImGuiPushClipRect2(item_rect);
+								imgui_draw_text(draw, l.time_bar_text_size, text_pos, ColorWhite, str);
 							}
-							thread_height_offset = 0;
 						}
 					};
 
 					///////////////////////////////////
-					// Tabs
+					// Root
 					var active_tab = prof_win.active_tab;
 					ImGuiBeginTabItem("root", active_tab == ProfileTabActive_Root ? ImGuiTabItemFlags_SetSelected : 0) {
-						ScrollState& scroll_state = prof_win.root_scroll_state;
 						if(ImGui::IsWindowHovered()) {
-							scroll_state_update(scroll_state, ScrollType_PowClamp);
+							camera_zoom_and_pan(prof_win.root_cam, info_rect.min);
 						}
-						cursor_pos.y += 30;
-						draw_threads(scroll_state);
-						// u32 idx = (st->current_frame-1) % ArrayCount(prof.frames_times);
+						draw_thread_names(info_rect, prof_win.root_cam);
 						Slice<ProfAnchor> slices[ArrayCount(prof.prof_threads)] = {};
-						LoopArray(i, slices) slices[i] = slice(prof.prof_threads[i].recorded_anchors[0]);
-							// slices[i] = slice(prof.prof_threads[i].recorded_anchors[idx]);
-						// ProfFrameTime time = prof.frames_times[idx];
-						ProfFrameTime time = prof.frames_times[0];
-						draw_frame_graph(slice(slices), time, 0, scroll_state);
-					}tab_mouse_click_handle(ProfileTabActive_Root);
-					ImGuiBeginTabItem("frames", active_tab == ProfileTabActive_Frames ? ImGuiTabItemFlags_SetSelected : 0) {
-						ScrollState& scroll_state = prof_win.frames_scroll_state;
-						if(ImGui::IsWindowHovered()) {
-							scroll_state_update(scroll_state, ScrollType_PowClamp);
-						}
-						f32 width_size = avail_size.x;
+						u32 idx = (current_frame-1) % ArrayCount(prof.frames_times);
+						local_persist i32 frequency = 1;
+						ImGui::SetCursorScreenPos(rng2_subrng_x01(top_bar_rect, {0.5,1}).min);
+						ImGui::SetNextItemWidth(100);
+						ImGui::DragInt("show freq", &frequency, 0.1f, 1, ProfRecordHistoryNum);
+						idx /= ProfRecordHistoryNum/frequency;
 
-						///////////////////////////////////
 						// Little bars
+						Rng2 race_bar_rect = rng2_cut_top(&info_rect, l.bar_race_height);
 						Loop(i, ArrayCount(prof.frames_times)) {
 							ProfFrameTime frame_time = prof.frames_times[i];
-							f32 max_height = 40;
-							f32 max_ms = 30;
-							f64 frame_ms = tsc_to_ms(frame_time.tsc_end - frame_time.tsc_start);
-							f64 height = max_height / (max_ms / frame_ms);
-							v2 size = v2(avail_size.x / ArrayCount(prof.frames_times), height);
-							v2 min = cursor_pos + v2(i*size.x, -height + max_height);
-							Rng2 rect = rng2_make(min, size);
-							if(rng2_contains(rect, mouse_pos)) {
-								ImGui::BeginTooltip();
-								ImGui::Text("frame: %i", i);
-								ImGui::EndTooltip();
+							f32 ms = tsc_to_ms(frame_time.tsc_end - frame_time.tsc_start);
+							f32 width = rng2_width(race_bar_rect) / ArrayCount(prof.frames_times);
+							v2 max = race_bar_rect.min + v2(width * i + width, l.bar_race_height);
+							v2 s = {width, ms};
+							var rect = rng2_make(max - s, s);
+							if(rng2_contains(rect, os_mouse_pos())) {
 								if(os_mouse_is_button_pressed(MouseButton_Left)) {
-									prof_win.frames_scroll_state.offset.x = -width_size * i;
-									prof_win.frames_scroll_state.scale = v2(1);
+									prof_win.frames_cam.pos = v2(rng2_width(race_bar_rect) * i, 0);
+									prof_win.frames_cam.zoom2 = v2(1);
+									prof_win.frames_cam.zoom = 1;
 								}
 							}
+							v4 color = {};
 							if(i == current_frame % ArrayCount(prof.frames_times)) {
-								imgui_draw_rect_filled(draw, rect, colors.current_frame);
+								color = colors.current_frame;
 							} else {
-								v4 color = colors.frame_ok;
-								if(rng1_contains(Rng1(17, 21), frame_ms)) {
+								color = colors.frame_ok;
+								if(rng1_contains({17, 21}, ms)) {
 									color = colors.frame_warn;
-								} else if(frame_ms > 20) {
+								} else if(ms >= 21) {
 									color = colors.frame_bad;
 								}
-								imgui_draw_rect_filled(draw, rect, color);
-								imgui_draw_rect(draw, rect, v4_set_w(ColorGrey0, 0.3));
 							}
+							imgui_draw_rect_filled(draw, rect, color);
+							imgui_draw_rect(draw, rect, v4_set_w(ColorGrey0, 0.3));
 						}
-						cursor_pos.y += 80;
 
-						///////////////////////////////////
-						// Draw lines and current rect
-						{
-							f32 width_offset = 0;
-							Loop(i, ArrayCount(prof.frames_times)) {
-								f32 line_height = 1000;
-								f32 thick = 1;
-								v2 base = cursor_pos + v2(width_offset, 0);
-								v2 p0 = base + v2(0, -line_height / 2);
-								v2 p1 = base + v2(0, line_height);
-								v2 p2 = base + v2(width_size, 0);
-								v2 p3 = base + v2(width_size, 0) + v2(0, line_height);
-								p0 = p0 * scroll_state.scale.x + scroll_state.offset;
-								p1 = p1 * scroll_state.scale.x + scroll_state.offset;
-								p2 = p2 * scroll_state.scale.x + scroll_state.offset;
-								p3 = p3 * scroll_state.scale.x + scroll_state.offset;
-								imgui_draw_line(draw, p0, p1, ColorGrey3, thick);
-								if(i == current_frame % ArrayCount(prof.frames_times)) {
-									imgui_draw_rect_filled(draw, Rng2(p0, p3), v4(0.4,0.4,0.4,0.4));
+						LoopArray(i, slices) slices[i] = slice(prof.prof_threads[i].recorded_anchors[idx]);
+						draw_frame_graph(info_rect, slice(slices), prof.frames_times[idx], 0, prof_win.root_cam, true);
+					}tab_mouse_click_handle(ProfileTabActive_Root);
+					ImGuiBeginTabItem("frames", active_tab == ProfileTabActive_Frames ? ImGuiTabItemFlags_SetSelected : 0) {
+						if(ImGui::IsWindowHovered()) {
+							camera_zoom_and_pan(prof_win.frames_cam, info_rect.min);
+						}
+						// Little bars
+						Rng2 race_bar_rect = rng2_cut_top(&info_rect, l.bar_race_height);
+						Loop(i, ArrayCount(prof.frames_times)) {
+							ProfFrameTime frame_time = prof.frames_times[i];
+							f32 ms = tsc_to_ms(frame_time.tsc_end - frame_time.tsc_start);
+							f32 width = rng2_width(race_bar_rect) / ArrayCount(prof.frames_times);
+							v2 max = race_bar_rect.min + v2(width * i + width, l.bar_race_height);
+							v2 s = {width, ms};
+							var rect = rng2_make(max - s, s);
+							if(rng2_contains(rect, os_mouse_pos())) {
+								if(os_mouse_is_button_pressed(MouseButton_Left)) {
+									prof_win.frames_cam.pos = v2(rng2_width(info_rect) * i, 0);
+									prof_win.frames_cam.zoom2 = v2(1);
+									prof_win.frames_cam.zoom = 1;
 								}
-								width_offset += width_size;
 							}
+							v4 color = {};
+							if(i == current_frame % ArrayCount(prof.frames_times)) {
+								color = colors.current_frame;
+							} else {
+								color = colors.frame_ok;
+								if(rng1_contains({17, 21}, ms)) {
+									color = colors.frame_warn;
+								} else if(ms >= 21) {
+									color = colors.frame_bad;
+								}
+							}
+							imgui_draw_rect_filled(draw, rect, color);
+							imgui_draw_rect(draw, rect, v4_set_w(ColorGrey0, 0.3));
 						}
-						draw_threads(scroll_state);
-
-						///////////////////////////////////
+						draw_thread_names(info_rect, prof_win.frames_cam);
 						// Draw graph per thread
 						LoopArray(j, prof.frames_times) {
 							Slice<ProfAnchor> slices[ArrayCount(prof.prof_threads)] = {};
-							LoopArray(i, prof.prof_threads) {
-								slices[i] = slice(prof.prof_threads[i].recorded_anchors[j]);
-							}
-							ProfFrameTime time = prof.frames_times[j];
-							draw_frame_graph(slice(slices), time, j * width_size, scroll_state);
+							LoopArray(i, prof.prof_threads) slices[i] = slice(prof.prof_threads[i].recorded_anchors[j]);
+							draw_frame_graph(info_rect, slice(slices), prof.frames_times[j], j * rng2_width(info_rect), prof_win.frames_cam);
 						}
 					}tab_mouse_click_handle(ProfileTabActive_Frames);
 
 					///////////////////////////////////
 					// Time
 					ImGuiBeginTabItem("time", active_tab == ProfileTabActive_Time ? ImGuiTabItemFlags_SetSelected : 0) {
-						var sorted_anchors = slice_clone(scratch, prev_frame.anchors);
-						sort_insert(sorted_anchors, [](ProfAnchor a, ProfAnchor b) { return a.tsc_elapsed_excl > b.tsc_elapsed_excl; });
-						Loop(i, prev_frame.anchors.count) ImGuiPushID(i) {
-								ProfAnchor anchor = sorted_anchors[i];
-								f64 width_exclusive_percent = (f64)anchor.tsc_elapsed_excl / prev_frame_tsc_elapsed;
-								f32 width_exclusive = avail_size.x * 0.8;
-								f32 height = 30;
-								width_exclusive *= width_exclusive_percent;
-
-								v2 offset = v2(0,  i * height) + cursor_pos;
-								v2 size = v2(width_exclusive, height);
-								Rng2 rect = Rng2(offset, size + offset);
-
-								imgui_draw_rect_filled(draw, rect, ColorGreyDark);
-								imgui_draw_rect(draw, rect, ColorGreyLight);
-
-								String name_str = push_strf(scratch, "%s", anchor.label);
-								String ms_str = push_strf(scratch, "%.3fms", (f64)anchor.tsc_elapsed_excl / cpu_frequency() * 1000);
-								v2 name_offset = v2(0, height * i) + cursor_pos;
-								v2 ms_offset = v2(avail_size.x * 0.82, height * i) + cursor_pos;
-
-								imgui_draw_text(draw, name_offset, ColorWhite, name_str);
-								imgui_draw_text(draw, ms_offset, ColorWhite, ms_str);
+						var sort_entries = push_slice(scratch, SortEntry64, prev_frame.anchors.count);
+						Loop(i, sort_entries.count) {
+							var& entry = sort_entries[i];
+							entry.idx = i;
+							entry.sort_key = prev_frame.anchors[i].tsc_elapsed_excl;
+						}
+						sort_radix64_msd(sort_entries);
+						Loop(i, prev_frame.anchors.count) {
+							ProfAnchor anchor = prev_frame.anchors[sort_entries[i].idx];
+							f32 width = remap_f64(anchor.tsc_elapsed_excl, prev_frame_tsc_elapsed, rng2_width(info_rect));
+							f32 height = 30;
+							var rect = rng2_make(info_rect.min+v2(0,height*i), v2(width,height));
+							imgui_draw_rect_filled(draw, rect, ColorGreyDark);
+							imgui_draw_rect(draw, rect, ColorGreyLight);
+							v2 text_size = imgui_calc_text_size(anchor.label);
+							v2 pos = {
+								rect.min.x,
+								rng1_align_center(rng2_rng_y(rect), text_size.y),
+							};
+							imgui_draw_text(draw, pos, ColorWhite, anchor.label);
+							String ms_str = push_strf(scratch, "%.3fms", tsc_to_ms(anchor.tsc_elapsed_excl));
+							pos = {
+								rng2_width(info_rect) * 0.92f,
+								info_rect.min.y + height * i,
+							},
+							imgui_draw_text(draw, pos, ColorWhite, ms_str);
 						}
 					}tab_mouse_click_handle(ProfileTabActive_Time);
 
 					///////////////////////////////////
 					// Launch
 					ImGuiBeginTabItem("launch", active_tab == ProfileTabActive_LaunchTime ? ImGuiTabItemFlags_SetSelected : 0) {
-						ScrollState& scroll_state = prof_win.launch_time_scroll_state;
 						if(ImGui::IsWindowHovered()) {
-							scroll_state_update(scroll_state, ScrollType_PowClamp);
+							camera_zoom_and_pan(prof_win.launch_cam, info_rect.min);
 						}
-						draw_threads(scroll_state);
+						draw_thread_names(info_rect, prof_win.launch_cam);
 						Slice<ProfAnchor> slices[ArrayCount(prof.prof_threads)] = {};
-						LoopArray(i, prof.prof_threads) {
-							slices[i] = slice(prof.prof_threads[i].launch_anchors);
-						}
-						ProfFrameTime time = prof.launch_time;
-						draw_frame_graph(slice(slices), time, 0, scroll_state, true);
+						LoopArray(i, prof.prof_threads) slices[i] = slice(prof.prof_threads[i].launch_anchors);
+						draw_frame_graph(info_rect, slice(slices), prof.launch_time, 0, prof_win.launch_cam, true);
 					}tab_mouse_click_handle(ProfileTabActive_LaunchTime);
 
 					///////////////////////////////////
 					// Memory
 					ImGuiBeginTabItem("memory", active_tab == ProfileTabActive_Memory ? ImGuiTabItemFlags_SetSelected : 0) {
-						ScrollState& scroll_state = prof_win.mem_scroll_state;
 						if(ImGui::IsWindowHovered()) {
-							scroll_state_update(scroll_state);
+							camera_zoom_and_pan(prof_win.root_cam, info_rect.min);
 						}
-						enum UI_ItemType {
-							UI_ItemType_MemUsage,
-							UI_ItemType_MemLevel,
-							UI_ItemType_Arena,
-							UI_ItemType_Child,
-						};
-						struct UI_Item {
-							UI_ItemType type;
-							Rng2 rect;
-							u32 depth;
-							AllocatorInfo* info;
-							u32 mem_level;
-						};
-						var items = array_make<UI_Item>(scratch);
+						var mem_info_top = rng2_cut_top(&info_rect, 20);
 						AllocatorInfoList infos = mem_track_info();
-						var infos_sorted = sort_list_insert(scratch, infos.first, [](var a, var b) { return a->pos > b->pos; });
-						f64 mem_usage = 0;
-						for(var info : infos_sorted) mem_usage += info->cap;
+						var sort_entries = push_slice(scratch, SortEntry64, infos.count);
+						u64 mem_usage = 0;
+						u32 idx = 0;
+						LoopNode(it, infos.first) {
+							var& entry = sort_entries[idx++];
+							entry.p = it;
+							entry.sort_key = it->pos;
+							mem_usage += it->cap;
+						}
+						sort_radix64_msd(sort_entries);
+						u64 max_pos = ((AllocatorInfo*)sort_entries[0].p)->pos;
 						f32 mem_levels[] = {KB(1), KB(10), KB(100), MB(1), MB(10), MB(100), GB(1)};
-
-						///////////////////////////////////
-						// Layout
-						{
-							f32 row_h = 30;
-							Rng2Cursor curs = {};
-							UI_Item item = {
-								.type = UI_ItemType_MemUsage,
-								.rect = layout_row(curs, Rng1(0, avail_size.x), row_h),
-							};
-							array_push(items, item);
-							b32 level_drawn[ArrayCount(mem_levels)] = {};
-							for(var info : infos_sorted) {
-		
-								//  Mem level
-								u32 mem_level = 0;
-								LoopArray(i, mem_levels) if(info->pos < mem_levels[i]) {
-									mem_level = i;
+						DArray<AllocatorInfo*> mem_arrays[ArrayCount(mem_levels)] = {};
+						for(var& arr : mem_arrays) arr = array_make<AllocatorInfo*>(scratch);
+						u32 max_mem_level = 0;
+						LoopArray(i, mem_levels) {
+							if(max_pos < mem_levels[i]) { 
+								max_mem_level = i;
+								break;
+							}
+						}
+						Loop(i, sort_entries.count) {
+							var info = (AllocatorInfo*)sort_entries[i].p;
+							u32 max_level = 0;
+							LoopArray(j, mem_levels) {
+								if(info->pos < mem_levels[j]) {
+									max_level = j;
 									break;
 								}
-								if(!level_drawn[mem_level]) {
-									level_drawn[mem_level] = true;
-									UI_Item item = {
-										.type = UI_ItemType_MemLevel,
-										.rect = layout_row(curs, Rng1(0, avail_size.x), row_h),
-										.mem_level = mem_level,
-									};
-									array_push(items, item);
+							}
+							array_push(mem_arrays[max_level], info);
+						}
+						f32 height_off = 0;
+						LoopReverse(mem_idx, max_mem_level+1) {
+							if(mem_arrays[mem_idx].count) {
+								v2 rect_size = {50, 25};
+								var pos = rng1_align_center(rng2_rng_x(info_rect), rect_size.x);
+								var rect = rng2_make(v2(pos, info_rect.min.y) + v2(0,height_off), rect_size);
+								imgui_draw_rect_filled(draw, rect, ColorBlueUi);
+								imgui_draw_rect(draw, rect, ColorGreyLight);
+								MemFormatSize mem_fmt = mem_format_size(mem_levels[mem_idx]);
+								String str = push_strf(scratch, "%.0f%s", mem_fmt.size, mem_fmt.format);
+								v2 text_size = imgui_calc_text_size(str);
+								Rng2 text_rect = rng2_align_dim_at_center(rect, text_size);
+								imgui_draw_text(draw, text_rect.min, ColorWhite, str);
+								height_off += 40;
+							}
+							Loop(parent_idx, mem_arrays[mem_idx].count) {
+								var info = mem_arrays[mem_idx][parent_idx];
+								f32 excl_width = remap(info->pos - info->children_size, mem_levels[mem_idx], rng2_width(info_rect));
+								f32 incl_width = remap(info->pos, mem_levels[mem_idx], rng2_width(info_rect));
+								f32 cap_width = remap(info->cap, mem_levels[mem_idx], rng2_width(info_rect));
+								f32 height = 30;
+								var r = rng2_make(info_rect.min + v2(0, height_off), {rng2_width(info_rect), height});
+								var excl_rect = rng2_cut_left(&r, excl_width);
+								var incl_rect = rng2_cut_left(&r, incl_width-excl_width);
+								var cap_rect =  rng2_cut_left(&r, cap_width-incl_width);
+								height_off += 30;
+								imgui_draw_rect_filled(draw, excl_rect, ColorGreenUi);
+								imgui_draw_rect(draw, excl_rect, ColorGreyLight);
+								imgui_draw_rect_filled(draw, incl_rect, ColorBlueUi);
+								imgui_draw_rect(draw, incl_rect, ColorGreyLight);
+								imgui_draw_rect_filled(draw, cap_rect, ColorRedUi);
+								imgui_draw_rect(draw, cap_rect, ColorGreyLight);
+								MemFormatSize incl_mem = mem_format_size(info->pos);
+								MemFormatSize excl_mem = mem_format_size(info->pos - info->children_size);
+								MemFormatSize cmt_mem = mem_format_size(info->cap);
+								if(rng2_contains(rng2_union(excl_rect, cap_rect), os_mouse_pos())) ImGuiBeginToolTip() {
+									imgui_text(push_strf(scratch, "inclusive: %.2f%s", incl_mem.size, incl_mem.format));
+									imgui_text(push_strf(scratch, "exclusive: %.2f%s", excl_mem.size, excl_mem.format));
+									imgui_text(push_strf(scratch, "file: %s, line: %i", String(info->file), info->line));
 								}
-		
-								// Arena
-								UI_Item item = {
-									.type = UI_ItemType_Arena,
-									.rect = layout_row(curs, Rng1(0, avail_size.x), row_h),
-									.info = info,
-									.mem_level = mem_level,
-								};
-								array_push(items, item);
-		
-								// Children
-								u32 depth = 1;
-								struct StackEntry {
-									AllocatorInfo* node;
-									u32 depth;
-								};
-								var stack = array_make<StackEntry>(scratch);
-								Slice sorted_children = sort_list_insert(scratch, info->first, [](var a, var b) { return a->pos > b->pos; });
-								LoopReverse(i, sorted_children.count) {
-									array_push(stack, {sorted_children[i], 1});
+								String name_str = push_strf(scratch, "%s", String(info->name));
+								String mem_str = push_strf(scratch, "%.2f%s pos, %.2f%s cap", incl_mem.size, incl_mem.format, cmt_mem.size, cmt_mem.format);
+								imgui_draw_text(draw, excl_rect.min, ColorWhite, name_str);
+								imgui_draw_text(draw, excl_rect.min + v2(200, 0), ColorWhite, mem_str);
+								var sort_entries = push_slice(scratch, SortEntry64, info->child_count);
+								u64 mem_usage = 0;
+								u32 idx = 0;
+								LoopNode(it, info->first) {
+									var& entry = sort_entries[idx++];
+									entry.p = it;
+									entry.sort_key = it->pos;
+									mem_usage += it->cap;
 								}
-								while(stack.count) {
-									StackEntry entry = array_pop(stack);
-									var child = entry.node;
-									UI_Item item = {
-										.type = UI_ItemType_Child,
-										.depth = entry.depth,
-										.info = child,
-										.mem_level = mem_level,
-									};
-									item.rect = Rng2(
-										v2(depth * 10, curs.pos.y),
-										v2(avail_size.x, curs.pos.y + row_h * 0.6)
-									);
-									array_push(items, item);
-									layout_next(curs, row_h * 0.6);
-									if(child->first) {
-										depth++;
-										Slice sorted_children = sort_list_insert(scratch, child->first, [](var a, var b) { return a->pos > b->pos; });
-										LoopReverse (i, sorted_children.count) {
-											array_push(stack, {sorted_children[i], entry.depth + 1});
-										}
+								sort_radix64_msd(sort_entries);
+								Loop(child_idx, sort_entries.count) {
+									var info = (AllocatorInfo*)sort_entries[child_idx].p;
+									f32 c_width = remap(info->pos, mem_levels[mem_idx], rng2_width(info_rect));
+									f32 c_cap_width = remap(info->cap, mem_levels[mem_idx], rng2_width(info_rect));
+									f32 height = 30;
+									var r = rng2_make(info_rect.min + v2(0, height_off), {rng2_width(info_rect), height});
+									var rect = rng2_cut_left(&r, c_width);
+									var cap_rect =  rng2_cut_left(&r, c_cap_width - c_width);
+									height_off += 30;
+									imgui_draw_rect_filled(draw, rect, ColorGreyDark);
+									imgui_draw_rect(draw, rect, ColorGreyLight);
+									imgui_draw_rect_filled(draw, cap_rect, ColorRedUi);
+									imgui_draw_rect(draw, cap_rect, ColorGreyLight);
+									MemFormatSize mem = mem_format_size(info->pos);
+									MemFormatSize cap_mem = mem_format_size(info->cap);
+									if(rng2_contains(rng2_union(rect, cap_rect), os_mouse_pos())) ImGuiBeginToolTip() {
+										imgui_text(push_strf(scratch, "pos: %.2f%s", mem.size, mem.format));
+										imgui_text(push_strf(scratch, "file: %s, line: %i", String(info->file), info->line));
 									}
+									String name_str = push_strf(scratch, "%s", String(info->name));
+									String mem_str = push_strf(scratch, "%.2f%s pos, %.2f%s cap", mem.size, mem.format, cap_mem.size, cap_mem.format);
+									imgui_draw_text(draw, rect.min, ColorWhite, name_str);
+									imgui_draw_text(draw, rect.min + v2(200, 0), ColorWhite, mem_str);
 								}
+								if(sort_entries.count) height_off += 10;
+								height_off+=2;
 							}
 						}
 
-						for(var& item : items) {
-							item.rect = rng2_shift(item.rect, cursor_pos);
-							item.rect = rng2_scale(item.rect, scroll_state.scale);
-							item.rect = rng2_shift(item.rect, scroll_state.offset);
-						}
-
-						Rng2 rounding_edge = rng2_shift(rng2_scale(rng2_make(cursor_pos, avail_size), v2(scroll_state.scale)), v2(scroll_state.offset));
-						rounding_edge = rng2_pad(rounding_edge, 10);
-						imgui_draw_rect(draw, rounding_edge, ColorGreyLight);
-
-						///////////////////////////////////
-						// Drawing
-						for(var item : items) {
-							var info = item.info;
-							switch(item.type) {
-								case UI_ItemType_MemUsage: {
-									MemFormatSize mem_fmt = mem_format_size(mem_usage);
-									MemFormatSize os_commited_fmt = mem_format_size(os_commited_size());
-									MemFormatSize os_address_reserved_fmt = mem_format_size(os_reserved_size());
-									String mem_usage_str = push_strf(scratch, "os commited: %.2f%s, address reserved %.2f%s, mem usage: %.2f%s", 
-										os_commited_fmt.size, os_commited_fmt.format,
-										os_address_reserved_fmt.size, os_address_reserved_fmt.format,
-										mem_fmt.size, mem_fmt.format);
-									imgui_draw_text(draw, cursor_pos, ColorWhite, mem_usage_str);
-								}break;
-								case UI_ItemType_MemLevel: {
-									MemFormatSize mem_fmt = mem_format_size(mem_levels[item.mem_level]);
-									String str = push_strf(scratch, "%.0f%s", mem_fmt.size, mem_fmt.format);
-									v2 text_size = imgui_calc_text_size(str);
-									Rng2 rect = item.rect;
-									Rng2 text_rect = rng2_align_dim_at_center(rect, text_size);
-									Rng2 pad_text_rect = rng2_pad(text_rect, 5);
-									imgui_draw_rect_filled(draw, pad_text_rect, v4(0.3, 3.5, 0.5, 0.5));
-									imgui_draw_text(draw, text_rect.min, ColorWhite, str);
-								}break;
-								case UI_ItemType_Arena: {
-									f32 t_w = rng2_dim(item.rect).x;
-									f32 t_pos = info->pos / mem_levels[item.mem_level];
-									// f32 t_cap = info->cap / mem_levels[item.mem_level];
-									f32 t_excl = info->children_size / mem_levels[item.mem_level];
-									f32 w_pos = t_w * t_pos;
-									// f32 w_cap = t_w * t_cap;
-									f32 w_excl = t_w * t_excl;
-									Rng2 excl_rect = rng2_subrng_x(item.rect, Rng1(0, w_excl));
-									Rng2 incl_rect = rng2_subrng_x(item.rect, Rng1(w_excl, w_pos));
-
-									imgui_draw_rect_filled(draw, excl_rect, ColorGreenUi);
-									imgui_draw_rect(draw, excl_rect, ColorGreyLight);
-									imgui_draw_rect_filled(draw, incl_rect, ColorBlueUi);
-									imgui_draw_rect(draw, incl_rect, ColorGreyLight);
-
-									MemFormatSize pos = mem_format_size(info->pos);
-									MemFormatSize pos_exclusive = mem_format_size(info->children_size);
-									MemFormatSize cmt = mem_format_size(info->cap);
-
-									String name_str = push_strf(scratch, "%s", info->name);
-									String mem_str = push_strf(scratch, "%.2f%s pos, %.2f%s cmt", pos.size, pos.format, cmt.size, cmt.format);
-
-									imgui_draw_text(draw, excl_rect.min, ColorWhite, name_str);
-									imgui_draw_text(draw, rng2_subrng_x01(item.rect, Rng1(0.2, 1)).min, ColorWhite, mem_str);
-									
-									if(rng2_contains(rng2_union(incl_rect, excl_rect), mouse_pos)) {
-										ImGui::BeginTooltip();
-										imgui_text(push_strf(scratch, "inclusive: %.2f%s", pos.size, pos.format));
-										imgui_text(push_strf(scratch, "exclusive: %.2f%s", pos_exclusive.size, pos_exclusive.format));
-										ImGui::EndTooltip();
-									}
-								}break;
-								case UI_ItemType_Child: {
-									f32 t_w = rng2_dim(item.rect).x;
-									f32 t_pos = info->pos / mem_levels[item.mem_level];
-									f32 t_cap = info->cap / mem_levels[item.mem_level];
-									// f32 t_excl = info.exclusive_pos / mem_levels[item.mem_level];
-									f32 w_pos = t_w * t_pos;
-									f32 w_cap = t_w * t_cap;
-									// f32 w_excl = t_w * t_excl;
-									Rng2 child_rect = rng2_subrng_x(item.rect, Rng1(0, w_pos));
-									Rng2 child_rect_cap = rng2_subrng_x(item.rect, Rng1(w_pos, w_cap));
-
-									// pos
-									imgui_draw_rect_filled(draw, child_rect, ColorGreyDark);
-									imgui_draw_rect(draw, child_rect, ColorGreyLight);
-									
-									// cap
-									imgui_draw_rect_filled(draw, child_rect_cap, ColorRedUi);
-									imgui_draw_rect(draw, child_rect_cap, ColorGrey);
-
-									MemFormatSize pos = mem_format_size(info->pos);
-									MemFormatSize cap = mem_format_size(info->cap);
-									String child_name_str = push_strf(scratch, "%s", info->name);
-									String child_meta_str = push_strf(scratch, "%.2f%s pos, %.2f%s cap, alloc count: %u, free count: %u, current alloc count: %u", pos.size, pos.format, cap.size, cap.format, info->allocs_count, info->frees_count, info->allocs_count-info->frees_count);
-									imgui_draw_text(draw, child_rect.min, ColorWhite, child_name_str);
-									imgui_draw_text(draw, rng2_subrng_x01(child_rect, Rng1(0.3, 1)).min, ColorWhite, child_meta_str);
-								}break;
-							}
-						}
+						// overall usage
+						ImGui::SetCursorScreenPos(mem_info_top.min);
+						MemFormatSize mem_fmt = mem_format_size(mem_usage);
+						MemFormatSize os_commited_fmt = mem_format_size(os_commited_size());
+						MemFormatSize os_address_reserved_fmt = mem_format_size(os_reserved_size());
+						imgui_text("os commited: %.2f%s, address reserved %.2f%s, mem usage: %.2f%s",
+							os_commited_fmt.size, os_commited_fmt.format,
+							os_address_reserved_fmt.size, os_address_reserved_fmt.format,
+							mem_fmt.size, mem_fmt.format);
 					}tab_mouse_click_handle(ProfileTabActive_Memory);
 				}
 			}
@@ -2032,40 +1877,10 @@ v4 parse_v4(Parser& p) {
 String write_v3(Allocator alloc, v3 v) { return push_strf(alloc, "%f %f %f", v.x, v.y, v.z); }
 String write_v4(Allocator alloc, v4 v) { return push_strf(alloc, "%f %f %f %f", v.x, v.y, v.z, v.w); }
 
-b32 key_pressed(Key key) {
-	if(os_key_is_pressed(key)) {
-		if(!st->input.consumed[key]) return true;
-	}
-	return false;
-}
-b32 key_pressed_consume(Key key) {
-	if(key_pressed(key)) {
-		key_consume(key);
-		return true;
-	}
-	return false;
-}
-b32 key_down(Key key) {
-	if(os_key_is_down(key)) {
-		if(!st->input.consumed[key]) return true;
-	}
-	return false;
-}
-b32 key_down_consume(Key key) {
-	if(key_down(key)) {
-		key_consume(key);
-		return true;
-	}
-	return false;
-}
-void key_consume(Key key) {
-	st->input.consumed[key] = true;
-}
-
 ScrollState scroll_state_make(f32 scale) {
 	ScrollState res = {
 		.scale_level = scale,
-		.scale = v2(scale),
+		.zoom = v2(scale),
 	};
 	return res;
 }
@@ -2080,37 +1895,37 @@ void scroll_state_update(ScrollState& s, ScrollType type) {
 			switch(type) {
 				case ScrollType_Default: {
 					// we have: mouse == world * scale + offset;
-					v2 world = (mouse - s.offset) / s.scale_level;
+					v2 world = (mouse - s.pos) / s.scale_level;
 					s.scale_level *= zoom;
-					s.offset = mouse - world * s.scale_level;
-					s.scale = v2(s.scale_level);
+					s.pos = mouse - world * s.scale_level;
+					s.zoom = v2(s.scale_level);
 				}break;
 				case ScrollType_PowClamp: {
 					v2 world = {
-						(mouse.x - s.offset.x) / s.scale.x,
-						(mouse.y - s.offset.y) / s.scale.y
+						(mouse.x - s.pos.x) / s.zoom.x,
+						(mouse.y - s.pos.y) / s.zoom.y
 					};
 					s.scale_level *= zoom;
 					s.scale_level = ClampBot(s.scale_level, 0.02);
-					s.scale.y = Clamp(0.01, s.scale_level, 3);
-					f32 t = Pow(s.scale_level + 1, 2);
+					s.zoom.y = Clamp(0.01, s.scale_level, 3);
+					f32 t = pow(s.scale_level + 1, 2);
 					f32 ratio = t * 0.3;
-					s.scale.x = s.scale.y * ratio;
+					s.zoom.x = s.zoom.y * ratio;
 
-					if(s.scale.y > 1) {
+					if(s.zoom.y > 1) {
 						f32 inv = 1.0f / s.scale_level;
 						f32 target = inv / (1.0f + inv);
-						s.scale.y = Lerp(1.0f, 0.3f, target);
+						s.zoom.y = lerp(1.0f, 0.3f, target);
 					}
 
-					s.offset.x = mouse.x - world.x * s.scale.x;
-					s.offset.y = mouse.y - world.y * s.scale.y;
+					s.pos.x = mouse.x - world.x * s.zoom.x;
+					s.pos.y = mouse.y - world.y * s.zoom.y;
 
 				}break;
 			}
 		}
 		else {
-			s.offset.y += wheel * 100.0f;
+			s.pos.y += wheel * 100.0f;
 		}
 	}
 
@@ -2120,7 +1935,77 @@ void scroll_state_update(ScrollState& s, ScrollType type) {
 		if(os_key_is_down(Key_Shift)) {
 			sensity *= 3;
 		}
-		s.offset.x += scroll_h * sensity;
+		s.pos.x += scroll_h * sensity;
+	}
+}
+
+v2 world_to_screen(Camera2 c, v2 p, v2 screen_center) {
+	return screen_center + (p - c.pos) * c.zoom;
+}
+v2 world_to_screen2(Camera2 c, v2 p, v2 screen_center) {
+	v2 res = {
+		screen_center.x + (p.x - c.pos.x) * c.zoom2.x,
+		screen_center.y + (p.y - c.pos.y) * c.zoom2.y,
+	};
+	return res;
+}
+v2 screen_to_world(Camera2 c, v2 p, v2 screen_center) {
+	return c.pos + (p - screen_center) / c.zoom;
+}
+v2 screen_to_world2(Camera2 c, v2 p, v2 screen_center) {
+	v2 res = {
+		c.pos.x + (p.x - screen_center.x) / c.zoom2.x,
+		c.pos.y + (p.y - screen_center.y) / c.zoom2.y,
+	};
+	return res;
+}
+void camera_zoom_at(Camera2& c, v2 mouse, v2 screen_center, f32 factor) {
+	v2 before = screen_to_world(c, mouse, screen_center);
+	c.zoom *= factor;
+	v2 after = screen_to_world(c, mouse, screen_center);
+	c.pos += before - after;
+}
+void camera_zoom_at2(Camera2& c, v2 mouse, v2 screen_center, f32 factor) {
+	v2 before = screen_to_world2(c, mouse, screen_center);
+	c.zoom *= factor;
+	v2 after = screen_to_world2(c, mouse, screen_center);
+	c.pos += before - after;
+}
+void camera_zoom_at_pow_clamp(Camera2& c, v2 mouse, v2 screen_center, f32 factor) {
+	v2 before = screen_to_world2(c, mouse, screen_center);
+	c.zoom *= factor;
+	c.zoom = ClampBot(c.zoom, 0.02);
+	c.zoom2.y = Clamp(0.01, c.zoom, 3);
+	f32 t = pow(c.zoom + 1, 2);
+	f32 ratio = t * 0.3;
+	c.zoom2.x = c.zoom2.y * ratio;
+	if(c.zoom2.y > 1) {
+		f32 inv = 1.0f / c.zoom;
+		f32 target = inv / (1.0f + inv);
+		c.zoom2.y = lerp(1.0f, 0.3f, target);
+	}
+	v2 after = screen_to_world2(c, mouse, screen_center);
+	c.pos += before - after;
+}
+void camera_pan(Camera2& camera, v2 screen_delta) {
+	camera.pos -= screen_delta / camera.zoom;
+}
+void camera_pan2(Camera2& camera, v2 screen_delta) {
+	camera.pos.x -= screen_delta.x / camera.zoom2.x;
+	camera.pos.y -= screen_delta.y / camera.zoom2.y;
+}
+void camera_zoom_and_pan(Camera2& c, v2 screen_center) {
+	f32 wheel = os_mouse_wheel();
+	if(wheel) {
+		if(os_key_is_down(Key_LControl)) {
+			camera_zoom_at_pow_clamp(c, os_mouse_pos(), screen_center, wheel > 0 ? 1.3f : 1 / 1.3f);
+		} else {
+			f32 wheel_h = os_mouse_wheel_horizontal();
+			camera_pan2(c, v2(wheel_h * 100, wheel * 100));
+		}
+	} else {
+		f32 wheel_h = os_mouse_wheel_horizontal();
+		camera_pan2(c, v2(wheel_h * 100, wheel * 100));
 	}
 }
 
@@ -2544,9 +2429,9 @@ R_MeshDesc generate_sphere(Allocator arena) {
 		for(u32 j = 0; j < lon_steps; j++) {
 			f32 lon_angle = j * lon_step_angle;
 			R_Vertex vert = {
-				.pos.x = Cos(lat_angle) * Cos(lon_angle),
-				.pos.y = Sin(lat_angle),
-				.pos.z = Cos(lat_angle) * Sin(lon_angle),
+				.pos.x = cos(lat_angle) * cos(lon_angle),
+				.pos.y = sin(lat_angle),
+				.pos.z = cos(lat_angle) * sin(lon_angle),
 				.uv.x = (f32)j / (lon_steps - 1),  // 0 → 1 across longitude
 				.uv.y = (f32)i / (lat_steps - 1),  // 0 → 1 from bottom to top
 			};
@@ -2870,6 +2755,12 @@ void init_game() {
 	g.moving_cubes = array_make<ThingId>(g.gpa);
 	g.font = r_make_font({.name = "arial.ttf", .font_height = 32});
 
+	var arena = arena_make(.name = "check arena");
+	var alloc = alloc_make(arena, .name = "check alloc");
+	push_buffer(arena, KB(1));
+	u8* p = push_buffer(alloc, KB(1));
+	mem_realloc(alloc, p, KB(1), KB(2));
+
 	LoopEnumNonZero(i, ThingEnum) {
 		map_set(g.str_to_thing_enum, hash(things_enum_strs[i]), (u32)i);
 	}
@@ -3044,9 +2935,9 @@ void init_game() {
 			.accel = 300,
 		};
 		cam.dir = {
-			CosD(cam.yaw) * CosD(cam.pitch),
-			SinD(cam.pitch),
-			SinD(cam.yaw) * CosD(cam.pitch)
+			cosd(cam.yaw) * cosd(cam.pitch),
+			sind(cam.pitch),
+			sind(cam.yaw) * cosd(cam.pitch)
 		};
 		st->view = m4x4_look_at(cam.pos, cam.dir, v3_up());
 	}
@@ -3099,7 +2990,7 @@ void init_game() {
 		desc.mesh = rand_choice(slice(meshes));
 		desc.mat = rand_choice(slice(materials));
 		u32 range = 100;
-		desc.pos = v3_rand_rng(-v3(range), v3(range));;
+		desc.pos = v3_rand(-v3(range), v3(range));;
 		make_thing(desc);
 	}
 #endif
@@ -3129,7 +3020,7 @@ void init_game() {
 			var desc = default_thing_desc();
 			desc.mat = Material_Container;
 			u32 range = KB(1);
-			desc.pos = v3_rand_rng(-v3(range), v3(range));
+			desc.pos = v3_rand(-v3(range), v3(range));
 			var id = make_thing(desc);
 			array_push(g.moving_cubes, id);
 		}
@@ -3150,7 +3041,7 @@ void init_game() {
 		desc.mesh = rand_choice(slice(meshes));
 		desc.mat = rand_choice(slice(materials));
 		u32 range = 100;
-		desc.pos = v3_rand_rng(-v3(range), v3(range));
+		desc.pos = v3_rand(-v3(range), v3(range));
 		var id = make_thing(desc);
 		array_push(g.moving_cubes, id);
 	}
@@ -3219,7 +3110,6 @@ void update_game() {
 	ProfFunc;
 	Scratch scratch;
 	var& g = *st;
-	ArrayZero(st->input.consumed);
 	dev_update();
 
 	// Test jobs
@@ -3245,6 +3135,8 @@ void update_game() {
 		thread_wg_wait(id3);
 		thread_wg_wait(batch);
 	}
+
+	return;
 
 	///////////////////////////////////
 	// Hotkeys
@@ -3375,9 +3267,9 @@ void update_game() {
 		Thing& cube0 = get_thing(g.cube0);
 		Thing& monkey = get_thing(g.monkey0);
 		monkey.pos.x += 0.1 * time_dt;
-		cube0.pos.x = monkey.pos.x + Sin(time_dt) * 4;
-		cube0.pos.z = monkey.pos.z + Cos(time_dt) * 4;
-		cube0.pos.y = monkey.pos.z + Cos(time_dt) * 4;
+		cube0.pos.x = monkey.pos.x + sin(time_dt) * 4;
+		cube0.pos.z = monkey.pos.z + cos(time_dt) * 4;
+		cube0.pos.y = monkey.pos.z + cos(time_dt) * 4;
 		r_draw_cuboid(rng3_shift(monkey.aabb, monkey.pos), ColorWhite);
 		Thing& cube1 = get_thing(g.cube1);
 		// v2_rotate_relative(a, b, cosine, sine);
@@ -3467,10 +3359,10 @@ void update_game() {
 			// Material_Screen,
 		};
 		var desc = default_thing_desc();
-		desc.mesh = meshes[rand_u32_rng(0, ArrayCount(meshes)-1)];
-		desc.mat = materials[rand_u32_rng(0, ArrayCount(materials)-1)];
+		desc.mesh = ArrayRand(meshes);
+		desc.mat = ArrayRand(materials);
 		u32 range = 100;
-		desc.pos = v3_rand_rng(-v3(range), v3(range));;
+		desc.pos = v3_rand(-v3(range), v3(range));;
 		var id = make_thing(desc);
 		array_push(g.moving_cubes, id);
 	}
@@ -3535,81 +3427,6 @@ void update_game() {
 		// 	}
 		// } else {
 		// 	// r_draw_rect(rect, ColorGrey1);
-		// }
-	}
-
-	///////////////////////////////////
-	// UI
-	{
-		// static B32 dark_mode = false;
-		// static F32 volume = 0.3f;
-		// S32 click_count = 0;
-
-		// UI_Input input = {0};
-		// input.mouse_pos = (UI_Vec2){ script[f].x, script[f].y };
-		// input.mouse_down[0] = script[f].down;
-		// input.dt = 1.0f / 60.0f;
-
-		// printf("================ frame %d: %s ================\n", f, script[f].note);
-		// input.mouse_pos = bit_cast(UI_Vec2, os_mouse_pos());
-
-		// ui_begin_frame(input, 800, 600);
-		// {
-		//   // UI_Parent()
-		//   // ui_button(str8_lit("hello"));
-		//   // ui_button(str8_lit("hello"));
-		//   // ui_button(str8_lit("hello"));
-		//   // ui_button(str8_lit("hello"));
-
-		//   UI_Parent(ui_panel_begin(str8_lit("panel1"), UI_Axis2_Y)) {
-		//     ui_label(str8_lit("label1"));
-		//   }
-		//   UI_Parent(ui_panel_begin(str8_lit("panel2"), UI_Axis2_Y)) {
-		//     ui_label(str8_lit("label2"));
-		//     UI_Parent(ui_panel_begin(str8_lit("panel3"), UI_Axis2_Y)) {
-		//       ui_label(str8_lit("label3"));
-		//     }
-		//   }
-
-		//   /* ui_panel_begin_sized() pushes itself as the current parent;
-		//    * ui_panel_end() pops it. Fixed pixel width here (rather than
-		//    * ui_size_children) is what lets the Volume slider below use
-		//    * PercentOfParent safely -- see the note on ui_panel_begin(). */
-		//   ui_panel_begin_sized(str8_lit("main_panel##mp"), UI_Axis2_Y, ui_size_px(200, 1), ui_size_children(1));
-		//   {
-		//     ui_label(str8_lit("Settings"));
-		//     ui_spacer(ui_size_px(4, 1));
-
-		//     UI_Signal btn = ui_button(str8_lit("Click me##btn1"));
-		//     if(btn.clicked) click_count++;
-
-		//     ui_checkbox(str8_lit("Dark mode##dm"), &dark_mode);
-
-		//     ui_spacer(ui_size_px(4, 1));
-		//     ui_slider(str8_lit("Volume##vol"), &volume, 0.0f, 1.0f);
-		//   }
-		//   ui_panel_end();
-		// }
-		// ui_end_frame();
-		// Loop(i, ui_state->draw_cmd_count) {
-		//   UI_DrawCmd cmd = ui_state->draw_cmds[i];
-		//   Rng2 rect = Transmute(Rng2, cmd.rect);
-		//   v4 color = Transmute(v4, cmd.color);
-		//   String str = Transmute(String, cmd.text.str);
-		//   switch(cmd.kind) {
-		//     case UI_DrawCmd_Rect: {
-		//       if(cmd.filled) {
-		//         ui_draw_rect(rect, color);
-		//       } else {
-		//         r_draw_rect_outline(rect, 2, color);
-		//       }
-		//     }break;
-		//     case UI_DrawCmd_Text: {
-		//       // u32 a = 1;
-		//       r_draw_text(v2(cmd.rect.x0, cmd.rect.y0), str, color);
-		//     }break;
-		//     default: break;
-		//   }
 		// }
 	}
 }
