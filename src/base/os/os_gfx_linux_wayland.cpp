@@ -2,11 +2,11 @@
 
 #if OS_LINUX && GFX_WAYLAND
 
-#undef global
+#undef global_var
 #include <wayland-client.h>
 #include "wayland_extensions/xdg-shell-client-protocol.h"
 #include "wayland_extensions/xdg-shell-protocol.c"
-#define global static
+#define global_var static
 
 #include <linux/input-event-codes.h>
 
@@ -47,8 +47,8 @@ struct WaylandState {
 	} input;
 };
 
-global WaylandState wl_st;
-#undef global // because of: wl_registry_listener.global;
+global_var WaylandState wl_st;
+#undef global_var // because of: wl_registry_listener.global;
 
 u32 lnx_keycode_translate(u32 code) {
 	switch(code) {

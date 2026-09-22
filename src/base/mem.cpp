@@ -32,7 +32,7 @@ struct MemState {
 	u32 allocated_infos_count;
 };
 
-global MemState mem_track;
+global_var MemState mem_track;
 extern thread_local TCTX tctx;
 
 void mem_track_init() { /*mem_track.mutex = os_mutex_make();*/ }
@@ -48,7 +48,7 @@ AllocatorInfo* mem_track_get_info(Allocator alloc) {
 }
 
 AllocatorInfo* mem_track_make(Allocator parent_alloc, AllocatorType type, String name, String file, u32 line) {
-	if(PtrMatch(parent_alloc.ctx, &tctx.arenas[0]) || PtrMatch(parent_alloc.ctx, &tctx.arenas[1])) {
+	if(ptr_match(parent_alloc.ctx, &tctx.arenas[0]) || ptr_match(parent_alloc.ctx, &tctx.arenas[1])) {
 		return null;
 	}
 	AllocatorInfo* info = mem_track.free;
@@ -183,10 +183,10 @@ void arena_clear(Arena& arena) {
 
 u8* arena_alloc(Arena* arena, u64 size, u64 align) {
 	if(arena->lock) os_mutex_lock(arena->mutex);
-	u64 pos = AlignUp(arena->pos, align);
+	u64 pos = align_up(arena->pos, align);
 	u64 pad = pos - arena->pos;
 	if(pos + size > arena->cmt) {
-		u64 commit_size = AlignUp(pad + size, ARENA_DEFAULT_COMMIT_SIZE);
+		u64 commit_size = align_up(pad + size, ARENA_DEFAULT_COMMIT_SIZE);
 		Assert((pos + commit_size) <= arena->cap && "Arena is out of memory");
 		os_commit(Offset(arena->base, arena->cmt), commit_size);
 		MemGuardDealloc(Offset(arena->base, arena->cmt), commit_size);
@@ -272,12 +272,12 @@ ArenaBlock* arena_list_new_block(ArenaList* arena) {
 }
 
 u8* arena_list_alloc(ArenaList* arena, u64 size, u64 align) {
-	Assert(AlignUp(size, align) <= KB(64));
+	Assert(align_up(size, align) <= KB(64));
 	if(!arena->current) {
 		arena->first = arena->current = arena_list_new_block(arena);
 	}
 	u8* base = Offset(arena->current, sizeof(ArenaBlock));
-	u64 pos = AlignUp((u64)base + arena->current->pos, align) - (u64)base;
+	u64 pos = align_up((u64)base + arena->current->pos, align) - (u64)base;
 	if(pos + size > arena->current->cap) {
 		if(arena->current->next) {
 			arena->current = arena->current->next;
@@ -285,7 +285,7 @@ u8* arena_list_alloc(ArenaList* arena, u64 size, u64 align) {
 			arena->current = arena->current->next = arena_list_new_block(arena);
 		}
 		base = Offset(arena->current, sizeof(ArenaBlock));
-		pos = AlignUp((u64)base, align) - (u64)base;
+		pos = align_up((u64)base, align) - (u64)base;
 	}
 	u64 pad = pos - arena->current->pos;
 	AsanUnpoisonMemRegion(Offset(base, arena->current->pos), size + pad);
@@ -383,7 +383,7 @@ void intern_free(Alloc* alloc, void* ptr, u64 size) {
 u8* intern_alloc_align(Alloc* alloc, u64 size, u64 align) {
 	u64 alloc_size = align+sizeof(AllocHeader)+size;
 	u8* raw = intern_alloc(alloc, alloc_size);
-	u8* user = AlignUpPtr(raw+sizeof(AllocHeader), align);
+	u8* user = align_up_ptr(raw+sizeof(AllocHeader), align);
 	AllocHeader* h = OffsetBackStruct(user, AllocHeader);
 	h->off = user - raw;
 	return user;
@@ -392,7 +392,7 @@ u8* intern_alloc_align(Alloc* alloc, u64 size, u64 align) {
 void intern_free_align(Alloc* alloc, void*ptr, u64 size) {
 	AllocHeader* h = OffsetBackStruct(ptr, AllocHeader);
 	u8* raw = OffsetBack(ptr, h->off);
-	u64 raw_size = size + PtrDiff(ptr, raw);
+	u64 raw_size = size + ptr_diff(ptr, raw);
 	intern_free(alloc, raw, raw_size);
 }
 
@@ -580,7 +580,7 @@ GpuMemId gpu_alloc_seglist_alloc(GpuAllocSegList& a, u64 size, u64 align) {
 	u64 pool_idx = ctz(pow2_size) - ctz(8);
 	u32& p = a.heads[pool_idx];
 	if(p == 0) {
-		u64 cur_pos = AlignUp(a.pos, align);
+		u64 cur_pos = align_up(a.pos, align);
 		a.pos = cur_pos + pow2_size;
 		GpuBlockList range = {0, true, cur_pos, alloc_size};
 		u32 result = a.range_count;
@@ -686,12 +686,12 @@ u8* mem_realloc_soa_zero(Allocator alloc, u32 old_count, u32 new_count, Slice<So
 }
 
 u64 offset_push(u64& offset, u64 size, u64 align) {
-	u64 result = AlignUp(offset, align);
+	u64 result = align_up(offset, align);
 	offset = result + size;
 	return result;
 }
 
-global String mem_units[] = {"B", "KB", "MB", "GB", "TB"};
+global_var String mem_units[] = {"B", "KB", "MB", "GB", "TB"};
 MemFormatSize mem_format_size(f32 value) {
 	u32 unit = 0;
 	while(value >= 1024) {

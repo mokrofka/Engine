@@ -1,6 +1,7 @@
 #pragma once
 #include "lib.h"
 
+#define IMGUI_DISABLE_OBSOLETE_FUNCTIONS
 #define IM_VEC2_CLASS_EXTRA                        \
 	constexpr ImVec2(const v2& f) : x(f.x), y(f.y) {} \
 	operator v2() const { return v2(x, y); }
@@ -13,19 +14,12 @@
 #define ImGuiBeginToolTip()									DeferLoop(ImGui::BeginTooltip(), ImGui::EndTooltip())
 #define ImGuiBeginTabBar(str)							DeferLoopIf(ImGui::BeginTabBar(str), ImGui::EndTabBar())
 #define ImGuiBeginTabItem(str, ...)	DeferLoopIf(ImGui::BeginTabItem(str, null, ##__VA_ARGS__), ImGui::EndTabItem())
-// #define ImGuiPushClipRect(rect)   DeferLoop((ImGui::PushClipRect(rect.min, rect.max), false), ImGuiPopClipRect())
+#define ImGuiPushClipRect(rect)   		DeferLoop(ImGui::PushClipRect(rect.min, rect.max, true), ImGui::PopClipRect())
 struct _ImGuiPushClipRect {
-	_ImGuiPushClipRect(Rng2 rect) {ImGui::PushClipRect(rect.min,rect.max, false);}
+	_ImGuiPushClipRect(Rng2 rect) {ImGui::PushClipRect(rect.min,rect.max, true);}
 	~_ImGuiPushClipRect() 								{ImGui::PopClipRect();}
 };
-#define ImGuiPushClipRect(rect) _ImGuiPushClipRect Glue(_Clip, __LINE__)(rect)
-
-struct _ImGuiDrawPushClipRect {
-	ImDrawList* draw;
-	_ImGuiDrawPushClipRect(ImDrawList* draw_, Rng2 rect) {draw = draw_; draw->PushClipRect(rect.min,rect.max, true);}
-	~_ImGuiDrawPushClipRect() 																											{draw->PopClipRect();}
-};
-#define ImGuiDrawPushClipRect(draw, rect) _ImGuiDrawPushClipRect Glue(_Clip, __LINE__)(draw, rect)
+#define ImGuiPushClipRect2(rect) _ImGuiPushClipRect Glue(_Clip, __LINE__)(rect)
 
 struct OpaqueId {u32 idx; u32 gen;};
 struct ThingId {u32 idx; u32 gen;};

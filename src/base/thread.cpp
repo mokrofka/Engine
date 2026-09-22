@@ -26,7 +26,7 @@ struct ThreadPool {
 	u32 ctx_write;
 };
 
-global ThreadPool thread_pool;
+global_var ThreadPool thread_pool;
 
 WaitGroup thread_wg_make(u32 count) {
 	var& g = thread_pool;
@@ -154,7 +154,7 @@ void thread_wait_remanings() {
 u8* _thread_push_ctx(u64 size, u64 align) {
 	var& g = thread_pool;
 	os_mutex_lock(g.ctx_mutex);
-	g.ctx_write = AlignUp(g.ctx_write, align) % sizeof(g.ctx_buffer);
+	g.ctx_write = align_up(g.ctx_write, align) % sizeof(g.ctx_buffer);
 	if(g.ctx_write + size > sizeof(g.ctx_buffer)) {
 		g.ctx_write = 0;
 	}

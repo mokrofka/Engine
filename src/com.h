@@ -83,9 +83,15 @@ enum ScrollType {
 };
 
 struct ScrollState {
-	v2 offset;
-	v2 scale;
+	v2 pos;
+	v2 zoom;
 	f32 scale_level;
+};
+
+struct Camera2 {
+	v2 pos;
+	f32 zoom;
+	v2 zoom2;
 };
 
 struct DebugWindow {
@@ -162,10 +168,6 @@ struct JsParser {
 	Allocator arena;
 	String str;
 	u32 cursor;
-};
-
-struct InputState {
-	b8 consumed[Key_COUNT];
 };
 
 enum WatchOp {
@@ -433,7 +435,6 @@ struct GlobalState {
 	Array<String, R_MaxMeshes> mesh_to_str;
 	Array<String, R_MaxMaterials> material_to_str;
 
-	InputState input;
 	R_State r;
 	Gfx_State gfx;
 	UI_State ui;
@@ -450,6 +451,10 @@ struct GlobalState {
 		ScrollState frames_scroll_state;
 		ScrollState launch_time_scroll_state;
 		ScrollState mem_scroll_state;
+		Camera2 root_cam;
+		Camera2 frames_cam;
+		Camera2 launch_cam;
+		Camera2 mem_cam;
 		ProfTabActive active_tab;
 		f32 frame_avg_time;
 		f32 frame_min_time;
@@ -524,15 +529,12 @@ f64 time_until(f64 timestamp);
 
 void imgui_draw_rect(ImDrawList* draw, Rng2 rect, v4 col, f32 rounding = 0, ImDrawFlags flags = 0, f32 thickness = 1);
 void imgui_draw_rect_filled(ImDrawList* draw, Rng2 rect, v4 col, f32 rounding = 0, ImDrawFlags flags = 0);
-void imgui_draw_push_clip_rect(ImDrawList* draw, Rng2 rect);
-void imgui_draw_pop_clip_rect(ImDrawList* draw);
 void imgui_draw_line(ImDrawList* draw, v2 p0, v2 p1, v4 col, f32 thickness = 1);
 void imgui_draw_text(ImDrawList* draw, v2 pos, v4 col, String fmt, ...);
 void imgui_draw_text(ImDrawList* draw, f32 font_size, v2 pos, v4 col, String fmt, ...); struct ImGuiDrawText_Params {f32 font_size; v2 pos; v4 col = ColorWhite;};
 void imgui_text(String fmt, ...);
 v2 imgui_calc_text_size(String str);
 
-Rng2 debug_window_get_rect(DebugWindow win);
 void debug_window_apply_state(DebugWindow& win);
 void debug_window_track_state(DebugWindow& win);
 void debug_window_toggle_fullscreen(DebugWindow& win);
@@ -573,14 +575,18 @@ v4 parse_v4(Parser& p);
 String write_v3(Allocator alloc, v3 v);
 String write_v4(Allocator alloc, v4 v);
 
-b32 key_pressed(Key key);
-b32 key_pressed_consume(Key key);
-b32 key_down(Key key);
-b32 key_down_consume(Key key);
-void key_consume(Key key);
-
 ScrollState scroll_state_make(f32 scale);
 void scroll_state_update(ScrollState& s, ScrollType type = ScrollType_Default);
+v2 world_to_screen(Camera2 c, v2 p, v2 screen_center);
+v2 world_to_screen2(Camera2 c, v2 p, v2 screen_center);
+v2 screen_to_world(Camera2 c, v2 p, v2 screen_center);
+v2 screen_to_world2(Camera2 c, v2 p, v2 screen_center);
+void camera_zoom_at(Camera2& camera, v2 mouse, v2 screen_center, f32 factor);
+void camera_zoom_at2(Camera2& c, v2 mouse, v2 screen_center, f32 factor);
+void camera_zoom_at_pow_clamp(Camera2& c, v2 mouse, v2 screen_center, f32 factor);
+void camera_pan(Camera2& camera, v2 screen_delta);
+void camera_pan2(Camera2& camera, v2 screen_delta);
+void camera_zoom_and_pan(Camera2& c, v2 screen_center);
 
 void watch_add(String watch_name, WatchOp op);
 void watch_directory_add(String watch_name, WatchOp op, OS_WatchFlags flags = OS_WatchFlag_Modify);

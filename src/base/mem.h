@@ -1,7 +1,6 @@
 #pragma once
 #include "base.h"
 
-
 const u32 MEM_DEFAULT_ALIGNMENT = sizeof(void*);
 
 const u32 ARENA_DEFAULT_RESERVE_SIZE = MB(64);
@@ -70,7 +69,6 @@ struct AllocatorInfo {
 	u64 pos;
 	u64 children_size;
 	u64 cap;
-	u64 cmt;
 
 	u64 allocs_count;
 	u64 frees_count;

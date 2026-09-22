@@ -44,9 +44,10 @@ u32 sort_f32_key_to_u32(f32 sort_key) {
 	return res;
 }
 
-void sort_radix(Allocator alloc, Slice<SortEntry> arr) {
+void sort_radix(Slice<SortEntry> arr) {
+	Scratch scratch;
 	SortEntry* src = arr.data;
-	SortEntry* dst = push_array(alloc, SortEntry, arr.size);
+	SortEntry* dst = push_array(scratch, SortEntry, arr.size);
 	for(u32 shift = 0; shift < 32; shift += 8) {
 		u32 counts[256] = {};
 
@@ -65,6 +66,87 @@ void sort_radix(Allocator alloc, Slice<SortEntry> arr) {
 		}
 
 		// 3) distribute (stable)
+		Loop(i, arr.size) {
+			u32 byte = (src[i].sort_key >> shift) & 0xFF;
+			dst[counts[byte]++] = src[i];
+		}
+		Swap(src, dst);
+	}
+}
+
+void sort_radix_msd(Slice<SortEntry> arr) {
+	Scratch scratch;
+	SortEntry* src = arr.data;
+	SortEntry* dst = push_array(scratch, SortEntry, arr.size);
+	for(u32 shift = 0; shift < 32; shift += 8) {
+		u32 counts[256] = {};
+
+		Loop(i, arr.size) {
+			u32 byte = (src[i].sort_key >> shift) & 0xFF;
+			counts[byte]++;
+		}
+
+		u32 sum = 0;
+		LoopArrayReverse(i, counts) {
+			u32 c = counts[i];
+			counts[i] = sum;
+			sum += c;
+		}
+
+		Loop(i, arr.size) {
+			u32 byte = (src[i].sort_key >> shift) & 0xFF;
+			dst[counts[byte]++] = src[i];
+		}
+		Swap(src, dst);
+	}
+}
+
+void sort_radix64(Slice<SortEntry64> arr) {
+	Scratch scratch;
+	SortEntry64* src = arr.data;
+	SortEntry64* dst = push_array(scratch, SortEntry64, arr.size);
+	for(u32 shift = 0; shift < 64; shift += 8) {
+		u32 counts[256] = {};
+
+		Loop(i, arr.size) {
+			u32 byte = (src[i].sort_key >> shift) & 0xFF;
+			counts[byte]++;
+		}
+
+		u32 sum = 0;
+		LoopArray(i, counts) {
+			u32 c = counts[i];
+			counts[i] = sum;
+			sum += c;
+		}
+
+		Loop(i, arr.size) {
+			u32 byte = (src[i].sort_key >> shift) & 0xFF;
+			dst[counts[byte]++] = src[i];
+		}
+		Swap(src, dst);
+	}
+}
+
+void sort_radix64_msd(Slice<SortEntry64> arr) {
+	Scratch scratch;
+	SortEntry64* src = arr.data;
+	SortEntry64* dst = push_array(scratch, SortEntry64, arr.size);
+	for(u32 shift = 0; shift < 64; shift += 8) {
+		u32 counts[256] = {};
+
+		Loop(i, arr.size) {
+			u32 byte = (src[i].sort_key >> shift) & 0xFF;
+			counts[byte]++;
+		}
+
+		u32 sum = 0;
+		LoopArrayReverse(i, counts) {
+			u32 c = counts[i];
+			counts[i] = sum;
+			sum += c;
+		}
+
 		Loop(i, arr.size) {
 			u32 byte = (src[i].sort_key >> shift) & 0xFF;
 			dst[counts[byte]++] = src[i];

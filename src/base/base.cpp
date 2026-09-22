@@ -7,9 +7,10 @@
 #include "profiler.cpp"
 #include "os/os_impl.cpp"
 
-Global f32 time_dt;
-Global f32 time_now;
-Global u32 current_frame;
+GlobalVar f32 time_dt;
+GlobalVar f32 time_now;
+GlobalVar u32 current_frame;
+GlobalVar u64 cpu_frequency;
 
 ////////////////////////////////////////////////////////////////////////
 // Basic
@@ -26,21 +27,21 @@ void MemZero(void *d, u64 size)           { MemSet(d, 0, size); }
 void MemCopy(void* d, void* s, u64 size)  { __builtin_memcpy(d, s, size); }
 b32  MemMatch(void* a, void* b, u64 size) { return (__builtin_memcmp(a, b, size) == 0); }
 
-u64 AlignUp(u64 x, u64 a)           { return (x + a - 1) & ~(a - 1); }
-u64 AlignDown(u64 x, u64 a)         { return x & ~(a - 1); }
-u64 AlignPadUp(u64 x, u64 a)        { return -x & (a - 1); }
-u64 AlignPadDown(u64 x, u64 a)      { return x & (a - 1); }
-b32 IsAligned(u64 x, u64 a)         { return ((a - 1) & x) == 0; }
-u8* AlignUpPtr(void* x, u64 a)      { return (u8*)AlignUp(u64(x), a); }
-u8* AlignDownPtr(void* x, u64 a)    { return (u8*)AlignDown(u64(x), a); }
-u8* AlignPadUpPtr(void* x, u64 a)   { return (u8*)AlignPadUp(u64(x), a); }
-u8* AlignPadDownPtr(void* x, u64 a) { return (u8*)AlignPadDown(u64(x), a); }
-b32 IsAlignedPtr(void* x, u64 a)    { return  IsAligned(u64(x), a); }
-b32 IsPow2(u64 x)                   { return ((x - 1) & x) == 0; }
+u64 align_up(u64 x, u64 a)           { return (x + a - 1) & ~(a - 1); }
+u64 align_down(u64 x, u64 a)         { return x & ~(a - 1); }
+u64 align_pad_up(u64 x, u64 a)        { return -x & (a - 1); }
+u64 align_pad_down(u64 x, u64 a)      { return x & (a - 1); }
+b32 is_aligned(u64 x, u64 a)         { return ((a - 1) & x) == 0; }
+u8* align_up_ptr(void* x, u64 a)      { return (u8*)align_up(u64(x), a); }
+u8* align_down_ptr(void* x, u64 a)    { return (u8*)align_down(u64(x), a); }
+u8* align_pad_up_ptr(void* x, u64 a)   { return (u8*)align_pad_up(u64(x), a); }
+u8* align_pad_down_ptr(void* x, u64 a) { return (u8*)align_pad_down(u64(x), a); }
+b32 is_aligned_ptr(void* x, u64 a)    { return  is_aligned(u64(x), a); }
+b32 is_pow2(u64 x)                   { return ((x - 1) & x) == 0; }
 u8* Offset(void* x, u64 a)          { return (u8*)x + a; }
 u8* OffsetBack(void* x, u64 a)      { return (u8*)x - a; }
-u64 PtrDiff(void* a, void* b)       { return (u8*)a - (u8*)a; }
-b32 PtrMatch(void* a, void* b)      { return (u8*)a == (u8*)b; }
+u64 ptr_diff(void* a, void* b)       { return (u8*)a - (u8*)a; }
+b32 ptr_match(void* a, void* b)      { return (u8*)a == (u8*)b; }
 
 ////////////////////////////////////////////////////////////////////////
 // Bits
@@ -99,8 +100,10 @@ void DebugTrap() { __builtin_debugtrap(); }
 ////////////////////////////////////////////////////////////////////////
 // Types
 
-void bit_array_set(BitArrayD& bits, u64 idx)   { bits.words[idx >> 6] |= Bit(idx & 63); }
-void bit_array_clear(BitArrayD& bits, u64 idx) { bits.words[idx >> 6] &= ~Bit(idx & 63); }
+void bit_array_set(BitArrayD& bits, u64 idx) { bits.words[idx >> 6] |= (u64(1)<<(idx & 63)); }
+void bit_array_clear(BitArrayD& bits, u64 idx) { bits.words[idx >> 6] &= ~(u64(1)<<(idx & 63)); }
+// void bit_array_set(BitArrayD& bits, u64 idx)   { bits.words[idx >> 6] |= (1<<(idx & 63)); }
+// void bit_array_clear(BitArrayD& bits, u64 idx) { bits.words[idx >> 6] &= ~Bit(idx & 63); }
 b32 bit_array_get(BitArrayD& bits, u64 idx)    { return (bits.words[idx >> 6] >> (idx & 63)) & 1; }
 u64 bit_array_word_count(BitArrayD& bits)      { return (bits.bit_count + 63) / 64; }
 
@@ -138,9 +141,9 @@ u64 ring_read(RingBuffer& ring, void* dst, u64 dst_size) {
 	return offset;
 }
 
-u64 ring_write_nowrap(RingBuffer& ring, void* src, u64 src_size, u64 align) {
+u64 ring_write_nowrap(RingBuffer& ring, void* src, u64 src_size) {
 	Assert(ring.size >= src_size);
-	u64 offset = AlignUp(ring.write_pos, align) % ring.size;
+	u64 offset = ring.write_pos % ring.size;
 	u64 tail = ring.size - offset;
 	b32 wrap = src_size > tail;
 	if(wrap) {
@@ -393,6 +396,18 @@ void println(String fmt, ...) {
 	va_end(argc);
 	String out_message = push_strf(scratch, "%s\n", formatted);
 	os_console_write(out_message, 0);
+}
+
+u64 cpu_now()       { return __rdtsc(); }
+void cpu_find_frequency() {
+	u64 cpu_start = cpu_now();
+	u64 start_ns = os_now_ns();
+	u64 ns_elapsed = 0;
+	while(ns_elapsed < Million(1)) {
+		ns_elapsed = os_now_ns() - start_ns;
+	}
+	u64 cpu_elapsed = cpu_now() - cpu_start;
+	cpu_frequency = Billion(1) / ns_elapsed * cpu_elapsed;
 }
 
 // struct CoroCtx {

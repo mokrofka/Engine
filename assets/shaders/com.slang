@@ -31,10 +31,10 @@ typedef float4x4 m4x4;
 v4 operator*(m4x4 mat, v4 vec) { return mul(mat, vec); }
 m4x4 operator*(m4x4 a, m4x4 b) { return mul(a, b); }
 
-global const u32 MaxMaterials = KB(1);
-global const u32 MaxLights = KB(1);
+global_var const u32 MaxMaterials = KB(1);
+global_var const u32 MaxLights = KB(1);
 
-global const f32 PI = 3.14159265358f;
+global_var const f32 PI = 3.14159265358f;
 
 #include "../../src/shader_header.h"
 

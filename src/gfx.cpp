@@ -1874,7 +1874,7 @@ Gfx_Image gfx_make_image(Gfx_ImageDesc desc) {
 		.sample_count = desc.sample_count,
 	};
 	if(desc.mipmaps) {
-		image.mipmaps_count = Floor(Log2(Max(image.width, image.height))) + 1;
+		image.mipmaps_count = floor(log2(Max(image.width, image.height))) + 1;
 	}
 	VkImageCreateInfo image_info = {
 		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,

@@ -1,7 +1,7 @@
 #include "lib.h"
 
-global thread_local TCTX tctx;
-global u32 _next_thread_id;
+global_var thread_local TCTX tctx;
+global_var u32 _next_thread_id;
 
 u32 tctx_id() { return tctx.id; }
 

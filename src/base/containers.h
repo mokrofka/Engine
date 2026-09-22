@@ -908,18 +908,29 @@ struct SortEntry {
 	u32 sort_key;
 	u32 idx;
 };
+struct SortEntry64 {
+	u64 sort_key;
+	union {
+		u32 idx;
+		void* p;
+	};
+};
 
 u32 sort_i32_key_to_u32(i32 x);
 u32 sort_f32_key_to_u32(f32 sort_key);
-void sort_radix(Allocator alloc, Slice<SortEntry> arr);
+void sort_radix(Slice<SortEntry> arr);
+void sort_radix_msd(Slice<SortEntry> arr);
+void sort_radix64(Slice<SortEntry64> arr);
+void sort_radix64_msd(Slice<SortEntry64> arr);
 
 ////////////////////////////////////////////////////////////////////////
 // List sort
-template<typename T, typename Cmp> Slice<T> sort_list_insert(Allocator arena, T first, Cmp cmp) {
-	var sorted_arr = array_make<T>(arena);
-	for(T it = first; it != 0; it = it->next) {
-		array_push(sorted_arr, it);
-	}
-	sort_insert(slice(sorted_arr), cmp);
-	return slice(sorted_arr);
-}
+// template<typename T, typename Cmp> Slice<T> sort_list_insert(Allocator arena, T first, Cmp cmp) {
+// 	var sorted_arr = array_make<T>(arena);
+// 	for(T it = first; it != 0; it = it->next) {
+// 		array_push(sorted_arr, it);
+// 	}
+// 	sort_insert(slice(sorted_arr), cmp);
+// 	return slice(sorted_arr);
+// }
+

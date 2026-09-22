@@ -28,20 +28,6 @@ _LockScope::~_LockScope() {
 	os_mutex_unlock(mutex);
 }
 
-global u64 _cpu_frequency;
-u64 cpu_now()       { return __rdtsc(); }
-u64 cpu_frequency() { return _cpu_frequency; }
-void cpu_find_frequency() {
-	u64 cpu_start = cpu_now();
-	u64 start_ns = os_now_ns();
-	u64 ns_elapsed = 0;
-	while(ns_elapsed < Million(1)) {
-		ns_elapsed = os_now_ns() - start_ns;
-	}
-	u64 cpu_elapsed = cpu_now() - cpu_start;
-	_cpu_frequency = Billion(1) / ns_elapsed * cpu_elapsed;
-}
-
 struct OS_LNX_FileIter {
 	DIR* dir;
 	struct dirent* dp;
@@ -85,7 +71,7 @@ struct OS_State {
 	u64 mem_address_space_reserve;
 };
 
-global OS_State os_st;
+global_var OS_State os_st;
 
 OS_LNX_Entity* os_lnx_entity_push(OS_LNX_EntityType type) {
 	OS_LNX_Entity* entity = 0;

@@ -9,7 +9,7 @@ read_only u64 pow10[] = {
 };
 
 #define HEX_LENGTH 16
-read_only global u8 HEX[] = "0123456789ABCDEF";
+read_only global_var u8 HEX[] = "0123456789ABCDEF";
 
 String::String(const char* str_) { 
 	str = (u8*)str_;
@@ -596,7 +596,7 @@ f64 f64_from_str(String str) {
 		}
 		if(exp_negative)
 			exp = -exp;
-		x *= Pow(10.0, exp);
+		x *= pow(10.0, exp);
 	}
 
 	if(negative)

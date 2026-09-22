@@ -2,13 +2,13 @@
 
 // printf("hello %v4f", in.pos);
 
-global v2 positions[] = {
+global_var v2 positions[] = {
 	{-1.0, -1.0},
 	{-1.0,  3.0},
 	{ 3.0, -1.0},
 };
 
-global v2 tex_coords[] = {
+global_var v2 tex_coords[] = {
 	{0.0, 0.0},
 	{0.0, 2.0},
 	{2.0, 0.0},
