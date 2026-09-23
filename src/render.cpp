@@ -905,6 +905,7 @@ void r_end() {
 	// World
 	u32 drawcall_count = 0;
 	{
+		vk_begin_timestamp("world");
 		gfx_begin_pass({.attachments = r_render_target_to_attachments(g.world_rt)});
 		{
 			gfx_apply_viewport(rng2_make(v2(), os_window_size()), true);
@@ -919,8 +920,6 @@ void r_end() {
 					Loop(i, pushes.count) {
 						R_DrawCall draw = pushes[i];
 						m4x4 model = m4x4_transform(draw.pos, draw.scale, draw.rot);
-						// m4x4 model = m4x4_from_quat(draw.rot) * m4x4_translate(draw.pos) * m4x4_scale(draw.scale);
-						// m4x4 model =  m4x4_translate(draw.pos) * m4x4_scale(draw.scale) * m4x4_from_quat(draw.rot);
 						var mat = pool_get(g.materials, draw.mat);
 						g.gpu_drawcalls[drawcall_count] = {
 							.model = model,
@@ -1017,10 +1016,12 @@ void r_end() {
 			}
 		}
 		gfx_end_pass();
+		vk_end_timestamp();
 	}
 	
 	///////////////////////////////////
 	// Swapchain
+	vk_begin_timestamp("swapchain");
 	gfx_begin_pass({});
 	{
 		gfx_bind_pipeline(g.uber_pip_screen);
@@ -1036,6 +1037,7 @@ void r_end() {
 		imgui_end_frame();
 	}
 	gfx_end_pass();
+	vk_end_timestamp();
 	gfx_end();
 }
 
@@ -1491,7 +1493,8 @@ void imgui_init() {
 	platform_io.Platform_GetClipboardTextFn = imgui_platform_get_clipboard_text;
 	platform_io.Platform_SetClipboardTextFn = imgui_platform_set_clipboard_text;
 	VkDescriptorPoolSize pool_sizes[] = {
-		{VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
+		{VK_DESCRIPTOR_TYPE_SAMPLER, 100},
+		{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 100},
 	};
 	VkDescriptorPoolCreateInfo pool_info = {
 		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
@@ -1537,7 +1540,7 @@ void imgui_begin_frame() {
 void imgui_end_frame() {
 	ProfFunc;
 	ImGui::Render();
-	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), st->gfx.render_cmds[st->gfx.current_frame_idx]);
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), st->gfx.render_cmds[st->gfx.cur_frame_idx]);
 	ImGui::UpdatePlatformWindows();
 	ImGui::RenderPlatformWindowsDefault();
 }

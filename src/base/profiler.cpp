@@ -76,7 +76,6 @@ void prof_end() {
 	};
 	u32 read_buf = atomic_xor(&g.current_write, 1);
 	for(var& prof_thread : g.prof_threads) {
-		// var anchors = array_make<ProfAnchor>(scratch);
 		var& anchors = prof_thread.recorded_anchors[current_frame % ArrayCount(g.frames_times)];
 		array_clear(anchors);
 		u32 depth = 0;
@@ -132,13 +131,6 @@ void prof_end() {
 		Loop(i, stack.count) {
 			array_push(prof_thread.delayed_anchors, anchors[anchors.count - stack.count + i]);
 		}
-
-		///////////////////////////////////
-		// Record anchors
-		// var& write_anchors = prof_thread.recorded_anchors[current_frame % ArrayCount(g.frames_times)];
-		// array_reserve(write_anchors, anchors.count);
-		// MemCopyArray(write_anchors.data, anchors.data, anchors.count);
-		// write_anchors.count = anchors.count;
 	}
 }
 
