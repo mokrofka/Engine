@@ -8,7 +8,7 @@ struct Gfx_Pipeline {u32 idx; u32 gen;};
 struct Gfx_View {u32 idx; u32 gen;};
 
 enum {
-	Gfx_NumFramesInFlight = 2,
+	Gfx_NumFramesInFlight = 3,
 	Gfx_MaxImagesInFlight = 4,
 	Gfx_MaxColorAttachments = 8,
 	Gfx_MaxShaders = 32,
@@ -641,6 +641,26 @@ struct Gfx_Environment {
 	u64 image_mem_size;
 };
 
+struct Gfx_ProfileZone {
+	String name;
+	f64 start;
+	f64 end;
+	u32 depth;
+	u64 vert_invocations;
+	u64 frag_invocations;
+};
+
+struct Gfx_ProfileFrame {
+	Array<Gfx_ProfileZone, 128> zones;
+	f64 start_ms;
+	f64 end_ms;
+};
+
+struct Gfx_PipelineStats {
+	u64 vert_invocations;
+	u64 frag_invocations;
+};
+
 struct Gfx_State {
 	Arena arena;
 	VkAllocationCallbacks allocator_;
@@ -650,6 +670,17 @@ struct Gfx_State {
 	VkDebugUtilsMessengerEXT debug_messenger;
 	VK_Device device;
 	VK_Swapchain swapchain;
+
+	#define MaxTimeStamps 128
+	VkQueryPool query_pools[Gfx_NumFramesInFlight];
+	VkQueryPool stats_query_pools[Gfx_NumFramesInFlight];
+	u32 zone_count[Gfx_NumFramesInFlight];
+	String zone_names[Gfx_NumFramesInFlight * MaxTimeStamps];
+	u32 zone_depth[Gfx_NumFramesInFlight * MaxTimeStamps];
+	u32 open_zone_index[MaxTimeStamps];
+	u32 stack_depth;
+	Gfx_ProfileFrame cur_prof_frame;
+	f64 ns_per_tick;
 
 	VkSemaphore image_available_semaphores[Gfx_MaxImagesInFlight];
 	VkSemaphore render_complete_semaphores[Gfx_MaxImagesInFlight];
@@ -680,7 +711,7 @@ struct Gfx_State {
 	u32 images_in_flight;
 	u32 frames_in_flight;
 	u32 current_image_idx;
-	u32 current_frame_idx;
+	u32 cur_frame_idx;
 	u32 current_frame_idx_plus_one;
 
 	Pool<VK_Shader, Gfx_MaxShaders, Gfx_Shader> shaders;
@@ -747,6 +778,12 @@ struct Gfx_State {
 		X(DestroySwapchainKHR) \
 		X(GetSwapchainImagesKHR) \
 		X(AcquireNextImageKHR) \
+		X(CreateQueryPool) \
+		X(GetQueryPoolResults) \
+		X(CmdResetQueryPool) \
+		X(CmdWriteTimestamp) \
+		X(CmdBeginQuery) \
+		X(CmdEndQuery) \
 		X(CreateImage) \
 		X(CreateImageView) \
 		X(DestroyImage) \
@@ -918,6 +955,9 @@ void gfx_bind_buffer(Gfx_Buffer buf, u32 binding);
 void gfx_make_binding_buffers(Slice<Gfx_BufferDesc> descs);
 void gfx_flush();
 void gfx_idle();
+
+void vk_begin_timestamp(String name);
+void vk_end_timestamp();
 
 void gfx_readback_image(Gfx_Image img, u8* dst);
 void gfx_init(Gfx_Environment environment);

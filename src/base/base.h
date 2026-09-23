@@ -118,6 +118,8 @@ typedef __builtin_va_list VaList;
 #define U16_MAX 0xFFFF
 #define U32_MAX 0xFFFFFFFF
 #define U64_MAX 0xFFFFFFFFFFFFFFFF
+#define F32_MAX __FLT_MAX__
+#define F64_MAX __DBL_MAX__
 #define PAGE_SIZE 4096
 
 template<typename T> void Swap(T& a, T& b) {

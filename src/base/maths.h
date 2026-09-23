@@ -2,7 +2,7 @@
 #include "base.h"
 
 const f32 PI             = 3.14159265358f;
-const f32 Tau            = (PI * 2);
+const f32 Tau            = PI * 2;
 const f32 EulerNumber    = 2.71828182846f;
 const f32 GoldBig        = 1.61803398875f;
 const f32 GoldSmall      = 0.61803398875f;

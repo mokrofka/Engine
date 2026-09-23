@@ -661,9 +661,9 @@ void vk_init_stencil_attachment_info(VkRenderingAttachmentInfo* info, Gfx_Stenci
 	info->clearValue.depthStencil.stencil = action.clear_value;
 }
 
-VkSemaphore vk_get_cur_image_available_semaphore() { return st->gfx.image_available_semaphores[st->gfx.current_frame_idx]; }
+VkSemaphore vk_get_cur_image_available_semaphore() { return st->gfx.image_available_semaphores[st->gfx.cur_frame_idx]; }
 VkSemaphore vk_get_cur_render_complete_semaphore() { return st->gfx.render_complete_semaphores[st->gfx.current_image_idx]; }
-VkCommandBuffer vk_cur_cmd()                       { return st->gfx.render_cmds[st->gfx.current_frame_idx]; }
+VkCommandBuffer vk_cur_cmd()                       { return st->gfx.render_cmds[st->gfx.cur_frame_idx]; }
 
 u32 vk_find_memory_idx(u32 type_filter, u32 property_flags) {
 	VkPhysicalDeviceMemoryProperties memory_properties = st->gfx.device.memory;
@@ -1502,6 +1502,7 @@ void vk_device_init() {
 				.fillModeNonSolid = true,  // Request anistrophy
 				.samplerAnisotropy = true, // Request wireframe
 				.shaderInt64 = true,       // Request 64bit integers
+				.pipelineStatisticsQuery = true,
 			}
 		};
 		const char* extension_names[] = {
@@ -2925,6 +2926,28 @@ void gfx_init(Gfx_Environment environment) {
 		vk_cmd_alloc(g.device.cmd_pool, g.frames_in_flight, g.render_cmds);
 		vk_cmd_alloc(g.device.upload_cmd_pool, 1, &g.upload_cmd);
 		Info("Command buffers created");
+
+		// Query pool
+		VkQueryPoolCreateInfo pool_info = {
+			.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
+			.queryType = VK_QUERY_TYPE_TIMESTAMP,
+			.queryCount = MaxTimeStamps,
+		};
+		Loop(i, Gfx_NumFramesInFlight) {
+			VK_CHECK(g.CreateQueryPool(vkdevice, &pool_info, g.allocator, &g.query_pools[i]));
+		}
+		VkQueryPoolCreateInfo stats_pool_info = {
+			.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
+			.queryType = VK_QUERY_TYPE_PIPELINE_STATISTICS,
+			.queryCount = MaxTimeStamps,
+			.pipelineStatistics = 
+				VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT |
+				VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT,
+		};
+		Loop(i, Gfx_NumFramesInFlight) {
+			VK_CHECK(g.CreateQueryPool(vkdevice, &stats_pool_info, g.allocator, &g.stats_query_pools[i]));
+		}
+		g.ns_per_tick = g.device.properties.limits.timestampPeriod;
 	}
 
 	// Sync
@@ -3009,18 +3032,70 @@ void gfx_shutdown() {
 	g.DestroyInstance(g.instance, g.allocator);
 }
 
+void vk_begin_timestamp(String name) {
+	var& g = st->gfx;
+	u32 idx = g.zone_count[g.cur_frame_idx]++;
+	g.zone_names[g.cur_frame_idx*MaxTimeStamps + idx] = name;
+	g.zone_depth[g.cur_frame_idx*MaxTimeStamps + idx] = g.stack_depth;
+	g.open_zone_index[g.stack_depth] = idx;
+	g.stack_depth++;
+	g.CmdWriteTimestamp(vk_cur_cmd(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, g.query_pools[g.cur_frame_idx], idx*2);
+	g.CmdBeginQuery(vk_cur_cmd(), g.stats_query_pools[g.cur_frame_idx], idx, 0);
+}
+void vk_end_timestamp() {
+	var& g = st->gfx;
+	g.stack_depth--;
+	u32 idx = g.open_zone_index[g.stack_depth];
+	g.CmdWriteTimestamp(vk_cur_cmd(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, g.query_pools[g.cur_frame_idx], idx*2 + 1);
+	g.CmdEndQuery(vk_cur_cmd(), g.stats_query_pools[g.cur_frame_idx], idx);
+}
+
 void gfx_begin() {
 	ProfFunc;
 	Gfx_State& g = st->gfx;
-
 	{
 		ProfBlock("rendering waiting");
-		VK_CHECK(g.WaitForFences(vkdevice, 1, &g.in_flight_fences[g.current_frame_idx], true, U64_MAX));
-		VK_CHECK(g.ResetFences(vkdevice, 1, &g.in_flight_fences[g.current_frame_idx]));
+		VK_CHECK(g.WaitForFences(vkdevice, 1, &g.in_flight_fences[g.cur_frame_idx], true, U64_MAX));
+		VK_CHECK(g.ResetFences(vkdevice, 1, &g.in_flight_fences[g.cur_frame_idx]));
 	}
-
 	VkCommandBuffer cmd = vk_cur_cmd();
 	vk_cmd_begin(cmd);
+
+	///////////////////////////////////
+	// Timestamps
+	Assert(g.stack_depth == 0);
+	g.cur_prof_frame.start_ms = F64_MAX;
+	g.cur_prof_frame.end_ms = 0;
+	u32 query_count = g.zone_count[g.cur_frame_idx];
+	array_clear(g.cur_prof_frame.zones);
+	if(query_count) {
+		u64 timestamps[MaxTimeStamps*2] = {};
+		VK_CHECK(g.GetQueryPoolResults(vkdevice, g.query_pools[g.cur_frame_idx], 0, query_count*2, sizeof(u64)*query_count*2,
+			timestamps, sizeof(u64), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT));
+		Gfx_PipelineStats stats[MaxTimeStamps] = {};
+		VK_CHECK(g.GetQueryPoolResults(vkdevice, g.stats_query_pools[g.cur_frame_idx], 0, query_count, sizeof(Gfx_PipelineStats)*query_count,
+			stats, sizeof(Gfx_PipelineStats), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT));
+		Loop(i, query_count) {
+			u64 start = timestamps[i*2 + 0];
+			u64 end = timestamps[i*2 + 1];
+			String name = g.zone_names[i];
+			f64 start_ms = start*g.ns_per_tick / Million(1);
+			f64 end_ms = end*g.ns_per_tick / Million(1);
+			g.cur_prof_frame.start_ms = Min(start_ms, g.cur_prof_frame.start_ms);
+			g.cur_prof_frame.end_ms = Max(end_ms, g.cur_prof_frame.end_ms);
+			array_push(g.cur_prof_frame.zones, {
+				.start = start_ms,
+				.end = end_ms,
+				.name = name,
+				.depth = g.zone_depth[g.cur_frame_idx*MaxTimeStamps + i],
+				.vert_invocations = stats[i].vert_invocations,
+				.frag_invocations = stats[i].frag_invocations,
+			});
+		}
+	}
+	g.CmdResetQueryPool(cmd, g.query_pools[g.cur_frame_idx], 0, MaxTimeStamps);
+	g.CmdResetQueryPool(cmd, g.stats_query_pools[g.cur_frame_idx], 0, MaxTimeStamps);
+	g.zone_count[g.cur_frame_idx] = 0;
 
 	g.swapchain_resized = false;
 	v2u win_size = os_window_size();
@@ -3032,14 +3107,16 @@ void gfx_begin() {
 		Info("Swapchain recreated x: %i y: %i", win_size.x, win_size.y);
 	}
 
+	vk_begin_timestamp("start");
 	g.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipeline_layout, 0, 1, &g.descriptor_set, 0, null);
+	vk_end_timestamp();
 	// Next image
 	{
 		ProfBlock("swapchain flip waiting");
 		#if GFX_X11 // NOTE: on x11 errors
 		VkResult res = g.AcquireNextImageKHR(vkdevice, g.swapchain.h, U64_MAX, vk_get_cur_image_available_semaphore(), null, &g.current_image_idx);
 		if(res != VK_SUCCESS) {
-				// Warn("%s", vk_result_string(res));
+			// Warn("%s", vk_result_str(res));
 		}
 		#else
 		VK_CHECK(g_g.AcquireNextImageKHR(vkdevice, g_g.swapchain.handle, U64_MAX, image_available_semaphore, null, &image_index));
@@ -3089,20 +3166,20 @@ void gfx_begin() {
 			}
 			vk_cmd_end(g.upload_cmd);
 			VkCommandBufferSubmitInfo command_info = {
-					.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-					.commandBuffer = g.upload_cmd,
+				.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+				.commandBuffer = g.upload_cmd,
 			};
 			VkSemaphoreSubmitInfo signal_info = {
-					.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-					.semaphore = g.stage_semaphore,
-					.value = ++g.stage_cmd_counter,
+				.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+				.semaphore = g.stage_semaphore,
+				.value = ++g.stage_cmd_counter,
 			};
 			VkSubmitInfo2 info = {
-					.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
-					.commandBufferInfoCount = 1,
-					.pCommandBufferInfos = &command_info,
-					.signalSemaphoreInfoCount = 1,
-					.pSignalSemaphoreInfos = &signal_info,
+				.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+				.commandBufferInfoCount = 1,
+				.pCommandBufferInfos = &command_info,
+				.signalSemaphoreInfoCount = 1,
+				.pSignalSemaphoreInfos = &signal_info,
 			};
 			VK_CHECK(g.QueueSubmit2(g.device.graphics_queue, 1, &info, null));
 			g.stage_cmd_busy = true;
@@ -3145,30 +3222,28 @@ void gfx_end() {
 		.signalSemaphoreInfoCount = 1,
 		.pSignalSemaphoreInfos = &signal_info,
 	};
-	VK_CHECK(g.QueueSubmit2(g.device.graphics_queue, 1, &info, g.in_flight_fences[g.current_frame_idx]));
+	VK_CHECK(g.QueueSubmit2(g.device.graphics_queue, 1, &info, g.in_flight_fences[g.cur_frame_idx]));
 
 	///////////////////////////////////
 	// Present
-	{
-		VkSemaphore render_complete = vk_get_cur_render_complete_semaphore();
-		VkPresentInfoKHR present_info = {
-			.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-			.waitSemaphoreCount = 1,
-			.pWaitSemaphores = &render_complete,
-			.swapchainCount = 1,
-			.pSwapchains = &g.swapchain.h,
-			.pImageIndices = &g.current_image_idx,
-		};
+	VkSemaphore render_complete = vk_get_cur_render_complete_semaphore();
+	VkPresentInfoKHR present_info = {
+		.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+		.waitSemaphoreCount = 1,
+		.pWaitSemaphores = &render_complete,
+		.swapchainCount = 1,
+		.pSwapchains = &g.swapchain.h,
+		.pImageIndices = &g.current_image_idx,
+	};
 #if GFX_X11 // NOTE: on x11 errors
-		VkResult res = g.QueuePresentKHR(g.device.graphics_queue, &present_info);
-		NoOp(res);
-		// if(res != VK_SUCCESS) {
-		//   Error("%s", vk_result_string(res));
-		// }
-#else
-		VK_CHECK(g_g.QueuePresentKHR(g_g.device.graphics_queue, &present_info));
-#endif
+	VkResult res = g.QueuePresentKHR(g.device.graphics_queue, &present_info);
+	NoOp(res);
+	if(res != VK_SUCCESS) {
+		// Error("%s", vk_result_str(res));
 	}
-	g.current_frame_idx = (g.current_frame_idx + 1) % g.frames_in_flight;
+#else
+	VK_CHECK(g_g.QueuePresentKHR(g_g.device.graphics_queue, &present_info));
+#endif
+	g.cur_frame_idx = (g.cur_frame_idx + 1) % g.frames_in_flight;
 	g.current_frame_idx_plus_one = (g.current_frame_idx_plus_one + 1) % (g.frames_in_flight+1);
 }

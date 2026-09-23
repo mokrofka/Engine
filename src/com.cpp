@@ -1007,8 +1007,6 @@ void dev_update() {
 					ImGui::SetCursorScreenPos(top_bar_rect.min);
 					imgui_text("%.1ffps %.1fms CPU %.1fGhz, Recording: %s", 1000 / tsc_to_ms(prev_frame_tsc_elapsed), tsc_to_ms(prev_frame_tsc_elapsed), (f64)cpu_frequency / Billion(1), prof.paused ? S("off") : S("on"));
 					imgui_text("avg %.1fms, max %.1f, min %.1f", prof_win.frame_avg_time, prof_win.frame_max_time, prof_win.frame_min_time);
-					// v2 cursor_pos = win_rect.min; // TODO: remove
-					v2 avail_size = ImGui::GetContentRegionAvail();
 
 					///////////////////////////////////
 					// Tab mouse click
@@ -1098,7 +1096,7 @@ void dev_update() {
 								imgui_draw_rect(draw, item_rect, ColorGreyLight);
 								if(rng2_contains(item_rect, os_mouse_pos())) ImGuiBeginToolTip() {
 									imgui_text("Label: %s", anchor.label);
-									imgui_text("Percent: %f%%", rng2_dim(item_rect).x / avail_size.x * 100);
+									imgui_text("Percent: %f%%", rng2_dim(item_rect).x / rng2_dim(info_rect).x * 100);
 									imgui_text("Time: %fms", tsc_to_ms(anchor.tsc_end - anchor.tsc_start));
 									imgui_text("Time exclusive: %fms", tsc_to_ms(anchor.tsc_elapsed_excl));
 									imgui_text("Type: %s", str);
@@ -1172,6 +1170,66 @@ void dev_update() {
 
 						LoopArray(i, slices) slices[i] = slice(prof.prof_threads[i].recorded_anchors[idx]);
 						draw_frame_graph(info_rect, slice(slices), prof.frames_times[idx], 0, prof_win.root_cam, true);
+
+						// Gpu flame graph
+						{
+							local_persist Gfx_ProfileFrame pf;
+							if(time_on_interval(0.5)) pf = st->gfx.cur_prof_frame;
+							var& zones = pf.zones;
+							f64 elapsed = pf.end_ms-pf.start_ms;
+							f64 time_start = pf.start_ms;
+							f64 time_end = pf.end_ms;
+							f32 gpu_offset_height = -100;
+
+							Rng2 item_rect = rng2_make(v2(0), v2(rng2_width(info_rect), l.bar_height));
+							item_rect = rng2_shift(item_rect, v2(0, gpu_offset_height - l.bar_height));
+							item_rect.min = world_to_screen2(prof_win.root_cam, item_rect.min, info_rect.min);
+							item_rect.max = world_to_screen2(prof_win.root_cam, item_rect.max, info_rect.min);
+							imgui_draw_rect_filled(draw, item_rect, colors.work);
+							imgui_draw_rect(draw, item_rect, ColorGreyLight);
+
+							{
+								String str = push_strf(scratch, "gpu frame %.3f", elapsed);
+								v2 text_size = imgui_calc_text_size(str);
+								v2 text_pos = rng2_align_dim_at_center(item_rect, text_size).min;
+								ImGuiPushClipRect2(item_rect);
+								imgui_draw_text(draw, l.time_bar_text_size, text_pos, ColorWhite, str);
+							}
+
+							for(var zone : zones) {
+								f64 width = remap_f64(zone.end - zone.start, elapsed, rng2_width(info_rect));
+								f64 start_off = remap_f64(zone.start, time_start, time_end, 0, rng2_width(info_rect));
+								Rng2 item_rect = rng2_make(v2(start_off, zone.depth*l.bar_height), v2(width, l.bar_height));
+
+								item_rect = rng2_shift(item_rect, v2(0, gpu_offset_height));
+
+								item_rect.min = world_to_screen2(prof_win.root_cam, item_rect.min, info_rect.min);
+								item_rect.max = world_to_screen2(prof_win.root_cam, item_rect.max, info_rect.min);
+
+								imgui_draw_rect_filled(draw, item_rect, colors.work);
+								imgui_draw_rect(draw, item_rect, ColorGreyLight);
+								
+								if(rng2_contains(item_rect, os_mouse_pos())) ImGuiBeginToolTip() {
+									imgui_text("vert count: %u, frag count: %u", zone.vert_invocations, zone.frag_invocations);
+								}
+
+								// Text
+								String str = push_strf(scratch, "%s %.3f", zone.name, zone.end - zone.start);
+								v2 text_size = imgui_calc_text_size(str);
+								if(rng2_dim(item_rect).x < 30.1 || prof_win.root_cam.zoom2.y < 0.3) {
+									continue;
+								}
+								v2 text_pos = {};
+								if(text_size.x > rng2_dim(item_rect).x) {
+									text_pos.x = item_rect.min.x;
+									text_pos.y = rng1_align_center(rng2_rng_y(item_rect), text_size.y);
+								} else {
+									text_pos = rng2_align_dim_at_center(item_rect, text_size).min;
+								}
+								ImGuiPushClipRect2(item_rect);
+								imgui_draw_text(draw, l.time_bar_text_size, text_pos, ColorWhite, str);
+							}
+						}
 					}tab_mouse_click_handle(ProfileTabActive_Root);
 					ImGuiBeginTabItem("frames", active_tab == ProfileTabActive_Frames ? ImGuiTabItemFlags_SetSelected : 0) {
 						if(ImGui::IsWindowHovered()) {
@@ -2755,11 +2813,11 @@ void init_game() {
 	g.moving_cubes = array_make<ThingId>(g.gpa);
 	g.font = r_make_font({.name = "arial.ttf", .font_height = 32});
 
-	var arena = arena_make(.name = "check arena");
-	var alloc = alloc_make(arena, .name = "check alloc");
-	push_buffer(arena, KB(1));
-	u8* p = push_buffer(alloc, KB(1));
-	mem_realloc(alloc, p, KB(1), KB(2));
+	// var arena = arena_make(.name = "check arena");
+	// var alloc = alloc_make(arena, .name = "check alloc");
+	// push_buffer(arena, KB(1));
+	// u8* p = push_buffer(alloc, KB(1));
+	// mem_realloc(alloc, p, KB(1), KB(2));
 
 	LoopEnumNonZero(i, ThingEnum) {
 		map_set(g.str_to_thing_enum, hash(things_enum_strs[i]), (u32)i);
@@ -3113,6 +3171,7 @@ void update_game() {
 	dev_update();
 
 	// Test jobs
+	#if 0
 	{
 		ProfBlock("push jobs");
 		Loop(i, 2) {
@@ -3135,8 +3194,9 @@ void update_game() {
 		thread_wg_wait(id3);
 		thread_wg_wait(batch);
 	}
+	#endif
 
-	return;
+	// return;
 
 	///////////////////////////////////
 	// Hotkeys
