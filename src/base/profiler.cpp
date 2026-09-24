@@ -57,10 +57,6 @@ _ProfBlock::~_ProfBlock() {
 
 void prof_begin() {
 	var& g = profiler_st;
-	for(var& prof_thread : g.prof_threads) {
-		Assert(prof_thread.events[0].count < 3000);
-		Assert(prof_thread.events[1].count < 3000);
-	}
 	for(var& prof_thread : g.prof_threads) array_clear(prof_thread.events[g.current_write]);
 	g.current_frame_time.tsc_start = cpu_now();
 }

@@ -568,6 +568,7 @@ template<typename T, i32 N> struct QueueSPSC {
 template<typename T, i32 N> void queue_push(QueueSPSC<T, N>& q, T elem) {
 	u32 write = atomic_load_explicit(&q.write, AtomicRelaxed);
 	u32 read = atomic_load_explicit(&q.read, AtomicAcquire);
+	NoOp(read);
 	// if(write - read >= q.cap) return false;
 	Assert(write - read < q.cap);
 	q.data[write % q.cap] = elem;
@@ -577,6 +578,7 @@ template<typename T, i32 N> void queue_push(QueueSPSC<T, N>& q, T elem) {
 template<typename T, i32 N> T queue_pop(QueueSPSC<T, N>& q) {
 	u32 read = atomic_load_explicit(&q.read, AtomicRelaxed);
 	u32 write = atomic_load_explicit(&q.write, AtomicAcquire);   
+	NoOp(write);
 	// if (read == write) return {};
 	Assert(read != write);
 	T res = q.data[read % q.cap];
@@ -587,6 +589,8 @@ template<typename T, i32 N> T queue_pop(QueueSPSC<T, N>& q) {
 template<typename T, i32 N> T queue_back(QueueSPSC<T, N>& q) {
 	u32 write = atomic_load_explicit(&q.write, AtomicRelaxed);
 	u32 read = atomic_load_explicit(&q.read, AtomicAcquire);
+	NoOp(write);
+	NoOp(read);
 	// if(write - read >= q.cap) return {};
 	Assert(write - read < q.cap);
 	// return {q.data[(q.write-1) % q.cap], true};
@@ -595,6 +599,8 @@ template<typename T, i32 N> T queue_back(QueueSPSC<T, N>& q) {
 template<typename T, i32 N> T queue_front(QueueSPSC<T, N>& q) {
 	u32 read = atomic_load_explicit(&q.read, AtomicRelaxed);
 	u32 write = atomic_load_explicit(&q.write, AtomicAcquire);   
+	NoOp(write);
+	NoOp(read);
 	// if(read == write) return {};
 	Assert(read != write);
 	// return {q.data[(q.read) % q.cap], true};

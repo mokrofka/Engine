@@ -221,6 +221,7 @@ u32 my_sprintf(u8* buf, String fmt, VaList argc) {
 			}break;
 			case 'f': {
 				f64 val = va_arg(argc, f64);
+#if BUILD_DEBUG
 				if(is_inf(val)) {
 					String inf = "inf";
 					w_bytes(&w, inf.str, inf.size);
@@ -228,16 +229,20 @@ u32 my_sprintf(u8* buf, String fmt, VaList argc) {
 					String nan = "nan";
 					w_bytes(&w, nan.str, nan.size);
 				} else {
+#endif
 					u32 float_precision = 6;
 					u8 tmp[64];
 					u32 len = f64_write(tmp, val, float_precision);
 					w_bytes(&w, tmp, len);
-				}
+#if BUILD_DEBUG
+}
+#endif
 			}break;
 			case '.': {
 				u32 precision = *++p - '0';
 				p++; // skip number, land on 'f'
 				f64 val = va_arg(argc, f64);
+#if BUILD_DEBUG
 				if(is_inf(val)) {
 					String inf = "inf";
 					w_bytes(&w, inf.str, inf.size);
@@ -245,10 +250,13 @@ u32 my_sprintf(u8* buf, String fmt, VaList argc) {
 					String nan = "nan";
 					w_bytes(&w, nan.str, nan.size);
 				} else {
+#endif
 					u8 tmp[64];
 					u32 len = f64_write(tmp, val, precision);
 					w_bytes(&w, tmp, len);
+#if BUILD_DEBUG
 				}
+#endif
 			}break;
 			case 's': {
 				String val = va_arg(argc, String);

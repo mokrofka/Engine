@@ -496,6 +496,7 @@ struct VK_BufferRegion {
 struct VK_Image {
 	VkImage h;
 	VkDeviceMemory memory;
+	u64 mem_size;
 	Gfx_ImageType type;
 	u32 width;
 	u32 height;
@@ -698,6 +699,7 @@ struct Gfx_State {
 	Gfx_Environment environment;
 	VK_Memory gpu_mem;
 	VK_Memory cpu_mem;
+	u64 images_mem_usage;
 	VK_DescriptorWriter descriptor_writer;
 
 	VK_Buffer gpu_buf;

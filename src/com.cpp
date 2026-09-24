@@ -1005,7 +1005,9 @@ void dev_update() {
 					var top_bar_rect = rng2_cut_top(&win_rect, l.top_bar_height);
 					var info_rect = win_rect;
 					ImGui::SetCursorScreenPos(top_bar_rect.min);
-					imgui_text("%.1ffps %.1fms CPU %.1fGhz, Recording: %s", 1000 / tsc_to_ms(prev_frame_tsc_elapsed), tsc_to_ms(prev_frame_tsc_elapsed), (f64)cpu_frequency / Billion(1), prof.paused ? S("off") : S("on"));
+					local_persist f32 fps;
+					if(time_on_interval(0.1)) fps = 1000 / tsc_to_ms(prev_frame_tsc_elapsed);
+					imgui_text("%.1ffps %.1fms CPU %.1fGhz, Recording: %s", fps, tsc_to_ms(prev_frame_tsc_elapsed), (f64)cpu_frequency / Billion(1), prof.paused ? S("off") : S("on"));
 					imgui_text("avg %.1fms, max %.1f, min %.1f", prof_win.frame_avg_time, prof_win.frame_max_time, prof_win.frame_min_time);
 
 					///////////////////////////////////
@@ -1091,7 +1093,6 @@ void dev_update() {
 										str = "async";
 									}break;
 								}
-								// ProfBlock("draw");
 								imgui_draw_rect_filled(draw, item_rect, color);
 								imgui_draw_rect(draw, item_rect, ColorGreyLight);
 								if(rng2_contains(item_rect, os_mouse_pos())) ImGuiBeginToolTip() {
@@ -1133,8 +1134,11 @@ void dev_update() {
 						u32 idx = (current_frame-1) % ArrayCount(prof.frames_times);
 						local_persist i32 frequency = 1;
 						ImGui::SetCursorScreenPos(rng2_subrng_x01(top_bar_rect, {0.5,1}).min);
-						ImGui::SetNextItemWidth(100);
-						ImGui::DragInt("show freq", &frequency, 0.1f, 1, ProfRecordHistoryNum);
+						ImGui::PushItemWidth((50));
+						ImGui::DragInt("show freq", &frequency, 0.1f, 1, ProfRecordHistoryNum); ImGui::SameLine();
+						ImGui::DragInt("fps max", &g.fps, 1.0f, 10, 2000); ImGui::SameLine();
+						ImGui::SliderFloat("scale", &st->r.scale, 0.01, 1);
+						ImGui::PopItemWidth();
 						idx /= ProfRecordHistoryNum/frequency;
 
 						// Little bars
@@ -1322,7 +1326,7 @@ void dev_update() {
 					// Memory
 					ImGuiBeginTabItem("memory", active_tab == ProfileTabActive_Memory ? ImGuiTabItemFlags_SetSelected : 0) {
 						if(ImGui::IsWindowHovered()) {
-							camera_zoom_and_pan(prof_win.root_cam, info_rect.min);
+							camera_zoom_and_pan(prof_win.mem_cam, info_rect.min, true);
 						}
 						var mem_info_top = rng2_cut_top(&info_rect, 20);
 						AllocatorInfoList infos = mem_track_info();
@@ -1362,8 +1366,14 @@ void dev_update() {
 						LoopReverse(mem_idx, max_mem_level+1) {
 							if(mem_arrays[mem_idx].count) {
 								v2 rect_size = {50, 25};
-								var pos = rng1_align_center(rng2_rng_x(info_rect), rect_size.x);
-								var rect = rng2_make(v2(pos, info_rect.min.y) + v2(0,height_off), rect_size);
+								// var pos = rng1_align_center(rng2_rng_x(info_rect), rect_size.x);
+								var pos = rng1_align_center(Rng1(0, rng2_width(info_rect)), rect_size.x);
+								// var rect = rng2_make(v2(pos, info_rect.min.y) + v2(0,height_off), rect_size);
+								var rect = rng2_make(v2(pos, 0) + v2(0,height_off), rect_size);
+								rect = world_to_screen(prof_win.mem_cam, rect, info_rect.min);
+
+								// rect = world_to_screen(prof_win.mem_cam, rect, info_rect.min);
+
 								imgui_draw_rect_filled(draw, rect, ColorBlueUi);
 								imgui_draw_rect(draw, rect, ColorGreyLight);
 								MemFormatSize mem_fmt = mem_format_size(mem_levels[mem_idx]);
@@ -1379,10 +1389,14 @@ void dev_update() {
 								f32 incl_width = remap(info->pos, mem_levels[mem_idx], rng2_width(info_rect));
 								f32 cap_width = remap(info->cap, mem_levels[mem_idx], rng2_width(info_rect));
 								f32 height = 30;
-								var r = rng2_make(info_rect.min + v2(0, height_off), {rng2_width(info_rect), height});
+								// var r = rng2_make(info_rect.min + v2(0, height_off), {rng2_width(info_rect), height});
+								var r = rng2_make(v2(0, height_off), {rng2_width(info_rect), height});
 								var excl_rect = rng2_cut_left(&r, excl_width);
 								var incl_rect = rng2_cut_left(&r, incl_width-excl_width);
 								var cap_rect =  rng2_cut_left(&r, cap_width-incl_width);
+								excl_rect = world_to_screen(prof_win.mem_cam, excl_rect, info_rect.min);
+								incl_rect = world_to_screen(prof_win.mem_cam, incl_rect, info_rect.min);
+								cap_rect = world_to_screen(prof_win.mem_cam, cap_rect, info_rect.min);
 								height_off += 30;
 								imgui_draw_rect_filled(draw, excl_rect, ColorGreenUi);
 								imgui_draw_rect(draw, excl_rect, ColorGreyLight);
@@ -1417,9 +1431,12 @@ void dev_update() {
 									f32 c_width = remap(info->pos, mem_levels[mem_idx], rng2_width(info_rect));
 									f32 c_cap_width = remap(info->cap, mem_levels[mem_idx], rng2_width(info_rect));
 									f32 height = 30;
-									var r = rng2_make(info_rect.min + v2(0, height_off), {rng2_width(info_rect), height});
+									var r = rng2_make(v2(0, height_off), {rng2_width(info_rect), height});
 									var rect = rng2_cut_left(&r, c_width);
 									var cap_rect =  rng2_cut_left(&r, c_cap_width - c_width);
+									r = world_to_screen(prof_win.mem_cam, r, info_rect.min);
+									rect = world_to_screen(prof_win.mem_cam, rect, info_rect.min);
+									cap_rect = world_to_screen(prof_win.mem_cam, cap_rect, info_rect.min);
 									height_off += 30;
 									imgui_draw_rect_filled(draw, rect, ColorGreyDark);
 									imgui_draw_rect(draw, rect, ColorGreyLight);
@@ -1450,6 +1467,52 @@ void dev_update() {
 							os_commited_fmt.size, os_commited_fmt.format,
 							os_address_reserved_fmt.size, os_address_reserved_fmt.format,
 							mem_fmt.size, mem_fmt.format);
+
+						// Gpu memory
+						{
+							var& gfx = st->gfx;
+							u64 cpu_cap = st->gfx.cpu_mem.cap;
+							u64 gpu_cap = st->gfx.gpu_mem.cap;
+							u64 images_size = st->gfx.images_mem_usage;
+							u64 max = Max3(cpu_cap, gpu_cap, images_size);
+							struct Info {
+								u64 pos;
+								u64 cap;
+								String name;
+							} infos[] = {
+								{gfx.cpu_buf.pos, gfx.cpu_buf.cap, "cpu"},
+								{gfx.gpu_buf.pos, gfx.gpu_buf.cap, "gpu"},
+								{gfx.stage_buffer.pos, gfx.stage_buffer.size, "stage"},
+								{gfx.images_mem_usage, gfx.images_mem_usage, "images"},
+							};
+
+							f32 height_off = -150;
+							LoopArray(i, infos) {
+								f32 height = 30;
+								f32 pos_width = remap(infos[i].pos, max, rng2_width(info_rect));
+								f32 cap_width = remap(infos[i].cap, max, rng2_width(info_rect));
+	
+								var r = rng2_make(v2(), v2(rng2_width(info_rect), height));
+								var pos_r = rng2_cut_left(&r, pos_width);
+								var cap_r = rng2_cut_left(&r, cap_width - pos_width);
+	
+								pos_r = rng2_shift(pos_r, v2(0, height_off));
+								cap_r = rng2_shift(cap_r, v2(0, height_off));
+								height_off += height;
+	
+								pos_r = world_to_screen(prof_win.mem_cam, pos_r, info_rect.min);
+								cap_r = world_to_screen(prof_win.mem_cam, cap_r, info_rect.min);
+	
+								imgui_draw_rect_filled(draw, pos_r, ColorGreenUi);
+								imgui_draw_rect(draw, pos_r, ColorGreyLight);
+								imgui_draw_rect_filled(draw, cap_r, ColorRedUi);
+								imgui_draw_rect(draw, cap_r, ColorGreyLight);
+	
+								var pos_fmt = mem_format_size(infos[i].pos);
+								var cap_fmt = mem_format_size(infos[i].cap);
+								imgui_draw_text(draw, pos_r.min, ColorWhite, push_strf(scratch, "%s pos: %.2f%s cap: %.2f%s", infos[i].name, pos_fmt.size, pos_fmt.format, cap_fmt.size, cap_fmt.format));
+							}
+						}
 					}tab_mouse_click_handle(ProfileTabActive_Memory);
 				}
 			}
@@ -1591,6 +1654,7 @@ R_MeshDesc load_gltf(Allocator arena, String path, b32 is_glb) {
 		cursor = os_file_path_read_all(scratch, path);
 
 		FileHeader* header = (FileHeader*)cursor.data;
+		NoOp(header);
 		Assert(str_match(String((u8*)&header->magic, 4), "glTF"));
 		cursor = slice_skip(cursor, sizeof(FileHeader));
 
@@ -1601,6 +1665,7 @@ R_MeshDesc load_gltf(Allocator arena, String path, b32 is_glb) {
 		cursor = slice_skip(cursor, json_chunk->chunk_length);
 
 		ChunkHeader* bin_chunk = (ChunkHeader*)cursor.data;
+		NoOp(bin_chunk);
 		Assert(str_match(String((u8*)&bin_chunk->chunk_type, 3), "BIN"));
 		cursor = slice_skip(cursor, sizeof(ChunkHeader));
 
@@ -2000,6 +2065,13 @@ void scroll_state_update(ScrollState& s, ScrollType type) {
 v2 world_to_screen(Camera2 c, v2 p, v2 screen_center) {
 	return screen_center + (p - c.pos) * c.zoom;
 }
+Rng2 world_to_screen(Camera2 c, Rng2 rect, v2 screen_center) {
+	Rng2 res = {
+		screen_center + (rect.min - c.pos) * c.zoom,
+		screen_center + (rect.max - c.pos) * c.zoom,
+	};
+	return res;
+}
 v2 world_to_screen2(Camera2 c, v2 p, v2 screen_center) {
 	v2 res = {
 		screen_center.x + (p.x - c.pos.x) * c.zoom2.x,
@@ -2052,11 +2124,15 @@ void camera_pan2(Camera2& camera, v2 screen_delta) {
 	camera.pos.x -= screen_delta.x / camera.zoom2.x;
 	camera.pos.y -= screen_delta.y / camera.zoom2.y;
 }
-void camera_zoom_and_pan(Camera2& c, v2 screen_center) {
+void camera_zoom_and_pan(Camera2& c, v2 screen_center, b32 linear) {
 	f32 wheel = os_mouse_wheel();
 	if(wheel) {
 		if(os_key_is_down(Key_LControl)) {
-			camera_zoom_at_pow_clamp(c, os_mouse_pos(), screen_center, wheel > 0 ? 1.3f : 1 / 1.3f);
+			if(!linear) {
+				camera_zoom_at_pow_clamp(c, os_mouse_pos(), screen_center, wheel > 0 ? 1.3f : 1 / 1.3f);
+			} else {
+				camera_zoom_at(c, os_mouse_pos(), screen_center, wheel > 0 ? 1.3f : 1 / 1.3f);
+			}
 		} else {
 			f32 wheel_h = os_mouse_wheel_horizontal();
 			camera_pan2(c, v2(wheel_h * 100, wheel * 100));
@@ -2146,6 +2222,9 @@ ThingDesc default_thing_desc() {
 	ThingDesc res = {
 		.scale = v3(1),
 		.rot = quat_identity(),
+		.color = u32_from_rgba(ColorWhite),
+		.mesh_id = get_mesh(Mesh_Cube),
+		.mat_id = get_material(Material_Orange),
 	};
 	return res;
 }
@@ -2422,10 +2501,11 @@ if(data->ctx == null) {
 		st->should_hotreload = false;
 	}
 
-	// var& g = *st;
+	var& g = *st;
 	// ui_set_current_state(g.ui0);
 
-	u64 target_fps = Billion(1) / 60;
+	// u64 target_fps = Billion(1) / 60;
+	g.fps = 60;
 	u64 prev_ns = os_now_ns();
 
 	while(!os_window_should_close()) {
@@ -2433,6 +2513,7 @@ if(data->ctx == null) {
 		if(st->should_hotreload) {
 			goto hotreload;
 		}
+		u64 target_fps = Billion(1) / g.fps;
 		// if(time_on_interval(get_time(), get_dt(), 0.1, 0)) {
 		//   Info("ye");
 		// }
@@ -2588,11 +2669,6 @@ R_MeshDesc generate_grid(Allocator arena, u32 size, f32 step) {
 
 ThingId make_thing(ThingDesc desc) {
 	var& g = *st;
-	// _DefSet(desc.mesh, Mesh_Cube);
-	// _DefSet(desc.mat, Material_Orange);
-	_DefIfSet(desc.rot, v4_equal(desc.rot, v4()), quat_identity());
-	_DefIfSet(desc.scale, v3_equal(desc.scale, v3()), v3(1));
-	_DefSet(desc.color, u32_from_rgba(ColorWhite));
 	R_MeshId mesh_id = {};
 	if(desc.mesh) {
 		mesh_id = get_mesh(desc.mesh);

@@ -124,6 +124,20 @@ void mem_track_reset(AllocatorInfo* info) {
 	info->frees_count = 0;
 }
 
+void destroy(AllocatorInfo* info) {
+	LoopNode (child, info->first) {
+		destroy(child);
+	}
+	mem_track_destroy(info);
+}
+
+void reset(AllocatorInfo* info) {
+	LoopNode (child, info->first) {
+		destroy(child);
+	}
+	mem_track_reset(info);
+}
+
 #else
 AllocatorInfoList mem_track_info() { return {}; }
 void mem_track_init() {}
@@ -147,20 +161,6 @@ Arena _arena_make(ArenaParams params) {
 	result.info = mem_track_make({}, AllocatorType_Arena, params.name, params.file, params.line);
 #endif
 	return result;
-}
-
-void destroy(AllocatorInfo* info) {
-	LoopNode (child, info->first) {
-		destroy(child);
-	}
-	mem_track_destroy(info);
-}
-
-void reset(AllocatorInfo* info) {
-	LoopNode (child, info->first) {
-		destroy(child);
-	}
-	mem_track_reset(info);
 }
 
 void arena_destroy(Arena& arena) {
