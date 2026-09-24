@@ -37,18 +37,18 @@ f32 round_to(f32 x, f32 step) { return round(x / step) * step; }
 
 v4 rgba_from_u32(u32 hex) {
 	v4 res = v4(
-		((hex >> 0) & 0xff) / 255.f,
-		((hex >> 8) & 0xff) / 255.f,
-		((hex >> 16) & 0xff) / 255.f,
-		((hex >> 24) & 0xff) / 255.f);
+		((hex >> 0) & 0xff) / 255.0f,
+		((hex >> 8) & 0xff) / 255.0f,
+		((hex >> 16) & 0xff) / 255.0f,
+		((hex >> 24) & 0xff) / 255.0f);
 	return res;
 }
 u32 u32_from_rgba(v4 rgba) {
 	u32 res =
-		((u32)((u8)(rgba.x * 255.f))) << 0 |
-		((u32)((u8)(rgba.y * 255.f))) << 8 |
-		((u32)((u8)(rgba.z * 255.f))) << 16 |
-		((u32)((u8)(rgba.w * 255.f))) << 24;
+		((u32)((u8)(rgba.x * 255.0f))) << 0 |
+		((u32)((u8)(rgba.y * 255.0f))) << 8 |
+		((u32)((u8)(rgba.z * 255.0f))) << 16 |
+		((u32)((u8)(rgba.w * 255.0f))) << 24;
 	return res;
 }
 

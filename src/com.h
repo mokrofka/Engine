@@ -19,7 +19,7 @@
 // thread safe allocator
 // glb loader
 // obj mouse selection
-// gpu profiler, memory
+// memory
 
 #define MESH_LIST \
 	X(Cube) \
@@ -417,6 +417,7 @@ struct GlobalState {
 	m4x4 view;
 	m4x4 projection;
 	v4 ambient_color;
+	i32 fps;
 
 	R_MeshId meshes_ids[Mesh_COUNT];
 	R_TextureId textures_ids[Texture_COUNT];
@@ -578,6 +579,7 @@ String write_v4(Allocator alloc, v4 v);
 ScrollState scroll_state_make(f32 scale);
 void scroll_state_update(ScrollState& s, ScrollType type = ScrollType_Default);
 v2 world_to_screen(Camera2 c, v2 p, v2 screen_center);
+Rng2 world_to_screen(Camera2 c, Rng2 rect, v2 screen_center);
 v2 world_to_screen2(Camera2 c, v2 p, v2 screen_center);
 v2 screen_to_world(Camera2 c, v2 p, v2 screen_center);
 v2 screen_to_world2(Camera2 c, v2 p, v2 screen_center);
@@ -586,7 +588,7 @@ void camera_zoom_at2(Camera2& c, v2 mouse, v2 screen_center, f32 factor);
 void camera_zoom_at_pow_clamp(Camera2& c, v2 mouse, v2 screen_center, f32 factor);
 void camera_pan(Camera2& camera, v2 screen_delta);
 void camera_pan2(Camera2& camera, v2 screen_delta);
-void camera_zoom_and_pan(Camera2& c, v2 screen_center);
+void camera_zoom_and_pan(Camera2& c, v2 screen_center, b32 linear = false);
 
 void watch_add(String watch_name, WatchOp op);
 void watch_directory_add(String watch_name, WatchOp op, OS_WatchFlags flags = OS_WatchFlag_Modify);

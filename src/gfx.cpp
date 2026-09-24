@@ -1900,6 +1900,8 @@ Gfx_Image gfx_make_image(Gfx_ImageDesc desc) {
 	VK_CHECK(g.CreateImage(vkdevice, &image_info, g.allocator, &image.h));
 	VkMemoryRequirements requirements;
 	g.GetImageMemoryRequirements(vkdevice, image.h, &requirements);
+	g.images_mem_usage += requirements.size;
+	image.mem_size = requirements.size;
 
 	VkMemoryAllocateInfo alloc_info = {
 		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
@@ -2364,7 +2366,9 @@ void gfx_update_buffer(Gfx_Buffer dst, u64 offset, Slice<u8> data) {
 
 void gfx_destroy_image(Gfx_Image img) {
 	Gfx_State& g = st->gfx;
-	g.DestroyImage(vkdevice, pool_get(g.images, img).h, g.allocator);
+	var& vkimg = pool_get(g.images, img);
+	g.DestroyImage(vkdevice, vkimg.h, g.allocator);
+	g.images_mem_usage -= vkimg.mem_size;
 	pool_remove(g.images, img);
 }
 
@@ -2913,13 +2917,13 @@ void gfx_init(Gfx_Environment environment) {
 		}
 		// Choose present mode
 		VkPresentModeKHR present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
-		Loop(i, g.device.present_mode_count) {
-			VkPresentModeKHR mode = g.device.present_modes[i];
-			if(mode == VK_PRESENT_MODE_FIFO_KHR) {
-				present_mode = mode;
-				break;
-			}
-		}
+		// Loop(i, g.device.present_mode_count) {
+		// 	VkPresentModeKHR mode = g.device.present_modes[i];
+		// 	if(mode == VK_PRESENT_MODE_FIFO_KHR) {
+		// 		present_mode = mode;
+		// 		break;
+		// 	}
+		// }
 		g.swapchain.present_mode = present_mode;
 		vk_swapchain_create();
 		Info("Swapchain created");

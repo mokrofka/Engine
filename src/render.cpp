@@ -572,7 +572,8 @@ void r_shaders_compile(Allocator arena) {
 	Loop(i, files.count) {
 		File& f = files[i];
 		var arr = array_make<String>(scratch);
-		String args[] = {S("slangc"), f.file_path, S("-target"), S("spirv"), S("-O0"), S("-g3"), S("-o"), f.compiled_file_path};
+		// String args[] = {S("slangc"), f.file_path, S("-target"), S("spirv"), S("-O0"), S("-g3"), S("-o"), f.compiled_file_path};
+		String args[] = {S("slangc"), f.file_path, S("-target"), S("spirv"), S("-o"), f.compiled_file_path};
 		array_push_elems(arr, slice(args));
 		g.shader_module_compilation_pids[i] = os_process_make(slice(arr));
 		Debug("%s", f.file_path);
@@ -796,6 +797,8 @@ void r_end() {
 		g.old_scale = g.scale;
 		gfx_idle();
 		v2u win_size = os_window_size();
+		win_size.x *= g.scale;
+		win_size.y *= g.scale;
 		r_recreate_render_target(&g.world_rt, win_size);
 	}
 
@@ -908,7 +911,7 @@ void r_end() {
 		vk_begin_timestamp("world");
 		gfx_begin_pass({.attachments = r_render_target_to_attachments(g.world_rt)});
 		{
-			gfx_apply_viewport(rng2_make(v2(), os_window_size()), true);
+			gfx_apply_viewport(rng2_make(v2(), os_window_size() * g.scale), true);
 			gfx_apply_scissor(rng2_make(v2(), os_window_size()));
 			gfx_bind_vert(g.vert_reg);
 			gfx_bind_index(g.index_reg);
@@ -982,7 +985,7 @@ void r_end() {
 			gfx_draw_mesh(pool_get(g.meshes, get_mesh(Mesh_Cube)));
 
 			// UI drawing
-			gfx_apply_viewport(rng2_make(v2(), os_window_size()));
+			gfx_apply_viewport(rng2_make(v2(), os_window_size() * g.scale));
 			if(g.draw_rects.count) {
 				Loop(i, g.draw_rects.count) {
 					var rect = g.draw_rects[i];
@@ -1024,6 +1027,7 @@ void r_end() {
 	vk_begin_timestamp("swapchain");
 	gfx_begin_pass({});
 	{
+		gfx_apply_viewport(rng2_make(v2(), os_window_size()));
 		gfx_bind_pipeline(g.uber_pip_screen);
 		r_apply_state({});
 		g.gpu_drawcalls[drawcall_count] = {

@@ -90,6 +90,6 @@ void prof_launch_end();
 	#define ProfBlock(Name, ...) _ProfBlock Glue(__profiler_block, __LINE__)(Name, __func__, ##__VA_ARGS__)
 	#define ProfFunc ProfBlock(__func__)
 #else
-	#define ProfBlock(Name)
+	#define ProfBlock(Name, ...)
 	#define ProfFunc
 #endif
