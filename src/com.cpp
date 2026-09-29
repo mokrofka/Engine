@@ -1417,13 +1417,11 @@ void dev_update() {
 								imgui_draw_text(draw, excl_rect.min, ColorWhite, name_str);
 								imgui_draw_text(draw, excl_rect.min + v2(200, 0), ColorWhite, mem_str);
 								var sort_entries = push_slice(scratch, SortEntry64, info->child_count);
-								u64 mem_usage = 0;
 								u32 idx = 0;
 								LoopNode(it, info->first) {
 									var& entry = sort_entries[idx++];
 									entry.p = it;
 									entry.sort_key = it->pos;
-									mem_usage += it->cap;
 								}
 								sort_radix64_msd(sort_entries);
 								Loop(child_idx, sort_entries.count) {
@@ -1474,7 +1472,8 @@ void dev_update() {
 							u64 cpu_cap = st->gfx.cpu_mem.cap;
 							u64 gpu_cap = st->gfx.gpu_mem.cap;
 							u64 images_size = st->gfx.images_mem_usage;
-							u64 max = Max3(cpu_cap, gpu_cap, images_size);
+							u64 target_images_size = st->gfx.target_images_mem_usage;
+							u64 max = Max(Max3(cpu_cap, gpu_cap, images_size), target_images_size);
 							struct Info {
 								u64 pos;
 								u64 cap;
@@ -1484,6 +1483,7 @@ void dev_update() {
 								{gfx.gpu_buf.pos, gfx.gpu_buf.cap, "gpu"},
 								{gfx.stage_buffer.pos, gfx.stage_buffer.size, "stage"},
 								{gfx.images_mem_usage, gfx.images_mem_usage, "images"},
+								{gfx.target_images_mem_usage, gfx.target_images_mem_usage, "targets images"},
 							};
 
 							f32 height_off = -150;
@@ -2253,7 +2253,8 @@ void mesh_set(MeshEnum mesh_enum, R_MeshId id) {
 
 void push_child_thing(ThingId parent, ThingId id) {
 	var& g = *st;
-	hdll_list_push_back(g.things.pool.data, get_thing(parent), id);
+	var& t = get_thing(parent);
+	hdll_push_back(g.things.pool.data, t.first, t.last, id);
 }
 
 String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, EntityFlags flags) {
@@ -2373,6 +2374,142 @@ void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser
 	}
 }
 
+struct Observation {
+	ThingId observed;
+	ThingId observer;
+	u32 next_observed, prev_observed;
+	u32 next_observer, prev_observer;
+};
+
+Poolu32<Observation, KB(1)> observations;
+Map<u32, KB(1)> first_observed;
+Map<u32, KB(1)> first_observer;
+
+Slice<ThingId> find_observed(Allocator arena, ThingId observer) {
+	var res = array_make<ThingId>(arena);
+	u64 key = observer.idx;
+	var[first_idx, ok] = map_get(first_observed, key);
+	if(!ok) return {};
+	u32 idx = first_idx;
+	do {
+		Observation o = observations.data[idx];
+		array_push(res, o.observed);
+		idx = o.next_observed;
+	}while(idx != first_idx);
+	return slice(res);
+}
+
+Slice<ThingId> find_observers(Allocator arena, ThingId observed) {
+	var res = array_make<ThingId>(arena);
+	u64 key = observed.idx;
+	var[first_idx, ok] = map_get(first_observer, key);
+	if(!ok) return {};
+	u32 idx = first_idx;
+	do {
+		Observation o = observations.data[idx];
+		array_push(res, o.observer);
+		idx = o.next_observer;
+	}while(idx != first_idx);
+	return slice(res);
+}
+
+u32 add_observation(ThingId observer, ThingId observed) {
+	u32 idx = pool_push(observations, {.observed = observed, .observer = observer});
+	{
+		u64 key = observer.idx;
+		var[first, ok] = map_get(first_observed, key);
+		if(ok) {
+			DLL_list_push(observations.data, first, idx, next_observed, prev_observed);
+		} else {
+			DLL_list_init(observations.data, idx, next_observed, prev_observed);
+			map_set(first_observed, key, idx);
+		}
+	}
+	{
+		u64 key = observed.idx;
+		var[first, ok] = map_get(first_observer, key);
+		if(ok) {
+			DLL_list_push(observations.data, first, idx, next_observer, prev_observer);
+		} else {
+			DLL_list_init(observations.data, idx, next_observer, prev_observer);
+			map_set(first_observer, key, idx);
+		}
+	}
+	return idx;
+}
+
+void remove_observation(u32 idx) {
+	var o = observations.data[idx];
+	{
+		DLL_list_remove(observations.data, idx, next_observed, prev_observed);
+		u64 key = o.observer.idx;
+		var[first, ok] = map_get(first_observed, key);
+		if(first == idx) {
+			if(o.next_observed != idx) {
+				map_set(first_observed, key, o.next_observed);
+			} else {
+				map_remove(first_observed, key);
+			}
+		}
+	}
+	{
+		DLL_list_remove(observations.data, idx, next_observer, prev_observer);
+		u64 key = o.observed.idx;
+		var[first, ok] = map_get(first_observer, key);
+		if(first == idx) {
+			if(o.next_observer != idx) {
+				map_set(first_observer, key, o.next_observer);
+			} else {
+				map_remove(first_observer, key);
+			}
+		}
+	}
+	pool_remove(observations, idx);
+}
+
+void print_observed(ThingId id) {
+	Scratch scratch;
+	var s = find_observed(scratch, id);
+	print("Thing %i is observed by: ", id.idx);
+	for(var idx : s) {
+		print("%i ", idx);
+	}
+	println("");
+}
+
+void print_observers(ThingId id) {
+	Scratch scratch;
+	var s = find_observers(scratch, id);
+	print("Thing %i is observing: ", id.idx);
+	for(var idx : s) {
+		print("%i ", idx);
+	}
+	println("");
+}
+
+void check_observer_observed() {
+	Scratch scratch;
+
+	add_observation({2}, {1}); /* Enemy A observes Player      -> idx 0 */
+	uint32_t enemyB_watches_player =
+		add_observation({3}, {1}); /* Enemy B observes Player      -> idx 1 */
+	add_observation({4}, {1});	 /* Enemy C observes Player      -> idx 2 */
+	add_observation({2}, {5});	 /* Enemy A also observes QuestGiver -> idx 3 */
+
+	Info("-- before removal --");
+	print_observers({1}); /* expect: 2 3 4 (some order) */
+	print_observed({2});	 /* expect: 1 5 */
+	print_observed({3});	 /* expect: 1 */
+	print_observers({5}); /* expect: 2 */
+
+	/* Enemy B stops observing Player */
+	remove_observation(enemyB_watches_player);
+
+	Info("\n-- after Enemy B stops observing Player --");
+	print_observers({1}); /* expect: 2 4 only, no 3 */
+	print_observed({3});	 /* expect: (nothing) - B's chain is now empty */
+}
+
 void init() {
 	Scratch scratch;
 	var& g = *st;
@@ -2389,71 +2526,6 @@ void init() {
 			r_shaders_compile(scratch);
 			r_shaders_compile_join();
 			Info("took: %fms", f64(os_now_ns()-s) / Million(1));
-			os_exit(0);
-		} else if(str_match(s, "preprocessor")) {
-			Map<u8, 32> saved = {};
-			LoopEnumNonZero(i, MetaType) {
-				map_set(saved, hash(meta_type_str[i]), {});
-			}
-
-			String files[] = {
-				"com.h",
-				"types.h",
-			};
-			Array<String, ArrayCount(files)> buffers = {};
-			LoopArray(i, files) {
-				buffers[i] = os_file_path_read_all_str(scratch, push_strf(scratch, "%s/../src/%s", os_cur_directory(), files[i]));
-			}
-			
-			var string = dstr_make(scratch);
-			var enum_meta_type_string = dstr_make(scratch);
-			dstr_push(enum_meta_type_string, "enum {\n");
-			b32 first_enum_meta_type = true;
-
-			LoopArray(i, files) {
-				Slice tokens = tokens_from_str(scratch, buffers[i]);
-				Parser p = parser_make(tokens);
-				while(p.cur < p.tokens.count) {
-					Token tok = tok_advance(p);
-					if(tok.type == TokenType_Identifier) {
-						if(str_match(tok.str, "Introspect")) {
-							tok_expect_name(p, "struct");
-							Token struct_name = tok_expect(p, TokenType_Identifier);
-							dstr_push(string, push_strf(scratch, "MemberDefinition members_of_%s[] = {\n", struct_name.str));
-							tok_expect(p, TokenType_OpenBrace);
-							while(!tok_match(p, TokenType_CloseBrace)) {
-								Token field_type = tok_expect(p, TokenType_Identifier);
-								Token field_name = tok_expect(p, TokenType_Identifier);
-								if(tok_match(p, TokenType_OpenBracket)) {
-									tok_expect(p, TokenType_Number);
-									tok_expect(p, TokenType_CloseBracket);
-								}
-								tok_expect(p, TokenType_Semicolon);
-								String s = push_strf(scratch, "\t{MetaType_%s, \"%s\", OffsetOf(%s,%s)},\n", field_type.str, field_name.str, struct_name.str, field_name.str);
-								dstr_push(string, s);
-	
-								// Enum meta type
-								String meta_type = push_strf(scratch, "MetaType_%s", field_type.str);
-								u64 h = hash(meta_type);
-								if(var[_, ok] = map_get(saved, h); !ok) {
-									meta_type = push_strf(scratch, "\t%s", meta_type);
-									if(first_enum_meta_type) {
-										meta_type = push_strf(scratch, "%s = %u", meta_type, MetaType_COUNT);
-										first_enum_meta_type = false;
-									}
-									meta_type = push_strf(scratch, "%s,\n", meta_type);
-									map_set(saved, h, {});
-									dstr_push(enum_meta_type_string, meta_type);
-								}
-							}
-							dstr_push(string, String("};\n"));
-						}
-					}
-				}
-			}
-			dstr_push(enum_meta_type_string, "};\n");
-			dstr_push(enum_meta_type_string, string);
-			os_file_path_write_all(push_strf(scratch, "%s/../src/generated.h", os_cur_directory()), dstr_slice(enum_meta_type_string));
 			os_exit(0);
 		}
 	}
@@ -3647,7 +3719,7 @@ UI_Box* ui_box_make(UI_BoxFlags flags, UI_Size size_x, UI_Size size_y, String st
 	UI_Box* box = ui_box_from_key(key);
 	box->first = box->last = box->next = box->prev = null;
 	box->parent = parent;
-	if(parent) dll_list_push_back(parent, box);
+	if(parent) dll_push_back(parent->first, parent->last, box);
 	box->flags = flags;
 	box->string = string;
 	box->semantic_size[UI_Axis2_X] = size_x;
@@ -3839,12 +3911,6 @@ void ui_build_draw_cmds(UI_Box* box) {
 		ui_build_draw_cmds(it);
 }
 
-f32 ui_animate_towards(f32 current, f32 target, f32 dt, f32 rate_per_sec) {
-	// f32 t = 1.0f - (f32)((f64)1.0 / (1.0 + rate_per_sec * dt)); /* simple, frame-rate-robust ease */
-	// return Lerp(current, Clamp01(t), target);
-	return exp_decay(current, target, rate_per_sec, dt);
-}
-
 UI_Signal ui_signal_from_box(UI_Box* box) {
 	var& g = st->ui;
 	UI_Signal sig = {};
@@ -3885,8 +3951,8 @@ UI_Signal ui_signal_from_box(UI_Box* box) {
 
 	f32 hot_target = (g.hot_key == box->key) ? 1.0f : 0.0f;
 	f32 active_target = (g.active_key == box->key) ? 1.0f : 0.0f;
-	box->hot_t = ui_animate_towards(box->hot_t, hot_target, g.input.dt, 10.0f);
-	box->active_t = ui_animate_towards(box->active_t, active_target, g.input.dt, 15.0f);
+	box->hot_t = exp_decay(box->hot_t, hot_target, 10.0f, g.input.dt);
+	box->active_t = exp_decay(box->active_t, active_target, 15.0f, g.input.dt);
 
 	return sig;
 }

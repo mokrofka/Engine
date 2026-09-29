@@ -82,13 +82,21 @@ FS_Entry v4 fs_main(VSOutput in) {
 			o = textures[draw.cur_resolve_idx].Sample(samplers[1], in.uv);
 		}break;
 		case ShaderType::SoftwareRender: {
-			f32 x = in.pos.x;
-			f32 y = in.pos.y;
+			// f32 x = (in.pos.x + 1) / 2;
+			// f32 y = (in.pos.y + 1) / 2;
+			u32 x = (u32)in.pos.x;
+			u32 y = (u32)in.pos.y;
 			o = rgba_from_u32(software_render[(u32)(y * st.res.x + x)]);
-			if(o.w < 0.1) discard;
+			// o = software_render[y * (u32)st.res.x + x];
+			// if(o.w < 0.1) discard;
 		}break;
 	}
 	return o;
 }
+
+
+
+
+
 
 

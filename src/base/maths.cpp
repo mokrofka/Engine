@@ -55,45 +55,25 @@ u32 u32_from_rgba(v4 rgba) {
 ////////////////////////////////////////////////////////////////////////
 // Hash
 
-u64 squirrel3(u64 x) {
-	x *= 0X9e3779b185ebca87ull;
-	x ^= x >> 8;
-	x += 0Xc2b2ae3d27d4eb4full;
-	x ^= x << 8;
-	x *= 0X27d4eb2f165667c5ull;
-	x ^= x >> 8;
+u64 splitmix64(u64 x) {
+	x += 0x9e3779b97f4a7c15;
+	x ^= x >> 30;
+	x *= 0xbf58476d1ce4e5b9;
+	x ^= x >> 27;
+	x *= 0x94d049bb133111eb;
+	x ^= x >> 31;
 	return x;
 }
 
-u32 xorshift32(u32 x) {
-	x ^= x << 13;
-	x ^= x >> 17;
-	x ^= x << 5;
-	return x;
-}
-
-// u64 hash_bytes(void* data, u64 size) {
-// 	u8*p = (u8*)data;
-// 	uint64_t h = 1469598103934665603ull;
-// 	Loop(i, size) {
-// 		h ^= p[i];
-// 		h *= 1099511628211ull;
-// 	}
-// 	return h;
-// }
-
+// wyhash (https://github.com/wangyi-fudan/wyhash)
 u64 wyr8(u8* p) { u64 v; MemCopy(&v, p, 8); return v; }
 u64 wyr4(u8* p) { u32 v; MemCopy(&v, p, 4); return v; }
 u64 wyr3(u8* p, u64 k) { return ((u64)p[0] << 16) | ((u64)p[k >> 1] << 8) | p[k - 1]; }
-
 u64 wymix(u64 a, u64 b) {
 	__uint128_t r = (__uint128_t)a * b;
 	return (u64)r ^ (u64)(r >> 64);
 }
-
 const u64 wyp0 = 0xa0761d6478bd642full, wyp1 = 0xe7037ed1a0b428dbull, wyp2 = 0x8ebc6af09c88c6e3ull, wyp3 = 0x589965cc75374cc3ull;
-
-// wyhash (https://github.com/wangyi-fudan/wyhash)
 u64 hash_bytes(void* data, u64 size, u64 seed) {
 	u8* p = (u8*)data;
 	seed ^= wymix(seed ^ wyp0, wyp1);
@@ -118,7 +98,7 @@ u64 hash_bytes(void* data, u64 size, u64 seed) {
 				see2 = wymix(wyr8(p + 32) ^ wyp3, wyr8(p + 40) ^ see2);
 				p += 48;
 				i -= 48;
-			} while(i > 48);
+			}while(i > 48);
 			seed ^= see1 ^ see2;
 		}
 		while(i > 16) {
@@ -135,24 +115,46 @@ u64 hash_bytes(void* data, u64 size, u64 seed) {
 	return wymix((u64)r ^ wyp0 ^ size, (u64)(r >> 64) ^ wyp1);
 }
 
-u64 hash(u64 x, u64 seed) { return squirrel3(x + seed); }
+u64 hash(u64 x, u64 seed) { return splitmix64(x + seed); }
 u64 hash(String x, u64 seed) { return hash_bytes(x.str, x.size, seed); }
 
 ////////////////////////////////////////////////////////////////////////
 // Random
 
-u64 rand_u64()																														{ return squirrel3(++_seed); }
+u32 xorshift32(u32 x) {
+	x ^= x << 13;
+	x ^= x >> 17;
+	x ^= x << 5;
+	return x;
+}
+
+u64 xorshift64(u64 x) {
+	x ^= x << 13;
+	x ^= x >> 7;
+	x ^= x << 17;
+	return x;
+}
+
+u64 wyrand(u64 *seed){
+	*seed += 0xa0761d6478bd642full;
+	__uint128_t t = (__uint128_t)(*seed ^ 0xe7037ed1a0b428dbull) * (*seed);
+	return (t >> 64) ^ t;
+}
+
+u64 rand_u64()																														{ return wyrand(&_seed); }
 u32 rand_u32()                              { return rand_u64(); }
+u32 rand_u32(u32 max)                       { return rand_u64() % max; }
 u32 rand_u32(u32 min, u32 max)              { return (rand_u32() % (max - min)) + min; }
 i32 rand_i32()                              { return rand_u32(); }
-i32 rand_i32(i32 min, i32 max)              { return (i32)(rand_u32() % (u32)(max - min)) + min; }
-f32 rand_f32_01()                           { return rand_u32() / (f32)U32_MAX; }
-f32 rand_f32_11()                           { return rand_f32_01()*2.f - 1.f; }
-f32 rand_f32()                              { return rand_f32_01()*2*U16_MAX - U16_MAX; }
-f32 rand_f32(f32 min, f32 max)          				{ return rand_f32_01()*(max - min) + min ; }
+i32 rand_i32(i32 max)                       { return rand_u32() % max; }
+i32 rand_i32(i32 min, i32 max)              { return i32(rand_u32() % (max - min)) + min; }
+f32 rand_f32() 																										   { return rand_u64() * 0x1.0p-24f; }
+f32 rand_f32_11()                           { return rand_f32() * 2.0f - 1.0f; }
+f32 rand_f32(f32 max)																							{ return rand_f32() * max; }
+f32 rand_f32(f32 min, f32 max)          				{ return rand_f32() * (max - min) + min ; }
 f32 rand_f32_centered(f32 base, f32 radius) { return rand_f32(base-radius, base+radius); }
 f32 rand_f32_signed(f32 magnitude)          { return rand_f32(-magnitude, magnitude); }
-b32 rand_b32()                              { return rand_u32() % 2; }
+b32 rand_b32()                              { return rand_u64() & 1; }
 void rand_set_seed(u64 seed)                { _seed = seed; }
 u32 rand_get_seed()                         { return _seed; }
 
@@ -1202,6 +1204,15 @@ v4 operator*(m4x4 mat, v4 v) {
 	return res;
 }
 
+v3 operator*(m4x4 mat, v3 v) {
+	v3 res = {
+		mat.v[0][0]*v.x + mat.v[0][1]*v.y + mat.v[0][2]*v.z + mat.v[0][3],
+		mat.v[1][0]*v.x + mat.v[1][1]*v.y + mat.v[1][2]*v.z + mat.v[1][3],
+		mat.v[2][0]*v.x + mat.v[2][1]*v.y + mat.v[2][2]*v.z + mat.v[2][3],
+	};
+	return res;
+}
+
 m4x4 m4x4_identity() {
 	m4x4 res = {
 		1,0,0,0,
@@ -1557,21 +1568,23 @@ f32 rng1_align_center(Rng1 r, f32 size) 		{ return r.min + (rng1_dim(r) - size) 
 f32 rng2u_width(Rng2u r) { return r.x1 - r.x0; }
 f32 rng2u_height(Rng2u r) { return r.y1 - r.y0; }
 
-Rng2 rng2_shift(Rng2 r, v2 x)       { return Rng2(r.min + x, r.max + x); }
-Rng2 rng2_pad(Rng2 r, f32 x)        { return Rng2(r.min - v2(x), r.max + v2(x)); }
-Rng2 rng2_pad(Rng2 r, v2 x)									{ return Rng2(r.min - x, r.max + x); }
-v2 rng2_center(Rng2 r)              { return v2((r.min + r.max)/2); }
-b32 rng2_contains(Rng2 r, v2 x)     { return (r.min.x <= x.x && x.x < r.max.x && r.min.y <= x.y && x.y < r.max.y); }
-v2 rng2_dim(Rng2 r)                 { return v2(r.max.x - r.min.x, r.max.y - r.min.y); }
-f32 rng2_width(Rng2 r)              { return r.x1 - r.x0; }
-f32 rng2_height(Rng2 r)             { return r.y1 - r.y0; }
-Rng2 rng2_union(Rng2 a, Rng2 b)     { return Rng2(v2(Min(a.min.x, b.min.x), Min(a.min.y, b.min.y)), v2(Max(a.max.x, b.max.x), Max(a.max.y, b.max.y))); }
-Rng2 rng2_intersect(Rng2 a, Rng2 b) { return Rng2(v2(Max(a.min.x, b.min.x), Max(a.min.y, b.min.y)), v2(Min(a.max.x, b.max.x), Min(a.max.y, b.max.y))); }
-b32 rng2_overlaps(Rng2 a, Rng2 b)   { return (a.min.x < b.max.x && b.min.x < a.max.x) && (a.min.y < b.max.y && b.min.y < a.max.y); }
-v2 rng2_clamp(Rng2 r, v2 x)         { return v2(Clamp(r.min.x, x.x, r.max.x), Clamp(r.min.y, x.y, r.max.y)); }
-Rng1 rng2_rng_x(Rng2 r)													{ return Rng1(r.min.x,r.max.x); }
-Rng1 rng2_rng_y(Rng2 r)													{ return Rng1(r.min.y,r.max.y); }
-v2 rng2_bottom_left(Rng2 r)									{ return r.min + v2(0, rng2_dim(r).y); }
+f32 rng2_width(Rng2 r)                 { return r.x1 - r.x0; }
+f32 rng2_height(Rng2 r)                { return r.y1 - r.y0; }
+v2 rng2_top_right(Rng2 r)														{ return r.min + v2(rng2_width(r), 0); }
+v2 rng2_bottom_left(Rng2 r)									   { return r.min + v2(0, rng2_height(r)); }
+
+Rng2 rng2_shift(Rng2 r, v2 x)          { return Rng2(r.min + x, r.max + x); }
+Rng2 rng2_pad(Rng2 r, f32 x)           { return Rng2(r.min - v2(x), r.max + v2(x)); }
+Rng2 rng2_pad(Rng2 r, v2 x)									   { return Rng2(r.min - x, r.max + x); }
+v2 rng2_center(Rng2 r)                 { return v2((r.min + r.max)/2); }
+b32 rng2_contains(Rng2 r, v2 x)        { return (r.min.x <= x.x && x.x < r.max.x && r.min.y <= x.y && x.y < r.max.y); }
+v2 rng2_dim(Rng2 r)                    { return v2(r.max.x - r.min.x, r.max.y - r.min.y); }
+Rng2 rng2_union(Rng2 a, Rng2 b)        { return Rng2(v2(Min(a.min.x, b.min.x), Min(a.min.y, b.min.y)), v2(Max(a.max.x, b.max.x), Max(a.max.y, b.max.y))); }
+Rng2 rng2_intersection(Rng2 a, Rng2 b) { return Rng2(v2(Max(a.min.x, b.min.x), Max(a.min.y, b.min.y)), v2(Min(a.max.x, b.max.x), Min(a.max.y, b.max.y))); }
+b32 rng2_intersect(Rng2 a, Rng2 b)     { return (a.min.x < b.max.x && b.min.x < a.max.x) && (a.min.y < b.max.y && b.min.y < a.max.y); }
+v2 rng2_clamp(Rng2 r, v2 x)            { return v2(Clamp(r.min.x, x.x, r.max.x), Clamp(r.min.y, x.y, r.max.y)); }
+Rng1 rng2_rng_x(Rng2 r)													   { return Rng1(r.min.x,r.max.x); }
+Rng1 rng2_rng_y(Rng2 r)													   { return Rng1(r.min.y,r.max.y); }
 
 Rng2 rng2_lerp(Rng2 a, f32 t, Rng2 b) { return Rng2(v2_lerp(a.min, t, b.min), v2_lerp(a.max, t, b.max)); }
 v2 rng2_remap(v2 p, Rng2 from, Rng2 to) {

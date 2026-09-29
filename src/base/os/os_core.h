@@ -48,9 +48,9 @@ enum {
 
 typedef u32 OS_WatchFlags;
 enum {
-	OS_WatchFlag_Create = 0<<0,
-	OS_WatchFlag_Delete = 0<<1,
-	OS_WatchFlag_Modify = 0<<2,
+	OS_WatchFlag_Create = 1<<0,
+	OS_WatchFlag_Delete = 1<<1,
+	OS_WatchFlag_Modify = 1<<2,
 };
 
 struct OS_Watch{

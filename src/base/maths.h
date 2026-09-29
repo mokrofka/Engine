@@ -121,10 +121,6 @@ struct m3x3 { f32 v[3][3]; };
 struct m4x3 { f32 v[3][4]; };
 struct m4x4 { f32 v[4][4]; };
 
-// typedef mat4 m4x4;
-// typedef mat3 m3x3;
-// typedef mat2x2 m2x2;
-
 ////////////////////////////////////////////////////////////////////////
 // Ranges
 
@@ -242,9 +238,8 @@ u32 u32_from_rgba(v4 rgba);
 
 ////////////////////////////////////////////////////////////////////////
 // Hash
-#define HASH_DEFAULT_SEED 0x9E3779B97F4A7C15ull
+#define HASH_DEFAULT_SEED 0x9e3779b97f4a7c15ull
 
-u64 squirrel3(u64 x);
 u32 xorshift32(u32 x);
 
 u64 hash(u64 x, u64 seed = HASH_DEFAULT_SEED);
@@ -255,12 +250,14 @@ u64 hash_bytes(void *data, u64 size, u64 seed = HASH_DEFAULT_SEED);
 // Random
 NO_DEBUG u64 rand_u64();
 NO_DEBUG u32 rand_u32();
+NO_DEBUG u32 rand_u32(u32 max);
 NO_DEBUG u32 rand_u32(u32 min, u32 max);
 NO_DEBUG i32 rand_i32();
+NO_DEBUG i32 rand_i32(i32 max);
 NO_DEBUG i32 rand_i32(i32 min, i32 max);
-NO_DEBUG f32 rand_f32_01();
-NO_DEBUG f32 rand_f32_11();
 NO_DEBUG f32 rand_f32();
+NO_DEBUG f32 rand_f32_11();
+NO_DEBUG f32 rand_f32(f32 max);
 NO_DEBUG f32 rand_f32(f32 min, f32 max);
 NO_DEBUG f32 rand_f32_centered(f32 base, f32 radius);
 NO_DEBUG f32 rand_f32_signed(f32 magnitude);
@@ -585,6 +582,7 @@ v3 m4x4_left(m4x4 matrix);
 m4x4 operator*(m4x4 a, m4x4 b);
 m4x4& operator*=(m4x4& a, m4x4 b);
 v4 operator*(m4x4 mat, v4 v);
+v3 operator*(m4x4 mat, v3 v);
 
 m4x4 m4x4_identity();
 m4x4 m4x4_translate(v3 pos);
@@ -667,21 +665,23 @@ f32 rng1_align_center(Rng1 r, f32 size);
 f32 rng2u_width(Rng2u r);
 f32 rng2u_height(Rng2u r);
 
+f32 rng2_width(Rng2 r);
+f32 rng2_height(Rng2 r);
+v2 rng2_top_right(Rng2 r);
+v2 rng2_bottom_left(Rng2 r);
+
 Rng2 rng2_shift(Rng2 r, v2 x);
 Rng2 rng2_pad(Rng2 r, f32 x);
 Rng2 rng2_pad(Rng2 r, v2 x);
 v2 rng2_center(Rng2 r);
 b32 rng2_contains(Rng2 r, v2 x);
 v2 rng2_dim(Rng2 r);
-f32 rng2_width(Rng2 r);
-f32 rng2_height(Rng2 r);
 Rng2 rng2_union(Rng2 a, Rng2 b);
-Rng2 rng2_intersect(Rng2 a, Rng2 b);
-b32 rng2_overlaps(Rng2 a, Rng2 b);
+Rng2 rng2_intersection(Rng2 a, Rng2 b);
+b32 rng2_intersect(Rng2 a, Rng2 b);
 v2 rng2_clamp(Rng2 r, v2 x);
 Rng1 rng2_rng_x(Rng2 r);
 Rng1 rng2_rng_y(Rng2 r);
-v2 rng2_bottom_left(Rng2 r);
 
 Rng2 rng2_lerp(Rng2 a, f32 t, Rng2 b);
 v2 rng2_remap(v2 p, Rng2 from, Rng2 to);

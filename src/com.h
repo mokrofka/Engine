@@ -19,7 +19,6 @@
 // thread safe allocator
 // glb loader
 // obj mouse selection
-// memory
 
 #define MESH_LIST \
 	X(Cube) \
@@ -658,7 +657,6 @@ void ui_layout_positions(UI_Box* box);
 
 void ui_build_draw_cmds(UI_Box* box);
 
-f32 ui_animate_towards(f32 current, f32 target, f32 dt, f32 rate_per_sec);
 UI_Signal ui_signal_from_box(UI_Box* box);
 
 UI_Signal ui_label(String string);
