@@ -287,6 +287,7 @@ struct R_State {
 };
 
 R_DrawBatch r_make_draw_batch(Allocator alloc, Gfx_Pipeline pip);
+
 R_Attachment r_make_attachment(R_AttachmentDesc desc);
 void r_destroy_attachment(R_Attachment attachment);
 void r_recreate_attachment(R_Attachment* attachment, v2u size);

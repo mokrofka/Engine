@@ -1,11 +1,11 @@
 #pragma once
 #include "types.h"
 
-struct Gfx_Image {u32 idx; u32 gen;};
-struct Gfx_Sampler {u32 idx; u32 gen;};
-struct Gfx_Shader {u32 idx; u32 gen;};
-struct Gfx_Pipeline {u32 idx; u32 gen;};
-struct Gfx_View {u32 idx; u32 gen;};
+MakeId(Gfx_Image);
+MakeId(Gfx_Sampler);
+MakeId(Gfx_Shader);
+MakeId(Gfx_Pipeline);
+MakeId(Gfx_View);
 
 enum {
 	Gfx_NumFramesInFlight = 3,
@@ -700,6 +700,7 @@ struct Gfx_State {
 	VK_Memory gpu_mem;
 	VK_Memory cpu_mem;
 	u64 images_mem_usage;
+	u64 target_images_mem_usage;
 	VK_DescriptorWriter descriptor_writer;
 
 	VK_Buffer gpu_buf;

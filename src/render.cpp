@@ -34,8 +34,8 @@ R_Attachment r_make_attachment(R_AttachmentDesc desc) {
 }
 void r_destroy_attachment(R_Attachment attachment) {
 	Loop(i, st->gfx.images_in_flight) {
-		gfx_destroy_image(attachment.images[i]);
 		gfx_destroy_view(attachment.views[i]);
+		gfx_destroy_image(attachment.images[i]);
 	}
 }
 void r_recreate_attachment(R_Attachment* attachment, v2u size) {
@@ -369,7 +369,7 @@ R_FontId r_make_font(R_FontDesc desc) {
 		u32 dim = sqrt(pixels_size);
 		u32 width = round_up(dim, font_height);
 		u32 height = round_up(dim, font_height);
-		u8* pixels = push_buffer(g.arena, width*height);
+		u8* pixels = push_buffer(scratch, width*height);
 		stbtt_BakeFontBitmap(data.data, 0, font_height, pixels, width, height, 32, 96, characters_info);
 		R_TextureId texture_id = r_make_texture({.width = width, .height = height, .data = pixels, .pixel_format = Gfx_PixelFormat_R8});
 		R_Font font = {.font_height = font_height, .texture = texture_id};
@@ -572,8 +572,8 @@ void r_shaders_compile(Allocator arena) {
 	Loop(i, files.count) {
 		File& f = files[i];
 		var arr = array_make<String>(scratch);
-		// String args[] = {S("slangc"), f.file_path, S("-target"), S("spirv"), S("-O0"), S("-g3"), S("-o"), f.compiled_file_path};
-		String args[] = {S("slangc"), f.file_path, S("-target"), S("spirv"), S("-o"), f.compiled_file_path};
+		String args[] = {S("slangc"), f.file_path, S("-target"), S("spirv"), S("-O0"), S("-g3"), S("-o"), f.compiled_file_path};
+		// String args[] = {S("slangc"), f.file_path, S("-target"), S("spirv"), S("-o"), f.compiled_file_path};
 		array_push_elems(arr, slice(args));
 		g.shader_module_compilation_pids[i] = os_process_make(slice(arr));
 		Debug("%s", f.file_path);
@@ -716,7 +716,7 @@ void r_init() {
 			},
 			{
 				.binding = Bindings::SoftwareRender,
-				.size = (Scope(v2u size = os_screen_size(); size.x * size.y * sizeof(u32);)),
+				.size = os_screen_size().x * os_screen_size().y * sizeof(u32),
 				.out_cpu_ptr = (void**)&g.gpu_software_render,
 			},
 			{
@@ -1036,7 +1036,11 @@ void r_end() {
 		};
 		vk_push_constants({drawcall_count++});
 		gfx_draw(0, 3);
-		// gfx_bind_pipeline(g.software_render_pip);
+		// g.gpu_drawcalls[drawcall_count] = {
+		// 	.type = ShaderType::SoftwareRender,
+		// 	.cur_resolve_idx = g.world_rt.resolve.views[st->gfx.current_image_idx].idx,
+		// };
+		// vk_push_constants({drawcall_count++});
 		// gfx_draw(0, 3);
 		imgui_end_frame();
 	}

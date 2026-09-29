@@ -69,13 +69,12 @@ AllocatorInfo* mem_track_make(Allocator parent_alloc, AllocatorType type, String
 
 	LockScope(mem_track.mutex);
 	if(parent) {
-		dll_list_push_back(parent, info);
+		dll_push_back(parent->first, parent->last, info);
 		parent->child_count++;
 	} else {
-		dll_list_push_back(&mem_track.roots, info);
+		dll_push_back(mem_track.roots.first, mem_track.roots.last, info);
 		mem_track.roots.count++;
 	}
-
 	return info;
 }
 
@@ -83,10 +82,10 @@ void mem_track_destroy(AllocatorInfo* info) {
 	if(info) {
 		LockScope(mem_track.mutex);
 		if(info->parent) {
-			dll_list_remove(info->parent, info);
+			dll_remove(info->parent->first, info->parent->last, info);
 			info->parent->child_count--;
 		} else {
-			dll_list_remove(&mem_track.roots, info);
+			dll_remove(mem_track.roots.first, mem_track.roots.last, info);
 			mem_track.roots.count--;
 		}
 	}

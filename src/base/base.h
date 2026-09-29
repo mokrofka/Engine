@@ -114,10 +114,10 @@ typedef __builtin_va_list VaList;
 #define local_persist  static
 #define GlobalVar
 
-#define U8_MAX  0xFF
-#define U16_MAX 0xFFFF
-#define U32_MAX 0xFFFFFFFF
-#define U64_MAX 0xFFFFFFFFFFFFFFFF
+#define U8_MAX  0xff
+#define U16_MAX 0xffff
+#define U32_MAX 0xffffffff
+#define U64_MAX 0xffffffffffffffff
 #define F32_MAX __FLT_MAX__
 #define F64_MAX __DBL_MAX__
 #define PAGE_SIZE 4096
@@ -202,11 +202,11 @@ b32 flag_any(u64 x, u64 f);
 
 #define Max(a, b)              ((a) > (b) ? (a) : (b))
 #define Min(a, b)              ((a) < (b) ? (a) : (b))
-#define Max3(a, b, c)          (Max(Max((a),(b)), (c)))
-#define Min3(a, b, c)          (Min(Min((a),(b)), (c)))
-#define ClampTop(x, a)         (Min((x), (a)))
-#define ClampBot(x, a)         (Max((x), (a)))
-#define Clamp(a, x, b)         Min(Max(a, x), b)
+#define Max3(a, b, c)          Max(Max((a),(b)), (c))
+#define Min3(a, b, c)          Min(Min((a),(b)), (c))
+#define ClampTop(x, a)         Min((x), (a))
+#define ClampBot(x, a)         Max((x), (a))
+#define Clamp(a, x, b)         ((x) < (a) ? (a) : (x) > (b) ? (b) : x)
 #define Clamp01(x)             Clamp(0, (x), 1)
 #define Clamp11(x)             Clamp(-1, (x), 1)
 #define ReverseClamp(a, x, b)  (((x) < (a)) ? (b) : ((b) < (x)) ? (a) : (x))
@@ -215,6 +215,18 @@ b32 flag_any(u64 x, u64 f);
 #define Sign(x)                (((x) < 0) ? -1 : ((x) > 0) ? 1 : 0)
 #define Abs(x)                 (((x) < 0) ? -(x) : (x))
 #define InRange(a, x, b)							((a) <= (x) && (x) < (b))
+#define IsBetween(a, x, b)					((a) <= (x) && (x) <= (b))
+
+inline u32 foo1() {
+	u32 a = 1;
+	u32 b = 1;
+	#define tm_or(a, b) ((a) ?: (b))
+	#define tm_clamp(lo, x, hi) ((x) < (lo) ? (lo) : (x) > (hi) ? (hi) : x)
+
+	return tm_or(a, b);
+	Clamp(5, a, 10);
+	tm_clamp(5, a, 10);
+}
 
 u64 mod_pow2(u64 x, u64 b);
 u64 div_pow2(u64 x, u64 b);
@@ -306,58 +318,91 @@ void DebugTrap();
 #define atomic_xor_explicit(x, v, order)    __atomic_fetch_xor((x), (v), (order))
 #define atomic_swap_explicit(x, v, order)   __atomic_exchange_n((x), (v), (order))
 #define atomic_cmp_swap_explicit(x, expect, v, success_order, failure_order) __atomic_compare_exchange_n((x), (expect), (v), 0, (success_order), (failure_order))
+#define atomic_cmp_swap_weak_explicit(x, expect, v, success_order, failure_order) __atomic_compare_exchange_n((x), (expect), (v), 1, (success_order), (failure_order))
 
-#define atomic_inc(x)      __atomic_fetch_add((x), 1, AtomicSeqCst)
-#define atomic_dec(x)      __atomic_fetch_sub((x), 1, AtomicSeqCst)
-#define atomic_add(x, v)   __atomic_fetch_add((x), (v), AtomicSeqCst)
-#define atomic_sub(x, v)   __atomic_fetch_sub((x), (v), AtomicSeqCst)
-#define atomic_load(x)     __atomic_load_n((x), AtomicSeqCst)
-#define atomic_store(x, v) __atomic_store_n((x), (v), AtomicSeqCst)
-#define atomic_or(x, v)    __atomic_fetch_or((x), (v), AtomicSeqCst)
-#define atomic_and(x, v)   __atomic_fetch_and((x), (v), AtomicSeqCst)
-#define atomic_nand(x, v)  __atomic_fetch_nand((x), (v), AtomicSeqCst)
-#define atomic_xor(x, v)   __atomic_fetch_xor((x), (v), AtomicSeqCst)
-#define atomic_swap(x, v)  __atomic_exchange_n((x), (v), AtomicSeqCst)
-#define atomic_cmp_swap(x, expect, v) __atomic_compare_exchange_n((x), (expect), (v), 0, (AtomicSeqCst), (AtomicSeqCst))
+#define atomic_inc(x)      atomic_inc_explicit((x), AtomicSeqCst)
+#define atomic_dec(x)      atomic_dec_explicit((x), AtomicSeqCst)
+#define atomic_add(x, v)   atomic_add_explicit((x), (v), AtomicSeqCst)
+#define atomic_sub(x, v)   atomic_sub_explicit((x), (v), AtomicSeqCst)
+#define atomic_load(x)     atomic_load_explicit((x), AtomicSeqCst)
+#define atomic_store(x, v) atomic_store_explicit((x), (v), AtomicSeqCst)
+#define atomic_or(x, v)    atomic_or_explicit((x), (v), AtomicSeqCst)
+#define atomic_and(x, v)   atomic_and_explicit((x), (v), AtomicSeqCst)
+#define atomic_nand(x, v)  atomic_nand_explicit((x), (v), AtomicSeqCst)
+#define atomic_xor(x, v)   atomic_xor_explicit((x), (v), AtomicSeqCst)
+#define atomic_swap(x, v)  atomic_swap_explicit((x), (v), AtomicSeqCst)
+#define atomic_cmp_swap(x, expect, v) atomic_cmp_swap_explicit((x), (expect), (v), (AtomicSeqCst), (AtomicSeqCst))
+#define atomic_cmp_swap_weak(x, expect, v) atomic_cmp_swap_weak_explicit((x), (expect), (v), (AtomicSeqCst), (AtomicSeqCst))
 
 inline b32 atomic_cmp_set(u32* x, u32 expect, u32 v) { return atomic_cmp_swap(x, &expect, v); }
 inline u32 atomic_cmp_swap_old(u32* x, u32 expect, u32 v) { u32 res = expect; atomic_cmp_swap(x, &res, v); return res; }
 
+
+////////////////////////////////////////////////////////////////////////
+// Circular Linked List
+#define DLL_list_init(a, n, next, prev) \
+	(a[n].next = n,                       \
+		a[n].prev = n)
+
+#define DLL_list_push(a, first, n, next, prev) \
+	a[n].next = first;                           \
+	a[n].prev = a[first].prev;                   \
+	a[a[first].prev].next = n;                   \
+	a[first].prev = n;
+
+#define DLL_list_insert(a, first, n, next, prev) \
+	a[n].next = a[first].next;                     \
+	a[n].prev = first;                             \
+	a[a[first].next].prev = n;                     \
+	a[first].next = n;
+
+#define DLL_list_remove(a, n, next, prev) \
+	a[a[n].next].prev = a[n].prev;          \
+	a[a[n].prev].next = a[n].next;
+
+#define dll_list_init(a, x) DLL_list_init(a, x, next, prev)
+#define dll_list_push(a, first, n) DLL_list_push(a, first, n, next, prev)
+#define dll_list_insert(a, first, n) DLL_list_insert(a, first, n, next, prev)
+#define dll_list_remove(a, n)	DLL_list_remove(a, n, next, prev)
+
+#define PDLL_list_init(first, next, prev) \
+	(first)->next = first;                  \
+	(first)->prev = first;
+
+#define PDLL_list_push(first, n, next, prev) \
+	(n)->next = (first);                       \
+	(n)->prev = (first)->prev;                 \
+	(first)->prev->next = n;                   \
+	(first)->prev = n;
+
+#define PDLL_list_insert(first, n, next, prev) \
+	(n)->next = (first)->next;                    \
+	(n)->prev = first;                            \
+	(first)->next->prev = n;                      \
+	(first)->next = n;
+
+#define PDLL_list_remove(n, next, prev) \
+	(n)->next->prev = (n)->prev;          \
+	(n)->prev->next = (n)->next;
+
+#define pdll_list_init(first) PDLL_list_init(first, next, prev)
+#define pdll_list_push(first, n) PDLL_list_push(first, n, next, prev)
+#define pdll_list_insert(first, n) PDLL_list_insert(first, n, next, prev)
+#define pdll_list_remove(n)	PDLL_list_remove(n, next, prev)
+
 ////////////////////////////////////////////////////////////////////////
 // Doulby Linked List
-#define DLL_push_back(first, last, n, next, prev)     \
+#define DLL_push_back(first, last, n, next, prev)    \
 	((n)->prev = (last),                                \
 	 (n)->next = null,                                  \
 	 ((last) ? ((last)->next = (n)) : ((first) = (n))), \
 	 (last) = (n))
 
-#define DLL_push_front(first, last, n, next, prev)     \
-	((n)->next = (first),                                \
-	 (n)->prev = null,                                   \
-	 ((first) ? ((first)->prev = (n)) : ((last) = (n))), \
-	 (first) = (n))
-
 #define DLL_remove(first, last, n, next, prev) \
-	(((n)->prev ? ((n)->prev->next = (n)->next)  \
-													: ((first) = (n)->next)),        \
-		((n)->next ? ((n)->next->prev = (n)->prev)  \
+	(((n)->prev ? ((n)->prev->next = (n)->next)   \
+													: ((first) = (n)->next)),         \
+		((n)->next ? ((n)->next->prev = (n)->prev)   \
 													: ((last) = (n)->prev)))
-
-#define DLL_pop_back(first, last, n, next, prev)  \
-	(((n) = (last)),                                \
-			((n) ? (                                      \
-					((last) = (n)->prev),                       \
-					((last) ? ((last)->next = null)             \
-													: ((first) = null))                 \
-			) : 0))
-
-#define DLL_pop_front(first, last, n, next, prev) \
-	(((n) = (first)),                               \
-			((n) ? (                                      \
-					((first) = (n)->next),                      \
-					((first) ? ((first)->prev = null)           \
-														: ((last) = null))                 \
-			) : 0))
 
 ////////////////////////////////////////////////////////////////////////
 // Singly Linked List
@@ -377,95 +422,28 @@ inline u32 atomic_cmp_swap_old(u32* x, u32 expect, u32 v) { u32 res = expect; at
 																						: ((first) = (first)->next))
 
 #define dll_push_back(first, last, n)  DLL_push_back(first, last, n, next, prev)
-#define dll_push_front(first, last, n) DLL_push_front(first, last, n, next, prev)
 #define dll_remove(first, last, n)     DLL_remove(first, last, n, next, prev)
-#define dll_pop_back(first, last, n)   DLL_pop_back(first, last, n, next, prev)
-#define dll_pop_front(first, last, n)  DLL_pop_front(first, last, n, next, prev)
-
-#define dll_list_push_back(list, n)  DLL_push_back((list)->first, (list)->last, n, next, prev)
-#define dll_list_push_front(list, n) DLL_push_front((list)->first, (list)->last, n, next, prev)
-#define dll_list_remove(list, n)     DLL_remove((list)->first, (list)->last, n, next, prev)
-#define dll_list_pop_back(list, n)   DLL_pop_back((list)->first, (list)->last, n, next, prev)
-#define dll_list_pop_front(list, n)  DLL_pop_front((list)->first, (list)->last, n, next, prev)
-
 #define sll_stack_push(first, n)       SLL_stack_push(first, n, next)
 #define sll_stack_pop(first)           SLL_stack_pop(first, next)
 #define sll_queue_push(first, last, n) SLL_queue_push(first, last, n, next)
 #define sll_queue_pop(first, lsat, n)  SLL_queue_pop(first, last, next)
 
-#define sll_list_queue_push(list, n) SLL_queue_push(list.first, list.last, n, next)
-#define sll_list_queue_pop(list)     SLL_queue_pop(list.first, list.last, next)
-
 ////////////////////////////////////////////////////////////////////////
 // Indexed Doubly Linked List
-#define IDLL_push_back(arr, first, last, n, next, prev)   \
-		((arr)[n].prev = (last),                                \
-			(arr)[n].next = 0,                                     \
-			((last) ? ((arr)[last].next = (n)) : ((first) = (n))), \
-			(last) = (n))
+#define IDLL_push_back(arr, first, last, n, next, prev)  \
+	((arr)[n].prev = (last),                                \
+		(arr)[n].next = 0,                                     \
+		((last) ? ((arr)[last].next = (n)) : ((first) = (n))), \
+		(last) = (n))
 
-#define IDLL_push_front(arr, first, last, n, next, prev)   \
-		((arr)[n].next = (first),                                \
-			(arr)[n].prev = 0,                                      \
-			((first) ? ((arr)[first].prev = (n)) : ((last) = (n))), \
-			(first) = (n))
-
-#define IDLL_remove(arr, first, last, n, next, prev)            \
-		(((arr)[n].prev ? ((arr)[(arr)[n].prev].next = (arr)[n].next) \
-																		: ((first) = (arr)[n].next)),                 \
-			((arr)[n].next ? ((arr)[(arr)[n].next].prev = (arr)[n].prev) \
-																		: ((last) = (arr)[n].prev)))
-
-#define IDLL_pop_back(arr, first, last, n, next, prev)  \
-		(((n) = (last)),                                      \
-				((n) ? (                                            \
-						((last) = (arr)[n].prev),                         \
-						((last) ? ((arr)[last].next = 0) : ((first) = 0)) \
-				) : 0))
-
-#define IDLL_pop_front(arr, first, last, n, next, prev)  \
-		(((n) = (first)),                                      \
-				((n) ? (                                             \
-						((first) = (arr)[n].next),                         \
-						((first) ? ((arr)[first].prev = 0) : ((last) = 0)) \
-				) : 0))
-
-////////////////////////////////////////////////////////////////////////
-// Indexed Singly Linked List
-#define ISLL_stack_push(arr, first, n, next) \
-		((arr)[n].next = (first), (first) = (n))
-
-#define ISLL_stack_pop(arr, first, next) \
-		((first) = (arr)[first].next)
-
-#define ISLL_queue_push(arr, first, last, n, next)        \
-		((arr)[n].next = 0,                                     \
-			((last) ? ((arr)[last].next = (n)) : ((first) = (n))), \
-			(last) = (n))
-
-#define ISLL_queue_pop(arr, first, last, next) \
-		(((first) == (last)) ? ((first) = (last) = 0)      \
-																							: ((first) = (arr)[first].next))
+#define IDLL_remove(arr, first, last, n, next, prev)           \
+	(((arr)[n].prev ? ((arr)[(arr)[n].prev].next = (arr)[n].next) \
+																	: ((first) = (arr)[n].next)),                 \
+		((arr)[n].next ? ((arr)[(arr)[n].next].prev = (arr)[n].prev) \
+																	: ((last) = (arr)[n].prev)))
 
 #define idll_push_back(arr, first, last, n)  IDLL_push_back(arr, first, last, n, next, prev)
-#define idll_push_front(arr, first, last, n) IDLL_push_front(arr, first, last, n, next, prev)
 #define idll_remove(arr, first, last, n)     IDLL_remove(arr, first, last, n, next, prev)
-#define idll_pop_back(arr, first, last, n)   IDLL_pop_back(arr, first, last, n, next, prev)
-#define idll_pop_front(arr, first, last, n)  IDLL_pop_front(arr, first, last, n, next, prev)
-
-#define idll_list_push_back(arr, list, n)  IDLL_push_back(arr, list.first, list.last, n, next, prev)
-#define idll_list_push_front(arr, list, n) IDLL_push_front(arr, list.first, list.last, n, next, prev)
-#define idll_list_remove(arr, list, n)     IDLL_remove(arr, list.first, list.last, n, next, prev)
-#define idll_list_pop_back(arr, list, n)   IDLL_pop_back(arr, list.first, list.last, n, next, prev)
-#define idll_list_pop_front(arr, list, n)  IDLL_pop_front(arr, list.first, list.last, n, next, prev)
-
-#define isll_stack_push(arr, first, n)       ISLL_stack_push(arr, first, n, next)
-#define isll_stack_pop(arr, first)           ISLL_stack_pop(arr, first, next)
-#define isll_queue_push(arr, first, last, n) ISLL_queue_push(arr, first, last, n, next)
-#define isll_queue_pop(arr, first, last)     ISLL_queue_pop(arr, first, last, next)
-
-#define isll_list_queue_push(arr, list, n)   ISLL_queue_push(arr, list.first, list.last, n, next)
-#define isll_list_queue_pop(arr, list)       ISLL_queue_pop(arr, list.first, list.last, next)
 
 ////////////////////////////////////////////////////////////////////////
 // Handler Linked List
@@ -483,9 +461,6 @@ inline u32 atomic_cmp_swap_old(u32* x, u32 expect, u32 v) { u32 res = expect; at
 
 #define hdll_push_back(arr, first, last, n)  HDLL_push_back(arr, first, last, n, next, prev)
 #define hdll_remove(arr, first, last, n)     HDLL_remove(arr, first, last, n, next, prev)
-
-#define hdll_list_push_back(arr, list, n)  HDLL_push_back(arr, list.first, list.last, n, next, prev)
-#define hdll_list_remove(arr, list, n)     HDLL_remove(arr, list.first, list.last, n, next, prev)
 
 ////////////////////////////////////////////////////////////////////////
 // Defer
@@ -578,6 +553,7 @@ const u32 DEFAULT_CAPACITY = 8;
 const u32 DEFAULT_RESIZE_FACTOR = 2;
 
 #define Introspect
+#define MakeId(T) struct T {u32 idx : 24; u32 gen : 8;}
 
 struct BitArrayD {
 	u64* words;

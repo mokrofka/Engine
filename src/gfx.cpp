@@ -1900,7 +1900,11 @@ Gfx_Image gfx_make_image(Gfx_ImageDesc desc) {
 	VK_CHECK(g.CreateImage(vkdevice, &image_info, g.allocator, &image.h));
 	VkMemoryRequirements requirements;
 	g.GetImageMemoryRequirements(vkdevice, image.h, &requirements);
-	g.images_mem_usage += requirements.size;
+	if(flag_any(desc.usage, Gfx_ImageUsage_ColorAttachment | Gfx_ImageUsage_ResolveAttachment | Gfx_ImageUsage_DepthStencilAttachment)) {
+		g.target_images_mem_usage += requirements.size;
+	} else {
+		g.images_mem_usage += requirements.size;
+	}
 	image.mem_size = requirements.size;
 
 	VkMemoryAllocateInfo alloc_info = {
@@ -2368,7 +2372,11 @@ void gfx_destroy_image(Gfx_Image img) {
 	Gfx_State& g = st->gfx;
 	var& vkimg = pool_get(g.images, img);
 	g.DestroyImage(vkdevice, vkimg.h, g.allocator);
-	g.images_mem_usage -= vkimg.mem_size;
+	if(flag_any(vkimg.usage, Gfx_ImageUsage_ColorAttachment | Gfx_ImageUsage_ResolveAttachment | Gfx_ImageUsage_DepthStencilAttachment)) {
+		g.target_images_mem_usage -= vkimg.mem_size;
+	} else {
+		g.images_mem_usage -= vkimg.mem_size;
+	}
 	pool_remove(g.images, img);
 }
 

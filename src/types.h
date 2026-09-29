@@ -21,13 +21,13 @@ struct _ImGuiPushClipRect {
 };
 #define ImGuiPushClipRect2(rect) _ImGuiPushClipRect Glue(_Clip, __LINE__)(rect)
 
-struct OpaqueId {u32 idx; u32 gen;};
-struct ThingId {u32 idx; u32 gen;};
-struct R_TextureId {u32 idx; u32 gen;};
-struct R_MeshId {u32 idx; u32 gen;};
-struct R_MaterialId {u32 idx; u32 gen;};
-struct R_FontId {u32 idx; u32 gen;};
-struct R_LightId {u32 idx; u32 gen;};
+MakeId(OpaqueId);
+MakeId(ThingId);
+MakeId(R_TextureId);
+MakeId(R_MeshId);
+MakeId(R_MaterialId);
+MakeId(R_FontId);
+MakeId(R_LightId);
 
 const u32 MaxEntities = KB(1);
 

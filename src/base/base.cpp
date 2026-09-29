@@ -57,7 +57,7 @@ u32 remove_lowest_bit(u64 v)       { return v & (v - 1);}
 u32 remove_highest_bit(u32 v)      { return v ^ (1 << most_significant_bit(v)); }
 u64 remove_highest_bit(u64 v)      { return v ^ (1 << most_significant_bit(v)); }
 
-b32 bit_has(u64 x, u64 pos)       { return x & (1 << pos); }
+b32 bit_has(u64 x, u64 pos)       { return (x >> pos) & 1; }
 u64 flag_clear(u64 x, u64 f)      { return x & ~f; }
 u64 flag_toggle(u64 x, u64 f)     { return x ^ f; }
 b32 flag_has(u64 x, u64 f)        { return (x & f) == (f); }
