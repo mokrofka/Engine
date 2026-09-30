@@ -42,4 +42,5 @@ MemberDefinition members_of_Thing[] = {
 	{MetaType_u8, "buf3", OffsetOf(Thing,buf3)},
 	{MetaType_f32, "modify3", OffsetOf(Thing,modify3)},
 	{MetaType_f32, "angle", OffsetOf(Thing,angle)},
+	{MetaType_u32, "serialized_idx", OffsetOf(Thing,serialized_idx)},
 };

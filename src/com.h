@@ -10,15 +10,14 @@
 #include "stb_truetype.h"
 
 // TODO:
-// dummy assets/null 
 // UI
-// memory visualisation thread safe, and gpu memory
 // thread graph visualisation
 // make wayland backend work
 // console
 // thread safe allocator
 // glb loader
 // obj mouse selection
+// load mesh, animations, textures
 
 #define MESH_LIST \
 	X(Cube) \
@@ -30,15 +29,13 @@
 	X(CubeGlft) \
 	X(GreeMan) \
 	X(Barrack) \
+	X(Bubble) \
 
 #define TEXTURE_LIST \
 	X(Dummy) \
 	X(Orange) \
 	X(Container) \
 	X(Barrack) \
-	X(Black) \
-	X(Black1) \
-	X(Black2) \
 	X(Bricks) \
 
 #define MATERIAL_LIST \
@@ -216,8 +213,6 @@ struct ThingDesc {
 	v3 vel;
 	u32 color;
 	Rng3 aabb;
-	MeshEnum mesh;
-	MaterialEnum mat;
 	R_MeshId mesh_id;
 	R_MaterialId mat_id;
 };
@@ -416,89 +411,63 @@ struct GlobalState {
 	m4x4 view;
 	m4x4 projection;
 	v4 ambient_color;
-	i32 fps;
+	u32 fps;
+
+	R_State r;
+	Gfx_State gfx;
+	UI_State ui;
 
 	R_MeshId meshes_ids[Mesh_COUNT];
 	R_TextureId textures_ids[Texture_COUNT];
 	R_MaterialId materials_ids[Material_COUNT];
 	R_FontId font;
+	ImTextureID imgui_dummy;
 
 	String asset_dir;
 	String shader_dir;
 	String shader_compiled_dir;
 	String models_dir;
 	String textures_dir;
-	Map<R_TextureId, R_MaxTextures> str_to_texture;
-	Map<R_MeshId, R_MaxMeshes> str_to_mesh;
-	Map<R_MaterialId, R_MaxMaterials> str_to_material;
-	Array<String, R_MaxTextures> texture_to_str;
-	Array<String, R_MaxMeshes> mesh_to_str;
-	Array<String, R_MaxMaterials> material_to_str;
-
-	R_State r;
-	Gfx_State gfx;
-	UI_State ui;
+	Map<R_TextureId, R_MaxTextures> str_to_texture_id;
+	Map<R_MeshId, R_MaxMeshes> str_to_mesh_id;
+	Map<R_MaterialId, R_MaxMaterials> str_to_material_id;
+	Array<String, R_MaxTextures> texture_id_to_str;
+	Array<String, R_MaxMeshes> mesh_id_to_str;
+	Array<String, R_MaxMaterials> material_id_to_str;
 
 	Slice<OS_Handle> shader_module_compilation_pids;
 	Slice<String> shaders_to_compile;
 
-	Array<WatchFile, 128> watches;
-	Array<WatchDirectory, 128> watch_directories;
+	Array<WatchFile, 32> watches;
+	Array<WatchDirectory, 32> watch_directories;
 
 	struct {
 		DebugWindow win;
-		ScrollState root_scroll_state;
-		ScrollState frames_scroll_state;
-		ScrollState launch_time_scroll_state;
-		ScrollState mem_scroll_state;
 		Camera2 root_cam;
 		Camera2 frames_cam;
 		Camera2 launch_cam;
 		Camera2 mem_cam;
 		ProfTabActive active_tab;
-		f32 frame_avg_time;
-		f32 frame_min_time;
-		f32 frame_max_time;
 		ProfColors colors;
 	} prof_win;
 	DebugWindow game_win;
 	b32 imgui_demo_open;
 
 	Camera cam;
-	R_Camera r_cam;
 	b32 fps_camera;
 
 	u32 entities_count;
 	PoolIterative<Thing, MaxEntities, ThingId> things;
 
-	DArray<ThingId> moving_cubes;
-	Map<ThingId, 32> find_entity;
-
-	ThingId thing_enums[ThingEnum_COUNT];
-	Map<u32, 32> str_to_thing_enum;
 	ThingId axis_attached_to_cam_id;
-	ThingId monkey0;
-	ThingId cube0;
-	ThingId cube1;
-	ThingId cube2;
-	ThingId cube3;
-	ThingId cube4;
-	ThingId cube5;
-
-	ThingId cube_root;
-	ThingId monkey1;
-	v3 pos_target;
-
-	Coroutine co;
-	ImTextureID imgui_dummy;
+	ThingId grid;
+	ThingId barrack;
 };
 
 extern GlobalState* st;
 
 void test();
 f64 tsc_to_ms(u64 tsc);
-// f32 time_dt;
-// f32 time_now;
 b32 time_on_interval(f64 time, f32 delta, f32 interval, f32 offset);
 u32 time_on_interval_steps(f64 time, f32 delta, f32 interval, f32 offset);
 f64 time_next_interval(f64 time, f32 interval, f32 offset);
@@ -520,12 +489,6 @@ b32 time_on_interval(f32 interval, f32 offset = 0);
 b32 time_on_between_interval(f32 interval, f32 offset = 0);
 f64 time_since(f64 timestamp);
 f64 time_until(f64 timestamp);
-
-// void ui_draw_rect(Rng2 rect, v4 color);
-// b32 ui_button(u32 id, v2 pos);
-// b32 ui_slider(u32 id, v2 pos, i32 max, i32& v);
-// void ui_begin();
-// void ui_end();
 
 void imgui_draw_rect(ImDrawList* draw, Rng2 rect, v4 col, f32 rounding = 0, ImDrawFlags flags = 0, f32 thickness = 1);
 void imgui_draw_rect_filled(ImDrawList* draw, Rng2 rect, v4 col, f32 rounding = 0, ImDrawFlags flags = 0);
@@ -575,8 +538,6 @@ v4 parse_v4(Parser& p);
 String write_v3(Allocator alloc, v3 v);
 String write_v4(Allocator alloc, v4 v);
 
-ScrollState scroll_state_make(f32 scale);
-void scroll_state_update(ScrollState& s, ScrollType type = ScrollType_Default);
 v2 world_to_screen(Camera2 c, v2 p, v2 screen_center);
 Rng2 world_to_screen(Camera2 c, Rng2 rect, v2 screen_center);
 v2 world_to_screen2(Camera2 c, v2 p, v2 screen_center);
@@ -599,7 +560,6 @@ Thing& get_thing(ThingId id);
 void push_child_thing(ThingId parent, ThingId id);
 R_MeshId get_mesh(MeshEnum id);
 R_MaterialId get_material(MaterialEnum id);
-void mesh_set(MeshEnum mesh_enum, R_MeshId id);
 
 String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, EntityFlags flags = {});
 void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser);
@@ -610,9 +570,6 @@ shared_function void com(HotReloadData* data);
 R_MeshDesc generate_sphere(Allocator arena);
 R_MeshDesc generate_grid(Allocator arena, u32 size, f32 step);
 
-// ThingId e_alloc_bare();
-// ThingId e_alloc(R_MeshId mesh_id, R_MaterialId material_id, EntityThing thing = {});
-// ThingId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing = {});
 ThingId make_thing(ThingDesc desc);
 void destroy_thing(ThingId id);
 PoolIterativeIter<Thing, MaxEntities, ThingId> things_begin();

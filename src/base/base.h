@@ -464,11 +464,15 @@ inline u32 atomic_cmp_swap_old(u32* x, u32 expect, u32 v) { u32 res = expect; at
 
 ////////////////////////////////////////////////////////////////////////
 // Defer
-template<typename F> struct _Defer {
+template <typename F> struct _Defer {
 	F f;
+	_Defer(F f) : f(f) {}
 	~_Defer() { f(); }
 };
-#define defer(code) auto Glue(_defer_, __LINE__) = _Defer([&](){ code; })
+struct _DeferDummy {};
+template <typename F> _Defer<F> operator+(_DeferDummy, F f) { return _Defer<F>(f); }
+#define defer auto Glue(_defer_, __LINE__) = _DeferDummy{} + [&]()
+
 #define DeferLoop(begin, end) for(int _i_ = ((begin), 1); _i_; _i_ = 0, (end))
 #define DeferLoopIf(begin, end) for(int _i_ = (begin); _i_; _i_ = false, (end))
 

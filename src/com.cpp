@@ -171,7 +171,7 @@ void test_arena_list_alloc() {
 void test_alloc() {
 	Scratch scratch;
 	Alloc alloc = alloc_make(scratch);
-	defer(alloc_destroy(alloc));
+	defer{alloc_destroy(alloc);};
 	struct AllocCtx {
 		u8* data;
 		u64 size;
@@ -880,10 +880,6 @@ void debug_window_toggle_fullscreen(DebugWindow& win) {
 void dev_init() {
 	var& g = *st;
 	g.prof_win = {
-		.root_scroll_state = scroll_state_make(1),
-		.frames_scroll_state = scroll_state_make(1),
-		.launch_time_scroll_state = scroll_state_make(1),
-		.mem_scroll_state = scroll_state_make(1),
 		.win.open = false,
 		.root_cam = {.zoom = 1, .zoom2 = v2(1)},
 		.frames_cam = {.zoom = 1, .zoom2 = v2(1)},
@@ -931,15 +927,8 @@ void dev_update() {
 				if(ImGui::Button("load state")) {
 					load_game_state();
 				}
-				if(ImGui::Button("clear moving cubes")) {
-					Loop(i, g.moving_cubes.count) {
-						ThingId e =  g.moving_cubes[i];
-						destroy_thing(e);
-					}
-					array_clear(g.moving_cubes);
-				}
-				ImGui::SliderFloat3("target pos", g.pos_target.v, -10, 10);
 				ImGui::DragFloat3("cam pos", g.cam.pos.v);
+				ImGui::DragFloat("cam vel fric", &g.cam.vel_friction, 0.1, 0, 100);
 			}
 		}
 	}
@@ -971,9 +960,9 @@ void dev_update() {
 			tsc_elapsed_max = Max(tsc_elapsed_max, elapsed);
 			tsc_elapsed_min = Min(tsc_elapsed_min, elapsed);
 		}
-		prof_win.frame_avg_time = tsc_to_ms(tsc_elapsed_sum / ProfRecordHistoryNum);
-		prof_win.frame_max_time = tsc_to_ms(tsc_elapsed_max);
-		prof_win.frame_min_time = tsc_to_ms(tsc_elapsed_min);
+		f32 frame_avg_time = tsc_to_ms(tsc_elapsed_sum / ProfRecordHistoryNum);
+		f32 frame_max_time = tsc_to_ms(tsc_elapsed_max);
+		f32 frame_min_time = tsc_to_ms(tsc_elapsed_min);
 
 		// Prev frame
 		ProfFrame prev_frame = prof_get_prev_frame();
@@ -1008,7 +997,7 @@ void dev_update() {
 					local_persist f32 fps;
 					if(time_on_interval(0.1)) fps = 1000 / tsc_to_ms(prev_frame_tsc_elapsed);
 					imgui_text("%.1ffps %.1fms CPU %.1fGhz, Recording: %s", fps, tsc_to_ms(prev_frame_tsc_elapsed), (f64)cpu_frequency / Billion(1), prof.paused ? S("off") : S("on"));
-					imgui_text("avg %.1fms, max %.1f, min %.1f", prof_win.frame_avg_time, prof_win.frame_max_time, prof_win.frame_min_time);
+					imgui_text("avg %.1fms, max %.1f, min %.1f", frame_avg_time, frame_max_time, frame_min_time);
 
 					///////////////////////////////////
 					// Tab mouse click
@@ -1136,7 +1125,7 @@ void dev_update() {
 						ImGui::SetCursorScreenPos(rng2_subrng_x01(top_bar_rect, {0.5,1}).min);
 						ImGui::PushItemWidth((50));
 						ImGui::DragInt("show freq", &frequency, 0.1f, 1, ProfRecordHistoryNum); ImGui::SameLine();
-						ImGui::DragInt("fps max", &g.fps, 1.0f, 10, 2000); ImGui::SameLine();
+						ImGui::DragInt("fps max", (i32*)&g.fps, 1.0f, 10, 2000); ImGui::SameLine();
 						ImGui::SliderFloat("scale", &st->r.scale, 0.01, 1);
 						ImGui::PopItemWidth();
 						idx /= ProfRecordHistoryNum/frequency;
@@ -2000,68 +1989,6 @@ v4 parse_v4(Parser& p) {
 String write_v3(Allocator alloc, v3 v) { return push_strf(alloc, "%f %f %f", v.x, v.y, v.z); }
 String write_v4(Allocator alloc, v4 v) { return push_strf(alloc, "%f %f %f %f", v.x, v.y, v.z, v.w); }
 
-ScrollState scroll_state_make(f32 scale) {
-	ScrollState res = {
-		.scale_level = scale,
-		.zoom = v2(scale),
-	};
-	return res;
-}
-
-void scroll_state_update(ScrollState& s, ScrollType type) {
-	f32 wheel = os_mouse_wheel();
-	if(wheel) {
-		if(os_key_is_down(Key_Ctrl)) {
-			v2 mouse = os_mouse_pos();
-			f32 sensity = 1.3;
-			f32 zoom = (wheel > 0) ? sensity : 1.0f/sensity;
-			switch(type) {
-				case ScrollType_Default: {
-					// we have: mouse == world * scale + offset;
-					v2 world = (mouse - s.pos) / s.scale_level;
-					s.scale_level *= zoom;
-					s.pos = mouse - world * s.scale_level;
-					s.zoom = v2(s.scale_level);
-				}break;
-				case ScrollType_PowClamp: {
-					v2 world = {
-						(mouse.x - s.pos.x) / s.zoom.x,
-						(mouse.y - s.pos.y) / s.zoom.y
-					};
-					s.scale_level *= zoom;
-					s.scale_level = ClampBot(s.scale_level, 0.02);
-					s.zoom.y = Clamp(0.01, s.scale_level, 3);
-					f32 t = pow(s.scale_level + 1, 2);
-					f32 ratio = t * 0.3;
-					s.zoom.x = s.zoom.y * ratio;
-
-					if(s.zoom.y > 1) {
-						f32 inv = 1.0f / s.scale_level;
-						f32 target = inv / (1.0f + inv);
-						s.zoom.y = lerp(1.0f, 0.3f, target);
-					}
-
-					s.pos.x = mouse.x - world.x * s.zoom.x;
-					s.pos.y = mouse.y - world.y * s.zoom.y;
-
-				}break;
-			}
-		}
-		else {
-			s.pos.y += wheel * 100.0f;
-		}
-	}
-
-	f32 scroll_h = os_mouse_wheel_horizontal();
-	if(scroll_h) {
-		f32 sensity = 100;
-		if(os_key_is_down(Key_Shift)) {
-			sensity *= 3;
-		}
-		s.pos.x += scroll_h * sensity;
-	}
-}
-
 v2 world_to_screen(Camera2 c, v2 p, v2 screen_center) {
 	return screen_center + (p - c.pos) * c.zoom;
 }
@@ -2243,13 +2170,6 @@ Thing& get_thing(ThingId id) { return pool_get(st->things, id); }
 R_MeshId get_mesh(MeshEnum mesh_enum) { return st->meshes_ids[mesh_enum]; }
 R_TextureId get_texture(TextureEnum tex_enum) { return st->textures_ids[tex_enum]; }
 R_MaterialId get_material(MaterialEnum id) { return st->materials_ids[id]; }
-void mesh_set(MeshEnum mesh_enum, R_MeshId id) { 
-	GlobalState& g = *st;
-	g.meshes_ids[mesh_enum] = id;
-	String str = push_str_copy(g.arena, meshes_strs[mesh_enum]);
-	map_set(g.str_to_mesh, hash(str), id);
-	g.mesh_to_str[id.idx] = str;
-}
 
 void push_child_thing(ThingId parent, ThingId id) {
 	var& g = *st;
@@ -2298,11 +2218,11 @@ String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, 
 			}break;
 			case MetaType_R_MeshId: {
 				R_MeshId v = *(R_MeshId*)member_ptr;
-				dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->mesh_to_str[v.idx]));
+				dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->mesh_id_to_str[v.idx]));
 			}break;
 			case MetaType_R_MaterialId: {
 				R_MaterialId v = *(R_MaterialId*)member_ptr;
-				dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->material_to_str[v.idx]));
+				dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->material_id_to_str[v.idx]));
 			}break;
 		}
 	}
@@ -2713,57 +2633,15 @@ R_MeshDesc generate_grid(Allocator arena, u32 size, f32 step) {
 //   return true;
 // };
 
-// ThingId e_alloc_bare() {
-//   var& g = *st;
-//   ThingId e_id = pool_push(g.entities, {});
-//   ++g.entities_count;
-//   return e_id;
-// }
-
-// ThingId e_alloc(R_MeshId mesh_id, R_MaterialId material_id, EntityThing thing) {
-//   var& g = *st;
-//   Thing e = {
-//     .name = thing.name,
-//     .flags = thing.flags,
-//     .pos = v3(),
-//     .rot = quat_identity(),
-//     .scale = v3(1),
-//     .mesh = mesh_id,
-//     .mat = material_id,
-//     .aabb = Rng3(v3(-1), v3(1)),
-//     .color = u32_from_rgba(ColorWhite),
-//   };
-//   ThingId e_id = pool_push(g.entities, e);
-//   ++g.entities_count;
-//   return e_id;
-// }
-// ThingId e_alloc(MeshEnum mesh_id, MaterialEnum material_id, EntityThing thing) { return e_alloc(get_mesh(mesh_id), get_material(material_id), thing); }
-
 ThingId make_thing(ThingDesc desc) {
 	var& g = *st;
-	R_MeshId mesh_id = {};
-	if(desc.mesh) {
-		mesh_id = get_mesh(desc.mesh);
-	} else if(desc.mesh_id.idx) {
-		mesh_id = desc.mesh_id;
-	} else {
-		mesh_id = get_mesh(Mesh_Cube);
-	}
-	R_MaterialId mat_id = {};
-	if(desc.mat) {
-		mat_id = get_material(desc.mat);
-	} else if(desc.mat_id.idx) {
-		mat_id = desc.mat_id;
-	} else {
-		mat_id = get_material(Material_Orange);
-	}
 	Thing e = {
 		.pos = desc.pos,
 		.rot = desc.rot,
 		.scale = desc.scale,
-		.mesh = mesh_id,
-		.mat = mat_id,
-		.aabb = Rng3(v3(-1), v3(1)),
+		.mesh = desc.mesh_id,
+		.mat = desc.mat_id,
+		.aabb = desc.aabb,
 		.color = desc.color,
 	};
 	ThingId id = pool_push(g.things, e);
@@ -2776,7 +2654,7 @@ void destroy_thing(ThingId id) {
 	var& g = *st;
 	pool_remove(g.things, id);
 	// sparse_set_remove(g.active_entities, id.idx);
-	--g.entities_count;
+	g.entities_count--;
 }
 
 PoolIterativeIter<Thing, MaxEntities, ThingId> things_begin() {
@@ -2829,19 +2707,19 @@ void save_game_state() {
 			dstr_pushf(data, "pos %s\n", write_v3(scratch, e.pos));
 			dstr_pushf(data, "rot %s\n", write_v4(scratch, e.rot));
 			dstr_pushf(data, "scale %s\n", write_v3(scratch, e.scale));
-			dstr_pushf(data, "mesh \"%s\"\n", g.mesh_to_str[e.mesh.idx]);
-			dstr_pushf(data, "mat \"%s\"\n", g.material_to_str[e.mat.idx]);
+			dstr_pushf(data, "mesh \"%s\"\n", g.mesh_id_to_str[e.mesh.idx]);
+			dstr_pushf(data, "mat \"%s\"\n", g.material_id_to_str[e.mat.idx]);
 			dstr_push(data, "}\n");
 			idx++;
 		}
 		dstr_push(data, "}\n");
 		dstr_push(data, "ThingEnum {\n");
 		LoopEnumNonZero(i, ThingEnum) {
-			var id = g.thing_enums[i];
-			if(pool_is_valid_handle(g.things.pool, id)) {
-				var& t = get_thing(id);
-				dstr_pushf(data, "%s %u\n", things_enum_strs[i], t.serialized_idx);
-			}
+			// var id = g.thing_enums[i];
+			// if(pool_is_valid_handle(g.things.pool, id)) {
+			// 	var& t = get_thing(id);
+			// 	dstr_pushf(data, "%s %u\n", things_enum_strs[i], t.serialized_idx);
+			// }
 		}
 		dstr_push(data, "}\n");
 	}
@@ -2906,8 +2784,8 @@ void load_game_state() {
 					tok_expect(p, TokenType_Identifier); desc.pos = parse_v3(p);
 					tok_expect(p, TokenType_Identifier); desc.rot = parse_v4(p);
 					tok_expect(p, TokenType_Identifier); desc.scale = parse_v3(p);
-					tok_expect(p, TokenType_Identifier); desc.mesh_id = map_get(g.str_to_mesh, hash(tok_advance(p).str)).value;
-					tok_expect(p, TokenType_Identifier); desc.mat_id = map_get(g.str_to_material, hash(tok_advance(p).str)).value;
+					tok_expect(p, TokenType_Identifier); desc.mesh_id = map_get(g.str_to_mesh_id, hash(tok_advance(p).str)).value;
+					tok_expect(p, TokenType_Identifier); desc.mat_id = map_get(g.str_to_material_id, hash(tok_advance(p).str)).value;
 					make_thing(desc);
 					tok_expect(p, TokenType_CloseBrace);
 				}
@@ -2915,10 +2793,10 @@ void load_game_state() {
 			} else if(str_match(tok.str, "ThingEnum")) {
 				tok_expect(p, TokenType_OpenBrace);
 				while(!tok_match(p, TokenType_CloseBrace)) {
-					var t = tok_expect(p, TokenType_Identifier);
-					u32 thing_idx = parse_u32(p) + 1;
-					u32 enum_idx = map_get(g.str_to_thing_enum, hash(t.str)).value;
-					g.thing_enums[enum_idx] = pool_get_handle(g.things.pool, thing_idx);
+					// var t = tok_expect(p, TokenType_Identifier);
+					// u32 thing_idx = parse_u32(p) + 1;
+					// u32 enum_idx = map_get(g.str_to_thing_enum, hash(t.str)).value;
+					// g.thing_enums[enum_idx] = pool_get_handle(g.things.pool, thing_idx);
 				}
 			}
 		}
@@ -2954,124 +2832,62 @@ void load_game_state() {
 
 void init_game() {
 	ProfFunc;
-	var& g = *st;
 	Scratch scratch;
+	var& g = *st;
 	g.arena = arena_make(.name = "game arena");
 	g.gpa = alloc_make(g.arena);
-	g.moving_cubes = array_make<ThingId>(g.gpa);
-	g.font = r_make_font({.name = "arial.ttf", .font_height = 32});
 
-	// var arena = arena_make(.name = "check arena");
-	// var alloc = alloc_make(arena, .name = "check alloc");
-	// push_buffer(arena, KB(1));
-	// u8* p = push_buffer(alloc, KB(1));
-	// mem_realloc(alloc, p, KB(1), KB(2));
-
-	LoopEnumNonZero(i, ThingEnum) {
-		map_set(g.str_to_thing_enum, hash(things_enum_strs[i]), (u32)i);
-	}
-
-	R_MeshDesc triangle_mesh = {.vertices = slice(triangle_vertices)};
-	mesh_set(Mesh_Triangle, r_make_mesh(triangle_mesh));
-	R_MeshDesc grid_mesh = generate_grid(scratch, 100, 1);
-	mesh_set(Mesh_Grid, r_make_mesh(grid_mesh));
-	R_MeshDesc axis_mesh = {.vertices = slice(axis_vertices)};
-	mesh_set(Mesh_Axis, r_make_mesh(axis_mesh));
-	R_MeshDesc sphere = generate_sphere(scratch);
-	mesh_set(Mesh_Sphere, r_make_mesh(sphere));
-
+	///////////////////////////////////
+	// Assets
 	{
-		ProfBlock("cube");
-		// R_Texture cubemap = r_texture_cube_load("night_cubemap");
-		// R_TextureId cubemap = r_load_async_cubemap("night_cubemap");
-		R_TextureId cubemap = r_make_texture({.name = "night_cubemap", .is_cube = true, .async = true});
-		r_set_cubemap(cubemap);
-	}
+		g.font = r_make_font({.name = "arial.ttf", .font_height = 32});
+		r_set_cubemap(r_make_texture({.name = "night_cubemap", .is_cube = true}));
 
-	{
-		GlobalState& g = *st;
+		// Known assets
+		var mesh_set = [](MeshEnum mesh_enum, R_MeshId id) { 
+			GlobalState& g = *st;
+			g.meshes_ids[mesh_enum] = id;
+			String str = push_str_copy(g.arena, meshes_strs[mesh_enum]);
+			map_set(g.str_to_mesh_id, hash(str), id);
+			g.mesh_id_to_str[id.idx] = str;
+		};
+		mesh_set(Mesh_Triangle, r_make_mesh({.vertices = slice(triangle_vertices)}));
+		mesh_set(Mesh_Grid, r_make_mesh(generate_grid(scratch, 100, 1)));
+		mesh_set(Mesh_Axis, r_make_mesh({.vertices = slice(axis_vertices)}));
+		mesh_set(Mesh_Sphere, r_make_mesh(generate_sphere(scratch)));
+
+		// Mehs
 		var load_mesh = [&](MeshEnum enum_name, String name) {
 			R_MeshId id = r_make_mesh({.name = name});
 			g.meshes_ids[enum_name] = id;
 			String str = push_str_copy(g.arena, name);
-			map_set(g.str_to_mesh, hash(str), id);
-			g.mesh_to_str[id.idx] = str;
+			map_set(g.str_to_mesh_id, hash(str), id);
+			g.mesh_id_to_str[id.idx] = str;
 		};
 		load_mesh(Mesh_Cube, "cube_ok_uv.glb");
 		load_mesh(Mesh_MonkeyGlb, "monkey.glb");
 		load_mesh(Mesh_CubeGlft, "cube.gltf");
 		load_mesh(Mesh_Barrack, "castle.gltf");
+		load_mesh(Mesh_Bubble, "t0 copy.gltf");
 
-		var load_tex = [&](TextureEnum enum_name, String name) {
-			R_TextureId id = r_make_texture({.name = name, .async = true});
+		// Texture
+		var load_texture = [&](TextureEnum enum_name, String name) {
+			R_TextureId id = r_make_texture({.name = name});
 			g.textures_ids[enum_name] = id;
 			String str = push_str_copy(g.arena, name);
-			map_set(g.str_to_texture, hash(str), id);
-			g.texture_to_str[id.idx] = str;
+			map_set(g.str_to_texture_id, hash(str), id);
+			g.texture_id_to_str[id.idx] = str;
 		};
-		load_tex(Texture_Orange, "orange_lines_512.png");
-		load_tex(Texture_Container, "container.jpg");
-		load_tex(Texture_Barrack, "castle_diffuse.png");
-		load_tex(Texture_Bricks, "bricks.png");
-		load_tex(Texture_Dummy, "dummy.png");
+		load_texture(Texture_Orange, "orange_lines_512.png");
+		load_texture(Texture_Container, "container.jpg");
+		load_texture(Texture_Barrack, "castle_diffuse.png");
+		load_texture(Texture_Bricks, "bricks.png");
+		load_texture(Texture_Dummy, "dummy.png");
 
+		// Imgui dummy
 		g.imgui_dummy = imgui_add_texture(g.textures_ids[Texture_Dummy]);
-		
-		u32 size = 32;
-		// u8* data = push_buffer_zero(g.arena, size*size*4);
-		u32* data = push_array_zero(g.arena, u32, size*size);
-		Loop(i, size) {
-			Loop(j, size) {
-				if((j+i) % 2 == 0) {
-					data[i*size + j] = u32_from_rgba(v4(0,1,0,1));
-				} else {
-					data[i*size + j] = u32_from_rgba(v4(1,1,0,1));
-				}
-			}
-		}
-		
-		// MemSet(data, 255, size*size*4);
-		g.textures_ids[Texture_Black] = r_make_texture({
-			// .name = "16x16.png",
-			.width = size,
-			.height = size,
-			// .pixel_format = Gfx_PixelFormat_R8,
-			.async = false,
-			.data = (u8*)data,
-		});
-		g.textures_ids[Texture_Black1] = r_make_texture({
-			.name = "16x16.png",
-			.width = size,
-			.height = size,
-			// .pixel_format = Gfx_PixelFormat_R8,
-			.async = false,
-			.data = (u8*)data,
-		});
-		{
-			u32 size = 8;
-			u8* data = push_buffer_zero(g.arena, size*size*4);
-			Loop(i, size) {
-				Loop(j, size) {
-					if((j+i) % 2 == 0) {
-						data[i*size + j] = 255;
-					} else {
-						data[i*size + j] = 100;
-					}
-				}
-			}
-			g.textures_ids[Texture_Black2] = r_make_texture({
-				.width = size,
-				.height = size,
-				// .pixel_format = Gfx_PixelFormat_R8,
-				// .async = ,
-				// .blocking = false,
-				.pixel_format = Gfx_PixelFormat_R8,
-				.data = (u8*)data,
-			});
-			// st->r.my_font = r_make_font({"arial.ttf", 32});
-			// st->r.my_font1 = r_make_font({"arial.ttf", 16});
-		}
 
+		// Materials
 		var default_state = r_make_pipeline_state({
 			.depth = {
 				.compare = Gfx_CompareOp_Less,
@@ -3085,15 +2901,13 @@ void init_game() {
 				.write_enabled = true,
 			}
 		});
-
 		var load_mat = [&](MaterialEnum enum_name, R_Material desc) {
 			R_MaterialId id = r_make_material(desc);
 			g.materials_ids[enum_name] = id;
 			String str = push_str_copy(g.arena, materials_strs[enum_name]);
-			map_set(g.str_to_material, hash(str), id);
-			g.material_to_str[id.idx] = str;
+			map_set(g.str_to_material_id, hash(str), id);
+			g.material_id_to_str[id.idx] = str;
 		};
-
 		load_mat(Material_Dummy, {
 			.type = ShaderType::Texture,
 			.batch = default_state,
@@ -3131,7 +2945,6 @@ void init_game() {
 	///////////////////////////////////
 	// Camera
 	{
-		var& g = *st;
 		Camera& cam = g.cam;
 		cam = {
 			.pos = v3(0,0,5),
@@ -3145,170 +2958,29 @@ void init_game() {
 			sind(cam.pitch),
 			sind(cam.yaw) * cosd(cam.pitch)
 		};
-		st->view = m4x4_look_at(cam.pos, cam.dir, v3_up());
+		g.view = m4x4_look_at(cam.pos, cam.dir, v3_up());
 	}
 
-	g.cube0 = make_thing(default_thing_desc());
-	g.thing_enums[Thing_Cube0] = g.cube0;
-	var desc = default_thing_desc();
-	desc.mesh = Mesh_MonkeyGlb;
-	desc.mat = Material_Container;
-	desc.pos.x = 10;
-	desc.aabb = Rng3(v3(-1.2), v3(1.2));
-	g.monkey0 = make_thing(desc);
-	g.thing_enums[Thing_Monkey] = g.monkey0;
 	{
 		var desc = default_thing_desc();
-		desc.mesh = Mesh_Triangle;
-		desc.mat = Material_Orange;
-		desc.pos = v3(6);
-		make_thing(desc);
-	}
-	{
-		var desc = default_thing_desc();
-		desc.mesh = Mesh_Grid;
-		desc.mat = Material_Line;
-		desc.color = u32_from_rgba(v4(0.6));
-		desc.pos = v3(0,0,-5);
-		make_thing(desc);
-	}
-	{
-		var desc = default_thing_desc();
-		desc.mesh = Mesh_Axis;
-		desc.mat = Material_Axis;
+		desc.mesh_id = get_mesh(Mesh_Axis);
+		desc.mat_id = get_material(Material_Axis);
 		g.axis_attached_to_cam_id = make_thing(desc);
 	}
-#if 1
-	Loop(i, 10) {
-		// Handle<StaticEntity> e = entity_static_create(Mesh_Cube, Material_Orange);
-		// u32 range = KB(1);
-		// e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
-		MeshEnum meshes[] = {
-			// Mesh_MonkeyGlb,
-			// Mesh_Triangle,
-			Mesh_Cube,
-		};
-		MaterialEnum materials[] = {
-			Material_Orange,
-			// Material_Container,
-		};
-		var desc = default_thing_desc();
-		desc.mesh = rand_choice(slice(meshes));
-		desc.mat = rand_choice(slice(materials));
-		u32 range = 100;
-		desc.pos = v3_rand(-v3(range), v3(range));;
-		make_thing(desc);
-	}
-#endif
-
 	{
 		var desc = default_thing_desc();
-		desc.mesh = Mesh_Sphere;
-		desc.mat = Material_Container;
-		desc.pos = v3(0,0,-10);
-		make_thing(desc);
-	}
-	{
-		// Handle<Entity> e = entity_create(Mesh_Castle, Shader_E_Texture, Material_Castle);
-		// e.pos().z = -100;
-	}
-	{
-		// Loop(i, KB(1)) {
-		//   Handle<Entity> e = entity_create(Mesh_Cube, Material_Screen);
-		//   u32 range = 100;
-		//   e.pos() = v3_rand_range(-v3_scale(range), v3_scale(range));
-		// }
-	}
-	{
-		// Loop(i, KB(400)) {
-		// Loop(i, MB(1)-KB(1)) {
-		Loop(i, 0) {
-			var desc = default_thing_desc();
-			desc.mat = Material_Container;
-			u32 range = KB(1);
-			desc.pos = v3_rand(-v3(range), v3(range));
-			var id = make_thing(desc);
-			array_push(g.moving_cubes, id);
-		}
-	}
-
-	Loop(i, 0) {
-		MeshEnum meshes[] = {
-			Mesh_MonkeyGlb,
-			Mesh_Triangle,
-			Mesh_Cube,
-		};
-		MaterialEnum materials[] = {
-			// Material_Orange,
-			Material_Container,
-			// Material_Screen,
-		};
-		var desc = default_thing_desc();
-		desc.mesh = rand_choice(slice(meshes));
-		desc.mat = rand_choice(slice(materials));
-		u32 range = 100;
-		desc.pos = v3_rand(-v3(range), v3(range));
-		var id = make_thing(desc);
-		array_push(g.moving_cubes, id);
+		desc.mesh_id = get_mesh(Mesh_Grid);
+		desc.mat_id = get_material(Material_Line);
+		desc.color = u32_from_rgba(v4(0.6));
+		desc.pos = v3(0,0,-5);
+		g.grid = make_thing(desc);
 	}
 	{
 		var desc = default_thing_desc();
-		desc.mat = Material_Container;
-		desc.pos = v3(10,10,20);
-		g.cube1 = make_thing(desc);
-	}
-
-	{
-		v4 quat = quat_axis_angle(v3(1,0,0), deg2rad(90));
-		v4 quat1 = quat_axis_angle(v3(1,0,0), deg2rad(90));
-		quat = quat_mul(quat, quat1);
-		v3 v = v3(0, 1, 0);
-		v = quat_rotate(quat, v);
-		Info("%f %f %f", v.x,v.y,v.z);
-	}
-
-	{
-		var desc = default_thing_desc();
-		desc.mesh = Mesh_Barrack;
-		desc.mat = Material_Barrack;
-		desc.pos = v3(-3,3,-33);
-		make_thing(desc);
-	}
-	{
-		var desc = default_thing_desc();
-		desc.mat = Material_Container;
-		desc.pos = v3(3,3,10);
-		g.cube_root = make_thing(desc);
-		Loop(i, 4) {
-			var desc = default_thing_desc();
-			desc.mat = Material_Container;
-			var child_id = make_thing(desc);
-			push_child_thing(g.cube_root, child_id);
-			Loop(i, 4) {
-				var new_child_id = make_thing(desc);
-				push_child_thing(child_id, new_child_id);
-			}
-		}
-	}
-	{
-		var desc = default_thing_desc();
-		desc.mesh = Mesh_MonkeyGlb;
-		desc.mat = Material_Container;
-		desc.pos = v3(5,5,0);
-		g.monkey1 = make_thing(desc);
-	}
-	{
-		var desc = default_thing_desc();
-		desc.pos = v3(1);
-		g.cube2 = make_thing(desc);
-		desc.pos = v3(0,3,0);
-		g.cube3 = make_thing(desc);
-		desc.pos += v3(0,3,0);
-		desc.mat = Material_Container;
-		g.cube4 = make_thing(desc);
-		get_thing(g.cube4).angle = deg2rad(-160);
-		g.cube5 = make_thing(desc);
-		get_thing(g.cube5).angle = deg2rad(160);
+		desc.mesh_id = get_mesh(Mesh_Barrack);
+		desc.mat_id = get_material(Material_Barrack);
+		desc.pos = v3(0,0,-40);
+		g.barrack = make_thing(desc);
 	}
 }
 
@@ -3419,41 +3091,6 @@ void update_game() {
 		cam.vel += mov * dt;
 		cam.pos += cam.vel * dt;
 		cam.vel -= cam.vel * cam.vel_friction * dt;
-		// cam.vel.y -= 9 * dt;
-
-		ImGuiWindow("cam") {
-			// ImGui::Begin("cam");
-			// ImGui::DragFloat("accel", &cam.accel, 0, 0, 3000);
-			ImGui::DragFloat("vel fric", &cam.vel_friction, 0.1, 0, 100);
-	
-			var& cube2 = get_thing(g.cube2);
-			var& cube3 = get_thing(g.cube3);
-			var& cube4 = get_thing(g.cube4);
-
-			// f32 t = 1.0f - Pow(0.5f, dt);
-			// f32 t = 1.0f - Exp(-111.9 * dt);
-			// cube3.pos += (cam.pos - cube3.pos) * t;
-			// cube3.pos.x += (cube2.pos.x - cube3.pos.x) * t;
-
-			cube3.pos.x = exp_decay(cube3.pos.x, cube2.pos.x, 1.1f, dt);
-			ImGui::DragFloat3("drag", cube4.pos.v, 0.1);
-			// Mutex2 m = {};
-			// mutex_lock(m);
-			// mutex_lock(m);
-			// Mutex mutex = os_mutex_make();
-			// os_mutex_lock(mutex);
-			// os_mutex_lock(mutex);
-			// ImGui::End();
-		}
-
-		// cam.pos -= v3(0,1,0) * 10 * time_dt;
-		// cam.pitch = Clamp(-89.0f, cam.pitch, 89.0f);
-		// cam.dir = {
-		//   CosD(cam.yaw) * CosD(cam.pitch),
-		//   SinD(cam.pitch),
-		//   SinD(cam.yaw) * CosD(cam.pitch)
-		// };
-		// view = m4x4_look_at(cam.pos, cam.pos + cam.dir);
 		v4 yaw = quat_axis_angle(v3_up(), deg2rad(cam.yaw));
 		v4 pitch = quat_axis_angle(v3_right(), deg2rad(-cam.pitch));
 		v4 quat = quat_mul(yaw, pitch);
@@ -3461,83 +3098,13 @@ void update_game() {
 		view = m4x4_look_at(cam.pos, cam.pos + cam.dir, quat_up(quat));
 	}
 
-	// if(os_mouse_is_button_pressed(MouseButton_Left)) {
-		// select_obj();
-		// v3 dir = ray_from_screen();
-		// Ray ray = ray_from_screen(os_mouse_get_pos(), os_get_window_size(), g.cam.pos, st->view, st->projection);
-		// r_draw_line_persistent(ray.pos - v3(0,0.1,0), g.cam.pos + ray.dir*100, ColorWhite);
-		// v3 max = st->cam.pos + v3_one();
-		// v3 min = st->cam.pos - v3_one();
-	// }
-
-	// Playing stuff with moving/drawing things
+	// XYZ Axis at center
 	{
-		Thing& cube0 = get_thing(g.cube0);
-		Thing& monkey = get_thing(g.monkey0);
-		monkey.pos.x += 0.1 * time_dt;
-		cube0.pos.x = monkey.pos.x + sin(time_dt) * 4;
-		cube0.pos.z = monkey.pos.z + cos(time_dt) * 4;
-		cube0.pos.y = monkey.pos.z + cos(time_dt) * 4;
-		r_draw_cuboid(rng3_shift(monkey.aabb, monkey.pos), ColorWhite);
-		Thing& cube1 = get_thing(g.cube1);
-		// v2_rotate_relative(a, b, cosine, sine);
-		// v2 pivot = v2(20, 10);
-		// e.pos = v2_to_v3(v2_rotate_relative(v2_of_v3(e.pos), pivot, degtorad(20 * get_dt())), 0);
-		// e.pos = v3_rotate_z(e.pos, degtorad(20) * get_dt());
-		// e.pos = v3_rotate_y(e.pos, degtorad(20) * get_dt());
-		// e.pos = v3_rotate_z(e.pos, degtorad(20) * get_dt());
-		cube1.pos = v3_rotate_around_axis(cube1.pos, v3(1,1,1), deg2rad(60)*time_dt);
-
-		{
-			var& thing = get_thing(g.cube2);
-			thing.scale = v3(1,1,3);
-			// thing.pos.x = Lerp(-10, time_smooth_wave(time_now, 2), 10);
-			thing.rot = quat_axis_angle(v3_up(), time_now);
-		}
-
-		{
-			var& cube4 = get_thing(g.cube4);
-			var& cube5 = get_thing(g.cube5);
-			f32 dst = 10;
-			cube4.pos = v2_to_v3(v2_from_angle(cube4.angle), 0) * dst;
-			cube5.pos = v2_to_v3(v2_from_angle(cube5.angle), 0) * dst;
-			// cube4.angle = angle_move_toward(cube4.angle, cube5.angle, 0.1, time_dt);
-			
-		}
-
-		{
-			Thing& e = get_thing(g.monkey1);
-			// e.rot = quat_look_rotation(v3_back(), v3(0,1,0));
-			// e.rot = quat_look_rotation(g.pos_target - e.pos, v3(0,1,0));
-			e.rot = quat_axis_angle(v3_up(),time_now);
-			r_draw_line(e.pos, e.pos + quat_right(e.rot)*2, ColorRed);
-			r_draw_line(e.pos, e.pos + quat_up(e.rot)*2, ColorGreen);
-			r_draw_line(e.pos, e.pos + quat_forward(e.rot)*2, ColorBlue);
-			r_draw_mesh_trs(get_mesh(Mesh_Cube), get_material(Material_Container), g.pos_target, quat_identity(), v3(0.2));
-			r_draw_mesh(st->r.dummy_mesh, get_material(Material_Dummy), v3(-5,0,0));
-
-			f32 line_len = 5;
-			v3 pos = v3(0,0.1,0);
-			r_draw_line(pos, line_len * v3_right(), ColorRed);
-			r_draw_line(pos, line_len * v3_up(), ColorGreen);
-			r_draw_line(pos, line_len * v3_forward(), ColorBlue);
-		}
-
-		{
-			var& my = get_thing(g.cube_root);
-			my.pos.z += time_dt * 1;
-			u32 i = 1;
-			LoopIter(it, thing_node_begin(my.first)) {
-				var& child = *it;
-				child.pos = my.pos + v3(0,3,0)*i++;
-				u32 j = 1;
-				LoopIter(it, thing_node_begin(child.first)) {
-					var& new_child = *it;
-					new_child.pos = child.pos + v3(3,0,0)*j;
-					++j;
-				}
-			}
-		}
+		f32 line_len = 5;
+		v3 pos = v3(0, 0.1, 0);
+		r_draw_line(pos, line_len * v3_right(), ColorRed);
+		r_draw_line(pos, line_len * v3_up(), ColorGreen);
+		r_draw_line(pos, line_len * v3_forward(), ColorBlue);
 	}
 
 	// Axis aligned at edge of screen
@@ -3553,90 +3120,10 @@ void update_game() {
 		axis.pos = g.cam.pos + forward*dist + right*xoff + up*yoff;
 		axis.scale = v3(0.1);
 	}
-
-	// Random creating
-	Loop(i, 0) {
-		MeshEnum meshes[] = {
-			// Mesh_MonkeyGlb,
-			// Mesh_Triangle,
-			Mesh_Cube,
-		};
-		MaterialEnum materials[] = {
-			Material_Orange,
-			// Material_Container,
-			// Material_Screen,
-		};
-		var desc = default_thing_desc();
-		desc.mesh = ArrayRand(meshes);
-		desc.mat = ArrayRand(materials);
-		u32 range = 100;
-		desc.pos = v3_rand(-v3(range), v3(range));;
-		var id = make_thing(desc);
-		array_push(g.moving_cubes, id);
-	}
-
-	// Moving cubes
-	Loop(i, g.moving_cubes.count) {
-		Thing& e = get_thing(g.moving_cubes[i]);
-		e.pos += e.vel * time_dt;
-		v3 center = {0, 0, 0};
-		v3 dir = e.pos - center;
-		v3 tangent = v3_norm(v3{-dir.z, 0, dir.x});
-		e.vel += tangent * 2.0f * time_dt;
-		e.vel += -dir * 0.5f * time_dt;
-	}
-
-	///////////////////////////////////
-	// Drawing things
-	// LoopIter (it, pool_begin(g.entities)) {
-	LoopIter(it, things_begin()) {
-		ThingId e_id = it.id();
-		// Entity& e = pool_get(g.entities, e_id);
-		// r_draw_mesh(e.mesh, e.mat, e.pos);
-		r_draw_entity(e_id);
-	}
-
-	///////////////////////////////////
-	// Rect text
-	{
-		r_draw_texture(rng2_make(v2(600, 50), v2(100)), get_texture(Texture_Bricks));
-		r_draw_texture(rng2_make(v2(800), v2(100)), get_texture(Texture_Orange));
-		r_draw_texture(rng2_make(v2(100,400), v2(100)), get_texture(Texture_Black));
-		r_draw_texture(rng2_make(v2(400,400), v2(100)), get_texture(Texture_Black1));
-		r_draw_texture(rng2_make(v2(700,400), v2(100)), get_texture(Texture_Black2));
-		r_draw_text_ext(st->r.dummy_font, v2(300), "I'm a hobbit from Shire!", ColorOrange, 64);
-		r_draw_text_ext(g.font, v2(500, 400), "New font!", ColorOrange, 64);
-		r_draw_rect(rng2_make(v2(100), v2(130)), ColorGreyDark);
-		r_draw_text_ext(st->r.dummy_font, v2(100, 100+32), "I'm a button", ColorWhite, 32);
-		// r_draw_text_ext(st->r.my_font, os_mouse_pos(), "I'm a button", ColorWhite, 32);
-		// if(time_on_interval(0.3)) {
-		//   Info("%f %f", os_mouse_pos().x, os_mouse_pos().y);
-		// }
-		// r_draw_rect_gradient(rng2_make(v2(500), v2(100)), {v4(1,1,1,0.0), v4(0,0,0,0.3), v4(1,1,1,0.3), v4()});
-		Rng2 rect = rng2_make(v2(100), v2(100));
-		r_draw_rect_rounded(rng2_pad(rect, 10), ColorGrey, 20, 9.1);
-
-		r_draw_rect(rng2_pad(rng2_make(v2(100,240), v2(100)), -5), ColorGrey, 30, 0, 3);
-		r_draw_rect(rng2_make(v2(100,240), v2(100)), ColorGrey, 3, 5, 3);
-		r_draw_texture(rng2_make(v2(200, 240), v2(100)), rng2_make(v2(0), v2(1024)), get_texture(Texture_Bricks), ColorGrey, 8, 0, 8);
-
-		// f32 font_height = 64;
-		// String t = "Let's see";
-		// f32 w = ui_text_width(t, g.font, font_height);
-		// String t1 = push_strf(scratch, "%s %f", t, w);
-		// r_draw_text_ext(g.font, v2(0,200), t1, ColorWhite, font_height);
-		// r_draw_rect(rng2_make(v2(0,200-font_height), v2(w, font_height)), v4(1,0.4,0.4,0.7));
-
-		// if(rng2_contains(rect, os_mouse_pos())) {
-		// 	if(os_mouse_is_button_down(MouseButton_Left)) {
-		// 		r_draw_rect(rect, ColorBlack);
-		// 	} else {
-		// 		r_draw_rect(rect, ColorGrey);
-		// 	}
-		// } else {
-		// 	// r_draw_rect(rect, ColorGrey1);
-		// }
-	}
+	r_draw_entity(g.axis_attached_to_cam_id);
+	r_draw_entity(g.grid);
+	r_draw_entity(g.barrack);
+	r_draw_mesh(get_mesh(Mesh_Bubble), get_material(Material_Container), v3());
 }
 
 #define FONT_SIZE 24
