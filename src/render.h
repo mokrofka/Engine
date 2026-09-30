@@ -42,7 +42,6 @@ struct R_TextureDesc {
 		u8* cube[6];
 	};
 	Gfx_PixelFormat pixel_format;
-	b32 async;
 	b32 is_cube;
 };
 
@@ -116,7 +115,6 @@ struct R_Glyph {
 struct R_FontDesc {
 	String name;
 	u32 font_height;
-	b32 async;
 	u8* data;
 };
 
@@ -185,16 +183,6 @@ struct R_RenderTarget {
 	R_Attachment color;
 	R_Attachment resolve;
 	R_Attachment depth;
-};
-
-struct R_Camera {
-	v3 pos;
-	v4 rot;
-	f32 fov;
-	f32 near_plane;
-	f32 far_plane;
-	b32 orthographic;
-	f32 ortho_size;
 };
 
 enum R_PushToGpuType {

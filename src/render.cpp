@@ -407,7 +407,7 @@ R_FontId r_make_dummy_font(R_FontDesc desc) {
 	u32 height = round_up(dim, font_height);
 	u8* pixels = push_buffer(g.arena, width*height);
 	stbtt_BakeFontBitmap(data.data, 0, font_height, pixels, width, height, 32, 96, characters_info);
-	R_TextureId texture_id = r_make_texture({.width = width, .height = height, .data = pixels, .pixel_format = Gfx_PixelFormat_R8, .async = desc.async});
+	R_TextureId texture_id = r_make_texture({.width = width, .height = height, .data = pixels, .pixel_format = Gfx_PixelFormat_R8});
 	R_Font font = {.font_height = font_height, .texture = texture_id};
 	LoopArray (i, font.glyphs) {
 		stbtt_bakedchar bakedchar = characters_info[i];
