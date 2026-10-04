@@ -59,18 +59,18 @@ R_Vertex cube_vertices[] = {
 };
 
 R_Vertex triangle_vertices[] = {
-	{.pos = v3( 0.0f,   0.5f, 0), .uv = v2(0.5f, 0), .color = v4(1,0,0,1)},
-	{.pos = v3(-0.5f,  -0.5f, 0), .uv = v2(0.0f, 1), .color = v4(0,1,0,1)},
-	{.pos = v3( 0.5f,  -0.5f, 0), .uv = v2(1.0f, 1), .color = v4(0,0,1,1)},
+	{.pos = v3( 0.0f,   0.5f, 0), .uv = v2(0.5f, 0), .color = u32_from_rgba(v4(1,0,0,1))},
+	{.pos = v3(-0.5f,  -0.5f, 0), .uv = v2(0.0f, 1), .color = u32_from_rgba(v4(0,1,0,1))},
+	{.pos = v3( 0.5f,  -0.5f, 0), .uv = v2(1.0f, 1), .color = u32_from_rgba(v4(0,0,1,1))},
 };
 
 R_Vertex axis_vertices[] = {
-	{.pos = v3(),      .color = v4(1,0,0,1)},
-	{.pos = v3(1,0,0), .color = v4(1,0,0,1)},
-	{.pos = v3(),      .color = v4(0,1,0,1)},
-	{.pos = v3(0,1,0), .color = v4(0,1,0,1)},
-	{.pos = v3(),      .color = v4(0,0,1,1)},
-	{.pos = v3(0,0,1), .color = v4(0,0,1,1)},
+	{.pos = v3(),      .color = u32_from_rgba(v4(1,0,0,1))},
+	{.pos = v3(1,0,0), .color = u32_from_rgba(v4(1,0,0,1))},
+	{.pos = v3(),      .color = u32_from_rgba(v4(0,1,0,1))},
+	{.pos = v3(0,1,0), .color = u32_from_rgba(v4(0,1,0,1))},
+	{.pos = v3(),      .color = u32_from_rgba(v4(0,0,1,1))},
+	{.pos = v3(0,0,1), .color = u32_from_rgba(v4(0,0,1,1))},
 };
 
 global_var String meshes_strs[] = {
@@ -610,6 +610,7 @@ void test_sort() {
 }
 
 void test_js() {
+	Scratch scratch;
 	String d = R"(
 	{
 		"name": "cube",
@@ -622,90 +623,69 @@ void test_js() {
 	}
 	)";
 
-	Scratch scratch;
+
+	// {
+	// 	struct {
+	// 		String name;
+	// 		b32 visible;
+	// 		v3 pos;
+	// 		struct {
+	// 			v3 color;
+	// 			f32 roughness;
+	// 		} material;
+	// 	} res = {};
+	// 	JsParser p = js_parse_make(scratch, d);
+	// 	JsObj root = js_parse(&p).obj;
+	// 	Loop(i, root.fields.count) {
+	// 		var [k, v] = root.fields[i];
+	// 		if(str_match(k, "name")) {
+	// 			res.name = push_str_copy(scratch, v->str);
+	// 		}
+	// 		else if(str_match(k, "visible")) {
+	// 			res.visible = v->boolean;
+	// 		}
+	// 		else if(str_match(k, "pos")) {
+	// 			Loop(i, v->array.count) {
+	// 				res.pos.v[i] = v->array[i]->number;
+	// 			}
+	// 		}
+	// 		else if(str_match(k, "material")) {
+	// 			JsObj material = v->obj;
+	// 			Loop(i, material.fields.count) {
+	// 				var [k, v] = material.fields[i];
+	// 				if(str_match(k, "color")) {
+	// 					Loop(i, v->array.count) {
+	// 						res.material.color.v[i] = v->array[i]->number;
+	// 					}
+	// 				} else if(str_match(k, "roughness")) {
+	// 					res.material.roughness = v->number;
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// }
+
 
 	{
-		struct {
-			String name;
-			b32 visible;
-			v3 pos;
-			struct {
-				v3 color;
-				f32 roughness;
-			} material;
-		} res = {};
-
 		JsParser p = js_parse_make(scratch, d);
-		JsObj root = js_parse(&p).obj;
-		Loop(i, root.fields.count) {
-			var [k, v] = root.fields[i];
-			if(str_match(k, "name")) {
-				res.name = push_str_copy(scratch, v->str);
-			}
-			else if(str_match(k, "visible")) {
-				res.visible = v->boolean;
-			}
-			else if(str_match(k, "pos")) {
-				Loop(i, v->array.count) {
-					res.pos.v[i] = v->array[i]->number;
-				}
-			}
-			else if(str_match(k, "material")) {
-				JsObj material = v->obj;
-				Loop(i, material.fields.count) {
-					var [k, v] = material.fields[i];
-					if(str_match(k, "color")) {
-						Loop(i, v->array.count) {
-							res.material.color.v[i] = v->array[i]->number;
-						}
-					} else if(str_match(k, "roughness")) {
-						res.material.roughness = v->number;
-					}
-				}
-			}
-		}
-	}
-
-	{
-		JsParser p = js_parse_make(scratch, d);
-		JsObj root = js_parse(&p).obj;
-		String name = js_get_str(root, "name");
+		JsObj root = js_parse(p).obj;
+		String name = js_str(root, "name").val();
 		Info("%s", name);
-		b32 visible = js_get_bool(root, "visible");
+		b32 visible = js_bool(root, "visible").val();
 		Info("%u", visible);
-		Slice pos = js_get_array(root, "pos");
+		Slice pos = js_array(root, "pos").val();
 		Loop(i, pos.count) {
 			Info("%f", pos[i]->number);
 		}
 		{
-			JsObj material = js_get_obj(root, "material");
-			Slice color = js_get_array(material, "color");
+			JsObj material = js_obj(root, "material").val();
+			Slice color = js_array(material, "color").val();
 			Loop(i, color.count) {
 				Info("%f", color[i]->number);
 			}
-			f64 roughness = js_get_number(material, "roughness");
+			f64 roughness = js_number(material, "roughness").val();
 			Info("%f", roughness);
 		}
-	}
-
-	{
-		JsParser p = js_parse_make(scratch, d);
-		JsVal root = js_parse(&p);
-		JsVal name = js_get_val(root, "name");
-		Info("%s", name.str);
-		JsVal visible = js_get_val(root, "visible");
-		Info("%u", visible.boolean);
-		JsVal pos = js_get_val(root, "pos");
-		Loop(i, pos.array.count) {
-			Info("%f", pos.array[i]->number);
-		}
-		JsVal material = js_get_val(root, "material");
-		JsVal color = js_get_val(material, "color");
-		Loop(i, color.array.count) {
-			Info("%f", color.array[i]->number);
-		}
-		JsVal roughness = js_get_val(material, "roughness");
-		Info("%f", roughness.number);
 	}
 }
 
@@ -812,30 +792,30 @@ b32 time_on_between_interval(f32 interval, f32 offset) { return time_on_between_
 f64 time_since(f64 timestamp) { return time_now - timestamp; }
 f64 time_until(f64 timestamp) { return timestamp - time_now; }
 
-void imgui_draw_rect(ImDrawList* draw, Rng2 rect, v4 col, f32 rounding, ImDrawFlags flags, f32 thickness) {
-	draw->AddRect(rect.min, rect.max, u32_from_rgba(col), rounding, thickness, flags);
+void imgui_draw_rect(ImDrawList* draw, Rng2 rect, Color col, f32 rounding, ImDrawFlags flags, f32 thickness) {
+	draw->AddRect(rect.min, rect.max, col.v, rounding, thickness, flags);
 }
-void imgui_draw_rect_filled(ImDrawList* draw, Rng2 rect, v4 col, f32 rounding, ImDrawFlags flags) {
-	draw->AddRectFilled(rect.min, rect.max, u32_from_rgba(col));
+void imgui_draw_rect_filled(ImDrawList* draw, Rng2 rect, Color col, f32 rounding, ImDrawFlags flags) {
+	draw->AddRectFilled(rect.min, rect.max, col.v);
 }
-void imgui_draw_line(ImDrawList* draw, v2 p0, v2 p1, v4 col, f32 thickness) {
-	draw->AddLine(p0, p1, u32_from_rgba(col));
+void imgui_draw_line(ImDrawList* draw, v2 p0, v2 p1, Color col, f32 thickness) {
+	draw->AddLine(p0, p1, col.v);
 }
-void imgui_draw_text(ImDrawList* draw, v2 pos, v4 col, String fmt, ...) {
+void imgui_draw_text(ImDrawList* draw, v2 pos, Color col, String fmt, ...) {
 	Scratch scratch;
 	VaList args;
 	va_start(args, fmt);
 	String formateted = push_strfv(scratch, fmt, args);
 	va_end(args);
-	draw->AddText(pos, u32_from_rgba(col), (char*)formateted.str, (char*)(formateted.str + formateted.size));
+	draw->AddText(pos, col.v, (char*)formateted.str, (char*)(formateted.str + formateted.size));
 }
-void imgui_draw_text(ImDrawList* draw, f32 font_size, v2 pos, v4 col, String fmt, ...) {
+void imgui_draw_text(ImDrawList* draw, f32 font_size, v2 pos, Color col, String fmt, ...) {
 	Scratch scratch;
 	VaList args;
 	va_start(args, fmt);
 	String formateted = push_strfv(scratch, fmt, args);
 	va_end(args);
-	draw->AddText(null, font_size, pos, u32_from_rgba(col), (char*)formateted.str, (char*)(formateted.str + formateted.size));
+	draw->AddText(null, font_size, pos, col.v, (char*)formateted.str, (char*)(formateted.str + formateted.size));
 }
 void imgui_text(String fmt, ...) {
 	Scratch scratch;
@@ -1062,7 +1042,7 @@ void dev_update() {
 
 								///////////////////////////////////
 								// Draw
-								v4 color = {};
+								Color color = {};
 								String str = {};
 								switch(anchor.type) {
 									case ProfType_Default: {
@@ -1146,7 +1126,7 @@ void dev_update() {
 									prof_win.frames_cam.zoom = 1;
 								}
 							}
-							v4 color = {};
+							Color color = {};
 							if(i == current_frame % ArrayCount(prof.frames_times)) {
 								color = colors.current_frame;
 							} else {
@@ -1158,7 +1138,9 @@ void dev_update() {
 								}
 							}
 							imgui_draw_rect_filled(draw, rect, color);
-							imgui_draw_rect(draw, rect, v4_set_w(ColorGrey0, 0.3));
+							Color c = ColorGrey0;
+							c.a = 0.3f * 255;
+							imgui_draw_rect(draw, rect, c);
 						}
 
 						LoopArray(i, slices) slices[i] = slice(prof.prof_threads[i].recorded_anchors[idx]);
@@ -1244,7 +1226,7 @@ void dev_update() {
 									prof_win.frames_cam.zoom = 1;
 								}
 							}
-							v4 color = {};
+							Color color = {};
 							if(i == current_frame % ArrayCount(prof.frames_times)) {
 								color = colors.current_frame;
 							} else {
@@ -1256,7 +1238,9 @@ void dev_update() {
 								}
 							}
 							imgui_draw_rect_filled(draw, rect, color);
-							imgui_draw_rect(draw, rect, v4_set_w(ColorGrey0, 0.3));
+							var c = ColorGrey0;
+							c.a = 0.3f * 255;
+							imgui_draw_rect(draw, rect, c.a);
 						}
 						draw_thread_names(info_rect, prof_win.frames_cam);
 						// Draw graph per thread
@@ -1591,8 +1575,8 @@ R_MeshDesc load_obj(Allocator arena, String name) {
 	}
 
 	var vertices = array_make<R_Vertex>(arena);
-	var final_indices = array_make<u32>(arena);
-	var map = map_make<u32>(scratch);
+	var final_indices = array_make<u16>(arena);
+	var map = map_make<u16>(scratch);
 	Loop(i, indexes.count) {
 		v3u idx = indexes[i];
 		u64 h = hash_bytes(&idx, sizeof(v3u));
@@ -1605,7 +1589,7 @@ R_MeshDesc load_obj(Allocator arena, String name) {
 			 normals[idx.y],
 			 uvs[idx.z],
 			};
-			u32 new_index = vertices.count;
+			u16 new_index = vertices.count;
 			array_push(vertices, v);
 			array_push(final_indices, new_index);
 			map_set(map, h, new_index);
@@ -1625,8 +1609,10 @@ R_MeshDesc load_obj(Allocator arena, String name) {
 #define Gltf_u32 5125
 #define Gltf_f32 5126
 
-R_MeshDesc load_gltf(Allocator arena, String path, b32 is_glb) {
+GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 	Scratch scratch(arena);
+
+	String path = push_strf(scratch, "%s/%s", st->models_dir, name);
 
 	String json = {};
 	Slice<u8> cursor = {};
@@ -1657,88 +1643,203 @@ R_MeshDesc load_gltf(Allocator arena, String path, b32 is_glb) {
 		NoOp(bin_chunk);
 		Assert(str_match(String((u8*)&bin_chunk->chunk_type, 3), "BIN"));
 		cursor = slice_skip(cursor, sizeof(ChunkHeader));
-
 	} else {
 		json = os_file_path_read_all_str(scratch, path);
 	}
 
-	struct Accessor {
-		u32 buffer_view;
-		u32 count;
-	};
-
-	struct {
-		u32 pos_attribute;
-		u32 norm_attribute;
-		u32 texcoord_attribute;
-		u32 indices_attribute;
-		Accessor pos_accessor;
-		Accessor norm_accessor;
-		Accessor texcoord_accessor;
-		Accessor indices_accessor;
-		Region pos_buffer_view;
-		Region norm_buffer_view;
-		Region texcoord_buffer_view;
-		Region indices_buffer_view;
-	} gltf;
-
-	JsParser p = js_parse_make(scratch, json);
-	JsObj root = js_parse(&p).obj;
-	{
-		Slice meshes = js_get_array(root, "meshes");
-		JsObj mesh = meshes[0]->obj;
-		{
-			Slice primitives = js_get_array(mesh, "primitives");
-			JsObj first = primitives[0]->obj;
-			{
-				JsObj attributes = js_get_obj(first, "attributes");
-				gltf.pos_attribute = js_get_number(attributes, "POSITION");
-				gltf.norm_attribute = js_get_number(attributes, "NORMAL");
-				gltf.texcoord_attribute = js_get_number(attributes, "TEXCOORD_0");
-			}
-			gltf.indices_attribute = js_get_number(first, "indices");
-		}
-	}
-	{
-		Slice accessors = js_get_array(root, "accessors");
-		JsObj pos_accessor = accessors[gltf.pos_attribute]->obj;
-		gltf.pos_accessor.buffer_view = js_get_number(pos_accessor, "bufferView");
-		gltf.pos_accessor.count = js_get_number(pos_accessor, "count");
-		JsObj norm_accessor = accessors[gltf.norm_attribute]->obj;
-		gltf.norm_accessor.buffer_view = js_get_number(norm_accessor, "bufferView");
-		gltf.norm_accessor.count = js_get_number(norm_accessor, "count");
-		JsObj texcoord_accessor = accessors[gltf.texcoord_attribute]->obj;
-		gltf.texcoord_accessor.buffer_view = js_get_number(texcoord_accessor, "bufferView");
-		gltf.texcoord_accessor.count = js_get_number(texcoord_accessor, "count");
-		JsObj indices_accessor = accessors[gltf.indices_attribute]->obj;
-		gltf.indices_accessor.buffer_view = js_get_number(indices_accessor, "bufferView");
-		gltf.indices_accessor.count = js_get_number(indices_accessor, "count");
-	}
-	{
-		Slice buffer_views = js_get_array(root, "bufferViews");
-		JsObj pos_buffer_view = buffer_views[gltf.pos_accessor.buffer_view]->obj;
-		gltf.pos_buffer_view.size = js_get_number(pos_buffer_view, "byteLength");
-		gltf.pos_buffer_view.offset = js_get_number(pos_buffer_view, "byteOffset");
-		JsObj norm_buffer_view = buffer_views[gltf.norm_accessor.buffer_view]->obj;
-		gltf.norm_buffer_view.size = js_get_number(norm_buffer_view, "byteLength");
-		gltf.norm_buffer_view.offset = js_get_number(norm_buffer_view, "byteOffset");
-		JsObj texcoord_buffer_view = buffer_views[gltf.texcoord_accessor.buffer_view]->obj;
-		gltf.texcoord_buffer_view.size = js_get_number(texcoord_buffer_view, "byteLength");
-		gltf.texcoord_buffer_view.offset = js_get_number(texcoord_buffer_view, "byteOffset");
-		JsObj indices_buffer_view = buffer_views[gltf.indices_accessor.buffer_view]->obj;
-		gltf.indices_buffer_view.size = js_get_number(indices_buffer_view, "byteLength");
-		gltf.indices_buffer_view.offset = js_get_number(indices_buffer_view, "byteOffset");
-	}
 	String file_path = str_chop_last_dot(path);
 	String file_path_bin = push_strf(scratch, "%s.bin", file_path);
 	Slice data = is_glb ? cursor : os_file_path_read_all(scratch, file_path_bin);
-	Slice pos = slice_reinterpret<v3>(slice_n(data, gltf.pos_buffer_view.offset, gltf.pos_buffer_view.size));
-	Slice norm = slice_reinterpret<v3>(slice_n(data, gltf.norm_buffer_view.offset, gltf.norm_buffer_view.size));
-	Slice texcoord = slice_reinterpret<v2>(slice_n(data, gltf.texcoord_buffer_view.offset, gltf.texcoord_buffer_view.size));
-	Slice indices_u16 = slice_reinterpret<u16>(slice_n(data, gltf.indices_buffer_view.offset, gltf.indices_buffer_view.size));
 
-	Slice vertices = push_slice(arena, R_Vertex, gltf.pos_accessor.count);
-	Slice indices = push_slice(arena, u32, gltf.indices_accessor.count);
+	u32 vert_count = 0;
+	u32 indices_count = 0;
+	Slice<v3> pos = {};
+	Slice<v3> norm = {};
+	Slice<v2> texcoord = {};
+	Slice<u16> indices_u16 = {};
+	Slice<v4u8> joints = {};
+	Slice<v4> weights = {};
+	Slice<m4x4> inv_matrices = {};
+	Slice<Bone> bones = {};
+	Slice<Channel> channels = {};
+	Slice<Sampler> samplers = {};
+
+	JsParser p = js_parse_make(scratch, json);
+	JsObj root = js_parse(p).obj;
+	Slice nodes = js_array(root, "nodes").val();
+	Slice accessors = js_array(root, "accessors").val();
+	Slice buffer_views = js_array(root, "bufferViews").val();
+
+	///////////////////////////////////
+	// Mesh
+	{
+		Slice meshes = js_array(root, "meshes").val();
+		JsObj first_mesh = meshes[0]->obj;
+		Slice primitives = js_array(first_mesh, "primitives").val();
+		JsObj first_primitive = primitives[0]->obj;
+		JsObj attributes = js_obj(first_primitive, "attributes").val();
+		{
+			u32 pos_attribute = js_number(attributes, "POSITION").val();
+			JsObj pos_accessor = accessors[pos_attribute]->obj;
+			u32 buffer_view = js_number(pos_accessor, "bufferView").val();
+			vert_count = js_number(pos_accessor, "count").val();
+			JsObj pos_buffer_view = buffer_views[buffer_view]->obj;
+			u64 size = js_number(pos_buffer_view, "byteLength").val();
+			u64 off = js_number(pos_buffer_view, "byteOffset").val();
+			pos = slice_reinterpret<v3>(slice_n(data, off, size));
+		}
+		{
+			u32 norm_attribute = js_number(attributes, "NORMAL").val();
+			JsObj norm_accessor = accessors[norm_attribute]->obj;
+			u32 buffer_view = js_number(norm_accessor, "bufferView").val();
+			JsObj norm_buffer_view = buffer_views[buffer_view]->obj;
+			u64 size = js_number(norm_buffer_view, "byteLength").val();
+			u64 off = js_number(norm_buffer_view, "byteOffset").val();
+			norm = slice_reinterpret<v3>(slice_n(data, off, size));
+		}
+		{
+			u32 texcoord_attribute = js_number(attributes, "TEXCOORD_0").val();
+			JsObj texcoord_accessor = accessors[texcoord_attribute]->obj;
+			u32 buffer_view = js_number(texcoord_accessor, "bufferView").val();
+			JsObj texcoord_buffer_view = buffer_views[buffer_view]->obj;
+			u64 size = js_number(texcoord_buffer_view, "byteLength").val();
+			u64 off = js_number(texcoord_buffer_view, "byteOffset").val();
+			texcoord = slice_reinterpret<v2>(slice_n(data, off, size));
+		}
+		{
+			u32 indices_attribute = js_number(first_primitive, "indices").val();
+			JsObj indices_accessor = accessors[indices_attribute]->obj;
+			u32 buffer_view = js_number(indices_accessor, "bufferView").val();
+			indices_count = js_number(indices_accessor, "count").val();
+			JsObj indices_buffer_view = buffer_views[buffer_view]->obj;
+			u64 size = js_number(indices_buffer_view, "byteLength").val();
+			u64 off = js_number(indices_buffer_view, "byteOffset").val();
+			indices_u16 = slice_reinterpret<u16>(slice_n(data, off, size));
+		}
+		{
+			var[joints_attribute, ok] = js_number(attributes, "JOINTS_0");
+			if(ok) {
+				JsObj joints_accessor = accessors[joints_attribute]->obj;
+				u32 buffer_view = js_number(joints_accessor, "bufferView").val();
+				JsObj joints_buffer_view = buffer_views[buffer_view]->obj;
+				u64 size = js_number(joints_buffer_view, "byteLength").val();
+				u64 offset = js_number(joints_buffer_view, "byteOffset").val();
+				joints = slice_reinterpret<v4u8>(slice_n(data, offset, size));
+			}
+		}
+		{
+			var[weights_attribute, ok] = js_number(attributes, "WEIGHTS_0");
+			if(ok) {
+				JsObj weights_accessor = accessors[weights_attribute]->obj;
+				u32 buffer_view = js_number(weights_accessor, "bufferView").val();
+				JsObj weights_buffer_view = buffer_views[buffer_view]->obj;
+				u64 size = js_number(weights_buffer_view, "byteLength").val();
+				u64 off = js_number(weights_buffer_view, "byteOffset").val();
+				weights = slice_reinterpret<v4>(slice_n(data, off, size));
+			}
+		}
+	}
+
+	///////////////////////////////////
+	// Skin
+	{
+		var[skins, ok] = js_array(root, "skins");
+		if(ok) {
+			JsObj first_skin = skins[0]->obj;
+			u32 inv_matrices_attribute = js_number(first_skin, "inverseBindMatrices").val();
+			JsObj inv_matrices_accessor = accessors[inv_matrices_attribute]->obj;
+			u32 buffer_view = js_number(inv_matrices_accessor, "bufferView").val();
+			JsObj inv_matrices_buffer_view = buffer_views[buffer_view]->obj;
+			u64 size = js_number(inv_matrices_buffer_view, "byteLength").val();
+			u64 off = js_number(inv_matrices_buffer_view, "byteOffset").val();
+			var matrices = slice_reinterpret<m4x4>(slice_n(data, off, size));
+			inv_matrices = push_slice(arena, m4x4, matrices.count);
+			Slice joints_indices = js_array(first_skin, "joints").val();
+			bones = push_slice(arena, Bone, joints_indices.count);
+			u32 bone_count = 0;
+			u32 node_to_joint[255] = {};
+			u32 node_to_bone[255] = {};
+			Loop(joint_idx, joints_indices.count) {
+				u32 node_idx = joints_indices[joint_idx]->number;
+				node_to_joint[node_idx] = joint_idx;
+			}
+			var dfs = [&](var dfs, u32 node_idx, u32 parent_idx) -> void {
+				JsObj node = nodes[node_idx]->obj;
+				u32 bone_idx = bone_count++;
+				node_to_bone[node_idx] = bone_idx;
+				inv_matrices[bone_idx] = matrices[node_to_joint[node_idx]];
+				Transform trans = {};
+				trans.pos = js_v3(node, "translation").or_else(v3());
+				trans.rot = js_v4(node, "rotation").or_else(quat_identity());
+				trans.scale = js_v3(node, "scale").or_else(v3(1));
+				bones[bone_idx].local = trans;
+				bones[bone_idx].parent = parent_idx;
+				Slice children = js_array(node, "children").or_else({});
+				Loop(i, children.count) {
+					dfs(dfs, children[i]->number, bone_idx);
+				}
+			};
+			dfs(dfs, joints_indices[0]->number, 0);
+
+			// Animation
+			var[animations, ok] = js_array(root, "animations");
+			if(ok) {
+				var first_animation = animations[0]->obj;
+				var js_channels = js_array(first_animation, "channels").val();
+				channels = push_slice(arena, Channel, js_channels.count);
+				Loop(i, js_channels.count) {
+					var channel = js_channels[i]->obj;
+					u32 sampler = js_number(channel, "sampler").val();
+					var target = js_obj(channel, "target").val();
+					u32 node = js_number(target, "node").val();
+					String path = js_str(target, "path").val();
+					channels[i].bone = node_to_bone[node];
+					channels[i].sampler = sampler;
+					AnimPath anim_path = {};
+					if(str_match(path, "translation")) {
+						anim_path = AnimPath_Pos;
+					} else if(str_match(path, "rotation")) {
+						anim_path = AnimPath_Rot;
+					} else if(str_match(path, "scale")) {
+						anim_path = AnimPath_Scale;
+					} else InvalidPath;
+					channels[i].path = anim_path;
+				}
+				var js_samplers = js_array(first_animation, "samplers").val();
+				samplers = push_slice(arena, Sampler, js_samplers.count);
+				Loop(i, js_samplers.count) {
+					var sampler = js_samplers[i]->obj;
+					u32 input = js_number(sampler, "input").val();
+					JsObj input_accessor = accessors[input]->obj;
+					u32 input_buffer_view = js_number(input_accessor, "bufferView").val();
+					JsObj js_input_buffer_view = buffer_views[input_buffer_view]->obj;
+					u64 input_size = js_number(js_input_buffer_view, "byteLength").val();
+					u64 input_off = js_number(js_input_buffer_view, "byteOffset").val();
+					var timestamps = slice_reinterpret<f32>(slice_n(data, input_off, input_size));
+					samplers[i].times = slice_clone(arena, timestamps).data;
+					samplers[i].count = timestamps.count;
+
+					u32 output = js_number(sampler, "output").val();
+					JsObj output_accessor = accessors[output]->obj;
+					u32 output_buffer_view = js_number(output_accessor, "bufferView").val();
+					String output_type = js_str(output_accessor, "type").val();
+					JsObj js_output_buffer_view = buffer_views[output_buffer_view]->obj;
+					u64 output_size = js_number(js_output_buffer_view, "byteLength").val();
+					u64 output_off = js_number(js_output_buffer_view, "byteOffset").val();
+					if(str_match(output_type, "VEC3")) {
+						var values = slice_reinterpret<v3>(slice_n(data, output_off, output_size));
+						samplers[i].values = slice_clone(arena, values).data;
+					} else if(str_match(output_type, "VEC4")) {
+						var values = slice_reinterpret<v4>(slice_n(data, output_off, output_size));
+						samplers[i].values = slice_clone(arena, values).data;
+					} else InvalidPath;
+				}
+			}
+		}
+	}
+
+	Slice vertices = push_slice(arena, R_Vertex, vert_count);
+	Slice indices = push_slice(arena, u16, indices_count);
 	Loop(i, indices.count) {
 		indices[i] = indices_u16[i];
 	}
@@ -1749,11 +1850,92 @@ R_MeshDesc load_gltf(Allocator arena, String path, b32 is_glb) {
 			.uv = texcoord[i],
 		};
 	}
-	R_MeshDesc mesh = {
-		.vertices = vertices,
-		.indices = indices,
+	if(joints.count) {
+		Loop(i, vertices.count) {
+			// vertices[i].joints = joints[i];
+			vertices[i].joints.v[0] = joints[i].v[0];
+			vertices[i].joints.v[1] = joints[i].v[1];
+			vertices[i].joints.v[2] = joints[i].v[2];
+			vertices[i].joints.v[3] = joints[i].v[3];
+			// vertices[i].weights = weights[i];
+		}
+	}
+	GltfInfo res = {
+		.mesh = {
+			.vertices = vertices,
+			.indices = indices,
+		},
+		.bones = bones,
+		.inv_matrices = inv_matrices,
+		.animation = {
+			.channels = channels,
+			.samplers = samplers,
+		},
 	};
-	return mesh;
+	res.animation.duration = animation_duration(res.animation);
+	return res;
+}
+
+v3 sample_v3(Sampler s, f32 time) {
+	u32 found = -1;
+	LoopOff(i, 1, s.count) {
+		if(time < s.times[i]) {
+			found = i-1;
+			break;
+		}
+	}
+	if(found == -1)
+		return ((v3*)s.values)[s.count - 1];
+	f32 t0 = s.times[found];
+	f32 t1 = s.times[found + 1];
+	f32 t = unlerp(t0, time, t1);
+	v3 a = ((v3*)s.values)[found];
+	v3 b = ((v3*)s.values)[found + 1];
+	return v3_lerp(a, t, b);
+}
+v4 sample_quat(Sampler s, f32 time) {
+	u32 found = -1;
+	LoopOff(i, 1, s.count) {
+		if(time < s.times[i]) {
+			found = i-1;
+			break;
+		}
+	}
+	if(found == -1)
+		return ((v4*)s.values)[s.count - 1];
+	f32 t0 = s.times[found];
+	f32 t1 = s.times[found + 1];
+	f32 t = unlerp(t0, time, t1);
+	v4 a = ((v4*)s.values)[found];
+	v4 b = ((v4*)s.values)[found + 1];
+	return quat_slerp(a, t, b);
+}
+
+void update_animation(Animation anim, Pose pose, f32 time) {
+	for(var channel : anim.channels) {
+		Sampler sampler = anim.samplers[channel.sampler];
+		Transform& bone = pose.bones[channel.bone].local;
+		switch(channel.path) {
+			case AnimPath_Pos: {
+				bone.pos = sample_v3(sampler, time);
+			} break;
+			case AnimPath_Rot: {
+				bone.rot = sample_quat(sampler, time);
+			} break;
+			case AnimPath_Scale: {
+				bone.scale = sample_v3(sampler, time);
+			} break;
+		}
+	}
+}
+
+f32 animation_duration(Animation anim) {
+	f32 duration = 0;
+	for(var sampler : anim.samplers) {
+		f32 last_time = sampler.times[sampler.count - 1];
+		duration = Max(duration, last_time);
+	}
+	return duration;
 }
 
 JsParser js_parse_make(Allocator arena, String str) {
@@ -1763,76 +1945,70 @@ JsParser js_parse_make(Allocator arena, String str) {
 	};
 	return res;
 }
-u8 js_peek(JsParser* p) {
-	if(p->cursor >= p->str.size) return 0;
-	return p->str.str[p->cursor];
+b32 js_is_end(JsParser& p) {
+	return p.cursor >= p.str.size;
 }
-b32 js_at_end(JsParser* p) {
-	return p->cursor >= p->str.size;
+u8 js_peek(JsParser& p) {
+	if(js_is_end(p)) return 0;
+	return p.str.str[p.cursor];
 }
-void js_advance(JsParser* p) {
-	p->cursor++;
-}
-void js_skip_ws(JsParser* p) {
+void js_skip_ws(JsParser& p) {
 	while(char_is_ws(js_peek(p))) {
-		js_advance(p);
+		p.cursor++;
 	}
 }
-String js_parse_str(JsParser* p) {
+String js_parse_str(JsParser& p) {
 	Assert(js_peek(p) == '\"');
-	js_advance(p);
-	u32 start = p->cursor;
-	while(js_peek(p) != '\"' && !js_at_end(p)) {
-		js_advance(p);
+	p.cursor++;
+	u32 start = p.cursor;
+	while(js_peek(p) != '\"' && !js_is_end(p)) {
+		p.cursor++;
 	}
 	Assert(js_peek(p) == '\"'); 
-	String res = str_substr(p->str, Rng1u(start, p->cursor));
-	js_advance(p);
+	String res = str_substr(p.str, Rng1u(start, p.cursor));
+	p.cursor++;
 	return res;
 }
-f64 js_parse_number(JsParser* p) {
-	u32 start = p->cursor;
-	// while(char_is_number_cont(js_peek(p))) {
-	//   js_advance(p);
-	// }
+f64 js_parse_number(JsParser& p) {
+	u32 start = p.cursor;
 	if(js_peek(p) == '-')
-		js_advance(p);
+		p.cursor++;
 	while(char_is_digit(js_peek(p)))
-		js_advance(p);
+		p.cursor++;
 	if(js_peek(p) == '.') {
-		js_advance(p);
+		p.cursor++;
 		while(char_is_digit(js_peek(p)))
-			js_advance(p);
+			p.cursor++;
 	}
 	if(js_peek(p) == 'e' || js_peek(p) == 'E') {
-		js_advance(p);
+		p.cursor++;
 		if(js_peek(p) == '+' || js_peek(p) == '-')
-			js_advance(p);
+			p.cursor++;
 		while(char_is_digit(js_peek(p)))
-			js_advance(p);
+			p.cursor++;
 	}
-	String str = str_substr(p->str, Rng1u(start, p->cursor));
+	String str = str_substr(p.str, Rng1u(start, p.cursor));
 	f64 res = f64_from_str(str);
 	return res;
 }
-JsVal js_parse(JsParser* p) {
+JsVal js_parse(JsParser& p) {
 	js_skip_ws(p);
 	switch(js_peek(p)) {
-		default:   return { .type = JsType_Number, .number = js_parse_number(p) };
-		case '\"': return { .type = JsType_Str, .str = js_parse_str(p), };
-		case 't': p->cursor += 4; return { .type = JsType_Bool, .boolean = true, };
-		case 'f': p->cursor += 5; return { .type = JsType_Bool, .boolean = false, };
-		case 'n': p->cursor += 4; return { .type = JsType_Null, };
+		default:   return {.type = JsType_Number, .number = js_parse_number(p)};
+		case '\"': return {.type = JsType_Str, .str = js_parse_str(p)};
+		case 't': p.cursor += 4; return {.type = JsType_Bool, .boolean = true};
+		case 'f': p.cursor += 5; return {.type = JsType_Bool, .boolean = false};
+		case 'n': p.cursor += 4; return {.type = JsType_Null};
 		case '[': {
-			js_advance(p);
-			var arr = array_make<JsVal*>(p->arena);
-			while(true) {
+			p.cursor++;
+			var arr = array_make<JsVal*>(p.arena);
+			For {
 				js_skip_ws(p);
 				if(js_peek(p) == ']') {
-					js_advance(p);
+					p.cursor++;
 					break;
 				}
-				JsVal* val = push_struct(p->arena, JsVal);
+				JsVal* val = push_struct(p.arena, JsVal);
 				*val = js_parse(p);
 				// switch(val->type) {
 				//   case JsType_Null: Info("null"); break;
@@ -1845,7 +2021,7 @@ JsVal js_parse(JsParser* p) {
 				array_push(arr, val);
 				js_skip_ws(p);
 				if(js_peek(p) == ',') {
-					js_advance(p);
+					p.cursor++;
 				}
 			}
 			JsVal res = {
@@ -1855,19 +2031,19 @@ JsVal js_parse(JsParser* p) {
 			return res;
 		}break;
 		case '{': {
-			js_advance(p);
-			var fields = array_make<JsField>(p->arena);
-			while(true) {
+			p.cursor++;
+			var fields = array_make<JsField>(p.arena);
+			For {
 				js_skip_ws(p);
 				if(js_peek(p) == '}') {
-					js_advance(p);
+					p.cursor++;
 					break;
 				}
 				String key = js_parse_str(p);
 				js_skip_ws(p);
 				Assert(js_peek(p) == ':');
-				js_advance(p);
-				JsVal* val = push_struct(p->arena, JsVal);
+				p.cursor++;
+				JsVal* val = push_struct(p.arena, JsVal);
 				*val = js_parse(p);
 				// switch(val->type) {
 				//   case JsType_Null: Info("null"); break;
@@ -1880,7 +2056,7 @@ JsVal js_parse(JsParser* p) {
 				array_push(fields, {.key = key, .val = val});
 				js_skip_ws(p);
 				if(js_peek(p) == ',') {
-					js_advance(p);
+					p.cursor++;
 				}
 			}
 			JsVal res = {
@@ -1892,63 +2068,53 @@ JsVal js_parse(JsParser* p) {
 	}
 }
 
-JsVal js_get_val(JsVal val, String key) {
-	Loop(i, val.obj.fields.count) {
-		JsField& field = val.obj.fields[i];
+Result<JsVal> js_val(JsVal val, String key) {
+	for(var& field : val.obj.fields) {
 		if(str_match(field.key, key)) {
-			// Assert(field.val->type == JsType_Obj);
-			return *field.val;
+			return {*field.val, true};
 		}
 	}
 	return {};
 }
-b32 js_get_bool(JsObj obj, String key) {
-	Loop(i, obj.fields.count) {
-		JsField& field = obj.fields[i];
-		if(str_match(field.key, key)) {
-			Assert(field.val->type == JsType_Bool);
-			return field.val->boolean;
+Result<b32> js_bool(JsObj obj, String key) {
+	var[v, ok] = js_val({.obj = obj}, key);
+	return {v.boolean, ok};
+}
+Result<f64> js_number(JsObj obj, String key) {
+	var[v, ok] = js_val({.obj = obj}, key);
+	return {v.number, ok};
+}
+Result<String> js_str(JsObj obj, String key) {
+	var[v, ok] = js_val({.obj = obj}, key);
+	return {v.str, ok};
+}
+Result<Slice<JsVal*>> js_array(JsObj obj, String key) {
+	var[v, ok] = js_val({.obj = obj}, key);
+	return {v.array, ok};
+}
+Result<JsObj> js_obj(JsObj obj, String key) {
+	var[v, ok] = js_val({.obj = obj}, key);
+	return {v.obj, ok};
+}
+Result<v3> js_v3(JsObj obj, String key) {
+	var[v, ok] = js_val({.obj = obj}, key);
+	if(ok) {
+		v3 res = {};
+		Loop(i, 3) {
+			res.v[i] = v.array[i]->number;
 		}
+		return {res, true};
 	}
 	return {};
 }
-f64 js_get_number(JsObj obj, String key) {
-	Loop(i, obj.fields.count) {
-		JsField& field = obj.fields[i];
-		if(str_match(field.key, key)) {
-			Assert(field.val->type == JsType_Number);
-			return field.val->number;
+Result<v4> js_v4(JsObj obj, String key) {
+	var[v, ok] = js_val({.obj = obj}, key);
+	if(ok) {
+		v4 res = {};
+		Loop(i, 4) {
+			res.v[i] = v.array[i]->number;
 		}
-	}
-	return {};
-}
-String js_get_str(JsObj obj, String key) {
-	Loop(i, obj.fields.count) {
-		JsField& field = obj.fields[i];
-		if(str_match(field.key, key)) {
-			Assert(field.val->type == JsType_Str);
-			return field.val->str;
-		}
-	}
-	return {};
-}
-Slice<JsVal*> js_get_array(JsObj obj, String key) {
-	Loop(i, obj.fields.count) {
-		JsField& field = obj.fields[i];
-		if(str_match(field.key, key)) {
-			Assert(field.val->type == JsType_Array);
-			return field.val->array;
-		}
-	}
-	return {};
-}
-JsObj js_get_obj(JsObj obj, String key) {
-	Loop(i, obj.fields.count) {
-		JsField& field = obj.fields[i];
-		if(str_match(field.key, key)) {
-			Assert(field.val->type == JsType_Obj);
-			return field.val->obj;
-		}
+		return {res, true};
 	}
 	return {};
 }
@@ -2149,7 +2315,7 @@ ThingDesc default_thing_desc() {
 	ThingDesc res = {
 		.scale = v3(1),
 		.rot = quat_identity(),
-		.color = u32_from_rgba(ColorWhite),
+		.color = ColorWhite,
 		.mesh_id = get_mesh(Mesh_Cube),
 		.mat_id = get_material(Material_Orange),
 	};
@@ -2494,23 +2660,14 @@ if(data->ctx == null) {
 	}
 
 	var& g = *st;
-	// ui_set_current_state(g.ui0);
-
-	// u64 target_fps = Billion(1) / 60;
 	g.fps = 60;
 	u64 prev_ns = os_now_ns();
-
 	while(!os_window_should_close()) {
-		// co_test(&g.co, get_dt());
 		if(st->should_hotreload) {
 			goto hotreload;
 		}
 		u64 target_fps = Billion(1) / g.fps;
-		// if(time_on_interval(get_time(), get_dt(), 0.1, 0)) {
-		//   Info("ye");
-		// }
-
-		prof_begin();
+		prof_begin_frame();
 		{
 			ProfBlock("frame");
 			os_pump_messages();
@@ -2532,7 +2689,7 @@ if(data->ctx == null) {
 				os_sleep_ms(sleep_time / Million(1));
 			}
 		}
-		prof_end();
+		prof_end_frame();
 		current_frame++;
 		arena_clear(st->frame_arena);
 		mem_track_end();
@@ -2552,7 +2709,7 @@ R_MeshDesc generate_sphere(Allocator arena) {
 	u32 vert_count = lat_steps*lon_steps;
 	u32 index_count = (lat_steps - 1) * lon_steps * 6;
 	var vertices = push_slice(arena, R_Vertex, vert_count);
-	var indices = push_slice(arena, u32, index_count);
+	var indices = push_slice(arena, u16, index_count);
 	f32 lat_step_angle = PI / lat_steps;
 	f32 lon_step_angle = 2*PI / lon_steps;
 	for(u32 i = 0; i < lat_steps; i++) {
@@ -2868,7 +3025,13 @@ void init_game() {
 		load_mesh(Mesh_MonkeyGlb, "monkey.glb");
 		load_mesh(Mesh_CubeGlft, "cube.gltf");
 		load_mesh(Mesh_Barrack, "castle.gltf");
-		load_mesh(Mesh_Bubble, "t0 copy.gltf");
+		// load_mesh(Mesh_T, "t.gltf");
+		{
+			var info = load_gltf(scratch, "t.gltf", false);
+			mesh_set(Mesh_T, r_make_mesh(info.mesh));
+			array_push_elems(g.r.bones, info.bones);
+			array_push_elems(g.r.inv_matrices, info.inv_matrices);
+		}
 
 		// Texture
 		var load_texture = [&](TextureEnum enum_name, String name) {
@@ -2950,7 +3113,7 @@ void init_game() {
 			.pos = v3(0,0,5),
 			.yaw = 180,
 			.fov = 45,
-			.vel_friction = 7.7,
+			.vel_friction = 7.7f,
 			.accel = 300,
 		};
 		cam.dir = {
@@ -2959,28 +3122,6 @@ void init_game() {
 			sind(cam.yaw) * cosd(cam.pitch)
 		};
 		g.view = m4x4_look_at(cam.pos, cam.dir, v3_up());
-	}
-
-	{
-		var desc = default_thing_desc();
-		desc.mesh_id = get_mesh(Mesh_Axis);
-		desc.mat_id = get_material(Material_Axis);
-		g.axis_attached_to_cam_id = make_thing(desc);
-	}
-	{
-		var desc = default_thing_desc();
-		desc.mesh_id = get_mesh(Mesh_Grid);
-		desc.mat_id = get_material(Material_Line);
-		desc.color = u32_from_rgba(v4(0.6));
-		desc.pos = v3(0,0,-5);
-		g.grid = make_thing(desc);
-	}
-	{
-		var desc = default_thing_desc();
-		desc.mesh_id = get_mesh(Mesh_Barrack);
-		desc.mat_id = get_material(Material_Barrack);
-		desc.pos = v3(0,0,-40);
-		g.barrack = make_thing(desc);
 	}
 }
 
@@ -2995,7 +3136,7 @@ void update_game() {
 	{
 		ProfBlock("push jobs");
 		Loop(i, 2) {
-			thread_push({.fn = [](void* ctx) {os_sleep_ms(rand_u32()%4);}, .priority = TaskPriority_Low});
+			thread_push({.fn = [](void* ctx) {os_sleep_ms(rand_u32()%6);}, .priority = TaskPriority_Low});
 		}
 		WaitGroup id0 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
 		WaitGroup id1 = thread_push({.fn = [](void* ctx) { os_sleep_ms(2); }});
@@ -3116,14 +3257,15 @@ void update_game() {
 		f32 dist = 1.0f;
 		f32 xoff = 0.3f;
 		f32 yoff = 0.3f;
-		Thing& axis = get_thing(g.axis_attached_to_cam_id);
-		axis.pos = g.cam.pos + forward*dist + right*xoff + up*yoff;
-		axis.scale = v3(0.1);
+		v3 pos = g.cam.pos + forward*dist + right*xoff + up*yoff;
+		r_draw_mesh_trs(get_mesh(Mesh_Axis), get_material(Material_Axis), pos, quat_identity(), v3(0.1));
 	}
-	r_draw_entity(g.axis_attached_to_cam_id);
-	r_draw_entity(g.grid);
-	r_draw_entity(g.barrack);
-	r_draw_mesh(get_mesh(Mesh_Bubble), get_material(Material_Container), v3());
+	r_draw_mesh(get_mesh(Mesh_Barrack), get_material(Material_Barrack), v3(0,0,-40));
+	r_draw_grid(v3(0), 40, 2, u32_from_rgba(v4(0.8)));
+	r_draw_mesh(get_mesh(Mesh_T), get_material(Material_Container), v3(), DrawCallFlag_Skeleton);
+	// r_draw_mesh(get_mesh(Mesh_T), get_material(Material_Container), v3());
+
+	r_draw_rect(rng2_make(v2(100), v2(100)), RED);
 }
 
 #define FONT_SIZE 24
@@ -3384,15 +3526,15 @@ void ui_build_draw_cmds(UI_Box* box) {
 		else if((box->flags & UI_BoxFlag_HotAnimation) && box->hot_t > 0.001f)
 			color = v3_to_v4(v3_lerp(color.xyz, box->hot_t, g.style.hot_color.xyz), 1);
 		array_push(g.draw_cmds, {UI_DrawCmdType_Rect, box->rect, color, true});
-		r_draw_rect(box->rect, color, 0,0,0);
+		r_draw_rect(box->rect, u32_from_rgba(color), 0,0,0);
 	}
 	if(box->flags & UI_BoxFlag_DrawBorder) {
 		array_push(g.draw_cmds, {UI_DrawCmdType_Rect, box->rect, box->border_color});
-		r_draw_rect(box->rect, box->border_color, 0,4,0);
+		r_draw_rect(box->rect, u32_from_rgba(box->border_color), 0,4,0);
 	}
 	if(box->flags & UI_BoxFlag_DrawText) {
 		array_push(g.draw_cmds, {UI_DrawCmdType_Text, box->rect, box->text_color, false, ui_display_string(box->string)});
-		r_draw_text_ext(g.style.font, v2(box->rect.x0, box->rect.y1), box->string, box->text_color, FONT_SIZE);
+		r_draw_text_ext(g.style.font, v2(box->rect.x0, box->rect.y1), box->string, u32_from_rgba(box->text_color), FONT_SIZE);
 	}
 	LoopNode(it, box->first)
 		ui_build_draw_cmds(it);

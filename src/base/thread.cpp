@@ -87,10 +87,9 @@ WaitGroup thread_push_batch(Slice<TaskDesc> tasks) {
 
 Task thread_pop_locked() {
 	var& g = thread_pool;
-	var res = queue_pop(g.tasks[TaskPriority_High]);
-	if(!res.ok) res = queue_pop(g.tasks[TaskPriority_Low]);
-	Assert(res.ok);
-	return res.value;
+	var[res, ok] = queue_pop(g.tasks[TaskPriority_High]);
+	if(!ok) res = queue_pop(g.tasks[TaskPriority_Low]).val();
+	return res;
 }
 
 Task thread_pop() {
@@ -102,7 +101,7 @@ Task thread_pop() {
 	return thread_pop_locked();
 }
 
-ResultOk<Task> thread_try_pop() {
+Result<Task> thread_try_pop() {
 	var& g = thread_pool;
 	if(os_sem_try_wait(g.tasks_available)) return {thread_pop_locked(), true};
 	return {};

@@ -56,8 +56,6 @@ struct ProfFrame {
 };
 
 struct ProfThread {
-	// u8 string_buffer[KB(16)];
-	// RingBuffer ring;
 	DArray<ProfEvent> events[2];
 	DArray<ProfAnchor> recorded_anchors[ProfRecordHistoryNum];
 	DArray<ProfAnchor> launch_anchors;
@@ -80,8 +78,8 @@ struct ProfState {
 extern ProfState profiler_st;
 
 void prof_init(Allocator arena);
-void prof_begin();
-void prof_end();
+void prof_begin_frame();
+void prof_end_frame();
 ProfFrame prof_get_prev_frame();
 void prof_launch_begin();
 void prof_launch_end();

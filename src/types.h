@@ -6,6 +6,7 @@
 	constexpr ImVec2(const v2& f) : x(f.x), y(f.y) {} \
 	operator v2() const { return v2(x, y); }
 #include "imgui/imgui.h"
+#undef assert
 
 #define ImGuiWindow(str, ...) 						DeferLoop(ImGui::Begin(str, null, ##__VA_ARGS__), ImGui::End()) if (_i_)
 #define ImGuiPushID(id) 												DeferLoop(ImGui::PushID(id), ImGui::PopID())
@@ -31,37 +32,66 @@ MakeId(R_LightId);
 
 const u32 MaxEntities = KB(1);
 
-const v4 ColorWhite       = v4(1,    1,    1,    1);
-const v4 ColorBlack       = v4(0,    0,    0,    1);
-const v4 ColorGrey        = v4(0.5,  0.5,  0.5,  1);
-const v4 ColorGreyDark    = v4(0.25, 0.25, 0.25, 1);
-const v4 ColorGreyLight   = v4(0.75, 0.75, 0.75, 1);
-const v4 ColorGrey0       = v4(0.15, 0.15, 0.15, 1);
-const v4 ColorGrey1       = v4(0.35, 0.35, 0.35, 1);
-const v4 ColorGrey2       = v4(0.60, 0.60, 0.60, 1);
-const v4 ColorGrey3       = v4(0.85, 0.85, 0.85, 1);
+#define ColorWhite        Color{ 255, 255, 255, 255 }
+#define ColorBlack        Color{   0,   0,   0, 255 }
+#define ColorGrey         Color{ 128, 128, 128, 255 }
+#define ColorGreyDark     Color{  64,  64,  64, 255 }
+#define ColorGreyLight    Color{ 191, 191, 191, 255 }
+#define ColorGrey0        Color{  38,  38,  38, 255 }
+#define ColorGrey1        Color{  89,  89,  89, 255 }
+#define ColorGrey2        Color{ 153, 153, 153, 255 }
+#define ColorGrey3        Color{ 217, 217, 217, 255 }
 
-const v4 ColorRed         = v4(0.89, 0.33, 0.23, 1.0);
-const v4 ColorOrange      = v4(0.95, 0.65, 0.30, 1.0);
-const v4 ColorYellow      = v4(0.90, 0.82, 0.35, 1.0);
-const v4 ColorGreen       = v4(0.14, 0.8,  0.01, 1.0);
-const v4 ColorCyan        = v4(0.35, 0.78, 0.82, 1.0);
-const v4 ColorBlue        = v4(0.38, 0.65, 0.95, 1.0);
-const v4 ColorPurple      = v4(0.72, 0.55, 0.92, 1.0);
-const v4 ColorPink        = v4(0.90, 0.45, 0.65, 1.0);
+#define ColorRed          Color{ 227,  84,  59, 255 }
+#define ColorOrange       Color{ 242, 166,  77, 255 }
+#define ColorYellow       Color{ 230, 209,  89, 255 }
+#define ColorGreen        Color{  36, 204,   3, 255 }
+#define ColorCyan         Color{  89, 199, 209, 255 }
+#define ColorBlue         Color{  97, 166, 242, 255 }
+#define ColorPurple       Color{ 184, 140, 235, 255 }
+#define ColorPink         Color{ 230, 115, 166, 255 }
 
-const v4 ColorRedUi        = v4(0.3, 0.15, 0.15, 1);
-const v4 ColorRedUiBright  = v4(0.41, 0.19, 0.21, 1);
-const v4 ColorGreenUi      = v4(0.3, 0.4, 0.2, 1);
-const v4 ColorBlueUi       = v4(0.15, 0.3, 0.5, 1);
-const v4 ColorOrangeUi     = v4(0.4, 0.28, 0.15, 1);
-const v4 ColorYellowUi     = v4(0.4, 0.43, 0.2, 1);
-const v4 ColorCyanUi       = v4(0.15, 0.4, 0.36, 1);
-const v4 ColorPurpleUi     = v4(0.32, 0.19, 0.41, 1);
+#define ColorRedUi        Color{  77,  38,  38, 255 }
+#define ColorRedUiBright  Color{ 105,  48,  54, 255 }
+#define ColorGreenUi      Color{  77, 102,  51, 255 }
+#define ColorBlueUi       Color{  38,  77, 128, 255 }
+#define ColorOrangeUi     Color{ 102,  71,  38, 255 }
+#define ColorYellowUi     Color{ 102, 110,  51, 255 }
+#define ColorCyanUi       Color{  38, 102,  92, 255 }
+#define ColorPurpleUi     Color{  82,  48, 105, 255 }
 
-const v4 ColorBounds     = v4(0.38, 0.65, 0.95, 1);
-const v4 ColorSelection  = v4(0.95, 0.65, 0.30, 1);
-const v4 ColorCollision  = v4(0.86, 0.33, 0.33, 1);
+#define ColorBounds       Color{  97, 166, 242, 255 }
+#define ColorSelection    Color{ 242, 166,  77, 255 }
+#define ColorCollision    Color{ 219,  84,  84, 255 }
+
+// Raylib col
+#define LIGHTGRAY  Color{ 200, 200, 200, 255 }   // Light Gray
+#define GRAY       Color{ 130, 130, 130, 255 }   // Gray
+#define DARKGRAY   Color{ 80, 80, 80, 255 }      // Dark Gray
+#define YELLOW     Color{ 253, 249, 0, 255 }     // Yellow
+#define GOLD       Color{ 255, 203, 0, 255 }     // Gold
+#define ORANGE     Color{ 255, 161, 0, 255 }     // Orange
+#define PINK       Color{ 255, 109, 194, 255 }   // Pink
+#define RED        Color{ 230, 41, 55, 255 }     // Red
+#define MAROON     Color{ 190, 33, 55, 255 }     // Maroon
+#define GREEN      Color{ 0, 228, 48, 255 }      // Green
+#define LIME       Color{ 0, 158, 47, 255 }      // Lime
+#define DARKGREEN  Color{ 0, 117, 44, 255 }      // Dark Green
+#define SKYBLUE    Color{ 102, 191, 255, 255 }   // Sky Blue
+#define BLUE       Color{ 0, 121, 241, 255 }     // Blue
+#define DARKBLUE   Color{ 0, 82, 172, 255 }      // Dark Blue
+#define PURPLE     Color{ 200, 122, 255, 255 }   // Purple
+#define VIOLET     Color{ 135, 60, 190, 255 }    // Violet
+#define DARKPURPLE Color{ 112, 31, 126, 255 }    // Dark Purple
+#define BEIGE      Color{ 211, 176, 131, 255 }   // Beige
+#define BROWN      Color{ 127, 106, 79, 255 }    // Brown
+#define DARKBROWN  Color{ 76, 63, 47, 255 }      // Dark Brown
+
+#define WHITE      Color{ 255, 255, 255, 255 }   // White
+#define BLACK      Color{ 0, 0, 0, 255 }         // Black
+#define BLANK      Color{ 0, 0, 0, 0 }           // Blank (Transparent)
+#define MAGENTA    Color{ 255, 0, 255, 255 }     // Magenta
+#define RAYWHITE   Color{ 245, 245, 245, 255 }   // My own White (raylib logo)
 
 enum LightType {
 	LightType_Point,
@@ -85,18 +115,52 @@ struct Timer {
 	f32 acc;
 };
 
-// union Color {
-//   u32 value;
-//   struct {
-//     u8 r;
-//     u8 g;
-//     u8 b;
-//     u8 a;
-//   };
-//   Color(u32 col):value(col){}
-//   Color(v4 col) { value = u32_from_rgba(col); }
-//   operator v4() { return rgba_from_u32(value); }
-// };
+union Color {
+	u32 v;
+	struct {
+		u8 r;
+		u8 g;
+		u8 b;
+		u8 a;
+	};
+	Color() = default;
+	Color(u32 col) : v(col) {}
+	Color(u8 r, u8 g, u8 b, u8 a):r(r),g(g),b(b),a(a) {}
+	// Color(v4 col) { rgba = u32_from_rgba(col); }
+	// operator v4() { return rgba_from_u32(rgba); }
+};
 
+enum AnimPath {
+	AnimPath_Pos,
+	AnimPath_Rot,
+	AnimPath_Scale,
+};
 
+struct Sampler {
+	f32* times;
+	void* values;
+	u32 count;
+	u32 interpolation_type;
+};
+
+struct Channel {
+	u32 bone;
+	u32 sampler;
+	AnimPath path;
+};
+
+struct Animation {
+	Slice<Sampler> samplers;
+	Slice<Channel> channels;
+	f32 duration;
+};
+
+struct Bone {
+	u32 parent;
+	Transform local;
+};
+
+struct Pose {
+	Slice<Bone> bones;
+};
 

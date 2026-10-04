@@ -5,7 +5,6 @@ enum Bindings {
 	Samplers,
 	CubeTextures,
 	Drawinfo,
-	Entities,
 	Materials,
 	PointLights,
 	DirLights,
@@ -14,6 +13,7 @@ enum Bindings {
 	SoftwareRender,
 	UI_RectBinding,
 	Vertices,
+	SkinMatrices,
 };
 
 enum class ShaderType {
@@ -24,11 +24,6 @@ enum class ShaderType {
 	Line,
 	Screen,
 	SoftwareRender,
-};
-
-typedef u32 DrawCallFlags;
-enum {
-	DrawCallFlag_Indexed,
 };
 
 struct GpuState {
@@ -44,28 +39,31 @@ struct GpuState {
 	u32 dir_light_count;
 	u32 spot_light_count;
 	u32 cubemap;
-	// u32 win_width;
-	// u32 win_height;
 };
 
 struct Glue(R_, Vertex) {
-	alignas(16) v3 pos;
-	alignas(16) v3 norm;
-	alignas(8)  v2 uv;
-	alignas(16) v4 color;
+	v3 pos;
+	v3 norm;
+	v2 uv;
+	u32 color;
+	v4 weights;
+	v4u joints;
+
+	// TODO: use it in future:
+	// v4u8 joints; // causes invalid indexes
+	// v4u8 weights;
 };
+
+CONST u32 DrawCallFlag_Skeleton = 1<<1;
 
 struct Glue(Gpu, DrawCall) {
 	alignas(16) m4x4 model;
 	ShaderType type;
-	u32 color;
 	u32 tex;
 	u32 mat;
 	u32 cur_resolve_idx;
-	DrawCallFlags flags;
-};
-
-struct Glue(Gpu, Entity) {
+	u32 color;
+	u32 flags;
 };
 
 struct Glue(Gpu, Material) {
@@ -98,7 +96,7 @@ struct Glue(Gpu, SpotLight) {
 	f32 outer_cutoff;
 };
 
-global_var const u32 GpuUI_RectFlag_IsFont = 1<<0;
+CONST u32 GpuUI_RectFlag_IsFont = 1<<0;
 
 struct Glue(Gpu, UI_Rect) {
 	alignas(8) v2 dst_p0;
@@ -106,7 +104,7 @@ struct Glue(Gpu, UI_Rect) {
 	alignas(8) v2 src_p0;
 	alignas(8) v2 src_p1;
 	alignas(8) v2 tex_size;
-	alignas(16) v4 colors[4];
+	u32 colors[4];
 	u32 texture;
 	u32 flags;
 	f32 corner_radius;

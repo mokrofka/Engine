@@ -20,7 +20,7 @@ VS_Entry UI_VSOutput vs_main(u32 vert_id : SV_VertexID, u32 inst_id : SV_Instanc
 	UI_VSOutput o;
 	o.vert = v4(2 * dst_pos.x / st.res.x - 1, 2 * dst_pos.y / st.res.y - 1, 0, 1);
 	o.uv = v2(src_pos.x / in.tex_size.x, src_pos.y / in.tex_size.y);
-	o.color = in.colors[vert_id];
+	o.color = rgba_from_u32(in.colors[vert_id]);
 
 	o.dst_pos = dst_pos;
 	o.dst_center = dst_center;

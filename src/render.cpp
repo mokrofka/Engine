@@ -115,17 +115,17 @@ R_TextureDesc r_load_cubemap(String dir) {
 	return cube;
 }
 
-R_MeshDesc r_load_mesh(String name) {
-	Scratch scratch;
-	String filepath = push_strf(scratch, "%s/%s", st->models_dir, name);
+R_MeshDesc r_load_mesh(Allocator arena, String name) {
+	Scratch scratch(arena);
+	// String filepath = push_strf(scratch, "%s/%s", st->models_dir, name);
 	String format = str_skip_last_dot(name);
 	R_MeshDesc res = {};
 	if(str_match(format, "glb")) {
-		res = load_gltf(scratch, filepath, true);
+		res = load_gltf(arena, name, true).mesh;
 	} else if(str_match(format, "gltf")) {
-		res = load_gltf(scratch, filepath, false);
+		res = load_gltf(arena, name, false).mesh;
 	} else if(str_match(format, "obj")) {
-		res = load_obj(scratch, filepath);
+		res = load_obj(arena, name);
 	} else {
 		InvalidPath;
 	}
@@ -141,6 +141,10 @@ R_TextureId r_make_texture(R_TextureDesc desc) {
 	struct Ctx {
 		R_TextureDesc desc;
 		R_TextureId texture_id;
+	};
+	Ctx ctx = {
+		.desc = desc,
+		.texture_id = res,
 	};
 	var f = [](void* in){
 		Scratch scratch;
@@ -173,17 +177,10 @@ R_TextureId r_make_texture(R_TextureDesc desc) {
 		});
 	};
 	if(desc.name.size) {
-		var& ctx = thread_push_ctx(Ctx);
-		ctx = {
-			.desc = desc,
-			.texture_id = res,
-		};
-		thread_push(&ctx, f);
+		var& task = thread_push_ctx(Ctx);
+		task = ctx;
+		thread_push(&task, f);
 	} else {
-		Ctx ctx = {
-			.desc = desc,
-			.texture_id = res,
-		};
 		f(&ctx);
 	}
 	return res;
@@ -214,6 +211,7 @@ R_TextureId r_make_dummy_texture(R_TextureDesc desc) {
 }
 
 R_MeshId r_make_mesh(R_MeshDesc desc) {
+	ProfFunc;
 	Scratch scratch;
 	var& g = st->r;
 	R_MeshId res = pool_push(g.meshes, pool_get(g.meshes, g.dummy_mesh));
@@ -221,13 +219,17 @@ R_MeshId r_make_mesh(R_MeshDesc desc) {
 		R_MeshDesc desc;
 		R_MeshId mesh_id;
 	};
+	Ctx ctx = {
+		.desc = desc,
+		.mesh_id = res,
+	};
 	var f = [](void* in){
 		Scratch scratch;
 		Ctx& ctx = *(Ctx*)in;
 		var& g = st->r;
 		var desc = ctx.desc;
 		if(desc.name.size) {
-			desc = r_load_mesh(desc.name);
+			desc = r_load_mesh(scratch, desc.name);
 		}
 		os_mutex_lock(g.vert_index_buffer_mutex);
 		u64 vert_buf_off = gfx_push_buffer(g.vert_reg, slice_size(desc.vertices));
@@ -237,7 +239,7 @@ R_MeshId r_make_mesh(R_MeshDesc desc) {
 		u32 stage_offset = gfx_push_stage_buffer(slice_to_bytes(desc.vertices));
 		u32 base_index = 0;
 		if(desc.indices.count) {
-			base_index = index_buf_off / sizeof(u32);
+			base_index = index_buf_off / sizeof(u16);
 			gfx_push_stage_buffer(slice_to_bytes(desc.indices));
 		}
 		LockScope(g.push_to_gpu_queue_mutex);
@@ -253,27 +255,22 @@ R_MeshId r_make_mesh(R_MeshDesc desc) {
 			.stage_off = stage_offset,
 		});
 	};
-	if(desc.name.size) {
-		var& ctx = thread_push_ctx(Ctx);
-		ctx = {
-			.desc = desc,
-			.mesh_id = res,
-		};
-		thread_push(&ctx, f);
-	} else {
-		Ctx ctx = {
-			.desc = desc,
-			.mesh_id = res,
-		};
-		f(&ctx);
-	}
+	// if(desc.name.size) {
+	// 	var& task = thread_push_ctx(Ctx);
+	// 	task = ctx;
+	// 	thread_push(&task, f);
+	// } else {
+	// 	f(&ctx);
+	// }
+	f(&ctx);
 	return res;
 }
 
 R_MeshId r_make_dummy_mesh(R_MeshDesc desc) {
+	Scratch scratch;
 	var& g = st->r;
 	if(desc.name.size) {
-		desc = r_load_mesh(desc.name);
+		desc = r_load_mesh(scratch, desc.name);
 	}
 	u64 buf_offset = gfx_push_buffer(g.vert_reg, slice_size(desc.vertices));
 	u32 base_vert = buf_offset / sizeof(R_Vertex);
@@ -313,7 +310,7 @@ R_MaterialId r_make_material(R_Material mat) {
 Gfx_Pipeline r_make_pipeline(String name, Gfx_PipelineDesc desc) {
 	Scratch scratch;
 	var& g = st->r;
-	u32 module_idx = or_else(map_get(g.shader_to_module_idx, hash(name)),
+	u32 module_idx = Or_else(map_get(g.shader_to_module_idx, hash(name)),
 		Slice code = os_file_path_read_all(scratch, push_strf(scratch, "%s/%s.spv", st->shader_compiled_dir, name));
 		R_ShaderModuleWithPipelines entry = {.shd = gfx_make_shader(code)};
 		u32 idx = array_push(g.shader_modules, entry);
@@ -330,7 +327,7 @@ Gfx_Pipeline r_make_pipeline(String name, Gfx_PipelineDesc desc) {
 Gfx_Pipeline r_make_pipeline2(String name, Gfx_PipelineDesc2 desc) {
 	Scratch scratch;
 	var& g = st->r;
-	u32 module_idx = or_else(map_get(g.shader_to_module_idx, hash(name)),
+	u32 module_idx = Or_else(map_get(g.shader_to_module_idx, hash(name)),
 		Slice code = os_file_path_read_all(scratch, push_strf(scratch, "%s/%s.spv", st->shader_compiled_dir, name));
 		R_ShaderModuleWithPipelines entry = {.shd = gfx_make_shader(code)};
 		u32 idx = array_push(g.shader_modules, entry);
@@ -681,6 +678,7 @@ void r_init() {
 	///////////////////////////////////
 	// Buffers
 	{
+		ProfBlock("buffers");
 		g.cpu_vert_reg = gfx_make_buffer(MB(1), Gfx_MemType_Cpu);
 		g.cpu_vertices = (R_Vertex*)gfx_buffer_base_ptr(g.cpu_vert_reg);
 		g.vert_reg = gfx_make_buffer(MB(1), Gfx_MemType_Gpu);
@@ -690,6 +688,7 @@ void r_init() {
 	///////////////////////////////////
 	// Descriptors
 	{
+		ProfBlock("descriptors");
 		gfx_make_bind({.type = Gfx_BindType_Image, .binding = Bindings::Textures, .count = Gfx_MaxImages});
 		gfx_make_bind({.type = Gfx_BindType_Sampler, .binding = Bindings::Samplers, .count = Gfx_MaxSamplers});
 		gfx_make_bind({.type = Gfx_BindType_Image, .binding = Bindings::CubeTextures, .count = Gfx_MaxCubeTextures});
@@ -698,11 +697,6 @@ void r_init() {
 				.binding = Bindings::State,
 				.size = sizeof(GpuState),
 				.out_cpu_ptr = (void**)&g.gpu_state,
-			},
-			{
-				.binding = Bindings::Entities,
-				.size = sizeof(GpuEntity) * MaxEntities,
-				.out_cpu_ptr = (void**)&g.gpu_entities,
 			},
 			{
 				.binding = Bindings::Materials,
@@ -723,6 +717,11 @@ void r_init() {
 				.binding = Bindings::UI_RectBinding,
 				.size = sizeof(R_UI_Rect) * MaxEntities,
 				.out_cpu_ptr = (void**)&g.gpu_ui_rects,
+			},
+			{
+				.binding = Bindings::SkinMatrices,
+				.size = sizeof(R_UI_Rect) * R_MaxSkinMatrices,
+				.out_cpu_ptr = (void**)&g.gpu_skin_matrices,
 			}
 		};
 		gfx_make_binding_buffers(slice(buffers));
@@ -731,7 +730,10 @@ void r_init() {
 	}
 
 	// Misc
-	g.world_rt = r_make_render_target(R_RenderTargetUsage_Color | R_RenderTargetUsage_Resolve | R_RenderTargetUsage_Depth, os_window_size());
+	{
+		ProfBlock("render targers");
+		g.world_rt = r_make_render_target(R_RenderTargetUsage_Color | R_RenderTargetUsage_Resolve | R_RenderTargetUsage_Depth, os_window_size());
+	}
 	g.com_sampler = gfx_make_sampler({});
 	{
 		ProfBlock("Waiting for compiling shaders");
@@ -741,6 +743,7 @@ void r_init() {
 	///////////////////////////////////
 	// Dummy
 	{
+		ProfBlock("making dummy");
 		R_TextureDesc dum = r_load_texture("dummy.png");
 		g.dummy_texture = r_make_dummy_texture({
 			.data = dum.data,
@@ -764,12 +767,11 @@ void r_init() {
 	///////////////////////////////////
 	// Load basic shaders
 	{
+		ProfBlock("load shaders");
 		g.uber_pip = r_make_pipeline2("uber", {});
 		g.uber_pip_screen = r_make_pipeline2("uber", {
 			.sample_count = 1,
 		});
-	}
-	{
 		g.ui_rect_pip = r_make_pipeline2("ui_rect", {});
 	}
 	Info("Renderer initialized");
@@ -838,8 +840,8 @@ void r_end() {
 							.type = Gfx_CmdType_Mesh,
 							.stage_offset = push.stage_off + vert_size,
 							.buf = g.index_reg,
-							.size = mesh.index_count*sizeof(u32),
-							.buf_offset = push.mesh.base_index*sizeof(u32),
+							.size = mesh.index_count*sizeof(u16),
+							.buf_offset = push.mesh.base_index*sizeof(u16),
 						});
 					}
 					push.counter = counter;
@@ -868,9 +870,6 @@ void r_end() {
 				}
 			} else break;
 		} 
-		struct A {
-			long a;
-		};
 
 		// Update font?
 		Loop(i, queue_count(g.waiting_fonts)) {
@@ -878,6 +877,18 @@ void r_end() {
 				var slot = queue_pop(g.waiting_fonts);
 				pool_get(g.fonts, slot.id) = slot.font;
 			} else break;
+		}
+	}
+
+	// Update skeleton
+	{
+		g.global_matrices[0] = m4x4_transform(g.bones[0].local);
+		g.skin_matrices[0] = g.global_matrices[0] * g.inv_matrices[0];
+		// g.skin_matrices[0] = g.global_matrices[0];
+		LoopOff(i, 1, g.bones.count) {
+			g.global_matrices[i] = g.global_matrices[g.bones[i].parent] * m4x4_transform(g.bones[i].local);
+			g.skin_matrices[i] = g.global_matrices[i] * g.inv_matrices[i];
+			// g.skin_matrices[i] = g.global_matrices[i];
 		}
 	}
 
@@ -902,6 +913,7 @@ void r_end() {
 			};
 		}
 		gpu_st.cubemap = r_texture_descriptor_idx(g.cur_cubemap);
+		MemCopyArray(g.gpu_skin_matrices, g.skin_matrices.data, g.bones.count);
 	}
 
 	///////////////////////////////////
@@ -926,9 +938,10 @@ void r_end() {
 						var mat = pool_get(g.materials, draw.mat);
 						g.gpu_drawcalls[drawcall_count] = {
 							.model = model,
-							.color = draw.color,
+							.color = draw.color.v,
 							.mat = mat.idx,
 							.type = draw.type,
+							.flags = draw.flags,
 						};
 						Gfx_Mesh mesh = pool_get(g.meshes, draw.mesh);
 						gfx_push_indirect_mesh(mesh, drawcall_count++);
@@ -1049,7 +1062,7 @@ void r_end() {
 	gfx_end();
 }
 
-void r_draw_mesh(R_MeshId mesh, R_MaterialId mat, v3 pos) {
+void r_draw_mesh(R_MeshId mesh, R_MaterialId mat, v3 pos, u32 flags) {
 	var& g = st->r;
 	var material = pool_get(g.materials, mat);
 	u32 batch_idx = material.batch;
@@ -1060,6 +1073,7 @@ void r_draw_mesh(R_MeshId mesh, R_MaterialId mat, v3 pos) {
 		.mesh = mesh,
 		.mat = mat,
 		.type = material.type,
+		.flags = flags,
 	};
 	if(pool_get(g.meshes, mesh).index_count) {
 		array_push(g.batches[batch_idx].draws, cmd);
@@ -1108,39 +1122,39 @@ void r_draw_entity(ThingId id) {
 	}
 }
 
-void r_draw_line(v3 a, v3 b, v4 color) {
+void r_draw_line(v3 a, v3 b, Color color) {
 	R_Vertex vert[] = {
-		{.pos = a, .color = color},
-		{.pos = b, .color = color},
+		{.pos = a, .color = color.v},
+		{.pos = b, .color = color.v},
 	};
 	array_push_elems(st->r.draw_lines, slice(vert));
 }
 
-void r_draw_line_persistent(v3 a, v3 b, v4 color) {
+void r_draw_line_persistent(v3 a, v3 b, Color color) {
 	R_Vertex vert[] = {
-		{.pos = a, .color = color},
-		{.pos = b, .color = color},
+		{.pos = a, .color = color.v},
+		{.pos = b, .color = color.v},
 	};
 	array_push_elems(st->r.draw_lines_persistent, slice(vert));
 }
 
-void r_draw_grid(v3 center, u32 slices, f32 spacing, v4 color) {
+void r_draw_grid(v3 center, u32 slices, f32 spacing, Color color) {
 	var& lines = st->r.draw_lines;
 	f32 half = slices * spacing * 0.5f;
 	for(u32 i = 0; i <= slices; i++) {
 		f32 t = i * spacing - half;
 
 		// Horizontal line
-		array_push(lines, {.pos = center + v3(-half, 0, t), .color = color});
-		array_push(lines, {.pos = center + v3(+half, 0, t), .color = color});
+		array_push(lines, {.pos = center + v3(-half, 0, t), .color = color.v});
+		array_push(lines, {.pos = center + v3(+half, 0, t), .color = color.v});
 
 		// Vertical line
-		array_push(lines, {.pos = center + v3(t, 0, -half), .color = color});
-		array_push(lines, {.pos = center + v3(t, 0, +half), .color = color});
+		array_push(lines, {.pos = center + v3(t, 0, -half), .color = color.v});
+		array_push(lines, {.pos = center + v3(t, 0, +half), .color = color.v});
 	}
 }
 
-void r_draw_cuboid(Rng3 rng, v4 color) {
+void r_draw_cuboid(Rng3 rng, Color color) {
 	v3 p000 = {rng.min.x, rng.min.y, rng.min.z};
 	v3 p001 = {rng.min.x, rng.min.y, rng.max.z};
 	v3 p010 = {rng.min.x, rng.max.y, rng.min.z};
@@ -1169,7 +1183,7 @@ void r_draw_cuboid(Rng3 rng, v4 color) {
 	r_draw_line(p100, p110, color);
 }
 
-void r_draw_rect(Rng2 rect, v4 color, f32 corner_radius, f32 border_thickness, f32 edge_softness) {
+void r_draw_rect(Rng2 rect, Color color, f32 corner_radius, f32 border_thickness, f32 edge_softness) {
 	var& g = st->r;
 	R_UI_Rect vert = {
 		.dst_p0 = rect.min,
@@ -1178,11 +1192,11 @@ void r_draw_rect(Rng2 rect, v4 color, f32 corner_radius, f32 border_thickness, f
 		.border_thickness = border_thickness,
 		.edge_softness = edge_softness,
 	};
-	for(v4& x : vert.colors) x = color;
+	for(var& x : vert.colors) x = color.v;
 	array_push(g.draw_rects, vert);
 }
 
-void r_draw_texture(Rng2 dst, Rng2 src, R_TextureId tex, v4 color, f32 corner_radius, f32 border_thickness, f32 edge_softness) {
+void r_draw_texture(Rng2 dst, Rng2 src, R_TextureId tex, Color color, f32 corner_radius, f32 border_thickness, f32 edge_softness) {
 	var& g = st->r;
 	var t = pool_get(g.textures, tex);
 	var desc = gfx_query_image_desc(t.image);
@@ -1198,21 +1212,21 @@ void r_draw_texture(Rng2 dst, Rng2 src, R_TextureId tex, v4 color, f32 corner_ra
 		.tex_size = tex_size,
 		.texture = r_texture_descriptor_idx(tex),
 	};
-	for(v4& x : vert.colors) x = ColorWhite;
+	for(var& x : vert.colors) x = ColorWhite;
 	array_push(g.draw_rects, vert);
 }
 
-void r_draw_rect(Rng2 rect, v4 color) {
+void r_draw_rect(Rng2 rect, Color color) {
 	var& g = st->r;
 	R_UI_Rect vert = {
 		.dst_p0 = rect.min,
 		.dst_p1 = rect.max,
 	};
-	for(v4& x : vert.colors) x = color;
+	for(var& x : vert.colors) x = color.v;
 	array_push(g.draw_rects, vert);
 }
 
-void r_draw_rect_rounded(Rng2 rect, v4 color, f32 corner_radius, f32 edge_softness) {
+void r_draw_rect_rounded(Rng2 rect, Color color, f32 corner_radius, f32 edge_softness) {
 	var& g = st->r;
 	R_UI_Rect vert = {
 		.dst_p0 = rect.min,
@@ -1220,7 +1234,7 @@ void r_draw_rect_rounded(Rng2 rect, v4 color, f32 corner_radius, f32 edge_softne
 		.corner_radius = corner_radius,
 		.edge_softness = edge_softness,
 	};
-	for(v4& x : vert.colors) x = color;
+	for(var& x : vert.colors) x = color.v;
 	array_push(g.draw_rects, vert);
 }
 
@@ -1237,14 +1251,14 @@ void r_draw_rect_gradient(Rng2 rect, R_Gradient grad) {
 	array_push(g.draw_rects, vert);
 }
 
-void r_draw_rect_thickborders(Rng2 rect, v4 color, f32 thick) {
+void r_draw_rect_thickborders(Rng2 rect, Color color, f32 thick) {
 	var& g = st->r;
 	R_UI_Rect vert = {
 		.dst_p0 = rect.min,
 		.dst_p1 = rect.max,
 		.border_thickness = thick,
 	};
-	for(v4& x : vert.colors) x = color;
+	for(var& x : vert.colors) x = color.v;
 	array_push(g.draw_rects, vert);
 }
 
@@ -1261,11 +1275,11 @@ void r_draw_texture(Rng2 rect, R_TextureId tex) {
 		.tex_size = tex_size,
 		.texture = r_texture_descriptor_idx(tex),
 	};
-	for(v4& x : vert.colors) x = ColorWhite;
+	for(var& x : vert.colors) x = ColorWhite;
 	array_push(g.draw_rects, vert);
 }
 
-void r_draw_rect_outline(Rng2 rect, u32 thickness, v4 color) {
+void r_draw_rect_outline(Rng2 rect, u32 thickness, Color color) {
 	// Top
 	r_draw_rect(rng2_make(rect.min, v2(rng2_dim(rect).x, thickness)), color);
 
@@ -1279,7 +1293,7 @@ void r_draw_rect_outline(Rng2 rect, u32 thickness, v4 color) {
 	r_draw_rect(rng2_make(v2(rect.max.x - thickness, rect.min.y), v2(thickness, rng2_dim(rect).y)), color);
 }
 
-void r_draw_text_ext(R_FontId font, v2 pos, String str, v4 color, u32 font_height) {
+void r_draw_text_ext(R_FontId font, v2 pos, String str, Color color, u32 font_height) {
 	var& g = st->r;
 	var fo = pool_get(g.fonts, font);
 	var desc = gfx_query_image_desc(pool_get(g.textures, fo.texture).image);
@@ -1303,7 +1317,7 @@ void r_draw_text_ext(R_FontId font, v2 pos, String str, v4 color, u32 font_heigh
 			.texture = r_texture_descriptor_idx(fo.texture),
 			.flags = GpuUI_RectFlag_IsFont,
 		};
-		for(v4& col : rect.colors) col = color;
+		for(var& x : rect.colors) x = color;
 		array_push(g.draw_rects, rect);
 	}
 }

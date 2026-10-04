@@ -3,6 +3,7 @@ import com;
 #endif
 
 #define global_var static
+#define CONST static const
 
 #define KB(n) ((n) << 10)
 #define MB(n) ((n) << 20)
@@ -13,9 +14,6 @@ import com;
 #define FS_Entry [shader("fragment")]
 #define CS_Entry [shader("compute")]
 
-#define ShaderEnum [UnscopedEnum] enum
-
 #define st state[0]
 
-#define Bit(x) (1 << (x))
 
