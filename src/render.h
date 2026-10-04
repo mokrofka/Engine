@@ -9,7 +9,11 @@ const u32 R_MaxTextures   = 32;
 const u32 R_MaxCubemaps   = 32;
 const u32 R_MaxFonts      = 32;
 const u32 R_MaxDebugLines = KB(1);
+const u32 R_MaxSkinMatrices = 128;
+const u32 R_MaxBones = 128;
+const u32 R_MaxRuntimeBones = 128;
 
+#define CONST const
 #include "shader_header.h"
 
 struct R_UI_Rect {
@@ -18,7 +22,7 @@ struct R_UI_Rect {
 	v2 src_p0;
 	v2 src_p1;
 	v2 tex_size;
-	v4 colors[4];
+	Color colors[4];
 	u32 texture;
 	u32 flags;
 	f32 corner_radius;
@@ -53,10 +57,29 @@ struct R_Texture {
 	b32 imgui_is_ready;
 };
 
+// struct Bone {
+//     i32 parent;
+//     Transform local;
+//     Mat4 inverse_bind;
+//     Mat4 global;
+// };
+// for (i32 i = 0; i < bone_count; i++) {
+//     if (bones[i].parent >= 0)
+//         bones[i].global =
+//             bones[bones[i].parent].global *
+//             to_mat4(bones[i].local);
+//     else
+//         bones[i].global = to_mat4(bones[i].local);
+
+//     skin_matrices[i] =
+//         bones[i].global *
+//         bones[i].inverse_bind;
+// }
+
 struct R_MeshDesc {
 	String name;
 	Slice<R_Vertex> vertices;
-	Slice<u32> indices;
+	Slice<u16> indices;
 	f32 bounds_min;
 	f32 bounds_max;
 	f32 bounds_rad;
@@ -101,10 +124,10 @@ struct R_Material {
 // };
 
 struct R_Gradient {
-	v4 color0;
-	v4 color1;
-	v4 color2;
-	v4 color3;
+	u32 color0;
+	u32 color1;
+	u32 color2;
+	u32 color3;
 };
 
 struct R_Glyph {
@@ -128,10 +151,11 @@ struct R_DrawCall {
 	v3 pos;
 	v4 rot;
 	v3 scale;
-	u32 color;
+	Color color;
 	R_MeshId mesh;
 	R_MaterialId mat;
 	ShaderType type;
+	u32 flags;
 };
 
 struct R_DrawBatch {
@@ -218,6 +242,12 @@ struct R_State {
 	Map<u32, Gfx_MaxShaders> shader_to_module_idx;
 	PoolIterative<R_Material, R_MaxMaterials, R_MaterialId> materials;
 	Array<R_DrawBatch, 8> batches;
+	Array<Bone, R_MaxBones> bones;
+	Array<m4x4, R_MaxSkinMatrices> inv_matrices;
+	Array<m4x4, R_MaxSkinMatrices> global_matrices;
+	Array<m4x4, R_MaxSkinMatrices> skin_matrices;
+	Array<Bone, R_MaxRuntimeBones> runtime_bones;
+	Animation anim;
 
 	Pool<Gfx_Mesh, R_MaxMeshes, R_MeshId> meshes;
 	Pool<R_Texture, R_MaxTextures, R_TextureId> textures;
@@ -266,12 +296,12 @@ struct R_State {
 	Gfx_Buffer gpu_ui_rect_buf;
 
 	GpuState* gpu_state;
-	GpuEntity* gpu_entities;
 	u32* gpu_entities_indices;
 	GpuMaterial* gpu_materials;
 	GpuDrawCall* gpu_drawcalls;
 	u32* gpu_software_render;
 	GpuUI_Rect* gpu_ui_rects;
+	m4x4* gpu_skin_matrices;
 };
 
 R_DrawBatch r_make_draw_batch(Allocator alloc, Gfx_Pipeline pip);
@@ -286,7 +316,7 @@ Gfx_Attachments r_render_target_to_attachments(R_RenderTarget rt);
 
 R_TextureDesc r_load_texture(String name);
 R_TextureDesc r_load_cubemap(String dir);
-R_MeshDesc r_load_mesh(String name);
+R_MeshDesc r_load_mesh(Allocator arena, String name);
 R_TextureId r_make_texture(R_TextureDesc desc);
 R_TextureId r_make_dummy_texture(R_TextureDesc desc);
 R_MeshId r_make_mesh(R_MeshDesc desc);
@@ -321,23 +351,23 @@ void r_shutdown();
 void r_begin();
 void r_end();
 
-void r_draw_mesh(R_MeshId mesh, R_MaterialId mat, v3 pos);
+void r_draw_mesh(R_MeshId mesh, R_MaterialId mat, v3 pos, u32 flags = 0);
 void r_draw_mesh_trs(R_MeshId mesh, R_MaterialId mat, v3 pos, v4 rot, v3 scale);
 void r_draw_entity(ThingId id);
 
-void r_draw_line(v3 a, v3 b, v4 color);
-void r_draw_line_persistent(v3 a, v3 b, v4 color);
-void r_draw_grid(v3 center, u32 slices, f32 spacing, v4 color);
-void r_draw_cuboid(Rng3 rng, v4 color);
-void r_draw_rect(Rng2 rect, v4 color, f32 corner_radius, f32 border_thickness, f32 edge_softness);
-void r_draw_texture(Rng2 dst, Rng2 src, R_TextureId tex, v4 color, f32 corner_radius, f32 border_thickness, f32 edge_softness);
-void r_draw_rect(Rng2 rect, v4 color);
-void r_draw_rect_rounded(Rng2 rect, v4 color, f32 corner_radius, f32 edge_softness);
+void r_draw_line(v3 a, v3 b, Color color);
+void r_draw_line_persistent(v3 a, v3 b, Color color);
+void r_draw_grid(v3 center, u32 slices, f32 spacing, Color color);
+void r_draw_cuboid(Rng3 rng, Color color);
+void r_draw_rect(Rng2 rect, Color color, f32 corner_radius, f32 border_thickness, f32 edge_softness);
+void r_draw_texture(Rng2 dst, Rng2 src, R_TextureId tex, Color color, f32 corner_radius, f32 border_thickness, f32 edge_softness);
+void r_draw_rect(Rng2 rect, Color color);
+void r_draw_rect_rounded(Rng2 rect, Color color, f32 corner_radius, f32 edge_softness);
 void r_draw_rect_gradient(Rng2 rect, R_Gradient grad);
-void r_draw_rect_thickborders(Rng2 rect, v4 color, f32 thick);
+void r_draw_rect_thickborders(Rng2 rect, Color color, f32 thick);
 void r_draw_texture(Rng2 rect, R_TextureId tex);
-void r_draw_rect_outline(Rng2 rect, u32 thickness, v4 color);
-void r_draw_text_ext(R_FontId font, v2 pos, String str, v4 color, u32 font_height);
+void r_draw_rect_outline(Rng2 rect, u32 thickness, Color color);
+void r_draw_text_ext(R_FontId font, v2 pos, String str, Color color, u32 font_height);
 
 void imgui_init();
 void imgui_begin_frame();

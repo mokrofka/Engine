@@ -28,10 +28,12 @@ template<typename T, i32 N> u32 array_push(Array<T, N>& arr, T a) {
 	arr.data[arr.count] = a;
 	return arr.count++;
 }
-template<typename T, i32 N> void array_push_elems(Array<T, N>& arr, Slice<T> elems) {
+template<typename T, i32 N> u32 array_push_elems(Array<T, N>& arr, Slice<T> elems) {
 	Assert(arr.count + elems.count <= arr.cap);
 	MemCopyArray(arr.data + arr.count, elems.data, elems.count);
+	u32 res = arr.count;
 	arr.count += elems.count;
+	return res;
 }
 template<typename T, i32 N> void array_swap_remove(Array<T, N>& arr, u32 idx) {
 	Assert(idx < arr.count);
@@ -639,7 +641,7 @@ template<typename T, i32 N> b32 queue_push(QueueMPMC<T, N>& q, T elem) {
 		} else if(dif < 0) return false; // full
 	}
 }
-template<typename T, i32 N> ResultOk<T> queue_pop(QueueMPMC<T, N>& q) {
+template<typename T, i32 N> Result<T> queue_pop(QueueMPMC<T, N>& q) {
 	For {
 		u32 read = atomic_load(&q.read);
 		var& slot = q.data[read % q.cap];
@@ -706,7 +708,7 @@ template<typename V, i32 N> V* map_set(Map<V, N>& m, u64 hash, V val) {
 	m.count++;
 	return &m.data[idx];
 }
-template<typename V, i32 N> ResultOk<V> map_get(Map<V, N>& m, u64 hash) {
+template<typename V, i32 N> Result<V> map_get(Map<V, N>& m, u64 hash) {
 	u64 idx = mod_pow2(hash, m.cap);
 	Loop(i, m.cap) {
 		if(m.hashes[idx] == hash) {
@@ -788,7 +790,7 @@ template<typename V> V* map_set(DMap<V>& m, u64 hash, V val) {
 	m.count++;
 	return &m.data[idx];
 }
-template<typename V> ResultOk<V> map_get(DMap<V>& m, u64 hash) {
+template<typename V> Result<V> map_get(DMap<V>& m, u64 hash) {
 	if(!m.data) return {};
 	u64 idx = mod_pow2(hash, m.cap);
 	Loop(i, m.cap) {

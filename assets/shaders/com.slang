@@ -20,6 +20,8 @@ typedef i32 b32;
 typedef float2 v2;
 typedef float3 v3;
 typedef float4 v4;
+typedef uint8_t4 v4u8;
+typedef uint4 v4u;
 
 typedef float3x3 m3x3;
 typedef float4x4 m4x4;
@@ -31,10 +33,10 @@ typedef float4x4 m4x4;
 v4 operator*(m4x4 mat, v4 vec) { return mul(mat, vec); }
 m4x4 operator*(m4x4 a, m4x4 b) { return mul(a, b); }
 
-global_var const u32 MaxMaterials = KB(1);
-global_var const u32 MaxLights = KB(1);
+CONST u32 MaxMaterials = KB(1);
+CONST u32 MaxLights = KB(1);
 
-global_var const f32 PI = 3.14159265358f;
+CONST f32 PI = 3.14159265358f;
 
 #include "../../src/shader_header.h"
 
@@ -80,7 +82,6 @@ VkBind(Bindings.Textures)       Texture2D textures[];
 VkBind(Bindings.Samplers)       SamplerState samplers[];
 VkBind(Bindings.CubeTextures)   TextureCube cube_texture[];
 VkBind(Bindings.State)          StructuredBuffer<GpuState> state;
-VkBind(Bindings.Entities)       StructuredBuffer<Entity> entities;
 VkBind(Bindings.Materials)      StructuredBuffer<Material> materials;
 VkBind(Bindings.PointLights)    StructuredBuffer<PointLight> point_lights;
 VkBind(Bindings.DirLights)      StructuredBuffer<DirLight> dir_lights;
@@ -90,6 +91,7 @@ VkBind(Bindings.DrawCtx)        StructuredBuffer<DrawCall> drawcalls;
 VkBind(Bindings.SoftwareRender) StructuredBuffer<u32> software_render;
 VkBind(Bindings.UI_RectBinding) StructuredBuffer<UI_Rect> ui_rects;
 VkBind(Bindings.Vertices)       StructuredBuffer<Vertex> vertices;
+VkBind(Bindings.SkinMatrices)   StructuredBuffer<m4x4> skin_matrices;
 
 bool flag_has(u64 x, u64 f) { return (x & f) == (f); }
 
@@ -108,6 +110,7 @@ f32 Square(f32 x)                     { return x * x; }
 f32 Cube(f32 x)                       { return x * x * x; }
 f32 Sign(f32 x)                       { return x < 0 ? -1 : x > 0 ? 1 : 0; }
 f32 Abs(f32 x)                        { return x < 0 ? -x : x; }
+bool flag_any(u64 x, u64 f)											{ return bool(x & f); }
 
 f32 deg2rad(f32 degrees) { return degrees * PI / 180; }
 f32 rad2deg(f32 radians) { return radians * 180 / PI; }
@@ -123,10 +126,10 @@ v4 v4_hadamard(v4 a, v4 b) { return v4(a.x*b.x, a.y*b.y, a.z*b.z, a.w*b.w); }
 v4 v4_hadamard_div(v4 a, v4 b) { return v4(a.x/b.x, a.y/b.y, a.z/b.z, a.w/b.w); }
 
 v4 rgba_from_u32(u32 hex) {
-	v4 result = v4(((hex >>  0) & 0xff) / 255.f,
-																((hex >>  8) & 0xff) / 255.f,
-																((hex >> 16) & 0xff) / 255.f,
-																((hex >> 24) & 0xff) / 255.f);
+	v4 result = v4(((hex >>  0) & 0xff) / 255.0f,
+																((hex >>  8) & 0xff) / 255.0f,
+																((hex >> 16) & 0xff) / 255.0f,
+																((hex >> 24) & 0xff) / 255.0f);
 	return result;
 }
 
@@ -138,8 +141,4 @@ u32 u32_from_rgba(v4 rgba) {
 	result |= ((u32)((u8)(rgba.w*255))) << 24;
 	return result;
 }
-
-
-
-
 

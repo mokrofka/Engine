@@ -39,6 +39,7 @@ typedef __builtin_va_list VaList;
 	typedef __UINT16_TYPE__ u16;
 	typedef __UINT32_TYPE__ u32;
 	typedef __UINT64_TYPE__ u64;
+	typedef __uint128_t u128;
 
 	typedef __INT8_TYPE__  i8;
 	typedef __INT16_TYPE__ i16;
@@ -77,12 +78,6 @@ typedef __builtin_va_list VaList;
 	#define Packed __attribute__((packed))
 #else
 	#error Compiler not supported.
-#endif
-
-#if BUILD_DEBUG
-	#define DebugDo(...) __VA_ARGS__
-#else
-	#define DebugDo(...)
 #endif
 
 #define C_LINKAGE_BEGIN extern "C"{
@@ -206,27 +201,16 @@ b32 flag_any(u64 x, u64 f);
 #define Min3(a, b, c)          Min(Min((a),(b)), (c))
 #define ClampTop(x, a)         Min((x), (a))
 #define ClampBot(x, a)         Max((x), (a))
-#define Clamp(a, x, b)         ((x) < (a) ? (a) : (x) > (b) ? (b) : x)
+#define Clamp(a, x, b)         ((x) < (a) ? (a) : (x) > (b) ? (b) : (x))
 #define Clamp01(x)             Clamp(0, (x), 1)
 #define Clamp11(x)             Clamp(-1, (x), 1)
-#define ReverseClamp(a, x, b)  (((x) < (a)) ? (b) : ((b) < (x)) ? (a) : (x))
+#define ReverseClamp(a, x, b)  ((x) < (a) ? (b) : (b) < (x) ? (a) : (x))
 #define Square(x)              ((x) * (x))
 #define Cube(x)                ((x) * (x) * (x))
 #define Sign(x)                (((x) < 0) ? -1 : ((x) > 0) ? 1 : 0)
 #define Abs(x)                 (((x) < 0) ? -(x) : (x))
 #define InRange(a, x, b)							((a) <= (x) && (x) < (b))
 #define IsBetween(a, x, b)					((a) <= (x) && (x) <= (b))
-
-inline u32 foo1() {
-	u32 a = 1;
-	u32 b = 1;
-	#define tm_or(a, b) ((a) ?: (b))
-	#define tm_clamp(lo, x, hi) ((x) < (lo) ? (lo) : (x) > (hi) ? (hi) : x)
-
-	return tm_or(a, b);
-	Clamp(5, a, 10);
-	tm_clamp(5, a, 10);
-}
 
 u64 mod_pow2(u64 x, u64 b);
 u64 div_pow2(u64 x, u64 b);
@@ -336,7 +320,6 @@ void DebugTrap();
 
 inline b32 atomic_cmp_set(u32* x, u32 expect, u32 v) { return atomic_cmp_swap(x, &expect, v); }
 inline u32 atomic_cmp_swap_old(u32* x, u32 expect, u32 v) { u32 res = expect; atomic_cmp_swap(x, &res, v); return res; }
-
 
 ////////////////////////////////////////////////////////////////////////
 // Circular Linked List
@@ -476,11 +459,13 @@ template <typename F> _Defer<F> operator+(_DeferDummy, F f) { return _Defer<F>(f
 #define DeferLoop(begin, end) for(int _i_ = ((begin), 1); _i_; _i_ = 0, (end))
 #define DeferLoopIf(begin, end) for(int _i_ = (begin); _i_; _i_ = false, (end))
 
-template<typename T> struct ResultOk {
+template<typename T> struct Result {
 	T value;
 	b32 ok;
+	T or_else(T fallback) { return ok ? value : fallback; }
+	T val() { Assert(ok); return value; }
 };
-template<typename T, typename Err = b32> struct ResultErr {
+template<typename T, typename Err> struct ResultErr {
 	T value;
 	Err err;
 };
@@ -492,7 +477,7 @@ template<typename T, typename Err = b32> struct ResultErr {
 		var _temp = (expr);                       \
 		_temp.ok ? _temp.value : Scope(fallback); \
 	)
-#define or_else(expr, fallback) OrElse(value, ok, expr, fallback)
+#define Or_else(expr, fallback) OrElse(value, ok, expr, fallback)
 #define OrElseErr(value, err, expr, fallback) \
 	Scope(                                       \
 		var _temp = (expr);                         \
@@ -632,6 +617,7 @@ template<typename To, typename From> NO_DEBUG Slice<To> slice_reinterpret(Slice<
 	Assert((s.count * sizeof(From)) % sizeof(To) == 0);
 	return Slice((To*)s.data, (s.count*sizeof(From)) / sizeof(To));
 }
+template<typename T> NO_DEBUG void slice_copy(Slice<T> dst, Slice<T> src) {Assert(dst.count == src.count); MemCopyArray(dst.data, src.data, src.count); }
 
 struct String {
 	u8* str;
@@ -812,3 +798,8 @@ extern u64 cpu_frequency;
 // #define X_2(a, value) x_foo(a, value)
 // #define X_SELECT(_1, _2, NAME, ...) NAME
 // #define X(...) X_SELECT(__VA_ARGS__, X_2, X_1)(__VA_ARGS__)
+
+
+
+
+

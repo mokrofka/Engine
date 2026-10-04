@@ -115,6 +115,14 @@ union v4 {
 	NO_DEBUG v4(v3 v, f32 w):x(v.x),y(v.y),z(v.z),w(w){}
 };
 
+struct v4u8 {
+	u8 v[4];
+};
+
+struct v4u {
+	u32 v[4];
+};
+
 struct m2x2 { f32 v[2][2]; };
 struct m3x2 { f32 v[3][2]; };
 struct m3x3 { f32 v[3][3]; };
@@ -242,7 +250,10 @@ u32 u32_from_rgba(v4 rgba);
 
 u32 xorshift32(u32 x);
 
-u64 hash(u64 x, u64 seed = HASH_DEFAULT_SEED);
+u64 hash(u64 x);
+u64 hash(u64 a, u64 b);
+u64 hash(u64 a, u64 b, u64 c);
+u64 hash(u64 a, u64 b, u64 c, u64 d);
 u64 hash(String x, u64 seed = HASH_DEFAULT_SEED);
 u64 hash_bytes(void *data, u64 size, u64 seed = HASH_DEFAULT_SEED);
 
@@ -253,7 +264,6 @@ NO_DEBUG u32 rand_u32();
 NO_DEBUG u32 rand_u32(u32 max);
 NO_DEBUG u32 rand_u32(u32 min, u32 max);
 NO_DEBUG i32 rand_i32();
-NO_DEBUG i32 rand_i32(i32 max);
 NO_DEBUG i32 rand_i32(i32 min, i32 max);
 NO_DEBUG f32 rand_f32();
 NO_DEBUG f32 rand_f32_11();
@@ -263,7 +273,6 @@ NO_DEBUG f32 rand_f32_centered(f32 base, f32 radius);
 NO_DEBUG f32 rand_f32_signed(f32 magnitude);
 NO_DEBUG b32 rand_b32();
 NO_DEBUG void rand_set_seed();
-NO_DEBUG u32 rand_get_seed();
 template<typename T> void rand_shuffle(Slice<T> data) {
 	Loop(i, data.count) {
 		u32 j = rand_u32(i, data.count);
@@ -516,6 +525,7 @@ v4 quat_rotate_towards(v4 a, v4 b, f32 max_rad);
 v4 quat_from_to(v3 a, v3 b);
 v4 quat_from_euler(v3 e);
 v4 quat_look_rotation(v3 dir, v3 up);
+v3 quat_rotate_point(v3 point, v3 pivot, v4 q);
 
 ////////////////////////////////////////////////////////////////////////
 // m2x2
@@ -589,6 +599,7 @@ m4x4 m4x4_translate(v3 pos);
 m4x4 m4x4_scale(v3 scale);
 m4x4 m4x4_scale_translate(v3 scale, v3 pos);
 m4x4 m4x4_transform(v3 pos, v3 scale, v4 q);
+m4x4 m4x4_transform(Transform trans);
 m4x4 m4x4_scale_all_elements(m4x4 mat, f32 scale);
 m4x4 m4x4_rotate_x(f32 rad);
 m4x4 m4x4_rotate_y(f32 rad);

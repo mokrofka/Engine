@@ -30,6 +30,7 @@
 	X(GreeMan) \
 	X(Barrack) \
 	X(Bubble) \
+	X(T) \
 
 #define TEXTURE_LIST \
 	X(Dummy) \
@@ -73,17 +74,6 @@ struct MemberDefinition {
 	u64 offset;
 };
 
-enum ScrollType {
-	ScrollType_Default,
-	ScrollType_PowClamp,
-};
-
-struct ScrollState {
-	v2 pos;
-	v2 zoom;
-	f32 scale_level;
-};
-
 struct Camera2 {
 	v2 pos;
 	f32 zoom;
@@ -108,22 +98,22 @@ enum ProfTabActive {
 };
 
 struct ProfColors {
-	v4 work;
-	v4 sleep;
-	v4 job;
-	v4 async;
-	v4 selected;
-	v4 hovered;
-	v4 border;
-	v4 text;
-	v4 text_dim;
-	v4 current_frame;
-	v4 frame_ok;     // < 16ms
-	v4 frame_warn;   // 16-20ms
-	v4 frame_bad;    // > 20ms
-	v4 mem_used;
-	v4 mem_committed;
-	v4 mem_cap;
+	Color work;
+	Color sleep;
+	Color job;
+	Color async;
+	Color selected;
+	Color hovered;
+	Color border;
+	Color text;
+	Color text_dim;
+	Color current_frame;
+	Color frame_ok;     // < 16ms
+	Color frame_warn;   // 16-20ms
+	Color frame_bad;    // > 20ms
+	Color mem_used;
+	Color mem_committed;
+	Color mem_cap;
 };
 
 struct ImGuiImage {
@@ -211,7 +201,7 @@ struct ThingDesc {
 	v4 rot;
 	v3 scale;
 	v3 vel;
-	u32 color;
+	Color color;
 	Rng3 aabb;
 	R_MeshId mesh_id;
 	R_MaterialId mat_id;
@@ -248,7 +238,7 @@ Introspect struct Thing {
 	v3 vel;
 	R_MeshId mesh;
 	R_MaterialId mat;
-	u32 color;
+	Color color;
 	f32 elapsed;
 	u8 buf0[64];
 	f32 modify0;
@@ -403,6 +393,13 @@ enum ThingEnum {
 	ThingEnum_COUNT,
 };
 
+struct GltfInfo {
+	R_MeshDesc mesh;
+	Slice<Bone> bones;
+	Slice<m4x4> inv_matrices;
+	Animation animation;
+};
+
 struct GlobalState {
 	Arena arena;
 	Arena frame_arena;
@@ -458,10 +455,6 @@ struct GlobalState {
 
 	u32 entities_count;
 	PoolIterative<Thing, MaxEntities, ThingId> things;
-
-	ThingId axis_attached_to_cam_id;
-	ThingId grid;
-	ThingId barrack;
 };
 
 extern GlobalState* st;
@@ -490,11 +483,11 @@ b32 time_on_between_interval(f32 interval, f32 offset = 0);
 f64 time_since(f64 timestamp);
 f64 time_until(f64 timestamp);
 
-void imgui_draw_rect(ImDrawList* draw, Rng2 rect, v4 col, f32 rounding = 0, ImDrawFlags flags = 0, f32 thickness = 1);
-void imgui_draw_rect_filled(ImDrawList* draw, Rng2 rect, v4 col, f32 rounding = 0, ImDrawFlags flags = 0);
-void imgui_draw_line(ImDrawList* draw, v2 p0, v2 p1, v4 col, f32 thickness = 1);
-void imgui_draw_text(ImDrawList* draw, v2 pos, v4 col, String fmt, ...);
-void imgui_draw_text(ImDrawList* draw, f32 font_size, v2 pos, v4 col, String fmt, ...); struct ImGuiDrawText_Params {f32 font_size; v2 pos; v4 col = ColorWhite;};
+void imgui_draw_rect(ImDrawList* draw, Rng2 rect, Color col, f32 rounding = 0, ImDrawFlags flags = 0, f32 thickness = 1);
+void imgui_draw_rect_filled(ImDrawList* draw, Rng2 rect, Color col, f32 rounding = 0, ImDrawFlags flags = 0);
+void imgui_draw_line(ImDrawList* draw, v2 p0, v2 p1, Color col, f32 thickness = 1);
+void imgui_draw_text(ImDrawList* draw, v2 pos, Color col, String fmt, ...);
+void imgui_draw_text(ImDrawList* draw, f32 font_size, v2 pos, Color col, String fmt, ...);
 void imgui_text(String fmt, ...);
 v2 imgui_calc_text_size(String str);
 
@@ -505,21 +498,28 @@ void dev_init();
 void dev_update();
 
 R_MeshDesc load_obj(Allocator arena, String name);
-R_MeshDesc load_gltf(Allocator arena, String path, b32 is_glb);
+GltfInfo load_gltf(Allocator arena, String name, b32 is_glb);
+v3 sample_v3(Sampler s, f32 time);
+v4 sample_quat(Sampler s, f32 time);
+void update_animation(Animation anim, Pose pose, f32 time);
+f32 animation_duration(Animation anim);
 
 JsParser js_parse_make(Allocator arena, String str);
-u8 js_peek(JsParser* p);
-void js_advance(JsParser* p);
-void js_skip_ws(JsParser* p);
-String js_parse_str(JsParser* p);
-f64 js_parse_number(JsParser* p);
-JsVal js_parse(JsParser* p);
-JsVal js_get_val(JsVal val, String key);
-b32 js_get_bool(JsObj obj, String key);
-f64 js_get_number(JsObj obj, String key);
-String js_get_str(JsObj obj, String key);
-Slice<JsVal*> js_get_array(JsObj obj, String key);
-JsObj js_get_obj(JsObj obj, String key);
+b32 js_is_end(JsParser& p);
+u8 js_peek(JsParser& p);
+void js_skip_ws(JsParser& p);
+String js_parse_str(JsParser& p);
+f64 js_parse_number(JsParser& p);
+JsVal js_parse(JsParser& p);
+
+Result<JsVal> js_val(JsVal val, String key);
+Result<b32> js_bool(JsObj obj, String key);
+Result<f64> js_number(JsObj obj, String key);
+Result<String> js_str(JsObj obj, String key);
+Result<Slice<JsVal*>> js_array(JsObj obj, String key);
+Result<JsObj> js_obj(JsObj obj, String key);
+Result<v3> js_v3(JsObj obj, String key);
+Result<v4> js_v4(JsObj obj, String key);
 
 Slice<Token> tokens_from_str(Allocator arena, String string);
 Parser parser_make(Slice<Token> tokens);

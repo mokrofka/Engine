@@ -33,7 +33,8 @@
 		typedef u32 xcb_visualid_t;
 		#include <vulkan/vulkan_xcb.h>
 		void vk_surface_create() {
-			Gfx_State& g = st->gfx;
+			ProfFunc;
+			var& g = st->gfx;
 			struct VK_Surface {
 				xcb_connection_t* connection;
 				xcb_window_t window;
@@ -1083,33 +1084,41 @@ VkPipeline vk_pipeline_create2(Gfx_PipelineDesc2 desc) {
 	};
 
 	// Attributes
-	VkVertexInputAttributeDescription attribute_desriptions[16] = {};
-	u32 attribute_desriptions_count = 0;
-	attribute_desriptions_count = 4;
-	attribute_desriptions[0] = {
-		.format = VK_FORMAT_R32G32B32_SFLOAT,
-		.offset = (u32)OffsetOf(R_Vertex, pos),
+	VkVertexInputAttributeDescription attribute_desriptions[] = {
+		[0] = {
+			.format = VK_FORMAT_R32G32B32_SFLOAT,
+			.offset = (u32)OffsetOf(R_Vertex, pos),
+		},
+		[1] = {
+			.format = VK_FORMAT_R32G32B32_SFLOAT,
+			.offset = (u32)OffsetOf(R_Vertex, norm),
+		},
+		[2] = {
+			.format = VK_FORMAT_R32G32_SFLOAT,
+			.offset = (u32)OffsetOf(R_Vertex, uv),
+		},
+		[3] = {
+			.format = VK_FORMAT_R32_UINT,
+			.offset = (u32)OffsetOf(R_Vertex, color),
+		},
+		[4] = {
+			.format = VK_FORMAT_R32G32B32A32_SFLOAT,
+			.offset = (u32)OffsetOf(R_Vertex, weights),
+		},
+		[5] = {
+			// .format = VK_FORMAT_R8G8B8A8_UINT,
+			.format = VK_FORMAT_R32G32B32A32_UINT,
+			.offset = (u32)OffsetOf(R_Vertex, joints),
+		},
 	};
-	attribute_desriptions[1] = {
-		.format = VK_FORMAT_R32G32B32_SFLOAT,
-		.offset = (u32)OffsetOf(R_Vertex, norm),
-	};
-	attribute_desriptions[2] = {
-		.format = VK_FORMAT_R32G32_SFLOAT,
-		.offset = (u32)OffsetOf(R_Vertex, uv),
-	};
-	attribute_desriptions[3] = {
-		.format = VK_FORMAT_R32G32B32A32_SFLOAT,
-		.offset = (u32)OffsetOf(R_Vertex, color),
-	};
-	Loop(i, attribute_desriptions_count) {
+	LoopArray(i, attribute_desriptions) {
 		attribute_desriptions[i].location = i;
 	}
 	VkPipelineVertexInputStateCreateInfo vertex_input_state = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
 		.vertexBindingDescriptionCount = 1,
 		.pVertexBindingDescriptions = &binding_description,
-		.vertexAttributeDescriptionCount = attribute_desriptions_count,
+		.vertexAttributeDescriptionCount = ArrayCount(attribute_desriptions),
 		.pVertexAttributeDescriptions = attribute_desriptions,
 	};
 
@@ -1210,7 +1219,8 @@ VkPipeline vk_pipeline_create2(Gfx_PipelineDesc2 desc) {
 }
 
 void vk_loader_load_core() {
-	Gfx_State& g = st->gfx;
+	ProfFunc;
+	var& g = st->gfx;
 	g.lib = os_lib_open("libvulkan.so");
 #define X(name) VK_GET_PROC(name)
 	VK_GET_PROC_LIST
@@ -1218,14 +1228,16 @@ void vk_loader_load_core() {
 }
 
 void vk_loader_load_instance() {
-	Gfx_State& g = st->gfx;
+	ProfFunc;
+	var& g = st->gfx;
 #define X(name) VK_INSTANCE_GET_PROC(name)
 	VK_INSTANCE_GET_PROC_LIST
 #undef X
 }
 
 void vk_loader_load_device() {
-	Gfx_State& g = st->gfx;
+	ProfFunc;
+	var& g = st->gfx;
 #define X(name) VK_DEVICE_GET_PROC(name)
 	VK_DEVICE_GET_PROC_LIST
 #undef X
@@ -1233,8 +1245,9 @@ void vk_loader_load_device() {
 
 VkBool32 vk_debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity, VkDebugUtilsMessageTypeFlagsEXT message_types, const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data);
 void vk_instance_init() {
+	ProfFunc;
 	Scratch scratch;
-	Gfx_State& g = st->gfx;
+	var& g = st->gfx;
 	VkApplicationInfo app_info = {
 		.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
 		.apiVersion = VK_API_VERSION_1_4
@@ -1253,9 +1266,12 @@ void vk_instance_init() {
 		Debug(required_validation_layer_names[i]);
 	}
 	u32 available_layer_count = 0;
+	VkLayerProperties* available_layers;
+	{ProfBlock("enum inst props");
 	VK_CHECK(g.EnumerateInstanceLayerProperties(&available_layer_count, null));
-	VkLayerProperties* available_layers = push_array(scratch, VkLayerProperties, available_layer_count);
+	available_layers = push_array(scratch, VkLayerProperties, available_layer_count);
 	VK_CHECK(g.EnumerateInstanceLayerProperties(&available_layer_count, available_layers));
+	}
 	Loop(i, required_validation_layer_names.count) {
 		b32 found = false;
 		Loop(j, available_layer_count) {
@@ -1275,9 +1291,12 @@ void vk_instance_init() {
 		Debug(required_extensions[i]);
 	}
 	u32 extension_count = 0;
+	VkExtensionProperties* props;
+	{ProfBlock("enum inst ext");
 	g.EnumerateInstanceExtensionProperties(null, &extension_count, null);
-	VkExtensionProperties* props = push_array(scratch, VkExtensionProperties, extension_count);
+	props = push_array(scratch, VkExtensionProperties, extension_count);
 	g.EnumerateInstanceExtensionProperties(null, &extension_count, props);
+	}
 	Loop(i, required_extensions.count) {
 		b32 found = false;
 		Loop(j, extension_count) {
@@ -1299,7 +1318,10 @@ void vk_instance_init() {
 		.enabledExtensionCount = (u32)required_extensions.count,
 		.ppEnabledExtensionNames = required_extensions.data,
 	};
-	VK_CHECK(g.CreateInstance(&instance_create_info, g.allocator, &g.instance));
+	{
+		ProfBlock("init");
+		VK_CHECK(g.CreateInstance(&instance_create_info, g.allocator, &g.instance));
+	}
 	Info("Vulkan insance created");
 
 #if BUILD_DEBUG
@@ -1322,8 +1344,9 @@ void vk_instance_init() {
 }
 
 void vk_device_init() {
+	ProfFunc;
 	Scratch scratch;
-	Gfx_State& g = st->gfx;
+	var& g = st->gfx;
 
 	///////////////////////////////////
 	// Physical device
@@ -1488,6 +1511,7 @@ void vk_device_init() {
 			.descriptorBindingPartiallyBound = true,               // allows not updated descriptors
 			.runtimeDescriptorArray = true,                        // allows not specified size of descriptor array in shader
 			.timelineSemaphore = true,
+			.shaderInt8 = true,
 		};
 		VkPhysicalDeviceVulkan11Features vulkan11 = {
 			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
@@ -2755,7 +2779,7 @@ void gfx_bind_index(Gfx_Buffer buf) {
 		case Gfx_MemType_Gpu: vkbuf = g.gpu_buf.h; break;
 	}
 	VkDeviceSize offset = buf.base;
-	g.CmdBindIndexBuffer(vk_cur_cmd(), vkbuf, offset, VK_INDEX_TYPE_UINT32);
+	g.CmdBindIndexBuffer(vk_cur_cmd(), vkbuf, offset, VK_INDEX_TYPE_UINT16);
 }
 
 void gfx_bind_buffer(Gfx_Buffer buf, u32 binding) {
@@ -2874,7 +2898,8 @@ void gfx_readback_image(Gfx_Image img, u8* dst) {
 }
 
 void gfx_init(Gfx_Environment environment) {
-	Gfx_State& g = st->gfx;
+	ProfFunc;
+	var& g = st->gfx;
 	g.environment = environment;
 	g.arena = arena_make(.name = "gfx arena");
 	// g.stage_buffer_reserve_mutex = os_mutex_make();
