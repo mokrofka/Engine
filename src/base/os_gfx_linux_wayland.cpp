@@ -1,4 +1,4 @@
-#include "../lib.h"
+#include "base.h"
 
 #if OS_LINUX && GFX_WAYLAND
 

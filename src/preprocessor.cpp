@@ -9,7 +9,6 @@ i32 main(i32 count, char** args) {
 	LoopEnumNonZero(i, MetaType) {
 		map_set(saved, hash(meta_type_str[i]), {});
 	}
-
 	String files[] = {
 		"com.h",
 		"types.h",
@@ -18,12 +17,10 @@ i32 main(i32 count, char** args) {
 	LoopArray(i, files) {
 		buffers[i] = os_file_path_read_all_str(scratch, push_strf(scratch, "%s/../src/%s", os_cur_directory(), files[i]));
 	}
-	
 	var string = dstr_make(scratch);
 	var enum_meta_type_string = dstr_make(scratch);
 	dstr_push(enum_meta_type_string, "enum {\n");
 	b32 first_enum_meta_type = true;
-
 	LoopArray(i, files) {
 		Slice tokens = tokens_from_str(scratch, buffers[i]);
 		Parser p = parser_make(tokens);
@@ -49,7 +46,7 @@ i32 main(i32 count, char** args) {
 						// Enum meta type
 						String meta_type = push_strf(scratch, "MetaType_%s", field_type.str);
 						u64 h = hash(meta_type);
-						if(var[_, ok] = map_get(saved, h); !ok) {
+						if(!map_exists(saved, h)) {
 							meta_type = push_strf(scratch, "\t%s", meta_type);
 							if(first_enum_meta_type) {
 								meta_type = push_strf(scratch, "%s = %u", meta_type, MetaType_COUNT);

@@ -50,7 +50,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 	add_compile_definitions(BUILD_DEBUG=1)
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
 	add_compile_options(-flto -ffast-math)
-	# add_compile_options(-ffast-math)
 endif()
 
 if(X11_use)
@@ -59,8 +58,6 @@ elseif(Wayland_Use)
 	add_compile_definitions(GFX_WAYLAND=1)
 endif()
 include_directories(src)
-include_directories(src/base)
-include_directories(vendor)
 
 set(game_source src/com.cpp)
 set(exe_source src/main.cpp vendor/vendor_impl.cpp)
@@ -74,7 +71,7 @@ if(dev_build)
 		COMPILE_OPTIONS "-O0;-g"
 	)
 else()
-	add_link_options("-nostdlib++") # imgui depends on it
+	add_link_options("-nostdlib++")
 endif()
 
 add_executable(exe)

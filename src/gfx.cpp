@@ -856,213 +856,6 @@ VkShaderModule vk_shader_create(Slice<u8> code) {
 	return res;
 }
 
-VkPipeline vk_pipeline_create(Gfx_PipelineDesc desc) {
-	Gfx_State& g = st->gfx;
-
-	VK_Shader shader = pool_get(g.shaders, desc.shader);
-	if(desc.compute) {
-		VkComputePipelineCreateInfo pip_create_info = {
-			.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-			.flags = VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT,
-			.stage = {
-				.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-				.stage = VK_SHADER_STAGE_COMPUTE_BIT,
-				.module = shader.h,
-				.pName = "cs_main",
-			},
-			.layout = g.pipeline_layout,
-		};
-		VkPipeline res;
-		VK_CHECK(g.CreateComputePipelines(vkdevice, null, 1, &pip_create_info, 0, &res));
-		return res;
-	}
-	
-	///////////////////////////////////
-	// Graphics pipeline
-	// Dynamic rendering
-	VkFormat color_formats[Gfx_MaxColorAttachments] = {};
-	Loop(i, desc.color_count) {
-		color_formats[i] = vk_format(desc.colors[i].pixel_format);
-	}
-	VkPipelineRenderingCreateInfo rendering_info = {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-		.colorAttachmentCount = desc.color_count,
-		.pColorAttachmentFormats = color_formats,
-		.depthAttachmentFormat = vk_format(desc.depth.pixel_format),
-		.stencilAttachmentFormat = desc.depth.pixel_format == Gfx_PixelFormat_DepthStencil ? vk_format(desc.depth.pixel_format) : VK_FORMAT_UNDEFINED,
-	};
-	
-	// Vertex input
-	VkVertexInputBindingDescription binding_description = {
-		.binding = 0,
-		.stride = sizeof(R_Vertex),
-		.inputRate = VK_VERTEX_INPUT_RATE_VERTEX
-	};
-
-	// Attributes
-	VkVertexInputAttributeDescription attribute_desriptions[16] = {};
-	u32 attribute_desriptions_count = 0;
-	attribute_desriptions_count = 4;
-	attribute_desriptions[0] = {
-		.format = VK_FORMAT_R32G32B32_SFLOAT,
-		.offset = (u32)OffsetOf(R_Vertex, pos),
-	};
-	attribute_desriptions[1] = {
-		.format = VK_FORMAT_R32G32B32_SFLOAT,
-		.offset = (u32)OffsetOf(R_Vertex, norm),
-	};
-	attribute_desriptions[2] = {
-		.format = VK_FORMAT_R32G32_SFLOAT,
-		.offset = (u32)OffsetOf(R_Vertex, uv),
-	};
-	attribute_desriptions[3] = {
-		.format = VK_FORMAT_R32G32B32A32_SFLOAT,
-		.offset = (u32)OffsetOf(R_Vertex, color),
-	};
-	Loop(i, attribute_desriptions_count) {
-		attribute_desriptions[i].location = i;
-	}
-	VkPipelineVertexInputStateCreateInfo vertex_input_state = {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-		.vertexBindingDescriptionCount = 1,
-		.pVertexBindingDescriptions = &binding_description,
-		.vertexAttributeDescriptionCount = attribute_desriptions_count,
-		.pVertexAttributeDescriptions = attribute_desriptions,
-	};
-
-	// Input assembly
-	VkPipelineInputAssemblyStateCreateInfo input_assembly_state = {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-		.topology = vk_primitive_topology(desc.primitive_type),
-		.primitiveRestartEnable = false,
-	};
-	
-	// Viewport
-	VkPipelineViewportStateCreateInfo viewport_state = {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-		.viewportCount = 1,
-		.scissorCount = 1,
-	};
-	
-	// Rasterizer
-	VkPipelineRasterizationStateCreateInfo rasterizer_state = {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-		.depthClampEnable = false,
-		.rasterizerDiscardEnable = false,
-		.polygonMode = VK_POLYGON_MODE_FILL,
-		.cullMode = vk_cullmode(desc.cull_mode),
-		.frontFace = vk_frontface(desc.face_winding),
-		.depthBiasEnable = (u32)desc.depth.bias != 0,
-		.depthBiasConstantFactor = desc.depth.bias,
-		.depthBiasClamp = desc.depth.bias_clamp,
-		.depthBiasSlopeFactor = desc.depth.bias_slope_scale,
-		.lineWidth = 1.0f,
-	};
-	
-	// Multisampling
-	VkPipelineMultisampleStateCreateInfo multisampling_info = {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-		.rasterizationSamples = (VkSampleCountFlagBits)desc.sample_count,
-		.alphaToCoverageEnable = (u32)desc.alpha_to_coverage_enabled,
-	};
-
-	// Depth and stencil testing
-	VkPipelineDepthStencilStateCreateInfo depth_stencil_info = {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-		.depthTestEnable = (u32)!desc.depth.test_disable,
-		.depthWriteEnable = (u32)desc.depth.write_enabled,
-		.depthCompareOp = vk_compare_op(desc.depth.compare),
-		.depthBoundsTestEnable = false,
-		.front = {
-			.failOp = vk_stencil_op(desc.stencil.front.fail_op),
-			.passOp = vk_stencil_op(desc.stencil.front.pass_op),
-			.depthFailOp = vk_stencil_op(desc.stencil.front.depth_fail_op),
-			.compareOp = vk_compare_op(desc.stencil.front.compare),
-			.compareMask = desc.stencil.read_mask,
-			.writeMask = desc.stencil.write_mask,
-			.reference = desc.stencil.ref,
-		},
-		.back = {
-			.failOp = vk_stencil_op(desc.stencil.back.fail_op),
-			.passOp = vk_stencil_op(desc.stencil.back.pass_op),
-			.depthFailOp = vk_stencil_op(desc.stencil.back.depth_fail_op),
-			.compareOp = vk_compare_op(desc.stencil.back.compare),
-			.compareMask = desc.stencil.read_mask,
-			.writeMask = desc.stencil.write_mask,
-			.reference = desc.stencil.ref,
-		},
-	};
-	
-	// Blending
-	VkPipelineColorBlendAttachmentState attachment_states[Gfx_MaxColorAttachments] = {};
-	Loop(i, desc.color_count) {
-		attachment_states[i].blendEnable = desc.colors[i].blend.enabled;
-		attachment_states[i].srcColorBlendFactor = vk_blend_factor(desc.colors[i].blend.src_factor_rgb);
-		attachment_states[i].dstColorBlendFactor = vk_blend_factor(desc.colors[i].blend.dst_factor_rgb);
-		attachment_states[i].colorBlendOp = vk_blend_op(desc.colors[i].blend.op_rgb);
-		attachment_states[i].srcAlphaBlendFactor = vk_blend_factor(desc.colors[i].blend.src_factor_alpha);
-		attachment_states[i].dstAlphaBlendFactor = vk_blend_factor(desc.colors[i].blend.dst_factor_alpha);
-		attachment_states[i].alphaBlendOp = vk_blend_op(desc.colors[i].blend.op_alpha);
-		attachment_states[i].colorWriteMask = vk_color_write_mask(desc.colors[i].write_mask);
-	}
-	VkPipelineColorBlendStateCreateInfo color_blend_state_info = {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-		.attachmentCount = desc.color_count,
-		.pAttachments = attachment_states,
-		.blendConstants[0] = desc.blend_color.v[0],
-		.blendConstants[1] = desc.blend_color.v[1],
-		.blendConstants[2] = desc.blend_color.v[2],
-		.blendConstants[3] = desc.blend_color.v[3],
-	};
-		
-	// Dynamic state
-	VkDynamicState dynamic_states[] = {
-		VK_DYNAMIC_STATE_VIEWPORT,
-		VK_DYNAMIC_STATE_SCISSOR,
-	};
-	VkPipelineDynamicStateCreateInfo dynamic_state_info = {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-		.dynamicStateCount = ArrayCount(dynamic_states),
-		.pDynamicStates = dynamic_states,
-	};
-
-	// Shader stages
-	u32 stages_count = 0;
-	VkPipelineShaderStageCreateInfo stages[2] = {};
-	stages[stages_count++] = {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-		.stage = VK_SHADER_STAGE_VERTEX_BIT,
-		.module = shader.h,
-		.pName = "vs_main",
-	};
-	stages[stages_count++] = {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-		.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-		.module = shader.h,
-		.pName = "fs_main",
-	};
-	
-	// Pipeline
-	VkGraphicsPipelineCreateInfo pipeline_info = {
-		.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-		.pNext = &rendering_info,
-		.stageCount = stages_count,
-		.pStages = stages,
-		.pVertexInputState = &vertex_input_state,
-		.pInputAssemblyState = &input_assembly_state,
-		.pViewportState = &viewport_state,
-		.pRasterizationState = &rasterizer_state,
-		.pMultisampleState = &multisampling_info,
-		.pDepthStencilState = &depth_stencil_info,
-		.pColorBlendState = &color_blend_state_info,
-		.pDynamicState = &dynamic_state_info,
-		.layout = g.pipeline_layout,
-	};
-	VkPipeline res;
-	VK_CHECK(g.CreateGraphicsPipelines(vkdevice, null, 1, &pipeline_info, g.allocator, &res));
-	return res;
-}
-
 VkPipeline vk_pipeline_create2(Gfx_PipelineDesc2 desc) {
 	var& g = st->gfx;
 
@@ -1144,11 +937,11 @@ VkPipeline vk_pipeline_create2(Gfx_PipelineDesc2 desc) {
 	};
 
 	// Multisampling
-	VkPipelineMultisampleStateCreateInfo multisampling_info = {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-		.rasterizationSamples = (VkSampleCountFlagBits)desc.sample_count,
-		.alphaToCoverageEnable = (u32)desc.alpha_to_coverage_enabled,
-	};
+	// VkPipelineMultisampleStateCreateInfo multisampling_info = {
+	// 	.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+	// 	.rasterizationSamples = (VkSampleCountFlagBits)desc.sample_count,
+	// 	.alphaToCoverageEnable = (u32)desc.alpha_to_coverage_enabled,
+	// };
 
 	VkPipelineColorBlendStateCreateInfo color_blend_state_info = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
@@ -1172,6 +965,9 @@ VkPipeline vk_pipeline_create2(Gfx_PipelineDesc2 desc) {
 		VK_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT,
 		VK_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT,
 		VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT,
+		VK_DYNAMIC_STATE_RASTERIZATION_SAMPLES_EXT,
+		VK_DYNAMIC_STATE_SAMPLE_MASK_EXT,
+		VK_DYNAMIC_STATE_ALPHA_TO_COVERAGE_ENABLE_EXT
 		// VK_DYNAMIC_STATE_BLEND_CONSTANTS,
 	};
 	VkPipelineDynamicStateCreateInfo dynamic_state_info = {
@@ -1207,7 +1003,7 @@ VkPipeline vk_pipeline_create2(Gfx_PipelineDesc2 desc) {
 		.pInputAssemblyState = &input_assembly_state,
 		.pViewportState = &viewport_state,
 		.pRasterizationState = &rasterizer_state,
-		.pMultisampleState = &multisampling_info,
+		// .pMultisampleState = &multisampling_info,
 		.pDepthStencilState = null,
 		.pColorBlendState = &color_blend_state_info,
 		.pDynamicState = &dynamic_state_info,
@@ -1491,6 +1287,9 @@ void vk_device_init() {
 			.extendedDynamicState3ColorBlendEnable = true,
 			.extendedDynamicState3ColorBlendEquation = true,
 			.extendedDynamicState3ColorWriteMask = true,
+			.extendedDynamicState3RasterizationSamples = true,
+			.extendedDynamicState3SampleMask = true,
+			.extendedDynamicState3AlphaToCoverageEnable = true,
 		};
 		VkPhysicalDeviceVulkan14Features vulkan14 = {
 			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
@@ -1799,29 +1598,12 @@ void gfx_pass_defaults(Gfx_Pass* pass) {
 	}
 }
 
-void gfx_pipeline_common_init(VK_Pipeline* pip, Gfx_PipelineDesc desc) {
-	pip->shd_ref = desc.shader;
-	pip->compute = desc.compute;
-	pip->depth = desc.depth;
-	pip->stencil = desc.stencil;
-	pip->color_count = desc.color_count;
-	pip->primitive_type = desc.primitive_type;
-	pip->cull_mode = desc.cull_mode;
-	pip->face_winding = desc.face_winding;
-	pip->sample_count = desc.sample_count;
-	pip->blend_color = desc.blend_color;
-	pip->alpha_to_coverage_enabled = desc.alpha_to_coverage_enabled;
-	ArrayCopy(pip->colors, desc.colors);
-}
-
-void gfx_pipeline_common_init2(VK_Pipeline* pip, Gfx_PipelineDesc2 desc) {
+void gfx_pipeline_common_init(VK_Pipeline* pip, Gfx_PipelineDesc2 desc) {
 	pip->shd_ref = desc.shader;
 	pip->compute = desc.compute;
 	pip->colors[0].pixel_format = desc.pixel_format;
 	pip->depth.pixel_format = desc.depth_pixel_format;
-	pip->sample_count = desc.sample_count;
 	pip->blend_color = desc.blend_color;
-	pip->alpha_to_coverage_enabled = desc.alpha_to_coverage_enabled;
 }
 
 Gfx_Shader gfx_make_shader(Slice<u8> code) {
@@ -1833,52 +1615,12 @@ Gfx_Shader gfx_make_shader(Slice<u8> code) {
 	return res;
 }
 
-Gfx_Pipeline gfx_make_pipeline(Gfx_PipelineDesc desc) {
+Gfx_Pipeline gfx_make_pipeline(Gfx_PipelineDesc2 desc) {
 	Gfx_State& g = st->gfx;
-
-	_DefSet(desc.depth.pixel_format, Gfx_PixelFormat_DefaultDepth);
-	_DefSet(desc.depth.compare, Gfx_CompareOp_Always);
-	_DefSet(desc.stencil.front.compare, Gfx_CompareOp_Always);
-	_DefSet(desc.stencil.front.fail_op, Gfx_StencilOp_Keep);
-	_DefSet(desc.stencil.front.depth_fail_op, Gfx_StencilOp_Keep);
-	_DefSet(desc.stencil.front.pass_op, Gfx_StencilOp_Keep);
-	_DefSet(desc.stencil.back.compare, Gfx_CompareOp_Always);
-	_DefSet(desc.stencil.back.fail_op, Gfx_StencilOp_Keep);
-	_DefSet(desc.stencil.back.depth_fail_op, Gfx_StencilOp_Keep);
-	_DefSet(desc.stencil.back.pass_op, Gfx_StencilOp_Keep);
-	_DefSet(desc.color_count, 1);
-	Loop(i, desc.color_count) {
-		Gfx_ColorTargetState& col = desc.colors[i];
-		_DefSet(col.pixel_format, Gfx_PixelFormat_DefaulttAttachment);
-		_DefSet(col.write_mask, Gfx_ColorMask_RGBA);
-		_DefSet(col.blend.src_factor_rgb, Gfx_BlendFactor_One);
-		_DefSet(col.blend.dst_factor_rgb, Gfx_BlendFactor_Zero);
-		_DefSet(col.blend.op_rgb, Gfx_BlendOp_Add);
-		_DefSet(col.blend.src_factor_alpha, Gfx_BlendFactor_One);
-		_DefSet(col.blend.dst_factor_alpha, Gfx_BlendFactor_Zero);
-		_DefSet(col.blend.op_alpha, Gfx_BlendOp_Add);
-	}
-	_DefSet(desc.primitive_type, Gfx_PrimitiveType_Triangle);
-	_DefSet(desc.cull_mode, Gfx_CullMode_None);
-	_DefSet(desc.face_winding, Gfx_FaceWinding_CCW);
-	_DefSet(desc.sample_count, Gfx_DefaultSampleCount);
-
-	VK_Pipeline pipeline = {};
-	gfx_pipeline_common_init(&pipeline, desc);
-	pipeline.h = vk_pipeline_create(desc);
-	Gfx_Pipeline res = pool_push(g.pipelines, pipeline);
-	return res;
-}
-
-Gfx_Pipeline gfx_make_pipeline2(Gfx_PipelineDesc2 desc) {
-	Gfx_State& g = st->gfx;
-
-	_DefSet(desc.sample_count, Gfx_DefaultSampleCount);
 	_DefSet(desc.depth_pixel_format, Gfx_PixelFormat_DefaultDepth);
 	_DefSet(desc.pixel_format, Gfx_PixelFormat_DefaulttAttachment);
-
 	VK_Pipeline pipeline = {};
-	gfx_pipeline_common_init2(&pipeline, desc);
+	gfx_pipeline_common_init(&pipeline, desc);
 	pipeline.h = vk_pipeline_create2(desc);
 	Gfx_Pipeline res = pool_push(g.pipelines, pipeline);
 	return res;
@@ -2187,9 +1929,7 @@ Gfx_PipelineDesc2 gfx_query_pipeline_desc2(Gfx_Pipeline pip) {
 	Gfx_PipelineDesc2 res = {
 		.shader = pipeline.shd_ref,
 		.compute = pipeline.compute,
-		.sample_count = pipeline.sample_count,
 		.blend_color = pipeline.blend_color,
-		.alpha_to_coverage_enabled = pipeline.alpha_to_coverage_enabled,
 		.pixel_format = pipeline.colors[0].pixel_format,
 		.depth_pixel_format = pipeline.depth.pixel_format,
 	};
@@ -2219,19 +1959,11 @@ void gfx_update_shader(Gfx_Shader shd, Slice<u8> code) {
 	shader.h = vk_shader_create(code);
 }
 
-void gfx_update_pipeline(Gfx_Pipeline pip, Gfx_PipelineDesc desc) {
+void gfx_update_pipeline(Gfx_Pipeline pip, Gfx_PipelineDesc2 desc) {
 	var& g = st->gfx;
 	VK_Pipeline& pipeline = pool_get(g.pipelines, pip);
 	g.DestroyPipeline(vkdevice, pipeline.h, g.allocator);
 	gfx_pipeline_common_init(&pipeline, desc);
-	pipeline.h = vk_pipeline_create(desc);
-}
-
-void gfx_update_pipeline2(Gfx_Pipeline pip, Gfx_PipelineDesc2 desc) {
-	var& g = st->gfx;
-	VK_Pipeline& pipeline = pool_get(g.pipelines, pip);
-	g.DestroyPipeline(vkdevice, pipeline.h, g.allocator);
-	gfx_pipeline_common_init2(&pipeline, desc);
 	pipeline.h = vk_pipeline_create2(desc);
 }
 
@@ -2477,6 +2209,19 @@ void gfx_apply_color_blend_mask(Gfx_BlendState bs) {
 	VkColorComponentFlags write_mask = vk_color_write_mask(bs.write_mask);
 	st->gfx.CmdSetColorWriteMaskEXT(vk_cur_cmd(), 0, 1, &write_mask);
 }
+void gfx_apply_sample(u32 sample_count) {
+	VkSampleCountFlagBits s = VkSampleCountFlagBits(sample_count);
+	st->gfx.CmdSetRasterizationSamplesEXT(vk_cur_cmd(), s);
+}
+void gfx_apply_sample_mask(u32 sample_count, u32 mask) {
+	VkSampleCountFlagBits s = VkSampleCountFlagBits(sample_count);
+	VkSampleMask m = ~VkSampleMask();
+	st->gfx.CmdSetSampleMaskEXT(vk_cur_cmd(), s, &m);
+}
+void gfx_apply_alpha_to_coverage(b32 enable) {
+	st->gfx.CmdSetAlphaToCoverageEnableEXT(vk_cur_cmd(), false);
+}
+
 void gfx_draw(u32 base_vert, u32 vert_count, u32 instance_count, u32 base_instance) {
 	st->gfx.CmdDraw(vk_cur_cmd(), vert_count, instance_count, base_vert, base_instance);
 }

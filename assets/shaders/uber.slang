@@ -1,6 +1,7 @@
 #include "lib.slang"
-
+// #include "com.slang"
 // printf("hello %v4f", in.pos);
+
 
 CONST v2 positions[] = {
 	{-1.0, -1.0},

@@ -97,30 +97,18 @@ bool flag_has(u64 x, u64 f) { return (x & f) == (f); }
 
 v2 flip_uv_y(v2 uv) { return v2(uv.x, -uv.y); }
 
-f32 Max(f32 a, f32 b)                 { return a > b ? a : b; }
-f32 Min(f32 a, f32 b)                 { return a < b ? a : b; }
-f32 Max3(f32 a, f32 b, f32 c)         { return Max(Max(a,b), c); }
-f32 Min3(f32 a, f32 b, f32 c)         { return Min(Min(a,b), c); }
-f32 ClampTop(f32 x, f32 a)            { return Min(x, a); }
-f32 ClampBot(f32 x, f32 a)            { return Max(x, a); }
-f32 Clamp(f32 a, f32 x, f32 b)        { return x < a ? a : x > b ? b : x; }
-f32 Clamp01(f32 x)                    { return Clamp(0, x, 1); }
-f32 ReverseClamp(f32 a, f32 x, f32 b) { return x < a ? b : b < x ? a : x; }
-f32 Square(f32 x)                     { return x * x; }
-f32 Cube(f32 x)                       { return x * x * x; }
-f32 Sign(f32 x)                       { return x < 0 ? -1 : x > 0 ? 1 : 0; }
-f32 Abs(f32 x)                        { return x < 0 ? -x : x; }
+f32 max3(f32 a, f32 b, f32 c)         { return max(max(a,b), c); }
+f32 min3(f32 a, f32 b, f32 c)         { return min(min(a,b), c); }
+f32 clamp01(f32 x)                    { return clamp(x, 0, 1); }
+f32 square(f32 x)                     { return x * x; }
+f32 cube(f32 x)                       { return x * x * x; }
 bool flag_any(u64 x, u64 f)											{ return bool(x & f); }
 
 f32 deg2rad(f32 degrees) { return degrees * PI / 180; }
 f32 rad2deg(f32 radians) { return radians * 180 / PI; }
 
 f32 Lerp(f32 a, f32 t, f32 b)      { return (1 - t)*a + t*b; }
-f32 LerpClamp(f32 a, f32 t, f32 b) { return Lerp(a, Clamp01(t), b); }
 f32 Unlerp(f32 a, f32 x, f32 b)    { return (x - a) / (b - a); }
-f32 remap(f32 x, f32 old_min, f32 old_max, f32 new_min, f32 new_max) {
-	return new_min + (((x - old_min) * (new_max - new_min)) / (old_max - old_min));
-}
 
 v4 v4_hadamard(v4 a, v4 b) { return v4(a.x*b.x, a.y*b.y, a.z*b.z, a.w*b.w); }
 v4 v4_hadamard_div(v4 a, v4 b) { return v4(a.x/b.x, a.y/b.y, a.z/b.z, a.w/b.w); }
