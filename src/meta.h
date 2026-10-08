@@ -1,5 +1,5 @@
 #pragma once
-#include "base/lib.h"
+#include "base/base.h"
 
 #define TOKEN_TYPE_LIST    \
 	X(TokenType_Null)         \
@@ -66,4 +66,4 @@ struct Parser {
 	u32 cur;
 };
 
-
+#define Introspect

@@ -184,8 +184,8 @@ Token tok_expect(Parser& p, TokenType type) {
 }
 Token tok_expect_name(Parser& p, String name) {
 	Token t = tok_peek(p);
-	if(t.type == TokenType_Identifier && str_match(t.str, name)) {
-		AssertMsg("expected '%s', got '%s'", name, t.str);
+	if(t.type != TokenType_Identifier || !str_match(t.str, name)) {
+		Error("expected '%s', got '%s'", name, t.str);
 	}
 	return tok_advance(p);
 }

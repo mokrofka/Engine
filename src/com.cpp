@@ -1,12 +1,1554 @@
 #include "com.h"
 
 #include "gfx.cpp"
-#include "render.cpp"
 #include "meta.cpp"
 
 #include "generated.h"
 
 GlobalVar GlobalState* st;
+
+DrawBatch make_draw_batch(Allocator alloc, Gfx_Pipeline pip) {
+	DrawBatch res = {
+		.draws = array_make<DrawCall>(alloc),
+		.unindexed_draws = array_make<DrawCall>(alloc),
+	};
+	return res;
+}
+
+Attachment make_attachment(AttachmentDesc desc) {
+	Attachment res = {.type = desc.type};
+	Gfx_ImageUsage usage = 0;
+	switch(desc.type) {
+		InvalidDefaultCase;
+		case R_AttachmentType_Color: usage = Gfx_ImageUsage_ColorAttachment; break;
+		case R_AttachmentType_Resolve: usage = Gfx_ImageUsage_ResolveAttachment; break;
+		case R_AttachmentType_Depth: usage = Gfx_ImageUsage_DepthStencilAttachment; break;
+	}
+	Loop(i, st->gfx.images_in_flight) {
+		res.images[i] = gfx_make_image({
+			.usage = usage,
+			.width = desc.size.x,
+			.height = desc.size.y
+		});
+		switch(desc.type) {
+			InvalidDefaultCase;
+			case R_AttachmentType_Color: res.views[i] = gfx_make_view({Gfx_ViewType_ColorAttachment, res.images[i]}); break;
+			case R_AttachmentType_Resolve: res.views[i] = gfx_make_view({Gfx_ViewType_ResolveAttachment, res.images[i]}); break;
+			case R_AttachmentType_Depth: res.views[i] = gfx_make_view({Gfx_ViewType_DepthStencilAttachment, res.images[i]}); break;
+		}
+	}
+	return res;
+}
+void destroy_attachment(Attachment attachment) {
+	Loop(i, st->gfx.images_in_flight) {
+		gfx_destroy_view(attachment.views[i]);
+		gfx_destroy_image(attachment.images[i]);
+	}
+}
+void recreate_attachment(Attachment* attachment, v2u size) {
+	destroy_attachment(*attachment);
+	*attachment = make_attachment({.type = attachment->type, size});
+}
+
+RenderTarget make_render_target(RenderTargetUsage usage, v2u size) {
+	RenderTarget res = {.attachments = usage};
+	if(flag_has(usage, R_RenderTargetUsage_Color)) {
+		res.color = make_attachment({.type = R_AttachmentType_Color, .size = size});
+	}
+	if(flag_has(usage, R_RenderTargetUsage_Resolve)) {
+		res.resolve = make_attachment({.type = R_AttachmentType_Resolve, .size = size});
+	}
+	if(flag_has(usage, R_RenderTargetUsage_Depth)) {
+		res.depth = make_attachment({.type = R_AttachmentType_Depth, .size = size});
+	}
+	return res;
+}
+void destroy_render_target(RenderTarget rt) {
+	if(flag_has(rt.attachments, R_RenderTargetUsage_Color)) {
+		destroy_attachment(rt.color);
+	}
+	if(flag_has(rt.attachments, R_RenderTargetUsage_Resolve)) {
+		destroy_attachment(rt.resolve);
+	}
+	if(flag_has(rt.attachments, R_RenderTargetUsage_Depth)) {
+		destroy_attachment(rt.depth);
+	}
+}
+void recreate_render_target(RenderTarget* rt, v2u size) {
+	destroy_render_target(*rt);
+	*rt = make_render_target(rt->attachments, size);
+}
+Gfx_Attachments render_target_to_attachments(RenderTarget rt) {
+	Gfx_Attachments att = {};
+	if(flag_has(rt.attachments, R_RenderTargetUsage_Color)) {
+		att.color = rt.color.views[st->gfx.current_image_idx];
+	}
+	if(flag_has(rt.attachments, R_RenderTargetUsage_Resolve)) {
+		att.resolve = rt.resolve.views[st->gfx.current_image_idx];
+	}
+	if(flag_has(rt.attachments, R_RenderTargetUsage_Depth)) {
+		att.depth_stencil = rt.depth.views[st->gfx.current_image_idx];
+	}
+	return att;
+}
+
+TextureDesc load_texture(String name) {
+	Scratch scratch;
+	u32 required_channel_count = 4;
+	u32 channel_count;
+	String path = push_strf(scratch, "%s/%s", st->textures_dir, name);
+	Slice buf = os_file_path_read_all(scratch, path);
+	TextureDesc res = {};
+	res.data = stbi_load_from_memory(buf.data, buf.count, (i32*)&res.width, (i32*)&res.height, (i32*)&channel_count, required_channel_count);
+	Assert(res.data);
+	return res;
+}
+
+TextureDesc load_cubemap(String dir) {
+	Scratch scratch;
+	String sides[] = {
+			"right", "left",
+			"top", "bottom",
+			"front", "back",
+	};
+	TextureDesc cube = {};
+	LoopArray (i, sides) {
+		String name = push_strf(scratch, "%s/%s%s", dir, sides[i], S(".png"));
+		TextureDesc tex = load_texture(name);
+		cube.cube[i] = tex.data;
+		cube.width = tex.width;
+		cube.height = tex.height;
+	}
+	return cube;
+}
+
+MeshDesc load_mesh(Allocator arena, String name) {
+	Scratch scratch(arena);
+	// String filepath = push_strf(scratch, "%s/%s", st->models_dir, name);
+	String format = str_skip_last_dot(name);
+	MeshDesc res = {};
+	if(str_match(format, "glb")) {
+		res = load_gltf(arena, name, true).mesh;
+	} else if(str_match(format, "gltf")) {
+		res = load_gltf(arena, name, false).mesh;
+	} else if(str_match(format, "obj")) {
+		res = load_obj(arena, name);
+	} else {
+		InvalidPath;
+	}
+	return res;
+}
+
+TextureId make_texture(TextureDesc desc) {
+	Scratch scratch;
+	var& g = *st;
+	_DefSet(desc.pixel_format, Gfx_PixelFormat_RGBA8);
+	Texture dum = desc.is_cube ? g.textures[g.textures_ids[Texture_DummyCubeMap].idx] : g.textures[g.textures_ids[Texture_Dummy].idx];
+	TextureId res = {array_push(g.textures, dum)};
+	struct Ctx {
+		TextureDesc desc;
+		TextureId texture_id;
+	};
+	Ctx ctx = {
+		.desc = desc,
+		.texture_id = res,
+	};
+	var f = [](void* in){
+		Scratch scratch;
+		Ctx& ctx = *(Ctx*)in;
+		var& g = *st;
+		var desc = ctx.desc;
+		if(desc.name.size) {
+			TextureDesc loaded = desc.is_cube ? load_cubemap(desc.name) : load_texture(desc.name);
+			desc.width = loaded.width;
+			desc.height = loaded.height;
+			ArrayCopy(desc.cube, loaded.cube);
+		}
+		Slice<Slice<u8>> data = push_slice(scratch, Slice<u8>, 6);
+		Loop(i, 6) {
+			data[i] = Slice(desc.cube[i], desc.width * desc.height * gfx_pixelformat_bytesize(desc.pixel_format));
+		}
+		u32 stage_offset = desc.is_cube ? gfx_push_stage_buffers(data) : gfx_push_stage_buffer(data[0]);
+		LockScope(g.push_to_gpu_queue_mutex);
+		queue_push(g.push_to_gpu_queue, {
+			.type = R_PushToGpuType_Texture,
+			.texture_id = ctx.texture_id,
+			.stage_off = stage_offset,
+			.image_desc = {
+				.type = desc.is_cube ? Gfx_ImageType_Cube : Gfx_ImageType_2D,
+				.width = desc.width,
+				.height = desc.height,
+				.pixel_format = desc.pixel_format,
+				.mipmaps = true,
+			},
+		});
+	};
+	if(desc.name.size) {
+		var& task = thread_push_ctx(Ctx);
+		task = ctx;
+		thread_push(&task, f);
+	} else {
+		f(&ctx);
+	}
+	return res;
+}
+
+TextureId make_dummy_texture(TextureDesc desc) {
+	var& g = *st;
+	if(desc.name.size) {
+		TextureDesc loaded = desc.is_cube ? load_cubemap(desc.name) : load_texture(desc.name);
+		desc.width = loaded.width;
+		desc.height = loaded.height;
+		ArrayCopy(desc.cube, loaded.cube);
+	}
+	Gfx_ImageDesc img_desc = {
+		.type = desc.is_cube ? Gfx_ImageType_Cube : Gfx_ImageType_2D,
+		.width = desc.width,
+		.height = desc.height,
+		.pixel_format = desc.pixel_format,
+		.mipmaps = true,
+	};
+	ArrayCopy(img_desc.cube, desc.cube);
+	Texture tex = {
+		.image = gfx_make_image(img_desc),
+		.view = gfx_make_view({Gfx_ViewType_Texture, tex.image}),
+	};
+	TextureId res = {array_push(g.textures, tex)};
+	return res;
+}
+
+MeshId make_mesh(MeshDesc desc) {
+	ProfFunc;
+	Scratch scratch;
+	var& g = *st;
+	MeshId res = {array_push(g.meshes, g.meshes[g.meshes_ids[Mesh_Dummy].idx])};
+	struct Ctx {
+		MeshDesc desc;
+		MeshId mesh_id;
+	};
+	Ctx ctx = {
+		.desc = desc,
+		.mesh_id = res,
+	};
+	var f = [](void* in){
+		Scratch scratch;
+		Ctx& ctx = *(Ctx*)in;
+		var& g = *st;
+		var desc = ctx.desc;
+		if(desc.name.size) {
+			desc = load_mesh(scratch, desc.name);
+		}
+		os_mutex_lock(g.vert_index_buffer_mutex);
+		u64 vert_buf_off = gfx_push_buffer(g.gpu_vert_buf, slice_size(desc.vertices));
+		u64 index_buf_off = gfx_push_buffer(g.gpu_index_buf, slice_size(desc.indices));
+		os_mutex_unlock(g.vert_index_buffer_mutex);
+		u32 base_vert = vert_buf_off / sizeof(R_Vertex);
+		u32 stage_offset = gfx_push_stage_buffer(slice_to_bytes(desc.vertices));
+		u32 base_index = 0;
+		if(desc.indices.count) {
+			base_index = index_buf_off / sizeof(u16);
+			gfx_push_stage_buffer(slice_to_bytes(desc.indices));
+		}
+		LockScope(g.push_to_gpu_queue_mutex);
+		queue_push(g.push_to_gpu_queue, {
+			.type = R_PushToGpuType_Mesh,
+			.mesh_id = ctx.mesh_id,
+			.mesh = {
+				.vert_count = (u32)desc.vertices.count,
+				.base_vert = base_vert,
+				.index_count = (u32)desc.indices.count,
+				.base_index = base_index,
+			},
+			.stage_off = stage_offset,
+		});
+	};
+	// if(desc.name.size) {
+	// 	var& task = thread_push_ctx(Ctx);
+	// 	task = ctx;
+	// 	thread_push(&task, f);
+	// } else {
+	// 	f(&ctx);
+	// }
+	f(&ctx);
+	return res;
+}
+
+MeshId make_dummy_mesh(MeshDesc desc) {
+	Scratch scratch;
+	var& g = *st;
+	if(desc.name.size) {
+		desc = load_mesh(scratch, desc.name);
+	}
+	u64 buf_offset = gfx_push_buffer(g.gpu_vert_buf, slice_size(desc.vertices));
+	u32 base_vert = buf_offset / sizeof(R_Vertex);
+	gfx_update_buffer(g.gpu_vert_buf, buf_offset, slice_to_bytes(desc.vertices));
+	u32 base_index = 0;
+	if(desc.indices.count) {
+		u64 buf_offset = gfx_push_buffer(g.gpu_index_buf, slice_size(desc.indices));
+		base_index = buf_offset / sizeof(u32);
+		gfx_update_buffer(g.gpu_index_buf, buf_offset, slice_to_bytes(desc.indices));
+	}
+	Gfx_Mesh mesh = {
+		.base_vert = base_vert,
+		.vert_count = (u32)desc.vertices.count,
+		.base_index = base_index,
+		.index_count = (u32)desc.indices.count,
+	};
+	MeshId res = {array_push(g.meshes, mesh)};
+	return res;
+}
+
+u32 make_pipeline_state(Gfx_PipelineState s) {
+	var& g = *st;
+	u32 res = array_push(g.batches, make_draw_batch(g.gpa, {}));
+	g.batches[res].state = s;
+	return res;
+}
+
+MaterialId make_material(Material mat) {
+	var& g = *st;
+	if(!mat.base_color.idx) {
+		mat.base_color = g.textures_ids[Texture_Dummy];
+	}
+	MaterialId res = MaterialId(array_push(g.materials, mat));
+	return res;
+}
+
+Gfx_Pipeline make_pipeline(String name, Gfx_PipelineDesc2 desc) {
+	Scratch scratch;
+	var& g = *st;
+	ShaderModuleWithPipelines module = {};
+	if(!map_get(g.shader_to_module, hash(name), &module)) {
+		Slice code = os_file_path_read_all(scratch, push_strf(scratch, "%s/%s.spv", st->shader_compiled_dir, name));
+		module = {.shd = gfx_make_shader(code)};
+		map_set(g.shader_to_module, hash(name), module);
+	};
+	desc.shader = module.shd;
+	Gfx_Pipeline pip = gfx_make_pipeline(desc);
+	array_push(module.pipelines, pip);
+	return pip;
+}
+
+FontId make_font(FontDesc desc) {
+	// return r_make_dummy_font(desc);
+	Scratch scratch;
+	var& g = *st;
+	FontId res = {array_push(g.fonts, g.fonts[g.fonts_ids[Font_Dummy].idx])};
+	struct Ctx {
+		FontDesc desc;
+		FontId font_id;
+	};
+	var& ctx = thread_push_ctx(Ctx);
+	ctx = {
+		.desc = desc,
+		.font_id = res,
+	};
+	thread_push(&ctx, [](void* in) {
+		Scratch scratch;
+		Ctx& ctx = *(Ctx*)in;
+		var& g = *st;
+		String path = push_strf(scratch, "%s/%s/%s", st->asset_dir, S("fonts"), ctx.desc.name);
+		Slice data = os_file_path_read_all(scratch, path);
+		stbtt_bakedchar characters_info[96];
+		u32 font_height = ctx.desc.font_height;
+		u32 pixels_size = 96 * Square(font_height);
+		u32 dim = sqrt(pixels_size);
+		u32 width = round_up(dim, font_height);
+		u32 height = round_up(dim, font_height);
+		u8* pixels = push_buffer(scratch, width*height);
+		stbtt_BakeFontBitmap(data.data, 0, font_height, pixels, width, height, 32, 96, characters_info);
+		TextureId texture_id = make_texture({.width = width, .height = height, .data = pixels, .pixel_format = Gfx_PixelFormat_R8});
+		Font font = {.font_height = font_height, .texture = texture_id};
+		LoopArray (i, font.glyphs) {
+			stbtt_bakedchar bakedchar = characters_info[i];
+			font.glyphs[i] = {
+				.rect.x0 = bakedchar.x0,
+				.rect.y0 = bakedchar.y0,
+				.rect.x1 = bakedchar.x1,
+				.rect.y1 = bakedchar.y1,
+				.xoff = bakedchar.xoff,
+				.yoff = bakedchar.yoff,
+				.xadvance = bakedchar.xadvance,
+			};
+		}
+		LockScope(g.waiting_fonts_mutex);
+		queue_push(g.waiting_fonts, {
+			.id = ctx.font_id,
+			.font = font,
+		});
+	});
+	return res;
+}
+
+FontId make_dummy_font(FontDesc desc) {
+	Scratch scratch;
+	var& g = *st;
+	String path = push_strf(scratch, "%s/%s/%s", st->asset_dir, S("fonts"), desc.name);
+	Slice data = os_file_path_read_all(scratch, path);
+	stbtt_bakedchar characters_info[96];
+	u32 font_height = desc.font_height;
+	u32 pixels_size = 96 * Square(font_height);
+	u32 dim = sqrt(pixels_size);
+	u32 width = round_up(dim, font_height);
+	u32 height = round_up(dim, font_height);
+	u8* pixels = push_buffer(g.arena, width*height);
+	stbtt_BakeFontBitmap(data.data, 0, font_height, pixels, width, height, 32, 96, characters_info);
+	TextureId texture_id = make_texture({.width = width, .height = height, .data = pixels, .pixel_format = Gfx_PixelFormat_R8});
+	Font font = {.font_height = font_height, .texture = texture_id};
+	LoopArray (i, font.glyphs) {
+		stbtt_bakedchar bakedchar = characters_info[i];
+		font.glyphs[i] = {
+			.rect.x0 = bakedchar.x0,
+			.rect.y0 = bakedchar.y0,
+			.rect.x1 = bakedchar.x1,
+			.rect.y1 = bakedchar.y1,
+			.xoff = bakedchar.xoff,
+			.yoff = bakedchar.yoff,
+			.xadvance = bakedchar.xadvance,
+		};
+	}
+	FontId res = {array_push(g.fonts, font)};
+	return res;
+}
+
+b32 texture_is_ready(TextureId id) {
+	var& g = *st;
+	return g.textures[id.idx].is_ready;
+}
+
+u32 texture_descriptor_idx(TextureId id) {
+	var& g = *st;
+	u32 res = g.textures[id.idx].view.idx;
+	return res;
+}
+
+void set_cubemap(TextureId cubemap) {
+	var& g = *st;
+	g.cur_cubemap = cubemap;
+}
+
+void update_texture(TextureId t, u8* data) {
+	var& g = *st;
+	Texture tex = g.textures[t.idx];
+	gfx_update_image(tex.image, data);
+}
+
+void update_mesh(MeshId mesh, MeshDesc desc) {
+}
+
+void reload_shader(String name) {
+	Scratch scratch;
+	var& g = *st;
+	Info("reload '%s' shader", name);
+	ShaderModuleWithPipelines module; AssertOk(map_get(g.shader_to_module, hash(name), &module));
+	Slice code = os_file_path_read_all(scratch, push_strf(scratch, "%s/%s.spv", st->shader_compiled_dir, name));
+	gfx_update_shader(module.shd, code);
+	Loop(i, module.pipelines.count) {
+		Gfx_Pipeline pip = module.pipelines[i];
+		gfx_update_pipeline(pip, gfx_query_pipeline_desc2(pip));
+	}
+}
+
+void shaders_compile(Allocator arena) {
+	Scratch scratch(arena);
+	String cur_dir = os_cur_directory();
+	String shader_dir = st->shader_dir;
+	String compiled_shader_dir = st->shader_compiled_dir;
+	String saved_time_stamps = push_strf(scratch, "%s/%s", cur_dir, String("saved_time_stamps_for_shad"));
+	if(!os_directory_path_exist(shader_dir)) {
+		os_directory_make(shader_dir);
+	}
+	if(!os_directory_path_exist(compiled_shader_dir)) {
+		os_directory_make(compiled_shader_dir);
+	}
+	String com_path = push_strf(scratch, "%s/%s", shader_dir, String("com.slang"));
+	String lib_path = push_strf(scratch, "%s/%s", shader_dir, String("lib.slang"));
+	String header_path = push_strf(scratch, "%s/../src/shader_header.h", os_cur_directory());
+	u64 com_modified = os_file_path_mtime(com_path);
+	u64 lib_modified = os_file_path_mtime(lib_path);
+	u64 header_modified = os_file_path_mtime(header_path);
+	FileProperties time_stamp_file_props = os_file_path_properties(saved_time_stamps);
+
+	///////////////////////////////////
+	// Recompile?
+	struct FileData {
+		u64 com_modified;
+		u64 lib_modified;
+		u64 header_modified;
+	};
+	b32 recompile = false;
+	if(time_stamp_file_props.size == 0) {
+		recompile = true;
+	} else {
+		Slice buf = os_file_path_read_all(scratch, saved_time_stamps);
+		FileData* data = (FileData*)buf.data;
+		if(com_modified != data->com_modified || lib_modified != data->lib_modified || header_modified != data->header_modified) {
+			recompile = true;
+		}
+	}
+	if(recompile) {
+		FileData data = {
+			.com_modified = com_modified,
+			.lib_modified = lib_modified,
+			.header_modified = header_modified,
+		};
+		os_file_path_write_all(saved_time_stamps, slice_struct_to_bytes(&data));
+	}
+
+	///////////////////////////////////
+	// Which files recompile?
+	struct File {
+		String file_path;
+		String compiled_file_path;
+		String shader_name;
+		OS_Handle pid;
+	};
+	var files = array_make<File>(scratch);
+	Slice infos = os_file_iter_directory(scratch, shader_dir, OS_FileIterFlag_SkipFolders);
+	Loop(i, infos.count) {
+		String name = infos[i].name;
+		String file_path = push_strf(scratch, "%s/%s", shader_dir, name);
+		String shader_name = str_chop_last_dot(name);
+		String compiled_file_path = push_strf(scratch, "%s/%s.spv", compiled_shader_dir, shader_name);
+		if(str_match(name, "com.slang") || str_match(name, "lib.slang")) {
+			continue;
+		}
+		FileProperties compiled_props = os_file_path_properties(compiled_file_path);
+		if(infos[i].props.modified != compiled_props.modified || recompile) {
+			File f = {
+				.file_path = file_path,
+				.compiled_file_path = compiled_file_path,
+				.shader_name = shader_name,
+			};
+			array_push(files, f);
+		}
+	}
+
+	///////////////////////////////////
+	// Compilation
+	var& g = *st;
+	var file_names = array_make<String>(arena);
+	g.shader_module_compilation_pids = push_slice(arena, OS_Handle, files.count);
+	g.shaders_to_compile = push_slice(arena, String, files.count);
+	Loop(i, files.count) {
+		File& f = files[i];
+		var arr = array_make<String>(scratch);
+		String args[] = {S("slangc"), f.file_path, S("-target"), S("spirv"), S("-O0"), S("-g3"), S("-o"), f.compiled_file_path};
+		// String args[] = {S("slangc"), f.file_path, S("-target"), S("spirv"), S("-o"), f.compiled_file_path};
+		array_push_elems(arr, slice(args));
+		g.shader_module_compilation_pids[i] = os_process_make(slice(arr));
+		Debug("%s", f.file_path);
+		array_push(file_names, f.shader_name);
+	}
+	g.shaders_to_compile = slice(file_names);
+}
+
+void shaders_compile_join() {
+	Scratch scratch;
+	var& g = *st;
+	Loop(i, g.shaders_to_compile.count) {
+		os_process_join(g.shader_module_compilation_pids[i]);
+		String shader_file_path = push_strf(scratch, "%s/%s.slang", st->shader_dir, g.shaders_to_compile[i]);
+		String compiled_file_path = push_strf(scratch, "%s/%s.spv", st->shader_compiled_dir, g.shaders_to_compile[i]);
+		os_file_path_copy_mtime(shader_file_path, compiled_file_path);
+	}
+}
+
+void r_bind_pipeline(Gfx_Pipeline pip) {
+	var& g = *st;
+	g.cur_pip = pip;
+	gfx_bind_pipeline(pip);
+}
+
+void r_default_pipeline_state(Gfx_PipelineState* s) {
+	_DefSet(s->primitive_type, Gfx_PrimitiveType_Triangle);
+	_DefSet(s->cull_mode, Gfx_CullMode_None);
+	_DefSet(s->face_winding, Gfx_FaceWinding_CCW);
+	_DefSet(s->depth.compare, Gfx_CompareOp_Always);
+	_DefSet(s->blend.write_mask, Gfx_ColorMask_RGBA);
+	_DefSet(s->blend.op_rgb, Gfx_BlendOp_Add);
+	_DefSet(s->blend.op_alpha, Gfx_BlendOp_Add);
+	_DefSet(s->sample_count, Gfx_DefaultSampleCount);
+}
+
+void r_apply_state_raw(Gfx_PipelineState s = {}) {
+	gfx_apply_primitive_type(s.primitive_type);
+	gfx_apply_cull_mode(s.cull_mode);
+	gfx_apply_face_winding(s.face_winding);
+	gfx_apply_depth_test(s.depth.test_disable);
+	gfx_apply_depth_write(s.depth.write_enabled);
+	gfx_apply_depth_compare(s.depth.compare);
+	gfx_apply_color_blend_enable(s.blend.enabled);
+	if(s.blend.enabled) {
+		gfx_apply_color_blend_equation(s.blend);
+	}
+	gfx_apply_color_blend_mask(s.blend);
+	gfx_apply_sample(s.sample_count);
+	gfx_apply_sample_mask(s.sample_count, U32_MAX);
+	gfx_apply_alpha_to_coverage(false);
+}
+
+void apply_pip_state(Gfx_PipelineState s) {
+	var& g = *st;
+	r_default_pipeline_state(&s);
+	if(g.cur_pip.idx != g.prev_pip.idx) {
+		g.prev_pip = g.cur_pip;
+		r_apply_state_raw(s);
+	} else {
+		var& prev = g.prev_pip_state;
+		if(s.primitive_type != prev.primitive_type) {
+			gfx_apply_primitive_type(s.primitive_type);
+		}
+		if(s.cull_mode != prev.cull_mode) {
+			gfx_apply_cull_mode(s.cull_mode);
+		}
+		if(s.face_winding != prev.face_winding) {
+			gfx_apply_face_winding(s.face_winding);
+		}
+		if(s.depth.test_disable != prev.depth.test_disable) {
+			gfx_apply_depth_test(s.depth.test_disable);
+		}
+		if(s.depth.write_enabled != prev.depth.write_enabled) {
+			gfx_apply_depth_write(s.depth.write_enabled);
+		}
+		if(s.depth.compare != prev.depth.compare) {
+			gfx_apply_depth_compare(s.depth.compare);
+		}
+		if(s.depth.write_enabled != prev.depth.write_enabled) {
+			gfx_apply_color_blend_enable(s.blend.enabled);
+		}
+		if(s.blend.enabled) {
+			Gfx_BlendState b = s.blend;
+			Gfx_BlendState pb = prev.blend;
+			if(b.src_factor_rgb != pb.src_factor_rgb || b.dst_factor_rgb != pb.dst_factor_rgb || b.op_rgb != pb.op_rgb ||
+						b.src_factor_alpha != pb.src_factor_alpha || b.dst_factor_alpha != pb.dst_factor_alpha || b.op_alpha != pb.op_alpha)
+			{
+				gfx_apply_color_blend_equation(s.blend);
+			}
+		}
+		if(s.blend.write_mask != prev.blend.write_mask) {
+			gfx_apply_color_blend_mask(s.blend);
+		}
+		if(s.sample_count != prev.sample_count) {
+			gfx_apply_sample(s.sample_count);
+		}
+	}
+	g.prev_pip_state = s;
+}
+
+void r_init() {
+	ProfFunc;
+	Scratch scratch;
+	Arena arena = arena_make(.name = "render arena");
+	var& g = *st;
+	g.arena = arena;
+	g.gpa = alloc_make(g.arena);
+	g.scale = 1;
+	gfx_init({.cpu_mem_size = MB(100), .gpu_mem_size = MB(10), .image_mem_size = MB(10)});
+
+	///////////////////////////////////
+	// Buffers
+	{
+		ProfBlock("buffers");
+		g.cpu_vert_buf = gfx_make_buffer(MB(1), Gfx_MemType_Cpu);
+		g.cpu_vertices = (R_Vertex*)gfx_buffer_base_ptr(g.cpu_vert_buf);
+		g.gpu_vert_buf = gfx_make_buffer(MB(1), Gfx_MemType_Gpu);
+		g.gpu_index_buf = gfx_make_buffer(MB(1), Gfx_MemType_Gpu);
+	}
+
+	///////////////////////////////////
+	// Descriptors
+	{
+		ProfBlock("descriptors");
+		gfx_make_bind({.type = Gfx_BindType_Image, .binding = Bindings::Textures, .count = Gfx_MaxImages});
+		gfx_make_bind({.type = Gfx_BindType_Sampler, .binding = Bindings::Samplers, .count = Gfx_MaxSamplers});
+		gfx_make_bind({.type = Gfx_BindType_Image, .binding = Bindings::CubeTextures, .count = Gfx_MaxCubeTextures});
+		Gfx_BufferDesc buffers[] = {
+			{
+				.binding = Bindings::State,
+				.size = sizeof(GpuState),
+				.out_cpu_ptr = (void**)&g.gpu_state,
+			},
+			{
+				.binding = Bindings::Materials,
+				.size = sizeof(GpuMaterial) * MaxMaterials,
+				.out_cpu_ptr = (void**)&g.gpu_materials,
+			},
+			{
+				.binding = Bindings::DrawCtx,
+				.size = sizeof(GpuDrawCall) * MaxEntities,
+				.out_cpu_ptr = (void**)&g.gpu_drawcalls,
+			},
+			{
+				.binding = Bindings::SoftwareRender,
+				.size = os_screen_size().x * os_screen_size().y * sizeof(u32),
+				.out_cpu_ptr = (void**)&g.gpu_software_render,
+			},
+			{
+				.binding = Bindings::UI_RectBinding,
+				.size = sizeof(UI_Rect) * MaxEntities,
+				.out_cpu_ptr = (void**)&g.gpu_ui_rects,
+			},
+			{
+				.binding = Bindings::SkinMatrices,
+				.size = sizeof(UI_Rect) * MaxSkinMatrices,
+				.out_cpu_ptr = (void**)&g.gpu_skin_matrices,
+			}
+		};
+		gfx_make_binding_buffers(slice(buffers));
+		gfx_flush();
+		g.gpu_state->p = st->gfx.cpu_buf_address;
+	}
+
+	// Misc
+	{
+		ProfBlock("render targers");
+		g.world_rt = make_render_target(R_RenderTargetUsage_Color | R_RenderTargetUsage_Resolve | R_RenderTargetUsage_Depth, os_window_size());
+	}
+	g.sampler = gfx_make_sampler({});
+	{
+		ProfBlock("Waiting for compiling shaders");
+		shaders_compile_join();
+	}
+
+	///////////////////////////////////
+	// Dummy
+	{
+		ProfBlock("making dummy");
+		TextureDesc dum = load_texture("dummy.png");
+		g.textures_ids[Texture_Dummy] = make_dummy_texture({
+			.data = dum.data,
+			.width = dum.width,
+			.height = dum.height,
+		});
+		TextureDesc cube = {
+			.width = dum.width,
+			.height = dum.width,
+			.is_cube = true,
+		};
+		Loop(i, 6) {
+			cube.cube[i] = (u8*)dum.data;
+		}
+		g.textures_ids[Texture_DummyCubeMap] = make_dummy_texture(cube);
+		g.gpu_state->cubemap = texture_descriptor_idx(g.textures_ids[Texture_DummyCubeMap]);
+		g.meshes_ids[Mesh_Dummy] = make_dummy_mesh({.name = "dummy.glb"});
+		g.fonts_ids[Font_Dummy] = make_dummy_font({"Roboto-Bold.ttf", 32});
+	}
+
+	///////////////////////////////////
+	// Load basic shaders
+	{
+		ProfBlock("load shaders");
+		g.uber_pip = make_pipeline("uber", {});
+		// g.uber_pip_screen = make_pipeline("uber", {
+		// 	.sample_count = 1,
+		// });
+		g.ui_rect_pip = make_pipeline("ui_rect", {});
+	}
+	Info("Renderer initialized");
+}
+
+void r_shutdown() {
+	gfx_shutdown();
+}
+
+void r_begin() {
+	imgui_begin_frame();
+}
+
+void r_end() {
+	ProfFunc;
+	Scratch scratch;
+	var& g = *st;
+	gfx_begin();
+	g.gpu_state->res.x = os_window_size().x;
+	g.gpu_state->res.y = os_window_size().y;
+	g.prev_pip = {};
+
+	// Resize?
+	if(st->gfx.swapchain_resized || g.old_scale != g.scale) {
+		g.old_scale = g.scale;
+		gfx_idle();
+		v2u win_size = os_window_size();
+		win_size.x *= g.scale;
+		win_size.y *= g.scale;
+		recreate_render_target(&g.world_rt, win_size);
+	}
+
+	// Push to gpu
+	{
+		Loop(i, queue_count(g.push_to_gpu_queue)) {
+			var push = queue_pop(g.push_to_gpu_queue);
+			switch(push.type) {
+				InvalidDefaultCase;
+				case R_PushToGpuType_Texture: {
+					Gfx_Image image = gfx_make_image(push.image_desc);
+					Gfx_View view = gfx_make_view({Gfx_ViewType_Texture, image});
+					u32 counter = gfx_push_stage_buffer_cmd({
+						.type = Gfx_CmdType_Texture,
+						.img = image,
+						.stage_offset = push.stage_off,
+					});
+					push.texture = {
+						.image = image,
+						.view = view,
+					};
+					push.counter = counter;
+					queue_push(g.finished_gpu_queue, push);
+				}break;
+				case R_PushToGpuType_Mesh: {
+					var mesh = push.mesh;
+					u32 vert_size = mesh.vert_count*sizeof(R_Vertex);
+					u32 counter = gfx_push_stage_buffer_cmd({
+						.type = Gfx_CmdType_Mesh,
+						.stage_offset = push.stage_off,
+						.buf = g.gpu_vert_buf,
+						.size = vert_size,
+						.buf_offset = push.mesh.base_vert*sizeof(R_Vertex),
+					});
+					if(mesh.index_count) {
+						gfx_push_stage_buffer_cmd({
+							.type = Gfx_CmdType_Mesh,
+							.stage_offset = push.stage_off + vert_size,
+							.buf = g.gpu_index_buf,
+							.size = mesh.index_count*sizeof(u16),
+							.buf_offset = push.mesh.base_index*sizeof(u16),
+						});
+					}
+					push.counter = counter;
+					queue_push(g.finished_gpu_queue, push);
+				}break;
+			}
+		}
+	}
+
+	// Update dummies?
+	{
+		Loop(i, queue_count(g.finished_gpu_queue)) {
+			if(queue_front(g.finished_gpu_queue).counter <= gfx_ready_counter()) {
+				var slot = queue_pop(g.finished_gpu_queue);
+				switch(slot.type) {
+					InvalidDefaultCase;
+					case R_PushToGpuType_Texture: {
+						var& t = g.textures[slot.texture_id.idx];
+						t = slot.texture;
+						t.is_ready = true;
+					}break;
+					case R_PushToGpuType_Mesh: {
+						var& t = g.meshes[slot.mesh_id.idx];
+						t = slot.mesh;
+					}break;
+				}
+			} else break;
+		} 
+
+		// Update font? //TODO:
+		Loop(i, queue_count(g.waiting_fonts)) {
+			if(texture_is_ready(queue_front(g.waiting_fonts).font.texture)) {
+				var slot = queue_pop(g.waiting_fonts);
+				g.fonts[slot.id.idx] = slot.font;
+			} else break;
+		}
+	}
+
+	// Update skeleton
+	{
+		g.global_matrices[0] = m4x4_transform(g.bones[0].local);
+		g.skin_matrices[0] = g.global_matrices[0] * g.inv_matrices[0];
+		// g.skin_matrices[0] = g.global_matrices[0];
+		LoopOff(i, 1, g.bones.count) {
+			g.global_matrices[i] = g.global_matrices[g.bones[i].parent] * m4x4_transform(g.bones[i].local);
+			g.skin_matrices[i] = g.global_matrices[i] * g.inv_matrices[i];
+			// g.skin_matrices[i] = g.global_matrices[i];
+		}
+	}
+
+	// Write to shaders
+	{
+		var& gpu_st = *g.gpu_state;
+		gpu_st.projection_view = g.projection * g.view;
+		gpu_st.projection = g.projection;
+		gpu_st.view = g.view;
+		gpu_st.ambient_color = g.ambient_color;
+		u32 idx = 0;
+		Loop(i, g.materials.count) {
+			var& mat = g.materials[i];
+			mat.idx = idx;
+			MaterialProps props = mat.props;
+			g.gpu_materials[idx++] = {
+				.ambient = props.ambient,
+				.diffuse = props.diffuse,
+				.specular = props.specular,
+				.shininess = props.shininess,
+				.tex = texture_descriptor_idx(mat.base_color),
+			};
+		}
+		gpu_st.cubemap = texture_descriptor_idx(g.cur_cubemap);
+		MemCopyArray(g.gpu_skin_matrices, g.skin_matrices.data, g.bones.count);
+	}
+
+	///////////////////////////////////
+	// World
+	u32 drawcall_count = 0;
+	{
+		vk_begin_timestamp("world");
+		gfx_begin_pass({.attachments = render_target_to_attachments(g.world_rt)});
+		{
+			gfx_apply_viewport(rng2_make(v2(), os_window_size() * g.scale), true);
+			gfx_apply_scissor(rng2_make(v2(), os_window_size()));
+			gfx_bind_vert(g.gpu_vert_buf);
+			gfx_bind_index(g.gpu_index_buf);
+			r_bind_pipeline(g.uber_pip);
+			for(var& batch : g.batches) {
+				apply_pip_state(batch.state);
+				var emit_batch = [&](Slice<DrawCall> pushes, b32 indexed) {
+					u32 base = gfx_begin_indirect();
+					Loop(i, pushes.count) {
+						DrawCall draw = pushes[i];
+						m4x4 model = m4x4_transform(draw.pos, draw.scale, draw.rot);
+						var mat = g.materials[draw.mat.idx];
+						g.gpu_drawcalls[drawcall_count] = {
+							.model = model,
+							.color = draw.color.v,
+							.mat = mat.idx,
+							.type = draw.type,
+							.flags = draw.flags,
+						};
+						Gfx_Mesh mesh = g.meshes[draw.mesh.idx];
+						gfx_push_indirect_mesh(mesh, drawcall_count++);
+					}
+					Gfx_IndirectDrawCall draw = gfx_end_indirect(base);
+					if(draw.count) {
+						vk_push_constants({draw.base});
+						if(indexed) {
+								gfx_draw_indexed_indirect(draw);
+						} else {
+								gfx_draw_indirect(draw);
+						}
+					}
+				};
+				emit_batch(slice(batch.draws), true);
+				emit_batch(slice(batch.unindexed_draws), false);
+				array_clear(batch.draws);
+				array_clear(batch.unindexed_draws);
+			}
+
+			// Debug drawing
+			gfx_bind_vert(g.cpu_vert_buf);
+			if(g.draw_lines.count) {
+				MemCopyArray(g.cpu_vertices, g.draw_lines.data, g.draw_lines.count);
+				apply_pip_state({
+					.primitive_type = Gfx_PrimitiveType_Line,
+					.depth = {
+						.compare = Gfx_CompareOp_Less,
+						.write_enabled = true,
+					},
+					.blend = {
+						.enabled = true,
+						.src_factor_rgb = Gfx_BlendFactor_SrcAlpha,
+						.dst_factor_rgb = Gfx_BlendFactor_OneMinusSrcAlpha,
+						.src_factor_alpha = Gfx_BlendFactor_SrcAlpha,
+						.dst_factor_alpha = Gfx_BlendFactor_OneMinusSrcAlpha,
+					}
+				});
+				g.gpu_drawcalls[drawcall_count].type = ShaderType::Line;
+				vk_push_constants({drawcall_count++});
+				gfx_draw(0, g.draw_lines.count);
+				array_clear(g.draw_lines);
+			}
+			// if(g.draw_lines_persistent.count) {
+			//   gfx_bind_pipeline(g.uber_pip_debug_line);
+			//   gfx_draw(g.draw_base_persistent_lines, g.draw_lines_persistent.count);
+			// }
+
+			// Cube map
+			apply_pip_state({.depth = {.compare = Gfx_CompareOp_LessEqual}});
+			gfx_bind_vert(g.gpu_vert_buf);
+			g.gpu_drawcalls[drawcall_count].type = ShaderType::Cube;
+			vk_push_constants({drawcall_count++});
+			gfx_draw_mesh(g.meshes[g.meshes_ids[Mesh_Cube].idx]);
+
+			// UI drawing
+			gfx_apply_viewport(rng2_make(v2(), os_window_size() * g.scale));
+			if(g.draw_rects.count) {
+				Loop(i, g.draw_rects.count) {
+					var rect = g.draw_rects[i];
+					g.gpu_ui_rects[i] = {
+						.dst_p0 = rect.dst_p0,
+						.dst_p1 = rect.dst_p1,
+						.src_p0 = rect.src_p0,
+						.src_p1 = rect.src_p1,
+						.tex_size = rect.tex_size,
+						.corner_radius = rect.corner_radius,
+						.edge_softness = rect.edge_softness,
+						.texture = rect.texture,
+						.flags = rect.flags,
+						.border_thickness = rect.border_thickness,
+					};
+					ArrayCopy(g.gpu_ui_rects[i].colors, rect.colors);
+				}
+				r_bind_pipeline(g.ui_rect_pip);
+				apply_pip_state({
+					.primitive_type = Gfx_PrimitiveType_TriangleStrip,
+					.blend = {
+						.enabled = true,
+						.src_factor_rgb = Gfx_BlendFactor_SrcAlpha,
+						.dst_factor_rgb = Gfx_BlendFactor_OneMinusSrcAlpha,
+						.src_factor_alpha = Gfx_BlendFactor_SrcAlpha,
+						.dst_factor_alpha = Gfx_BlendFactor_OneMinusSrcAlpha,
+					}
+				});
+				gfx_draw(0, 4, g.draw_rects.count);
+				array_clear(g.draw_rects);
+			}
+		}
+		gfx_end_pass();
+		vk_end_timestamp();
+	}
+	
+	///////////////////////////////////
+	// Swapchain
+	vk_begin_timestamp("swapchain");
+	gfx_begin_pass({});
+	{
+		gfx_apply_viewport(rng2_make(v2(), os_window_size()));
+		gfx_bind_pipeline(g.uber_pip);
+		apply_pip_state({.sample_count = 1});
+		g.gpu_drawcalls[drawcall_count] = {
+			.type = ShaderType::Screen,
+			.cur_resolve_idx = g.world_rt.resolve.views[st->gfx.current_image_idx].idx,
+		};
+		vk_push_constants({drawcall_count++});
+		gfx_draw(0, 3);
+		// g.gpu_drawcalls[drawcall_count] = {
+		// 	.type = ShaderType::SoftwareRender,
+		// 	.cur_resolve_idx = g.world_rt.resolve.views[st->gfx.current_image_idx].idx,
+		// };
+		// vk_push_constants({drawcall_count++});
+		// gfx_draw(0, 3);
+		imgui_end_frame();
+	}
+	gfx_end_pass();
+	vk_end_timestamp();
+	gfx_end();
+}
+
+void draw_mesh(MeshId mesh, MaterialId mat, v3 pos, u32 flags) {
+	var& g = *st;
+	var material = g.materials[mat.idx];
+	u32 batch_idx = material.batch;
+	DrawCall cmd = {
+		.pos = pos,
+		.scale = v3(1),
+		.rot = quat_identity(),
+		.mesh = mesh,
+		.mat = mat,
+		.type = material.type,
+		.flags = flags,
+	};
+	if(g.meshes[mesh.idx].index_count) {
+		array_push(g.batches[batch_idx].draws, cmd);
+	} else {
+		array_push(g.batches[batch_idx].unindexed_draws, cmd);
+	}
+}
+
+void draw_mesh_trs(MeshId mesh, MaterialId mat, v3 pos, v4 rot, v3 scale) {
+	var& g = *st;
+	var material = g.materials[mat.idx];
+	u32 batch_idx = material.batch;
+	DrawCall cmd = {
+		.pos = pos,
+		.scale = scale,
+		.rot = rot,
+		.mesh = mesh,
+		.mat = mat,
+		.type = material.type,
+	};
+	if(g.meshes[mesh.idx].index_count) {
+		array_push(g.batches[batch_idx].draws, cmd);
+	} else {
+		array_push(g.batches[batch_idx].unindexed_draws, cmd);
+	}
+}
+
+void draw_entity(ThingId id) {
+	var& g = *st;
+	Thing& e = get_thing(id);
+	var material = g.materials[e.mat.idx];
+	u32 batch_idx = material.batch;
+	DrawCall cmd = {
+		.pos = e.pos,
+		.scale = e.scale,
+		.rot = e.rot,
+		.color = e.color,
+		.mesh = e.mesh,
+		.mat = e.mat,
+		.type = material.type,
+	};
+	if(g.meshes[e.mesh.idx].index_count) {
+		array_push(g.batches[batch_idx].draws, cmd);
+	} else {
+		array_push(g.batches[batch_idx].unindexed_draws, cmd);
+	}
+}
+
+void draw_line(v3 a, v3 b, Color color) {
+	R_Vertex vert[] = {
+		{.pos = a, .color = color.v},
+		{.pos = b, .color = color.v},
+	};
+	array_push_elems(st->draw_lines, slice(vert));
+}
+
+void draw_line_persistent(v3 a, v3 b, Color color) {
+	R_Vertex vert[] = {
+		{.pos = a, .color = color.v},
+		{.pos = b, .color = color.v},
+	};
+	array_push_elems(st->draw_lines_persistent, slice(vert));
+}
+
+void draw_grid(v3 center, u32 slices, f32 spacing, Color color) {
+	var& g = *st;
+	f32 half = slices * spacing * 0.5f;
+	for(u32 i = 0; i <= slices; i++) {
+		f32 t = i * spacing - half;
+
+		// Horizontal line
+		array_push(g.draw_lines, {.pos = center + v3(-half, 0, t), .color = color.v});
+		array_push(g.draw_lines, {.pos = center + v3(+half, 0, t), .color = color.v});
+
+		// Vertical line
+		array_push(g.draw_lines, {.pos = center + v3(t, 0, -half), .color = color.v});
+		array_push(g.draw_lines, {.pos = center + v3(t, 0, +half), .color = color.v});
+	}
+}
+
+void draw_cuboid(Rng3 rng, Color color) {
+	v3 p000 = {rng.min.x, rng.min.y, rng.min.z};
+	v3 p001 = {rng.min.x, rng.min.y, rng.max.z};
+	v3 p010 = {rng.min.x, rng.max.y, rng.min.z};
+	v3 p011 = {rng.min.x, rng.max.y, rng.max.z};
+
+	v3 p100 = {rng.max.x, rng.min.y, rng.min.z};
+	v3 p101 = {rng.max.x, rng.min.y, rng.max.z};
+	v3 p110 = {rng.max.x, rng.max.y, rng.min.z};
+	v3 p111 = {rng.max.x, rng.max.y, rng.max.z};
+
+	draw_line(p000, p001, color);
+	draw_line(p000, p010, color);
+	draw_line(p000, p100, color);
+
+	draw_line(p111, p110, color);
+	draw_line(p111, p101, color);
+	draw_line(p111, p011, color);
+
+	draw_line(p001, p011, color);
+	draw_line(p001, p101, color);
+
+	draw_line(p010, p011, color);
+	draw_line(p010, p110, color);
+
+	draw_line(p100, p101, color);
+	draw_line(p100, p110, color);
+}
+
+void draw_rect(Rng2 rect, Color color, f32 corner_radius, f32 border_thickness, f32 edge_softness) {
+	var& g = *st;
+	UI_Rect vert = {
+		.dst_p0 = rect.min,
+		.dst_p1 = rect.max,
+		.corner_radius = corner_radius,
+		.border_thickness = border_thickness,
+		.edge_softness = edge_softness,
+	};
+	for(var& x : vert.colors) x = color.v;
+	array_push(g.draw_rects, vert);
+}
+
+void draw_texture(Rng2 dst, Rng2 src, TextureId tex, Color color, f32 corner_radius, f32 border_thickness, f32 edge_softness) {
+	var& g = *st;
+	var t = g.textures[tex.idx];
+	var desc = gfx_query_image_desc(t.image);
+	v2 tex_size = v2(desc.width, desc.height);
+	UI_Rect vert = {
+		.dst_p0 = dst.min,
+		.dst_p1 = dst.max,
+		.src_p0 = src.min,
+		.src_p1 = src.max,
+		.corner_radius = corner_radius,
+		.border_thickness = border_thickness,
+		.edge_softness = edge_softness,
+		.tex_size = tex_size,
+		.texture = texture_descriptor_idx(tex),
+	};
+	for(var& x : vert.colors) x = ColorWhite;
+	array_push(g.draw_rects, vert);
+}
+
+void draw_rect(Rng2 rect, Color color) {
+	var& g = *st;
+	UI_Rect vert = {
+		.dst_p0 = rect.min,
+		.dst_p1 = rect.max,
+	};
+	for(var& x : vert.colors) x = color.v;
+	array_push(g.draw_rects, vert);
+}
+
+void draw_rect_rounded(Rng2 rect, Color color, f32 corner_radius, f32 edge_softness) {
+	var& g = *st;
+	UI_Rect vert = {
+		.dst_p0 = rect.min,
+		.dst_p1 = rect.max,
+		.corner_radius = corner_radius,
+		.edge_softness = edge_softness,
+	};
+	for(var& x : vert.colors) x = color.v;
+	array_push(g.draw_rects, vert);
+}
+
+void draw_rect_gradient(Rng2 rect, Gradient grad) {
+	var& g = *st;
+	UI_Rect vert = {
+		.dst_p0 = rect.min,
+		.dst_p1 = rect.max,
+	};
+	vert.colors[0] = grad.color0;
+	vert.colors[1] = grad.color1;
+	vert.colors[2] = grad.color2;
+	vert.colors[3] = grad.color3;
+	array_push(g.draw_rects, vert);
+}
+
+void draw_rect_thickborders(Rng2 rect, Color color, f32 thick) {
+	var& g = *st;
+	UI_Rect vert = {
+		.dst_p0 = rect.min,
+		.dst_p1 = rect.max,
+		.border_thickness = thick,
+	};
+	for(var& x : vert.colors) x = color.v;
+	array_push(g.draw_rects, vert);
+}
+
+void draw_texture(Rng2 rect, TextureId tex) {
+	var& g = *st;
+	var t = g.textures[tex.idx];
+	var desc = gfx_query_image_desc(t.image);
+	v2 tex_size = v2(desc.width, desc.height);
+	UI_Rect vert = {
+		.dst_p0 = rect.min,
+		.dst_p1 = rect.max,
+		.src_p0 = v2(),
+		.src_p1 = tex_size,
+		.tex_size = tex_size,
+		.texture = texture_descriptor_idx(tex),
+	};
+	for(var& x : vert.colors) x = ColorWhite;
+	array_push(g.draw_rects, vert);
+}
+
+void draw_rect_outline(Rng2 rect, u32 thickness, Color color) {
+	// Top
+	draw_rect(rng2_make(rect.min, v2(rng2_dim(rect).x, thickness)), color);
+
+	// Bottom
+	draw_rect(rng2_make(v2(rect.min.x, rect.max.y - thickness), v2(rng2_dim(rect).x, thickness)), color);
+
+	// Left
+	draw_rect(rng2_make(rect.min, v2(thickness, rng2_dim(rect).y)), color);
+
+	// Right
+	draw_rect(rng2_make(v2(rect.max.x - thickness, rect.min.y), v2(thickness, rng2_dim(rect).y)), color);
+}
+
+void draw_text_ext(FontId font, v2 pos, String str, Color color, u32 font_height) {
+	var& g = *st;
+	var fo = g.fonts[font.idx];
+	var desc = gfx_query_image_desc(g.textures[fo.texture.idx].image);
+	v2 tex_size = v2(desc.width, desc.height);
+	v2 cursor = pos;
+	f32 scale = (f32)font_height / fo.font_height;
+	Loop(i, str.size) {
+		u8 c = str.str[i];
+		var glyph = fo.glyphs[c - 32];
+		f32 y0 = cursor.y + glyph.yoff * scale;
+		f32 x0 = cursor.x + glyph.xoff * scale;
+		f32 x1 = x0 + rng2u_width(glyph.rect) * scale;
+		f32 y1 = y0 + rng2u_height(glyph.rect) * scale;
+		cursor.x += glyph.xadvance * scale;
+		UI_Rect rect = {
+			.dst_p0 = v2(x0,y0),
+			.dst_p1 = v2(x1,y1),
+			.src_p0 = glyph.rect.min,
+			.src_p1 = glyph.rect.max,
+			.tex_size = tex_size,
+			.texture = texture_descriptor_idx(fo.texture),
+			.flags = GpuUI_RectFlag_IsFont,
+		};
+		for(var& x : rect.colors) x = color;
+		array_push(g.draw_rects, rect);
+	}
+}
+
+////////////////////////////////////////////////////////////////////////
+// @Dear imgui
+
+#if BUILD_DEV
+#include "../vendor/imgui/imgui_impl_vulkan.h"
+
+ImGuiKey imgui_keycode_translate(Key key) {
+	switch(key) {
+		default: return ImGuiKey_None;
+		case Key_Tab:         return ImGuiKey_Tab;
+		case Key_Left:        return ImGuiKey_LeftArrow;
+		case Key_Right:       return ImGuiKey_RightArrow;
+		case Key_Up:          return ImGuiKey_UpArrow;
+		case Key_Down:        return ImGuiKey_DownArrow;
+
+		case Key_Pageup:      return ImGuiKey_PageUp;
+		case Key_Pagedown:    return ImGuiKey_PageDown;
+		case Key_Home:        return ImGuiKey_Home;
+		case Key_End:         return ImGuiKey_End;
+		case Key_Delete:      return ImGuiKey_Delete;
+
+		case Key_Backspace:   return ImGuiKey_Backspace;
+		case Key_Space:       return ImGuiKey_Space;
+		case Key_Enter:       return ImGuiKey_Enter;
+		case Key_Escape:      return ImGuiKey_Escape;
+
+		case Key_Capslock:    return ImGuiKey_CapsLock;
+		case Key_Numlock:     return ImGuiKey_NumLock;
+		case Key_Printscreen: return ImGuiKey_PrintScreen;
+		case Key_Pause:       return ImGuiKey_Pause;
+
+		case Key_LShift:      return ImGuiKey_LeftShift;
+		case Key_RShift:      return ImGuiKey_RightShift;
+		case Key_LControl:    return ImGuiKey_LeftCtrl;
+		case Key_RControl:    return ImGuiKey_RightCtrl;
+		case Key_LAlt:        return ImGuiKey_LeftAlt;
+		case Key_RAlt:        return ImGuiKey_RightAlt;
+		case Key_Lsuper:      return ImGuiKey_LeftSuper;
+		case Key_Rsuper:      return ImGuiKey_RightSuper;
+
+		// Digits
+		case Key_0: return ImGuiKey_0;
+		case Key_1: return ImGuiKey_1;
+		case Key_2: return ImGuiKey_2;
+		case Key_3: return ImGuiKey_3;
+		case Key_4: return ImGuiKey_4;
+		case Key_5: return ImGuiKey_5;
+		case Key_6: return ImGuiKey_6;
+		case Key_7: return ImGuiKey_7;
+		case Key_8: return ImGuiKey_8;
+		case Key_9: return ImGuiKey_9;
+
+		// Letters
+		case Key_A: return ImGuiKey_A;
+		case Key_B: return ImGuiKey_B;
+		case Key_C: return ImGuiKey_C;
+		case Key_D: return ImGuiKey_D;
+		case Key_E: return ImGuiKey_E;
+		case Key_F: return ImGuiKey_F;
+		case Key_G: return ImGuiKey_G;
+		case Key_H: return ImGuiKey_H;
+		case Key_I: return ImGuiKey_I;
+		case Key_J: return ImGuiKey_J;
+		case Key_K: return ImGuiKey_K;
+		case Key_L: return ImGuiKey_L;
+		case Key_M: return ImGuiKey_M;
+		case Key_N: return ImGuiKey_N;
+		case Key_O: return ImGuiKey_O;
+		case Key_P: return ImGuiKey_P;
+		case Key_Q: return ImGuiKey_Q;
+		case Key_R: return ImGuiKey_R;
+		case Key_S: return ImGuiKey_S;
+		case Key_T: return ImGuiKey_T;
+		case Key_U: return ImGuiKey_U;
+		case Key_V: return ImGuiKey_V;
+		case Key_W: return ImGuiKey_W;
+		case Key_X: return ImGuiKey_X;
+		case Key_Y: return ImGuiKey_Y;
+		case Key_Z: return ImGuiKey_Z;
+
+		// Function keys
+		case Key_F1:  return ImGuiKey_F1;
+		case Key_F2:  return ImGuiKey_F2;
+		case Key_F3:  return ImGuiKey_F3;
+		case Key_F4:  return ImGuiKey_F4;
+		case Key_F5:  return ImGuiKey_F5;
+		case Key_F6:  return ImGuiKey_F6;
+		case Key_F7:  return ImGuiKey_F7;
+		case Key_F8:  return ImGuiKey_F8;
+		case Key_F9:  return ImGuiKey_F9;
+		case Key_F10: return ImGuiKey_F10;
+		case Key_F11: return ImGuiKey_F11;
+		case Key_F12: return ImGuiKey_F12;
+
+		// Symbols
+		case Key_Semicolon:   return ImGuiKey_Semicolon;
+		case Key_Equal:       return ImGuiKey_Equal;
+		case Key_Comma:       return ImGuiKey_Comma;
+		case Key_Minus:       return ImGuiKey_Minus;
+		case Key_Dot:         return ImGuiKey_Period;
+		case Key_Slash:       return ImGuiKey_Slash;
+		case Key_Grave:       return ImGuiKey_GraveAccent;
+		case Key_LBracket:    return ImGuiKey_LeftBracket;
+		case Key_Backslash:   return ImGuiKey_Backslash;
+		case Key_RBracket:    return ImGuiKey_RightBracket;
+		case Key_Apostrophe:  return ImGuiKey_Apostrophe;
+	}
+}
+
+u32 imgui_mouse_button_translate(MouseButton button) {
+	switch(button) {
+		InvalidDefaultCase;
+		case MouseButton_Left:   return ImGuiMouseButton_Left;
+		case MouseButton_Right:  return ImGuiMouseButton_Right;
+		case MouseButton_Middle: return ImGuiMouseButton_Middle;
+	}
+}
+
+OS_InputEvent last_key_event;
+Timer _timer_type_repeat_delay = {.interval = 1.0f/6};
+
+void imgui_impl_new_frame() {
+	ImGuiIO& io = ImGui::GetIO();
+	io.DeltaTime = time_dt;
+	v2u win_size = os_window_size();
+	io.DisplaySize = ImVec2(win_size.x, win_size.y);
+	Slice<OS_InputEvent> events = os_get_input_events();
+	if(last_key_event.is_pressed) {
+		_timer_type_repeat_delay.acc += time_dt;
+		if(_timer_type_repeat_delay.acc >= _timer_type_repeat_delay.interval) {
+			if(time_on_interval(1.0/20)) {
+				io.AddInputCharacter(os_key_to_character(last_key_event.key, last_key_event.modifier));
+			}
+		}
+	}
+	for(var event : events) {
+		switch(event.type) {
+			case OS_EventType_Key: {
+				if(event.key < Key_COUNT && event.key != Key_Super) {
+					last_key_event = event;
+					_timer_type_repeat_delay.acc = 0;
+				}
+				ImGuiKey key = imgui_keycode_translate(event.key);
+				io.AddKeyEvent(key, event.is_pressed);
+				// Info("%u %u", event.key, event.is_pressed);
+				if(event.is_pressed) {
+					io.AddInputCharacter(os_key_to_character(event.key, event.modifier));
+				}
+			}break;
+			case OS_EventType_MouseButton: {
+				io.AddMouseButtonEvent(imgui_mouse_button_translate(event.mouse_button), event.is_pressed);
+			}break;
+			case OS_EventType_MouseMove: {
+				io.AddMousePosEvent(event.x, event.y);
+			}break;
+			case OS_EventType_Scroll: {
+				io.AddMouseWheelEvent(0, event.scroll);
+			}break;
+			case OS_EventType_Modifier: {
+				if(flag_has(event.modifier, OS_Modifier_Shift)) {
+					io.AddKeyEvent(ImGuiMod_Shift, true);
+					// Info("mod shift true");
+				} else {
+					io.AddKeyEvent(ImGuiMod_Shift, false);
+					// Info("mod shift false");
+				}
+				if(flag_has(event.modifier, OS_Modifier_Alt)) {
+					io.AddKeyEvent(ImGuiMod_Alt, true);
+				} else {
+					io.AddKeyEvent(ImGuiMod_Alt, false);
+				}
+				if(flag_has(event.modifier, OS_Modifier_Ctrl)) {
+					io.AddKeyEvent(ImGuiMod_Ctrl, true);
+				} else {
+					io.AddKeyEvent(ImGuiMod_Ctrl, false);
+				}break;
+			}
+		}
+	}
+}
+
+void imgui_init() {
+	ProfFunc;
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO();
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;   
+	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+	ImGuiStyle& style = ImGui::GetStyle();
+	style.FontScaleDpi = 1.3;
+	ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+	platform_io.Platform_GetClipboardTextFn = imgui_platform_get_clipboard_text;
+	platform_io.Platform_SetClipboardTextFn = imgui_platform_set_clipboard_text;
+	VkDescriptorPoolSize pool_sizes[] = {
+		{VK_DESCRIPTOR_TYPE_SAMPLER, 100},
+		{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 100},
+	};
+	VkDescriptorPoolCreateInfo pool_info = {
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+		.poolSizeCount = ArrayCount(pool_sizes),
+		.pPoolSizes = pool_sizes,
+		.maxSets = 1000,
+		.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+	};
+	VkDescriptorPool descriptor_pool;
+	VK_CHECK(st->gfx.CreateDescriptorPool(vkdevice, &pool_info, null, &descriptor_pool));
+	VkFormat format = VK_FORMAT_B8G8R8A8_UNORM;
+	ImGui_ImplVulkan_InitInfo init_info = {
+		.Instance = st->gfx.instance,
+		.PhysicalDevice = st->gfx.device.physical_device,
+		.Device = st->gfx.device.logical_device,
+		.QueueFamily = st->gfx.device.graphics_queue_family_idx,
+		.Queue = st->gfx.device.graphics_queue,
+		.DescriptorPool = descriptor_pool,
+		.MinImageCount = st->gfx.frames_in_flight,
+		.ImageCount = st->gfx.images_in_flight,
+		.PipelineInfoMain = {
+			.MSAASamples = VK_SAMPLE_COUNT_1_BIT,
+			.PipelineRenderingCreateInfo = {
+				.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
+				.colorAttachmentCount = 1,
+				.pColorAttachmentFormats = &format,
+			},
+		},
+		.UseDynamicRendering = true,
+	};
+	ImGui_ImplVulkan_LoadFunctions(VK_API_VERSION_1_4, [](const char* function_name, void* user_data) {
+		return (PFN_vkVoidFunction)os_lib_get_proc(st->gfx.lib, function_name);
+	}, null);
+	ImGui_ImplVulkan_Init(&init_info);
+}
+
+void imgui_begin_frame() {
+	imgui_impl_new_frame();
+	ImGui_ImplVulkan_NewFrame();
+	ImGui::NewFrame();
+}
+
+void imgui_end_frame() {
+	ProfFunc;
+	ImGui::Render();
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), st->gfx.render_cmds[st->gfx.cur_frame_idx]);
+	ImGui::UpdatePlatformWindows();
+	ImGui::RenderPlatformWindowsDefault();
+}
+
+void imgui_image(TextureId id, v2 pos) {
+	var& g = *st;
+	var& texture = g.textures[id.idx];
+	if(texture.imgui_id == 0) {
+		var vkview = pool_get(g.gfx.views, g.textures[id.idx].view);
+		texture.imgui_id = (ImTextureID)ImGui_ImplVulkan_AddTexture(vkview.h, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	}
+	ImGui::Image(texture.imgui_id, pos);
+}
+
+#endif
 
 R_Vertex cube_vertices[] = {
 	// Front face (0, 0, 1)
@@ -283,110 +1825,6 @@ void test_object_pool() {
 	}
 }
 
-void test_object_pool_linklist() {
-	Scratch scratch;
-	struct A {
-		u32 a;
-		u32 b;
-	};
-	PoolIterative<A, TEST_SAMPLES+1, OpaqueId> pool = {};
-	Array<A, TEST_SAMPLES> values = {};
-	Array<OpaqueId, TEST_SAMPLES> handlers = {};
-
-	Loop(i, TEST_SAMPLES) {
-		values[i].a = rand_u32(0, TEST_SAMPLES);
-		values[i].b = rand_u32(0, TEST_SAMPLES);
-	};
-	Loop(i, TEST_SAMPLES) {
-		handlers[i] = pool_push(pool, values[i]);
-	}
-	Loop(i, TEST_SAMPLES) {
-		AssertAlways(MemMatchStruct(&values[i], &pool_get(pool, handlers[i])));
-	}
-	Array<u32, TEST_SAMPLES> indices = {};
-	Loop(i, TEST_SAMPLES) array_push(indices, (u32)i);
-	rand_shuffle(slice(indices));
-
-	u32 i = 0;
-	LoopIter (it, pool_begin(pool)) {
-		A elem = *it;
-		AssertAlways(elem.a == values[i].a && elem.a == values[i].a);
-		i++;
-	}
-	Loop(i, TEST_SAMPLES) {
-		pool_remove(pool, handlers[i]);
-	}
-
-	array_clear(indices);
-	Loop(i, TEST_SAMPLES) {
-		values[i].a = rand_u32(0, TEST_SAMPLES);
-		values[i].b = rand_u32(0, TEST_SAMPLES);
-	};
-	Loop(i, TEST_SAMPLES) {
-		handlers[i] = pool_push(pool, values[i]);
-	}
-	Loop(i, TEST_SAMPLES) {
-		AssertAlways(MemMatchStruct(&values[i], &pool_get(pool, handlers[i])));
-	}
-	Loop(i, TEST_SAMPLES) array_push(indices, (u32)i);
-	rand_shuffle(slice(indices));
-	i = 0;
-	
-	LoopIter (it, pool_begin(pool)) {
-		A elem = *it;
-		AssertAlways(elem.a == values[i].a && elem.a == values[i].a);
-		i++;
-	}
-	Loop(i, TEST_SAMPLES) {
-		pool_remove(pool, handlers[i]);
-	}
-}
-
-// void test_handle_darray() {
-// 	Scratch scratch;
-// 	struct A {
-// 		u32 a;
-// 		u32 b;
-// 	};
-// 	var arr = array_handler_make<A, OpaqueId>(scratch);
-// 	Array<A, TEST_SAMPLES> values = {};
-// 	Array<OpaqueId, TEST_SAMPLES> handlers = {};
-
-// 	Loop(i, TEST_SAMPLES) {
-// 		values[i].a = rand_u32_rng(0, TEST_SAMPLES);
-// 		values[i].b = rand_u32_rng(0, TEST_SAMPLES);
-// 	};
-// 	Loop(i, TEST_SAMPLES) {
-// 		handlers[i] = array_handler_push(arr, values[i]);
-// 	}
-// 	Loop(i, TEST_SAMPLES) {
-// 		AssertAlways(MemMatchStruct(&values[i], &array_handler_get(arr, handlers[i])));
-// 	}
-// 	Array<u32, TEST_SAMPLES> indices = {};
-// 	Loop(i, TEST_SAMPLES) array_push(indices, i);
-// 	rand_shuffle(slice(indices));
-// 	Loop(i, TEST_SAMPLES) {
-// 		array_handler_remove(arr, handlers[indices[i]]);
-// 	}
-
-// 	array_clear(indices);
-// 	Loop(i, TEST_SAMPLES) {
-// 		values[i].a = rand_u32_rng(0, TEST_SAMPLES);
-// 		values[i].b = rand_u32_rng(0, TEST_SAMPLES);
-// 	};
-// 	Loop(i, TEST_SAMPLES) {
-// 		handlers[i] = array_handler_push(arr, values[i]);
-// 	}
-// 	Loop(i, TEST_SAMPLES) {
-// 		AssertAlways(MemMatchStruct(&values[i], &array_handler_get(arr, handlers[i])));
-// 	}
-// 	Loop(i, TEST_SAMPLES) array_push(indices, i);
-// 	rand_shuffle(slice(indices));
-// 	Loop(i, TEST_SAMPLES) {
-// 		array_handler_remove(arr, handlers[indices[i]]);
-// 	}
-// }
-
 void test_id_pool() {
 	Scratch scratch;
 	{
@@ -623,101 +2061,58 @@ void test_js() {
 	}
 	)";
 
-
-	// {
-	// 	struct {
-	// 		String name;
-	// 		b32 visible;
-	// 		v3 pos;
-	// 		struct {
-	// 			v3 color;
-	// 			f32 roughness;
-	// 		} material;
-	// 	} res = {};
-	// 	JsParser p = js_parse_make(scratch, d);
-	// 	JsObj root = js_parse(&p).obj;
-	// 	Loop(i, root.fields.count) {
-	// 		var [k, v] = root.fields[i];
-	// 		if(str_match(k, "name")) {
-	// 			res.name = push_str_copy(scratch, v->str);
-	// 		}
-	// 		else if(str_match(k, "visible")) {
-	// 			res.visible = v->boolean;
-	// 		}
-	// 		else if(str_match(k, "pos")) {
-	// 			Loop(i, v->array.count) {
-	// 				res.pos.v[i] = v->array[i]->number;
-	// 			}
-	// 		}
-	// 		else if(str_match(k, "material")) {
-	// 			JsObj material = v->obj;
-	// 			Loop(i, material.fields.count) {
-	// 				var [k, v] = material.fields[i];
-	// 				if(str_match(k, "color")) {
-	// 					Loop(i, v->array.count) {
-	// 						res.material.color.v[i] = v->array[i]->number;
-	// 					}
-	// 				} else if(str_match(k, "roughness")) {
-	// 					res.material.roughness = v->number;
-	// 				}
-	// 			}
-	// 		}
-	// 	}
-	// }
-
-
 	{
 		JsParser p = js_parse_make(scratch, d);
 		JsObj root = js_parse(p).obj;
-		String name = js_str(root, "name").val();
+		String name = {}; AssertOk(js_str(root, "name", &name));
 		Info("%s", name);
-		b32 visible = js_bool(root, "visible").val();
+		b32 visible = 0; AssertOk(js_bool(root, "visible", &visible));
 		Info("%u", visible);
-		Slice pos = js_array(root, "pos").val();
+		Slice<JsVal*> pos = {}; AssertOk(js_array(root, "pos", &pos));
 		Loop(i, pos.count) {
 			Info("%f", pos[i]->number);
 		}
 		{
-			JsObj material = js_obj(root, "material").val();
-			Slice color = js_array(material, "color").val();
+			JsObj material = {}; AssertOk(js_obj(root, "material", &material));
+			Slice<JsVal*> color = {}; AssertOk(js_array(material, "color", &color));
 			Loop(i, color.count) {
 				Info("%f", color[i]->number);
 			}
-			f64 roughness = js_number(material, "roughness").val();
+			f64 roughness = 0; AssertOk(js_f64(material, "roughness", &roughness));
 			Info("%f", roughness);
 		}
 	}
 }
 
-void test_co1(Coroutine* co, f32 dt) {
+void test_co1(Coroutine& co, f32 dt) {
 	co_begin(co);
 
 	Info("child");
-	co_wait(co, 1, dt);
-	co_yield(co);
+	co_wait(1);
+	co_yield();
 	Info("child waits");
-	co_wait(co, 1, dt);
+	co_wait(1);
 
-	co_end(co);
+	co_end();
 }
 
-void test_co(Coroutine* co, f32 dt) {
+void test_co(Coroutine& co, f32 dt) {
 	f32 wait_time = 1;
 	var& a = co_var(co, u32);
 	co_begin(co);
 
 	Info("start");
-	co_wait(co, wait_time, dt);
-	co_yield(co);
+	co_wait(wait_time);
+	co_yield();
 
 	Info("waited 0, %i", a++);
-	co_wait(co, wait_time, dt);
-	co_call(co, test_co1(co, dt));
+	co_wait(wait_time);
+	co_call(test_co1(co, dt));
 	Info("waited 1, %i", a);
-	co_wait(co, wait_time, dt);
+	co_wait(wait_time);
 	Info("waited 2, %i", a);
 
-	co_end(co);
+	co_end();
 }
 
 void test() {
@@ -729,7 +2124,6 @@ void test() {
 	test_arena_list_alloc();
 	test_gpu_seglist_alloc();
 	test_object_pool();
-	test_object_pool_linklist();
 	// test_handle_darray();
 	test_id_pool();
 }
@@ -909,6 +2303,8 @@ void dev_update() {
 				}
 				ImGui::DragFloat3("cam pos", g.cam.pos.v);
 				ImGui::DragFloat("cam vel fric", &g.cam.vel_friction, 0.1, 0, 100);
+
+				imgui_image(g.textures_ids[Texture_Dummy], v2(100));
 			}
 		}
 	}
@@ -927,7 +2323,7 @@ void dev_update() {
 		}l;
 
 		ProfBlock("Profiler");
-		var& prof = profiler_st;
+		var& prof = prof_st;
 		var& prof_win = st->prof_win;
 
 		// Avg, min, max
@@ -1106,7 +2502,7 @@ void dev_update() {
 						ImGui::PushItemWidth((50));
 						ImGui::DragInt("show freq", &frequency, 0.1f, 1, ProfRecordHistoryNum); ImGui::SameLine();
 						ImGui::DragInt("fps max", (i32*)&g.fps, 1.0f, 10, 2000); ImGui::SameLine();
-						ImGui::SliderFloat("scale", &st->r.scale, 0.01, 1);
+						ImGui::SliderFloat("scale", &st->scale, 0.01, 1);
 						ImGui::PopItemWidth();
 						idx /= ProfRecordHistoryNum/frequency;
 
@@ -1493,7 +2889,7 @@ void dev_update() {
 	}
 }
 
-R_MeshDesc load_obj(Allocator arena, String name) {
+MeshDesc load_obj(Allocator arena, String name) {
 	Scratch scratch(arena);
 	var positions = array_make<v3>(scratch);
 	var normals = array_make<v3>(scratch);
@@ -1580,8 +2976,8 @@ R_MeshDesc load_obj(Allocator arena, String name) {
 	Loop(i, indexes.count) {
 		v3u idx = indexes[i];
 		u64 h = hash_bytes(&idx, sizeof(v3u));
-		var[value, ok] = map_get(map, h);
-		if(ok) {
+		u16 value = 0;
+		if(map_get(map, h, &value)) {
 			array_push(final_indices, value);
 		} else {
 			R_Vertex v = {
@@ -1595,7 +2991,7 @@ R_MeshDesc load_obj(Allocator arena, String name) {
 			map_set(map, h, new_index);
 		} 
 	}
-	R_MeshDesc mesh = {
+	MeshDesc mesh = {
 		.vertices = slice(vertices),
 		.indices = slice(final_indices),
 	};
@@ -1666,75 +3062,75 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 
 	JsParser p = js_parse_make(scratch, json);
 	JsObj root = js_parse(p).obj;
-	Slice nodes = js_array(root, "nodes").val();
-	Slice accessors = js_array(root, "accessors").val();
-	Slice buffer_views = js_array(root, "bufferViews").val();
+	Slice<JsVal*> nodes; AssertOk(js_array(root, "nodes", &nodes));
+	Slice<JsVal*> accessors; AssertOk(js_array(root, "accessors", &accessors));
+	Slice<JsVal*> buffer_views; AssertOk(js_array(root, "bufferViews", &buffer_views));
 
 	///////////////////////////////////
 	// Mesh
 	{
-		Slice meshes = js_array(root, "meshes").val();
+		Slice<JsVal*> meshes; AssertOk(js_array(root, "meshes", &meshes));
 		JsObj first_mesh = meshes[0]->obj;
-		Slice primitives = js_array(first_mesh, "primitives").val();
+		Slice<JsVal*> primitives; AssertOk(js_array(first_mesh, "primitives", &primitives));
 		JsObj first_primitive = primitives[0]->obj;
-		JsObj attributes = js_obj(first_primitive, "attributes").val();
+		JsObj attributes; AssertOk(js_obj(first_primitive, "attributes", &attributes));
 		{
-			u32 pos_attribute = js_number(attributes, "POSITION").val();
+			u32 pos_attribute; AssertOk(js_u32(attributes, "POSITION", &pos_attribute));
 			JsObj pos_accessor = accessors[pos_attribute]->obj;
-			u32 buffer_view = js_number(pos_accessor, "bufferView").val();
-			vert_count = js_number(pos_accessor, "count").val();
+			u32 buffer_view; AssertOk(js_u32(pos_accessor, "bufferView", &buffer_view));
+			AssertOk(js_u32(pos_accessor, "count", &vert_count));
 			JsObj pos_buffer_view = buffer_views[buffer_view]->obj;
-			u64 size = js_number(pos_buffer_view, "byteLength").val();
-			u64 off = js_number(pos_buffer_view, "byteOffset").val();
+			u64 size; AssertOk(js_u64(pos_buffer_view, "byteLength", &size));
+			u64 off; AssertOk(js_u64(pos_buffer_view, "byteOffset", &off));
 			pos = slice_reinterpret<v3>(slice_n(data, off, size));
 		}
 		{
-			u32 norm_attribute = js_number(attributes, "NORMAL").val();
+			u32 norm_attribute; AssertOk(js_u32(attributes, "NORMAL", &norm_attribute));
 			JsObj norm_accessor = accessors[norm_attribute]->obj;
-			u32 buffer_view = js_number(norm_accessor, "bufferView").val();
+			u32 buffer_view; AssertOk(js_u32(norm_accessor, "bufferView", &buffer_view));
 			JsObj norm_buffer_view = buffer_views[buffer_view]->obj;
-			u64 size = js_number(norm_buffer_view, "byteLength").val();
-			u64 off = js_number(norm_buffer_view, "byteOffset").val();
+			u64 size; js_u64(norm_buffer_view, "byteLength", &size);
+			u64 off; js_u64(norm_buffer_view, "byteOffset", &off);
 			norm = slice_reinterpret<v3>(slice_n(data, off, size));
 		}
 		{
-			u32 texcoord_attribute = js_number(attributes, "TEXCOORD_0").val();
+			u32 texcoord_attribute; AssertOk(js_u32(attributes, "TEXCOORD_0", &texcoord_attribute));
 			JsObj texcoord_accessor = accessors[texcoord_attribute]->obj;
-			u32 buffer_view = js_number(texcoord_accessor, "bufferView").val();
+			u32 buffer_view; AssertOk(js_u32(texcoord_accessor, "bufferView", &buffer_view));
 			JsObj texcoord_buffer_view = buffer_views[buffer_view]->obj;
-			u64 size = js_number(texcoord_buffer_view, "byteLength").val();
-			u64 off = js_number(texcoord_buffer_view, "byteOffset").val();
+			u64 size; js_u64(texcoord_buffer_view, "byteLength", &size);
+			u64 off; js_u64(texcoord_buffer_view, "byteOffset", &off);
 			texcoord = slice_reinterpret<v2>(slice_n(data, off, size));
 		}
 		{
-			u32 indices_attribute = js_number(first_primitive, "indices").val();
+			u32 indices_attribute; AssertOk(js_u32(first_primitive, "indices", &indices_attribute));
 			JsObj indices_accessor = accessors[indices_attribute]->obj;
-			u32 buffer_view = js_number(indices_accessor, "bufferView").val();
-			indices_count = js_number(indices_accessor, "count").val();
+			u32 buffer_view; AssertOk(js_u32(indices_accessor, "bufferView", &buffer_view));
+			AssertOk(js_u32(indices_accessor, "count", &indices_count));
 			JsObj indices_buffer_view = buffer_views[buffer_view]->obj;
-			u64 size = js_number(indices_buffer_view, "byteLength").val();
-			u64 off = js_number(indices_buffer_view, "byteOffset").val();
+			u64 size; Assert(js_u64(indices_buffer_view, "byteLength", &size));
+			u64 off; Assert(js_u64(indices_buffer_view, "byteOffset", &off));
 			indices_u16 = slice_reinterpret<u16>(slice_n(data, off, size));
 		}
 		{
-			var[joints_attribute, ok] = js_number(attributes, "JOINTS_0");
-			if(ok) {
+			u32 joints_attribute = 0;
+			if(js_u32(attributes, "JOINTS_0", &joints_attribute)) {
 				JsObj joints_accessor = accessors[joints_attribute]->obj;
-				u32 buffer_view = js_number(joints_accessor, "bufferView").val();
+				u32 buffer_view; AssertOk(js_u32(joints_accessor, "bufferView", &buffer_view));
 				JsObj joints_buffer_view = buffer_views[buffer_view]->obj;
-				u64 size = js_number(joints_buffer_view, "byteLength").val();
-				u64 offset = js_number(joints_buffer_view, "byteOffset").val();
+				u64 size; AssertOk(js_u64(joints_buffer_view, "byteLength", &size));
+				u64 offset; AssertOk(js_u64(joints_buffer_view, "byteOffset", &offset));
 				joints = slice_reinterpret<v4u8>(slice_n(data, offset, size));
 			}
 		}
 		{
-			var[weights_attribute, ok] = js_number(attributes, "WEIGHTS_0");
-			if(ok) {
+			u32 weights_attribute = 0;
+			if(js_u32(attributes, "WEIGHTS_0", &weights_attribute)) {
 				JsObj weights_accessor = accessors[weights_attribute]->obj;
-				u32 buffer_view = js_number(weights_accessor, "bufferView").val();
+				u32 buffer_view; AssertOk(js_u32(weights_accessor, "bufferView", &buffer_view));
 				JsObj weights_buffer_view = buffer_views[buffer_view]->obj;
-				u64 size = js_number(weights_buffer_view, "byteLength").val();
-				u64 off = js_number(weights_buffer_view, "byteOffset").val();
+				u64 size; AssertOk(js_u64(weights_buffer_view, "byteLength", &size));
+				u64 off; AssertOk(js_u64(weights_buffer_view, "byteOffset", &off));
 				weights = slice_reinterpret<v4>(slice_n(data, off, size));
 			}
 		}
@@ -1743,18 +3139,18 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 	///////////////////////////////////
 	// Skin
 	{
-		var[skins, ok] = js_array(root, "skins");
-		if(ok) {
+		Slice<JsVal*> skins = {};
+		if(js_array(root, "skins", &skins)) {
 			JsObj first_skin = skins[0]->obj;
-			u32 inv_matrices_attribute = js_number(first_skin, "inverseBindMatrices").val();
+			u32 inv_matrices_attribute; AssertOk(js_u32(first_skin, "inverseBindMatrices", &inv_matrices_attribute));
 			JsObj inv_matrices_accessor = accessors[inv_matrices_attribute]->obj;
-			u32 buffer_view = js_number(inv_matrices_accessor, "bufferView").val();
+			u32 buffer_view; AssertOk(js_u32(inv_matrices_accessor, "bufferView", &buffer_view));
 			JsObj inv_matrices_buffer_view = buffer_views[buffer_view]->obj;
-			u64 size = js_number(inv_matrices_buffer_view, "byteLength").val();
-			u64 off = js_number(inv_matrices_buffer_view, "byteOffset").val();
+			u64 size; AssertOk(js_u64(inv_matrices_buffer_view, "byteLength", &size));
+			u64 off; AssertOk(js_u64(inv_matrices_buffer_view, "byteOffset", &off));
 			var matrices = slice_reinterpret<m4x4>(slice_n(data, off, size));
 			inv_matrices = push_slice(arena, m4x4, matrices.count);
-			Slice joints_indices = js_array(first_skin, "joints").val();
+			Slice<JsVal*> joints_indices; AssertOk(js_array(first_skin, "joints", &joints_indices));
 			bones = push_slice(arena, Bone, joints_indices.count);
 			u32 bone_count = 0;
 			u32 node_to_joint[255] = {};
@@ -1768,13 +3164,17 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 				u32 bone_idx = bone_count++;
 				node_to_bone[node_idx] = bone_idx;
 				inv_matrices[bone_idx] = matrices[node_to_joint[node_idx]];
-				Transform trans = {};
-				trans.pos = js_v3(node, "translation").or_else(v3());
-				trans.rot = js_v4(node, "rotation").or_else(quat_identity());
-				trans.scale = js_v3(node, "scale").or_else(v3(1));
+				Transform trans = {
+					.pos = v3(),
+					.rot = quat_identity(),
+					.scale = v3(1),
+				};
+				js_v3(node, "translation", &trans.pos);
+				js_v4(node, "rotation", &trans.rot);
+				js_v3(node, "scale", &trans.scale);
 				bones[bone_idx].local = trans;
 				bones[bone_idx].parent = parent_idx;
-				Slice children = js_array(node, "children").or_else({});
+				Slice<JsVal*> children = {}; js_array(node, "children", &children);
 				Loop(i, children.count) {
 					dfs(dfs, children[i]->number, bone_idx);
 				}
@@ -1782,17 +3182,17 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 			dfs(dfs, joints_indices[0]->number, 0);
 
 			// Animation
-			var[animations, ok] = js_array(root, "animations");
-			if(ok) {
+			Slice<JsVal*> animations = {};
+			if(js_array(root, "animations", &animations)) {
 				var first_animation = animations[0]->obj;
-				var js_channels = js_array(first_animation, "channels").val();
+				Slice<JsVal*> js_channels; AssertOk(js_array(first_animation, "channels", &js_channels));
 				channels = push_slice(arena, Channel, js_channels.count);
 				Loop(i, js_channels.count) {
 					var channel = js_channels[i]->obj;
-					u32 sampler = js_number(channel, "sampler").val();
-					var target = js_obj(channel, "target").val();
-					u32 node = js_number(target, "node").val();
-					String path = js_str(target, "path").val();
+					u32 sampler; AssertOk(js_u32(channel, "sampler", &sampler));
+					JsObj target; AssertOk(js_obj(channel, "target", &target));
+					u32 node; AssertOk(js_u32(target, "node", &node));
+					String path; AssertOk(js_str(target, "path", &path));
 					channels[i].bone = node_to_bone[node];
 					channels[i].sampler = sampler;
 					AnimPath anim_path = {};
@@ -1805,27 +3205,27 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 					} else InvalidPath;
 					channels[i].path = anim_path;
 				}
-				var js_samplers = js_array(first_animation, "samplers").val();
+				Slice<JsVal*> js_samplers; AssertOk(js_array(first_animation, "samplers", &js_samplers));
 				samplers = push_slice(arena, Sampler, js_samplers.count);
 				Loop(i, js_samplers.count) {
 					var sampler = js_samplers[i]->obj;
-					u32 input = js_number(sampler, "input").val();
+					u32 input; AssertOk(js_u32(sampler, "input", &input));
 					JsObj input_accessor = accessors[input]->obj;
-					u32 input_buffer_view = js_number(input_accessor, "bufferView").val();
+					u32 input_buffer_view; AssertOk(js_u32(input_accessor, "bufferView", &input_buffer_view));
 					JsObj js_input_buffer_view = buffer_views[input_buffer_view]->obj;
-					u64 input_size = js_number(js_input_buffer_view, "byteLength").val();
-					u64 input_off = js_number(js_input_buffer_view, "byteOffset").val();
+					u64 input_size; AssertOk(js_u64(js_input_buffer_view, "byteLength", &input_size));
+					u64 input_off; AssertOk(js_u64(js_input_buffer_view, "byteOffset", &input_off));
 					var timestamps = slice_reinterpret<f32>(slice_n(data, input_off, input_size));
 					samplers[i].times = slice_clone(arena, timestamps).data;
 					samplers[i].count = timestamps.count;
 
-					u32 output = js_number(sampler, "output").val();
+					u32 output; AssertOk(js_u32(sampler, "output", &output));
 					JsObj output_accessor = accessors[output]->obj;
-					u32 output_buffer_view = js_number(output_accessor, "bufferView").val();
-					String output_type = js_str(output_accessor, "type").val();
+					u32 output_buffer_view; AssertOk(js_u32(output_accessor, "bufferView", &output_buffer_view));
+					String output_type; AssertOk(js_str(output_accessor, "type", &output_type));
 					JsObj js_output_buffer_view = buffer_views[output_buffer_view]->obj;
-					u64 output_size = js_number(js_output_buffer_view, "byteLength").val();
-					u64 output_off = js_number(js_output_buffer_view, "byteOffset").val();
+					u64 output_size; AssertOk(js_u64(js_output_buffer_view, "byteLength", &output_size));
+					u64 output_off; AssertOk(js_u64(js_output_buffer_view, "byteOffset", &output_off));
 					if(str_match(output_type, "VEC3")) {
 						var values = slice_reinterpret<v3>(slice_n(data, output_off, output_size));
 						samplers[i].values = slice_clone(arena, values).data;
@@ -2068,55 +3468,102 @@ JsVal js_parse(JsParser& p) {
 	}
 }
 
-Result<JsVal> js_val(JsVal val, String key) {
+b32 js_val(JsVal val, String key, JsVal* out) {
 	for(var& field : val.obj.fields) {
 		if(str_match(field.key, key)) {
-			return {*field.val, true};
+			*out = *field.val;
+			return true;
 		}
 	}
-	return {};
+	return false;
 }
-Result<b32> js_bool(JsObj obj, String key) {
-	var[v, ok] = js_val({.obj = obj}, key);
-	return {v.boolean, ok};
+b32 js_bool(JsObj obj, String key, b32* out) {
+	JsVal v = {};
+	if(js_val({.obj = obj}, key, &v)) {
+		*out = v.boolean;
+		return true;
+	}
+	return false;
 }
-Result<f64> js_number(JsObj obj, String key) {
-	var[v, ok] = js_val({.obj = obj}, key);
-	return {v.number, ok};
+b32 js_f64(JsObj obj, String key, f64* out) {
+	JsVal v = {};
+	if(js_val({.obj = obj}, key, &v)) {
+		*out = v.number;
+		return true;
+	}
+	return false;
 }
-Result<String> js_str(JsObj obj, String key) {
-	var[v, ok] = js_val({.obj = obj}, key);
-	return {v.str, ok};
+b32 js_f32(JsObj obj, String key, f32* out) {
+	f64 r = 0;
+	if(js_f64(obj, key, &r)) {
+		*out = r;
+		return true;
+	}
+	return false;
 }
-Result<Slice<JsVal*>> js_array(JsObj obj, String key) {
-	var[v, ok] = js_val({.obj = obj}, key);
-	return {v.array, ok};
+b32 js_u64(JsObj obj, String key, u64* out) {
+	f64 r = 0;
+	if(js_f64(obj, key, &r)) {
+		*out = r;
+		return true;
+	}
+	return false;
 }
-Result<JsObj> js_obj(JsObj obj, String key) {
-	var[v, ok] = js_val({.obj = obj}, key);
-	return {v.obj, ok};
+b32 js_u32(JsObj obj, String key, u32* out) {
+	f64 r = 0;
+	if(js_f64(obj, key, &r)) {
+		*out = r;
+		return true;
+	}
+	return false;
 }
-Result<v3> js_v3(JsObj obj, String key) {
-	var[v, ok] = js_val({.obj = obj}, key);
-	if(ok) {
+b32 js_str(JsObj obj, String key, String* out) {
+	JsVal v = {};
+	if(js_val({.obj = obj}, key, &v)) {
+		*out = v.str;
+		return true;
+	}
+	return false;
+}
+b32 js_array(JsObj obj, String key, Slice<JsVal*>* out) {
+	JsVal v = {};
+	if(js_val({.obj = obj}, key, &v)) {
+		*out = v.array;
+		return true;
+	}
+	return false;
+}
+b32 js_obj(JsObj obj, String key, JsObj* out) {
+	JsVal v = {};
+	if(js_val({.obj = obj}, key, &v)) {
+		*out = v.obj;
+		return true;
+	}
+	return false;
+}
+b32 js_v3(JsObj obj, String key, v3* out) {
+	JsVal v = {};
+	if(js_val({.obj = obj}, key, &v)) {
 		v3 res = {};
 		Loop(i, 3) {
 			res.v[i] = v.array[i]->number;
 		}
-		return {res, true};
+		*out = res;
+		return true;
 	}
-	return {};
+	return false;
 }
-Result<v4> js_v4(JsObj obj, String key) {
-	var[v, ok] = js_val({.obj = obj}, key);
-	if(ok) {
+b32 js_v4(JsObj obj, String key, v4* out) {
+	JsVal v = {};
+	if(js_val({.obj = obj}, key, &v)) {
 		v4 res = {};
 		Loop(i, 4) {
 			res.v[i] = v.array[i]->number;
 		}
-		return {res, true};
+		*out = res;
+		return true;
 	}
-	return {};
+	return false;
 }
 
 f32 parse_f32(Parser& p) {
@@ -2303,7 +3750,7 @@ void watch_update() {
 					String shader_filepath = push_strf(scratch, "%s/%s", g.shader_dir, shader_name_slang);
 					String shader_compiled_filepath = push_strf(scratch, "%s/%s", g.shader_compiled_dir, name);
 					os_file_path_copy_mtime(shader_filepath, shader_compiled_filepath);
-					r_reload_shader(shader_name);
+					reload_shader(shader_name);
 				}break;
 				InvalidDefaultCase;
 			}
@@ -2312,18 +3759,19 @@ void watch_update() {
 }
 
 ThingDesc default_thing_desc() {
+	var& g = *st;
 	ThingDesc res = {
 		.scale = v3(1),
 		.rot = quat_identity(),
 		.color = ColorWhite,
-		.mesh_id = get_mesh(Mesh_Cube),
-		.mat_id = get_material(Material_Orange),
+		.mesh_id = g.meshes_ids[Mesh_Cube],
+		.mat_id = g.materials_ids[Material_Orange],
 	};
 	return res;
 }
 
-R_MaterialProps default_material_props() {
-	R_MaterialProps props = {
+MaterialProps default_material_props() {
+	MaterialProps props = {
 		.ambient = v3(1),
 		.diffuse = v3(1),
 		.specular = v3(1),
@@ -2333,14 +3781,11 @@ R_MaterialProps default_material_props() {
 }
 
 Thing& get_thing(ThingId id) { return pool_get(st->things, id); }
-R_MeshId get_mesh(MeshEnum mesh_enum) { return st->meshes_ids[mesh_enum]; }
-R_TextureId get_texture(TextureEnum tex_enum) { return st->textures_ids[tex_enum]; }
-R_MaterialId get_material(MaterialEnum id) { return st->materials_ids[id]; }
 
 void push_child_thing(ThingId parent, ThingId id) {
 	var& g = *st;
 	var& t = get_thing(parent);
-	hdll_push_back(g.things.pool.data, t.first, t.last, id);
+	hdll_push_back(g.things.data, t.first, t.last, id);
 }
 
 String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, EntityFlags flags) {
@@ -2383,11 +3828,11 @@ String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, 
 				dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, v));
 			}break;
 			case MetaType_R_MeshId: {
-				R_MeshId v = *(R_MeshId*)member_ptr;
+				MeshId v = *(MeshId*)member_ptr;
 				dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->mesh_id_to_str[v.idx]));
 			}break;
 			case MetaType_R_MaterialId: {
-				R_MaterialId v = *(R_MaterialId*)member_ptr;
+				MaterialId v = *(MaterialId*)member_ptr;
 				dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->material_id_to_str[v.idx]));
 			}break;
 		}
@@ -2474,8 +3919,10 @@ Map<u32, KB(1)> first_observer;
 Slice<ThingId> find_observed(Allocator arena, ThingId observer) {
 	var res = array_make<ThingId>(arena);
 	u64 key = observer.idx;
-	var[first_idx, ok] = map_get(first_observed, key);
-	if(!ok) return {};
+	u32 first_idx = 0;
+	if(!map_get(first_observed, key, &first_idx)) {
+		return {};
+	}
 	u32 idx = first_idx;
 	do {
 		Observation o = observations.data[idx];
@@ -2488,8 +3935,10 @@ Slice<ThingId> find_observed(Allocator arena, ThingId observer) {
 Slice<ThingId> find_observers(Allocator arena, ThingId observed) {
 	var res = array_make<ThingId>(arena);
 	u64 key = observed.idx;
-	var[first_idx, ok] = map_get(first_observer, key);
-	if(!ok) return {};
+	u32 first_idx = 0;
+	if(!map_get(first_observed, key, &first_idx)) {
+		return {};
+	}
 	u32 idx = first_idx;
 	do {
 		Observation o = observations.data[idx];
@@ -2503,8 +3952,8 @@ u32 add_observation(ThingId observer, ThingId observed) {
 	u32 idx = pool_push(observations, {.observed = observed, .observer = observer});
 	{
 		u64 key = observer.idx;
-		var[first, ok] = map_get(first_observed, key);
-		if(ok) {
+		u32 first = 0;
+		if(map_get(first_observed, key, &first)) {
 			DLL_list_push(observations.data, first, idx, next_observed, prev_observed);
 		} else {
 			DLL_list_init(observations.data, idx, next_observed, prev_observed);
@@ -2513,8 +3962,8 @@ u32 add_observation(ThingId observer, ThingId observed) {
 	}
 	{
 		u64 key = observed.idx;
-		var[first, ok] = map_get(first_observer, key);
-		if(ok) {
+		u32 first = 0;
+		if(map_get(first_observer, key, &first)) {
 			DLL_list_push(observations.data, first, idx, next_observer, prev_observer);
 		} else {
 			DLL_list_init(observations.data, idx, next_observer, prev_observer);
@@ -2529,7 +3978,8 @@ void remove_observation(u32 idx) {
 	{
 		DLL_list_remove(observations.data, idx, next_observed, prev_observed);
 		u64 key = o.observer.idx;
-		var[first, ok] = map_get(first_observed, key);
+		u32 first = 0;
+		map_get(first_observed, key, &first);
 		if(first == idx) {
 			if(o.next_observed != idx) {
 				map_set(first_observed, key, o.next_observed);
@@ -2541,7 +3991,8 @@ void remove_observation(u32 idx) {
 	{
 		DLL_list_remove(observations.data, idx, next_observer, prev_observer);
 		u64 key = o.observed.idx;
-		var[first, ok] = map_get(first_observer, key);
+		u32 first = 0;
+		map_get(first_observer, key, &first);
 		if(first == idx) {
 			if(o.next_observer != idx) {
 				map_set(first_observer, key, o.next_observer);
@@ -2596,6 +4047,40 @@ void check_observer_observed() {
 	print_observed({3});	 /* expect: (nothing) - B's chain is now empty */
 }
 
+template <typename T> struct NodeIter2 {
+	T* nodes;
+	u32 idx;
+	u32 cur;
+	T* val;
+};
+
+template <typename T> b32 node_iter_next(NodeIter2<T>& it) {
+	if(it.idx == 0) return false;
+	it.cur = it.idx;
+	it.val = &it.nodes[it.idx];
+	it.idx = it.val->next;
+	return true;
+}
+
+b32 iter_next(ThingIter& it) {
+	if(it.idx >= it.count) return false;
+	u32 dense_idx = it.dense[it.idx];
+	it.id = {dense_idx, it.gens[dense_idx]};
+	it.idx++;
+	return true;
+}
+
+ThingIter things_begin() {
+	var& g = *st;
+	ThingIter res = {
+		.data = g.things.data,
+		.count = g.things_set.count,
+		.dense = g.things_set.dense,
+		.gens = g.things.gens,
+	};
+	return res;
+}
+
 void init() {
 	Scratch scratch;
 	var& g = *st;
@@ -2609,18 +4094,16 @@ void init() {
 	for(var s : os_args()) {
 		if(str_match(s, "compile_shaders")) {
 			u64 s = os_now_ns();
-			r_shaders_compile(scratch);
-			r_shaders_compile_join();
+			shaders_compile(scratch);
+			shaders_compile_join();
 			Info("took: %fms", f64(os_now_ns()-s) / Million(1));
 			os_exit(0);
 		}
 	}
 
-	r_shaders_compile(scratch);
-
 	g.gpa = alloc_make(g.arena);
 	g.frame_arena = arena_make();
-
+	shaders_compile(scratch);
 	cpu_find_frequency();
 	prof_init(g.arena);
 	prof_launch_begin();
@@ -2634,7 +4117,6 @@ void init() {
 		init_game();
 		watch_directory_add(g.shader_dir, WatchOp_RecompileShader);
 		watch_directory_add(g.shader_compiled_dir, WatchOp_ShaderReload);
-		ui_init();
 	}
 	prof_launch_end();
 }
@@ -2645,11 +4127,9 @@ if(data->ctx == null) {
 		Arena arena = arena_make(.name = "common arena");
 		data->ctx = st = push_struct_zero(arena, GlobalState);
 		st->arena = arena;
-		{
-			u64 start = cpu_now();
-			init();
-			Debug("init time: %fms", tsc_to_ms(cpu_now() - start));
-		}
+		u64 start = cpu_now();
+		init();
+		Debug("init time: %fms", tsc_to_ms(cpu_now() - start));
 #if HOTRELOAD_BUILD
 		watch_add(data->lib_path, WatchOp_NotifyHotreload);
 #endif
@@ -2676,9 +4156,7 @@ if(data->ctx == null) {
 			time_now += time_dt;
 			prev_ns = now_ns;
 			r_begin();
-			ui_begin_frame();
 			update_game();
-			ui_end_frame();
 			r_end();
 			watch_update();
 
@@ -2703,7 +4181,7 @@ if(data->ctx == null) {
 	thread_wait_remanings();
 }
 
-R_MeshDesc generate_sphere(Allocator arena) {
+MeshDesc generate_sphere(Allocator arena) {
 	u32 lat_steps = 10;
 	u32 lon_steps = 10;
 	u32 vert_count = lat_steps*lon_steps;
@@ -2752,14 +4230,14 @@ R_MeshDesc generate_sphere(Allocator arena) {
 	//   indices[k++] = north_pole_index;      // pole
 	//   indices[k++] = idx(lat_steps - 2, next_j);
 	// }
-	R_MeshDesc mesh = {
+	MeshDesc mesh = {
 		.vertices = vertices,
 		.indices = indices,
 	};
 	return mesh;
 }
 
-R_MeshDesc generate_grid(Allocator arena, u32 size, f32 step) {
+MeshDesc generate_grid(Allocator arena, u32 size, f32 step) {
 	var vertices = push_slice(arena, R_Vertex, size*4);
 	v3 pos_offset = v3(-(i32)size/2, 0, -(i32)size/2);
 	for(i32 i = 0; i < size; i++) {
@@ -2771,7 +4249,7 @@ R_MeshDesc generate_grid(Allocator arena, u32 size, f32 step) {
 		vertical_vertices[i*2].pos = pos_offset + v3(i*step, 0, 0);
 		vertical_vertices[i*2+1].pos = pos_offset + v3(i*step, 0, size*step);
 	}
-	R_MeshDesc mesh = {
+	MeshDesc mesh = {
 		.vertices = vertices,
 	};
 	return mesh;
@@ -2802,26 +4280,14 @@ ThingId make_thing(ThingDesc desc) {
 		.color = desc.color,
 	};
 	ThingId id = pool_push(g.things, e);
-	// sparse_set_push(g.active_entities, id.idx);
-	g.entities_count++;
+	sparse_set_push(g.things_set, id.idx);
 	return id;
 }
 
 void destroy_thing(ThingId id) {
 	var& g = *st;
 	pool_remove(g.things, id);
-	// sparse_set_remove(g.active_entities, id.idx);
-	g.entities_count--;
-}
-
-PoolIterativeIter<Thing, MaxEntities, ThingId> things_begin() {
-	var& g = *st;
-	return {&g.things};
-}
-
-HNodeIter<Thing, ThingId> thing_node_begin(ThingId first) {
-	var& g = *st;
-	return {g.things.pool.data, first};
+	sparse_set_remove(g.things_set, id.idx);
 }
 
 void select_obj() {
@@ -2857,8 +4323,8 @@ void save_game_state() {
 	{
 		dstr_push(data, "Things {\n");
 		u32 idx = 0;
-		LoopIter(i, things_begin()) {
-			Thing& e = *i;
+		LoopIter(it, things_begin()) {
+			Thing& e = get_thing(it.id);
 			e.serialized_idx = idx;
 			dstr_push(data, "{\n");
 			dstr_pushf(data, "pos %s\n", write_v3(scratch, e.pos));
@@ -2912,10 +4378,10 @@ void load_game_state() {
 	var& g = *st;
 	Scratch scratch;
 	LoopIter(it, things_begin()) {
-		ThingId e_id = it.id();
-		destroy_thing(e_id);
+		destroy_thing(it.id);
 	}
-	pool_clear(g.things.pool);
+	pool_clear(g.things);
+	g.things_set.count = 0;
 	String str = os_file_path_read_all_str(scratch, push_strf(scratch, "%s/saved", os_cur_directory(), String("saved")));
 	Slice tokens = tokens_from_str(scratch, str);
 	Parser p = parser_make(tokens);
@@ -2941,8 +4407,8 @@ void load_game_state() {
 					tok_expect(p, TokenType_Identifier); desc.pos = parse_v3(p);
 					tok_expect(p, TokenType_Identifier); desc.rot = parse_v4(p);
 					tok_expect(p, TokenType_Identifier); desc.scale = parse_v3(p);
-					tok_expect(p, TokenType_Identifier); desc.mesh_id = map_get(g.str_to_mesh_id, hash(tok_advance(p).str)).value;
-					tok_expect(p, TokenType_Identifier); desc.mat_id = map_get(g.str_to_material_id, hash(tok_advance(p).str)).value;
+					tok_expect(p, TokenType_Identifier); map_get(g.str_to_mesh_id, hash(tok_advance(p).str), &desc.mesh_id);
+					tok_expect(p, TokenType_Identifier); map_get(g.str_to_material_id, hash(tok_advance(p).str), &desc.mat_id);
 					make_thing(desc);
 					tok_expect(p, TokenType_CloseBrace);
 				}
@@ -2997,25 +4463,24 @@ void init_game() {
 	///////////////////////////////////
 	// Assets
 	{
-		g.font = r_make_font({.name = "arial.ttf", .font_height = 32});
-		r_set_cubemap(r_make_texture({.name = "night_cubemap", .is_cube = true}));
+		set_cubemap(make_texture({.name = "night_cubemap", .is_cube = true}));
 
 		// Known assets
-		var mesh_set = [](MeshEnum mesh_enum, R_MeshId id) { 
+		var mesh_set = [](MeshEnum mesh_enum, MeshId id) { 
 			GlobalState& g = *st;
 			g.meshes_ids[mesh_enum] = id;
 			String str = push_str_copy(g.arena, meshes_strs[mesh_enum]);
 			map_set(g.str_to_mesh_id, hash(str), id);
 			g.mesh_id_to_str[id.idx] = str;
 		};
-		mesh_set(Mesh_Triangle, r_make_mesh({.vertices = slice(triangle_vertices)}));
-		mesh_set(Mesh_Grid, r_make_mesh(generate_grid(scratch, 100, 1)));
-		mesh_set(Mesh_Axis, r_make_mesh({.vertices = slice(axis_vertices)}));
-		mesh_set(Mesh_Sphere, r_make_mesh(generate_sphere(scratch)));
+		mesh_set(Mesh_Triangle, make_mesh({.vertices = slice(triangle_vertices)}));
+		mesh_set(Mesh_Grid, make_mesh(generate_grid(scratch, 100, 1)));
+		mesh_set(Mesh_Axis, make_mesh({.vertices = slice(axis_vertices)}));
+		mesh_set(Mesh_Sphere, make_mesh(generate_sphere(scratch)));
 
-		// Mehs
+		// Mesh
 		var load_mesh = [&](MeshEnum enum_name, String name) {
-			R_MeshId id = r_make_mesh({.name = name});
+			MeshId id = make_mesh({.name = name});
 			g.meshes_ids[enum_name] = id;
 			String str = push_str_copy(g.arena, name);
 			map_set(g.str_to_mesh_id, hash(str), id);
@@ -3028,14 +4493,14 @@ void init_game() {
 		// load_mesh(Mesh_T, "t.gltf");
 		{
 			var info = load_gltf(scratch, "t.gltf", false);
-			mesh_set(Mesh_T, r_make_mesh(info.mesh));
-			array_push_elems(g.r.bones, info.bones);
-			array_push_elems(g.r.inv_matrices, info.inv_matrices);
+			mesh_set(Mesh_T, make_mesh(info.mesh));
+			array_push_elems(g.bones, info.bones);
+			array_push_elems(g.inv_matrices, info.inv_matrices);
 		}
 
 		// Texture
 		var load_texture = [&](TextureEnum enum_name, String name) {
-			R_TextureId id = r_make_texture({.name = name});
+			TextureId id = make_texture({.name = name});
 			g.textures_ids[enum_name] = id;
 			String str = push_str_copy(g.arena, name);
 			map_set(g.str_to_texture_id, hash(str), id);
@@ -3045,27 +4510,23 @@ void init_game() {
 		load_texture(Texture_Container, "container.jpg");
 		load_texture(Texture_Barrack, "castle_diffuse.png");
 		load_texture(Texture_Bricks, "bricks.png");
-		load_texture(Texture_Dummy, "dummy.png");
-
-		// Imgui dummy
-		g.imgui_dummy = imgui_add_texture(g.textures_ids[Texture_Dummy]);
 
 		// Materials
-		var default_state = r_make_pipeline_state({
+		var default_state = make_pipeline_state({
 			.depth = {
 				.compare = Gfx_CompareOp_Less,
 				.write_enabled = true,
 			}
 		});
-		var default_state_line = r_make_pipeline_state({
+		var default_state_line = make_pipeline_state({
 			.primitive_type = Gfx_PrimitiveType_Line,
 			.depth = {
 				.compare = Gfx_CompareOp_Less,
 				.write_enabled = true,
 			}
 		});
-		var load_mat = [&](MaterialEnum enum_name, R_Material desc) {
-			R_MaterialId id = r_make_material(desc);
+		var load_mat = [&](MaterialEnum enum_name, Material desc) {
+			MaterialId id = make_material(desc);
 			g.materials_ids[enum_name] = id;
 			String str = push_str_copy(g.arena, materials_strs[enum_name]);
 			map_set(g.str_to_material_id, hash(str), id);
@@ -3075,19 +4536,19 @@ void init_game() {
 			.type = ShaderType::Texture,
 			.batch = default_state,
 			.props = default_material_props(),
-			.base_color = get_texture(Texture_Dummy),
+			.base_color = g.textures_ids[Texture_Dummy],
 		});
 		load_mat(Material_Orange, {
 			.type = ShaderType::Texture,
 			.batch = default_state,
 			.props = default_material_props(),
-			.base_color = get_texture(Texture_Orange),
+			.base_color = g.textures_ids[Texture_Orange],
 		});
 		load_mat(Material_Container, {
 			.type = ShaderType::Texture,
 			.batch = default_state,
 			.props = default_material_props(),
-			.base_color = get_texture(Texture_Container),
+			.base_color = g.textures_ids[Texture_Container],
 		});
 		load_mat(Material_Axis, {
 			.type = ShaderType::VertColor,
@@ -3101,7 +4562,7 @@ void init_game() {
 			.type = ShaderType::Texture,
 			.batch = default_state,
 			.props = default_material_props(),
-			.base_color = get_texture(Texture_Barrack),
+			.base_color = g.textures_ids[Texture_Barrack],
 		});
 	}
 
@@ -3243,9 +4704,9 @@ void update_game() {
 	{
 		f32 line_len = 5;
 		v3 pos = v3(0, 0.1, 0);
-		r_draw_line(pos, line_len * v3_right(), ColorRed);
-		r_draw_line(pos, line_len * v3_up(), ColorGreen);
-		r_draw_line(pos, line_len * v3_forward(), ColorBlue);
+		draw_line(pos, line_len * v3_right(), ColorRed);
+		draw_line(pos, line_len * v3_up(), ColorGreen);
+		draw_line(pos, line_len * v3_forward(), ColorBlue);
 	}
 
 	// Axis aligned at edge of screen
@@ -3258,395 +4719,12 @@ void update_game() {
 		f32 xoff = 0.3f;
 		f32 yoff = 0.3f;
 		v3 pos = g.cam.pos + forward*dist + right*xoff + up*yoff;
-		r_draw_mesh_trs(get_mesh(Mesh_Axis), get_material(Material_Axis), pos, quat_identity(), v3(0.1));
+		draw_mesh_trs(g.meshes_ids[Mesh_Axis], g.materials_ids[Material_Axis], pos, quat_identity(), v3(0.1));
 	}
-	r_draw_mesh(get_mesh(Mesh_Barrack), get_material(Material_Barrack), v3(0,0,-40));
-	r_draw_grid(v3(0), 40, 2, u32_from_rgba(v4(0.8)));
-	r_draw_mesh(get_mesh(Mesh_T), get_material(Material_Container), v3(), DrawCallFlag_Skeleton);
-	// r_draw_mesh(get_mesh(Mesh_T), get_material(Material_Container), v3());
+	draw_mesh(g.meshes_ids[Mesh_Barrack], g.materials_ids[Material_Barrack], v3(0,0,-40));
+	draw_grid(v3(0), 40, 2, u32_from_rgba(v4(0.8)));
+	draw_mesh(g.meshes_ids[Mesh_T], g.materials_ids[Material_Container], v3(), DrawCallFlag_Skeleton);
+	// r_draw_mesh(g.meshes_ids[Mesh_T], g.materials_ids[Material_Container], v3());
 
-	r_draw_rect(rng2_make(v2(100), v2(100)), RED);
+	draw_rect(rng2_make(v2(100), v2(100)), RED);
 }
-
-#define FONT_SIZE 24
-
-String ui_display_string(String full) {
-	u64 idx = str_find_needle(full, S("##"));
-	if(idx < full.size) return {full.str, idx};
-	return full;
-}
-
-String ui_hash_string(String full) {
-	u64 idx = str_find_needle(full, S("###"));
-	if(idx < full.size) return {full.str+idx, full.size-idx};
-	return full;
-}
-
-u64 ui_key_from_string(String str, u64 seed) {
-	String h = ui_hash_string(str);
-	if(h.size == 0) return 0;
-	return hash(h, seed);
-}
-
-f32 ui_text_measure(String text, R_FontId font, f32 font_height) {
-	var f = pool_get(st->r.fonts, font);
-	f32 width = 0;
-	Loop(i, text.size) {
-		u32 advance = f.glyphs[text.str[i]-32].xadvance;
-		width += advance;
-	}
-	f32 scale = font_height / f.font_height;
-	return width * scale;
-}
-
-UI_Size ui_size_px(f32 v) 	{ return {UI_SizeType_Pixels, v}; }
-UI_Size ui_size_text() 				{ return {UI_SizeType_TextContent, 0}; }
-UI_Size ui_size_pct(f32 v) { return {UI_SizeType_PercentOfParent, v}; }
-UI_Size ui_size_children() { return {UI_SizeType_ChildrenSum, 0}; }
-UI_Size ui_size_null()  			{ return {UI_SizeType_Null, 0}; }
-
-void ui_push_parent(UI_Box* box) {
-	var& g = st->ui;
-	array_push(g.parent_stack, box);
-}
-
-void ui_pop_parent() {
-	var& g = st->ui;
-	array_pop(g.parent_stack);
-}
-
-UI_Box* ui_top_parent() {
-	var& g = st->ui;
-	return g.parent_stack.count > 0 ? array_back(g.parent_stack) : null;
-}
-
-void ui_push_font(R_FontId id) {
-	var& g = st->ui;
-	g.style.font = id;
-}
-
-void ui_push_bg_color(v4 color) {
-	var& g = st->ui;
-	array_push(g.bg_color_stack, color);
-}
-
-void ui_pop_bg_color() {
-	var& g = st->ui;
-	array_pop(g.bg_color_stack);
-}
-
-v4 ui_current_bg_color() {
-	var& g = st->ui;
-	return g.bg_color_stack.count > 0 ? array_back(g.bg_color_stack) : g.style.bg_color;
-}
-
-UI_Box* ui_box_make(UI_BoxFlags flags, UI_Size size_x, UI_Size size_y, String string) {
-	var& g = st->ui;
-	UI_Box* parent = ui_top_parent();
-	u64 seed = parent ? parent->key : 0;
-	u64 key = ui_key_from_string(string, seed);
-	UI_Box* box = ui_box_from_key(key);
-	box->first = box->last = box->next = box->prev = null;
-	box->parent = parent;
-	if(parent) dll_push_back(parent->first, parent->last, box);
-	box->flags = flags;
-	box->string = string;
-	box->semantic_size[UI_Axis2_X] = size_x;
-	box->semantic_size[UI_Axis2_Y] = size_y;
-	box->child_layout_axis = UI_Axis2_X;
-	box->background_color = ui_current_bg_color();
-	box->text_color = g.style.text_color;
-	box->border_color = g.style.border_color;
-	box->last_frame_touched = current_frame;
-	return box;
-}
-
-UI_Box* ui_box_from_key(u64 key) {
-	var& g = st->ui;
-	if(key == 0) {
-		UI_Box* b = push_struct(g.frame_arena, UI_Box);
-		*b = {};
-		return b;
-	}
-	var[b, ok] = map_get(g.box_map, key);
-	if(!ok) {
-		b = pool_push(g.boxes, {.key = key});
-		map_set(g.box_map, key, b);
-		u64 d = b - g.boxes.data;
-		if(d < UI_KEY_TABLE_SIZE) {
-			sparse_set_push(g.active_boxes, d);
-		}
-	}
-	Assert(b > g.boxes.data && b <= g.boxes.data+g.boxes.max_idx);
-	return b;
-}
-
-void ui_prune_stale_boxes() {
-	var& g = st->ui;
-	Loop(i, g.active_boxes.count) {
-		u32 idx = g.active_boxes.dense[i];
-		UI_Box* b = &g.boxes.data[idx];
-		if(current_frame - b->last_frame_touched > UI_STALE_FRAMES) {
-			sparse_set_remove(g.active_boxes, idx);
-			pool_remove(g.boxes, b);
-			map_remove(g.box_map, b->key);
-		}
-	}
-}
-
-void ui_init() {
-	var& g = st->ui;
-	g.frame_arena = arena_make();
-	g.style.padding = 8.0f;
-	g.style.gap = 4.0f;
-	g.style.line_height = 18.0f;
-	g.style.text_pad = 6.0f;
-	g.style.bg_color = v4(0.16f, 0.16f, 0.18f, 1.0f);
-	g.style.text_color = v4(0.92f, 0.92f, 0.92f, 1.0f);
-	g.style.border_color = v4(0.30f, 0.30f, 0.33f, 1.0f);
-	g.style.hot_color = v4(0.26f, 0.26f, 0.30f, 1.0f);
-	g.style.active_color = v4(0.35f, 0.45f, 0.75f, 1.0f);
-	g.style.accent_color = v4(0.30f, 0.55f, 0.90f, 1.0f);
-}
-
-void ui_begin_frame() {
-	var& g = st->ui;
-	g.prev_input = g.input;
-	g.input = {
-		.dt = time_dt,
-		.mouse_pos = os_mouse_pos(),
-		.mouse_down[0] = os_mouse_is_button_down(MouseButton_Left),
-		.mouse_down[1] = os_mouse_is_button_down(MouseButton_Right),
-		.mouse_down[2] = os_mouse_is_button_down(MouseButton_Middle),
-	};
-	arena_clear(g.frame_arena);
-	array_clear(g.draw_cmds);
-	g.root = ui_box_make(0, ui_size_px(os_window_width()), ui_size_px(os_window_height()), "###root");
-	g.root->child_layout_axis = UI_Axis2_Y;
-	ui_push_parent(g.root);
-}
-
-void ui_end_frame() {
-	var& g = st->ui;
-	ui_pop_parent();
-	ui_layout_standalone(g.root);
-	ui_layout_upward(g.root);
-	ui_layout_downward(g.root);
-	g.root->rect = Rng2(v2(0, 0), v2(g.root->computed_size[UI_Axis2_X], g.root->computed_size[UI_Axis2_Y]));
-	ui_layout_positions(g.root);
-	ui_build_draw_cmds(g.root);
-	ui_prune_stale_boxes();
-}
-
-void ui_layout_standalone(UI_Box* box) {
-	var& g = st->ui;
-	LoopEnum(axis, UI_Axis2) {
-		UI_Size sz = box->semantic_size[axis];
-		if(sz.type == UI_SizeType_Pixels) {
-			box->computed_size[axis] = sz.value;
-		} else if(sz.type == UI_SizeType_TextContent) {
-			if(axis == UI_Axis2_X)
-				box->computed_size[axis] = ui_text_measure(ui_display_string(box->string), g.style.font, FONT_SIZE) + 2.0f * g.style.text_pad;
-			else
-				box->computed_size[axis] = g.style.line_height + 2.0f * g.style.text_pad;
-		}
-	}
-	LoopNode(it, box->first) {
-		ui_layout_standalone(it);
-	}
-}
-
-void ui_layout_upward(UI_Box* box) {
-	LoopEnum(axis, UI_Axis2) {
-		UI_Size sz = box->semantic_size[axis];
-		if(sz.type == UI_SizeType_PercentOfParent) {
-			f32 parent_size = box->parent ? box->parent->computed_size[axis] : box->computed_size[axis];
-			box->computed_size[axis] = parent_size * sz.value;
-		}
-	}
-	LoopNode(it, box->first) {
-		ui_layout_upward(it);
-	}
-}
-
-void ui_layout_downward(UI_Box* box) {
-	var& g = st->ui;
-	LoopNode(it, box->first) {
-		ui_layout_downward(it);
-	}
-	LoopEnum(axis, UI_Axis2) {
-		UI_Size sz = box->semantic_size[axis];
-		if(sz.type == UI_SizeType_ChildrenSum) {
-			f32 sum = 0, mx = 0;
-			u32 n = 0;
-			LoopNode(it, box->first) {
-				if(it->semantic_size[axis].type == UI_SizeType_PercentOfParent) continue;
-				sum += it->computed_size[axis];
-				mx = Max(mx, it->computed_size[axis]);
-				n++;
-			}
-			if(axis == box->child_layout_axis) {
-				f32 gaps = n > 1 ? (f32)(n - 1) * g.style.gap : 0;
-				box->computed_size[axis] = sum + gaps + 2.0f * g.style.padding;
-			} else {
-				box->computed_size[axis] = mx + 2.0f * g.style.padding;
-			}
-		}
-	}
-}
-
-void ui_layout_positions(UI_Box* box) {
-	var& g = st->ui;
-	f32 pad = g.style.padding;
-	f32 gap = g.style.gap;
-	f32 cursor = pad;
-	LoopNode(it, box->first) {
-		f32 main = cursor;
-		f32 cross = pad;
-		if(box->child_layout_axis == UI_Axis2_X) {
-			it->rect.x0 = box->rect.x0 + main;
-			it->rect.y0 = box->rect.y0 + cross;
-		} else {
-			it->rect.x0 = box->rect.x0 + cross;
-			it->rect.y0 = box->rect.y0 + main;
-		}
-		it->rect.x1 = it->rect.x0 + it->computed_size[UI_Axis2_X];
-		it->rect.y1 = it->rect.y0 + it->computed_size[UI_Axis2_Y];
-		cursor += it->computed_size[box->child_layout_axis] + gap;
-		ui_layout_positions(it);
-	}
-}
-
-void ui_build_draw_cmds(UI_Box* box) {
-	var& g = st->ui;
-	if(box->flags & UI_BoxFlag_DrawBackground) {
-		v4 color = box->background_color;
-		if((box->flags & UI_BoxFlag_ActiveAnimation) && box->active_t > 0.001f)
-			color = v3_to_v4(v3_lerp(color.xyz, box->active_t, g.style.active_color.xyz), 1);
-		else if((box->flags & UI_BoxFlag_HotAnimation) && box->hot_t > 0.001f)
-			color = v3_to_v4(v3_lerp(color.xyz, box->hot_t, g.style.hot_color.xyz), 1);
-		array_push(g.draw_cmds, {UI_DrawCmdType_Rect, box->rect, color, true});
-		r_draw_rect(box->rect, u32_from_rgba(color), 0,0,0);
-	}
-	if(box->flags & UI_BoxFlag_DrawBorder) {
-		array_push(g.draw_cmds, {UI_DrawCmdType_Rect, box->rect, box->border_color});
-		r_draw_rect(box->rect, u32_from_rgba(box->border_color), 0,4,0);
-	}
-	if(box->flags & UI_BoxFlag_DrawText) {
-		array_push(g.draw_cmds, {UI_DrawCmdType_Text, box->rect, box->text_color, false, ui_display_string(box->string)});
-		r_draw_text_ext(g.style.font, v2(box->rect.x0, box->rect.y1), box->string, u32_from_rgba(box->text_color), FONT_SIZE);
-	}
-	LoopNode(it, box->first)
-		ui_build_draw_cmds(it);
-}
-
-UI_Signal ui_signal_from_box(UI_Box* box) {
-	var& g = st->ui;
-	UI_Signal sig = {};
-	sig.box = box;
-
-	if(!(box->flags & UI_BoxFlag_Clickable)) return sig;
-
-	/* Hit test against LAST FRAME's rect -- this frame's layout for
-	 * `box` hasn't run yet. This is the one-frame lag mentioned up top. */
-	b32 hovering = rng2_contains(box->rect, g.input.mouse_pos);
-	b32 mouse_down_now = g.input.mouse_down[0];
-	b32 mouse_down_prev = g.prev_input.mouse_down[0];
-	b32 mouse_pressed_edge = mouse_down_now && !mouse_down_prev;
-	b32 mouse_released_edge = !mouse_down_now && mouse_down_prev;
-
-	sig.hovering = hovering;
-
-	if(hovering)
-		g.hot_key = box->key;
-	else if(g.hot_key == box->key)
-		g.hot_key = 0;
-
-	if(hovering && mouse_pressed_edge) {
-		g.active_key = box->key;
-		sig.pressed = true;
-	}
-
-	b32 is_active = (g.active_key == box->key);
-	if(is_active && mouse_down_now) {
-		sig.dragging = true;
-		sig.drag_delta = g.input.mouse_pos - g.prev_input.mouse_pos;
-	}
-	if(is_active && mouse_released_edge) {
-		sig.released = true;
-		sig.clicked = hovering; /* only counts as a click if released back over the box */
-		g.active_key = 0;
-	}
-
-	f32 hot_target = (g.hot_key == box->key) ? 1.0f : 0.0f;
-	f32 active_target = (g.active_key == box->key) ? 1.0f : 0.0f;
-	box->hot_t = exp_decay(box->hot_t, hot_target, 10.0f, g.input.dt);
-	box->active_t = exp_decay(box->active_t, active_target, 15.0f, g.input.dt);
-
-	return sig;
-}
-
-UI_Signal ui_label(String string) {
-	UI_Box* box = ui_box_make(UI_BoxFlag_DrawText, ui_size_text(), ui_size_text(), string);
-	return ui_signal_from_box(box); /* not clickable -- returns an all-false signal */
-}
-
-UI_Signal ui_button(String string) {
-	UI_Box* box = ui_box_make(
-		UI_BoxFlag_Clickable | UI_BoxFlag_DrawBorder | UI_BoxFlag_DrawBackground |
-		UI_BoxFlag_DrawText | UI_BoxFlag_HotAnimation | UI_BoxFlag_ActiveAnimation,
-		ui_size_text(), ui_size_text(), string);
-	return ui_signal_from_box(box);
-}
-
-b32 ui_checkbox(String string, b32* value) {
-	var& g = st->ui;
-	UI_Box* box = ui_box_make(
-		UI_BoxFlag_Clickable | UI_BoxFlag_DrawBorder | UI_BoxFlag_DrawBackground |
-		UI_BoxFlag_HotAnimation | UI_BoxFlag_ActiveAnimation,
-		ui_size_px(20), ui_size_px(20), string);
-	UI_Signal sig = ui_signal_from_box(box);
-	if(sig.clicked) *value = !*value;
-	if(*value) box->background_color = g.style.accent_color;
-	return *value;
-}
-
-f32 ui_slider(String string, f32* value, f32 min, f32 max) {
-	var& g = st->ui;
-	UI_Box* track = ui_box_make(
-		UI_BoxFlag_Clickable | UI_BoxFlag_DrawBorder | UI_BoxFlag_DrawBackground |
-		UI_BoxFlag_HotAnimation | UI_BoxFlag_ActiveAnimation,
-		ui_size_pct(1.0f), ui_size_px(20), string);
-	UI_Signal sig = ui_signal_from_box(track);
-	if(sig.dragging || sig.pressed) {
-		f32 w = rng2_width(track->rect);
-		f32 t = w > 0.0f ? (g.input.mouse_pos.x - track->rect.x0) / w : 0.0f;
-		t = Clamp01(t);
-		*value = min + t * (max - min);
-	}
-	return *value;
-}
-
-void ui_spacer(UI_Size size_along_parent_axis) {
-	UI_Box* parent = ui_top_parent();
-	UI_Axis2 axis = parent ? parent->child_layout_axis : UI_Axis2_X;
-	UI_Size sizes[2] = {ui_size_px(0), ui_size_px(0)};
-	sizes[axis] = size_along_parent_axis;
-	ui_box_make(0, sizes[UI_Axis2_X], sizes[UI_Axis2_Y], {});
-}
-
-UI_Box* ui_panel_begin_sized(String string, UI_Axis2 child_layout_axis, UI_Size size_x, UI_Size size_y) {
-	UI_Box* box = ui_box_make(
-		UI_BoxFlag_DrawBackground | UI_BoxFlag_DrawBorder,
-		size_x, size_y, string);
-	box->child_layout_axis = child_layout_axis;
-	ui_push_parent(box);
-	return box;
-}
-
-UI_Box* ui_panel_begin(String string, UI_Axis2 child_layout_axis) {
-	return ui_panel_begin_sized(string, child_layout_axis, ui_size_children(), ui_size_children());
-}
-void ui_panel_end() { ui_pop_parent(); }
-
-

@@ -1,4 +1,5 @@
-#include "lib.slang"
+// #include "lib.slang"
+#include "com.slang"
 
 VS_Entry UI_VSOutput vs_main(u32 vert_id : SV_VertexID, u32 inst_id : SV_InstanceID) {
 	UI_Rect in = ui_rects[inst_id];
@@ -16,6 +17,8 @@ VS_Entry UI_VSOutput vs_main(u32 vert_id : SV_VertexID, u32 inst_id : SV_Instanc
 	v2 src_half_size = (in.src_p1 - in.src_p0) / 2;
 	v2 src_center = (in.src_p1 + in.src_p0) / 2;
 	v2 src_pos = vertices[vert_id] * src_half_size + src_center;
+
+	// lerp(0.1,2,3);
 
 	UI_VSOutput o;
 	o.vert = v4(2 * dst_pos.x / st.res.x - 1, 2 * dst_pos.y / st.res.y - 1, 0, 1);
@@ -62,7 +65,7 @@ FS_Entry v4 fs_main(UI_VSOutput in) {
 	if(in.border_thickness != 0) {
 		v2 interior_half_size = in.dst_half_size - v2(in.border_thickness);
 		f32 interior_radius_reduce_f = min(interior_half_size.x/in.dst_half_size.x, interior_half_size.y/in.dst_half_size.y);
-		f32 interior_corner_radius = in.corner_radius * Square(interior_radius_reduce_f);
+		f32 interior_corner_radius = in.corner_radius * square(interior_radius_reduce_f);
 		f32 inside_d = rounded_rect_sdf(in.dst_pos, in.dst_center, interior_half_size-softness_padding, interior_corner_radius);
 		f32 inside_f = smoothstep(0, 2*softness, inside_d);
 		border_factor = inside_f;

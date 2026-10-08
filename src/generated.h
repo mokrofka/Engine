@@ -4,6 +4,7 @@ enum {
 	MetaType_ThingFlags,
 	MetaType_R_MeshId,
 	MetaType_R_MaterialId,
+	MetaType_Color,
 };
 MemberDefinition members_of_Camera[] = {
 	{MetaType_v3, "pos", OffsetOf(Camera,pos)},
@@ -31,7 +32,7 @@ MemberDefinition members_of_Thing[] = {
 	{MetaType_v3, "vel", OffsetOf(Thing,vel)},
 	{MetaType_R_MeshId, "mesh", OffsetOf(Thing,mesh)},
 	{MetaType_R_MaterialId, "mat", OffsetOf(Thing,mat)},
-	{MetaType_u32, "color", OffsetOf(Thing,color)},
+	{MetaType_Color, "color", OffsetOf(Thing,color)},
 	{MetaType_f32, "elapsed", OffsetOf(Thing,elapsed)},
 	{MetaType_u8, "buf0", OffsetOf(Thing,buf0)},
 	{MetaType_f32, "modify0", OffsetOf(Thing,modify0)},

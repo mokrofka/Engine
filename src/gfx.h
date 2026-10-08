@@ -1,5 +1,5 @@
 #pragma once
-#include "types.h"
+#include "base/base.h"
 
 MakeId(Gfx_Image);
 MakeId(Gfx_Sampler);
@@ -343,9 +343,7 @@ struct Gfx_PipelineDesc2 {
 	Gfx_Shader shader;
 	Gfx_PixelFormat pixel_format;
 	Gfx_PixelFormat depth_pixel_format;
-	u32 sample_count;
 	v4 blend_color;
-	b32 alpha_to_coverage_enabled;
 };
 
 struct Gfx_PipelineState {
@@ -354,6 +352,7 @@ struct Gfx_PipelineState {
 	Gfx_PrimitiveType primitive_type;
 	Gfx_CullMode cull_mode;
 	Gfx_FaceWinding face_winding;
+	u32 sample_count;
 };
 
 enum Gfx_MemType {
@@ -857,6 +856,9 @@ struct Gfx_State {
 		X(CmdSetStencilWriteMask) \
 		X(CmdSetPrimitiveTopology) \
 		X(CmdSetPolygonModeEXT) \
+		X(CmdSetRasterizationSamplesEXT) \
+		X(CmdSetSampleMaskEXT) \
+		X(CmdSetAlphaToCoverageEnableEXT) \
 		X(CmdBeginRendering) \
 		X(CmdEndRendering) \
 		X(CmdClearColorImage) \
@@ -890,8 +892,7 @@ struct Gfx_State {
 u32 gfx_pixelformat_bytesize(Gfx_PixelFormat fmt);
 
 Gfx_Shader gfx_make_shader(Slice<u8> shd);
-Gfx_Pipeline gfx_make_pipeline(Gfx_PipelineDesc desc);
-Gfx_Pipeline gfx_make_pipeline2(Gfx_PipelineDesc2 desc);
+Gfx_Pipeline gfx_make_pipeline(Gfx_PipelineDesc2 desc);
 Gfx_Image gfx_make_image(Gfx_ImageDesc desc);
 Gfx_View gfx_make_view(Gfx_ViewDesc desc);
 Gfx_Sampler gfx_make_sampler(Gfx_SamplerDesc desc);
@@ -903,8 +904,7 @@ Gfx_PipelineDesc2 gfx_query_pipeline_desc2(Gfx_Pipeline pip);
 Gfx_ImageDesc gfx_query_image_desc(Gfx_Image img);
 
 void gfx_update_shader(Gfx_Shader shd, Slice<u8> code);
-void gfx_update_pipeline(Gfx_Pipeline pip, Gfx_PipelineDesc desc);
-void gfx_update_pipeline2(Gfx_Pipeline pip, Gfx_PipelineDesc2 desc);
+void gfx_update_pipeline(Gfx_Pipeline pip, Gfx_PipelineDesc2 desc);
 void gfx_update_image(Gfx_Image img, u8* data);
 void gfx_update_image(Gfx_Image img, Gfx_ImageDesc desc);
 void gfx_update_view(Gfx_View view, Gfx_ViewDesc desc);
@@ -926,6 +926,9 @@ void gfx_apply_depth_compare(Gfx_CompareOp op);
 void gfx_apply_color_blend_enable(b32 enable);
 void gfx_apply_color_blend_equation(Gfx_BlendState bs);
 void gfx_apply_color_blend_mask(Gfx_BlendState bs);
+void gfx_apply_sample(u32 sample_count);
+void gfx_apply_sample_mask(u32 sample_count, u32 mask);
+void gfx_apply_alpha_to_coverage(b32 enable);
 
 void gfx_draw(u32 base_vert, u32 vert_count, u32 instance_count = 1, u32 base_instance = 0);
 void gfx_draw_indexed(u32 base_index, u32 index_count, u32 base_vert, u32 instance_count = 1, u32 base_instance = 0);

@@ -1,17 +1,14 @@
 #pragma once
-#include "lib.h"
-#include "types.h"
+#include "base/base.h"
 #include "gfx.h"
-#include "render.h"
 #include "meta.h"
 
 #define STBI_NO_STDIO
-#include "stb_image.h"
-#include "stb_truetype.h"
+#include "../vendor/stb_image.h"
+#include "../vendor/stb_truetype.h"
 
 // TODO:
 // UI
-// thread graph visualisation
 // make wayland backend work
 // console
 // thread safe allocator
@@ -19,7 +16,365 @@
 // obj mouse selection
 // load mesh, animations, textures
 
+#define CONST const
+#include "shader_header.h"
+
+#define IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+#define IM_VEC2_CLASS_EXTRA                        \
+	constexpr ImVec2(const v2& f) : x(f.x), y(f.y) {} \
+	operator v2() const { return v2(x, y); }
+#include "../vendor/imgui/imgui.h"
+
+#define ImGuiWindow(str, ...) 						DeferLoop(ImGui::Begin(str, null, ##__VA_ARGS__), ImGui::End()) if (_i_)
+#define ImGuiPushID(id) 												DeferLoop(ImGui::PushID(id), ImGui::PopID())
+#define ImGuiPushFont(font, size) 		DeferLoop(ImGui::PushFont(font, size), ImGui::PopFont())
+#define ImGuiTreeNode(str)										DeferLoopIf(ImGui::TreeNode(str), ImGui::TreePop())
+#define ImGuiBeginToolTip()									DeferLoop(ImGui::BeginTooltip(), ImGui::EndTooltip())
+#define ImGuiBeginTabBar(str)							DeferLoopIf(ImGui::BeginTabBar(str), ImGui::EndTabBar())
+#define ImGuiBeginTabItem(str, ...)	DeferLoopIf(ImGui::BeginTabItem(str, null, ##__VA_ARGS__), ImGui::EndTabItem())
+#define ImGuiPushClipRect(rect)   		DeferLoop(ImGui::PushClipRect(rect.min, rect.max, true), ImGui::PopClipRect())
+struct _ImGuiPushClipRect {
+	_ImGuiPushClipRect(Rng2 rect) {ImGui::PushClipRect(rect.min,rect.max, true);}
+	~_ImGuiPushClipRect() 								{ImGui::PopClipRect();}
+};
+#define ImGuiPushClipRect2(rect) _ImGuiPushClipRect Glue(_Clip, __LINE__)(rect)
+
+MakeId(OpaqueId);
+MakeId(ThingId);
+struct TextureId {u32 idx;};
+struct MeshId {u32 idx;};
+struct MaterialId {u32 idx;};
+struct FontId {u32 idx;};
+
+const u32 MaxEntities = KB(1);
+const u32 MaxMaterials  = 32;
+const u32 MaxLights     = 32;
+const u32 MaxMeshes     = 32;
+const u32 MaxTextures   = 32;
+const u32 MaxCubemaps   = 32;
+const u32 MaxFonts      = 32;
+const u32 MaxDebugLines = KB(1);
+const u32 MaxSkinMatrices = 128;
+const u32 MaxBones = 128;
+const u32 MaxRuntimeBones = 128;
+
+#define ColorWhite        Color{ 255, 255, 255, 255 }
+#define ColorBlack        Color{   0,   0,   0, 255 }
+#define ColorGrey         Color{ 128, 128, 128, 255 }
+#define ColorGreyDark     Color{  64,  64,  64, 255 }
+#define ColorGreyLight    Color{ 191, 191, 191, 255 }
+#define ColorGrey0        Color{  38,  38,  38, 255 }
+#define ColorGrey1        Color{  89,  89,  89, 255 }
+#define ColorGrey2        Color{ 153, 153, 153, 255 }
+#define ColorGrey3        Color{ 217, 217, 217, 255 }
+
+#define ColorRed          Color{ 227,  84,  59, 255 }
+#define ColorOrange       Color{ 242, 166,  77, 255 }
+#define ColorYellow       Color{ 230, 209,  89, 255 }
+#define ColorGreen        Color{  36, 204,   3, 255 }
+#define ColorCyan         Color{  89, 199, 209, 255 }
+#define ColorBlue         Color{  97, 166, 242, 255 }
+#define ColorPurple       Color{ 184, 140, 235, 255 }
+#define ColorPink         Color{ 230, 115, 166, 255 }
+
+#define ColorRedUi        Color{  77,  38,  38, 255 }
+#define ColorRedUiBright  Color{ 105,  48,  54, 255 }
+#define ColorGreenUi      Color{  77, 102,  51, 255 }
+#define ColorBlueUi       Color{  38,  77, 128, 255 }
+#define ColorOrangeUi     Color{ 102,  71,  38, 255 }
+#define ColorYellowUi     Color{ 102, 110,  51, 255 }
+#define ColorCyanUi       Color{  38, 102,  92, 255 }
+#define ColorPurpleUi     Color{  82,  48, 105, 255 }
+
+#define ColorBounds       Color{  97, 166, 242, 255 }
+#define ColorSelection    Color{ 242, 166,  77, 255 }
+#define ColorCollision    Color{ 219,  84,  84, 255 }
+
+// Raylib col
+#define LIGHTGRAY  Color{ 200, 200, 200, 255 }   // Light Gray
+#define GRAY       Color{ 130, 130, 130, 255 }   // Gray
+#define DARKGRAY   Color{ 80, 80, 80, 255 }      // Dark Gray
+#define YELLOW     Color{ 253, 249, 0, 255 }     // Yellow
+#define GOLD       Color{ 255, 203, 0, 255 }     // Gold
+#define ORANGE     Color{ 255, 161, 0, 255 }     // Orange
+#define PINK       Color{ 255, 109, 194, 255 }   // Pink
+#define RED        Color{ 230, 41, 55, 255 }     // Red
+#define MAROON     Color{ 190, 33, 55, 255 }     // Maroon
+#define GREEN      Color{ 0, 228, 48, 255 }      // Green
+#define LIME       Color{ 0, 158, 47, 255 }      // Lime
+#define DARKGREEN  Color{ 0, 117, 44, 255 }      // Dark Green
+#define SKYBLUE    Color{ 102, 191, 255, 255 }   // Sky Blue
+#define BLUE       Color{ 0, 121, 241, 255 }     // Blue
+#define DARKBLUE   Color{ 0, 82, 172, 255 }      // Dark Blue
+#define PURPLE     Color{ 200, 122, 255, 255 }   // Purple
+#define VIOLET     Color{ 135, 60, 190, 255 }    // Violet
+#define DARKPURPLE Color{ 112, 31, 126, 255 }    // Dark Purple
+#define BEIGE      Color{ 211, 176, 131, 255 }   // Beige
+#define BROWN      Color{ 127, 106, 79, 255 }    // Brown
+#define DARKBROWN  Color{ 76, 63, 47, 255 }      // Dark Brown
+
+#define WHITE      Color{ 255, 255, 255, 255 }   // White
+#define BLACK      Color{ 0, 0, 0, 255 }         // Black
+#define BLANK      Color{ 0, 0, 0, 0 }           // Blank (Transparent)
+#define MAGENTA    Color{ 255, 0, 255, 255 }     // Magenta
+#define RAYWHITE   Color{ 245, 245, 245, 255 }   // My own White (raylib logo)
+
+enum LightType {
+	LightType_Point,
+	LightType_Dir,
+	LightType_Spot,
+};
+
+struct Light {
+	LightType type;
+	v3 pos;
+	v3 dir;
+	v3 color;
+	f32 intensity;
+	f32 radius;
+	f32 cone_angle;
+	b32 cast_shadow;
+};
+
+struct Timer {
+	f32 interval;
+	f32 acc;
+};
+
+union Color {
+	u32 v;
+	struct {
+		u8 r;
+		u8 g;
+		u8 b;
+		u8 a;
+	};
+	Color() = default;
+	Color(u32 col) : v(col) {}
+	Color(u8 r, u8 g, u8 b, u8 a):r(r),g(g),b(b),a(a) {}
+};
+
+enum AnimPath {
+	AnimPath_Pos,
+	AnimPath_Rot,
+	AnimPath_Scale,
+};
+
+struct Sampler {
+	f32* times;
+	void* values;
+	u32 count;
+	u32 interpolation_type;
+};
+
+struct Channel {
+	u32 bone;
+	u32 sampler;
+	AnimPath path;
+};
+
+struct Animation {
+	Slice<Sampler> samplers;
+	Slice<Channel> channels;
+	f32 duration;
+};
+
+struct Bone {
+	u32 parent;
+	Transform local;
+};
+
+struct Pose {
+	Slice<Bone> bones;
+};
+
+struct UI_Rect {
+	v2 dst_p0;
+	v2 dst_p1;
+	v2 src_p0;
+	v2 src_p1;
+	v2 tex_size;
+	Color colors[4];
+	u32 texture;
+	u32 flags;
+	f32 corner_radius;
+	f32 edge_softness;
+	f32 border_thickness;
+};
+
+struct Image {
+	u32 width;
+	u32 height;
+	u8* data;
+	Gfx_PixelFormat format;
+};
+
+struct TextureDesc {
+	String name;
+	u32 width;
+	u32 height;
+	union {
+		u8* data;
+		u8* cube[6];
+	};
+	Gfx_PixelFormat pixel_format;
+	b32 is_cube;
+};
+
+struct Texture {
+	Gfx_Image image;
+	Gfx_View view;
+	b32 is_ready;
+	ImTextureID imgui_id;
+	b32 imgui_is_ready;
+};
+
+// struct Bone {
+//     i32 parent;
+//     Transform local;
+//     Mat4 inverse_bind;
+//     Mat4 global;
+// };
+// for (i32 i = 0; i < bone_count; i++) {
+//     if (bones[i].parent >= 0)
+//         bones[i].global =
+//             bones[bones[i].parent].global *
+//             to_mat4(bones[i].local);
+//     else
+//         bones[i].global = to_mat4(bones[i].local);
+
+//     skin_matrices[i] =
+//         bones[i].global *
+//         bones[i].inverse_bind;
+// }
+
+struct MeshDesc {
+	String name;
+	Slice<R_Vertex> vertices;
+	Slice<u16> indices;
+	f32 bounds_min;
+	f32 bounds_max;
+	f32 bounds_rad;
+};
+
+struct MaterialProps {
+	v3 ambient;
+	v3 diffuse;
+	v3 specular;
+	f32 shininess;
+};
+
+struct Material {
+	ShaderType type;
+	u32 batch;
+	MaterialProps props;
+	TextureId base_color;
+	u32 idx;
+};
+
+struct Gradient {
+	u32 color0;
+	u32 color1;
+	u32 color2;
+	u32 color3;
+};
+
+struct Glyph {
+	Rng2u rect;
+	f32 xoff, yoff, xadvance;
+};
+
+struct FontDesc {
+	String name;
+	u32 font_height;
+	u8* data;
+};
+
+struct Font {
+	u32 font_height;
+	TextureId texture;
+	Glyph glyphs[96];
+};
+
+struct DrawCall {
+	v3 pos;
+	v4 rot;
+	v3 scale;
+	Color color;
+	MeshId mesh;
+	MaterialId mat;
+	ShaderType type;
+	u32 flags;
+};
+
+struct DrawBatch {
+	Gfx_PipelineState state;
+	DArray<DrawCall> draws;
+	DArray<DrawCall> unindexed_draws;
+};
+
+struct ShaderModuleWithPipelines {
+	Gfx_Shader shd;
+	Array<Gfx_Pipeline, 4> pipelines;
+};
+
+enum AttachmentType {
+	R_AttachmentType_Default,
+	R_AttachmentType_Color,
+	R_AttachmentType_Resolve,
+	R_AttachmentType_Depth,
+};
+
+struct Attachment {
+	AttachmentType type;
+	Gfx_Image images[Gfx_MaxImagesInFlight];
+	Gfx_View views[Gfx_MaxImagesInFlight];
+};
+
+struct AttachmentDesc {
+	AttachmentType type;
+	v2u size;
+};
+
+typedef u32 RenderTargetUsage;
+enum {
+	R_RenderTargetUsage_Default,
+	R_RenderTargetUsage_Color = 1<<0,
+	R_RenderTargetUsage_Resolve = 1<<1,
+	R_RenderTargetUsage_Depth = 1<<2,
+};
+
+struct RenderTarget {
+	RenderTargetUsage attachments;
+	Attachment color;
+	Attachment resolve;
+	Attachment depth;
+};
+
+enum PushToGpuType {
+	R_PushToGpuType_Texture,
+	R_PushToGpuType_Mesh,
+};
+
+struct PuhsToGpu {
+	PushToGpuType type;
+	TextureId texture_id;
+	MeshId mesh_id;
+	u32 stage_off;
+	Gfx_ImageDesc image_desc;
+	Gfx_ViewDesc view_desc;
+	Gfx_Mesh mesh;
+	Texture texture;
+	u32 counter;
+};
+
+struct WaitingFont {
+	FontId id;
+	Font font;
+};
+
 #define MESH_LIST \
+	X(Dummy) \
 	X(Cube) \
 	X(MonkeyGlb) \
 	X(Triangle) \
@@ -34,6 +389,7 @@
 
 #define TEXTURE_LIST \
 	X(Dummy) \
+	X(DummyCubeMap) \
 	X(Orange) \
 	X(Container) \
 	X(Barrack) \
@@ -66,6 +422,11 @@ enum MaterialEnum {
 	MATERIAL_LIST
 #undef X
 	Material_COUNT,
+};
+
+enum FontEnum {
+	Font_Dummy,
+	Font_COUNT,
 };
 
 struct MemberDefinition {
@@ -203,8 +564,8 @@ struct ThingDesc {
 	v3 vel;
 	Color color;
 	Rng3 aabb;
-	R_MeshId mesh_id;
-	R_MaterialId mat_id;
+	MeshId mesh_id;
+	MaterialId mat_id;
 };
 
 typedef u32 ThingFlags;
@@ -236,8 +597,8 @@ Introspect struct Thing {
 	v3 scale;
 	Rng3 aabb;
 	v3 vel;
-	R_MeshId mesh;
-	R_MaterialId mat;
+	MeshId mesh;
+	MaterialId mat;
 	Color color;
 	f32 elapsed;
 	u8 buf0[64];
@@ -259,127 +620,6 @@ enum {
 	ThingState_Poisoned = 1<<2,
 };
 
-enum UI_SizeType {
-	UI_SizeType_Null,
-	UI_SizeType_Pixels,
-	UI_SizeType_TextContent,
-	UI_SizeType_PercentOfParent,
-	UI_SizeType_ChildrenSum,
-};
-
-struct UI_Size {
-	UI_SizeType type;
-	f32 value;
-	// f32 strictness;
-};
-
-enum UI_Axis2 {
-	UI_Axis2_X,
-	UI_Axis2_Y,
-	UI_Axis2_COUNT,
-};
-
-typedef u32 UI_BoxFlags;
-enum {
-	UI_BoxFlag_Clickable 						= 1<<1,
-	UI_BoxFlag_DrawText 							= 1<<2,
-	UI_BoxFlag_DrawBorder 					= 1<<2,
-	UI_BoxFlag_DrawBackground 	= 1<<3,
-	UI_BoxFlag_HotAnimation 			= 1<<4,
-	UI_BoxFlag_ActiveAnimation = 1<<5,
-};
-
-struct UI_Box {
-	UI_Box *first, *last, *next, *prev, *parent;
-
-	u64 key;
-	u64 last_frame_touched;
-
-	UI_BoxFlags flags;
-	String string;
-	UI_Size semantic_size[UI_Axis2_COUNT];
-	UI_Axis2 child_layout_axis;
-	v4 background_color;
-	v4 text_color;
-	v4 border_color;
-
-	f32 computed_size[UI_Axis2_COUNT];
-	f32 computed_rel_position[UI_Axis2_COUNT];
-	Rng2 rect;
-
-	f32 hot_t;
-	f32 active_t;
-};
-
-struct UI_Signal {
-	UI_Box* box;
-	b32 hovering;
-	b32 pressed;
-	b32 released;
-	b32 clicked;
-	b32 dragging;
-	v2 drag_delta;
-};
-
-struct UI_Input {
-	v2 mouse_pos;
-	b32 mouse_down[3];
-	f32 dt;
-};
-
-enum UI_DrawCmdType {
-	UI_DrawCmdType_Rect,
-	UI_DrawCmdType_Text
-};
-
-struct UI_DrawCmd {
-	UI_DrawCmdType kind;
-	Rng2 rect;
-	v4 color;
-	b32 filled;
-	String text;
-};
-
-struct UI_Style {
-	R_FontId font;
-	f32 padding;
-	f32 gap;
-	f32 line_height;
-	f32 text_pad;
-	v4 bg_color;
-	v4 text_color;
-	v4 border_color;
-	v4 hot_color;
-	v4 active_color;
-	v4 accent_color;
-};
-
-#define UI_MAX_PARENT_STACK 64
-#define UI_MAX_COLOR_STACK 64
-#define UI_KEY_TABLE_SIZE 32
-#define UI_STALE_FRAMES 2
-
-struct UI_State {
-	Arena frame_arena;
-
-	Map<UI_Box*, UI_KEY_TABLE_SIZE> box_map;
-	PoolPtr<UI_Box, UI_KEY_TABLE_SIZE> boxes;
-	SparseSet<UI_KEY_TABLE_SIZE> active_boxes;
-	UI_Box* root;
-
-	Array<UI_Box*, UI_MAX_PARENT_STACK> parent_stack;
-	Array<v4, UI_MAX_COLOR_STACK> bg_color_stack;
-
-	u64 hot_key;
-	u64 active_key;
-
-	UI_Input input;
-	UI_Input prev_input;
-
-	Array<UI_DrawCmd, KB(4)> draw_cmds;
-	UI_Style style;
-};
-
 #define THING_LIST \
 	X(Thing_Cube0) \
 	X(Thing_Cube1) \
@@ -394,11 +634,23 @@ enum ThingEnum {
 };
 
 struct GltfInfo {
-	R_MeshDesc mesh;
+	MeshDesc mesh;
 	Slice<Bone> bones;
 	Slice<m4x4> inv_matrices;
 	Animation animation;
 };
+
+struct ThingIter {
+	Thing* data;
+	u32 count;
+	u32* dense;
+	u8* gens;
+	u32 idx;
+	ThingId id;
+};
+
+b32 iter_next(ThingIter& it);
+ThingIter things_begin();
 
 struct GlobalState {
 	Arena arena;
@@ -410,33 +662,30 @@ struct GlobalState {
 	v4 ambient_color;
 	u32 fps;
 
-	R_State r;
 	Gfx_State gfx;
-	UI_State ui;
 
-	R_MeshId meshes_ids[Mesh_COUNT];
-	R_TextureId textures_ids[Texture_COUNT];
-	R_MaterialId materials_ids[Material_COUNT];
-	R_FontId font;
-	ImTextureID imgui_dummy;
+	MeshId meshes_ids[Mesh_COUNT];
+	TextureId textures_ids[Texture_COUNT];
+	MaterialId materials_ids[Material_COUNT];
+	FontId fonts_ids[Font_COUNT];
 
 	String asset_dir;
 	String shader_dir;
 	String shader_compiled_dir;
 	String models_dir;
 	String textures_dir;
-	Map<R_TextureId, R_MaxTextures> str_to_texture_id;
-	Map<R_MeshId, R_MaxMeshes> str_to_mesh_id;
-	Map<R_MaterialId, R_MaxMaterials> str_to_material_id;
-	Array<String, R_MaxTextures> texture_id_to_str;
-	Array<String, R_MaxMeshes> mesh_id_to_str;
-	Array<String, R_MaxMaterials> material_id_to_str;
+	Map<TextureId, MaxTextures> str_to_texture_id;
+	Map<MeshId, MaxMeshes> str_to_mesh_id;
+	Map<MaterialId, MaxMaterials> str_to_material_id;
+	Array<String, MaxTextures> texture_id_to_str;
+	Array<String, MaxMeshes> mesh_id_to_str;
+	Array<String, MaxMaterials> material_id_to_str;
 
 	Slice<OS_Handle> shader_module_compilation_pids;
 	Slice<String> shaders_to_compile;
 
-	Array<WatchFile, 32> watches;
-	Array<WatchDirectory, 32> watch_directories;
+	Array<WatchFile, 8> watches;
+	Array<WatchDirectory, 8> watch_directories;
 
 	struct {
 		DebugWindow win;
@@ -453,11 +702,134 @@ struct GlobalState {
 	Camera cam;
 	b32 fps_camera;
 
-	u32 entities_count;
-	PoolIterative<Thing, MaxEntities, ThingId> things;
+	Pool<Thing, MaxEntities, ThingId> things;
+	SparseSetIdx<MaxEntities> things_set;
+
+	f32 scale;
+	f32 old_scale;
+	
+	Map<ShaderModuleWithPipelines, Gfx_MaxShaders> shader_to_module;
+	Array<Material, MaxMaterials> materials;
+	Array<DrawBatch, 8> batches;
+	Array<Bone, MaxBones> bones;
+	Array<m4x4, MaxSkinMatrices> inv_matrices;
+	Array<m4x4, MaxSkinMatrices> global_matrices;
+	Array<m4x4, MaxSkinMatrices> skin_matrices;
+	Array<Bone, MaxRuntimeBones> runtime_bones;
+	Animation anim;
+
+	Array<Gfx_Mesh, MaxMeshes> meshes;
+	Array<Texture, MaxTextures> textures;
+	Array<Font, MaxFonts> fonts;
+
+	Gfx_Pipeline uber_pip;
+	Gfx_Pipeline ui_rect_pip;
+	Gfx_Pipeline cur_pip;
+	Gfx_Pipeline prev_pip;
+	Gfx_PipelineState prev_pip_state;
+	Gfx_Sampler sampler;
+
+	RenderTarget world_rt;
+
+	Array<R_Vertex, MaxDebugLines> draw_lines;
+	Array<R_Vertex, MaxDebugLines> draw_lines_persistent;
+	Array<UI_Rect, MaxDebugLines> draw_rects;
+
+	Mutex push_to_gpu_queue_mutex;
+	QueueSPSC<PuhsToGpu, 32> push_to_gpu_queue;
+	Queue<PuhsToGpu, 32> finished_gpu_queue;
+	Mutex waiting_fonts_mutex;
+	QueueSPSC<WaitingFont, 32> waiting_fonts;
+	Mutex vert_index_buffer_mutex;
+
+	TextureId cur_cubemap;
+
+	Gfx_Buffer cpu_vert_buf;
+	Gfx_Buffer gpu_vert_buf;
+	Gfx_Buffer gpu_index_buf;
+	Gfx_Buffer gpu_state_buf;
+	Gfx_Buffer gpu_entities_indices_buf;
+	Gfx_Buffer gpu_materials_buf;
+	Gfx_Buffer gpu_drawcall_buf;
+	Gfx_Buffer gpu_software_render_buf;
+	Gfx_Buffer gpu_ui_rect_buf;
+
+	R_Vertex* cpu_vertices;
+	GpuState* gpu_state;
+	u32* gpu_entities_indices;
+	GpuMaterial* gpu_materials;
+	GpuDrawCall* gpu_drawcalls;
+	u32* gpu_software_render;
+	GpuUI_Rect* gpu_ui_rects;
+	m4x4* gpu_skin_matrices;
 };
 
 extern GlobalState* st;
+
+DrawBatch make_draw_batch(Allocator alloc, Gfx_Pipeline pip);
+
+Attachment make_attachment(AttachmentDesc desc);
+void destroy_attachment(Attachment attachment);
+void recreate_attachment(Attachment* attachment, v2u size);
+RenderTarget make_render_target(RenderTargetUsage usage, v2u size);
+void destroy_render_target(RenderTarget rt);
+void recreate_render_target(RenderTarget* rt, v2u size);
+Gfx_Attachments render_target_to_attachments(RenderTarget rt);
+
+TextureDesc load_texture(String name);
+TextureDesc load_cubemap(String dir);
+MeshDesc load_mesh(Allocator arena, String name);
+TextureId make_texture(TextureDesc desc);
+TextureId make_dummy_texture(TextureDesc desc);
+MeshId make_mesh(MeshDesc desc);
+MeshId make_dummy_mesh(MeshDesc desc);
+u32 make_pipeline_state(Gfx_PipelineState s);
+MaterialId make_material(Material mat);
+Gfx_Pipeline make_pipeline(String name, Gfx_PipelineDesc2 desc);
+FontId make_font(FontDesc desc);
+FontId make_dummy_font(FontDesc desc);
+
+b32 texture_is_ready(TextureId id);
+
+u32 texture_descriptor_idx(TextureId id);
+void set_cubemap(TextureId cubemap);
+
+void update_texture(TextureId t, u8* data);
+void update_mesh(MeshId mesh, MeshDesc desc);
+
+void reload_shader(String name);
+void shaders_compile(Allocator arena);
+void shaders_compile_join();
+
+void apply_pip_state(Gfx_PipelineState s);
+
+void r_init();
+void r_shutdown();
+void r_begin();
+void r_end();
+
+void draw_mesh(MeshId mesh, MaterialId mat, v3 pos, u32 flags = 0);
+void draw_mesh_trs(MeshId mesh, MaterialId mat, v3 pos, v4 rot, v3 scale);
+void draw_entity(ThingId id);
+
+void draw_line(v3 a, v3 b, Color color);
+void draw_line_persistent(v3 a, v3 b, Color color);
+void draw_grid(v3 center, u32 slices, f32 spacing, Color color);
+void draw_cuboid(Rng3 rng, Color color);
+void draw_rect(Rng2 rect, Color color, f32 corner_radius, f32 border_thickness, f32 edge_softness);
+void draw_texture(Rng2 dst, Rng2 src, TextureId tex, Color color, f32 corner_radius, f32 border_thickness, f32 edge_softness);
+void draw_rect(Rng2 rect, Color color);
+void draw_rect_rounded(Rng2 rect, Color color, f32 corner_radius, f32 edge_softness);
+void draw_rect_gradient(Rng2 rect, Gradient grad);
+void draw_rect_thickborders(Rng2 rect, Color color, f32 thick);
+void draw_texture(Rng2 rect, TextureId tex);
+void draw_rect_outline(Rng2 rect, u32 thickness, Color color);
+void draw_text_ext(FontId font, v2 pos, String str, Color color, u32 font_height);
+
+void imgui_init();
+void imgui_begin_frame();
+void imgui_end_frame();
+void imgui_image(TextureId id, v2 pos);
 
 void test();
 f64 tsc_to_ms(u64 tsc);
@@ -497,7 +869,7 @@ void debug_window_toggle_fullscreen(DebugWindow& win);
 void dev_init();
 void dev_update();
 
-R_MeshDesc load_obj(Allocator arena, String name);
+MeshDesc load_obj(Allocator arena, String name);
 GltfInfo load_gltf(Allocator arena, String name, b32 is_glb);
 v3 sample_v3(Sampler s, f32 time);
 v4 sample_quat(Sampler s, f32 time);
@@ -512,14 +884,17 @@ String js_parse_str(JsParser& p);
 f64 js_parse_number(JsParser& p);
 JsVal js_parse(JsParser& p);
 
-Result<JsVal> js_val(JsVal val, String key);
-Result<b32> js_bool(JsObj obj, String key);
-Result<f64> js_number(JsObj obj, String key);
-Result<String> js_str(JsObj obj, String key);
-Result<Slice<JsVal*>> js_array(JsObj obj, String key);
-Result<JsObj> js_obj(JsObj obj, String key);
-Result<v3> js_v3(JsObj obj, String key);
-Result<v4> js_v4(JsObj obj, String key);
+b32 js_val(JsVal val, String key, JsVal* out);
+b32 js_bool(JsObj obj, String key, b32* out);
+b32 js_f64(JsObj obj, String key, f64* out);
+b32 js_f32(JsObj obj, String key, f32* out);
+b32 js_u64(JsObj obj, String key, u64* out);
+b32 js_u32(JsObj obj, String key, u32* out);
+b32 js_str(JsObj obj, String key, String* out);
+b32 js_array(JsObj obj, String key, Slice<JsVal*>* out);
+b32 js_obj(JsObj obj, String key, JsObj* out);
+b32 js_v3(JsObj obj, String key, v3* out);
+b32 js_v4(JsObj obj, String key, v4* out);
 
 Slice<Token> tokens_from_str(Allocator arena, String string);
 Parser parser_make(Slice<Token> tokens);
@@ -555,11 +930,9 @@ void watch_directory_add(String watch_name, WatchOp op, OS_WatchFlags flags = OS
 void watch_update();
 
 ThingDesc default_thing_desc();
-R_MaterialProps default_material_props();
+MaterialProps default_material_props();
 Thing& get_thing(ThingId id);
 void push_child_thing(ThingId parent, ThingId id);
-R_MeshId get_mesh(MeshEnum id);
-R_MaterialId get_material(MaterialEnum id);
 
 String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, EntityFlags flags = {});
 void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser);
@@ -567,65 +940,13 @@ void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser
 void init();
 shared_function void com(HotReloadData* data);
 
-R_MeshDesc generate_sphere(Allocator arena);
-R_MeshDesc generate_grid(Allocator arena, u32 size, f32 step);
+MeshDesc generate_sphere(Allocator arena);
+MeshDesc generate_grid(Allocator arena, u32 size, f32 step);
 
 ThingId make_thing(ThingDesc desc);
 void destroy_thing(ThingId id);
-PoolIterativeIter<Thing, MaxEntities, ThingId> things_begin();
-HNodeIter<Thing, ThingId> thing_node_begin(ThingId first);
 void select_obj();
 void save_game_state();
 void load_game_state();
 void init_game();
 void update_game();
-
-String ui_display_string(String full);
-String ui_hash_string(String full);
-u64 ui_key_from_string(String str, u64 seed);
-f32 ui_text_measure(String text, R_FontId font, f32 font_height);
-
-UI_Size ui_size_px(f32 v);
-UI_Size ui_size_text();
-UI_Size ui_size_pct(f32 v);
-UI_Size ui_size_children();
-UI_Size ui_size_null();
-
-void ui_push_parent(UI_Box* box);
-void ui_pop_parent();
-UI_Box* ui_top_parent();
-void ui_push_font(R_FontId id);
-void ui_push_bg_color(v4 color);
-void ui_pop_bg_color();
-v4 ui_current_bg_color();
-
-UI_Box* ui_box_make(UI_BoxFlags flags, UI_Size size_x, UI_Size size_y, String string);
-UI_Box* ui_box_from_key(u64 key);
-void ui_prune_stale_boxes();
-
-void ui_init();
-void ui_begin_frame();
-void ui_end_frame();
-
-void ui_layout_standalone(UI_Box* box);
-void ui_layout_upward(UI_Box* box);
-void ui_layout_downward(UI_Box* box);
-void ui_layout_positions(UI_Box* box);
-
-void ui_build_draw_cmds(UI_Box* box);
-
-UI_Signal ui_signal_from_box(UI_Box* box);
-
-UI_Signal ui_label(String string);
-UI_Signal ui_button(String string);
-b32 ui_checkbox(String string, b32* value);
-f32 ui_slider(String string, f32* value, f32 min, f32 max);
-void ui_spacer(UI_Size size_along_parent_axis);
-UI_Box* ui_panel_begin_sized(String string, UI_Axis2 child_layout_axis, UI_Size size_x, UI_Size size_y);
-UI_Box* ui_panel_begin(String string, UI_Axis2 child_layout_axis);
-void ui_panel_end();
-
-#define UI_Parent(str, axis) DeferLoop(ui_panel_begin(str, axis), ui_pop_parent())
-
-
-
