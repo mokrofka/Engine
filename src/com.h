@@ -46,17 +46,16 @@ struct MeshId {u32 idx;};
 struct MaterialId {u32 idx;};
 struct FontId {u32 idx;};
 
-const u32 MaxEntities = KB(1);
-const u32 MaxMaterials  = 32;
-const u32 MaxLights     = 32;
-const u32 MaxMeshes     = 32;
-const u32 MaxTextures   = 32;
-const u32 MaxCubemaps   = 32;
-const u32 MaxFonts      = 32;
+const u32 MaxThings 				= KB(1);
+const u32 MaxMaterials  = 16;
+const u32 MaxMeshes     = 16;
+const u32 MaxTextures   = 16;
+const u32 MaxCubemaps   = 16;
+const u32 MaxFonts      = 16;
 const u32 MaxDebugLines = KB(1);
-const u32 MaxSkinMatrices = 128;
-const u32 MaxBones = 128;
-const u32 MaxRuntimeBones = 128;
+const u32 MaxSkinMatrices = 16;
+const u32 MaxBones 							= 16;
+const u32 MaxRuntimeBones = 16;
 
 #define ColorWhite        Color{ 255, 255, 255, 255 }
 #define ColorBlack        Color{   0,   0,   0, 255 }
@@ -118,23 +117,6 @@ const u32 MaxRuntimeBones = 128;
 #define BLANK      Color{ 0, 0, 0, 0 }           // Blank (Transparent)
 #define MAGENTA    Color{ 255, 0, 255, 255 }     // Magenta
 #define RAYWHITE   Color{ 245, 245, 245, 255 }   // My own White (raylib logo)
-
-enum LightType {
-	LightType_Point,
-	LightType_Dir,
-	LightType_Spot,
-};
-
-struct Light {
-	LightType type;
-	v3 pos;
-	v3 dir;
-	v3 color;
-	f32 intensity;
-	f32 radius;
-	f32 cone_angle;
-	b32 cast_shadow;
-};
 
 struct Timer {
 	f32 interval;
@@ -202,13 +184,6 @@ struct UI_Rect {
 	f32 border_thickness;
 };
 
-struct Image {
-	u32 width;
-	u32 height;
-	u8* data;
-	Gfx_PixelFormat format;
-};
-
 struct TextureDesc {
 	String name;
 	u32 width;
@@ -226,7 +201,6 @@ struct Texture {
 	Gfx_View view;
 	b32 is_ready;
 	ImTextureID imgui_id;
-	b32 imgui_is_ready;
 };
 
 // struct Bone {
@@ -250,7 +224,7 @@ struct Texture {
 
 struct MeshDesc {
 	String name;
-	Slice<R_Vertex> vertices;
+	Slice<Vertex> vertices;
 	Slice<u16> indices;
 	f32 bounds_min;
 	f32 bounds_max;
@@ -270,13 +244,6 @@ struct Material {
 	MaterialProps props;
 	TextureId base_color;
 	u32 idx;
-};
-
-struct Gradient {
-	u32 color0;
-	u32 color1;
-	u32 color2;
-	u32 color3;
 };
 
 struct Glyph {
@@ -318,51 +285,59 @@ struct ShaderModuleWithPipelines {
 	Array<Gfx_Pipeline, 4> pipelines;
 };
 
-enum AttachmentType {
-	R_AttachmentType_Default,
-	R_AttachmentType_Color,
-	R_AttachmentType_Resolve,
-	R_AttachmentType_Depth,
-};
-
-struct Attachment {
-	AttachmentType type;
-	Gfx_Image images[Gfx_MaxImagesInFlight];
-	Gfx_View views[Gfx_MaxImagesInFlight];
+typedef u32 AttachUsage;
+enum {
+	AttachUsage_Color = 1<<0,
+	AttachUsage_Depth = 1<<1,
+	AttachUsage_Resolve = 1<<2,
+	AttachUsage_Sampled = 1<<3,
 };
 
 struct AttachmentDesc {
-	AttachmentType type;
-	v2u size;
+	Gfx_PixelFormat fmt;
+	u32 samples;
+	AttachUsage usage;
 };
 
-typedef u32 RenderTargetUsage;
-enum {
-	R_RenderTargetUsage_Default,
-	R_RenderTargetUsage_Color = 1<<0,
-	R_RenderTargetUsage_Resolve = 1<<1,
-	R_RenderTargetUsage_Depth = 1<<2,
+struct Attachment {
+	Gfx_Image image;
+	Gfx_View view;
+	Gfx_View sampled;
+};
+
+enum SizeMode {Size_Swapchain, Size_Absolute};
+
+struct RenderTargetDesc {
+	SizeMode size_mode;
+	v2u size;
+	AttachmentDesc color;
+	AttachmentDesc depth;
+	u32 samples;
 };
 
 struct RenderTarget {
-	RenderTargetUsage attachments;
+	RenderTargetDesc desc;
+	v2u size;
 	Attachment color;
 	Attachment resolve;
 	Attachment depth;
 };
 
-enum PushToGpuType {
-	R_PushToGpuType_Texture,
-	R_PushToGpuType_Mesh,
+struct RenderPassDesc {
+	RenderTarget* target;
+	Gfx_ColorAttachmentAction color;
+	Gfx_DepthAttachmentAction depth;
 };
 
-struct PuhsToGpu {
+enum PushToGpuType {
+	PushToGpuType_Texture,
+	PushToGpuType_Mesh,
+};
+
+struct FinishedGpuTask {
 	PushToGpuType type;
 	TextureId texture_id;
 	MeshId mesh_id;
-	u32 stage_off;
-	Gfx_ImageDesc image_desc;
-	Gfx_ViewDesc view_desc;
 	Gfx_Mesh mesh;
 	Texture texture;
 	u32 counter;
@@ -649,9 +624,6 @@ struct ThingIter {
 	ThingId id;
 };
 
-b32 iter_next(ThingIter& it);
-ThingIter things_begin();
-
 struct GlobalState {
 	Arena arena;
 	Arena frame_arena;
@@ -702,8 +674,8 @@ struct GlobalState {
 	Camera cam;
 	b32 fps_camera;
 
-	Pool<Thing, MaxEntities, ThingId> things;
-	SparseSetIdx<MaxEntities> things_set;
+	Pool<Thing, MaxThings, ThingId> things;
+	SparseSetIdx<MaxThings> things_set;
 
 	f32 scale;
 	f32 old_scale;
@@ -731,16 +703,15 @@ struct GlobalState {
 
 	RenderTarget world_rt;
 
-	Array<R_Vertex, MaxDebugLines> draw_lines;
-	Array<R_Vertex, MaxDebugLines> draw_lines_persistent;
+	Array<Vertex, MaxDebugLines> draw_lines;
+	Array<Vertex, MaxDebugLines> draw_lines_persistent;
 	Array<UI_Rect, MaxDebugLines> draw_rects;
 
-	Mutex push_to_gpu_queue_mutex;
-	QueueSPSC<PuhsToGpu, 32> push_to_gpu_queue;
-	Queue<PuhsToGpu, 32> finished_gpu_queue;
-	Mutex waiting_fonts_mutex;
+	QueueSPSC<FinishedGpuTask, 32> finished_gpu_queue;
+	Mutex finished_gpu_mutex;
+	Mutex texture_mutex;
 	QueueSPSC<WaitingFont, 32> waiting_fonts;
-	Mutex vert_index_buffer_mutex;
+	Mutex font_mutex;
 
 	TextureId cur_cubemap;
 
@@ -754,7 +725,7 @@ struct GlobalState {
 	Gfx_Buffer gpu_software_render_buf;
 	Gfx_Buffer gpu_ui_rect_buf;
 
-	R_Vertex* cpu_vertices;
+	Vertex* cpu_vertices;
 	GpuState* gpu_state;
 	u32* gpu_entities_indices;
 	GpuMaterial* gpu_materials;
@@ -768,28 +739,26 @@ extern GlobalState* st;
 
 DrawBatch make_draw_batch(Allocator alloc, Gfx_Pipeline pip);
 
-Attachment make_attachment(AttachmentDesc desc);
-void destroy_attachment(Attachment attachment);
-void recreate_attachment(Attachment* attachment, v2u size);
-RenderTarget make_render_target(RenderTargetUsage usage, v2u size);
+Attachment make_attachment(AttachmentDesc desc, v2u size);
+void destroy_attachment(Attachment& attachment);
+v2u resolve_size(RenderTargetDesc d);
+RenderTarget make_render_target(RenderTargetDesc desc);
 void destroy_render_target(RenderTarget rt);
-void recreate_render_target(RenderTarget* rt, v2u size);
-Gfx_Attachments render_target_to_attachments(RenderTarget rt);
+void resize_render_target(RenderTarget& rt);
+void begin_render_pass(RenderPassDesc p);
 
 TextureDesc load_texture(String name);
 TextureDesc load_cubemap(String dir);
 MeshDesc load_mesh(Allocator arena, String name);
 TextureId make_texture(TextureDesc desc);
-TextureId make_dummy_texture(TextureDesc desc);
+TextureId make_texture_idle(TextureDesc desc);
 MeshId make_mesh(MeshDesc desc);
-MeshId make_dummy_mesh(MeshDesc desc);
+MeshId make_mesh_idle(MeshDesc desc);
 u32 make_pipeline_state(Gfx_PipelineState s);
 MaterialId make_material(Material mat);
 Gfx_Pipeline make_pipeline(String name, Gfx_PipelineDesc2 desc);
 FontId make_font(FontDesc desc);
-FontId make_dummy_font(FontDesc desc);
-
-b32 texture_is_ready(TextureId id);
+FontId make_font_idle(FontDesc desc);
 
 u32 texture_descriptor_idx(TextureId id);
 void set_cubemap(TextureId cubemap);
@@ -805,31 +774,32 @@ void apply_pip_state(Gfx_PipelineState s);
 
 void r_init();
 void r_shutdown();
-void r_begin();
 void r_end();
 
 void draw_mesh(MeshId mesh, MaterialId mat, v3 pos, u32 flags = 0);
 void draw_mesh_trs(MeshId mesh, MaterialId mat, v3 pos, v4 rot, v3 scale);
-void draw_entity(ThingId id);
+void draw_thing(ThingId id);
 
 void draw_line(v3 a, v3 b, Color color);
 void draw_line_persistent(v3 a, v3 b, Color color);
 void draw_grid(v3 center, u32 slices, f32 spacing, Color color);
 void draw_cuboid(Rng3 rng, Color color);
-void draw_rect(Rng2 rect, Color color, f32 corner_radius, f32 border_thickness, f32 edge_softness);
-void draw_texture(Rng2 dst, Rng2 src, TextureId tex, Color color, f32 corner_radius, f32 border_thickness, f32 edge_softness);
-void draw_rect(Rng2 rect, Color color);
-void draw_rect_rounded(Rng2 rect, Color color, f32 corner_radius, f32 edge_softness);
-void draw_rect_gradient(Rng2 rect, Gradient grad);
-void draw_rect_thickborders(Rng2 rect, Color color, f32 thick);
+void draw_rect(Rng2 rect, Color color, f32 corner_radius = 0, f32 border_thickness = 0, f32 edge_softness = 0);
+void draw_texture(Rng2 dst, Rng2 src, TextureId tex, Color color, f32 corner_radius = 0, f32 border_thickness = 0, f32 edge_softness = 0);
 void draw_texture(Rng2 rect, TextureId tex);
-void draw_rect_outline(Rng2 rect, u32 thickness, Color color);
-void draw_text_ext(FontId font, v2 pos, String str, Color color, u32 font_height);
+void draw_text(FontId font, v2 pos, String str, Color color, u32 font_height);
 
 void imgui_init();
 void imgui_begin_frame();
 void imgui_end_frame();
 void imgui_image(TextureId id, v2 pos);
+void imgui_draw_rect(ImDrawList* draw, Rng2 rect, Color col, f32 rounding = 0, ImDrawFlags flags = 0, f32 thickness = 1);
+void imgui_draw_rect_filled(ImDrawList* draw, Rng2 rect, Color col, f32 rounding = 0, ImDrawFlags flags = 0);
+void imgui_draw_line(ImDrawList* draw, v2 p0, v2 p1, Color col, f32 thickness = 1);
+void imgui_draw_text(ImDrawList* draw, v2 pos, Color col, String fmt, ...);
+void imgui_draw_text(ImDrawList* draw, f32 font_size, v2 pos, Color col, String fmt, ...);
+void imgui_text(String fmt, ...);
+v2 imgui_calc_text_size(String str);
 
 void test();
 f64 tsc_to_ms(u64 tsc);
@@ -854,14 +824,6 @@ b32 time_on_interval(f32 interval, f32 offset = 0);
 b32 time_on_between_interval(f32 interval, f32 offset = 0);
 f64 time_since(f64 timestamp);
 f64 time_until(f64 timestamp);
-
-void imgui_draw_rect(ImDrawList* draw, Rng2 rect, Color col, f32 rounding = 0, ImDrawFlags flags = 0, f32 thickness = 1);
-void imgui_draw_rect_filled(ImDrawList* draw, Rng2 rect, Color col, f32 rounding = 0, ImDrawFlags flags = 0);
-void imgui_draw_line(ImDrawList* draw, v2 p0, v2 p1, Color col, f32 thickness = 1);
-void imgui_draw_text(ImDrawList* draw, v2 pos, Color col, String fmt, ...);
-void imgui_draw_text(ImDrawList* draw, f32 font_size, v2 pos, Color col, String fmt, ...);
-void imgui_text(String fmt, ...);
-v2 imgui_calc_text_size(String str);
 
 void debug_window_apply_state(DebugWindow& win);
 void debug_window_track_state(DebugWindow& win);
@@ -929,6 +891,8 @@ void watch_add(String watch_name, WatchOp op);
 void watch_directory_add(String watch_name, WatchOp op, OS_WatchFlags flags = OS_WatchFlag_Modify);
 void watch_update();
 
+b32 iter_next(ThingIter& it);
+ThingIter things_begin();
 ThingDesc default_thing_desc();
 MaterialProps default_material_props();
 Thing& get_thing(ThingId id);

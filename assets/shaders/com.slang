@@ -130,3 +130,20 @@ u32 u32_from_rgba(v4 rgba) {
 	return result;
 }
 
+m4x4 m4x4_identity() {
+	m4x4 res = {
+		1,0,0,0,
+		0,1,0,0,
+		0,0,1,0,
+		0,0,0,1
+	};
+	return res;
+}
+
+v4 sample_texture(u32 texture, v2 uv, u32 sampler = 1) {
+	return textures[texture].Sample(samplers[sampler], uv);
+}
+
+v4 sample_cube(u32 cube, v3 v, u32 sampler = 1) {
+	return cube_texture[cube].Sample(samplers[sampler], v);
+}

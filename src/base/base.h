@@ -2302,7 +2302,7 @@ template<typename T, i32 N> T queue_front(QueueSPSC<T, N>& q) {
 	// return {q.data[(q.read) % q.cap], true};
 	return q.data[(q.read) % q.cap];
 }
-template<typename T, i32 N> u32 queue_count(QueueSPSC<T, N>& q) { return atomic_load_explicit(&q.write, AtomicRelaxed) - atomic_load_explicit(&q.read, AtomicAcquire); }
+template<typename T, i32 N> u32 queue_count(QueueSPSC<T, N>& q) { return atomic_load_explicit(&q.write, AtomicAcquire) - atomic_load_explicit(&q.read, AtomicRelaxed); }
 
 template<typename T, i32 N> struct QueueMPMC {
 	static constexpr u32 cap = N;
