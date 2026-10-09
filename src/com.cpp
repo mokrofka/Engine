@@ -15,81 +15,96 @@ DrawBatch make_draw_batch(Allocator alloc, Gfx_Pipeline pip) {
 	return res;
 }
 
-Attachment make_attachment(AttachmentDesc desc) {
-	Attachment res = {.type = desc.type};
+Attachment make_attachment(AttachmentDesc desc, v2u size) {
+	Attachment res = {};
 	Gfx_ImageUsage usage = 0;
-	switch(desc.type) {
-		InvalidDefaultCase;
-		case R_AttachmentType_Color: usage = Gfx_ImageUsage_ColorAttachment; break;
-		case R_AttachmentType_Resolve: usage = Gfx_ImageUsage_ResolveAttachment; break;
-		case R_AttachmentType_Depth: usage = Gfx_ImageUsage_DepthStencilAttachment; break;
+	if(flag_has(desc.usage, AttachUsage_Color )) {
+		usage |= Gfx_ImageUsage_ColorAttachment;
 	}
-	Loop(i, st->gfx.images_in_flight) {
-		res.images[i] = gfx_make_image({
-			.usage = usage,
-			.width = desc.size.x,
-			.height = desc.size.y
-		});
-		switch(desc.type) {
-			InvalidDefaultCase;
-			case R_AttachmentType_Color: res.views[i] = gfx_make_view({Gfx_ViewType_ColorAttachment, res.images[i]}); break;
-			case R_AttachmentType_Resolve: res.views[i] = gfx_make_view({Gfx_ViewType_ResolveAttachment, res.images[i]}); break;
-			case R_AttachmentType_Depth: res.views[i] = gfx_make_view({Gfx_ViewType_DepthStencilAttachment, res.images[i]}); break;
-		}
+	if(flag_has(desc.usage, AttachUsage_Depth)) {
+		usage |= Gfx_ImageUsage_DepthStencilAttachment;
+	}
+	if(flag_has(desc.usage, AttachUsage_Resolve)) {
+		usage |= Gfx_ImageUsage_ResolveAttachment;
+	}
+	res.image = gfx_make_image({
+		.pixel_format  = desc.fmt,
+		.samples = desc.samples,
+		.usage   = usage,
+		.width   = size.x,
+		.height  = size.y,
+	});
+	res.view = gfx_make_view({
+		.type = Gfx_ViewType_Attachment,
+		.image = res.image,
+	});
+	if(flag_has(usage, AttachUsage_Sampled)) {
+		res.sampled = gfx_make_view({Gfx_ViewType_Sampled, res.image});
 	}
 	return res;
 }
-void destroy_attachment(Attachment attachment) {
-	Loop(i, st->gfx.images_in_flight) {
-		gfx_destroy_view(attachment.views[i]);
-		gfx_destroy_image(attachment.images[i]);
+void destroy_attachment(Attachment& a) {
+	gfx_destroy_view(a.view);
+	gfx_destroy_image(a.image);
+	if(a.sampled.idx) {
+		gfx_destroy_view(a.sampled);
 	}
 }
-void recreate_attachment(Attachment* attachment, v2u size) {
-	destroy_attachment(*attachment);
-	*attachment = make_attachment({.type = attachment->type, size});
+v2u resolve_size(RenderTargetDesc d) {
+	switch(d.size_mode) {
+		InvalidDefaultCase;
+		case Size_Swapchain: return os_window_size();
+		case Size_Absolute:  return d.size;
+	}
 }
-
-RenderTarget make_render_target(RenderTargetUsage usage, v2u size) {
-	RenderTarget res = {.attachments = usage};
-	if(flag_has(usage, R_RenderTargetUsage_Color)) {
-		res.color = make_attachment({.type = R_AttachmentType_Color, .size = size});
+RenderTarget make_render_target(RenderTargetDesc desc) {
+	_DefSet(desc.samples, Gfx_DefaultSampleCount);
+	RenderTarget res = {.desc = desc, .size = resolve_size(desc)};
+	if(desc.color.usage) {
+		res.color = make_attachment(desc.color, res.size);
 	}
-	if(flag_has(usage, R_RenderTargetUsage_Resolve)) {
-		res.resolve = make_attachment({.type = R_AttachmentType_Resolve, .size = size});
+	if(desc.samples > 1) {
+		AttachmentDesc r = desc.color;
+		r.samples = 1;
+		r.usage = AttachUsage_Resolve;
+		res.resolve = make_attachment(r, res.size);
 	}
-	if(flag_has(usage, R_RenderTargetUsage_Depth)) {
-		res.depth = make_attachment({.type = R_AttachmentType_Depth, .size = size});
+	if(desc.depth.usage) {
+		AttachmentDesc d = desc.depth;
+		d.samples = desc.samples;
+		res.depth = make_attachment(d, res.size);
 	}
 	return res;
 }
 void destroy_render_target(RenderTarget rt) {
-	if(flag_has(rt.attachments, R_RenderTargetUsage_Color)) {
+	if(rt.color.image.idx) {
 		destroy_attachment(rt.color);
 	}
-	if(flag_has(rt.attachments, R_RenderTargetUsage_Resolve)) {
+	if(rt.resolve.image.idx) {
 		destroy_attachment(rt.resolve);
 	}
-	if(flag_has(rt.attachments, R_RenderTargetUsage_Depth)) {
+	if(rt.depth.image.idx) {
 		destroy_attachment(rt.depth);
 	}
 }
-void recreate_render_target(RenderTarget* rt, v2u size) {
-	destroy_render_target(*rt);
-	*rt = make_render_target(rt->attachments, size);
+void resize_render_target(RenderTarget& rt) {
+	v2u ns = resolve_size(rt.desc);
+	if(ns.x == rt.size.x && ns.y == rt.size.y) return;
+	destroy_render_target(rt);
+	rt = make_render_target(rt.desc);
 }
-Gfx_Attachments render_target_to_attachments(RenderTarget rt) {
+void begin_render_pass(RenderPassDesc p) {
 	Gfx_Attachments att = {};
-	if(flag_has(rt.attachments, R_RenderTargetUsage_Color)) {
-		att.color = rt.color.views[st->gfx.current_image_idx];
-	}
-	if(flag_has(rt.attachments, R_RenderTargetUsage_Resolve)) {
-		att.resolve = rt.resolve.views[st->gfx.current_image_idx];
-	}
-	if(flag_has(rt.attachments, R_RenderTargetUsage_Depth)) {
-		att.depth_stencil = rt.depth.views[st->gfx.current_image_idx];
-	}
-	return att;
+	att.color = p.target->color.view;
+	att.resolve = p.target->resolve.view;
+	att.depth_stencil = p.target->depth.view;
+	gfx_begin_pass({
+		.attachments = att,
+		.action = {
+			.color = p.color,
+			.depth = p.depth,
+		},
+	});
 }
 
 TextureDesc load_texture(String name) {
@@ -124,7 +139,6 @@ TextureDesc load_cubemap(String dir) {
 
 MeshDesc load_mesh(Allocator arena, String name) {
 	Scratch scratch(arena);
-	// String filepath = push_strf(scratch, "%s/%s", st->models_dir, name);
 	String format = str_skip_last_dot(name);
 	MeshDesc res = {};
 	if(str_match(format, "glb")) {
@@ -140,24 +154,27 @@ MeshDesc load_mesh(Allocator arena, String name) {
 }
 
 TextureId make_texture(TextureDesc desc) {
+	ProfFunc;
 	Scratch scratch;
 	var& g = *st;
 	_DefSet(desc.pixel_format, Gfx_PixelFormat_RGBA8);
 	Texture dum = desc.is_cube ? g.textures[g.textures_ids[Texture_DummyCubeMap].idx] : g.textures[g.textures_ids[Texture_Dummy].idx];
 	TextureId res = {array_push(g.textures, dum)};
 	struct Ctx {
+		TextureId id;
 		TextureDesc desc;
-		TextureId texture_id;
 	};
-	Ctx ctx = {
-		.desc = desc,
-		.texture_id = res,
+	var& ctx = thread_push_ctx(Ctx);
+	ctx = {
+		res,
+		desc,
 	};
-	var f = [](void* in){
+	var f = [](void* c) {
 		Scratch scratch;
-		Ctx& ctx = *(Ctx*)in;
 		var& g = *st;
+		var& ctx = *(Ctx*)c;
 		var desc = ctx.desc;
+		var res = ctx.id;
 		if(desc.name.size) {
 			TextureDesc loaded = desc.is_cube ? load_cubemap(desc.name) : load_texture(desc.name);
 			desc.width = loaded.width;
@@ -168,32 +185,39 @@ TextureId make_texture(TextureDesc desc) {
 		Loop(i, 6) {
 			data[i] = Slice(desc.cube[i], desc.width * desc.height * gfx_pixelformat_bytesize(desc.pixel_format));
 		}
-		u32 stage_offset = desc.is_cube ? gfx_push_stage_buffers(data) : gfx_push_stage_buffer(data[0]);
-		LockScope(g.push_to_gpu_queue_mutex);
-		queue_push(g.push_to_gpu_queue, {
-			.type = R_PushToGpuType_Texture,
-			.texture_id = ctx.texture_id,
-			.stage_off = stage_offset,
-			.image_desc = {
-				.type = desc.is_cube ? Gfx_ImageType_Cube : Gfx_ImageType_2D,
-				.width = desc.width,
-				.height = desc.height,
-				.pixel_format = desc.pixel_format,
-				.mipmaps = true,
+		u32 stage_off = desc.is_cube ? gfx_push_stage_buffers(data) : gfx_push_stage_buffer(data[0]);
+		LockScope(g.texture_mutex);
+		Gfx_Image image = gfx_make_image({
+			.type = desc.is_cube ? Gfx_ImageType_Cube : Gfx_ImageType_2D,
+			.width = desc.width,
+			.height = desc.height,
+			.pixel_format = desc.pixel_format,
+			.mipmaps = true,
+		});
+		Gfx_View view = gfx_make_view({Gfx_ViewType_Sampled, image});
+		u32 counter = gfx_push_stage_buffer_cmd({
+			.type = Gfx_CmdType_Texture,
+			.img = image,
+			.stage_off = stage_off,
+		});
+		queue_push(g.finished_gpu_queue, {
+			.texture_id = res,
+			.texture = {
+				image,
+				view,
 			},
+			.counter = counter,
 		});
 	};
 	if(desc.name.size) {
-		var& task = thread_push_ctx(Ctx);
-		task = ctx;
-		thread_push(&task, f);
+		thread_push({&ctx, f});
 	} else {
 		f(&ctx);
 	}
 	return res;
 }
 
-TextureId make_dummy_texture(TextureDesc desc) {
+TextureId make_texture_idle(TextureDesc desc) {
 	var& g = *st;
 	if(desc.name.size) {
 		TextureDesc loaded = desc.is_cube ? load_cubemap(desc.name) : load_texture(desc.name);
@@ -211,7 +235,7 @@ TextureId make_dummy_texture(TextureDesc desc) {
 	ArrayCopy(img_desc.cube, desc.cube);
 	Texture tex = {
 		.image = gfx_make_image(img_desc),
-		.view = gfx_make_view({Gfx_ViewType_Texture, tex.image}),
+		.view = gfx_make_view({Gfx_ViewType_Sampled, tex.image}),
 	};
 	TextureId res = {array_push(g.textures, tex)};
 	return res;
@@ -222,65 +246,59 @@ MeshId make_mesh(MeshDesc desc) {
 	Scratch scratch;
 	var& g = *st;
 	MeshId res = {array_push(g.meshes, g.meshes[g.meshes_ids[Mesh_Dummy].idx])};
-	struct Ctx {
-		MeshDesc desc;
-		MeshId mesh_id;
-	};
-	Ctx ctx = {
-		.desc = desc,
-		.mesh_id = res,
-	};
-	var f = [](void* in){
-		Scratch scratch;
-		Ctx& ctx = *(Ctx*)in;
-		var& g = *st;
-		var desc = ctx.desc;
-		if(desc.name.size) {
-			desc = load_mesh(scratch, desc.name);
-		}
-		os_mutex_lock(g.vert_index_buffer_mutex);
-		u64 vert_buf_off = gfx_push_buffer(g.gpu_vert_buf, slice_size(desc.vertices));
-		u64 index_buf_off = gfx_push_buffer(g.gpu_index_buf, slice_size(desc.indices));
-		os_mutex_unlock(g.vert_index_buffer_mutex);
-		u32 base_vert = vert_buf_off / sizeof(R_Vertex);
-		u32 stage_offset = gfx_push_stage_buffer(slice_to_bytes(desc.vertices));
-		u32 base_index = 0;
-		if(desc.indices.count) {
-			base_index = index_buf_off / sizeof(u16);
-			gfx_push_stage_buffer(slice_to_bytes(desc.indices));
-		}
-		LockScope(g.push_to_gpu_queue_mutex);
-		queue_push(g.push_to_gpu_queue, {
-			.type = R_PushToGpuType_Mesh,
-			.mesh_id = ctx.mesh_id,
-			.mesh = {
-				.vert_count = (u32)desc.vertices.count,
-				.base_vert = base_vert,
-				.index_count = (u32)desc.indices.count,
-				.base_index = base_index,
-			},
-			.stage_off = stage_offset,
+	if(desc.name.size) {
+		desc = load_mesh(scratch, desc.name);
+	}
+	u32 vert_buf_off = gfx_push_buffer(g.gpu_vert_buf, slice_size(desc.vertices));
+	u32 index_buf_off = gfx_push_buffer(g.gpu_index_buf, slice_size(desc.indices));
+	u32 vert_base = vert_buf_off / sizeof(Vertex);
+	u32 vert_stage_off = gfx_push_stage_buffer(slice_to_bytes(desc.vertices));
+	u32 index_stage_off = 0;
+	u32 index_base = 0;
+	if(desc.indices.count) {
+		index_base = index_buf_off / sizeof(u16);
+		index_stage_off = gfx_push_stage_buffer(slice_to_bytes(desc.indices));
+	}
+	u32 counter = gfx_push_stage_buffer_cmd({
+		.type = Gfx_CmdType_Mesh,
+		.stage_off = vert_stage_off,
+		.buf = g.gpu_vert_buf,
+		.size = desc.vertices.count * sizeof(Vertex),
+		.buf_offset = vert_base * sizeof(Vertex),
+	});
+	if(desc.indices.count) {
+		gfx_push_stage_buffer_cmd({
+			.type = Gfx_CmdType_Mesh,
+			.stage_off = index_stage_off,
+			.buf = g.gpu_index_buf,
+			.size = desc.indices.count * sizeof(u16),
+			.buf_offset = index_base * sizeof(u16),
 		});
-	};
-	// if(desc.name.size) {
-	// 	var& task = thread_push_ctx(Ctx);
-	// 	task = ctx;
-	// 	thread_push(&task, f);
-	// } else {
-	// 	f(&ctx);
-	// }
-	f(&ctx);
+	}
+	os_mutex_lock(g.finished_gpu_mutex);
+	queue_push(g.finished_gpu_queue, {
+		.type = PushToGpuType_Mesh,
+		.mesh_id = res,
+		.mesh = {
+			.vert_count = (u32)desc.vertices.count,
+			.base_vert = vert_base,
+			.index_count = (u32)desc.indices.count,
+			.base_index = index_base,
+		},
+		.counter = counter,
+	});
+	os_mutex_unlock(g.finished_gpu_mutex);
 	return res;
 }
 
-MeshId make_dummy_mesh(MeshDesc desc) {
+MeshId make_mesh_idle(MeshDesc desc) {
 	Scratch scratch;
 	var& g = *st;
 	if(desc.name.size) {
 		desc = load_mesh(scratch, desc.name);
 	}
 	u64 buf_offset = gfx_push_buffer(g.gpu_vert_buf, slice_size(desc.vertices));
-	u32 base_vert = buf_offset / sizeof(R_Vertex);
+	u32 base_vert = buf_offset / sizeof(Vertex);
 	gfx_update_buffer(g.gpu_vert_buf, buf_offset, slice_to_bytes(desc.vertices));
 	u32 base_index = 0;
 	if(desc.indices.count) {
@@ -315,11 +333,13 @@ MaterialId make_material(Material mat) {
 }
 
 Gfx_Pipeline make_pipeline(String name, Gfx_PipelineDesc2 desc) {
+	ProfFunc;
 	Scratch scratch;
 	var& g = *st;
 	ShaderModuleWithPipelines module = {};
 	if(!map_get(g.shader_to_module, hash(name), &module)) {
 		Slice code = os_file_path_read_all(scratch, push_strf(scratch, "%s/%s.spv", st->shader_compiled_dir, name));
+		ProfBlock("make shader");
 		module = {.shd = gfx_make_shader(code)};
 		map_set(g.shader_to_module, hash(name), module);
 	};
@@ -330,7 +350,6 @@ Gfx_Pipeline make_pipeline(String name, Gfx_PipelineDesc2 desc) {
 }
 
 FontId make_font(FontDesc desc) {
-	// return r_make_dummy_font(desc);
 	Scratch scratch;
 	var& g = *st;
 	FontId res = {array_push(g.fonts, g.fonts[g.fonts_ids[Font_Dummy].idx])};
@@ -359,7 +378,7 @@ FontId make_font(FontDesc desc) {
 		stbtt_BakeFontBitmap(data.data, 0, font_height, pixels, width, height, 32, 96, characters_info);
 		TextureId texture_id = make_texture({.width = width, .height = height, .data = pixels, .pixel_format = Gfx_PixelFormat_R8});
 		Font font = {.font_height = font_height, .texture = texture_id};
-		LoopArray (i, font.glyphs) {
+		LoopArray(i, font.glyphs) {
 			stbtt_bakedchar bakedchar = characters_info[i];
 			font.glyphs[i] = {
 				.rect.x0 = bakedchar.x0,
@@ -371,7 +390,7 @@ FontId make_font(FontDesc desc) {
 				.xadvance = bakedchar.xadvance,
 			};
 		}
-		LockScope(g.waiting_fonts_mutex);
+		LockScope(g.font_mutex);
 		queue_push(g.waiting_fonts, {
 			.id = ctx.font_id,
 			.font = font,
@@ -380,7 +399,7 @@ FontId make_font(FontDesc desc) {
 	return res;
 }
 
-FontId make_dummy_font(FontDesc desc) {
+FontId make_font_idle(FontDesc desc) {
 	Scratch scratch;
 	var& g = *st;
 	String path = push_strf(scratch, "%s/%s/%s", st->asset_dir, S("fonts"), desc.name);
@@ -393,7 +412,7 @@ FontId make_dummy_font(FontDesc desc) {
 	u32 height = round_up(dim, font_height);
 	u8* pixels = push_buffer(g.arena, width*height);
 	stbtt_BakeFontBitmap(data.data, 0, font_height, pixels, width, height, 32, 96, characters_info);
-	TextureId texture_id = make_texture({.width = width, .height = height, .data = pixels, .pixel_format = Gfx_PixelFormat_R8});
+	TextureId texture_id = make_texture_idle({.width = width, .height = height, .data = pixels, .pixel_format = Gfx_PixelFormat_R8});
 	Font font = {.font_height = font_height, .texture = texture_id};
 	LoopArray (i, font.glyphs) {
 		stbtt_bakedchar bakedchar = characters_info[i];
@@ -409,11 +428,6 @@ FontId make_dummy_font(FontDesc desc) {
 	}
 	FontId res = {array_push(g.fonts, font)};
 	return res;
-}
-
-b32 texture_is_ready(TextureId id) {
-	var& g = *st;
-	return g.textures[id.idx].is_ready;
 }
 
 u32 texture_descriptor_idx(TextureId id) {
@@ -651,7 +665,7 @@ void r_init() {
 	{
 		ProfBlock("buffers");
 		g.cpu_vert_buf = gfx_make_buffer(MB(1), Gfx_MemType_Cpu);
-		g.cpu_vertices = (R_Vertex*)gfx_buffer_base_ptr(g.cpu_vert_buf);
+		g.cpu_vertices = (Vertex*)gfx_buffer_base_ptr(g.cpu_vert_buf);
 		g.gpu_vert_buf = gfx_make_buffer(MB(1), Gfx_MemType_Gpu);
 		g.gpu_index_buf = gfx_make_buffer(MB(1), Gfx_MemType_Gpu);
 	}
@@ -676,7 +690,7 @@ void r_init() {
 			},
 			{
 				.binding = Bindings::DrawCtx,
-				.size = sizeof(GpuDrawCall) * MaxEntities,
+				.size = sizeof(GpuDrawCall) * MaxThings,
 				.out_cpu_ptr = (void**)&g.gpu_drawcalls,
 			},
 			{
@@ -686,7 +700,7 @@ void r_init() {
 			},
 			{
 				.binding = Bindings::UI_RectBinding,
-				.size = sizeof(UI_Rect) * MaxEntities,
+				.size = sizeof(UI_Rect) * MaxThings,
 				.out_cpu_ptr = (void**)&g.gpu_ui_rects,
 			},
 			{
@@ -703,7 +717,10 @@ void r_init() {
 	// Misc
 	{
 		ProfBlock("render targers");
-		g.world_rt = make_render_target(R_RenderTargetUsage_Color | R_RenderTargetUsage_Resolve | R_RenderTargetUsage_Depth, os_window_size());
+		g.world_rt = make_render_target({
+			.color = {.usage = AttachUsage_Color},
+			.depth = {.usage = AttachUsage_Depth},
+		});
 	}
 	g.sampler = gfx_make_sampler({});
 	{
@@ -711,12 +728,11 @@ void r_init() {
 		shaders_compile_join();
 	}
 
-	///////////////////////////////////
 	// Dummy
 	{
 		ProfBlock("making dummy");
 		TextureDesc dum = load_texture("dummy.png");
-		g.textures_ids[Texture_Dummy] = make_dummy_texture({
+		g.textures_ids[Texture_Dummy] = make_texture_idle({
 			.data = dum.data,
 			.width = dum.width,
 			.height = dum.height,
@@ -729,20 +745,16 @@ void r_init() {
 		Loop(i, 6) {
 			cube.cube[i] = (u8*)dum.data;
 		}
-		g.textures_ids[Texture_DummyCubeMap] = make_dummy_texture(cube);
+		g.textures_ids[Texture_DummyCubeMap] = make_texture_idle(cube);
 		g.gpu_state->cubemap = texture_descriptor_idx(g.textures_ids[Texture_DummyCubeMap]);
-		g.meshes_ids[Mesh_Dummy] = make_dummy_mesh({.name = "dummy.glb"});
-		g.fonts_ids[Font_Dummy] = make_dummy_font({"Roboto-Bold.ttf", 32});
+		g.meshes_ids[Mesh_Dummy] = make_mesh_idle({.name = "dummy.glb"});
+		g.fonts_ids[Font_Dummy] = make_font_idle({"Roboto-Bold.ttf", 32});
 	}
 
-	///////////////////////////////////
-	// Load basic shaders
+	// Shaders
 	{
 		ProfBlock("load shaders");
 		g.uber_pip = make_pipeline("uber", {});
-		// g.uber_pip_screen = make_pipeline("uber", {
-		// 	.sample_count = 1,
-		// });
 		g.ui_rect_pip = make_pipeline("ui_rect", {});
 	}
 	Info("Renderer initialized");
@@ -750,10 +762,6 @@ void r_init() {
 
 void r_shutdown() {
 	gfx_shutdown();
-}
-
-void r_begin() {
-	imgui_begin_frame();
 }
 
 void r_end() {
@@ -772,54 +780,7 @@ void r_end() {
 		v2u win_size = os_window_size();
 		win_size.x *= g.scale;
 		win_size.y *= g.scale;
-		recreate_render_target(&g.world_rt, win_size);
-	}
-
-	// Push to gpu
-	{
-		Loop(i, queue_count(g.push_to_gpu_queue)) {
-			var push = queue_pop(g.push_to_gpu_queue);
-			switch(push.type) {
-				InvalidDefaultCase;
-				case R_PushToGpuType_Texture: {
-					Gfx_Image image = gfx_make_image(push.image_desc);
-					Gfx_View view = gfx_make_view({Gfx_ViewType_Texture, image});
-					u32 counter = gfx_push_stage_buffer_cmd({
-						.type = Gfx_CmdType_Texture,
-						.img = image,
-						.stage_offset = push.stage_off,
-					});
-					push.texture = {
-						.image = image,
-						.view = view,
-					};
-					push.counter = counter;
-					queue_push(g.finished_gpu_queue, push);
-				}break;
-				case R_PushToGpuType_Mesh: {
-					var mesh = push.mesh;
-					u32 vert_size = mesh.vert_count*sizeof(R_Vertex);
-					u32 counter = gfx_push_stage_buffer_cmd({
-						.type = Gfx_CmdType_Mesh,
-						.stage_offset = push.stage_off,
-						.buf = g.gpu_vert_buf,
-						.size = vert_size,
-						.buf_offset = push.mesh.base_vert*sizeof(R_Vertex),
-					});
-					if(mesh.index_count) {
-						gfx_push_stage_buffer_cmd({
-							.type = Gfx_CmdType_Mesh,
-							.stage_offset = push.stage_off + vert_size,
-							.buf = g.gpu_index_buf,
-							.size = mesh.index_count*sizeof(u16),
-							.buf_offset = push.mesh.base_index*sizeof(u16),
-						});
-					}
-					push.counter = counter;
-					queue_push(g.finished_gpu_queue, push);
-				}break;
-			}
-		}
+		resize_render_target(g.world_rt);
 	}
 
 	// Update dummies?
@@ -829,12 +790,12 @@ void r_end() {
 				var slot = queue_pop(g.finished_gpu_queue);
 				switch(slot.type) {
 					InvalidDefaultCase;
-					case R_PushToGpuType_Texture: {
+					case PushToGpuType_Texture: {
 						var& t = g.textures[slot.texture_id.idx];
 						t = slot.texture;
 						t.is_ready = true;
 					}break;
-					case R_PushToGpuType_Mesh: {
+					case PushToGpuType_Mesh: {
 						var& t = g.meshes[slot.mesh_id.idx];
 						t = slot.mesh;
 					}break;
@@ -842,9 +803,9 @@ void r_end() {
 			} else break;
 		} 
 
-		// Update font? //TODO:
+		// Update font?
 		Loop(i, queue_count(g.waiting_fonts)) {
-			if(texture_is_ready(queue_front(g.waiting_fonts).font.texture)) {
+			if(g.textures[queue_front(g.waiting_fonts).font.texture.idx].is_ready) {
 				var slot = queue_pop(g.waiting_fonts);
 				g.fonts[slot.id.idx] = slot.font;
 			} else break;
@@ -891,8 +852,8 @@ void r_end() {
 	// World
 	u32 drawcall_count = 0;
 	{
-		vk_begin_timestamp("world");
-		gfx_begin_pass({.attachments = render_target_to_attachments(g.world_rt)});
+		gfx_begin_timestamp("world");
+		begin_render_pass({&g.world_rt});
 		{
 			gfx_apply_viewport(rng2_make(v2(), os_window_size() * g.scale), true);
 			gfx_apply_scissor(rng2_make(v2(), os_window_size()));
@@ -1003,12 +964,12 @@ void r_end() {
 			}
 		}
 		gfx_end_pass();
-		vk_end_timestamp();
+		gfx_end_timestamp();
 	}
 	
 	///////////////////////////////////
 	// Swapchain
-	vk_begin_timestamp("swapchain");
+	gfx_begin_timestamp("swapchain");
 	gfx_begin_pass({});
 	{
 		gfx_apply_viewport(rng2_make(v2(), os_window_size()));
@@ -1016,7 +977,7 @@ void r_end() {
 		apply_pip_state({.sample_count = 1});
 		g.gpu_drawcalls[drawcall_count] = {
 			.type = ShaderType::Screen,
-			.cur_resolve_idx = g.world_rt.resolve.views[st->gfx.current_image_idx].idx,
+			.cur_resolve_idx = g.world_rt.resolve.view.idx,
 		};
 		vk_push_constants({drawcall_count++});
 		gfx_draw(0, 3);
@@ -1026,10 +987,12 @@ void r_end() {
 		// };
 		// vk_push_constants({drawcall_count++});
 		// gfx_draw(0, 3);
+#if BUILD_DEV
 		imgui_end_frame();
+#endif
 	}
 	gfx_end_pass();
-	vk_end_timestamp();
+	gfx_end_timestamp();
 	gfx_end();
 }
 
@@ -1072,7 +1035,7 @@ void draw_mesh_trs(MeshId mesh, MaterialId mat, v3 pos, v4 rot, v3 scale) {
 	}
 }
 
-void draw_entity(ThingId id) {
+void draw_thing(ThingId id) {
 	var& g = *st;
 	Thing& e = get_thing(id);
 	var material = g.materials[e.mat.idx];
@@ -1094,7 +1057,7 @@ void draw_entity(ThingId id) {
 }
 
 void draw_line(v3 a, v3 b, Color color) {
-	R_Vertex vert[] = {
+	Vertex vert[] = {
 		{.pos = a, .color = color.v},
 		{.pos = b, .color = color.v},
 	};
@@ -1102,7 +1065,7 @@ void draw_line(v3 a, v3 b, Color color) {
 }
 
 void draw_line_persistent(v3 a, v3 b, Color color) {
-	R_Vertex vert[] = {
+	Vertex vert[] = {
 		{.pos = a, .color = color.v},
 		{.pos = b, .color = color.v},
 	};
@@ -1112,13 +1075,11 @@ void draw_line_persistent(v3 a, v3 b, Color color) {
 void draw_grid(v3 center, u32 slices, f32 spacing, Color color) {
 	var& g = *st;
 	f32 half = slices * spacing * 0.5f;
-	for(u32 i = 0; i <= slices; i++) {
+	Loop(i, slices+1) {
 		f32 t = i * spacing - half;
-
 		// Horizontal line
 		array_push(g.draw_lines, {.pos = center + v3(-half, 0, t), .color = color.v});
 		array_push(g.draw_lines, {.pos = center + v3(+half, 0, t), .color = color.v});
-
 		// Vertical line
 		array_push(g.draw_lines, {.pos = center + v3(t, 0, -half), .color = color.v});
 		array_push(g.draw_lines, {.pos = center + v3(t, 0, +half), .color = color.v});
@@ -1187,52 +1148,6 @@ void draw_texture(Rng2 dst, Rng2 src, TextureId tex, Color color, f32 corner_rad
 	array_push(g.draw_rects, vert);
 }
 
-void draw_rect(Rng2 rect, Color color) {
-	var& g = *st;
-	UI_Rect vert = {
-		.dst_p0 = rect.min,
-		.dst_p1 = rect.max,
-	};
-	for(var& x : vert.colors) x = color.v;
-	array_push(g.draw_rects, vert);
-}
-
-void draw_rect_rounded(Rng2 rect, Color color, f32 corner_radius, f32 edge_softness) {
-	var& g = *st;
-	UI_Rect vert = {
-		.dst_p0 = rect.min,
-		.dst_p1 = rect.max,
-		.corner_radius = corner_radius,
-		.edge_softness = edge_softness,
-	};
-	for(var& x : vert.colors) x = color.v;
-	array_push(g.draw_rects, vert);
-}
-
-void draw_rect_gradient(Rng2 rect, Gradient grad) {
-	var& g = *st;
-	UI_Rect vert = {
-		.dst_p0 = rect.min,
-		.dst_p1 = rect.max,
-	};
-	vert.colors[0] = grad.color0;
-	vert.colors[1] = grad.color1;
-	vert.colors[2] = grad.color2;
-	vert.colors[3] = grad.color3;
-	array_push(g.draw_rects, vert);
-}
-
-void draw_rect_thickborders(Rng2 rect, Color color, f32 thick) {
-	var& g = *st;
-	UI_Rect vert = {
-		.dst_p0 = rect.min,
-		.dst_p1 = rect.max,
-		.border_thickness = thick,
-	};
-	for(var& x : vert.colors) x = color.v;
-	array_push(g.draw_rects, vert);
-}
-
 void draw_texture(Rng2 rect, TextureId tex) {
 	var& g = *st;
 	var t = g.textures[tex.idx];
@@ -1250,21 +1165,7 @@ void draw_texture(Rng2 rect, TextureId tex) {
 	array_push(g.draw_rects, vert);
 }
 
-void draw_rect_outline(Rng2 rect, u32 thickness, Color color) {
-	// Top
-	draw_rect(rng2_make(rect.min, v2(rng2_dim(rect).x, thickness)), color);
-
-	// Bottom
-	draw_rect(rng2_make(v2(rect.min.x, rect.max.y - thickness), v2(rng2_dim(rect).x, thickness)), color);
-
-	// Left
-	draw_rect(rng2_make(rect.min, v2(thickness, rng2_dim(rect).y)), color);
-
-	// Right
-	draw_rect(rng2_make(v2(rect.max.x - thickness, rect.min.y), v2(thickness, rng2_dim(rect).y)), color);
-}
-
-void draw_text_ext(FontId font, v2 pos, String str, Color color, u32 font_height) {
+void draw_text(FontId font, v2 pos, String str, Color color, u32 font_height) {
 	var& g = *st;
 	var fo = g.fonts[font.idx];
 	var desc = gfx_query_image_desc(g.textures[fo.texture.idx].image);
@@ -1417,8 +1318,7 @@ Timer _timer_type_repeat_delay = {.interval = 1.0f/6};
 void imgui_impl_new_frame() {
 	ImGuiIO& io = ImGui::GetIO();
 	io.DeltaTime = time_dt;
-	v2u win_size = os_window_size();
-	io.DisplaySize = ImVec2(win_size.x, win_size.y);
+	io.DisplaySize = v2(os_window_size());
 	Slice<OS_InputEvent> events = os_get_input_events();
 	if(last_key_event.is_pressed) {
 		_timer_type_repeat_delay.acc += time_dt;
@@ -1428,48 +1328,46 @@ void imgui_impl_new_frame() {
 			}
 		}
 	}
-	for(var event : events) {
-		switch(event.type) {
-			case OS_EventType_Key: {
-				if(event.key < Key_COUNT && event.key != Key_Super) {
-					last_key_event = event;
-					_timer_type_repeat_delay.acc = 0;
-				}
-				ImGuiKey key = imgui_keycode_translate(event.key);
-				io.AddKeyEvent(key, event.is_pressed);
-				// Info("%u %u", event.key, event.is_pressed);
-				if(event.is_pressed) {
-					io.AddInputCharacter(os_key_to_character(event.key, event.modifier));
-				}
-			}break;
-			case OS_EventType_MouseButton: {
-				io.AddMouseButtonEvent(imgui_mouse_button_translate(event.mouse_button), event.is_pressed);
-			}break;
-			case OS_EventType_MouseMove: {
-				io.AddMousePosEvent(event.x, event.y);
-			}break;
-			case OS_EventType_Scroll: {
-				io.AddMouseWheelEvent(0, event.scroll);
-			}break;
-			case OS_EventType_Modifier: {
-				if(flag_has(event.modifier, OS_Modifier_Shift)) {
-					io.AddKeyEvent(ImGuiMod_Shift, true);
-					// Info("mod shift true");
-				} else {
-					io.AddKeyEvent(ImGuiMod_Shift, false);
-					// Info("mod shift false");
-				}
-				if(flag_has(event.modifier, OS_Modifier_Alt)) {
-					io.AddKeyEvent(ImGuiMod_Alt, true);
-				} else {
-					io.AddKeyEvent(ImGuiMod_Alt, false);
-				}
-				if(flag_has(event.modifier, OS_Modifier_Ctrl)) {
-					io.AddKeyEvent(ImGuiMod_Ctrl, true);
-				} else {
-					io.AddKeyEvent(ImGuiMod_Ctrl, false);
-				}break;
+	for(var event : events) switch(event.type) {
+		case OS_EventType_Key: {
+			if(event.key < Key_COUNT && event.key != Key_Super) {
+				last_key_event = event;
+				_timer_type_repeat_delay.acc = 0;
 			}
+			ImGuiKey key = imgui_keycode_translate(event.key);
+			io.AddKeyEvent(key, event.is_pressed);
+			// Info("%u %u", event.key, event.is_pressed);
+			if(event.is_pressed) {
+				io.AddInputCharacter(os_key_to_character(event.key, event.modifier));
+			}
+		}break;
+		case OS_EventType_MouseButton: {
+			io.AddMouseButtonEvent(imgui_mouse_button_translate(event.mouse_button), event.is_pressed);
+		}break;
+		case OS_EventType_MouseMove: {
+			io.AddMousePosEvent(event.x, event.y);
+		}break;
+		case OS_EventType_Scroll: {
+			io.AddMouseWheelEvent(0, event.scroll);
+		}break;
+		case OS_EventType_Modifier: {
+			if(flag_has(event.modifier, OS_Modifier_Shift)) {
+				io.AddKeyEvent(ImGuiMod_Shift, true);
+				// Info("mod shift true");
+			} else {
+				io.AddKeyEvent(ImGuiMod_Shift, false);
+				// Info("mod shift false");
+			}
+			if(flag_has(event.modifier, OS_Modifier_Alt)) {
+				io.AddKeyEvent(ImGuiMod_Alt, true);
+			} else {
+				io.AddKeyEvent(ImGuiMod_Alt, false);
+			}
+			if(flag_has(event.modifier, OS_Modifier_Ctrl)) {
+				io.AddKeyEvent(ImGuiMod_Ctrl, true);
+			} else {
+				io.AddKeyEvent(ImGuiMod_Ctrl, false);
+			}break;
 		}
 	}
 }
@@ -1548,9 +1446,46 @@ void imgui_image(TextureId id, v2 pos) {
 	ImGui::Image(texture.imgui_id, pos);
 }
 
+void imgui_draw_rect(ImDrawList* draw, Rng2 rect, Color col, f32 rounding, ImDrawFlags flags, f32 thickness) {
+	draw->AddRect(rect.min, rect.max, col.v, rounding, thickness, flags);
+}
+void imgui_draw_rect_filled(ImDrawList* draw, Rng2 rect, Color col, f32 rounding, ImDrawFlags flags) {
+	draw->AddRectFilled(rect.min, rect.max, col.v);
+}
+void imgui_draw_line(ImDrawList* draw, v2 p0, v2 p1, Color col, f32 thickness) {
+	draw->AddLine(p0, p1, col.v);
+}
+void imgui_draw_text(ImDrawList* draw, v2 pos, Color col, String fmt, ...) {
+	Scratch scratch;
+	VaList args;
+	va_start(args, fmt);
+	String formateted = push_strfv(scratch, fmt, args);
+	va_end(args);
+	draw->AddText(pos, col.v, (char*)formateted.str, (char*)(formateted.str + formateted.size));
+}
+void imgui_draw_text(ImDrawList* draw, f32 font_size, v2 pos, Color col, String fmt, ...) {
+	Scratch scratch;
+	VaList args;
+	va_start(args, fmt);
+	String formateted = push_strfv(scratch, fmt, args);
+	va_end(args);
+	draw->AddText(null, font_size, pos, col.v, (char*)formateted.str, (char*)(formateted.str + formateted.size));
+}
+void imgui_text(String fmt, ...) {
+	Scratch scratch;
+	VaList args;
+	va_start(args, fmt);
+	String formateted = push_strfv(scratch, fmt, args);
+	va_end(args);
+	ImGui::TextUnformatted((char*)formateted.str, (char*)(formateted.str + formateted.size));
+}
+v2 imgui_calc_text_size(String str) {
+	return ImGui::CalcTextSize((char*)str.str, (char*)str.str+str.size);
+}
+
 #endif
 
-R_Vertex cube_vertices[] = {
+Vertex cube_vertices[] = {
 	// Front face (0, 0, 1)
 	{.pos = v3(-1, -1,  1), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0, 0)},
 	{.pos = v3( 1, -1,  1), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1, 0)},
@@ -1600,13 +1535,13 @@ R_Vertex cube_vertices[] = {
 	{.pos = v3(-1,  1,  1), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0, 0)},
 };
 
-R_Vertex triangle_vertices[] = {
+Vertex triangle_vertices[] = {
 	{.pos = v3( 0.0f,   0.5f, 0), .uv = v2(0.5f, 0), .color = u32_from_rgba(v4(1,0,0,1))},
 	{.pos = v3(-0.5f,  -0.5f, 0), .uv = v2(0.0f, 1), .color = u32_from_rgba(v4(0,1,0,1))},
 	{.pos = v3( 0.5f,  -0.5f, 0), .uv = v2(1.0f, 1), .color = u32_from_rgba(v4(0,0,1,1))},
 };
 
-R_Vertex axis_vertices[] = {
+Vertex axis_vertices[] = {
 	{.pos = v3(),      .color = u32_from_rgba(v4(1,0,0,1))},
 	{.pos = v3(1,0,0), .color = u32_from_rgba(v4(1,0,0,1))},
 	{.pos = v3(),      .color = u32_from_rgba(v4(0,1,0,1))},
@@ -2186,43 +2121,6 @@ b32 time_on_between_interval(f32 interval, f32 offset) { return time_on_between_
 f64 time_since(f64 timestamp) { return time_now - timestamp; }
 f64 time_until(f64 timestamp) { return timestamp - time_now; }
 
-void imgui_draw_rect(ImDrawList* draw, Rng2 rect, Color col, f32 rounding, ImDrawFlags flags, f32 thickness) {
-	draw->AddRect(rect.min, rect.max, col.v, rounding, thickness, flags);
-}
-void imgui_draw_rect_filled(ImDrawList* draw, Rng2 rect, Color col, f32 rounding, ImDrawFlags flags) {
-	draw->AddRectFilled(rect.min, rect.max, col.v);
-}
-void imgui_draw_line(ImDrawList* draw, v2 p0, v2 p1, Color col, f32 thickness) {
-	draw->AddLine(p0, p1, col.v);
-}
-void imgui_draw_text(ImDrawList* draw, v2 pos, Color col, String fmt, ...) {
-	Scratch scratch;
-	VaList args;
-	va_start(args, fmt);
-	String formateted = push_strfv(scratch, fmt, args);
-	va_end(args);
-	draw->AddText(pos, col.v, (char*)formateted.str, (char*)(formateted.str + formateted.size));
-}
-void imgui_draw_text(ImDrawList* draw, f32 font_size, v2 pos, Color col, String fmt, ...) {
-	Scratch scratch;
-	VaList args;
-	va_start(args, fmt);
-	String formateted = push_strfv(scratch, fmt, args);
-	va_end(args);
-	draw->AddText(null, font_size, pos, col.v, (char*)formateted.str, (char*)(formateted.str + formateted.size));
-}
-void imgui_text(String fmt, ...) {
-	Scratch scratch;
-	VaList args;
-	va_start(args, fmt);
-	String formateted = push_strfv(scratch, fmt, args);
-	va_end(args);
-	ImGui::TextUnformatted((char*)formateted.str, (char*)(formateted.str + formateted.size));
-}
-v2 imgui_calc_text_size(String str) {
-	return ImGui::CalcTextSize((char*)str.str, (char*)str.str+str.size);
-}
-
 void debug_window_apply_state(DebugWindow& win) {
 	if(win.toggle_fullscreen) {
 		if(win.fullscreen) {
@@ -2252,6 +2150,7 @@ void debug_window_toggle_fullscreen(DebugWindow& win) {
 }
 
 void dev_init() {
+#if BUILD_DEV
 	var& g = *st;
 	g.prof_win = {
 		.win.open = false,
@@ -2275,9 +2174,11 @@ void dev_init() {
 		.mem_committed = ColorBlueUi,
 		.mem_cap = ColorRedUi,
 	};
+#endif
 }
 
 void dev_update() {
+#if BUILD_DEV
 	Scratch scratch;
 	var& g = *st;
 	if(g.imgui_demo_open) ImGui::ShowDemoWindow();
@@ -2887,6 +2788,7 @@ void dev_update() {
 			}
 		}
 	}
+#endif
 }
 
 MeshDesc load_obj(Allocator arena, String name) {
@@ -2970,7 +2872,7 @@ MeshDesc load_obj(Allocator arena, String name) {
 		}
 	}
 
-	var vertices = array_make<R_Vertex>(arena);
+	var vertices = array_make<Vertex>(arena);
 	var final_indices = array_make<u16>(arena);
 	var map = map_make<u16>(scratch);
 	Loop(i, indexes.count) {
@@ -2980,7 +2882,7 @@ MeshDesc load_obj(Allocator arena, String name) {
 		if(map_get(map, h, &value)) {
 			array_push(final_indices, value);
 		} else {
-			R_Vertex v = {
+			Vertex v = {
 			 positions[idx.x],
 			 normals[idx.y],
 			 uvs[idx.z],
@@ -3238,7 +3140,7 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 		}
 	}
 
-	Slice vertices = push_slice(arena, R_Vertex, vert_count);
+	Slice vertices = push_slice(arena, Vertex, vert_count);
 	Slice indices = push_slice(arena, u16, indices_count);
 	Loop(i, indices.count) {
 		indices[i] = indices_u16[i];
@@ -3758,6 +3660,25 @@ void watch_update() {
 	}
 }
 
+b32 iter_next(ThingIter& it) {
+	if(it.idx >= it.count) return false;
+	u32 dense_idx = it.dense[it.idx];
+	it.id = {dense_idx, it.gens[dense_idx]};
+	it.idx++;
+	return true;
+}
+
+ThingIter things_begin() {
+	var& g = *st;
+	ThingIter res = {
+		.data = g.things.data,
+		.count = g.things_set.count,
+		.dense = g.things_set.dense,
+		.gens = g.things.gens,
+	};
+	return res;
+}
+
 ThingDesc default_thing_desc() {
 	var& g = *st;
 	ThingDesc res = {
@@ -4062,25 +3983,6 @@ template <typename T> b32 node_iter_next(NodeIter2<T>& it) {
 	return true;
 }
 
-b32 iter_next(ThingIter& it) {
-	if(it.idx >= it.count) return false;
-	u32 dense_idx = it.dense[it.idx];
-	it.id = {dense_idx, it.gens[dense_idx]};
-	it.idx++;
-	return true;
-}
-
-ThingIter things_begin() {
-	var& g = *st;
-	ThingIter res = {
-		.data = g.things.data,
-		.count = g.things_set.count,
-		.dense = g.things_set.dense,
-		.gens = g.things.gens,
-	};
-	return res;
-}
-
 void init() {
 	Scratch scratch;
 	var& g = *st;
@@ -4155,7 +4057,9 @@ if(data->ctx == null) {
 			time_dt = f64(now_ns - prev_ns) / Billion(1);
 			time_now += time_dt;
 			prev_ns = now_ns;
-			r_begin();
+#if BUILD_DEV
+			imgui_begin_frame();
+#endif
 			update_game();
 			r_end();
 			watch_update();
@@ -4186,7 +4090,7 @@ MeshDesc generate_sphere(Allocator arena) {
 	u32 lon_steps = 10;
 	u32 vert_count = lat_steps*lon_steps;
 	u32 index_count = (lat_steps - 1) * lon_steps * 6;
-	var vertices = push_slice(arena, R_Vertex, vert_count);
+	var vertices = push_slice(arena, Vertex, vert_count);
 	var indices = push_slice(arena, u16, index_count);
 	f32 lat_step_angle = PI / lat_steps;
 	f32 lon_step_angle = 2*PI / lon_steps;
@@ -4194,7 +4098,7 @@ MeshDesc generate_sphere(Allocator arena) {
 		f32 lat_angle = -PI/2 + i*lat_step_angle;
 		for(u32 j = 0; j < lon_steps; j++) {
 			f32 lon_angle = j * lon_step_angle;
-			R_Vertex vert = {
+			Vertex vert = {
 				.pos.x = cos(lat_angle) * cos(lon_angle),
 				.pos.y = sin(lat_angle),
 				.pos.z = cos(lat_angle) * sin(lon_angle),
@@ -4238,7 +4142,7 @@ MeshDesc generate_sphere(Allocator arena) {
 }
 
 MeshDesc generate_grid(Allocator arena, u32 size, f32 step) {
-	var vertices = push_slice(arena, R_Vertex, size*4);
+	var vertices = push_slice(arena, Vertex, size*4);
 	v3 pos_offset = v3(-(i32)size/2, 0, -(i32)size/2);
 	for(i32 i = 0; i < size; i++) {
 		vertices[i*2].pos = pos_offset + v3(0, 0, i*step);
@@ -4591,6 +4495,10 @@ void update_game() {
 	Scratch scratch;
 	var& g = *st;
 	dev_update();
+
+	draw_rect(rng2_make(v2(400, 100), v2(50)), RED);
+	draw_rect(rng2_make(v2(600, 100), v2(50)), RED, 10, 2, 1);
+
 
 	// Test jobs
 	#if 0

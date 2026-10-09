@@ -41,7 +41,7 @@ struct GpuState {
 	u32 cubemap;
 };
 
-struct Glue(R_, Vertex) {
+struct Vertex {
 	v3 pos;
 	v3 norm;
 	v2 uv;

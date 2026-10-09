@@ -46,14 +46,12 @@ FS_Entry v4 fs_main(UI_VSOutput in) {
 	v4 sample = v4(1);
 	// Font?
 	if(flag_has(in.flags, GpuUI_RectFlag_IsFont)) {
-		f32 r = textures[in.texture].Sample(samplers[1], in.uv).r;
+		f32 r = sample_texture(in.texture, in.uv).r;
 		sample = r;
 	}
 	// Texture?
-	else {
-		if(in.texture > 0) {
-			sample = textures[in.texture].Sample(samplers[1], in.uv);
-		}
+	else if(in.texture > 0) {
+		sample = sample_texture(in.texture, in.uv);
 	}
 
 	f32 softness = in.edge_softness;

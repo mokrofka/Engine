@@ -171,21 +171,21 @@ enum Gfx_StoreAction {
 };
 
 struct Gfx_ColorAttachmentAction {
-	Gfx_LoadAction load_action;
-	Gfx_StoreAction store_action;
-	v4 clear_value;
+	Gfx_LoadAction load;
+	Gfx_StoreAction store;
+	v4 clear;
 };
 
 struct Gfx_DepthAttachmentAction {
-	Gfx_LoadAction load_action;
-	Gfx_StoreAction store_action;
-	f32 clear_value;
+	Gfx_LoadAction load;
+	Gfx_StoreAction store;
+	f32 clear;
 };
 
 struct Gfx_StencilAttachmentAction {
-	Gfx_LoadAction load_action;
-	Gfx_StoreAction store_action;
-	u8 clear_value;
+	Gfx_LoadAction load;
+	Gfx_StoreAction store;
+	u8 clear;
 };
 
 struct Gfx_PassAction {
@@ -240,7 +240,7 @@ struct Gfx_ImageDesc {
 	u32 slices_count;
 	b32 mipmaps;
 	Gfx_PixelFormat pixel_format;
-	u32 sample_count;
+	u32 samples;
 	union {
 		u8* data;
 		u8* cube[6];
@@ -248,10 +248,8 @@ struct Gfx_ImageDesc {
 };
 
 enum Gfx_ViewType {
-	Gfx_ViewType_Texture = 1,
-	Gfx_ViewType_ColorAttachment,
-	Gfx_ViewType_ResolveAttachment,
-	Gfx_ViewType_DepthStencilAttachment,
+	Gfx_ViewType_Sampled = 1,
+	Gfx_ViewType_Attachment,
 };
 
 struct Gfx_ViewDesc {
@@ -411,7 +409,7 @@ struct Gfx_StageBufferCmd {
 	Gfx_Image img;
 	Gfx_Buffer buf;
 	u64 buf_offset;
-	u64 stage_offset;
+	u64 stage_off;
 	u64 size;
 };
 
@@ -728,8 +726,9 @@ struct Gfx_State {
 	u64 stage_cmd_ready_counter;
 	b32 stage_cmd_busy;
 
-	Queue<Gfx_StageBufferCmd, 32> stage_cmd_queue;
-	Mutex stage_buffer_reserve_mutex;
+	QueueSPSC<Gfx_StageBufferCmd, 32> stage_cmd_queue;
+	Mutex stage_cmd_mutex;
+	Mutex stage_reserve_mutex;
 
 	struct {
 		v2u size;
@@ -962,8 +961,8 @@ void gfx_make_binding_buffers(Slice<Gfx_BufferDesc> descs);
 void gfx_flush();
 void gfx_idle();
 
-void vk_begin_timestamp(String name);
-void vk_end_timestamp();
+void gfx_begin_timestamp(String name);
+void gfx_end_timestamp();
 
 void gfx_readback_image(Gfx_Image img, u8* dst);
 void gfx_init(Gfx_Environment environment);
