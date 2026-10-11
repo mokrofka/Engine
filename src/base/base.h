@@ -303,20 +303,20 @@ template <typename F> _Defer<F> operator+(_DeferDummy, F f) { return {f}; }
 ////////////////////////////////////////////////////////////////////////
 // Circular Linked List
 #define DLL_list_init(a, n, next, prev) \
-	(a[n].next = n,                       \
+	(a[n].next = n,                        \
 		a[n].prev = n)
 #define DLL_list_push(a, first, n, next, prev) \
-	a[n].next = first;                           \
-	a[n].prev = a[first].prev;                   \
-	a[a[first].prev].next = n;                   \
+	a[n].next = first;                            \
+	a[n].prev = a[first].prev;                    \
+	a[a[first].prev].next = n;                    \
 	a[first].prev = n;
 #define DLL_list_insert(a, first, n, next, prev) \
-	a[n].next = a[first].next;                     \
-	a[n].prev = first;                             \
-	a[a[first].next].prev = n;                     \
+	a[n].next = a[first].next;                      \
+	a[n].prev = first;                              \
+	a[a[first].next].prev = n;                      \
 	a[first].next = n;
 #define DLL_list_remove(a, n, next, prev) \
-	a[a[n].next].prev = a[n].prev;          \
+	a[a[n].next].prev = a[n].prev;           \
 	a[a[n].prev].next = a[n].next;
 #define dll_list_init(a, x) DLL_list_init(a, x, next, prev)
 #define dll_list_push(a, first, n) DLL_list_push(a, first, n, next, prev)
@@ -324,12 +324,12 @@ template <typename F> _Defer<F> operator+(_DeferDummy, F f) { return {f}; }
 #define dll_list_remove(a, n) DLL_list_remove(a, n, next, prev)
 
 #define PDLL_list_init(first, next, prev) \
-	(first)->next = first;                  \
+	(first)->next = first;                   \
 	(first)->prev = first;
 #define PDLL_list_push(first, n, next, prev) \
-	(n)->next = (first);                       \
-	(n)->prev = (first)->prev;                 \
-	(first)->prev->next = n;                   \
+	(n)->next = (first);                        \
+	(n)->prev = (first)->prev;                  \
+	(first)->prev->next = n;                    \
 	(first)->prev = n;
 #define PDLL_list_insert(first, n, next, prev) \
 	(n)->next = (first)->next;                    \
@@ -337,7 +337,7 @@ template <typename F> _Defer<F> operator+(_DeferDummy, F f) { return {f}; }
 	(first)->next->prev = n;                      \
 	(first)->next = n;
 #define PDLL_list_remove(n, next, prev) \
-	(n)->next->prev = (n)->prev;          \
+	(n)->next->prev = (n)->prev;           \
 	(n)->prev->next = (n)->next;
 #define pdll_list_init(first) PDLL_list_init(first, next, prev)
 #define pdll_list_push(first, n) PDLL_list_push(first, n, next, prev)
@@ -506,7 +506,7 @@ template<typename To, typename From> NO_DEBUG Slice<To> slice_reinterpret(Slice<
 	Assert((s.count * sizeof(From)) % sizeof(To) == 0);
 	return Slice((To*)s.data, (s.count*sizeof(From)) / sizeof(To));
 }
-template<typename T> NO_DEBUG void slice_copy(Slice<T> dst, Slice<T> src) {Assert(dst.count == src.count); MemCopyArray(dst.data, src.data, src.count); }
+template<typename T> NO_DEBUG void slice_copy(Slice<T> dst, Slice<T> src) { MemCopyArray(dst.data, src.data, src.count); }
 
 ////////////////////////////////////////////////////////////////////////
 // RandyGaul stackless coroutine
@@ -1207,7 +1207,7 @@ v4 quat_rotate_towards(v4 a, v4 b, f32 max_rad);
 v4 quat_from_to(v3 a, v3 b);
 v4 quat_from_euler(v3 e);
 v4 quat_look_rotation(v3 dir, v3 up);
-v3 quat_rotate_point(v3 point, v3 pivot, v4 q);
+v3 quat_rotate_point(v4 q, v3 point, v3 pivot);
 
 ////////////////////////////////////////////////////////////////////////
 // m2x2
@@ -1284,8 +1284,11 @@ m4x4 m4x4_rotate_z(f32 rad);
 m4x4 m4x4_rotate_xyz(v3 rad);
 m4x4 m4x4_rotate_around_axis(v3 axis, f32 rad);
 m4x4 m4x4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far);
+m4x4 m4x4_orthographic_inverse(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far);
 m4x4 m4x4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far);
+m4x4 m4x4_perspective_inverse(f32 fov, f32 aspect, f32 near, f32 far);
 m4x4 m4x4_look_at(v3 pos, v3 target, v3 up = v3_up());
+m4x4 m4x4_look_at_inverse(v3 pos, v3 target, v3 up = v3_up());
 m4x4 m4x4_transpose(m4x4 matrix);
 m4x4 m4x4_inverse(m4x4 matrix);
 m4x4 m4x4_from_quat(v4 q);
@@ -2959,9 +2962,9 @@ void os_gfx_shutdown();
 void   os_pump_messages();
 b32    os_window_should_close();
 void   os_window_close();
-v2u    os_window_size();
-u32    os_window_width();
-u32    os_window_height();
+v2u    os_win_size();
+u32    os_win_width();
+u32    os_win_height();
 v2u    os_screen_size();
 u32    os_screen_width();
 u32    os_screen_height();

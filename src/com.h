@@ -7,14 +7,9 @@
 #include "../vendor/stb_image.h"
 #include "../vendor/stb_truetype.h"
 
-// TODO:
-// UI
 // make wayland backend work
 // console
-// thread safe allocator
-// glb loader
 // obj mouse selection
-// load mesh, animations, textures
 
 #define CONST const
 #include "shader_header.h"
@@ -348,35 +343,34 @@ struct WaitingFont {
 	Font font;
 };
 
-#define MESH_LIST \
-	X(Dummy) \
-	X(Cube) \
-	X(MonkeyGlb) \
-	X(Triangle) \
-	X(Grid) \
-	X(Axis) \
-	X(Sphere) \
-	X(CubeGlft) \
-	X(GreeMan) \
-	X(Barrack) \
-	X(Bubble) \
-	X(T) \
+#define MESH_LIST     \
+	X(Dummy)             \
+	X(Cube)              \
+	X(MonkeyGlb)         \
+	X(Triangle)          \
+	X(Axis)              \
+	X(Sphere)            \
+	X(CubeGlft)          \
+	X(GreeMan)           \
+	X(Barrack)           \
+	X(Bubble)            \
+	X(T)                 \
 
-#define TEXTURE_LIST \
-	X(Dummy) \
-	X(DummyCubeMap) \
-	X(Orange) \
-	X(Container) \
-	X(Barrack) \
-	X(Bricks) \
+#define TEXTURE_LIST  \
+	X(Dummy)             \
+	X(DummyCubeMap)      \
+	X(Orange)            \
+	X(Container)         \
+	X(Barrack)           \
+	X(Bricks)            \
 
 #define MATERIAL_LIST \
-	X(Dummy) \
-	X(Orange) \
-	X(Container) \
-	X(Axis) \
-	X(Line) \
-	X(Barrack) \
+	X(Dummy)             \
+	X(Orange)            \
+	X(Container)         \
+	X(Axis)              \
+	X(Line)              \
+	X(Barrack)           \
 
 enum MeshEnum {
 #define X(name) Glue(Mesh_, name),
@@ -612,7 +606,7 @@ struct GltfInfo {
 	MeshDesc mesh;
 	Slice<Bone> bones;
 	Slice<m4x4> inv_matrices;
-	Animation animation;
+	Animation anim;
 };
 
 struct ThingIter {
@@ -716,14 +710,13 @@ struct GlobalState {
 	TextureId cur_cubemap;
 
 	Gfx_Buffer cpu_vert_buf;
+	Gfx_Buffer cpu_drawcall_buf;
 	Gfx_Buffer gpu_vert_buf;
 	Gfx_Buffer gpu_index_buf;
-	Gfx_Buffer gpu_state_buf;
-	Gfx_Buffer gpu_entities_indices_buf;
-	Gfx_Buffer gpu_materials_buf;
-	Gfx_Buffer gpu_drawcall_buf;
-	Gfx_Buffer gpu_software_render_buf;
-	Gfx_Buffer gpu_ui_rect_buf;
+	Gfx_Buffer cpu_state_buf;
+	Gfx_Buffer cpu_materials_buf;
+	Gfx_Buffer cpu_software_render_buf;
+	Gfx_Buffer cpu_ui_rect_buf;
 
 	Vertex* cpu_vertices;
 	GpuState* gpu_state;
@@ -769,15 +762,17 @@ void update_mesh(MeshId mesh, MeshDesc desc);
 void reload_shader(String name);
 void shaders_compile(Allocator arena);
 void shaders_compile_join();
-
+void default_pip_state(Gfx_PipelineState* s);
+void apply_pip_state_raw(Gfx_PipelineState s);
 void apply_pip_state(Gfx_PipelineState s);
 
 void r_init();
 void r_shutdown();
+void drawcall_set_mesh(GpuDrawCall& draw, Gfx_Mesh mesh);
 void r_end();
 
 void draw_mesh(MeshId mesh, MaterialId mat, v3 pos, u32 flags = 0);
-void draw_mesh_trs(MeshId mesh, MaterialId mat, v3 pos, v4 rot, v3 scale);
+void draw_mesh_trs(MeshId mesh, MaterialId mat, v3 pos, v4 rot, v3 scale, u32 flags = 0);
 void draw_thing(ThingId id);
 
 void draw_line(v3 a, v3 b, Color color);

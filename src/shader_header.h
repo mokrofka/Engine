@@ -13,6 +13,8 @@ enum Bindings {
 	SoftwareRender,
 	UI_RectBinding,
 	Vertices,
+	CpuVertices,
+	Indices,
 	SkinMatrices,
 };
 
@@ -42,12 +44,12 @@ struct GpuState {
 };
 
 struct Vertex {
-	v3 pos;
-	v3 norm;
-	v2 uv;
+	alignas(16) v3 pos;
 	u32 color;
-	v4 weights;
-	v4u joints;
+	alignas(16) v3 norm;
+	alignas(16) v4 weights;
+	alignas(8) v2 uv;
+	alignas(16) v4u joints;
 
 	// TODO: use it in future:
 	// v4u8 joints; // causes invalid indexes
@@ -55,8 +57,19 @@ struct Vertex {
 };
 
 CONST u32 DrawCallFlag_Skeleton = 1<<1;
+CONST u32 DrawCallFlag_Indexed = 1<<2;
+CONST u32 DrawCallFlag_CpuVertices = 1<<3;
+
+struct DrawCallMesh {
+	u32 count;
+	u32 instance_count;
+	u32 base;
+	u32 base_instance;
+	i32 vert_off;
+};
 
 struct Glue(Gpu, DrawCall) {
+	DrawCallMesh mesh;
 	alignas(16) m4x4 model;
 	ShaderType type;
 	u32 tex;

@@ -53,7 +53,7 @@ void destroy_attachment(Attachment& a) {
 v2u resolve_size(RenderTargetDesc d) {
 	switch(d.size_mode) {
 		InvalidDefaultCase;
-		case Size_Swapchain: return os_window_size();
+		case Size_Swapchain: return os_win_size();
 		case Size_Absolute:  return d.size;
 	}
 }
@@ -574,7 +574,7 @@ void r_bind_pipeline(Gfx_Pipeline pip) {
 	gfx_bind_pipeline(pip);
 }
 
-void r_default_pipeline_state(Gfx_PipelineState* s) {
+void default_pip_state(Gfx_PipelineState* s) {
 	_DefSet(s->primitive_type, Gfx_PrimitiveType_Triangle);
 	_DefSet(s->cull_mode, Gfx_CullMode_None);
 	_DefSet(s->face_winding, Gfx_FaceWinding_CCW);
@@ -585,7 +585,7 @@ void r_default_pipeline_state(Gfx_PipelineState* s) {
 	_DefSet(s->sample_count, Gfx_DefaultSampleCount);
 }
 
-void r_apply_state_raw(Gfx_PipelineState s = {}) {
+void apply_pip_state_raw(Gfx_PipelineState s) {
 	gfx_apply_primitive_type(s.primitive_type);
 	gfx_apply_cull_mode(s.cull_mode);
 	gfx_apply_face_winding(s.face_winding);
@@ -604,10 +604,10 @@ void r_apply_state_raw(Gfx_PipelineState s = {}) {
 
 void apply_pip_state(Gfx_PipelineState s) {
 	var& g = *st;
-	r_default_pipeline_state(&s);
+	default_pip_state(&s);
 	if(g.cur_pip.idx != g.prev_pip.idx) {
 		g.prev_pip = g.cur_pip;
-		r_apply_state_raw(s);
+		apply_pip_state_raw(s);
 	} else {
 		var& prev = g.prev_pip_state;
 		if(s.primitive_type != prev.primitive_type) {
@@ -653,8 +653,8 @@ void apply_pip_state(Gfx_PipelineState s) {
 void r_init() {
 	ProfFunc;
 	Scratch scratch;
-	Arena arena = arena_make(.name = "render arena");
 	var& g = *st;
+	Arena arena = arena_make(.name = "render arena");
 	g.arena = arena;
 	g.gpa = alloc_make(g.arena);
 	g.scale = 1;
@@ -664,10 +664,6 @@ void r_init() {
 	// Buffers
 	{
 		ProfBlock("buffers");
-		g.cpu_vert_buf = gfx_make_buffer(MB(1), Gfx_MemType_Cpu);
-		g.cpu_vertices = (Vertex*)gfx_buffer_base_ptr(g.cpu_vert_buf);
-		g.gpu_vert_buf = gfx_make_buffer(MB(1), Gfx_MemType_Gpu);
-		g.gpu_index_buf = gfx_make_buffer(MB(1), Gfx_MemType_Gpu);
 	}
 
 	///////////////////////////////////
@@ -678,6 +674,24 @@ void r_init() {
 		gfx_make_bind({.type = Gfx_BindType_Sampler, .binding = Bindings::Samplers, .count = Gfx_MaxSamplers});
 		gfx_make_bind({.type = Gfx_BindType_Image, .binding = Bindings::CubeTextures, .count = Gfx_MaxCubeTextures});
 		Gfx_BufferDesc buffers[] = {
+			{
+				.binding = Bindings::Vertices,
+				.size = MB(2),
+				.mem_type = Gfx_MemType_Gpu,
+				.out_buffer = &g.gpu_vert_buf,
+			},
+			{
+				.binding = Bindings::Indices,
+				.size = MB(1),
+				.mem_type = Gfx_MemType_Gpu,
+				.out_buffer = &g.gpu_index_buf,
+			},
+			{
+				.binding = Bindings::CpuVertices,
+				.size = MB(1),
+				.out_buffer = &g.cpu_vert_buf,
+				.out_cpu_ptr = (void**)&g.cpu_vertices,
+			},
 			{
 				.binding = Bindings::State,
 				.size = sizeof(GpuState),
@@ -692,6 +706,7 @@ void r_init() {
 				.binding = Bindings::DrawCtx,
 				.size = sizeof(GpuDrawCall) * MaxThings,
 				.out_cpu_ptr = (void**)&g.gpu_drawcalls,
+				.out_buffer = &g.cpu_drawcall_buf,
 			},
 			{
 				.binding = Bindings::SoftwareRender,
@@ -711,7 +726,7 @@ void r_init() {
 		};
 		gfx_make_binding_buffers(slice(buffers));
 		gfx_flush();
-		g.gpu_state->p = st->gfx.cpu_buf_address;
+		// g.gpu_state->p = st->gfx.cpu_buf_address;
 	}
 
 	// Misc
@@ -764,20 +779,40 @@ void r_shutdown() {
 	gfx_shutdown();
 }
 
+void drawcall_set_mesh(GpuDrawCall& draw, Gfx_Mesh mesh) {
+	if(mesh.index_count) {
+		draw.mesh = {
+			.count = mesh.index_count,
+			.instance_count = 1,
+			.base = mesh.base_index,
+			.base_instance = 0,
+			.vert_off = (i32)mesh.base_vert,
+		};
+		draw.flags |= DrawCallFlag_Indexed;
+	} else {
+		draw.mesh = {
+			.count = mesh.vert_count,
+			.instance_count = 1,
+			.base = mesh.base_vert,
+			.base_instance = 0,
+		};
+	}
+}
+
 void r_end() {
 	ProfFunc;
 	Scratch scratch;
 	var& g = *st;
 	gfx_begin();
-	g.gpu_state->res.x = os_window_size().x;
-	g.gpu_state->res.y = os_window_size().y;
+	g.gpu_state->res.x = os_win_size().x;
+	g.gpu_state->res.y = os_win_size().y;
 	g.prev_pip = {};
 
 	// Resize?
 	if(st->gfx.swapchain_resized || g.old_scale != g.scale) {
 		g.old_scale = g.scale;
 		gfx_idle();
-		v2u win_size = os_window_size();
+		v2u win_size = os_win_size();
 		win_size.x *= g.scale;
 		win_size.y *= g.scale;
 		resize_render_target(g.world_rt);
@@ -814,13 +849,11 @@ void r_end() {
 
 	// Update skeleton
 	{
-		g.global_matrices[0] = m4x4_transform(g.bones[0].local);
+		g.global_matrices[0] = m4x4_transform(g.runtime_bones[0].local);
 		g.skin_matrices[0] = g.global_matrices[0] * g.inv_matrices[0];
-		// g.skin_matrices[0] = g.global_matrices[0];
-		LoopOff(i, 1, g.bones.count) {
-			g.global_matrices[i] = g.global_matrices[g.bones[i].parent] * m4x4_transform(g.bones[i].local);
+		LoopOff(i, 1, g.runtime_bones.count) {
+			g.global_matrices[i] = g.global_matrices[g.runtime_bones[i].parent] * m4x4_transform(g.runtime_bones[i].local);
 			g.skin_matrices[i] = g.global_matrices[i] * g.inv_matrices[i];
-			// g.skin_matrices[i] = g.global_matrices[i];
 		}
 	}
 
@@ -855,36 +888,43 @@ void r_end() {
 		gfx_begin_timestamp("world");
 		begin_render_pass({&g.world_rt});
 		{
-			gfx_apply_viewport(rng2_make(v2(), os_window_size() * g.scale), true);
-			gfx_apply_scissor(rng2_make(v2(), os_window_size()));
-			gfx_bind_vert(g.gpu_vert_buf);
-			gfx_bind_index(g.gpu_index_buf);
+			gfx_apply_viewport(rng2_make(v2(), os_win_size() * g.scale), true);
+			gfx_apply_scissor(rng2_make(v2(), os_win_size()));
+			// gfx_bind_vert(g.gpu_vert_buf);
+			// gfx_bind_index(g.gpu_index_buf);
 			r_bind_pipeline(g.uber_pip);
 			for(var& batch : g.batches) {
 				apply_pip_state(batch.state);
 				var emit_batch = [&](Slice<DrawCall> pushes, b32 indexed) {
 					u32 base = gfx_begin_indirect();
-					Loop(i, pushes.count) {
-						DrawCall draw = pushes[i];
+					for(var draw : pushes) {
 						m4x4 model = m4x4_transform(draw.pos, draw.scale, draw.rot);
 						var mat = g.materials[draw.mat.idx];
-						g.gpu_drawcalls[drawcall_count] = {
+						var& drawcall = g.gpu_drawcalls[drawcall_count];
+						drawcall = {
 							.model = model,
 							.color = draw.color.v,
 							.mat = mat.idx,
 							.type = draw.type,
 							.flags = draw.flags,
 						};
+
 						Gfx_Mesh mesh = g.meshes[draw.mesh.idx];
+						drawcall_set_mesh(drawcall, mesh);
+
 						gfx_push_indirect_mesh(mesh, drawcall_count++);
 					}
 					Gfx_IndirectDrawCall draw = gfx_end_indirect(base);
 					if(draw.count) {
 						vk_push_constants({draw.base});
 						if(indexed) {
-								gfx_draw_indexed_indirect(draw);
+							// gfx_draw_indexed_indirect(draw);
+							var& gfx = st->gfx;
+							gfx.CmdDrawIndirect(vk_cur_cmd(), gfx.cpu_buf.h, g.cpu_drawcall_buf.base + draw.base*sizeof(GpuDrawCall) + OffsetOf(GpuDrawCall, mesh), draw.count, sizeof(GpuDrawCall));
 						} else {
-								gfx_draw_indirect(draw);
+							// gfx_draw_indirect(draw);
+							var& gfx = st->gfx;
+							gfx.CmdDrawIndirect(vk_cur_cmd(), gfx.cpu_buf.h, g.cpu_drawcall_buf.base + draw.base*sizeof(GpuDrawCall) + OffsetOf(GpuDrawCall, mesh), draw.count, sizeof(GpuDrawCall));
 						}
 					}
 				};
@@ -895,7 +935,6 @@ void r_end() {
 			}
 
 			// Debug drawing
-			gfx_bind_vert(g.cpu_vert_buf);
 			if(g.draw_lines.count) {
 				MemCopyArray(g.cpu_vertices, g.draw_lines.data, g.draw_lines.count);
 				apply_pip_state({
@@ -913,6 +952,7 @@ void r_end() {
 					}
 				});
 				g.gpu_drawcalls[drawcall_count].type = ShaderType::Line;
+				g.gpu_drawcalls[drawcall_count].flags |=	DrawCallFlag_CpuVertices;
 				vk_push_constants({drawcall_count++});
 				gfx_draw(0, g.draw_lines.count);
 				array_clear(g.draw_lines);
@@ -924,13 +964,14 @@ void r_end() {
 
 			// Cube map
 			apply_pip_state({.depth = {.compare = Gfx_CompareOp_LessEqual}});
-			gfx_bind_vert(g.gpu_vert_buf);
 			g.gpu_drawcalls[drawcall_count].type = ShaderType::Cube;
+			var mesh = g.meshes[g.meshes_ids[Mesh_Cube].idx];
+			drawcall_set_mesh(g.gpu_drawcalls[drawcall_count], mesh);
 			vk_push_constants({drawcall_count++});
-			gfx_draw_mesh(g.meshes[g.meshes_ids[Mesh_Cube].idx]);
+			gfx_draw_mesh(mesh);
 
 			// UI drawing
-			gfx_apply_viewport(rng2_make(v2(), os_window_size() * g.scale));
+			gfx_apply_viewport(rng2_make(v2(), os_win_size() * g.scale));
 			if(g.draw_rects.count) {
 				Loop(i, g.draw_rects.count) {
 					var rect = g.draw_rects[i];
@@ -972,7 +1013,7 @@ void r_end() {
 	gfx_begin_timestamp("swapchain");
 	gfx_begin_pass({});
 	{
-		gfx_apply_viewport(rng2_make(v2(), os_window_size()));
+		gfx_apply_viewport(rng2_make(v2(), os_win_size()));
 		gfx_bind_pipeline(g.uber_pip);
 		apply_pip_state({.sample_count = 1});
 		g.gpu_drawcalls[drawcall_count] = {
@@ -1016,7 +1057,7 @@ void draw_mesh(MeshId mesh, MaterialId mat, v3 pos, u32 flags) {
 	}
 }
 
-void draw_mesh_trs(MeshId mesh, MaterialId mat, v3 pos, v4 rot, v3 scale) {
+void draw_mesh_trs(MeshId mesh, MaterialId mat, v3 pos, v4 rot, v3 scale, u32 flags) {
 	var& g = *st;
 	var material = g.materials[mat.idx];
 	u32 batch_idx = material.batch;
@@ -1027,6 +1068,7 @@ void draw_mesh_trs(MeshId mesh, MaterialId mat, v3 pos, v4 rot, v3 scale) {
 		.mesh = mesh,
 		.mat = mat,
 		.type = material.type,
+		.flags = flags,
 	};
 	if(g.meshes[mesh.idx].index_count) {
 		array_push(g.batches[batch_idx].draws, cmd);
@@ -1318,7 +1360,7 @@ Timer _timer_type_repeat_delay = {.interval = 1.0f/6};
 void imgui_impl_new_frame() {
 	ImGuiIO& io = ImGui::GetIO();
 	io.DeltaTime = time_dt;
-	io.DisplaySize = v2(os_window_size());
+	io.DisplaySize = v2(os_win_size());
 	Slice<OS_InputEvent> events = os_get_input_events();
 	if(last_key_event.is_pressed) {
 		_timer_type_repeat_delay.acc += time_dt;
@@ -2883,9 +2925,9 @@ MeshDesc load_obj(Allocator arena, String name) {
 			array_push(final_indices, value);
 		} else {
 			Vertex v = {
-			 positions[idx.x],
-			 normals[idx.y],
-			 uvs[idx.z],
+			 .pos = positions[idx.x],
+			 .norm = normals[idx.y],
+			 .uv = uvs[idx.z],
 			};
 			u16 new_index = vertices.count;
 			array_push(vertices, v);
@@ -3154,12 +3196,11 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 	}
 	if(joints.count) {
 		Loop(i, vertices.count) {
-			// vertices[i].joints = joints[i];
 			vertices[i].joints.v[0] = joints[i].v[0];
 			vertices[i].joints.v[1] = joints[i].v[1];
 			vertices[i].joints.v[2] = joints[i].v[2];
 			vertices[i].joints.v[3] = joints[i].v[3];
-			// vertices[i].weights = weights[i];
+			vertices[i].weights = weights[i];
 		}
 	}
 	GltfInfo res = {
@@ -3169,12 +3210,12 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 		},
 		.bones = bones,
 		.inv_matrices = inv_matrices,
-		.animation = {
+		.anim = {
 			.channels = channels,
 			.samplers = samplers,
 		},
 	};
-	res.animation.duration = animation_duration(res.animation);
+	res.anim.duration = animation_duration(res.anim);
 	return res;
 }
 
@@ -3220,13 +3261,13 @@ void update_animation(Animation anim, Pose pose, f32 time) {
 		switch(channel.path) {
 			case AnimPath_Pos: {
 				bone.pos = sample_v3(sampler, time);
-			} break;
+			}break;
 			case AnimPath_Rot: {
 				bone.rot = sample_quat(sampler, time);
-			} break;
+			}break;
 			case AnimPath_Scale: {
 				bone.scale = sample_v3(sampler, time);
-			} break;
+			}break;
 		}
 	}
 }
@@ -3968,21 +4009,6 @@ void check_observer_observed() {
 	print_observed({3});	 /* expect: (nothing) - B's chain is now empty */
 }
 
-template <typename T> struct NodeIter2 {
-	T* nodes;
-	u32 idx;
-	u32 cur;
-	T* val;
-};
-
-template <typename T> b32 node_iter_next(NodeIter2<T>& it) {
-	if(it.idx == 0) return false;
-	it.cur = it.idx;
-	it.val = &it.nodes[it.idx];
-	it.idx = it.val->next;
-	return true;
-}
-
 void init() {
 	Scratch scratch;
 	var& g = *st;
@@ -4141,24 +4167,6 @@ MeshDesc generate_sphere(Allocator arena) {
 	return mesh;
 }
 
-MeshDesc generate_grid(Allocator arena, u32 size, f32 step) {
-	var vertices = push_slice(arena, Vertex, size*4);
-	v3 pos_offset = v3(-(i32)size/2, 0, -(i32)size/2);
-	for(i32 i = 0; i < size; i++) {
-		vertices[i*2].pos = pos_offset + v3(0, 0, i*step);
-		vertices[i*2+1].pos = pos_offset + v3(size*step, 0, i*step);
-	}
-	var vertical_vertices = slice_skip(vertices, size*2);
-	for(i32 i = 0; i < size; i++) {
-		vertical_vertices[i*2].pos = pos_offset + v3(i*step, 0, 0);
-		vertical_vertices[i*2+1].pos = pos_offset + v3(i*step, 0, size*step);
-	}
-	MeshDesc mesh = {
-		.vertices = vertices,
-	};
-	return mesh;
-}
-
 // b32 ray_intersect_AABB(Ray ray, AABB aabb) {
 //   v3 tMin = v3_hadamard_div(aabb.min - ray.origin, ray.dir);
 //   v3 tMax = v3_hadamard_div(aabb.max - ray.origin, ray.dir);
@@ -4196,7 +4204,7 @@ void destroy_thing(ThingId id) {
 
 void select_obj() {
 	var& g = *st;
-	v3 dir = ray_from_screen(os_mouse_pos(), os_window_size(), g.cam.pos, st->view, st->projection).dir;
+	v3 dir = ray_from_screen(os_mouse_pos(), os_win_size(), g.cam.pos, st->view, st->projection).dir;
 	var desc = default_thing_desc();
 	desc.pos = g.cam.pos;
 	desc.scale = v3(0.3);
@@ -4378,7 +4386,6 @@ void init_game() {
 			g.mesh_id_to_str[id.idx] = str;
 		};
 		mesh_set(Mesh_Triangle, make_mesh({.vertices = slice(triangle_vertices)}));
-		mesh_set(Mesh_Grid, make_mesh(generate_grid(scratch, 100, 1)));
 		mesh_set(Mesh_Axis, make_mesh({.vertices = slice(axis_vertices)}));
 		mesh_set(Mesh_Sphere, make_mesh(generate_sphere(scratch)));
 
@@ -4396,10 +4403,11 @@ void init_game() {
 		load_mesh(Mesh_Barrack, "castle.gltf");
 		// load_mesh(Mesh_T, "t.gltf");
 		{
-			var info = load_gltf(scratch, "t.gltf", false);
+			var info = load_gltf(scratch, "t1.gltf", false);
 			mesh_set(Mesh_T, make_mesh(info.mesh));
 			array_push_elems(g.bones, info.bones);
 			array_push_elems(g.inv_matrices, info.inv_matrices);
+			g.anim = info.anim;
 		}
 
 		// Texture
@@ -4496,9 +4504,9 @@ void update_game() {
 	var& g = *st;
 	dev_update();
 
-	draw_rect(rng2_make(v2(400, 100), v2(50)), RED);
-	draw_rect(rng2_make(v2(600, 100), v2(50)), RED, 10, 2, 1);
-
+	array_clear(g.runtime_bones);
+	array_push_elems(g.runtime_bones, slice(g.bones));
+	update_animation(g.anim, {slice(g.runtime_bones)}, mod(time_now, 1));
 
 	// Test jobs
 	#if 0
@@ -4546,10 +4554,13 @@ void update_game() {
 	// Camera
 	{
 		Camera& cam = g.cam;
-		v2 win_size = v2_of_v2u(os_window_size());
-		m4x4& projection = st->projection;
-		m4x4& view = st->view;
-		projection = m4x4_perspective(deg2rad(cam.fov), win_size.x / win_size.y, 0.1f, 1000.0f);
+		m4x4& projection = g.projection;
+		m4x4& view = g.view;
+		projection = m4x4_perspective(deg2rad(cam.fov), f32(os_win_width()) / os_win_height(), 0.1f, 1000.0f);
+		// f32 ratio = f32(os_win_width()) / os_win_height();
+		// f32 height = 40;
+		// f32 width = height * ratio;
+		// projection = m4x4_orthographic(-width,width,-height,height,0.1f,1000);
 
 		f32 rotation_speed = 180.0f * time_dt;
 		if(os_key_is_down(Key_A)) {
@@ -4631,8 +4642,29 @@ void update_game() {
 	}
 	draw_mesh(g.meshes_ids[Mesh_Barrack], g.materials_ids[Material_Barrack], v3(0,0,-40));
 	draw_grid(v3(0), 40, 2, u32_from_rgba(v4(0.8)));
-	draw_mesh(g.meshes_ids[Mesh_T], g.materials_ids[Material_Container], v3(), DrawCallFlag_Skeleton);
-	// r_draw_mesh(g.meshes_ids[Mesh_T], g.materials_ids[Material_Container], v3());
+	// draw_mesh(g.meshes_ids[Mesh_T], g.materials_ids[Material_Container], v3(), DrawCallFlag_Skeleton);
 
-	draw_rect(rng2_make(v2(100), v2(100)), RED);
+	// draw_mesh_trs(g.meshes_ids[Mesh_T], g.materials_ids[Material_Container], v3(), DrawCallFlag_Skeleton);
+
+	// local_persist v3 world_pos = v3(0,1,0);
+	// local_persist v3 local_pos = v3(0,1,0);
+	// local_pos.y += 0.1f * time_dt;
+
+	
+	// v4 r = quat_axis_angle(v3(0,0,1), deg2rad(45));
+	// world_pos = quat_rotate(r, local_pos);
+
+	// draw_mesh(g.meshes_ids[Mesh_T], g.materials_ids[Material_Container], world_pos, DrawCallFlag_Skeleton);
+	// draw_mesh_trs(g.meshes_ids[Mesh_T], g.materials_ids[Material_Container], world_pos, r, v3(1), DrawCallFlag_Skeleton);
+
+	local_persist v3 p = v3(4,0,0);
+	v4 q = quat_axis_angle(v3(0,1,0), time_now);
+	v3 pos = quat_rotate(q, p);
+	draw_mesh_trs(g.meshes_ids[Mesh_T], g.materials_ids[Material_Container], pos, q, v3(1), DrawCallFlag_Skeleton);
+
+	// local_persist Transform world_trans = {v3(0,0,0), quat_axis_angle(v3(0,0,1), deg2rad(45)), v3(1)};
+	// local_persist Transform local_trans = {v3(10,0,0), quat_axis_angle(v3(1,0,0), deg2rad(45)), v3(1)};
+	// var res = transform_mul(world_trans, local_trans);
+	// draw_mesh_trs(g.meshes_ids[Mesh_T], g.materials_ids[Material_Container], res.pos, res.rot, v3(1), DrawCallFlag_Skeleton);
+
 }

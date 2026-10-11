@@ -8,19 +8,20 @@ MakeId(Gfx_Pipeline);
 MakeId(Gfx_View);
 
 enum {
-	Gfx_NumFramesInFlight = 3,
-	Gfx_MaxImagesInFlight = 4,
+	Gfx_NumFramesInFlight   = 3,
+	Gfx_MaxImagesInFlight   = 4,
 	Gfx_MaxColorAttachments = 8,
-	Gfx_MaxShaders = 32,
-	Gfx_MaxPipelines = 32,
-	Gfx_MaxViews = 32,
-	Gfx_MaxImages = 32,
-	Gfx_MaxSamplers = 32,
-	Gfx_MaxBuffers = 32,
-	Gfx_MaxCubeTextures = 16,
-	Gfx_MaxStorageBuffers = 16,
-	Gfx_MaxBindings = 64,
-	Gfx_DefaultSampleCount = 4,
+	Gfx_MaxShaders          = 32,
+	Gfx_MaxPipelines        = 32,
+	Gfx_MaxViews            = 32,
+	Gfx_MaxImages           = 32,
+	Gfx_MaxSamplers         = 32,
+	Gfx_MaxBuffers          = 32,
+	Gfx_MaxCubeTextures     = 16,
+	Gfx_MaxStorageBuffers   = 16,
+	Gfx_MaxBindings         = 64,
+	Gfx_DefaultSampleCount  = 4,
+	Gfx_StageBufferSize     = MB(50),
 };
 
 // unsigned normalized (no postfix)
@@ -604,7 +605,6 @@ struct VK_IndirectDrawCall {
 		VkDrawIndirectCommand draw_command;
 		VkDrawIndexedIndirectCommand index_draw_command;
 	};
-	u32 base_instance;
 };
 
 String vk_result_str(VkResult result);
@@ -702,8 +702,8 @@ struct Gfx_State {
 
 	VK_Buffer gpu_buf;
 	VK_Buffer cpu_buf;
-	u64 gpu_buf_address;
-	u64 cpu_buf_address;
+	// u64 gpu_buf_address;
+	// u64 cpu_buf_address;
 	Gfx_Buffer stage_buffer;
 
 	v2u size;
@@ -739,8 +739,6 @@ struct Gfx_State {
 
 	// Indirect drawing
 	Gfx_Buffer drawcalls_buf;
-	u32* base_index;
-	u32 entity_cursor;
 	u32 indirect_drawcall_cursor;
 
 	///////////////////////////////////
@@ -932,7 +930,6 @@ void gfx_apply_alpha_to_coverage(b32 enable);
 void gfx_draw(u32 base_vert, u32 vert_count, u32 instance_count = 1, u32 base_instance = 0);
 void gfx_draw_indexed(u32 base_index, u32 index_count, u32 base_vert, u32 instance_count = 1, u32 base_instance = 0);
 void gfx_draw_indirect(Gfx_IndirectDrawCall drawcall);
-void gfx_draw_indirect_mesh(Gfx_Mesh mesh, u32 id);
 void gfx_draw_indexed_indirect(Gfx_IndirectDrawCall drawcall);
 void gfx_draw_mesh(Gfx_Mesh mesh);
 
@@ -948,9 +945,6 @@ u32 gfx_ready_counter();
 u32  gfx_begin_indirect();
 Gfx_IndirectDrawCall gfx_end_indirect(u32 base);
 void gfx_push_indirect_mesh(Gfx_Mesh mesh, u32 id, u32 instance_count = 1);
-void gfx_push_indirect_instanced(Gfx_Mesh mesh, u32 count);
-void gfx_instance_set_indices(u32* indices);
-u32* gfx_indirect_indices();
 u8* gfx_buffer_base_ptr(Gfx_Buffer buf);
 
 void gfx_bind_pipeline(Gfx_Pipeline pip);

@@ -91,6 +91,8 @@ VkBind(Bindings.DrawCtx)        StructuredBuffer<DrawCall> drawcalls;
 VkBind(Bindings.SoftwareRender) StructuredBuffer<u32> software_render;
 VkBind(Bindings.UI_RectBinding) StructuredBuffer<UI_Rect> ui_rects;
 VkBind(Bindings.Vertices)       StructuredBuffer<Vertex> vertices;
+VkBind(Bindings.CpuVertices)    StructuredBuffer<Vertex> cpu_vertices;
+VkBind(Bindings.Indices)        StructuredBuffer<u16> indices;
 VkBind(Bindings.SkinMatrices)   StructuredBuffer<m4x4> skin_matrices;
 
 bool flag_has(u64 x, u64 f) { return (x & f) == (f); }
