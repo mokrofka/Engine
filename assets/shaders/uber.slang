@@ -15,10 +15,26 @@ CONST v2 tex_coords[] = {
 	{2.0, 0.0},
 };
 
-VS_Entry VSOutput vs_main(Vertex in, u32 vert_id: SV_VertexID, u32 draw_id: SV_DrawIndex, u32 inst_id: SV_InstanceID) {
+void foo(u32 b, u32 c) {
+}
+
+// how to make hotkey in vscode that for example: void foo(u32 <cursor> a, u32 b, u32 c) { in place of cursor by pressing key, it'd become: void foo(u32 b, u32 c) { } ?
+
+// VS_Entry VSOutput vs_main(Vertex in, u32 vert_id: SV_VertexID, u32 draw_id: SV_DrawIndex, u32 inst_id: SV_InstanceID) {
+VS_Entry VSOutput vs_main(u32 vert_id: SV_VertexID, u32 draw_id: SV_DrawIndex, u32 inst_id: SV_InstanceID) {
 	u32 drawcall_idx = push.idx + draw_id;
 	DrawCall draw = drawcalls[drawcall_idx];
 	VSOutput o;
+	Vertex in;
+	if(flag_any(draw.flags, DrawCallFlag_Indexed)) {
+		in = vertices[draw.mesh.vert_off + indices[draw.mesh.base + vert_id]];
+	} else {
+		if(flag_any(draw.flags, DrawCallFlag_CpuVertices)) {
+			in = cpu_vertices[vert_id];
+		} else {
+			in = vertices[draw.mesh.base + vert_id];
+		}
+	}
 	switch(draw.type) {
 		case ShaderType::Cube: {
 			m4x4 view = st.view;
@@ -35,32 +51,13 @@ VS_Entry VSOutput vs_main(Vertex in, u32 vert_id: SV_VertexID, u32 draw_id: SV_D
 		case ShaderType::Texture: {
 			v4 pos = v4(in.pos, 1);
 			if(flag_any(draw.flags, DrawCallFlag_Skeleton)) {
-				// m4x4 skin =
-				// 	in.weights.x * skin_matrices[in.joints.x] +
-				// 	in.weights.y * skin_matrices[in.joints.y] +
-				// 	in.weights.z * skin_matrices[in.joints.z] +
-				// 	in.weights.w * skin_matrices[in.joints.w];
-
-				// m4x4 skin = in.weights.x * skin_matrices[in.joints.x];
-				m4x4 skin = skin_matrices[in.joints.x];
+				m4x4 skin =
+					in.weights.x * skin_matrices[in.joints.x] +
+					in.weights.y * skin_matrices[in.joints.y] +
+					in.weights.z * skin_matrices[in.joints.z] +
+					in.weights.w * skin_matrices[in.joints.w];
 				pos = skin * pos;
-
-				// pos = m4x4_identity() * pos;
-
-				// u8 x = in.joints.x;
-				// u8 y = in.joints.y;
-				// u8 z = in.joints.z;
-				// u8 w = in.joints.w;
-				// printf("%u %u %u %u", x, y, z, w);
-				// m4x4 m = skin_matrices[in.joints.x];
-				// // pos = in.weights.x * m * pos;
-				// // m4x4 m = skin_matrices[0];
-				// pos = m * pos;
-				// pos = skin * pos;
-				// pos = skin * pos;
 			}
-			// o.pos = st.projection_view * draw.model * v4(pos, 1.0);
-			// o.pos = st.projection_view * draw.model * pos;
 			o.pos = st.projection_view * draw.model * pos;
 			o.uv = in.uv;
 		}break;
@@ -118,10 +115,4 @@ FS_Entry v4 fs_main(VSOutput in) {
 	}
 	return o;
 }
-
-
-
-
-
-
 

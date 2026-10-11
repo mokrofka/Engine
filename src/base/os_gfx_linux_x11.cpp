@@ -577,9 +577,9 @@ void os_pump_messages() {
 
 b32 os_window_should_close() { return gfx_st.should_close; }
 void os_window_close()       { gfx_st.should_close = true; }
-v2u os_window_size()         { return v2u(gfx_st.win_width, gfx_st.win_height); }
-u32 os_window_width()        { return gfx_st.win_width; }
-u32 os_window_height()       { return gfx_st.win_height; }
+v2u os_win_size()            { return v2u(gfx_st.win_width, gfx_st.win_height); }
+u32 os_win_width()           { return gfx_st.win_width; }
+u32 os_win_height()          { return gfx_st.win_height; }
 v2u os_screen_size()         { return v2u(gfx_st.screen_width, gfx_st.screen_height); }
 u32 os_screen_width()        { return gfx_st.screen_width; }
 u32 os_screen_height()       { return gfx_st.screen_height; }

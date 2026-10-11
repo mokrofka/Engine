@@ -1278,7 +1278,7 @@ Transform transform_mul(Transform a, Transform b) {
 	Transform r;
 	r.scale = v3(a.scale.x*b.scale.x);
 	r.rot = quat_mul(a.rot, b.rot);
-	r.pos = quat_rotate(a.rot, a.pos * b.scale.x) + a.pos;
+	r.pos = quat_rotate(a.rot, b.pos * b.scale.x) + a.pos;
 	return r;
 }
 
@@ -1287,15 +1287,6 @@ v3 transform_point(Transform t, v3 p) {
 	p = quat_rotate(t.rot, p);
 	p += t.pos;
 	return p;
-}
-
-v3 transform_point(m4x4 m, v3 p) {
-	v3 res = {
-		m.v[0][0]*p.x + m.v[0][1]*p.y + m.v[0][2]*p.z + m.v[0][3],
-		m.v[1][0]*p.x + m.v[1][1]*p.y + m.v[1][2]*p.z + m.v[1][3],
-		m.v[2][0]*p.x + m.v[2][1]*p.y + m.v[2][2]*p.z + m.v[2][3],
-	};
-	return res;
 }
 
 v3 transform_inverse_point(Transform t, v3 p) {
@@ -1356,7 +1347,7 @@ v4 quat_mul(v4 a, v4 b) {
 	v3 vec_b = v3_of_v4(b);
 	f32 scalar = a.w*b.w - v3_dot(vec_a, vec_b);
 	v3 v = a.w*vec_b + b.w*vec_a + v3_cross(vec_a, vec_b);
-	v4 res = v3_to_v4(v, scalar);
+	v4 res = v4(v, scalar);
 	return res;
 }
 
@@ -1495,7 +1486,7 @@ v4 quat_look_rotation(v3 dir, v3 up) {
 	return quat_norm(q);
 }
 
-v3 quat_rotate_point(v3 point, v3 pivot, v4 q) {
+v3 quat_rotate_point(v4 q, v3 point, v3 pivot) {
 	v3 relative = point - pivot;
 	v3 rotated = quat_rotate(q, relative);
 	return pivot + rotated;
@@ -2109,30 +2100,57 @@ m4x4 m4x4_rotate_around_axis(v3 axis, f32 rad) {
 }
 
 m4x4 m4x4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far) {
+	// m4x4 res = {
+	// 	2/(right-left),             0,                          0,                 0,
+	// 	0,                          2/(top-bottom),             0,                 0,
+	// 	0,                          0,                          1/(far-near),      0,
+	// 	-(right+left)/(right-left), -(top+bottom)/(top-bottom), -near/(far-near),  1
+	// };
+	// NOTE: This flips Z value so camera is looking at -Z direction
 	m4x4 res = {
-		2/(right - left), 0,                0,                  0,
-		0,                2/(top - bottom), 0,                  0,
-		0,                0,                1/(far - near),     0,
-		0,                0,                -near/(far - near), 1
+		2/(right-left),             0,                          0,                0,
+		0,                          2/(top-bottom),             0,                0,
+		0,                          0,                          1/(near-far),     0,
+		-(right+left)/(right-left), -(top+bottom)/(top-bottom), near/(near-far),  1
+	};
+	return res;
+}
+
+m4x4 m4x4_orthographic_inverse(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far) {
+	m4x4 res = {
+		(right-left)/2, 0,       						 	0,   					0,
+		0,              (top-bottom)/2,  0,   					0,
+		0,              0,       						 	near-far, 0,
+		(right+left)/2, (top+bottom)/2, -near,  			1
 	};
 	return res;
 }
 
 // NOTE: I use camera looking at -Z direction since I found it's more intuitive
-m4x4 m4x4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far) {
-	f32 fov = tan(fov_radians/2.0f);
-	// mat4 res = {
-	//   1/(fov*aspect_ratio), 0,                       0,                    0,
-	//   0,                    1/fov,                   0,                    0,
-	//   0,                    0,                       Far/(Far-Near),       1,
-	//   0,                    0,                       -Far*Near/(Far-Near), 0
+m4x4 m4x4_perspective(f32 fov_rad, f32 aspect, f32 near, f32 far) {
+	f32 fov = tan(fov_rad/2.0f);
+	// m4x4 res = {
+	// 	1/(fov*aspect), 0,     0,                      0,
+	// 	0,              1/fov, 0,                      0,
+	// 	0,              0,     far/(far-near),         1,
+	// 	0,              0,     (-far*near)/(far-near), 0
 	// };
 	// NOTE: This flips Z value so camera is looking at -Z direction
 	m4x4 res = {
-		1/(fov*aspect_ratio), 0,                0,                             0,
-		0,                    1/(fov),          0,                             0,
-		0,                    0,                -(far + near)/(far - near),   -1,
-		0,                    0,                (-2.0f*far*near)/(far - near), 0
+		1/(fov*aspect), 0,     0,                      0,
+		0,              1/fov, 0,                      0,
+		0,              0,     far/(near-far),        -1,
+		0,              0,     (far*near)/(near-far),  0
+	};
+	return res;
+}
+
+m4x4 m4x4_perspective_inverse(f32 fov, f32 aspect, f32 near, f32 far) {
+	m4x4 res = {
+		fov*aspect, 0,    0,  0,
+		0,          fov,  0,  0,
+		0,          0,    0,  (near-far)/(far*near),
+		0,          0,   -1,  1/near
 	};
 	return res;
 }
@@ -2147,6 +2165,19 @@ m4x4 m4x4_look_at(v3 pos, v3 target, v3 up) {
 		x.y, y.y, z.y, 0,
 		x.z, y.z, z.z, 0,
 	-v3_dot(x, pos), -v3_dot(y, pos), -v3_dot(z, pos), 1
+	};
+	return res;
+}
+
+m4x4 m4x4_look_at_inverse(v3 pos, v3 target, v3 up) {
+	v3 z = -v3_norm(target - pos);
+	v3 x = v3_norm(v3_cross(up, z));
+	v3 y = v3_cross(z, x);
+	m4x4 res = {
+		x.x,   x.y,   x.z,   0,
+		y.x,   y.y,   y.z,   0,
+		z.x,   z.y,   z.z,   0,
+		pos.x, pos.y, pos.z, 1
 	};
 	return res;
 }
@@ -3468,10 +3499,11 @@ u32 my_sprintf(u8* buf, String fmt, VaList argc) {
 		if(*p != '%') { w_byte(&w, *p); continue; }
 		p++; // skip '%'
 		switch(*p) {
+			default:break;
 			// default: {
 			//   Info("%s", str_make(p-60, 120));
 			// }
-			InvalidDefaultCase;
+			// InvalidDefaultCase;
 			case 'i': {
 				if(p + 2 < end && (p[1] == '6' && p[2] == '4')) {
 					p += 2;
