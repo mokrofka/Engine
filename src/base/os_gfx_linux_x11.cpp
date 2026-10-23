@@ -364,7 +364,6 @@ void os_gfx_shutdown() { xcb_disconnect(gfx_st.connection); }
 
 ////////////////////////////////////////////////////////////////////////
 // Window related
-
 void os_pump_messages() {
 	X11State& g = gfx_st;
 	os_input_update();
@@ -662,7 +661,6 @@ String os_clipboard_text_get() {
 
 ////////////////////////////////////////////////////////////////////////
 // Cursor
-
 void os_cursor_show() {
 	X11State& g = gfx_st;
 	uint32_t values[] = {XCB_NONE};
@@ -719,7 +717,6 @@ void os_cursor_unlock() {
 
 ////////////////////////////////////////////////////////////////////////
 // Input
-
 void os_input_update() {
 	MemCopyStruct(&gfx_st.input.keyboard_previous, &gfx_st.input.keyboard_current);
 	MemCopyStruct(&gfx_st.input.mouse_previous, &gfx_st.input.mouse_current);

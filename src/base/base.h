@@ -227,7 +227,6 @@ u32 prev_pow2(u32 x);
 #define LoopNodeReverse(it, last) for(var* it = last; it != 0; it = it->prev)
 #define LoopHNode(it, first, arr) for(var it = first; it.idx != 0; it = (arr)[it.idx].next)
 #define LoopINode(it, first, arr) for(var it = first; it != 0; it = (arr)[it].next)
-// #define LoopIter(it, begin) 						for(var it = begin; it; ++it)
 #define LoopIter(it, begin) 						for(var it = begin; iter_next(it);)
 
 // #define X(a, ...) X_IMPL(a, ##__VA_ARGS__, 3)
@@ -897,34 +896,47 @@ struct Ray {
 	v3 dir;
 };
 
+struct Polar2 {
+	f32 r;
+	f32 theta;
+};
+
+struct Orbit2 { v2 center; f32 radius, angle; };
+struct Orbit3 { v3 center; v3 u, v; f32 radius, angle; };
+
 ////////////////////////////////////////////////////////////////////////
 // Float Ops
-NO_DEBUG f32 sin(f32 x);
-NO_DEBUG f32 cos(f32 x);
-NO_DEBUG f32 tan(f32 x);
-NO_DEBUG f32 asin(f32 x);
-NO_DEBUG f32 acos(f32 x);
-NO_DEBUG f32 atan2(f32 y, f32 x);
-NO_DEBUG f32 sqrt(f32 x);
-NO_DEBUG f32 pow(f32 a, f32 b);
-NO_DEBUG f32 floor(f32 x);
-NO_DEBUG f32 ceil(f32 x);
-NO_DEBUG f32 round(f32 x);
-NO_DEBUG f32 mod(f32 a, f32 b);
-NO_DEBUG f32 exp(f32 x);
-NO_DEBUG f32 loge(f32 x);
-NO_DEBUG f32 log2(f32 x);
-NO_DEBUG f32 log10(f32 x);
-NO_DEBUG void sincos(f32 rad, f32* a, f32* b);
+NO_DEBUG f32 Sin(f32 x);
+NO_DEBUG f32 Cos(f32 x);
+NO_DEBUG f32 Tan(f32 x);
+NO_DEBUG f32 Asin(f32 x);
+NO_DEBUG f32 Acos(f32 x);
+NO_DEBUG f32 Atan2(f32 y, f32 x);
+NO_DEBUG f32 Sqrt(f32 x);
+NO_DEBUG f32 Pow(f32 a, f32 b);
+NO_DEBUG f32 Floor(f32 x);
+NO_DEBUG f32 Ceil(f32 x);
+NO_DEBUG f32 Round(f32 x);
+NO_DEBUG f32 Mod(f32 a, f32 b);
+NO_DEBUG f32 Trunc(f32 x);
+NO_DEBUG f32 Exp(f32 x);
+NO_DEBUG f32 Loge(f32 x);
+NO_DEBUG f32 Log2(f32 x);
+NO_DEBUG f32 Log10(f32 x);
+NO_DEBUG void Sincos(f32 rad, f32* a, f32* b);
 
 NO_DEBUG f32 sind(f32 x);
 NO_DEBUG f32 cosd(f32 x);
 
-f32 deg2rad(f32 degrees);
-f32 rad2deg(f32 radians);
+NO_DEBUG f32 deg2rad(f32 degrees);
+NO_DEBUG f32 rad2deg(f32 radians);
 f32 ceil_to(f32 x, f32 step);
 f32 floor_to(f32 x, f32 step);
 f32 round_to(f32 x, f32 step);
+
+f64 mod_trunc(f64 x, f64 m);
+f32 mod_floor(f32 x, f32 m);
+f32 frac(f32 x);
 
 ////////////////////////////////////////////////////////////////////////
 // Color
@@ -956,7 +968,7 @@ NO_DEBUG f32 rand_f32(f32 min, f32 max);
 NO_DEBUG f32 rand_f32_centered(f32 base, f32 radius);
 NO_DEBUG f32 rand_f32_signed(f32 magnitude);
 NO_DEBUG b32 rand_b32();
-NO_DEBUG void rand_set_seed();
+void rand_seed(u64 seed);
 template<typename T> void rand_shuffle(Slice<T> data) {
 	Loop(i, data.count) {
 		u32 j = rand_u32(i, data.count);
@@ -964,10 +976,11 @@ template<typename T> void rand_shuffle(Slice<T> data) {
 	}
 }
 template<typename T> T rand_choice(Slice<T> s) { return s[rand_u32()%s.count]; }
+v2 rand_in_disk(f32 r, f32 rad);
+v3 rand_on_sphere(f32 r, f32 rad);
 
 ////////////////////////////////////////////////////////////////////////
 // Misc
-i32 ipow(i32 base, u32 exponent);
 
 f32 safe_divn(f32 a, f32 b, f32 n);
 f32 safe_div0(f32 a, f32 b);
@@ -995,7 +1008,31 @@ f32 angle_delta_ccw(f32 from, f32 to);
 f32 angle_delta_longest(f32 from, f32 to);
 f32 angle_approach(f32 from, f32 to, f32 step);
 
+Polar2 cartesian_to_polar(v2 p);
+v2 polar_to_cartesian(Polar2 p);
+
+v2 orbit_pos(Orbit2 o);
+v3 orbit_pos(Orbit3 o);
+
+v3 spherical_coord(f32 r, f32 theta, f32 phi);
+v3 cylindrical_coord(f32 r, f32 theta, f32 z);
+
+void plane_basis(v3 n, v3* u, v3* v);
+v3 best_fit_norm(Slice<v3> v);
+
+f32 v2_falloff(v2 p, v2 center, f32 radius, f32 max);
+f32 v3_falloff(v3 p, v3 center, f32 radius, f32 max);
+
 v3 v3_bezier2(v3 p0, v3 p1, v3 p2, f32 t);
+v3 v3_bezier3(v3 p0, v3 p1, v3 p2, v3 p3, f32 t);
+
+v2 ndc_to_screen(v2 ndc);
+v2 screen_to_ndc(v2 p);
+b32 world_to_screen(m4x4 proj_view, v3 p, v2* out, f32* out_depth = null);
+v3 screen_to_world(m4x4 inv_view_proj, v2 p, f32 ndc_z);
+Ray screen_to_ray(m4x4 inv_view_proj, v3 pos, v2 p);
+b32 ray_plane(Ray r, v3 plane_p, v3 plane_n, v3* out_hit);
+b32 screen_to_ground(m4x4 inv_view_proj, v3 pos, v2 p, f32 ground_y, v3* out_hit);
 
 ////////////////////////////////////////////////////////////////////////
 // Vector2
@@ -1015,6 +1052,11 @@ NO_DEBUG v2  operator-(v2 v);
 NO_DEBUG b32 operator==(v2u a, v2u b);
 NO_DEBUG b32 operator!=(v2u a, v2u b);
 
+const v2 v2_up    = v2(0,1);
+const v2 v2_down  = v2(0,-1);
+const v2 v2_left  = v2(-1,0);
+const v2 v2_right = v2(1,0);
+
 NO_DEBUG v2i v2i_of_v2(v2 v);
 NO_DEBUG v2  v2_of_v3(v3 v);
 NO_DEBUG v2  v2_of_v4(v4 v);
@@ -1022,10 +1064,6 @@ NO_DEBUG v3  v2_to_v3(v2 v, f32 a);
 NO_DEBUG v4  v2_to_v4(v2 v, f32 a, f32 b);
 NO_DEBUG v2  v2_of_v2i(v2i v);
 NO_DEBUG v2  v2_of_v2u(v2u v);
-NO_DEBUG v2  v2_up();
-NO_DEBUG v2  v2_down();
-NO_DEBUG v2  v2_left();
-NO_DEBUG v2  v2_right();
 NO_DEBUG v2  v2_abs(v2 v);
 NO_DEBUG v2  v2_min(v2 a, v2 b);
 NO_DEBUG v2  v2_max(v2 a, v2 b);
@@ -1042,8 +1080,8 @@ NO_DEBUG v2  v2_rand(v2 a, v2 b);
 NO_DEBUG v2  v2_swizzle(v2 v, u32 x, u32 y);
 NO_DEBUG v3  v2_swizzle(v2 v, u32 x, u32 y, u32 z);
 
-NO_DEBUG f32 v2_length(v2 v);
-NO_DEBUG f32 v2_length_sqr(v2 v);
+NO_DEBUG f32 v2_len(v2 v);
+NO_DEBUG f32 v2_len_sqr(v2 v);
 NO_DEBUG v2  v2_norm(v2 v);
 NO_DEBUG f32 v2_distance(v2 a, v2 b);
 NO_DEBUG f32 v2_distance_sqr(v2 a, v2 b);
@@ -1054,7 +1092,7 @@ NO_DEBUG v2  v2_hadamard(v2 a, v2 b);
 NO_DEBUG v2  v2_hadamard_div(v2 a, v2 b);
 NO_DEBUG v2  v2_project(v2 v, v2 dir);
 NO_DEBUG v2  v2_project_on_unit(v2 v, v2 dir);
-NO_DEBUG f32 v2_project_length(v2 v, v2 dir);
+NO_DEBUG f32 v2_project_len(v2 v, v2 dir);
 NO_DEBUG v2  v2_reject(v2 v, v2 dir);
 NO_DEBUG v2  v2_reject_on_unit(v2 v, v2 dir);
 NO_DEBUG v2  v2_reflect(v2 v, v2 norm);
@@ -1063,7 +1101,7 @@ NO_DEBUG f32 v2_angle(v2 v);
 NO_DEBUG v2  v2_from_angle(f32 rad);
 
 v2 v2_approach(v2 current, v2 target, f32 step);
-v2 v2_clamp_length(f32 min, v2 v, f32 max);
+v2 v2_clamp_len(f32 min, v2 v, f32 max);
 v2 v2_bounce(v2 v, v2 normal, f32 restitution);
 
 NO_DEBUG v2  v2_flip_y(v2 v);
@@ -1092,14 +1130,13 @@ NO_DEBUG v3  operator-(v3 v);
 
 NO_DEBUG b32 operator==(v3u a, v3u b);
 
-NO_DEBUG v3  v3_of_v4(v4 v);
-NO_DEBUG v4  v3_to_v4(v3 v, f32 a);
-NO_DEBUG v3  v3_up();
-NO_DEBUG v3  v3_down();
-NO_DEBUG v3  v3_left();
-NO_DEBUG v3  v3_right();
-NO_DEBUG v3  v3_forward();
-NO_DEBUG v3  v3_back();
+const v3 v3_up      = v3(0,1,0);
+const v3 v3_down    = v3(0,-1,0);
+const v3 v3_left    = v3(-1,0,0);
+const v3 v3_right   = v3(1,0,0);
+const v3 v3_forward = v3(0,0,1);
+const v3 v3_back    = v3(0,0,-1);
+
 NO_DEBUG v3  v3_abs(v3 v);
 NO_DEBUG v3  v3_min(v3 a, v3 b);
 NO_DEBUG v3  v3_max(v3 a, v3 b);
@@ -1117,8 +1154,8 @@ NO_DEBUG v3  v3_rand(v3 a, v3 b);
 NO_DEBUG v2  v3_swizzle(v3 v, u32 x, u32 y);
 NO_DEBUG v3  v3_swizzle(v3 v, u32 x, u32 y, u32 z);
 
-NO_DEBUG f32 v3_length(v3 v);
-NO_DEBUG f32 v3_length_sqr(v3 v);
+NO_DEBUG f32 v3_len(v3 v);
+NO_DEBUG f32 v3_len_sqr(v3 v);
 NO_DEBUG v3  v3_norm(v3 v);
 NO_DEBUG f32 v3_distance(v3 a, v3 b);
 NO_DEBUG f32 v3_distance_sqr(v3 a, v3 b);
@@ -1129,14 +1166,14 @@ NO_DEBUG v3  v3_hadamard(v3 a, v3 b);
 NO_DEBUG v3  v3_hadamard_div(v3 a, v3 b);
 NO_DEBUG v3  v3_project(v3 a, v3 b);
 NO_DEBUG v3  v3_project_on_norm(v3 a, v3 b);
-NO_DEBUG f32 v3_length_projection(v3 a, v3 b);
+NO_DEBUG f32 v3_len_projection(v3 a, v3 b);
 NO_DEBUG v3  v3_reject(v3 a, v3 b);
 NO_DEBUG v3  v3_reject_on_norm(v3 a, v3 b);
 NO_DEBUG v3  v3_reflect(v3 v, v3 normal);
 NO_DEBUG f32 v3_angle(v3 a, v3 b);
 
 v3 v3_approach(v3 current, v3 target, f32 step);
-v3 v3_clamp_length(f32 min, v3 v, f32 max);
+v3 v3_clamp_len(f32 min, v3 v, f32 max);
 v3 v3_bounce(v3 v, v3 normal, f32 restitution);
 
 NO_DEBUG v3  v3_pos_of_mat4(m4x4 mat);
@@ -1144,7 +1181,6 @@ NO_DEBUG v3  v3_rotate_x(v3 v, f32 rad);
 NO_DEBUG v3  v3_rotate_y(v3 v, f32 rad);
 NO_DEBUG v3  v3_rotate_z(v3 v, f32 rad);
 v3 v3_rotate_around_pivot(v3 pos, v3 pivot, v4 q);
-
 
 v3 v3_barycentric(v3 v, v3 a, v3 b, v3 c);
 v3 v3_perpendicular(v3 v);
@@ -1165,8 +1201,6 @@ NO_DEBUG v4  operator*=(v4& v, f32 scalar);
 NO_DEBUG v4  operator/=(v4& v, f32 scalar);
 NO_DEBUG v4  operator-(v4 v);
 
-NO_DEBUG v4  v4_zero();
-NO_DEBUG v4  v4_one();
 NO_DEBUG v4  v4_abs(v4 v);
 NO_DEBUG v4  v4_set_w(v4 v, f32 w);
 NO_DEBUG v4  v4_min(v4 a, v4 b);
@@ -1174,8 +1208,8 @@ NO_DEBUG v4  v4_max(v4 a, v4 b);
 NO_DEBUG v4  v4_invert(v4 v);
 NO_DEBUG b32 v4_equal(v4 a, v4 b);
 
-NO_DEBUG f32 v4_length(v4 v);
-NO_DEBUG f32 v4_length_squared(v4 v);
+NO_DEBUG f32 v4_len(v4 v);
+NO_DEBUG f32 v4_len_sqr(v4 v);
 NO_DEBUG v4  v4_norm(v4 v);
 NO_DEBUG f32 v4_distance(v4 a, v4 b);
 NO_DEBUG f32 v4_distance_sqr(v4 a, v4 b);
@@ -1190,11 +1224,11 @@ v3 transform_direction(Transform t, v3 v);
 
 ////////////////////////////////////////////////////////////////////////
 // Quatornion
-v4 quat_identity();
+const v4 quat_identity = v4(0, 0, 0, 1);
 v3 quat_forward(v4 q);
+v3 quat_back(v4 q);
 v3 quat_right(v4 q);
 v3 quat_up(v4 q);
-v4 quat_norm(v4 q);
 v4 quat_conjugate(v4 q);
 v4 quat_inverse(v4 q);
 v4 quat_axis_angle(v3 axis, f32 rad);
@@ -1259,46 +1293,46 @@ m4x3 m4x3_from_quat(v4 q);
 
 ////////////////////////////////////////////////////////////////////////
 // m4x4
-v3 m4x4_forward(m4x4 matrix);
-v3 m4x4_backward(m4x4 matrix);
-v3 m4x4_up(m4x4 matrix);
-v3 m4x4_down(m4x4 matrix);
-v3 m4x4_right(m4x4 matrix);
-v3 m4x4_left(m4x4 matrix);
+v3 m4x4_view_forward(m4x4 matrix);
+v3 m4x4_view_backward(m4x4 matrix);
+v3 m4x4_view_up(m4x4 matrix);
+v3 m4x4_view_down(m4x4 matrix);
+v3 m4x4_view_right(m4x4 matrix);
+v3 m4x4_view_left(m4x4 matrix);
 
 m4x4 operator*(m4x4 a, m4x4 b);
 m4x4& operator*=(m4x4& a, m4x4 b);
 v4 operator*(m4x4 mat, v4 v);
 v3 operator*(m4x4 mat, v3 v);
 
-m4x4 m4x4_identity();
+const m4x4 m4x4_identity = {
+	1,0,0,0,
+	0,1,0,0,
+	0,0,1,0,
+	0,0,0,1
+};
 m4x4 m4x4_translate(v3 pos);
 m4x4 m4x4_scale(v3 scale);
 m4x4 m4x4_scale_translate(v3 scale, v3 pos);
 m4x4 m4x4_transform(v3 pos, v3 scale, v4 q);
 m4x4 m4x4_transform(Transform trans);
-m4x4 m4x4_scale_all_elements(m4x4 mat, f32 scale);
+m4x4 m4x4_mul_scalar(m4x4 mat, f32 scale);
 m4x4 m4x4_rotate_x(f32 rad);
 m4x4 m4x4_rotate_y(f32 rad);
 m4x4 m4x4_rotate_z(f32 rad);
-m4x4 m4x4_rotate_xyz(v3 rad);
 m4x4 m4x4_rotate_around_axis(v3 axis, f32 rad);
 m4x4 m4x4_orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far);
 m4x4 m4x4_orthographic_inverse(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far);
 m4x4 m4x4_perspective(f32 fov_radians, f32 aspect_ratio, f32 near, f32 far);
-m4x4 m4x4_perspective_inverse(f32 fov, f32 aspect, f32 near, f32 far);
-m4x4 m4x4_look_at(v3 pos, v3 target, v3 up = v3_up());
-m4x4 m4x4_look_at_inverse(v3 pos, v3 target, v3 up = v3_up());
+m4x4 m4x4_perspective_inverse(f32 fov_rad, f32 aspect, f32 near, f32 far);
+m4x4 m4x4_look_at(v3 pos, v3 target, v3 up = v3_up);
+m4x4 m4x4_look_at_inverse(v3 pos, v3 target, v3 up = v3_up);
 m4x4 m4x4_transpose(m4x4 matrix);
 m4x4 m4x4_inverse(m4x4 matrix);
 m4x4 m4x4_from_quat(v4 q);
+m4x4 m4x4_from_euler(v3 e);
 m4x4 m4x4_from_m4x3(m4x3 m);
 m4x4 m4x4_inverse_rigid(m4x4 m);
-
-////////////////////////////////////////////////////////////////////////
-// Misc
-Ray ray_make(v3 pos, v3 dir);
-Ray ray_from_screen(v2 screen_pos, v2u viewport_rect, v3 origin, m4x4 view, m4x4 projection);
 
 ////////////////////////////////////////////////////////////////////////
 // Range Ops
@@ -1409,7 +1443,7 @@ v3 rng3_center(Rng3 r);
 b32 rng3_contains(Rng3 r, v3 x);
 v3 rng3_dim(Rng3 r);
 Rng3 rng3_union(Rng3 a, Rng3 b);
-Rng3 rng3_intersect(Rng3 a, Rng3 b);
+Rng3 rng3_intersection(Rng3 a, Rng3 b);
 v3 rng3_clamp(Rng3 r, v3 x);
 
 Rng3 rng3_make(v3 min, v3 size);
@@ -1418,12 +1452,16 @@ Rng3 rng3_scale_centered(Rng3 r, f32 scale);
 Rng3 rng3_scale_centered(Rng3 r, v3 scale);
 Rng3 rng3_scale(Rng3 r, f32 scale);
 Rng3 rng3_scale(Rng3 r, v3 scale);
-
-f32 smoothstep(f32 t);
-f32 smootherstep(f32 t);
+f32 rng3_radius(Rng3 r);
+Rng3 rng3_empty();
+void rng3_push(Rng3& r, v3 p);
+Rng3 rng3_transform(Rng3 r, m4x4 m);
 
 ////////////////////////////////////////////////////////////////////////
 // Ease
+f32 smoothstep(f32 t);
+f32 smootherstep(f32 t);
+
 f32 ease_quad_in(f32 t);
 f32 ease_quad_out(f32 t);
 f32 ease_quad_in_out(f32 t);
@@ -1691,7 +1729,6 @@ MemFormatSize mem_format_size(f32 value);
 
 ////////////////////////////////////////////////////////////////////////
 // @TCTX
-
 struct Scratch {
 	Temp temp;
 	NO_DEBUG operator Allocator();
@@ -1710,7 +1747,6 @@ u32 tctx_id();
 
 ////////////////////////////////////////////////////////////////////////
 // @Str
-
 struct Dstring {
 	u8* str;
 	u32 size;
@@ -1739,6 +1775,8 @@ void dstr_clear(Dstring& arr);
 
 u64 cstr_length(const void* c);
 
+////////////////////////////////////////////////////////////////////////
+// String <=> Integer Conversions
 u32 u32_length(u32 x);
 u32 u64_length(u64 x);
 u32 u32_write(u8* dest, u32 x);
@@ -1751,12 +1789,19 @@ u32 f32_length(f32 x, u32 precision);
 u32 f64_length(f64 x, u32 precision);
 u32 f32_write(u8* dest, f32 value, u32 precision);
 u32 f64_write(u8* dest, f64 value, u32 precision);
-void u64_hex_write(u8* dest, u64 value);
-u32 my_sprintf(u8* buf, String fmt, VaList argc);
+void u64_hex_write(u8* dest, u64 value, b32 upper);
+
+u64 u64_from_str(String str);
+i64 i64_from_str(String str);
+f64 f64_from_str(String str);
+u32 u32_from_str(String str);
+i32 i32_from_str(String str);
+f32 f32_from_str(String str);
+
+u32 str_fmt(u8* buf, String fmt, VaList argc);
 
 ////////////////////////////////////////////////////////////////////////
 // Character Classification & Conversion Functions
-
 b32 char_is_space(u8 c);
 b32 char_is_newline(u8 c);
 b32 char_is_ws(u8);
@@ -1772,20 +1817,17 @@ b32 char_is_number_cont(u8 c);
 
 ////////////////////////////////////////////////////////////////////////
 // String Constructors
-
 String str_make(Slice<u8> str);
 #define S(str) String((u8*)str, sizeof(str)-1)
 String str_range(u8* first, u8* one_past_last);
 
 ////////////////////////////////////////////////////////////////////////
 // String Stylization
-
 String upper_from_str(Allocator arena, String string);
 String lower_from_str(Allocator arena, String string);
 
 ////////////////////////////////////////////////////////////////////////
 // String Matching
-
 b32 str_match(String str0, String str1);
 b32 str_matchi(String str0, String str1);
 u64 str_find_needle(String string, String needle);
@@ -1793,7 +1835,6 @@ b32 str_ends_with(String string, String end);
 
 ////////////////////////////////////////////////////////////////////////
 // String Slicing
-
 String str_substr(String str, Rng1u range);
 String str_prefix(String str, u64 size);
 String str_skip(String str, u64 amt);
@@ -1802,7 +1843,6 @@ String str_chop(String str, u64 amt);
 
 ////////////////////////////////////////////////////////////////////////
 // String Formatting & Copying
-
 String push_str_cat(Allocator arena, String s1, String s2);
 String push_str_copy(Allocator arena, String s);
 String push_strfv(Allocator arena, String fmt, VaList args);
@@ -1810,14 +1850,12 @@ String push_strf(Allocator arena, String fmt, ...);
 
 ////////////////////////////////////////////////////////////////////////
 // String List Construction Functions
-
 StringNode* str_list_push_node(StringList&, StringNode* node);
 StringNode* str_list_push(Allocator arena, StringList& list, String string);
 StringNode* str_list_pushf(Allocator arena, StringList& list, String fmt, ...);
 
 ////////////////////////////////////////////////////////////////////////
 // String utils
-
 void str_copy(String64& dest, String str);
 String str_next_word(String line, u32& start);
 // String str_read_line(Range* range);
@@ -1825,19 +1863,7 @@ String str_trim(String string);
 i32 str_index_of_char(String str, u8 c);
 
 ////////////////////////////////////////////////////////////////////////
-// String <=> Integer Conversions
-// ...
-
-u64 u64_from_str(String str);
-i64 i64_from_str(String str);
-f64 f64_from_str(String str);
-u32 u32_from_str(String str);
-i32 i32_from_str(String str);
-f32 f32_from_str(String str);
-
-////////////////////////////////////////////////////////////////////////
 // String Path Helpers
-
 // one/two/three -> one/two
 String str_chop_last_slash(String s);
 
@@ -1858,7 +1884,6 @@ String str_skip_last_dot(String s);
 
 ////////////////////////////////////////////////////////////////////////
 // Wchar stuff
-
 u64 wchar_to_char(char* out, const wchar_t* in, u64 out_size);
 String push_str_wchar(Allocator arena, const wchar_t* in, u32 wchar_length);
 
@@ -3013,7 +3038,6 @@ void imgui_platform_set_clipboard_text(struct ImGuiContext* ctx, const char* tex
 
 ////////////////////////////////////////////////////////////////////////
 // @Thread
-
 const u32 Thread_MaxTasks = 1024;
 const u32 Thread_MaxCounters = 1024;
 const u32 Thread_NumWorkers = 4;
@@ -3111,9 +3135,9 @@ template<typename T, typename F> void thread_parallel_for(u32 chunk_size, Slice<
 	WaitGroup wg = thread_push_batch(tasks);
 	thread_wg_wait(wg);
 }
+
 ////////////////////////////////////////////////////////////////////////
 // @Profile
-
 const u32 ProfRecordHistoryNum = 30;
 
 enum ProfType {

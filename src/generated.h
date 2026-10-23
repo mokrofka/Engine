@@ -2,19 +2,9 @@ enum {
 	MetaType_ThingId = 12,
 	MetaType_EntityFlags,
 	MetaType_ThingFlags,
-	MetaType_R_MeshId,
-	MetaType_R_MaterialId,
+	MetaType_MeshId,
+	MetaType_MaterialId,
 	MetaType_Color,
-};
-MemberDefinition members_of_Camera[] = {
-	{MetaType_v3, "pos", OffsetOf(Camera,pos)},
-	{MetaType_v3, "dir", OffsetOf(Camera,dir)},
-	{MetaType_f32, "yaw", OffsetOf(Camera,yaw)},
-	{MetaType_f32, "pitch", OffsetOf(Camera,pitch)},
-	{MetaType_f32, "fov", OffsetOf(Camera,fov)},
-	{MetaType_f32, "accel", OffsetOf(Camera,accel)},
-	{MetaType_v3, "vel", OffsetOf(Camera,vel)},
-	{MetaType_f32, "vel_friction", OffsetOf(Camera,vel_friction)},
 };
 MemberDefinition members_of_Thing[] = {
 	{MetaType_ThingId, "parent", OffsetOf(Thing,parent)},
@@ -30,8 +20,8 @@ MemberDefinition members_of_Thing[] = {
 	{MetaType_v3, "scale", OffsetOf(Thing,scale)},
 	{MetaType_Rng3, "aabb", OffsetOf(Thing,aabb)},
 	{MetaType_v3, "vel", OffsetOf(Thing,vel)},
-	{MetaType_R_MeshId, "mesh", OffsetOf(Thing,mesh)},
-	{MetaType_R_MaterialId, "mat", OffsetOf(Thing,mat)},
+	{MetaType_MeshId, "mesh", OffsetOf(Thing,mesh)},
+	{MetaType_MaterialId, "mat", OffsetOf(Thing,mat)},
 	{MetaType_Color, "color", OffsetOf(Thing,color)},
 	{MetaType_f32, "elapsed", OffsetOf(Thing,elapsed)},
 	{MetaType_u8, "buf0", OffsetOf(Thing,buf0)},

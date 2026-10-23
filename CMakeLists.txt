@@ -34,7 +34,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE "${binary_dir}")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO "${binary_dir}")
 
 # Compiler
-add_compile_options(-Wunused-variable -Wuninitialized -Wno-unused-const-variable -Wno-gnu-alignof-expression -Wno-c99-designator -fno-exceptions -fno-rtti -mavx)
+add_compile_options(-Wunused-variable -Wuninitialized -Wno-unused-const-variable -Wno-gnu-alignof-expression -Wno-c99-designator -fno-exceptions -fno-rtti -mavx2)
 
 # Sanitizer
 if(sanitize_address)
