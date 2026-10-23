@@ -4,7 +4,6 @@ enum Bindings {
 	Textures,
 	Samplers,
 	CubeTextures,
-	Drawinfo,
 	Materials,
 	PointLights,
 	DirLights,
@@ -32,10 +31,10 @@ struct GpuState {
 	alignas(16) m4x4 projection_view;
 	alignas(16) m4x4 projection;
 	alignas(16) m4x4 view;
-	m4x4 mat;
+	alignas(16) m4x4 mat;
 	alignas(16) v4 ambient_color;
 	u64 p;
-	v2 res;
+	alignas(8) v2 res;
 	f32 time;
 	u32 point_light_count;
 	u32 dir_light_count;
@@ -47,13 +46,9 @@ struct Vertex {
 	alignas(16) v3 pos;
 	u32 color;
 	alignas(16) v3 norm;
-	alignas(16) v4 weights;
+	v4u8 joints;
 	alignas(8) v2 uv;
-	alignas(16) v4u joints;
-
-	// TODO: use it in future:
-	// v4u8 joints; // causes invalid indexes
-	// v4u8 weights;
+	v4u8 weights;
 };
 
 CONST u32 DrawCallFlag_Skeleton = 1<<1;

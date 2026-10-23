@@ -679,10 +679,6 @@ u32 vk_find_memory_idx(u32 type_filter, u32 property_flags) {
 	return idx;
 }
 
-void vk_push_constants(VK_PushConstant constants) {
-	st->gfx.CmdPushConstants(vk_cur_cmd(), st->gfx.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VK_PushConstant), &constants);
-}
-
 VkSemaphore vk_make_semaphore(u64 initial_counter) {
 	var& g = st->gfx;
 	VkSemaphoreTypeCreateInfo timelineInfo = {
@@ -856,7 +852,7 @@ VkShaderModule vk_shader_create(Slice<u8> code) {
 	return res;
 }
 
-VkPipeline vk_pipeline_create2(Gfx_PipelineDesc2 desc) {
+VkPipeline vk_pipeline_create(Gfx_PipelineDesc2 desc) {
 	var& g = st->gfx;
 
 	// Dynamic rendering
@@ -1313,6 +1309,8 @@ void vk_device_init() {
 			.runtimeDescriptorArray = true,                        // allows not specified size of descriptor array in shader
 			.timelineSemaphore = true,
 			.shaderInt8 = true,
+			.storageBuffer8BitAccess = true,
+			.uniformAndStorageBuffer8BitAccess = true,
 		};
 		VkPhysicalDeviceVulkan11Features vulkan11 = {
 			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
@@ -1329,7 +1327,9 @@ void vk_device_init() {
 				.fillModeNonSolid = true,  // Request anistrophy
 				.samplerAnisotropy = true, // Request wireframe
 				.shaderInt64 = true,       // Request 64bit integers
+#if BUILD_DEV
 				.pipelineStatisticsQuery = true,
+#endif
 				.shaderInt16 = true,
 			}
 		};
@@ -1524,7 +1524,6 @@ void vk_texture_generate_mipmaps(VkCommandBuffer cmd, VK_Image* image) {
 
 ////////////////////////////////////////////////////////////////////////
 // @Gfx
-
 u32 gfx_pixelformat_bytesize(Gfx_PixelFormat fmt) {
 	switch(fmt) {
 		InvalidDefaultCase;
@@ -1626,7 +1625,7 @@ Gfx_Pipeline gfx_make_pipeline(Gfx_PipelineDesc2 desc) {
 	_DefSet(desc.pixel_format, Gfx_PixelFormat_DefaulttAttachment);
 	VK_Pipeline pipeline = {};
 	gfx_pipeline_common_init(&pipeline, desc);
-	pipeline.h = vk_pipeline_create2(desc);
+	pipeline.h = vk_pipeline_create(desc);
 	Gfx_Pipeline res = pool_push(g.pipelines, pipeline);
 	return res;
 }
@@ -1646,7 +1645,7 @@ Gfx_Image gfx_make_image(Gfx_ImageDesc desc) {
 		.sample_count = desc.samples,
 	};
 	if(desc.mipmaps) {
-		image.mipmaps_count = floor(log2(Max(image.width, image.height))) + 1;
+		image.mipmaps_count = Floor(Log2(Max(image.width, image.height))) + 1;
 	}
 	VkImageCreateInfo image_info = {
 		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -1764,7 +1763,9 @@ Gfx_View gfx_make_view(Gfx_ViewDesc desc) {
 	};
 	VK_CHECK(g.CreateImageView(vkdevice, &view_info, g.allocator, &view.h));
 
-	Gfx_View res = {pool_push(img.type == Gfx_ImageType_Cube ? g.cubemap_views : g.views, view)};
+	Gfx_View res = {};
+	if(img.type == Gfx_ImageType_Cube) res = pool_push(g.cubemap_views, view);
+	else res = pool_push(g.views, view);
 	VkDescriptorImageInfo descriptor_image_info = {
 		.imageView = view.h,
 		.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -1951,7 +1952,7 @@ void gfx_update_pipeline(Gfx_Pipeline pip, Gfx_PipelineDesc2 desc) {
 	VK_Pipeline& pipeline = pool_get(g.pipelines, pip);
 	g.DestroyPipeline(vkdevice, pipeline.h, g.allocator);
 	gfx_pipeline_common_init(&pipeline, desc);
-	pipeline.h = vk_pipeline_create2(desc);
+	pipeline.h = vk_pipeline_create(desc);
 }
 
 void gfx_update_image(Gfx_Image img, u8* data) {
@@ -2209,20 +2210,23 @@ void gfx_apply_alpha_to_coverage(b32 enable) {
 	st->gfx.CmdSetAlphaToCoverageEnableEXT(vk_cur_cmd(), false);
 }
 
+void gfx_push_ctx(Gfx_DrawCtx constants) {
+	st->gfx.CmdPushConstants(vk_cur_cmd(), st->gfx.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(Gfx_DrawCtx), &constants);
+}
 void gfx_draw(u32 base_vert, u32 vert_count, u32 instance_count, u32 base_instance) {
 	st->gfx.CmdDraw(vk_cur_cmd(), vert_count, instance_count, base_vert, base_instance);
 }
 void gfx_draw_indexed(u32 base_index, u32 index_count, u32 base_vert, u32 instance_count, u32 base_instance) {
 	st->gfx.CmdDrawIndexed(vk_cur_cmd(), index_count, instance_count, base_index, base_vert, base_instance);
 }
-void gfx_draw_indirect(Gfx_IndirectDrawCall drawcall) {
+void gfx_draw_indirect(Region region, Gfx_Buffer buf, u32 offset, u32 stride) {
 	var& g = st->gfx;
-	g.CmdDrawIndirect(vk_cur_cmd(), g.cpu_buf.h, g.drawcalls_buf.base + drawcall.base*sizeof(VK_IndirectDrawCall), drawcall.count, sizeof(VK_IndirectDrawCall));
+	g.CmdDrawIndirect(vk_cur_cmd(), g.cpu_buf.h, buf.base + region.base*stride, region.count, stride);
 }
-void gfx_draw_indexed_indirect(Gfx_IndirectDrawCall drawcall) {
-	var& g = st->gfx;
-	g.CmdDrawIndexedIndirect(vk_cur_cmd(), g.cpu_buf.h, g.drawcalls_buf.base + drawcall.base*sizeof(VK_IndirectDrawCall), drawcall.count, sizeof(VK_IndirectDrawCall));
-}
+// void gfx_draw_indexed_indirect(Gfx_IndirectDrawCall drawcall) {
+// 	// var& g = st->gfx;
+// 	// g.CmdDrawIndexedIndirect(vk_cur_cmd(), g.cpu_buf.h, g.drawcalls_buf.base + drawcall.base*sizeof(VK_IndirectDrawCall), drawcall.count, sizeof(VK_IndirectDrawCall));
+// }
 
 void gfx_draw_mesh(Gfx_Mesh mesh) {
 	if(mesh.index_count) {
@@ -2435,38 +2439,6 @@ u32 gfx_ready_counter() {
 	return g.stage_cmd_ready_counter;
 }
 
-u32 gfx_begin_indirect() {
-	return st->gfx.indirect_drawcall_cursor;
-}
-Gfx_IndirectDrawCall gfx_end_indirect(u32 base) {
-	Gfx_IndirectDrawCall res = {
-		.base = base,
-		.count = st->gfx.indirect_drawcall_cursor - base,
-	};
-	return res;
-}
-void gfx_push_indirect_mesh(Gfx_Mesh mesh, u32 id, u32 instance_count) {
-	VK_IndirectDrawCall info = {};
-	if(mesh.index_count) {
-		info.index_draw_command = {
-			.indexCount = mesh.index_count,
-			.instanceCount = instance_count,
-			.firstIndex = mesh.base_index,
-			.vertexOffset = (i32)mesh.base_vert,
-			.firstInstance = 0,
-		};
-	} else {
-		info.draw_command = {
-			.vertexCount = mesh.vert_count,
-			.instanceCount = instance_count,
-			.firstVertex = mesh.base_vert,
-			.firstInstance = 0,
-		};
-	}
-	VK_IndirectDrawCall* indirect_drawcalls = (VK_IndirectDrawCall*)gfx_buffer_base_ptr(st->gfx.drawcalls_buf);
-	indirect_drawcalls[st->gfx.indirect_drawcall_cursor++] = info;
-}
-
 u8* gfx_buffer_base_ptr(Gfx_Buffer buf) { return vk_get_vkbuffer(buf).base + buf.base; }
 
 void gfx_bind_pipeline(Gfx_Pipeline pip) {
@@ -2569,7 +2541,7 @@ void gfx_flush() {
 		VkPushConstantRange push_constant = {
 			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 			.offset = 0,
-			.size = sizeof(VK_PushConstant),
+			.size = sizeof(Gfx_DrawCtx),
 		};
 		VkPipelineLayoutCreateInfo pipeline_layout_info = {
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -2680,6 +2652,7 @@ void gfx_init(Gfx_Environment environment) {
 		Loop(i, Gfx_NumFramesInFlight) {
 			VK_CHECK(g.CreateQueryPool(vkdevice, &pool_info, g.allocator, &g.query_pools[i]));
 		}
+#if BUILD_DEV
 		VkQueryPoolCreateInfo stats_pool_info = {
 			.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
 			.queryType = VK_QUERY_TYPE_PIPELINE_STATISTICS,
@@ -2692,6 +2665,7 @@ void gfx_init(Gfx_Environment environment) {
 			VK_CHECK(g.CreateQueryPool(vkdevice, &stats_pool_info, g.allocator, &g.stats_query_pools[i]));
 		}
 		g.ns_per_tick = g.device.properties.limits.timestampPeriod;
+#endif
 	}
 
 	// Sync
@@ -2716,7 +2690,7 @@ void gfx_init(Gfx_Environment environment) {
 		VkDescriptorPoolSize pool_sizes[] = {
 			{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, Gfx_MaxStorageBuffers},
 			{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, Gfx_MaxImages},
-			{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, Gfx_MaxCubeTextures},
+			{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, Gfx_MaxCubeViews},
 			{VK_DESCRIPTOR_TYPE_SAMPLER, Gfx_MaxSamplers},
 		};
 		VkDescriptorPoolCreateInfo pool_info = {
@@ -2745,11 +2719,7 @@ void gfx_init(Gfx_Environment environment) {
 	// 	.buffer = g.cpu_buf.h,
 	// };
 	// g.cpu_buf_address = g.GetBufferDeviceAddress(vkdevice, &cpu_address_info);
-
-	g.drawcalls_buf = gfx_make_buffer(drawcall_mem, Gfx_MemType_Cpu);
 	g.stage_buffer = gfx_make_buffer(Gfx_StageBufferSize, Gfx_MemType_Cpu);
-	gfx_make_bind({.binding = Bindings::Drawinfo});
-	gfx_bind_buffer(g.drawcalls_buf, Bindings::Drawinfo);
 }
 
 void gfx_shutdown() {
@@ -2793,6 +2763,7 @@ void gfx_begin() {
 	VkCommandBuffer cmd = vk_cur_cmd();
 	vk_cmd_begin(cmd);
 
+#if BUILD_DEV
 	///////////////////////////////////
 	// Timestamps
 	Assert(g.stack_depth == 0);
@@ -2828,6 +2799,7 @@ void gfx_begin() {
 	g.CmdResetQueryPool(cmd, g.query_pools[g.cur_frame_idx], 0, MaxTimeStamps);
 	g.CmdResetQueryPool(cmd, g.stats_query_pools[g.cur_frame_idx], 0, MaxTimeStamps);
 	g.zone_count[g.cur_frame_idx] = 0;
+#endif
 
 	g.swapchain_resized = false;
 	v2u win_size = os_win_size();
@@ -2839,9 +2811,9 @@ void gfx_begin() {
 		Info("Swapchain recreated x: %i y: %i", win_size.x, win_size.y);
 	}
 
-	gfx_begin_timestamp("start");
+	GfxBeginBlock("start");
 	g.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipeline_layout, 0, 1, &g.descriptor_set, 0, null);
-	gfx_end_timestamp();
+	GfxEndBlock();
 	// Next image
 	{
 		ProfBlock("swapchain flip waiting");
@@ -2922,8 +2894,6 @@ void gfx_begin() {
 void gfx_end() {
 	ProfFunc;
 	var& g = st->gfx;
-
-	g.indirect_drawcall_cursor = 0;
 
 	VkCommandBuffer cmd = vk_cur_cmd();
 	vk_cmd_end(cmd);

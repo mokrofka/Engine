@@ -8,16 +8,15 @@ MakeId(Gfx_Pipeline);
 MakeId(Gfx_View);
 
 enum {
-	Gfx_NumFramesInFlight   = 3,
+	Gfx_NumFramesInFlight   = 2,
 	Gfx_MaxImagesInFlight   = 4,
-	Gfx_MaxColorAttachments = 8,
-	Gfx_MaxShaders          = 32,
-	Gfx_MaxPipelines        = 32,
+	Gfx_MaxColorAttachments = 4,
+	Gfx_MaxShaders          = 16,
+	Gfx_MaxPipelines        = 16,
 	Gfx_MaxViews            = 32,
 	Gfx_MaxImages           = 32,
-	Gfx_MaxSamplers         = 32,
-	Gfx_MaxBuffers          = 32,
-	Gfx_MaxCubeTextures     = 16,
+	Gfx_MaxSamplers         = 8,
+	Gfx_MaxCubeViews     			= 8,
 	Gfx_MaxStorageBuffers   = 16,
 	Gfx_MaxBindings         = 64,
 	Gfx_DefaultSampleCount  = 4,
@@ -373,11 +372,6 @@ struct Gfx_DescriptorDesc {
 	u32 count;
 };
 
-struct Gfx_IndirectDrawCall {
-	u32 base;
-	u32 count;
-};
-
 struct Gfx_Mesh {
 	u32 base_vert;
 	u32 vert_count;
@@ -414,9 +408,12 @@ struct Gfx_StageBufferCmd {
 	u64 size;
 };
 
+struct Gfx_DrawCtx {
+	u32 idx;
+};
+
 ////////////////////////////////////////////////////////////////////////
 // @Vulkan
-
 #include "vulkan/vulkan_core.h"
 
 #if BUILD_DEBUG
@@ -587,10 +584,6 @@ struct VK_Swapchain {
 	VkImageView old_view[Gfx_MaxImagesInFlight];
 };
 
-struct VK_PushConstant {
-	u32 idx;
-};
-
 struct VK_DescriptorWriter {
 	VkDescriptorBindingFlags binding_flags[Gfx_MaxBindings];
 	VkDescriptorSetLayoutBinding bindings[Gfx_MaxBindings];
@@ -617,7 +610,6 @@ VkSemaphore vk_get_cur_render_complete_semaphore();
 VkCommandBuffer vk_cur_cmd();
 
 u32 vk_find_memory_idx(u32 type_filter, u32 property_flags);
-void vk_push_constants(VK_PushConstant constants);
 
 VkSemaphore vk_make_semaphore(u64 initial_counter);
 
@@ -632,7 +624,6 @@ VK_Buffer vk_get_vkbuffer(Gfx_Buffer buf);
 
 ////////////////////////////////////////////////////////////////////////
 // @Gfx
-
 struct Gfx_Environment {
 	u64 gpu_mem_size;
 	u64 cpu_mem_size;
@@ -718,7 +709,7 @@ struct Gfx_State {
 	Pool<VK_Pipeline, Gfx_MaxPipelines, Gfx_Pipeline> pipelines;
 	Pool<VK_Image, Gfx_MaxImages, Gfx_Image> images;
 	Pool<VK_View, Gfx_MaxViews, Gfx_View> views;
-	Pool<VK_View, Gfx_MaxViews, Gfx_View> cubemap_views;
+	Pool<VK_View, Gfx_MaxCubeViews, Gfx_View> cubemap_views;
 	Pool<VK_Sampler, Gfx_MaxSamplers, Gfx_Sampler> samplers;
 
 	VkSemaphore stage_semaphore;
@@ -736,10 +727,6 @@ struct Gfx_State {
 		Gfx_PassAction action;
 		Gfx_Attachments attachments;
 	} cur_pass;
-
-	// Indirect drawing
-	Gfx_Buffer drawcalls_buf;
-	u32 indirect_drawcall_cursor;
 
 	///////////////////////////////////
 	// Vulkan loader
@@ -927,10 +914,11 @@ void gfx_apply_sample(u32 sample_count);
 void gfx_apply_sample_mask(u32 sample_count, u32 mask);
 void gfx_apply_alpha_to_coverage(b32 enable);
 
+void gfx_push_ctx(Gfx_DrawCtx constants);
 void gfx_draw(u32 base_vert, u32 vert_count, u32 instance_count = 1, u32 base_instance = 0);
 void gfx_draw_indexed(u32 base_index, u32 index_count, u32 base_vert, u32 instance_count = 1, u32 base_instance = 0);
-void gfx_draw_indirect(Gfx_IndirectDrawCall drawcall);
-void gfx_draw_indexed_indirect(Gfx_IndirectDrawCall drawcall);
+void gfx_draw_indirect(Region region, Gfx_Buffer buf, u32 offset, u32 stride);
+// void gfx_draw_indexed_indirect(Gfx_IndirectDrawCall drawcall);
 void gfx_draw_mesh(Gfx_Mesh mesh);
 
 void gfx_begin_pass(Gfx_Pass pass);
@@ -942,9 +930,6 @@ u64 gfx_push_stage_buffers(Slice<Slice<u8>> buffers);
 u32 gfx_push_stage_buffer_cmd(Gfx_StageBufferCmd cmd);
 u32 gfx_ready_counter();
 
-u32  gfx_begin_indirect();
-Gfx_IndirectDrawCall gfx_end_indirect(u32 base);
-void gfx_push_indirect_mesh(Gfx_Mesh mesh, u32 id, u32 instance_count = 1);
 u8* gfx_buffer_base_ptr(Gfx_Buffer buf);
 
 void gfx_bind_pipeline(Gfx_Pipeline pip);
@@ -964,4 +949,11 @@ void gfx_shutdown();
 void gfx_begin();
 void gfx_end();
 
+#if BUILD_DEV
+ #define GfxBeginBlock(name) gfx_begin_timestamp(name)			
+ #define GfxEndBlock() gfx_end_timestamp()		
+#else
+	#define GfxBeginBlock(name)
+	#define GfxEndBlock()
+#endif
 

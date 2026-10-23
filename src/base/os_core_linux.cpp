@@ -155,7 +155,6 @@ String os_get_environment(String name) {
 
 //////////////////////////////////////////////////////////////////////////
 // Memory
-
 u8*  os_reserve(u64 size)                  { atomic_add(&os_st.mem_address_space_reserve, size); return (u8*)mmap(null, size, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0); }
 b32  os_commit(void* ptr, u64 size)        { atomic_add(&os_st.mem_commited, size); return mprotect(ptr, size, PROT_READ | PROT_WRITE);}
 void os_decommit(void* ptr, u64 size)      { mprotect(ptr, size, PROT_NONE);}
@@ -163,7 +162,6 @@ void os_release(void* ptr, u64 size)       { munmap(ptr, size);}
 
 //////////////////////////////////////////////////////////////////////////
 // Files
-
 FileProperties os_lnx_file_properties_from_stat(struct stat fd_stat) {
 	FileProperties props = {
 		.size = (u64)fd_stat.st_size,
@@ -502,7 +500,6 @@ Slice<OS_FileInfo> os_file_iter_directory(Allocator arena, String path, OS_FileI
 
 ////////////////////////////////////////////////////////////////////////
 // Processes
-
 OS_Handle os_process_make(Slice<String> arr) {
 	Scratch scratch;
 	OS_Handle handle = {};
@@ -538,7 +535,6 @@ i32 os_process_join(OS_Handle handle) {
 
 ////////////////////////////////////////////////////////////////////////
 // Threads
-
 void* os_thread_entry(void* ctx) {
 	OS_LNX_Entity* entity = (OS_LNX_Entity*)ctx;
 	entity->thread.func(entity->thread.ptr);
@@ -646,7 +642,6 @@ void os_sem_post(Semaphore& s) {
 
 ////////////////////////////////////////////////////////////////////////
 // Lib
-
 OS_Handle os_lib_open(String path) { 
 	Scratch scratch;
 	String path_c = push_str_copy(scratch, path);

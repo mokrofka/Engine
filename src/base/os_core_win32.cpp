@@ -184,7 +184,6 @@ String    os_get_current_filepath()     { return st.binary_filepath; }
 
 //////////////////////////////////////////////////////////////////////////
 // Memory
-
 #define PAGE_SIZE 4096
 u8*   os_reserve(u64 size)                  { return (u8*)VirtualAlloc(0, size, MEM_RESERVE, PAGE_READWRITE); }
 void  os_commit(void* ptr, u64 size)        { VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE); }
@@ -195,7 +194,6 @@ b32   os_commit_large(void* ptr, u64 size)  { return 1; }
 
 //////////////////////////////////////////////////////////////////////////
 // File
-
 OS_Handle os_file_open(String path, OS_AccessFlags flags) {
   Scratch scratch;
   String path_c = push_str_copy(scratch, path);

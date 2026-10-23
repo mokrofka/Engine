@@ -57,6 +57,7 @@ VS_Entry VSOutput vs_main(u32 vert_id: SV_VertexID, u32 draw_id: SV_DrawIndex, u
 					in.weights.z * skin_matrices[in.joints.z] +
 					in.weights.w * skin_matrices[in.joints.w];
 				pos = skin * pos;
+				// printf("%i %i %i %i", in.joints.x, in.joints.y,in.joints.z,in.joints.w);
 			}
 			o.pos = st.projection_view * draw.model * pos;
 			o.uv = in.uv;

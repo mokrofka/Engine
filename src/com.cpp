@@ -10,7 +10,6 @@ GlobalVar GlobalState* st;
 DrawBatch make_draw_batch(Allocator alloc, Gfx_Pipeline pip) {
 	DrawBatch res = {
 		.draws = array_make<DrawCall>(alloc),
-		.unindexed_draws = array_make<DrawCall>(alloc),
 	};
 	return res;
 }
@@ -371,7 +370,7 @@ FontId make_font(FontDesc desc) {
 		stbtt_bakedchar characters_info[96];
 		u32 font_height = ctx.desc.font_height;
 		u32 pixels_size = 96 * Square(font_height);
-		u32 dim = sqrt(pixels_size);
+		u32 dim = Sqrt(pixels_size);
 		u32 width = round_up(dim, font_height);
 		u32 height = round_up(dim, font_height);
 		u8* pixels = push_buffer(scratch, width*height);
@@ -407,7 +406,7 @@ FontId make_font_idle(FontDesc desc) {
 	stbtt_bakedchar characters_info[96];
 	u32 font_height = desc.font_height;
 	u32 pixels_size = 96 * Square(font_height);
-	u32 dim = sqrt(pixels_size);
+	u32 dim = Sqrt(pixels_size);
 	u32 width = round_up(dim, font_height);
 	u32 height = round_up(dim, font_height);
 	u8* pixels = push_buffer(g.arena, width*height);
@@ -568,7 +567,7 @@ void shaders_compile_join() {
 	}
 }
 
-void r_bind_pipeline(Gfx_Pipeline pip) {
+void bind_pipeline(Gfx_Pipeline pip) {
 	var& g = *st;
 	g.cur_pip = pip;
 	gfx_bind_pipeline(pip);
@@ -654,9 +653,6 @@ void r_init() {
 	ProfFunc;
 	Scratch scratch;
 	var& g = *st;
-	Arena arena = arena_make(.name = "render arena");
-	g.arena = arena;
-	g.gpa = alloc_make(g.arena);
 	g.scale = 1;
 	gfx_init({.cpu_mem_size = MB(100), .gpu_mem_size = MB(10), .image_mem_size = MB(10)});
 
@@ -672,7 +668,7 @@ void r_init() {
 		ProfBlock("descriptors");
 		gfx_make_bind({.type = Gfx_BindType_Image, .binding = Bindings::Textures, .count = Gfx_MaxImages});
 		gfx_make_bind({.type = Gfx_BindType_Sampler, .binding = Bindings::Samplers, .count = Gfx_MaxSamplers});
-		gfx_make_bind({.type = Gfx_BindType_Image, .binding = Bindings::CubeTextures, .count = Gfx_MaxCubeTextures});
+		gfx_make_bind({.type = Gfx_BindType_Image, .binding = Bindings::CubeTextures, .count = Gfx_MaxCubeViews});
 		Gfx_BufferDesc buffers[] = {
 			{
 				.binding = Bindings::Vertices,
@@ -860,8 +856,8 @@ void r_end() {
 	// Write to shaders
 	{
 		var& gpu_st = *g.gpu_state;
-		gpu_st.projection_view = g.projection * g.view;
-		gpu_st.projection = g.projection;
+		gpu_st.projection_view = g.proj_view;
+		gpu_st.projection = g.proj;
 		gpu_st.view = g.view;
 		gpu_st.ambient_color = g.ambient_color;
 		u32 idx = 0;
@@ -885,22 +881,20 @@ void r_end() {
 	// World
 	u32 drawcall_count = 0;
 	{
-		gfx_begin_timestamp("world");
+		GfxBeginBlock("world");
 		begin_render_pass({&g.world_rt});
 		{
 			gfx_apply_viewport(rng2_make(v2(), os_win_size() * g.scale), true);
 			gfx_apply_scissor(rng2_make(v2(), os_win_size()));
-			// gfx_bind_vert(g.gpu_vert_buf);
-			// gfx_bind_index(g.gpu_index_buf);
-			r_bind_pipeline(g.uber_pip);
+			bind_pipeline(g.uber_pip);
 			for(var& batch : g.batches) {
 				apply_pip_state(batch.state);
 				var emit_batch = [&](Slice<DrawCall> pushes, b32 indexed) {
-					u32 base = gfx_begin_indirect();
+					u32 base = drawcall_count;
 					for(var draw : pushes) {
 						m4x4 model = m4x4_transform(draw.pos, draw.scale, draw.rot);
 						var mat = g.materials[draw.mat.idx];
-						var& drawcall = g.gpu_drawcalls[drawcall_count];
+						var& drawcall = g.gpu_drawcalls[drawcall_count++];
 						drawcall = {
 							.model = model,
 							.color = draw.color.v,
@@ -908,30 +902,17 @@ void r_end() {
 							.type = draw.type,
 							.flags = draw.flags,
 						};
-
 						Gfx_Mesh mesh = g.meshes[draw.mesh.idx];
 						drawcall_set_mesh(drawcall, mesh);
-
-						gfx_push_indirect_mesh(mesh, drawcall_count++);
 					}
-					Gfx_IndirectDrawCall draw = gfx_end_indirect(base);
-					if(draw.count) {
-						vk_push_constants({draw.base});
-						if(indexed) {
-							// gfx_draw_indexed_indirect(draw);
-							var& gfx = st->gfx;
-							gfx.CmdDrawIndirect(vk_cur_cmd(), gfx.cpu_buf.h, g.cpu_drawcall_buf.base + draw.base*sizeof(GpuDrawCall) + OffsetOf(GpuDrawCall, mesh), draw.count, sizeof(GpuDrawCall));
-						} else {
-							// gfx_draw_indirect(draw);
-							var& gfx = st->gfx;
-							gfx.CmdDrawIndirect(vk_cur_cmd(), gfx.cpu_buf.h, g.cpu_drawcall_buf.base + draw.base*sizeof(GpuDrawCall) + OffsetOf(GpuDrawCall, mesh), draw.count, sizeof(GpuDrawCall));
-						}
+					u32 count = drawcall_count - base;
+					if(count) {
+						gfx_push_ctx({base});
+						gfx_draw_indirect({base, count}, g.cpu_drawcall_buf, OffsetOf(GpuDrawCall, mesh), sizeof(GpuDrawCall));
 					}
 				};
 				emit_batch(slice(batch.draws), true);
-				emit_batch(slice(batch.unindexed_draws), false);
 				array_clear(batch.draws);
-				array_clear(batch.unindexed_draws);
 			}
 
 			// Debug drawing
@@ -951,9 +932,11 @@ void r_end() {
 						.dst_factor_alpha = Gfx_BlendFactor_OneMinusSrcAlpha,
 					}
 				});
-				g.gpu_drawcalls[drawcall_count].type = ShaderType::Line;
-				g.gpu_drawcalls[drawcall_count].flags |=	DrawCallFlag_CpuVertices;
-				vk_push_constants({drawcall_count++});
+				g.gpu_drawcalls[drawcall_count] = {
+					.type = ShaderType::Line,
+					.flags =	DrawCallFlag_CpuVertices,
+				};
+				gfx_push_ctx({drawcall_count++});
 				gfx_draw(0, g.draw_lines.count);
 				array_clear(g.draw_lines);
 			}
@@ -964,10 +947,12 @@ void r_end() {
 
 			// Cube map
 			apply_pip_state({.depth = {.compare = Gfx_CompareOp_LessEqual}});
-			g.gpu_drawcalls[drawcall_count].type = ShaderType::Cube;
+			g.gpu_drawcalls[drawcall_count] = {
+				.type = ShaderType::Cube,
+			};
 			var mesh = g.meshes[g.meshes_ids[Mesh_Cube].idx];
 			drawcall_set_mesh(g.gpu_drawcalls[drawcall_count], mesh);
-			vk_push_constants({drawcall_count++});
+			gfx_push_ctx({drawcall_count++});
 			gfx_draw_mesh(mesh);
 
 			// UI drawing
@@ -989,7 +974,7 @@ void r_end() {
 					};
 					ArrayCopy(g.gpu_ui_rects[i].colors, rect.colors);
 				}
-				r_bind_pipeline(g.ui_rect_pip);
+				bind_pipeline(g.ui_rect_pip);
 				apply_pip_state({
 					.primitive_type = Gfx_PrimitiveType_TriangleStrip,
 					.blend = {
@@ -1005,12 +990,12 @@ void r_end() {
 			}
 		}
 		gfx_end_pass();
-		gfx_end_timestamp();
+		GfxEndBlock();
 	}
 	
 	///////////////////////////////////
 	// Swapchain
-	gfx_begin_timestamp("swapchain");
+	GfxBeginBlock("swapchain");
 	gfx_begin_pass({});
 	{
 		gfx_apply_viewport(rng2_make(v2(), os_win_size()));
@@ -1020,7 +1005,7 @@ void r_end() {
 			.type = ShaderType::Screen,
 			.cur_resolve_idx = g.world_rt.resolve.view.idx,
 		};
-		vk_push_constants({drawcall_count++});
+		gfx_push_ctx({drawcall_count++});
 		gfx_draw(0, 3);
 		// g.gpu_drawcalls[drawcall_count] = {
 		// 	.type = ShaderType::SoftwareRender,
@@ -1033,7 +1018,7 @@ void r_end() {
 #endif
 	}
 	gfx_end_pass();
-	gfx_end_timestamp();
+	GfxEndBlock();
 	gfx_end();
 }
 
@@ -1044,17 +1029,13 @@ void draw_mesh(MeshId mesh, MaterialId mat, v3 pos, u32 flags) {
 	DrawCall cmd = {
 		.pos = pos,
 		.scale = v3(1),
-		.rot = quat_identity(),
+		.rot = quat_identity,
 		.mesh = mesh,
 		.mat = mat,
 		.type = material.type,
 		.flags = flags,
 	};
-	if(g.meshes[mesh.idx].index_count) {
-		array_push(g.batches[batch_idx].draws, cmd);
-	} else {
-		array_push(g.batches[batch_idx].unindexed_draws, cmd);
-	}
+	array_push(g.batches[batch_idx].draws, cmd);
 }
 
 void draw_mesh_trs(MeshId mesh, MaterialId mat, v3 pos, v4 rot, v3 scale, u32 flags) {
@@ -1070,11 +1051,7 @@ void draw_mesh_trs(MeshId mesh, MaterialId mat, v3 pos, v4 rot, v3 scale, u32 fl
 		.type = material.type,
 		.flags = flags,
 	};
-	if(g.meshes[mesh.idx].index_count) {
-		array_push(g.batches[batch_idx].draws, cmd);
-	} else {
-		array_push(g.batches[batch_idx].unindexed_draws, cmd);
-	}
+	array_push(g.batches[batch_idx].draws, cmd);
 }
 
 void draw_thing(ThingId id) {
@@ -1091,11 +1068,7 @@ void draw_thing(ThingId id) {
 		.mat = e.mat,
 		.type = material.type,
 	};
-	if(g.meshes[e.mesh.idx].index_count) {
-		array_push(g.batches[batch_idx].draws, cmd);
-	} else {
-		array_push(g.batches[batch_idx].unindexed_draws, cmd);
-	}
+	array_push(g.batches[batch_idx].draws, cmd);
 }
 
 void draw_line(v3 a, v3 b, Color color) {
@@ -1238,7 +1211,6 @@ void draw_text(FontId font, v2 pos, String str, Color color, u32 font_height) {
 
 ////////////////////////////////////////////////////////////////////////
 // @Dear imgui
-
 #if BUILD_DEV
 #include "../vendor/imgui/imgui_impl_vulkan.h"
 
@@ -2125,27 +2097,27 @@ f64 time_prev_interval(f64 time, f32 interval, f32 offset) {
 	return offset + prev * interval;
 }
 b32 time_on_time(f64 time, f64 timestamp, f64 dt)                  { return time >= timestamp && (time - dt) < timestamp; }
-b32 time_on_between_interval(f64 time, f32 interval, f32 offset)   { return mod(time - offset, interval*2) >= interval; }
+b32 time_on_between_interval(f64 time, f32 interval, f32 offset)   { return mod_trunc(time - offset, interval*2) >= interval; }
 f32 time_percent(f64 time, f64 start, f64 duration)                { return (time - start) / duration; }
-f32 time_lerp_delta(f32 current, f32 target, f32 rate, f32 delta)  { return target + (current - target) * exp(-rate * delta); }
+f32 time_lerp_delta(f32 current, f32 target, f32 rate, f32 delta)  { return target + (current - target) * Exp(-rate * delta); }
 b32 time_on_frame_interval(u32 frame, u32 n, u32 offset = 0)       { return (frame + offset) % n == 0; }
 f64 time_saw_wave(f64 time, f32 interval, f32 offset) {
 	f64 t = (time - offset) / interval;
-	return t - floor(t);
+	return t - Floor(t);
 }
 f32 time_sine_wave(f64 time, f32 period) {
-	return sin(time / period * 2.0f * PI);
+	return Sin(time / period * 2.0f * PI);
 }
 f32 time_smooth_wave(f64 time, f32 period) {
 	f32 p = time_saw_wave(time, period, 0);
-	return 0.5f - 0.5f * cos(p * 2.0f * PI);
+	return 0.5f - 0.5f * Cos(p * 2.0f * PI);
 }
 f32 time_triangle_wave(f64 time, f32 period) {
 	f32 p = time_saw_wave(time, period, 0);
 	return (1.0f - Abs(2.0f * p - 1.0f));
 }
 b32 time_pulse_wave(f64 time, f32 period, f32 duration, f32 offset) {
-	return mod(time - offset, period) < duration;
+	return mod_trunc(time - offset, period) < duration;
 }
 u32 time_frame(f64 time, f32 frame_duration, u32 frame_count) {
 	return u32(time / frame_duration) % frame_count;
@@ -2245,7 +2217,10 @@ void dev_update() {
 					load_game_state();
 				}
 				ImGui::DragFloat3("cam pos", g.cam.pos.v);
+				ImGui::Text("cam rot x:%f y:%f z:%f yaw: %f pitch: %f", g.cam.dir.x, g.cam.dir.y, g.cam.dir.z, g.cam.yaw, g.cam.pitch);
 				ImGui::DragFloat("cam vel fric", &g.cam.vel_friction, 0.1, 0, 100);
+				imgui_text("%s", g.visible ? S("visible") : S("invisible"));
+				ImGui::DragFloat3("euler pos", g.euler.v, 0.1);
 
 				imgui_image(g.textures_ids[Texture_Dummy], v2(100));
 			}
@@ -2267,7 +2242,7 @@ void dev_update() {
 
 		ProfBlock("Profiler");
 		var& prof = prof_st;
-		var& prof_win = st->prof_win;
+		var& prof_win = g.prof_win;
 
 		// Avg, min, max
 		u64 tsc_elapsed_sum = 0;
@@ -3110,7 +3085,7 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 				inv_matrices[bone_idx] = matrices[node_to_joint[node_idx]];
 				Transform trans = {
 					.pos = v3(),
-					.rot = quat_identity(),
+					.rot = quat_identity,
 					.scale = v3(1),
 				};
 				js_v3(node, "translation", &trans.pos);
@@ -3200,7 +3175,10 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 			vertices[i].joints.v[1] = joints[i].v[1];
 			vertices[i].joints.v[2] = joints[i].v[2];
 			vertices[i].joints.v[3] = joints[i].v[3];
-			vertices[i].weights = weights[i];
+			vertices[i].weights.v[0] = weights[i].v[0] * 255;
+			vertices[i].weights.v[1] = weights[i].v[1] * 255;
+			vertices[i].weights.v[2] = weights[i].v[2] * 255;
+			vertices[i].weights.v[3] = weights[i].v[3] * 255;
 		}
 	}
 	GltfInfo res = {
@@ -3589,7 +3567,7 @@ void camera_zoom_at_pow_clamp(Camera2& c, v2 mouse, v2 screen_center, f32 factor
 	c.zoom *= factor;
 	c.zoom = ClampBot(c.zoom, 0.02);
 	c.zoom2.y = Clamp(0.01, c.zoom, 3);
-	f32 t = pow(c.zoom + 1, 2);
+	f32 t = Pow(c.zoom + 1, 2);
 	f32 ratio = t * 0.3;
 	c.zoom2.x = c.zoom2.y * ratio;
 	if(c.zoom2.y > 1) {
@@ -3724,7 +3702,7 @@ ThingDesc default_thing_desc() {
 	var& g = *st;
 	ThingDesc res = {
 		.scale = v3(1),
-		.rot = quat_identity(),
+		.rot = quat_identity,
 		.color = ColorWhite,
 		.mesh_id = g.meshes_ids[Mesh_Cube],
 		.mat_id = g.materials_ids[Material_Orange],
@@ -3789,11 +3767,11 @@ String dumb_struct(Allocator arena, Slice<MemberDefinition> members, void* ptr, 
 				String v = *(String*)member_ptr;
 				dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, v));
 			}break;
-			case MetaType_R_MeshId: {
+			case MetaType_MeshId: {
 				MeshId v = *(MeshId*)member_ptr;
 				dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->mesh_id_to_str[v.idx]));
 			}break;
-			case MetaType_R_MaterialId: {
+			case MetaType_MaterialId: {
 				MaterialId v = *(MaterialId*)member_ptr;
 				dstr_push(string, push_strf(scratch, "%s \"%s\"\n", member.name, st->material_id_to_str[v.idx]));
 			}break;
@@ -3990,8 +3968,8 @@ void check_observer_observed() {
 	Scratch scratch;
 
 	add_observation({2}, {1}); /* Enemy A observes Player      -> idx 0 */
-	uint32_t enemyB_watches_player =
-		add_observation({3}, {1}); /* Enemy B observes Player      -> idx 1 */
+	u32 enemyB_watches_player =
+	add_observation({3}, {1}); /* Enemy B observes Player      -> idx 1 */
 	add_observation({4}, {1});	 /* Enemy C observes Player      -> idx 2 */
 	add_observation({2}, {5});	 /* Enemy A also observes QuestGiver -> idx 3 */
 
@@ -4012,7 +3990,7 @@ void check_observer_observed() {
 void init() {
 	Scratch scratch;
 	var& g = *st;
-
+	
 	g.asset_dir = push_strf(g.arena, "%s/%s", os_cur_directory(), String("../assets"));
 	g.shader_dir = push_str_cat(g.arena, g.asset_dir, "/shaders");
 	g.shader_compiled_dir = push_str_cat(g.arena, g.shader_dir, "/compiled");
@@ -4125,9 +4103,9 @@ MeshDesc generate_sphere(Allocator arena) {
 		for(u32 j = 0; j < lon_steps; j++) {
 			f32 lon_angle = j * lon_step_angle;
 			Vertex vert = {
-				.pos.x = cos(lat_angle) * cos(lon_angle),
-				.pos.y = sin(lat_angle),
-				.pos.z = cos(lat_angle) * sin(lon_angle),
+				.pos.x = Cos(lat_angle) * Cos(lon_angle),
+				.pos.y = Sin(lat_angle),
+				.pos.z = Cos(lat_angle) * Sin(lon_angle),
 				.uv.x = (f32)j / (lon_steps - 1),  // 0 → 1 across longitude
 				.uv.y = (f32)i / (lat_steps - 1),  // 0 → 1 from bottom to top
 			};
@@ -4190,6 +4168,7 @@ ThingId make_thing(ThingDesc desc) {
 		.mat = desc.mat_id,
 		.aabb = desc.aabb,
 		.color = desc.color,
+		.vel = desc.vel,
 	};
 	ThingId id = pool_push(g.things, e);
 	sparse_set_push(g.things_set, id.idx);
@@ -4204,13 +4183,15 @@ void destroy_thing(ThingId id) {
 
 void select_obj() {
 	var& g = *st;
-	v3 dir = ray_from_screen(os_mouse_pos(), os_win_size(), g.cam.pos, st->view, st->projection).dir;
+	Ray r = screen_to_ray(g.inv_view_proj, g.cam.pos, os_mouse_pos());
 	var desc = default_thing_desc();
 	desc.pos = g.cam.pos;
 	desc.scale = v3(0.3);
-	desc.vel = dir * 4;
+	desc.vel = v3_norm(r.dir) * 30;
 	make_thing(desc);
-	// e.pos() = st->cam.pos + v3_norm(m4x4_forward(st->cam.view));
+	r.dir *= 10;
+	array_push(g.lines, r.pos);
+	array_push(g.lines, r.pos + r.dir);
 }
 
 void save_game_state() {
@@ -4219,16 +4200,15 @@ void save_game_state() {
 	Dstring data = dstr_make(scratch);
 
 	{
-		var& cam = g.cam;
 		dstr_push(data, "Camera {\n");
-		dstr_pushf(data, "pos %s\n", write_v3(scratch, cam.pos));
-		dstr_pushf(data, "dir %f %f %f\n", write_v3(scratch, cam.dir));
-		dstr_pushf(data, "yaw %f\n", cam.yaw);
-		dstr_pushf(data, "pitch %f\n", cam.pitch);
-		dstr_pushf(data, "fov %f\n", cam.fov);
-		dstr_pushf(data, "accel %f\n", cam.accel);
-		dstr_pushf(data, "vel %s\n", write_v3(scratch, cam.vel));
-		dstr_pushf(data, "vel_friction %f\n", cam.vel_friction);
+		dstr_pushf(data, "pos %s\n", write_v3(scratch, g.cam.pos));
+		dstr_pushf(data, "dir %f %f %f\n", write_v3(scratch, g.cam.dir));
+		dstr_pushf(data, "yaw %f\n", g.cam.yaw);
+		dstr_pushf(data, "pitch %f\n", g.cam.pitch);
+		dstr_pushf(data, "fov %f\n", g.cam.fov);
+		dstr_pushf(data, "accel %f\n", g.cam.accel);
+		dstr_pushf(data, "vel %s\n", write_v3(scratch, g.cam.vel));
+		dstr_pushf(data, "vel_friction %f\n", g.cam.vel_friction);
 		dstr_push(data, "}\n");
 	}
 
@@ -4301,16 +4281,15 @@ void load_game_state() {
 		Token tok = tok_advance(p);
 		if(tok.type == TokenType_Identifier) {
 			if(str_match(tok.str, "Camera")) {
-				var& cam = g.cam;
 				tok_expect(p, TokenType_OpenBrace);
-				tok_expect(p, TokenType_Identifier); cam.pos = parse_v3(p);
-				tok_expect(p, TokenType_Identifier); cam.dir = parse_v3(p);
-				tok_expect(p, TokenType_Identifier); cam.yaw = parse_f32(p);
-				tok_expect(p, TokenType_Identifier); cam.pitch = parse_f32(p);
-				tok_expect(p, TokenType_Identifier); cam.fov = parse_f32(p);
-				tok_expect(p, TokenType_Identifier); cam.accel = parse_f32(p);
-				tok_expect(p, TokenType_Identifier); cam.vel = parse_v3(p);
-				tok_expect(p, TokenType_Identifier); cam.vel_friction = parse_f32(p);
+				tok_expect(p, TokenType_Identifier); g.cam.pos = parse_v3(p);
+				tok_expect(p, TokenType_Identifier); g.cam.dir = parse_v3(p);
+				tok_expect(p, TokenType_Identifier); g.cam.yaw = parse_f32(p);
+				tok_expect(p, TokenType_Identifier); g.cam.pitch = parse_f32(p);
+				tok_expect(p, TokenType_Identifier); g.cam.fov = parse_f32(p);
+				tok_expect(p, TokenType_Identifier); g.cam.accel = parse_f32(p);
+				tok_expect(p, TokenType_Identifier); g.cam.vel = parse_v3(p);
+				tok_expect(p, TokenType_Identifier); g.cam.vel_friction = parse_f32(p);
 				tok_expect(p, TokenType_CloseBrace);
 			} else if(str_match(tok.str, "Things")) {
 				tok_expect(p, TokenType_OpenBrace);
@@ -4369,8 +4348,6 @@ void init_game() {
 	ProfFunc;
 	Scratch scratch;
 	var& g = *st;
-	g.arena = arena_make(.name = "game arena");
-	g.gpa = alloc_make(g.arena);
 
 	///////////////////////////////////
 	// Assets
@@ -4378,8 +4355,7 @@ void init_game() {
 		set_cubemap(make_texture({.name = "night_cubemap", .is_cube = true}));
 
 		// Known assets
-		var mesh_set = [](MeshEnum mesh_enum, MeshId id) { 
-			GlobalState& g = *st;
+		var mesh_set = [&](MeshEnum mesh_enum, MeshId id) { 
 			g.meshes_ids[mesh_enum] = id;
 			String str = push_str_copy(g.arena, meshes_strs[mesh_enum]);
 			map_set(g.str_to_mesh_id, hash(str), id);
@@ -4481,20 +4457,18 @@ void init_game() {
 	///////////////////////////////////
 	// Camera
 	{
-		Camera& cam = g.cam;
-		cam = {
-			.pos = v3(0,0,5),
-			.yaw = 180,
-			.fov = 45,
-			.vel_friction = 7.7f,
-			.accel = 300,
-		};
-		cam.dir = {
-			cosd(cam.yaw) * cosd(cam.pitch),
-			sind(cam.pitch),
-			sind(cam.yaw) * cosd(cam.pitch)
-		};
-		g.view = m4x4_look_at(cam.pos, cam.dir, v3_up());
+		g.cam.pos = {0,0,5};
+		g.cam.yaw = 180;
+		g.cam.fov = 45;
+		g.cam.vel_friction = 7.7f;
+		g.cam.accel = 300;
+		// cam.dir = {
+		// 	cosd(cam.yaw) * cosd(cam.pitch),
+		// 	sind(cam.pitch),
+		// 	sind(cam.yaw) * cosd(cam.pitch)
+		// };
+		g.cam.dir = spherical_coord(1, g.cam.yaw, g.cam.pitch);
+		g.view = m4x4_look_at(g.cam.pos, g.cam.dir, v3_up);
 	}
 }
 
@@ -4506,7 +4480,7 @@ void update_game() {
 
 	array_clear(g.runtime_bones);
 	array_push_elems(g.runtime_bones, slice(g.bones));
-	update_animation(g.anim, {slice(g.runtime_bones)}, mod(time_now, 1));
+	update_animation(g.anim, {slice(g.runtime_bones)}, frac(time_now));
 
 	// Test jobs
 	#if 0
@@ -4534,10 +4508,6 @@ void update_game() {
 	}
 	#endif
 
-	// return;
-
-	///////////////////////////////////
-	// Hotkeys
 	if(os_key_is_down(Key_Escape)) {
 		os_window_close();
 	}
@@ -4549,50 +4519,54 @@ void update_game() {
 		}
 		g.fps_camera = !g.fps_camera;
 	}
+	if(os_key_is_pressed(Key_I)) {
+		select_obj();
+	}
+	
+	Loop(i, g.things_set.count) {
+		var id = pool_get_handle(g.things, g.things_set.dense[i]);
+		var& t = get_thing(id);
+		t.pos += t.vel * time_dt;
+		draw_thing(id);
+	}
+	for(u32 i = 0; i < g.lines.count; i += 2) {
+		draw_line(g.lines[i], g.lines[i+1], ColorWhite);
+	}
 
 	///////////////////////////////////
 	// Camera
 	{
-		Camera& cam = g.cam;
-		m4x4& projection = g.projection;
-		m4x4& view = g.view;
-		projection = m4x4_perspective(deg2rad(cam.fov), f32(os_win_width()) / os_win_height(), 0.1f, 1000.0f);
-		// f32 ratio = f32(os_win_width()) / os_win_height();
-		// f32 height = 40;
-		// f32 width = height * ratio;
-		// projection = m4x4_orthographic(-width,width,-height,height,0.1f,1000);
-
 		f32 rotation_speed = 180.0f * time_dt;
 		if(os_key_is_down(Key_A)) {
-			cam.yaw += rotation_speed;
+			g.cam.yaw += rotation_speed;
 		}
 		if(os_key_is_down(Key_D)) {
-			cam.yaw -= rotation_speed;
+			g.cam.yaw -= rotation_speed;
 		}
 		if(os_key_is_down(Key_R)) {
-			cam.pitch += rotation_speed;
+			g.cam.pitch += rotation_speed;
 		}
 		if(os_key_is_down(Key_F)) {
-			cam.pitch -= rotation_speed;
+			g.cam.pitch -= rotation_speed;
 		}
 		if(g.fps_camera) {
 			f32 rot_speed = 10;
-			cam.pitch -= os_mouse_dt().y * time_dt * rot_speed;
-			cam.yaw -= os_mouse_dt().x * time_dt * rot_speed;
+			g.cam.pitch -= os_mouse_dt().y * time_dt * rot_speed;
+			g.cam.yaw -= os_mouse_dt().x * time_dt * rot_speed;
 		}
 		f32 speed = 1;
 		v3 mov = {};
 		if(os_key_is_down(Key_W)) {
-			mov += m4x4_forward(view);
+			mov += m4x4_view_forward(g.view);
 		}
 		if(os_key_is_down(Key_S)) {
-			mov += m4x4_backward(view);
+			mov += m4x4_view_backward(g.view);
 		}
 		if(os_key_is_down(Key_Q)) {
-			mov += m4x4_left(view);
+			mov += m4x4_view_left(g.view);
 		}
 		if(os_key_is_down(Key_E)) {
-			mov += m4x4_right(view);
+			mov += m4x4_view_right(g.view);
 		}
 		if(os_key_is_down(Key_Space)) {
 			mov.y += 1.0f;
@@ -4606,39 +4580,49 @@ void update_game() {
 		if(os_key_is_down(Key_LAlt)) {
 			speed *= 0.1;
 		}
-		mov *= cam.accel * speed;
+		mov *= g.cam.accel * speed;
 		f32 dt = time_dt;
 
-		cam.vel += mov * dt;
-		cam.pos += cam.vel * dt;
-		cam.vel -= cam.vel * cam.vel_friction * dt;
-		v4 yaw = quat_axis_angle(v3_up(), deg2rad(cam.yaw));
-		v4 pitch = quat_axis_angle(v3_right(), deg2rad(-cam.pitch));
+		g.cam.vel += mov * dt;
+		g.cam.pos += g.cam.vel * dt;
+		g.cam.vel -= g.cam.vel * g.cam.vel_friction * dt;
+		v4 yaw = quat_axis_angle(v3_up, deg2rad(g.cam.yaw+180));
+		v4 pitch = quat_axis_angle(v3_right, deg2rad(g.cam.pitch));
 		v4 quat = quat_mul(yaw, pitch);
-		cam.dir = quat_forward(quat);
-		view = m4x4_look_at(cam.pos, cam.pos + cam.dir, quat_up(quat));
+		g.cam.dir = quat_back(quat);
+		g.view = m4x4_look_at(g.cam.pos, g.cam.pos + g.cam.dir, quat_up(quat));
+		g.proj = m4x4_perspective(deg2rad(g.cam.fov), f32(os_win_width()) / os_win_height(), 0.1f, 1000.0f);
+		g.proj_view = g.proj * g.view;
+		g.inv_view = m4x4_look_at_inverse(g.cam.pos, g.cam.pos + g.cam.dir);
+		g.inv_proj = m4x4_perspective_inverse(deg2rad(g.cam.fov), f32(os_win_width()) / os_win_height(), 0.1f, 1000.0f);
+		g.inv_view_proj = g.inv_view * g.inv_proj;
+
+		// f32 ratio = f32(os_win_width()) / os_win_height();
+		// f32 height = 40;
+		// f32 width = height * ratio;
+		// projection = m4x4_orthographic(-width,width,-height,height,0.1f,1000);
 	}
 
 	// XYZ Axis at center
 	{
 		f32 line_len = 5;
 		v3 pos = v3(0, 0.1, 0);
-		draw_line(pos, line_len * v3_right(), ColorRed);
-		draw_line(pos, line_len * v3_up(), ColorGreen);
-		draw_line(pos, line_len * v3_forward(), ColorBlue);
+		draw_line(pos, line_len * v3_right, ColorRed);
+		draw_line(pos, line_len * v3_up, ColorGreen);
+		draw_line(pos, line_len * v3_forward, ColorBlue);
 	}
 
 	// Axis aligned at edge of screen
 	{
 		m4x4& view = st->view;
-		v3 forward = m4x4_forward(view);
-		v3 right   = m4x4_right(view);
-		v3 up      = m4x4_up(view);
+		v3 forward = m4x4_view_forward(view);
+		v3 right   = m4x4_view_right(view);
+		v3 up      = m4x4_view_up(view);
 		f32 dist = 1.0f;
 		f32 xoff = 0.3f;
 		f32 yoff = 0.3f;
 		v3 pos = g.cam.pos + forward*dist + right*xoff + up*yoff;
-		draw_mesh_trs(g.meshes_ids[Mesh_Axis], g.materials_ids[Material_Axis], pos, quat_identity(), v3(0.1));
+		draw_mesh_trs(g.meshes_ids[Mesh_Axis], g.materials_ids[Material_Axis], pos, quat_identity, v3(0.1));
 	}
 	draw_mesh(g.meshes_ids[Mesh_Barrack], g.materials_ids[Material_Barrack], v3(0,0,-40));
 	draw_grid(v3(0), 40, 2, u32_from_rgba(v4(0.8)));
@@ -4646,25 +4630,20 @@ void update_game() {
 
 	// draw_mesh_trs(g.meshes_ids[Mesh_T], g.materials_ids[Material_Container], v3(), DrawCallFlag_Skeleton);
 
-	// local_persist v3 world_pos = v3(0,1,0);
-	// local_persist v3 local_pos = v3(0,1,0);
-	// local_pos.y += 0.1f * time_dt;
-
-	
-	// v4 r = quat_axis_angle(v3(0,0,1), deg2rad(45));
-	// world_pos = quat_rotate(r, local_pos);
-
-	// draw_mesh(g.meshes_ids[Mesh_T], g.materials_ids[Material_Container], world_pos, DrawCallFlag_Skeleton);
-	// draw_mesh_trs(g.meshes_ids[Mesh_T], g.materials_ids[Material_Container], world_pos, r, v3(1), DrawCallFlag_Skeleton);
-
 	local_persist v3 p = v3(4,0,0);
 	v4 q = quat_axis_angle(v3(0,1,0), time_now);
 	v3 pos = quat_rotate(q, p);
 	draw_mesh_trs(g.meshes_ids[Mesh_T], g.materials_ids[Material_Container], pos, q, v3(1), DrawCallFlag_Skeleton);
 
-	// local_persist Transform world_trans = {v3(0,0,0), quat_axis_angle(v3(0,0,1), deg2rad(45)), v3(1)};
-	// local_persist Transform local_trans = {v3(10,0,0), quat_axis_angle(v3(1,0,0), deg2rad(45)), v3(1)};
-	// var res = transform_mul(world_trans, local_trans);
-	// draw_mesh_trs(g.meshes_ids[Mesh_T], g.materials_ids[Material_Container], res.pos, res.rot, v3(1), DrawCallFlag_Skeleton);
-
+	draw_mesh_trs(g.meshes_ids[Mesh_Cube], g.materials_ids[Material_Container], pos, q, v3(0.2));
+	v2 po = {};
+	g.visible = world_to_screen(g.proj_view, pos, &po);
+	if(g.visible) {
+		draw_texture(rng2_make(po, v2(100)), g.textures_ids[Texture_Dummy]);
+	}
+	v3 draw_pos = {};
+	screen_to_ground(g.inv_view_proj, g.cam.pos, os_mouse_pos(), 0, &draw_pos);
+	draw_mesh(g.meshes_ids[Mesh_Cube], g.materials_ids[Material_Orange], draw_pos);
+	draw_mesh_trs(g.meshes_ids[Mesh_Cube], g.materials_ids[Material_Orange], {}, quat_from_euler(g.euler), v3(1));
 }
+

@@ -47,7 +47,7 @@ const u32 MaxMeshes     = 16;
 const u32 MaxTextures   = 16;
 const u32 MaxCubemaps   = 16;
 const u32 MaxFonts      = 16;
-const u32 MaxDebugLines = KB(1);
+const u32 MaxDebugLines = KB(2);
 const u32 MaxSkinMatrices = 16;
 const u32 MaxBones 							= 16;
 const u32 MaxRuntimeBones = 16;
@@ -272,7 +272,6 @@ struct DrawCall {
 struct DrawBatch {
 	Gfx_PipelineState state;
 	DArray<DrawCall> draws;
-	DArray<DrawCall> unindexed_draws;
 };
 
 struct ShaderModuleWithPipelines {
@@ -504,17 +503,6 @@ struct WatchDirectory {
 	WatchOp op;
 };
 
-Introspect struct Camera {
-	v3 pos;
-	v3 dir;
-	f32 yaw;
-	f32 pitch;
-	f32 fov;
-	f32 accel;
-	v3 vel;
-	f32 vel_friction;
-};
-
 typedef u32 EntityFlags;
 enum {
 	EntityFlag_Referenced = 1,
@@ -624,9 +612,17 @@ struct GlobalState {
 	Alloc gpa;
 	b32 should_hotreload;
 	m4x4 view;
-	m4x4 projection;
+	m4x4 proj;
+	m4x4 proj_view;
+	m4x4 inv_view;
+	m4x4 inv_proj;
+	m4x4 inv_view_proj;
 	v4 ambient_color;
 	u32 fps;
+	
+	b32 visible;
+	v3 euler;
+	Array<v3, KB(1)> lines;
 
 	Gfx_State gfx;
 
@@ -665,7 +661,17 @@ struct GlobalState {
 	DebugWindow game_win;
 	b32 imgui_demo_open;
 
-	Camera cam;
+	struct {
+		v3 pos;
+		v3 dir;
+		f32 yaw;
+		f32 pitch;
+		f32 fov;
+		f32 accel;
+		v3 vel;
+		f32 vel_friction;
+	} cam;
+
 	b32 fps_camera;
 
 	Pool<Thing, MaxThings, ThingId> things;
