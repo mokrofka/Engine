@@ -107,12 +107,12 @@ FS_Entry v4 fs_main(VSOutput in) {
 		case ShaderType::Screen: {
 			o = sample_texture(draw.cur_resolve_idx, in.uv);
 		}break;
-		case ShaderType::SoftwareRender: {
-			u32 x = (u32)in.pos.x;
-			u32 y = (u32)in.pos.y;
-			o = rgba_from_u32(software_render[(u32)(y * st.res.x + x)]);
+		// case ShaderType::SoftwareRender: {
+		// 	u32 x = (u32)in.pos.x;
+		// 	u32 y = (u32)in.pos.y;
+		// 	o = rgba_from_u32(software_render[(u32)(y * st.res.x + x)]);
 			// if(o.w < 0.1) discard;
-		}break;
+		// }break;
 	}
 	return o;
 }

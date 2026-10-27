@@ -14,31 +14,17 @@ DrawBatch make_draw_batch(Allocator alloc, Gfx_Pipeline pip) {
 	return res;
 }
 
-Attachment make_attachment(AttachmentDesc desc, v2u size) {
+Attachment make_attachment(v2u size, Gfx_Format fmt, u32 samples, b32 sampled) {
 	Attachment res = {};
-	Gfx_ImageUsage usage = 0;
-	if(flag_has(desc.usage, AttachUsage_Color )) {
-		usage |= Gfx_ImageUsage_ColorAttachment;
-	}
-	if(flag_has(desc.usage, AttachUsage_Depth)) {
-		usage |= Gfx_ImageUsage_DepthStencilAttachment;
-	}
-	if(flag_has(desc.usage, AttachUsage_Resolve)) {
-		usage |= Gfx_ImageUsage_ResolveAttachment;
-	}
 	res.image = gfx_make_image({
-		.pixel_format  = desc.fmt,
-		.samples = desc.samples,
-		.usage   = usage,
+		.format  = fmt,
+		.samples = samples,
 		.width   = size.x,
 		.height  = size.y,
 	});
-	res.view = gfx_make_view({
-		.type = Gfx_ViewType_Attachment,
-		.image = res.image,
-	});
-	if(flag_has(usage, AttachUsage_Sampled)) {
-		res.sampled = gfx_make_view({Gfx_ViewType_Sampled, res.image});
+	res.view = gfx_make_view({res.image});
+	if(sampled) {
+		res.sampled = gfx_make_view({res.image});
 	}
 	return res;
 }
@@ -59,19 +45,14 @@ v2u resolve_size(RenderTargetDesc d) {
 RenderTarget make_render_target(RenderTargetDesc desc) {
 	_DefSet(desc.samples, Gfx_DefaultSampleCount);
 	RenderTarget res = {.desc = desc, .size = resolve_size(desc)};
-	if(desc.color.usage) {
-		res.color = make_attachment(desc.color, res.size);
+	if(desc.color) {
+		res.color = make_attachment(res.size, st->gfx.swapchain.format, desc.samples, false);
 	}
 	if(desc.samples > 1) {
-		AttachmentDesc r = desc.color;
-		r.samples = 1;
-		r.usage = AttachUsage_Resolve;
-		res.resolve = make_attachment(r, res.size);
+		res.resolve = make_attachment(res.size, st->gfx.swapchain.format, 1, false);
 	}
-	if(desc.depth.usage) {
-		AttachmentDesc d = desc.depth;
-		d.samples = desc.samples;
-		res.depth = make_attachment(d, res.size);
+	if(desc.depth) {
+		res.depth = make_attachment(res.size, Gfx_Format_DepthStencil, desc.samples, false);
 	}
 	return res;
 }
@@ -93,16 +74,16 @@ void resize_render_target(RenderTarget& rt) {
 	rt = make_render_target(rt.desc);
 }
 void begin_render_pass(RenderPassDesc p) {
-	Gfx_Attachments att = {};
-	att.color = p.target->color.view;
-	att.resolve = p.target->resolve.view;
-	att.depth_stencil = p.target->depth.view;
 	gfx_begin_pass({
-		.attachments = att,
-		.action = {
-			.color = p.color,
-			.depth = p.depth,
-		},
+		.colors = {p.target->color.view},
+		.resolves = {p.target->resolve.view},
+		.depth_stencil = p.target->depth.view,
+		.colors_load = {p.color_load},
+		.colors_store = {p.color_store},
+		.depth_load = p.depth_load,
+		.depth_store = p.depth_store,
+		.colors_clear = {p.color_clear},
+		.depth_clear = p.depth_clear,
 	});
 }
 
@@ -121,9 +102,9 @@ TextureDesc load_texture(String name) {
 TextureDesc load_cubemap(String dir) {
 	Scratch scratch;
 	String sides[] = {
-			"right", "left",
-			"top", "bottom",
-			"front", "back",
+		"right", "left",
+		"top", "bottom",
+		"front", "back",
 	};
 	TextureDesc cube = {};
 	LoopArray (i, sides) {
@@ -156,7 +137,7 @@ TextureId make_texture(TextureDesc desc) {
 	ProfFunc;
 	Scratch scratch;
 	var& g = *st;
-	_DefSet(desc.pixel_format, Gfx_PixelFormat_RGBA8);
+	_DefSet(desc.format, Gfx_Format_RGBA8);
 	Texture dum = desc.is_cube ? g.textures[g.textures_ids[Texture_DummyCubeMap].idx] : g.textures[g.textures_ids[Texture_Dummy].idx];
 	TextureId res = {array_push(g.textures, dum)};
 	struct Ctx {
@@ -180,25 +161,28 @@ TextureId make_texture(TextureDesc desc) {
 			desc.height = loaded.height;
 			ArrayCopy(desc.cube, loaded.cube);
 		}
-		Slice<Slice<u8>> data = push_slice(scratch, Slice<u8>, 6);
+		Slice<u8> data[6] = {};
 		Loop(i, 6) {
-			data[i] = Slice(desc.cube[i], desc.width * desc.height * gfx_pixelformat_bytesize(desc.pixel_format));
+			data[i] = Slice(desc.cube[i], desc.width * desc.height * gfx_format_bytesize(desc.format));
 		}
-		u32 stage_off = desc.is_cube ? gfx_push_stage_buffers(data) : gfx_push_stage_buffer(data[0]);
+		// u32 stage_off = desc.is_cube ? gfx_push_stage_buffers(slice(data)) : gfx_push_stage_buffer(data[0]);
+		// u32 stage_off = desc.is_cube ? gfx_push_stage_buffers(slice(data)) : gfx_push_stage_buffer(data[0]);
 		LockScope(g.texture_mutex);
 		Gfx_Image image = gfx_make_image({
 			.type = desc.is_cube ? Gfx_ImageType_Cube : Gfx_ImageType_2D,
 			.width = desc.width,
 			.height = desc.height,
-			.pixel_format = desc.pixel_format,
+			.format = desc.format,
 			.mipmaps = true,
 		});
-		Gfx_View view = gfx_make_view({Gfx_ViewType_Sampled, image});
-		u32 counter = gfx_push_stage_buffer_cmd({
-			.type = Gfx_CmdType_Texture,
-			.img = image,
-			.stage_off = stage_off,
-		});
+		Gfx_View view = gfx_make_view({image});
+		// u32 counter = gfx_push_stage_buffer_cmd({
+		// 	.type = Gfx_StageType_Texture,
+		// 	.img = image,
+		// 	.stage_off = stage_off,
+		// });
+		u32 counter = gfx_update_image(image, desc.is_cube ? slice(data) : Slice(data,1));
+		// u32 counter = 0;
 		queue_push(g.finished_gpu_queue, {
 			.texture_id = res,
 			.texture = {
@@ -217,7 +201,9 @@ TextureId make_texture(TextureDesc desc) {
 }
 
 TextureId make_texture_idle(TextureDesc desc) {
+	Scratch scratch;
 	var& g = *st;
+	_DefSet(desc.format, Gfx_Format_RGBA8);
 	if(desc.name.size) {
 		TextureDesc loaded = desc.is_cube ? load_cubemap(desc.name) : load_texture(desc.name);
 		desc.width = loaded.width;
@@ -228,14 +214,16 @@ TextureId make_texture_idle(TextureDesc desc) {
 		.type = desc.is_cube ? Gfx_ImageType_Cube : Gfx_ImageType_2D,
 		.width = desc.width,
 		.height = desc.height,
-		.pixel_format = desc.pixel_format,
+		.format = desc.format,
 		.mipmaps = true,
 	};
-	ArrayCopy(img_desc.cube, desc.cube);
 	Texture tex = {
 		.image = gfx_make_image(img_desc),
-		.view = gfx_make_view({Gfx_ViewType_Sampled, tex.image}),
+		.view = gfx_make_view({tex.image}),
 	};
+	Slice<u8> data[6] = {};
+	Loop(i, 6) data[i] = Slice(desc.cube[i], desc.width * desc.height * gfx_format_bytesize(desc.format));
+	gfx_update_image(tex.image, desc.is_cube ? slice(data) : Slice(data, 1), true);
 	TextureId res = {array_push(g.textures, tex)};
 	return res;
 }
@@ -249,31 +237,14 @@ MeshId make_mesh(MeshDesc desc) {
 		desc = load_mesh(scratch, desc.name);
 	}
 	u32 vert_buf_off = gfx_push_buffer(g.gpu_vert_buf, slice_size(desc.vertices));
-	u32 index_buf_off = gfx_push_buffer(g.gpu_index_buf, slice_size(desc.indices));
 	u32 vert_base = vert_buf_off / sizeof(Vertex);
-	u32 vert_stage_off = gfx_push_stage_buffer(slice_to_bytes(desc.vertices));
-	u32 index_stage_off = 0;
 	u32 index_base = 0;
+	u32 index_buf_off	= 0;
 	if(desc.indices.count) {
+		index_buf_off = gfx_push_buffer(g.gpu_index_buf, slice_size(desc.indices));
 		index_base = index_buf_off / sizeof(u16);
-		index_stage_off = gfx_push_stage_buffer(slice_to_bytes(desc.indices));
 	}
-	u32 counter = gfx_push_stage_buffer_cmd({
-		.type = Gfx_CmdType_Mesh,
-		.stage_off = vert_stage_off,
-		.buf = g.gpu_vert_buf,
-		.size = desc.vertices.count * sizeof(Vertex),
-		.buf_offset = vert_base * sizeof(Vertex),
-	});
-	if(desc.indices.count) {
-		gfx_push_stage_buffer_cmd({
-			.type = Gfx_CmdType_Mesh,
-			.stage_off = index_stage_off,
-			.buf = g.gpu_index_buf,
-			.size = desc.indices.count * sizeof(u16),
-			.buf_offset = index_base * sizeof(u16),
-		});
-	}
+	u32 counter = gfx_update_vert_index(g.gpu_vert_buf, vert_buf_off, g.gpu_index_buf, index_buf_off, slice_to_bytes(desc.vertices), slice_to_bytes(desc.indices));
 	os_mutex_lock(g.finished_gpu_mutex);
 	queue_push(g.finished_gpu_queue, {
 		.type = PushToGpuType_Mesh,
@@ -298,12 +269,12 @@ MeshId make_mesh_idle(MeshDesc desc) {
 	}
 	u64 buf_offset = gfx_push_buffer(g.gpu_vert_buf, slice_size(desc.vertices));
 	u32 base_vert = buf_offset / sizeof(Vertex);
-	gfx_update_buffer(g.gpu_vert_buf, buf_offset, slice_to_bytes(desc.vertices));
+	gfx_update_buffer(g.gpu_vert_buf, buf_offset, slice_to_bytes(desc.vertices), true);
 	u32 base_index = 0;
 	if(desc.indices.count) {
 		u64 buf_offset = gfx_push_buffer(g.gpu_index_buf, slice_size(desc.indices));
 		base_index = buf_offset / sizeof(u32);
-		gfx_update_buffer(g.gpu_index_buf, buf_offset, slice_to_bytes(desc.indices));
+		gfx_update_buffer(g.gpu_index_buf, buf_offset, slice_to_bytes(desc.indices), true);
 	}
 	Gfx_Mesh mesh = {
 		.base_vert = base_vert,
@@ -331,7 +302,7 @@ MaterialId make_material(Material mat) {
 	return res;
 }
 
-Gfx_Pipeline make_pipeline(String name, Gfx_PipelineDesc2 desc) {
+Gfx_Pipeline make_pipeline(String name, Gfx_PipelineDesc desc) {
 	ProfFunc;
 	Scratch scratch;
 	var& g = *st;
@@ -375,7 +346,7 @@ FontId make_font(FontDesc desc) {
 		u32 height = round_up(dim, font_height);
 		u8* pixels = push_buffer(scratch, width*height);
 		stbtt_BakeFontBitmap(data.data, 0, font_height, pixels, width, height, 32, 96, characters_info);
-		TextureId texture_id = make_texture({.width = width, .height = height, .data = pixels, .pixel_format = Gfx_PixelFormat_R8});
+		TextureId texture_id = make_texture({.width = width, .height = height, .data = pixels, .format = Gfx_Format_R8});
 		Font font = {.font_height = font_height, .texture = texture_id};
 		LoopArray(i, font.glyphs) {
 			stbtt_bakedchar bakedchar = characters_info[i];
@@ -411,7 +382,7 @@ FontId make_font_idle(FontDesc desc) {
 	u32 height = round_up(dim, font_height);
 	u8* pixels = push_buffer(g.arena, width*height);
 	stbtt_BakeFontBitmap(data.data, 0, font_height, pixels, width, height, 32, 96, characters_info);
-	TextureId texture_id = make_texture_idle({.width = width, .height = height, .data = pixels, .pixel_format = Gfx_PixelFormat_R8});
+	TextureId texture_id = make_texture_idle({.width = width, .height = height, .data = pixels, .format = Gfx_Format_R8});
 	Font font = {.font_height = font_height, .texture = texture_id};
 	LoopArray (i, font.glyphs) {
 		stbtt_bakedchar bakedchar = characters_info[i];
@@ -440,12 +411,6 @@ void set_cubemap(TextureId cubemap) {
 	g.cur_cubemap = cubemap;
 }
 
-void update_texture(TextureId t, u8* data) {
-	var& g = *st;
-	Texture tex = g.textures[t.idx];
-	gfx_update_image(tex.image, data);
-}
-
 void update_mesh(MeshId mesh, MeshDesc desc) {
 }
 
@@ -458,7 +423,7 @@ void reload_shader(String name) {
 	gfx_update_shader(module.shd, code);
 	Loop(i, module.pipelines.count) {
 		Gfx_Pipeline pip = module.pipelines[i];
-		gfx_update_pipeline(pip, gfx_query_pipeline_desc2(pip));
+		gfx_update_pipeline(pip, gfx_query_pipeline_desc(pip));
 	}
 }
 
@@ -654,13 +619,7 @@ void r_init() {
 	Scratch scratch;
 	var& g = *st;
 	g.scale = 1;
-	gfx_init({.cpu_mem_size = MB(100), .gpu_mem_size = MB(10), .image_mem_size = MB(10)});
-
-	///////////////////////////////////
-	// Buffers
-	{
-		ProfBlock("buffers");
-	}
+	gfx_init();
 
 	///////////////////////////////////
 	// Descriptors
@@ -672,14 +631,14 @@ void r_init() {
 		Gfx_BufferDesc buffers[] = {
 			{
 				.binding = Bindings::Vertices,
-				.size = MB(2),
-				.mem_type = Gfx_MemType_Gpu,
+				.size = MB(1),
+				.gpu = true,
 				.out_buffer = &g.gpu_vert_buf,
 			},
 			{
 				.binding = Bindings::Indices,
 				.size = MB(1),
-				.mem_type = Gfx_MemType_Gpu,
+				.gpu = true,
 				.out_buffer = &g.gpu_index_buf,
 			},
 			{
@@ -704,11 +663,11 @@ void r_init() {
 				.out_cpu_ptr = (void**)&g.gpu_drawcalls,
 				.out_buffer = &g.cpu_drawcall_buf,
 			},
-			{
-				.binding = Bindings::SoftwareRender,
-				.size = os_screen_size().x * os_screen_size().y * sizeof(u32),
-				.out_cpu_ptr = (void**)&g.gpu_software_render,
-			},
+			// {
+			// 	.binding = Bindings::SoftwareRender,
+			// 	.size = os_screen_size().x * os_screen_size().y * sizeof(u32),
+			// 	.out_cpu_ptr = (void**)&g.gpu_software_render,
+			// },
 			{
 				.binding = Bindings::UI_RectBinding,
 				.size = sizeof(UI_Rect) * MaxThings,
@@ -721,17 +680,14 @@ void r_init() {
 			}
 		};
 		gfx_make_binding_buffers(slice(buffers));
-		gfx_flush();
+		gfx_flush_descriptors();
 		// g.gpu_state->p = st->gfx.cpu_buf_address;
 	}
 
 	// Misc
 	{
 		ProfBlock("render targers");
-		g.world_rt = make_render_target({
-			.color = {.usage = AttachUsage_Color},
-			.depth = {.usage = AttachUsage_Depth},
-		});
+		g.world_rt = make_render_target({.color = true, .depth = true});
 	}
 	g.sampler = gfx_make_sampler({});
 	{
@@ -817,7 +773,7 @@ void r_end() {
 	// Update dummies?
 	{
 		Loop(i, queue_count(g.finished_gpu_queue)) {
-			if(queue_front(g.finished_gpu_queue).counter <= gfx_ready_counter()) {
+			if(gfx_ready(queue_front(g.finished_gpu_queue).counter)) {
 				var slot = queue_pop(g.finished_gpu_queue);
 				switch(slot.type) {
 					InvalidDefaultCase;
@@ -889,29 +845,26 @@ void r_end() {
 			bind_pipeline(g.uber_pip);
 			for(var& batch : g.batches) {
 				apply_pip_state(batch.state);
-				var emit_batch = [&](Slice<DrawCall> pushes, b32 indexed) {
-					u32 base = drawcall_count;
-					for(var draw : pushes) {
-						m4x4 model = m4x4_transform(draw.pos, draw.scale, draw.rot);
-						var mat = g.materials[draw.mat.idx];
-						var& drawcall = g.gpu_drawcalls[drawcall_count++];
-						drawcall = {
-							.model = model,
-							.color = draw.color.v,
-							.mat = mat.idx,
-							.type = draw.type,
-							.flags = draw.flags,
-						};
-						Gfx_Mesh mesh = g.meshes[draw.mesh.idx];
-						drawcall_set_mesh(drawcall, mesh);
-					}
-					u32 count = drawcall_count - base;
-					if(count) {
-						gfx_push_ctx({base});
-						gfx_draw_indirect({base, count}, g.cpu_drawcall_buf, OffsetOf(GpuDrawCall, mesh), sizeof(GpuDrawCall));
-					}
-				};
-				emit_batch(slice(batch.draws), true);
+				u32 base = drawcall_count;
+				for(var draw : batch.draws) {
+					m4x4 model = m4x4_transform(draw.pos, draw.scale, draw.rot);
+					var mat = g.materials[draw.mat.idx];
+					var& drawcall = g.gpu_drawcalls[drawcall_count++];
+					drawcall = {
+						.model = model,
+						.color = draw.color.v,
+						.mat = mat.idx,
+						.type = draw.type,
+						.flags = draw.flags,
+					};
+					Gfx_Mesh mesh = g.meshes[draw.mesh.idx];
+					drawcall_set_mesh(drawcall, mesh);
+				}
+				u32 count = drawcall_count - base;
+				if(count) {
+					gfx_push_ctx({base});
+					gfx_draw_indirect({base, count}, g.cpu_drawcall_buf, OffsetOf(GpuDrawCall, mesh), sizeof(GpuDrawCall));
+				}
 				array_clear(batch.draws);
 			}
 
@@ -999,7 +952,7 @@ void r_end() {
 	gfx_begin_pass({});
 	{
 		gfx_apply_viewport(rng2_make(v2(), os_win_size()));
-		gfx_bind_pipeline(g.uber_pip);
+		bind_pipeline(g.uber_pip);
 		apply_pip_state({.sample_count = 1});
 		g.gpu_drawcalls[drawcall_count] = {
 			.type = ShaderType::Screen,
@@ -4646,4 +4599,3 @@ void update_game() {
 	draw_mesh(g.meshes_ids[Mesh_Cube], g.materials_ids[Material_Orange], draw_pos);
 	draw_mesh_trs(g.meshes_ids[Mesh_Cube], g.materials_ids[Material_Orange], {}, quat_from_euler(g.euler), v3(1));
 }
-

@@ -465,15 +465,37 @@ template<i32 N> u64 bit_array_word_count(BitArray<N>& bits)      { return (bits.
 struct RingBuffer {
 	u8* base;
 	u64 size;
-	u64 write_pos;
-	u64 read_pos;
+	u64 write;
+	u64 read;
 };
 
 RingBuffer ring_make(void* base, u64 size);
-u64 ring_write(RingBuffer& ring, void* src, u64 src_size);
-u64 ring_read(RingBuffer& ring, void* dst, u64 dst_size);
-u64 ring_write_nowrap(RingBuffer& ring, void* src, u64 src_size);
-u64 ring_read_nowrap(RingBuffer& ring, void* dst, u64 read_size);
+u64 ring_used(RingBuffer& r);
+u64 ring_free(RingBuffer& r);
+b32 ring_empty(RingBuffer& r);
+void ring_reset(RingBuffer& r);
+
+void ring__plan_nowrap(RingBuffer& r, u64 pos, u64 bytes, u64 align, u64* out_offset, u64* out_advance);
+void ring__copy_in(RingBuffer& r, u64 offset, void* src, u64 bytes);
+void ring__copy_out(RingBuffer& r, u64 offset, void* dst, u64 bytes);
+b32 ring_try_alloc(RingBuffer& r, u64 bytes, u64* out_offset, u64 align = 1);
+u64 ring_alloc(RingBuffer& r, u64 bytes, u64 align = 1);
+
+void ring_release_to(RingBuffer& r, u64 pos);
+void ring_release(RingBuffer& r, u64 bytes);
+
+b32 ring_try_write(RingBuffer& r, void* src, u64 bytes, u64* out_offset = 0);
+b32 ring_try_write_nowrap(RingBuffer& r, void* src, u64 bytes, u64* out_offset = 0);
+
+u64 ring_write(RingBuffer& r, void* src, u64 bytes);
+u64 ring_write_nowrap(RingBuffer& r, void* src, u64 bytes);
+
+b32 ring_try_peek(RingBuffer& r, void* dst, u64 bytes);
+b32 ring_try_read(RingBuffer& r, void* dst, u64 bytes, u64* out_offset = 0);
+b32 ring_try_read_nowrap(RingBuffer& r, void* dst, u64 bytes, u64* out_offset = 0);
+
+u64 ring_read(RingBuffer& r, void* dst, u64 bytes);
+u64 ring_read_nowrap(RingBuffer& r, void* dst, u64 bytes);
 
 template<typename T> struct Slice {
 	T* data;
@@ -506,6 +528,8 @@ template<typename To, typename From> NO_DEBUG Slice<To> slice_reinterpret(Slice<
 	return Slice((To*)s.data, (s.count*sizeof(From)) / sizeof(To));
 }
 template<typename T> NO_DEBUG void slice_copy(Slice<T> dst, Slice<T> src) { MemCopyArray(dst.data, src.data, src.count); }
+
+void MemCopy(void* d, Slice<u8> s);
 
 ////////////////////////////////////////////////////////////////////////
 // RandyGaul stackless coroutine
