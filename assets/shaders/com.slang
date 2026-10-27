@@ -87,7 +87,7 @@ VkBind(Bindings.PointLights)    StructuredBuffer<PointLight> point_lights;
 VkBind(Bindings.DirLights)      StructuredBuffer<DirLight> dir_lights;
 VkBind(Bindings.SpotLights)     StructuredBuffer<SpotLight> spot_lights;
 VkBind(Bindings.DrawCtx)        StructuredBuffer<DrawCall> drawcalls;
-VkBind(Bindings.SoftwareRender) StructuredBuffer<u32> software_render;
+// VkBind(Bindings.SoftwareRender) StructuredBuffer<u32> software_render;
 VkBind(Bindings.UI_RectBinding) StructuredBuffer<UI_Rect> ui_rects;
 VkBind(Bindings.Vertices)       StructuredBuffer<Vertex> vertices;
 VkBind(Bindings.CpuVertices)    StructuredBuffer<Vertex> cpu_vertices;

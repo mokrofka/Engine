@@ -39,6 +39,7 @@ f32 BytesToGB(u64 x) { return BytesToMB(x) / 1024; };
 void MemSet(void *d, i32 byte, u64 size)  { __builtin_memset(d, byte, size); }
 void MemZero(void *d, u64 size)           { MemSet(d, 0, size); }
 void MemCopy(void* d, void* s, u64 size)  { __builtin_memcpy(d, s, size); }
+void MemCopy(void* d, Slice<u8> s)								{ MemCopy(d, s.data, s.size); }
 b32  MemMatch(void* a, void* b, u64 size) { return (__builtin_memcmp(a, b, size) == 0); }
 
 u64 align_up(u64 x, u64 a)             { return (x + a - 1) & ~(a - 1); }
@@ -102,73 +103,129 @@ u32 prev_pow2(u32 x) {
 	return x - (x >> 1);
 }
 
-////////////////////////////////////////////////////////////////////////
-// Asserts
 void Trap()      { __builtin_trap(); }
 void DebugTrap() { __builtin_debugtrap(); }
 
-////////////////////////////////////////////////////////////////////////
-// Types
 RingBuffer ring_make(void* base, u64 size) {
-	RingBuffer res = {
-		.base = (u8*)base,
-		.size = size,
-	};
+	Assert(size > 0);
+	RingBuffer res = {};
+	res.base = (u8*)base;
+	res.size = size;
 	return res;
 }
 
-u64 ring_write(RingBuffer& ring, void* src, u64 src_size) {
-	Assert(ring.size >= src_size);
-	u64 offset = ring.write_pos % ring.size;
-	u64 first = Min(ring.size - offset, src_size);
-	u64 second = src_size - first;
-	MemCopy(ring.base + offset, src, first);
-	if(second) {
-		MemCopy(ring.base, Offset(src, first), second);
+u64 ring_used(RingBuffer& r) { return r.write - r.read; }
+u64 ring_free(RingBuffer& r) { return r.size - (r.write - r.read); }
+b32 ring_empty(RingBuffer& r) { return r.write == r.read; }
+void ring_reset(RingBuffer& r) { r.write = 0; r.read = 0; }
+
+void ring__plan_nowrap(RingBuffer& r, u64 pos, u64 bytes, u64 align, u64* out_offset, u64* out_advance) {
+	u64 off = pos % r.size;
+	u64 aligned = align_up(off, align);
+	u64 pad;
+	u64 chunk_off;
+	if(aligned + bytes <= r.size) {
+		pad = aligned - off;
+		chunk_off = aligned;
+	} else {
+		pad = r.size - off;
+		chunk_off = 0;
 	}
-	ring.write_pos += src_size;
-	return offset;
+	*out_offset = chunk_off;
+	*out_advance = pad + bytes;
+}
+void ring__copy_in(RingBuffer& r, u64 offset, void* src, u64 bytes) {
+	u64 first = Min(r.size - offset, bytes);
+	u64 second = bytes - first;
+	MemCopy(r.base + offset, src, first);
+	if(second) MemCopy(r.base, (u8*)src + first, second);
+}
+void ring__copy_out(RingBuffer& r, u64 offset, void* dst, u64 bytes) {
+	u64 first = Min(r.size - offset, bytes);
+	u64 second = bytes - first;
+	MemCopy(dst, r.base + offset, first);
+	if(second) MemCopy((u8*)dst + first, r.base, second);
 }
 
-u64 ring_read(RingBuffer& ring, void* dst, u64 dst_size) {
-	Assert(ring.size >= dst_size);
-	u64 offset = ring.read_pos % ring.size;
-	u64 first = Min(ring.size - offset, dst_size);
-	u64 second = dst_size - first;
-	MemCopy(dst, ring.base+offset, first);
-	if(second) {
-		MemCopy(Offset(dst, first), ring.base, second);
-	}
-	ring.read_pos += dst_size;
-	return offset;
+b32 ring_try_alloc(RingBuffer& r, u64 bytes, u64* out_offset, u64 align) {
+	Assert(align != 0 && is_pow2(align));
+	if(bytes > r.size) return false;
+	u64 off, advance;
+	ring__plan_nowrap(r, r.write, bytes, align, &off, &advance);
+	if(advance > ring_free(r)) return false;
+	r.write += advance;
+	if(out_offset) *out_offset = off;
+	return true;
 }
 
-u64 ring_write_nowrap(RingBuffer& ring, void* src, u64 src_size) {
-	Assert(ring.size >= src_size);
-	u64 offset = ring.write_pos % ring.size;
-	u64 tail = ring.size - offset;
-	b32 wrap = src_size > tail;
-	if(wrap) {
-		ring.write_pos += tail;
-		offset = 0;
-	}
-	MemCopy(ring.base + offset, src, src_size);
-	ring.write_pos += src_size;
-	return offset;
+u64 ring_alloc(RingBuffer& r, u64 bytes, u64 align) {
+	u64 off = 0;
+	b32 ok = ring_try_alloc(r, bytes, &off, align);
+	Assert(ok);
+	return off;
 }
 
-u64 ring_read_nowrap(RingBuffer& ring, void* dst, u64 dst_size) {
-	Assert(ring.size >= dst_size);
-	u64 offset = ring.read_pos % ring.size;
-	u64 tail = ring.size - offset;
-	b32 wrap = dst_size > tail;
-	if(wrap) {
-		ring.read_pos += tail;
-		offset = 0;
-	}
-	MemCopy(dst, ring.base+offset, dst_size);
-	ring.read_pos += dst_size;
-	return offset;
+void ring_release_to(RingBuffer& r, u64 pos) {
+	Assert(pos >= r.read && pos <= r.write);
+	r.read = pos;
+}
+
+void ring_release(RingBuffer& r, u64 bytes) {
+	Assert(bytes <= ring_used(r));
+	r.read += bytes;
+}
+b32 ring_try_write(RingBuffer& r, void* src, u64 bytes, u64* out_offset) {
+	if(bytes > ring_free(r)) return false;
+	u64 off = r.write % r.size;
+	ring__copy_in(r, off, src, bytes);
+	r.write += bytes;
+	if(out_offset) *out_offset = off;
+	return true;
+}
+b32 ring_try_write_nowrap(RingBuffer& r, void* src, u64 bytes, u64* out_offset) {
+	u64 off;
+	if(!ring_try_alloc(r, bytes, &off, 1)) return false;
+	MemCopy(r.base + off, src, bytes);
+	if(out_offset) *out_offset = off;
+	return true;
+}
+
+u64 ring_write(RingBuffer& r, void* src, u64 bytes) {
+	u64 off = 0; b32 ok = ring_try_write(r, src, bytes, &off); Assert(ok); return off;
+}
+u64 ring_write_nowrap(RingBuffer& r, void* src, u64 bytes) {
+	u64 off = 0; b32 ok = ring_try_write_nowrap(r, src, bytes, &off); Assert(ok); return off;
+}
+
+b32 ring_try_peek(RingBuffer& r, void* dst, u64 bytes) {
+	if(bytes > ring_used(r)) return false;
+	ring__copy_out(r, r.read % r.size, dst, bytes);
+	return true;
+}
+b32 ring_try_read(RingBuffer& r, void* dst, u64 bytes, u64* out_offset) {
+	if(bytes > ring_used(r)) return false;
+	u64 off = r.read % r.size;
+	ring__copy_out(r, off, dst, bytes);
+	r.read += bytes;
+	if(out_offset) *out_offset = off;
+	return true;
+}
+b32 ring_try_read_nowrap(RingBuffer& r, void* dst, u64 bytes, u64* out_offset) {
+	if(bytes > r.size) return false;
+	u64 off, advance;
+	ring__plan_nowrap(r, r.read, bytes, 1, &off, &advance);
+	if(advance > ring_used(r)) return false;
+	MemCopy(dst, r.base + off, bytes);
+	r.read += advance;
+	if(out_offset) *out_offset = off;
+	return true;
+}
+
+u64 ring_read(RingBuffer& r, void* dst, u64 bytes) {
+	u64 off = 0; b32 ok = ring_try_read(r, dst, bytes, &off); Assert(ok); return off;
+}
+u64 ring_read_nowrap(RingBuffer& r, void* dst, u64 bytes) {
+	u64 off = 0; b32 ok = ring_try_read_nowrap(r, dst, bytes, &off); Assert(ok); return off;
 }
 
 u8* Restrict _coroutine_var(Coroutine& co, u32 size) {

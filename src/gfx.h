@@ -20,25 +20,25 @@ enum {
 	Gfx_MaxStorageBuffers   = 16,
 	Gfx_MaxBindings         = 64,
 	Gfx_DefaultSampleCount  = 4,
-	Gfx_StageBufferSize     = MB(50),
+	Gfx_StageBufferSize     = MB(10),
+	Gfx_CpuMemSize          = MB(20),
+	Gfx_GpuMemSize          = MB(10),
 };
 
-// unsigned normalized (no postfix)
-// signed normalized (S postfix)
-// unsigned integer (UI postfix)
-// signed integer (SI postfix)
-enum Gfx_PixelFormat {
-	Gfx_PixelFormat_Default,
-	Gfx_PixelFormat_R8_UI,
-	Gfx_PixelFormat_R8,
-	Gfx_PixelFormat_BGRA8,
-	Gfx_PixelFormat_BGRA8_SRGB,
-	Gfx_PixelFormat_RGBA8,
-	Gfx_PixelFormat_RGBA8_SRGB,
-	Gfx_PixelFormat_Depth,
-	Gfx_PixelFormat_DepthStencil,
-	Gfx_PixelFormat_DefaulttAttachment = Gfx_PixelFormat_BGRA8,
-	Gfx_PixelFormat_DefaultDepth = Gfx_PixelFormat_Depth,
+//    - unsigned normalized
+// S  - signed normalized
+// UI - unsigned integer
+// SI - signed integer
+enum Gfx_Format {
+	Gfx_Format_Default,
+	Gfx_Format_R8_UI,
+	Gfx_Format_R8,
+	Gfx_Format_BGRA8,
+	Gfx_Format_BGRA8_SRGB,
+	Gfx_Format_RGBA8,
+	Gfx_Format_RGBA8_SRGB,
+	// Gfx_Format_Depth,
+	Gfx_Format_DepthStencil,
 };
 
 enum Gfx_PrimitiveType {
@@ -157,62 +157,32 @@ enum Gfx_ColorMask {
 	Gfx_ColorMask_RGBA   = 0xF,
 };
 
-enum Gfx_LoadAction {
-	Gfx_LoadAction_Default,
-	Gfx_LoadAction_Clear,
-	Gfx_LoadAction_Load,
-	Gfx_LoadAction_DontCare,
+enum Gfx_LoadOp {
+	Gfx_LoadOp_Default,
+	Gfx_LoadOp_Clear,
+	Gfx_LoadOp_Load,
+	Gfx_LoadOp_DontCare,
 };
 
-enum Gfx_StoreAction {
-	Gfx_StoreAction_Default,
-	Gfx_StoreAction_Store,
-	Gfx_StoreAction_DontCare,
-};
-
-struct Gfx_ColorAttachmentAction {
-	Gfx_LoadAction load;
-	Gfx_StoreAction store;
-	v4 clear;
-};
-
-struct Gfx_DepthAttachmentAction {
-	Gfx_LoadAction load;
-	Gfx_StoreAction store;
-	f32 clear;
-};
-
-struct Gfx_StencilAttachmentAction {
-	Gfx_LoadAction load;
-	Gfx_StoreAction store;
-	u8 clear;
-};
-
-struct Gfx_PassAction {
-	union {
-		Gfx_ColorAttachmentAction colors[Gfx_MaxColorAttachments];
-		Gfx_ColorAttachmentAction color;
-	};
-	Gfx_DepthAttachmentAction depth;
-	Gfx_StencilAttachmentAction stencil;
-};
-
-struct Gfx_Attachments {
-	union {
-		Gfx_View colors[Gfx_MaxColorAttachments];
-		Gfx_View color;
-	};
-	union {
-		Gfx_View resolves[Gfx_MaxColorAttachments];
-		Gfx_View resolve;
-	};
-	Gfx_View depth_stencil;
+enum Gfx_StoreOp {
+	Gfx_StoreOp_Default,
+	Gfx_StoreOp_Store,
+	Gfx_StoreOp_DontCare,
 };
 
 struct Gfx_Pass {
-	b32 compute;
-	Gfx_PassAction action;
-	Gfx_Attachments attachments;
+	Gfx_View colors[Gfx_MaxColorAttachments];
+	Gfx_View resolves[Gfx_MaxColorAttachments];
+	Gfx_View depth_stencil;
+	Gfx_LoadOp colors_load[Gfx_MaxColorAttachments];
+	Gfx_StoreOp colors_store[Gfx_MaxColorAttachments];
+	Gfx_LoadOp depth_load;
+	Gfx_StoreOp depth_store;
+	Gfx_LoadOp stencil_load;
+	Gfx_StoreOp stencil_store;
+	v4 colors_clear[Gfx_MaxColorAttachments];
+	f32 depth_clear;
+	u8 stencil_clear;
 };
 
 enum Gfx_ImageType {
@@ -223,42 +193,23 @@ enum Gfx_ImageType {
 	Gfx_ImageType_Array,
 };
 
-typedef u32 Gfx_ImageUsage;
-enum {
-	Gfx_ImageUsage_StorageImage = 1<<0,
-	Gfx_ImageUsage_ColorAttachment = 1<<1,
-	Gfx_ImageUsage_ResolveAttachment = 1<<2,
-	Gfx_ImageUsage_DepthStencilAttachment = 1<<3,
-	Gfx_ImageUsage_Immutable = 1<<4,
-};
-
 struct Gfx_ImageDesc {
 	Gfx_ImageType type;
-	Gfx_ImageUsage usage;
 	u32 width;
 	u32 height;
 	u32 slices_count;
 	b32 mipmaps;
-	Gfx_PixelFormat pixel_format;
+	Gfx_Format format;
 	u32 samples;
-	union {
-		u8* data;
-		u8* cube[6];
-	};
-};
-
-enum Gfx_ViewType {
-	Gfx_ViewType_Sampled = 1,
-	Gfx_ViewType_Attachment,
 };
 
 struct Gfx_ViewDesc {
-	Gfx_ViewType type;
 	Gfx_Image image;
 	u32 mip_level;
-	u32 slice;
 	u32 mip_level_count;
+	u32 slice;
 	u32 slice_count;
+	b32 stencil;
 };
 
 struct Gfx_SamplerDesc {
@@ -275,24 +226,16 @@ struct Gfx_SamplerDesc {
 	u32 max_anisotropy;
 };
 
-struct Gfx_StencilFaceState {
-	Gfx_CompareOp compare;
-	Gfx_StencilOp fail_op;
-	Gfx_StencilOp depth_fail_op;
-	Gfx_StencilOp pass_op;
-};
-
-struct Gfx_StencilState {
-	b32 enabled;
-	Gfx_StencilFaceState front;
-	Gfx_StencilFaceState back;
-	u8 read_mask;
-	u8 write_mask;
-	u8 ref;
+struct Gfx_PipelineDesc {
+	b32 compute;
+	Gfx_Shader shader;
+	Gfx_Format pixel_format;
+	Gfx_Format depth_pixel_format;
+	v4 blend_color;
 };
 
 struct Gfx_DepthState {
-	Gfx_PixelFormat pixel_format;
+	Gfx_Format pixel_format;
 	Gfx_CompareOp compare;
 	b32 write_enabled;
 	b32 test_disable;
@@ -312,38 +255,6 @@ struct Gfx_BlendState {
 	Gfx_ColorMask write_mask;
 };
 
-struct Gfx_ColorTargetState {
-	Gfx_PixelFormat pixel_format;
-	Gfx_ColorMask write_mask;
-	Gfx_BlendState blend;
-};
-
-struct Gfx_PipelineDesc {
-	b32 compute;
-	Gfx_Shader shader;
-	Gfx_DepthState depth;
-	Gfx_StencilState stencil;
-	u32 color_count;
-	union {
-		Gfx_ColorTargetState colors[Gfx_MaxColorAttachments];
-		Gfx_ColorTargetState color;
-	};
-	Gfx_PrimitiveType primitive_type;
-	Gfx_CullMode cull_mode;
-	Gfx_FaceWinding face_winding;
-	u32 sample_count;
-	v4 blend_color;
-	b32 alpha_to_coverage_enabled;
-};
-
-struct Gfx_PipelineDesc2 {
-	b32 compute;
-	Gfx_Shader shader;
-	Gfx_PixelFormat pixel_format;
-	Gfx_PixelFormat depth_pixel_format;
-	v4 blend_color;
-};
-
 struct Gfx_PipelineState {
 	Gfx_DepthState depth;
 	Gfx_BlendState blend;
@@ -353,10 +264,18 @@ struct Gfx_PipelineState {
 	u32 sample_count;
 };
 
-enum Gfx_MemType {
-	Gfx_MemType_Default,
-	Gfx_MemType_Cpu,
-	Gfx_MemType_Gpu,
+struct Gfx_Mesh {
+	u32 base_vert;
+	u32 vert_count;
+	u32 base_index;
+	u32 index_count;
+};
+
+struct Gfx_Buffer {
+	b32 gpu;
+	u64 base;
+	u64 size;
+	u64 pos;
 };
 
 enum Gfx_BindType {
@@ -372,40 +291,31 @@ struct Gfx_DescriptorDesc {
 	u32 count;
 };
 
-struct Gfx_Mesh {
-	u32 base_vert;
-	u32 vert_count;
-	u32 base_index;
-	u32 index_count;
-};
-
-struct Gfx_Buffer {
-	Gfx_MemType type;
-	u64 base;
-	u64 size;
-	u64 pos;
-};
-
 struct Gfx_BufferDesc {
 	u32 binding;
 	u64 size;
-	Gfx_MemType mem_type;
+	b32 gpu;
 	void** out_cpu_ptr;
 	Gfx_Buffer* out_buffer;
 };
 
-enum Gfx_StageBufferCmdType {
-	Gfx_CmdType_Texture = 1,
-	Gfx_CmdType_Mesh,
+enum Gfx_StageType {
+	Gfx_StageType_Texture = 1,
+	Gfx_StageType_Buffer,
+	Gfx_StageType_VertIndex,
 };
 
-struct Gfx_StageBufferCmd {
-	Gfx_StageBufferCmdType type;
+struct Gfx_Stage {
+	Gfx_StageType type;
 	Gfx_Image img;
 	Gfx_Buffer buf;
-	u64 buf_offset;
+	Gfx_Buffer index_buf;
+	u64 buf_off;
+	u64 index_off;
 	u64 stage_off;
-	u64 size;
+	u64 index_stage_off;
+	u64 buf_size;
+	u64 index_size;
 };
 
 struct Gfx_DrawCtx {
@@ -429,42 +339,45 @@ struct Gfx_DrawCtx {
 #endif
 #define vkdevice st->gfx.device.logical_device
 
-typedef u32 VK_Access;
-enum {
-	VK_Access_None = 0,
-
-	// Transfer
-	VK_Access_TransferDst = 1<<0,
-	VK_Access_TransferSrc = 1<<1,
-
-	// Vertex
-	// VK_Access_VertBuffer = 1<<2,
-	// VK_Access_IndexBuffer = 1<<3,
-
-	// Shader reads
-	VK_Access_StorageBuffer_RO = 1<<4,
-	VK_Access_StorageBuffer_RW = 1<<5,
-	VK_Access_Texture = 1<<6,
-	VK_Access_StorageImage_RO = 1<<7,
-	VK_Access_StorageImage_RW = 1<<8,
-
-	// Shader stage
-	VK_Access_VertexShader = 1<<9,
-	VK_Access_FragmentShader = 1<<10,
-	VK_Access_ComputeShader = 1<<11,
-
-	// Attachments
-	VK_Access_ColorAttachment = 1<<12,
-	VK_Access_ResolveAttachment = 1<<13,
-	VK_Access_DepthAttachment = 1<<14,
-	VK_Access_StencilAttachment = 1<<15,
-	VK_Access_DepthRead = 1<<16,
-
-	VK_Access_IndirectBuffer = 1<<18,
-
-	VK_Access_Discard = 1<<19,
-	VK_Access_Present = 1<<20,
+#define VK_SyncMaxBatch 16
+#define VK_SyncShaderStages (VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT   | \
+                            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | \
+                            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT)
+enum VK_Sync {
+	VK_Sync_Undefined,
+	VK_Sync_TransferSrc,
+	VK_Sync_TransferDst,
+	VK_Sync_VertexIndexBuffer,
+	VK_Sync_IndirectBuffer,
+	VK_Sync_ShaderRead,
+	VK_Sync_Storage,
+	VK_Sync_ColorAttachment,
+	VK_Sync_DepthAttachment,
+	VK_Sync_Present,
+	VK_Sync_HostRead,
+	VK_Sync_General,
+	VK_Sync_COUNT,
 };
+
+struct VK_SyncBatch {
+	VkCommandBuffer cmd;
+	Array<VkImageMemoryBarrier2, VK_SyncMaxBatch> images;
+	Array<VkBufferMemoryBarrier2, VK_SyncMaxBatch> buffers;
+};
+
+struct VK_SyncInfo {
+	VkPipelineStageFlags2 stage;
+	VkAccessFlags2 access;
+	VkImageLayout layout;
+	b32 writes;
+};
+
+// struct VK_SyncBuffer {
+// 	VkBuffer buffer;
+// 	VkDeviceSize offset;
+// 	VkDeviceSize size;
+// 	VK_Sync state;
+// };
 
 struct VK_Memory {
 	VkDeviceMemory h;
@@ -480,14 +393,6 @@ struct VK_Buffer {
 	u64 cap;
 };
 
-struct VK_BufferRegion {
-	VkBuffer h;
-	u64 base;
-	u64 pos;
-	u64 cap;
-	VK_Access cur_access;
-};
-
 struct VK_Image {
 	VkImage h;
 	VkDeviceMemory memory;
@@ -495,18 +400,16 @@ struct VK_Image {
 	Gfx_ImageType type;
 	u32 width;
 	u32 height;
-	u32 slices_count;
-	u32 mipmaps_count;
-	Gfx_ImageUsage usage;
-	Gfx_PixelFormat pixel_format;
+	u32 count;
+	u32 mip_count;
+	Gfx_Format format;
 	u32 sample_count;
-	VK_Access cur_access;
+	VK_Sync sync;
 };
 
 struct VK_View {
 	VkImageView h;
-	Gfx_Image ref;
-	Gfx_ViewType type;
+	Gfx_Image img;
 	u32 mip_level;
 	u32 slice;
 	u32 mip_level_count;
@@ -534,18 +437,11 @@ struct VK_Shader {
 
 struct VK_Pipeline {
 	VkPipeline h;
-	Gfx_Shader shd_ref;
+	Gfx_Shader shader;
 	b32 compute;
-	Gfx_DepthState depth;
-	Gfx_StencilState stencil;
-	u32 color_count;
-	Gfx_ColorTargetState colors[Gfx_MaxColorAttachments];
-	Gfx_PrimitiveType primitive_type;
-	Gfx_CullMode cull_mode;
-	Gfx_FaceWinding face_winding;
-	u32 sample_count;
+	Gfx_Format pixel_format;
+	Gfx_Format depth_pixel_format;
 	v4 blend_color;
-	b32 alpha_to_coverage_enabled;
 };
 
 struct VK_Device {
@@ -575,7 +471,8 @@ struct VK_Device {
 
 struct VK_Swapchain {
 	VkSwapchainKHR h;
-	VkSurfaceFormatKHR format;  
+	VkSurfaceFormatKHR surface_format;  
+	Gfx_Format format;
 	VkPresentModeKHR present_mode;
 	VkImage images[Gfx_MaxImagesInFlight];
 	VkImageView views[Gfx_MaxImagesInFlight];
@@ -593,43 +490,69 @@ struct VK_DescriptorWriter {
 	u32 writes_count;
 };
 
-struct VK_IndirectDrawCall {
-	union {
-		VkDrawIndirectCommand draw_command;
-		VkDrawIndexedIndirectCommand index_draw_command;
-	};
-};
-
-String vk_result_str(VkResult result);
-
+VkBool32 vk_debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity, VkDebugUtilsMessageTypeFlagsEXT message_types, const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data);
 void vk_surface_create();
-void vk_swapchain_create();
+String vk_result_str(VkResult result);
+VkImageCreateFlags vk_image_create_flags(Gfx_ImageType t);
+VkImageType vk_image_type(Gfx_ImageType t);
+VkImageUsageFlags vk_image_usage(Gfx_Format fmt);
+VkFormat vk_format(Gfx_Format fmt);
+VkImageAspectFlagBits vk_aspect(Gfx_Format fmt);
+
+VkPrimitiveTopology vk_primitive_topology(Gfx_PrimitiveType t);
+VkCullModeFlags vk_cullmode(Gfx_CullMode cm);
+VkFrontFace vk_frontface(Gfx_FaceWinding fw);
+VkCompareOp vk_compare_op(Gfx_CompareOp op);
+VkStencilOp vk_stencil_op(Gfx_StencilOp op);
+VkBlendOp vk_blend_op(Gfx_BlendOp op);
+VkBlendFactor vk_blend_factor(Gfx_BlendFactor f);
+VkColorComponentFlags vk_color_write_mask(Gfx_ColorMask m);
+VkAttachmentLoadOp vk_load_op(Gfx_LoadOp a);
+VkAttachmentStoreOp vk_store_op(Gfx_StoreOp a);
+VkImageViewType vk_image_view_type(Gfx_ImageType t);
+VkFilter vk_sampler_minmag_filter(Gfx_Filter f);
+VkSamplerMipmapMode vk_sampler_mipmap_mode(Gfx_Filter f);
+VkSamplerAddressMode vk_sampler_address_mode(Gfx_Wrap f);
+VkBorderColor vk_sampler_border_color(Gfx_BorderColor c);
+
+b32 vk_sync_needed(VK_Sync prev, VK_Sync next);
+VkImageMemoryBarrier2 vk_sync_make_image_barrier(VkImage image, VkImageSubresourceRange range, VK_Sync prev, VK_Sync next);
+// VkBufferMemoryBarrier2 vk_sync_make_buffer_barrier(VK_SyncBuffer buf, VK_Sync prev, VK_Sync next);
+VK_SyncBatch vk_sync_begin(VkCommandBuffer cmd);
+void vk_sync_end(VK_SyncBatch& b);
+void vk_sync_image(VK_SyncBatch& b, VK_Image& img, VK_Sync next);
+// void vk_sync_buffer(VK_SyncBatch& b, VK_SyncBuffer& buf, VK_Sync next);
+void vk_sync_image_now(VkCommandBuffer cmd, VK_Image& img, VK_Sync next);
+// void vk_sync_buffer_now(VkCommandBuffer cmd, VK_SyncBuffer& buf, VK_Sync next);
+void vk_sync_everything(VkCommandBuffer cmd);
 
 VkSemaphore vk_get_cur_image_available_semaphore();
 VkSemaphore vk_get_cur_render_complete_semaphore();
 VkCommandBuffer vk_cur_cmd();
-
 u32 vk_find_memory_idx(u32 type_filter, u32 property_flags);
-
 VkSemaphore vk_make_semaphore(u64 initial_counter);
 
-void vk_cmd_alloc(VkCommandPool pool, u32 count, VkCommandBuffer* out);
-void vk_cmd_begin(VkCommandBuffer cmd);
-void vk_cmd_end(VkCommandBuffer cmd);
-void vk_cmd_submit(VkCommandBuffer cmd);
+void vk_make_cmd(VkCommandPool pool, u32 count, VkCommandBuffer* out);
+void vk_begin_cmd(VkCommandBuffer cmd);
+void vk_end_cmd(VkCommandBuffer cmd);
+void vk_submit_cmd(VkCommandBuffer cmd);
 
-VK_Memory vk_mem_make(Gfx_MemType type, u64 size);
-VK_Buffer vk_make_buffer(Gfx_MemType type, u64 size);
+VK_Memory vk_make_mem(u64 size, b32 gpu = 0);
+VK_Buffer vk_make_buffer(u64 size, b32 gpu = 0);
 VK_Buffer vk_get_vkbuffer(Gfx_Buffer buf);
+VkShaderModule vk_make_shader(Slice<u8> code);
+VkPipeline vk_make_pipeline(Gfx_PipelineDesc desc);
+void vk_loader_load_core();
+void vk_loader_load_instance();
+void vk_loader_load_device();
+void vk_instance_init();
+void vk_device_init();
+void vk_swapchain_create();
+void vk_upload_image(VkCommandBuffer cmd, VK_Image image, u64 stage_offset);
+void vk_make_mipmaps(VkCommandBuffer cmd, VK_Image& image);
 
 ////////////////////////////////////////////////////////////////////////
 // @Gfx
-struct Gfx_Environment {
-	u64 gpu_mem_size;
-	u64 cpu_mem_size;
-	u64 image_mem_size;
-};
-
 struct Gfx_ProfileZone {
 	String name;
 	f64 start;
@@ -684,7 +607,6 @@ struct Gfx_State {
 	VkDescriptorSet descriptor_set;
 	VkPipelineLayout pipeline_layout;
 
-	Gfx_Environment environment;
 	VK_Memory gpu_mem;
 	VK_Memory cpu_mem;
 	u64 images_mem_usage;
@@ -712,21 +634,18 @@ struct Gfx_State {
 	Pool<VK_View, Gfx_MaxCubeViews, Gfx_View> cubemap_views;
 	Pool<VK_Sampler, Gfx_MaxSamplers, Gfx_Sampler> samplers;
 
+	RingBuffer stage_ring;
+	u64 stage_in_flight_write;
 	VkSemaphore stage_semaphore;
-	u64 stage_cmd_counter;
-	u64 stage_cmd_ready_counter;
-	b32 stage_cmd_busy;
+	u64 stage_completed;
+	u64 stage_submitted;
+	u64 stage_next_value;
 
-	QueueSPSC<Gfx_StageBufferCmd, 32> stage_cmd_queue;
-	Mutex stage_cmd_mutex;
+	Mutex stage_mutex;
+	QueueSPSC<Gfx_Stage, 32> stage_cmd_queue;
 	Mutex stage_reserve_mutex;
-
-	struct {
-		v2u size;
-		b32 compute;
-		Gfx_PassAction action;
-		Gfx_Attachments attachments;
-	} cur_pass;
+	Gfx_Pass prev_pass;
+	b32 is_first_pass;
 
 	///////////////////////////////////
 	// Vulkan loader
@@ -873,26 +792,23 @@ struct Gfx_State {
 #undef X
 };
 
-u32 gfx_pixelformat_bytesize(Gfx_PixelFormat fmt);
+u32 gfx_format_bytesize(Gfx_Format fmt);
 
 Gfx_Shader gfx_make_shader(Slice<u8> shd);
-Gfx_Pipeline gfx_make_pipeline(Gfx_PipelineDesc2 desc);
+Gfx_Pipeline gfx_make_pipeline(Gfx_PipelineDesc desc);
 Gfx_Image gfx_make_image(Gfx_ImageDesc desc);
 Gfx_View gfx_make_view(Gfx_ViewDesc desc);
 Gfx_Sampler gfx_make_sampler(Gfx_SamplerDesc desc);
-Gfx_Buffer gfx_make_buffer(u64 size, Gfx_MemType type, u64 align = 16);
-void gfx_make_bind(Gfx_DescriptorDesc desc);
+Gfx_Buffer gfx_make_buffer(u64 size, b32 gpu, u64 align = 16);
 
 Gfx_PipelineDesc gfx_query_pipeline_desc(Gfx_Pipeline pip);
-Gfx_PipelineDesc2 gfx_query_pipeline_desc2(Gfx_Pipeline pip);
 Gfx_ImageDesc gfx_query_image_desc(Gfx_Image img);
 
 void gfx_update_shader(Gfx_Shader shd, Slice<u8> code);
-void gfx_update_pipeline(Gfx_Pipeline pip, Gfx_PipelineDesc2 desc);
-void gfx_update_image(Gfx_Image img, u8* data);
-void gfx_update_image(Gfx_Image img, Gfx_ImageDesc desc);
-void gfx_update_view(Gfx_View view, Gfx_ViewDesc desc);
-void gfx_update_buffer(Gfx_Buffer dst, u64 offset, Slice<u8> data);
+void gfx_update_pipeline(Gfx_Pipeline pip, Gfx_PipelineDesc desc);
+u64 gfx_update_image(Gfx_Image img, Slice<Slice<u8>> data, b32 sync = false);
+u64 gfx_update_buffer(Gfx_Buffer dst, u64 off, Slice<u8> data, b32 sync = false);
+u64 gfx_update_vert_index(Gfx_Buffer vert_dst, u64 vert_off, Gfx_Buffer index_dst, u64 index_off, Slice<u8> vert_data, Slice<u8> index_data);
 
 void gfx_destroy_image(Gfx_Image img);
 void gfx_destroy_view(Gfx_View view);
@@ -916,35 +832,28 @@ void gfx_apply_alpha_to_coverage(b32 enable);
 
 void gfx_push_ctx(Gfx_DrawCtx constants);
 void gfx_draw(u32 base_vert, u32 vert_count, u32 instance_count = 1, u32 base_instance = 0);
-void gfx_draw_indexed(u32 base_index, u32 index_count, u32 base_vert, u32 instance_count = 1, u32 base_instance = 0);
 void gfx_draw_indirect(Region region, Gfx_Buffer buf, u32 offset, u32 stride);
-// void gfx_draw_indexed_indirect(Gfx_IndirectDrawCall drawcall);
 void gfx_draw_mesh(Gfx_Mesh mesh);
 
 void gfx_begin_pass(Gfx_Pass pass);
 void gfx_end_pass();
 
 u64 gfx_push_buffer(Gfx_Buffer& arena, u64 size);
-u64 gfx_push_stage_buffer(Slice<u8> buf);
-u64 gfx_push_stage_buffers(Slice<Slice<u8>> buffers);
-u32 gfx_push_stage_buffer_cmd(Gfx_StageBufferCmd cmd);
-u32 gfx_ready_counter();
+b32 gfx_ready(u64 counter);
 
 u8* gfx_buffer_base_ptr(Gfx_Buffer buf);
 
 void gfx_bind_pipeline(Gfx_Pipeline pip);
-void gfx_bind_vert(Gfx_Buffer buf);
-void gfx_bind_index(Gfx_Buffer buf);
+void gfx_make_bind(Gfx_DescriptorDesc desc);
 void gfx_bind_buffer(Gfx_Buffer buf, u32 binding);
 void gfx_make_binding_buffers(Slice<Gfx_BufferDesc> descs);
-void gfx_flush();
+void gfx_flush_descriptors();
 void gfx_idle();
 
 void gfx_begin_timestamp(String name);
 void gfx_end_timestamp();
 
-void gfx_readback_image(Gfx_Image img, u8* dst);
-void gfx_init(Gfx_Environment environment);
+void gfx_init();
 void gfx_shutdown();
 void gfx_begin();
 void gfx_end();

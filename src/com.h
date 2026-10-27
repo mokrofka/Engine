@@ -187,7 +187,7 @@ struct TextureDesc {
 		u8* data;
 		u8* cube[6];
 	};
-	Gfx_PixelFormat pixel_format;
+	Gfx_Format format;
 	b32 is_cube;
 };
 
@@ -197,25 +197,6 @@ struct Texture {
 	b32 is_ready;
 	ImTextureID imgui_id;
 };
-
-// struct Bone {
-//     i32 parent;
-//     Transform local;
-//     Mat4 inverse_bind;
-//     Mat4 global;
-// };
-// for (i32 i = 0; i < bone_count; i++) {
-//     if (bones[i].parent >= 0)
-//         bones[i].global =
-//             bones[bones[i].parent].global *
-//             to_mat4(bones[i].local);
-//     else
-//         bones[i].global = to_mat4(bones[i].local);
-
-//     skin_matrices[i] =
-//         bones[i].global *
-//         bones[i].inverse_bind;
-// }
 
 struct MeshDesc {
 	String name;
@@ -279,19 +260,19 @@ struct ShaderModuleWithPipelines {
 	Array<Gfx_Pipeline, 4> pipelines;
 };
 
-typedef u32 AttachUsage;
-enum {
-	AttachUsage_Color = 1<<0,
-	AttachUsage_Depth = 1<<1,
-	AttachUsage_Resolve = 1<<2,
-	AttachUsage_Sampled = 1<<3,
-};
+// typedef u32 AttachUsage;
+// enum {
+// 	AttachUsage_Color = 1<<0,
+// 	AttachUsage_Depth = 1<<1,
+// 	AttachUsage_Resolve = 1<<2,
+// 	AttachUsage_Sampled = 1<<3,
+// };
 
-struct AttachmentDesc {
-	Gfx_PixelFormat fmt;
-	u32 samples;
-	AttachUsage usage;
-};
+// struct AttachmentDesc {
+// 	Gfx_Format fmt;
+// 	u32 samples;
+// 	// AttachUsage usage;
+// };
 
 struct Attachment {
 	Gfx_Image image;
@@ -304,8 +285,10 @@ enum SizeMode {Size_Swapchain, Size_Absolute};
 struct RenderTargetDesc {
 	SizeMode size_mode;
 	v2u size;
-	AttachmentDesc color;
-	AttachmentDesc depth;
+	b32 color;
+	b32 coolor_sample;
+	b32 depth;
+	b32 depth_sample;
 	u32 samples;
 };
 
@@ -319,8 +302,12 @@ struct RenderTarget {
 
 struct RenderPassDesc {
 	RenderTarget* target;
-	Gfx_ColorAttachmentAction color;
-	Gfx_DepthAttachmentAction depth;
+	Gfx_LoadOp color_load;
+	Gfx_StoreOp color_store;
+	v4 color_clear;
+	Gfx_LoadOp depth_load;
+	Gfx_StoreOp depth_store;
+	f32 depth_clear;
 };
 
 enum PushToGpuType {
@@ -738,7 +725,7 @@ extern GlobalState* st;
 
 DrawBatch make_draw_batch(Allocator alloc, Gfx_Pipeline pip);
 
-Attachment make_attachment(AttachmentDesc desc, v2u size);
+Attachment make_attachment(v2u size, Gfx_Format fmt, u32 samples, b32 sampled);
 void destroy_attachment(Attachment& attachment);
 v2u resolve_size(RenderTargetDesc d);
 RenderTarget make_render_target(RenderTargetDesc desc);
@@ -755,14 +742,13 @@ MeshId make_mesh(MeshDesc desc);
 MeshId make_mesh_idle(MeshDesc desc);
 u32 make_pipeline_state(Gfx_PipelineState s);
 MaterialId make_material(Material mat);
-Gfx_Pipeline make_pipeline(String name, Gfx_PipelineDesc2 desc);
+Gfx_Pipeline make_pipeline(String name, Gfx_PipelineDesc desc);
 FontId make_font(FontDesc desc);
 FontId make_font_idle(FontDesc desc);
 
 u32 texture_descriptor_idx(TextureId id);
 void set_cubemap(TextureId cubemap);
 
-void update_texture(TextureId t, u8* data);
 void update_mesh(MeshId mesh, MeshDesc desc);
 
 void reload_shader(String name);
