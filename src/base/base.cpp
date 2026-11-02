@@ -1122,8 +1122,12 @@ v3 best_fit_norm(Slice<v3> v) {
 	}
 	return v3_norm(res);
 }
-f32 point_plane_signed_dist(v3 p, v3 n, f32 d) {
+f32 v3_plane_signed_dist(v3 p, v3 n, f32 d) {
 	return v3_dot(p, n) - d;
+}
+f32 v3_plane_signed_dist(v3 p, v3 a, v3 b, v3 c) {
+	v3 n = v3_norm(v3_cross(b - a, c - a));
+	return v3_dot(p - a, n);
 }
 
 f32 v2_falloff(v2 p, v2 center, f32 radius, f32 max) {
@@ -1379,10 +1383,20 @@ v3 v3_rotate_around_pivot(v3 pos, v3 pivot, v4 q) {
 	return pivot + rotated;
 }
 
-v3 v3_barycentric(v3 v, v3 a, v3 b, v3 c) {
-	v3 v0 = b-a;
-	v3 v1 = c-a;
-	v3 v2 = v-a;
+v3 v2_barycentric(v2 p, v2 a, v2 b, v2 c) {
+	v2 ab = b - a;
+	v2 ac = c - a;
+	v2 ap = p - a;
+	f32 d = ab.x * ac.y - ab.y * ac.x;
+	f32 v = (ap.x * ac.y - ap.y * ac.x) / d;
+	f32 w = (ab.x * ap.y - ab.y * ap.x) / d;
+	f32 u = 1 - v - w;
+	return v3(u, v, w);
+}
+v3 v3_barycentric(v3 p, v3 a, v3 b, v3 c) {
+	v3 v0 = b - a;
+	v3 v1 = c - a;
+	v3 v2 = p - a;
 	f32 d00 = v3_dot(v0,v0);
 	f32 d01 = v3_dot(v0,v1);
 	f32 d11 = v3_dot(v1,v1);
@@ -1392,7 +1406,7 @@ v3 v3_barycentric(v3 v, v3 a, v3 b, v3 c) {
 	v3 res;
 	res.y = (d11 * d20 - d01 * d21) / denom;
 	res.z = (d00 * d21 - d01 * d20) / denom;
-	res.x = 1.0f - (res.z + res.y);
+	res.x = 1 - (res.z + res.y);
 	return res;
 }
 v3 v3_perpendicular(v3 v) {
@@ -2653,7 +2667,7 @@ void rng3_push(Rng3& r, v3 p)															{
 	if(p.z > r.max.x) r.max.z = p.z;
 }
 Rng3 rng3_transform(Rng3 r, m4x4 m) {
-	v3 t = v3(m.v[3][0], m.v[3][1], m.v[3][2]);
+	v3 t = v3_pos_of_mat4(m);
 	Rng3 out = {t,t};
 	Loop(i, 3) {
 		Loop(j, 3) {
@@ -4279,7 +4293,6 @@ Temp tctx_get_scratch_conflict(Allocator conflict) {
 	if(arena_conflict == &tctx.arenas[0]) {
 		arena_result = &tctx.arenas[1];
 	} else {
-		Assert(arena_conflict == &tctx.arenas[1]);
 		arena_result = &tctx.arenas[0];
 	}
 	return temp_begin(arena_result);

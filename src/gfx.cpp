@@ -972,7 +972,7 @@ void vk_device_init() {
 			Info("GPU Driver version: %i.%i.%i", VK_VERSION_MAJOR(device.properties.driverVersion), VK_VERSION_MINOR(device.properties.driverVersion), VK_VERSION_PATCH(device.properties.driverVersion));
 			Info("GPU API version: %i.%i.%i", VK_VERSION_MAJOR(device.properties.apiVersion), VK_VERSION_MINOR(device.properties.apiVersion), VK_VERSION_PATCH(device.properties.apiVersion));
 			Loop(i, device.memory.memoryHeapCount) {
-				f64 mem_size = (f64)device.memory.memoryHeaps[i].size / GB(1);
+				f64 mem_size = f64(device.memory.memoryHeaps[i].size) / GB(1);
 				if(device.memory.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
 					Info("Heap %i: GPU: %.2f GiB", i, mem_size);
 				else
@@ -1069,6 +1069,7 @@ void vk_device_init() {
 			.shaderInt8 = true,
 			.storageBuffer8BitAccess = true,
 			.uniformAndStorageBuffer8BitAccess = true,
+			.shaderFloat16 = true,
 		};
 		VkPhysicalDeviceVulkan11Features vulkan11 = {
 			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,

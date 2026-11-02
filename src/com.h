@@ -10,6 +10,7 @@
 // make wayland backend work
 // console
 // obj mouse selection
+// that scene + lighting
 
 #define CONST const
 #include "shader_header.h"
@@ -42,11 +43,13 @@ struct MaterialId {u32 idx;};
 struct FontId {u32 idx;};
 
 const u32 MaxThings 				= KB(1);
+const u32 MaxUIRects 			= KB(1);
 const u32 MaxMaterials  = 16;
 const u32 MaxMeshes     = 16;
 const u32 MaxTextures   = 16;
 const u32 MaxCubemaps   = 16;
 const u32 MaxFonts      = 16;
+const u32 MaxLights     = 16;
 const u32 MaxDebugLines = KB(2);
 const u32 MaxSkinMatrices = 16;
 const u32 MaxBones 							= 16;
@@ -161,10 +164,6 @@ struct Bone {
 	Transform local;
 };
 
-struct Pose {
-	Slice<Bone> bones;
-};
-
 struct UI_Rect {
 	v2 dst_p0;
 	v2 dst_p1;
@@ -201,7 +200,7 @@ struct Texture {
 struct MeshDesc {
 	String name;
 	Slice<Vertex> vertices;
-	Slice<u16> indices;
+	Slice<u32> indices;
 	f32 bounds_min;
 	f32 bounds_max;
 	f32 bounds_rad;
@@ -337,6 +336,7 @@ struct WaitingFont {
 	X(Axis)              \
 	X(Sphere)            \
 	X(CubeGlft)          \
+	X(CubeTest)\
 	X(GreeMan)           \
 	X(Barrack)           \
 	X(Bubble)            \
@@ -579,6 +579,7 @@ enum ThingEnum {
 
 struct GltfInfo {
 	MeshDesc mesh;
+	Slice<MeshDesc> meshes;
 	Slice<Bone> bones;
 	Slice<m4x4> inv_matrices;
 	Animation anim;
@@ -719,6 +720,7 @@ struct GlobalState {
 	u32* gpu_software_render;
 	GpuUI_Rect* gpu_ui_rects;
 	m4x4* gpu_skin_matrices;
+	GpuLight* gpu_lights;
 };
 
 extern GlobalState* st;
@@ -822,7 +824,7 @@ MeshDesc load_obj(Allocator arena, String name);
 GltfInfo load_gltf(Allocator arena, String name, b32 is_glb);
 v3 sample_v3(Sampler s, f32 time);
 v4 sample_quat(Sampler s, f32 time);
-void update_animation(Animation anim, Pose pose, f32 time);
+void update_animation(Animation anim, Slice<Bone> bones, f32 time);
 f32 animation_duration(Animation anim);
 
 JsParser js_parse_make(Allocator arena, String str);
@@ -891,7 +893,6 @@ void dumb_struct_load(Slice<MemberDefinition> members, void* ptr, Parser* parser
 void init();
 shared_function void com(HotReloadData* data);
 
-MeshDesc generate_sphere(Allocator arena);
 MeshDesc generate_grid(Allocator arena, u32 size, f32 step);
 
 ThingId make_thing(ThingDesc desc);

@@ -7,6 +7,7 @@ MakeId(Gfx_Shader);
 MakeId(Gfx_Pipeline);
 MakeId(Gfx_View);
 
+
 enum {
 	Gfx_NumFramesInFlight   = 2,
 	Gfx_MaxImagesInFlight   = 4,

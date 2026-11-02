@@ -5,9 +5,7 @@ enum Bindings {
 	Samplers,
 	CubeTextures,
 	Materials,
-	PointLights,
-	DirLights,
-	SpotLights,
+	Lights,
 	DrawCtx,
 	SoftwareRender,
 	UI_RectBinding,
@@ -36,19 +34,17 @@ struct GpuState {
 	u64 p;
 	alignas(8) v2 res;
 	f32 time;
-	u32 point_light_count;
-	u32 dir_light_count;
-	u32 spot_light_count;
+	u32 lights_count;
 	u32 cubemap;
 };
 
 struct Vertex {
-	alignas(16) v3 pos;
+	alignas(8) v3f16 pos;
 	u32 color;
-	alignas(16) v3 norm;
-	v4u8 joints;
-	alignas(8) v2 uv;
-	v4u8 weights;
+	alignas(4) v3i8 norm;
+	alignas(4) v4u8 joints;
+	alignas(4) v4u8 weights;
+	alignas(4) v2f16 uv;
 };
 
 CONST u32 DrawCallFlag_Skeleton = 1<<1;
@@ -82,26 +78,11 @@ struct Glue(Gpu, Material) {
 	u32 tex;
 };
 
-struct Glue(Gpu, PointLight) {
-	alignas(16) v3 color;
+struct Glue(Gpu, Light) {
 	alignas(16) v3 pos;
+	u32 color;
 	f32 intensity;
 	f32 rad;
-};
-
-struct Glue(Gpu, DirLight) {
-	alignas(16) v3 color;
-	alignas(16) v3 dir;
-	f32 intensity;
-};
-
-struct Glue(Gpu, SpotLight) {
-	alignas(16) v3 color;
-	alignas(16) v3 pos;
-	alignas(16) v3 dir;
-	f32 intensity;
-	f32 inner_cutoff;
-	f32 outer_cutoff;
 };
 
 CONST u32 GpuUI_RectFlag_IsFont = 1<<0;

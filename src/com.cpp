@@ -242,7 +242,7 @@ MeshId make_mesh(MeshDesc desc) {
 	u32 index_buf_off	= 0;
 	if(desc.indices.count) {
 		index_buf_off = gfx_push_buffer(g.gpu_index_buf, slice_size(desc.indices));
-		index_base = index_buf_off / sizeof(u16);
+		index_base = index_buf_off / sizeof(u32);
 	}
 	u32 counter = gfx_update_vert_index(g.gpu_vert_buf, vert_buf_off, g.gpu_index_buf, index_buf_off, slice_to_bytes(desc.vertices), slice_to_bytes(desc.indices));
 	os_mutex_lock(g.finished_gpu_mutex);
@@ -250,9 +250,9 @@ MeshId make_mesh(MeshDesc desc) {
 		.type = PushToGpuType_Mesh,
 		.mesh_id = res,
 		.mesh = {
-			.vert_count = (u32)desc.vertices.count,
+			.vert_count = u32(desc.vertices.count),
 			.base_vert = vert_base,
-			.index_count = (u32)desc.indices.count,
+			.index_count = u32(desc.indices.count),
 			.base_index = index_base,
 		},
 		.counter = counter,
@@ -306,16 +306,17 @@ Gfx_Pipeline make_pipeline(String name, Gfx_PipelineDesc desc) {
 	ProfFunc;
 	Scratch scratch;
 	var& g = *st;
-	ShaderModuleWithPipelines module = {};
-	if(!map_get(g.shader_to_module, hash(name), &module)) {
+	ShaderModuleWithPipelines* module = map_get_ptr(g.shader_to_module, hash(name));
+	Gfx_Shader shd = {};
+	if(!module) {
 		Slice code = os_file_path_read_all(scratch, push_strf(scratch, "%s/%s.spv", st->shader_compiled_dir, name));
 		ProfBlock("make shader");
-		module = {.shd = gfx_make_shader(code)};
-		map_set(g.shader_to_module, hash(name), module);
-	};
-	desc.shader = module.shd;
+		shd = gfx_make_shader(code);
+		module = map_set(g.shader_to_module, hash(name), {.shd = shd});
+	} else shd = module->shd;
+	desc.shader = shd;
 	Gfx_Pipeline pip = gfx_make_pipeline(desc);
-	array_push(module.pipelines, pip);
+	array_push(module->pipelines, pip);
 	return pip;
 }
 
@@ -670,14 +671,19 @@ void r_init() {
 			// },
 			{
 				.binding = Bindings::UI_RectBinding,
-				.size = sizeof(UI_Rect) * MaxThings,
+				.size = sizeof(UI_Rect) * MaxUIRects,
 				.out_cpu_ptr = (void**)&g.gpu_ui_rects,
 			},
 			{
 				.binding = Bindings::SkinMatrices,
 				.size = sizeof(UI_Rect) * MaxSkinMatrices,
 				.out_cpu_ptr = (void**)&g.gpu_skin_matrices,
-			}
+			},
+			{
+				.binding = Bindings::Lights,
+				.size = sizeof(GpuLight) * MaxLights,
+				.out_cpu_ptr = (void**)&g.gpu_skin_matrices,
+			},
 		};
 		gfx_make_binding_buffers(slice(buffers));
 		gfx_flush_descriptors();
@@ -1452,60 +1458,63 @@ v2 imgui_calc_text_size(String str) {
 
 #endif
 
-Vertex cube_vertices[] = {
-	// Front face (0, 0, 1)
-	{.pos = v3(-1, -1,  1), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0, 0)},
-	{.pos = v3( 1, -1,  1), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1, 0)},
-	{.pos = v3( 1,  1,  1), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1, 1)},
-	{.pos = v3( 1,  1,  1), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1, 1)},
-	{.pos = v3(-1,  1,  1), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0, 1)},
-	{.pos = v3(-1, -1,  1), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0, 0)},
+// Vertex cube_vertices[] = {
+// 	// Front face (0, 0, 1)
+// 	{.pos = v3(-1, -1,  1), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0, 0)},
+// 	{.pos = v3( 1, -1,  1), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1, 0)},
+// 	{.pos = v3( 1,  1,  1), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1, 1)},
+// 	{.pos = v3( 1,  1,  1), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(1, 1)},
+// 	{.pos = v3(-1,  1,  1), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0, 1)},
+// 	{.pos = v3(-1, -1,  1), /*0.0f, 0.0f, 1.0f,*/ .uv = v2(0, 0)},
 
-	// Back face (0, 0, -1)
-	{.pos = v3( 1, -1, -1), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0, 0)},
-	{.pos = v3(-1, -1, -1), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1, 0)},
-	{.pos = v3(-1,  1, -1), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1, 1)},
-	{.pos = v3(-1,  1, -1), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1, 1)},
-	{.pos = v3( 1,  1, -1), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0, 1)},
-	{.pos = v3( 1, -1, -1), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0, 0)},
+// 	// Back face (0, 0, -1)
+// 	{.pos = v3( 1, -1, -1), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0, 0)},
+// 	{.pos = v3(-1, -1, -1), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1, 0)},
+// 	{.pos = v3(-1,  1, -1), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1, 1)},
+// 	{.pos = v3(-1,  1, -1), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(1, 1)},
+// 	{.pos = v3( 1,  1, -1), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0, 1)},
+// 	{.pos = v3( 1, -1, -1), /*0.0f, 0.0f, -1.0f,*/ .uv = v2(0, 0)},
 
-	// Left face (-1, 0, 0)
-	{.pos = v3(-1, -1, -1),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0, 0)},
-	{.pos = v3(-1, -1,  1),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1, 0)},
-	{.pos = v3(-1,  1,  1),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1, 1)},
-	{.pos = v3(-1,  1,  1),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1, 1)},
-	{.pos = v3(-1,  1, -1),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0, 1)},
-	{.pos = v3(-1, -1, -1),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0, 0)},
+// 	// Left face (-1, 0, 0)
+// 	{.pos = v3(-1, -1, -1),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0, 0)},
+// 	{.pos = v3(-1, -1,  1),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1, 0)},
+// 	{.pos = v3(-1,  1,  1),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1, 1)},
+// 	{.pos = v3(-1,  1,  1),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(1, 1)},
+// 	{.pos = v3(-1,  1, -1),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0, 1)},
+// 	{.pos = v3(-1, -1, -1),  /*-1.0f, 0.0f, 0.0f,*/ .uv = v2(0, 0)},
 
-	// Right face (1, 0, 0)
-	{.pos = v3(1, -1,  1),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0, 0)},
-	{.pos = v3(1, -1, -1),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1, 0)},
-	{.pos = v3(1,  1, -1),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1, 1)},
-	{.pos = v3(1,  1, -1),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1, 1)},
-	{.pos = v3(1,  1,  1),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0, 1)},
-	{.pos = v3(1, -1,  1),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0, 0)},
+// 	// Right face (1, 0, 0)
+// 	{.pos = v3(1, -1,  1),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0, 0)},
+// 	{.pos = v3(1, -1, -1),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1, 0)},
+// 	{.pos = v3(1,  1, -1),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1, 1)},
+// 	{.pos = v3(1,  1, -1),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(1, 1)},
+// 	{.pos = v3(1,  1,  1),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0, 1)},
+// 	{.pos = v3(1, -1,  1),  /*1.0f, 0.0f, 0.0f,*/ .uv = v2(0, 0)},
 
-	// Bottom face (0, -1, 0)
-	{.pos = v3(-1, -1, -1),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0, 1)},
-	{.pos = v3( 1, -1, -1),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1, 1)},
-	{.pos = v3( 1, -1,  1),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1, 0)},
-	{.pos = v3( 1, -1,  1),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1, 0)},
-	{.pos = v3(-1, -1,  1),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0, 0)},
-	{.pos = v3(-1, -1, -1),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0, 1)},
+// 	// Bottom face (0, -1, 0)
+// 	{.pos = v3(-1, -1, -1),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0, 1)},
+// 	{.pos = v3( 1, -1, -1),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1, 1)},
+// 	{.pos = v3( 1, -1,  1),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1, 0)},
+// 	{.pos = v3( 1, -1,  1),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(1, 0)},
+// 	{.pos = v3(-1, -1,  1),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0, 0)},
+// 	{.pos = v3(-1, -1, -1),  /*0.0f, -1.0f, 0.0f,*/ .uv = v2(0, 1)},
 
-	// Top face (0, 1, 0)
-	{.pos = v3(-1,  1,  1), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0, 0)},
-	{.pos = v3( 1,  1,  1), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1, 0)},
-	{.pos = v3( 1,  1, -1), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1, 1)},
-	{.pos = v3( 1,  1, -1), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1, 1)},
-	{.pos = v3(-1,  1, -1), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0, 1)},
-	{.pos = v3(-1,  1,  1), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0, 0)},
-};
+// 	// Top face (0, 1, 0)
+// 	{.pos = v3(-1,  1,  1), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0, 0)},
+// 	{.pos = v3( 1,  1,  1), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1, 0)},
+// 	{.pos = v3( 1,  1, -1), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1, 1)},
+// 	{.pos = v3( 1,  1, -1), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(1, 1)},
+// 	{.pos = v3(-1,  1, -1), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0, 1)},
+// 	{.pos = v3(-1,  1,  1), /*0.0f, 1.0f, 0.0f,*/ .uv = v2(0, 0)},
+// };
 
 Vertex triangle_vertices[] = {
-	{.pos = v3( 0.0f,   0.5f, 0), .uv = v2(0.5f, 0), .color = u32_from_rgba(v4(1,0,0,1))},
-	{.pos = v3(-0.5f,  -0.5f, 0), .uv = v2(0.0f, 1), .color = u32_from_rgba(v4(0,1,0,1))},
-	{.pos = v3( 0.5f,  -0.5f, 0), .uv = v2(1.0f, 1), .color = u32_from_rgba(v4(0,0,1,1))},
+	// {.pos = v3( 0.0f,   0.5f, 0), .uv = v2(0.5f, 0), .color = u32_from_rgba(v4(1,0,0,1))},
+	// {.pos = v3(-0.5f,  -0.5f, 0), .uv = v2(0.0f, 1), .color = u32_from_rgba(v4(0,1,0,1))},
+	// {.pos = v3( 0.5f,  -0.5f, 0), .uv = v2(1.0f, 1), .color = u32_from_rgba(v4(0,0,1,1))},
+	{.pos = v3( 0.0f,   0.5f, 0), .color = u32_from_rgba(v4(1,0,0,1))},
+	{.pos = v3(-0.5f,  -0.5f, 0), .color = u32_from_rgba(v4(0,1,0,1))},
+	{.pos = v3( 0.5f,  -0.5f, 0), .color = u32_from_rgba(v4(0,0,1,1))},
 };
 
 Vertex axis_vertices[] = {
@@ -2854,8 +2863,10 @@ MeshDesc load_obj(Allocator arena, String name) {
 		} else {
 			Vertex v = {
 			 .pos = positions[idx.x],
-			 .norm = normals[idx.y],
-			 .uv = uvs[idx.z],
+			 // .norm = normals[idx.y],
+			 // .uv = v2_to_v2u16(uvs[idx.z]),
+			 // .uv = v2_to_v2i8(uvs[idx.z]),
+			 // .uv = uvs[idx.z],
 			};
 			u16 new_index = vertices.count;
 			array_push(vertices, v);
@@ -2865,7 +2876,7 @@ MeshDesc load_obj(Allocator arena, String name) {
 	}
 	MeshDesc mesh = {
 		.vertices = slice(vertices),
-		.indices = slice(final_indices),
+		// .indices = slice(final_indices),
 	};
 	return mesh;
 }
@@ -2879,9 +2890,7 @@ MeshDesc load_obj(Allocator arena, String name) {
 
 GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 	Scratch scratch(arena);
-
 	String path = push_strf(scratch, "%s/%s", st->models_dir, name);
-
 	String json = {};
 	Slice<u8> cursor = {};
 	if(is_glb) {
@@ -2915,16 +2924,17 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 		json = os_file_path_read_all_str(scratch, path);
 	}
 
-	String file_path = str_chop_last_dot(path);
-	String file_path_bin = push_strf(scratch, "%s.bin", file_path);
-	Slice data = is_glb ? cursor : os_file_path_read_all(scratch, file_path_bin);
+	String bin_path = push_strf(scratch, "%s.bin", str_chop_last_dot(path));
+	Slice data = is_glb ? cursor : os_file_path_read_all(scratch, bin_path);
 
 	u32 vert_count = 0;
 	u32 indices_count = 0;
+	u32 index_type = 0; 
 	Slice<v3> pos = {};
 	Slice<v3> norm = {};
 	Slice<v2> texcoord = {};
-	Slice<u16> indices_u16 = {};
+	Slice<u32> indices32_view = {};
+	Slice<u16> indices16_view = {};
 	Slice<v4u8> joints = {};
 	Slice<v4> weights = {};
 	Slice<m4x4> inv_matrices = {};
@@ -2940,6 +2950,16 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 
 	///////////////////////////////////
 	// Mesh
+	struct Attributes {
+		Slice<v3> pos;
+		Slice<v3> norm;
+		Slice<v2> texcoord;
+		Slice<u32> indices;
+		Slice<v3> joints;
+		Slice<v3> weights;
+	};
+	// var make_attributes = [](JsVal mesh){
+	// };
 	{
 		Slice<JsVal*> meshes; AssertOk(js_array(root, "meshes", &meshes));
 		JsObj first_mesh = meshes[0]->obj;
@@ -2977,12 +2997,17 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 		{
 			u32 indices_attribute; AssertOk(js_u32(first_primitive, "indices", &indices_attribute));
 			JsObj indices_accessor = accessors[indices_attribute]->obj;
+			AssertOk(js_u32(indices_accessor, "bufferView", &index_type));
 			u32 buffer_view; AssertOk(js_u32(indices_accessor, "bufferView", &buffer_view));
 			AssertOk(js_u32(indices_accessor, "count", &indices_count));
 			JsObj indices_buffer_view = buffer_views[buffer_view]->obj;
 			u64 size; Assert(js_u64(indices_buffer_view, "byteLength", &size));
 			u64 off; Assert(js_u64(indices_buffer_view, "byteOffset", &off));
-			indices_u16 = slice_reinterpret<u16>(slice_n(data, off, size));
+			if(index_type == Gltf_u32) {
+				indices32_view = slice_reinterpret<u32>(slice_n(data, off, size));
+			} else {
+				indices16_view = slice_reinterpret<u16>(slice_n(data, off, size));
+			}
 		}
 		{
 			u32 joints_attribute = 0;
@@ -3111,14 +3136,18 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 	}
 
 	Slice vertices = push_slice(arena, Vertex, vert_count);
-	Slice indices = push_slice(arena, u16, indices_count);
+	Slice indices = push_slice(arena, u32, indices_count);
 	Loop(i, indices.count) {
-		indices[i] = indices_u16[i];
+		if(index_type == Gltf_u32) {
+			indices[i] = indices32_view[i];
+		} else {
+			indices[i] = indices16_view[i];
+		}
 	}
 	Loop(i, vertices.count) {
 		vertices[i] = {
 			.pos = pos[i],
-			.norm = norm[i],
+			.norm = v3_to_v3i8(norm[i]),
 			.uv = texcoord[i],
 		};
 	}
@@ -3185,19 +3214,19 @@ v4 sample_quat(Sampler s, f32 time) {
 	return quat_slerp(a, t, b);
 }
 
-void update_animation(Animation anim, Pose pose, f32 time) {
+void update_animation(Animation anim, Slice<Bone> bones, f32 time) {
 	for(var channel : anim.channels) {
-		Sampler sampler = anim.samplers[channel.sampler];
-		Transform& bone = pose.bones[channel.bone].local;
+		var sampler = anim.samplers[channel.sampler];
+		var& trans = bones[channel.bone].local;
 		switch(channel.path) {
 			case AnimPath_Pos: {
-				bone.pos = sample_v3(sampler, time);
+				trans.pos = sample_v3(sampler, time);
 			}break;
 			case AnimPath_Rot: {
-				bone.rot = sample_quat(sampler, time);
+				trans.rot = sample_quat(sampler, time);
 			}break;
 			case AnimPath_Scale: {
-				bone.scale = sample_v3(sampler, time);
+				trans.scale = sample_v3(sampler, time);
 			}break;
 		}
 	}
@@ -3941,6 +3970,21 @@ void check_observer_observed() {
 }
 
 void init() {
+	// Info("%u", u8(-255.0f));
+	// u8 v0 = f32_to_u8(0.3);
+	// u8 v1 = f32_to_u8(-0.3);
+	// u8 v2 = f32_to_u8(0.7);
+	// u8 v3 = f32_to_u8(-0.7);
+	// Info("%u", v0);
+	// Info("%u", v1);
+	// Info("%u", v2);
+	// sizeof(Vertex);
+	// Info("%u", v3);
+	// Info("%f", u8_to_f32(v0));
+	// Info("%f", u8_to_f32(v1));
+	// Info("%f", u8_to_f32(v2));
+	// Info("%f", u8_to_f32(v3));
+
 	Scratch scratch;
 	var& g = *st;
 	
@@ -4040,62 +4084,6 @@ if(data->ctx == null) {
 
 	hotreload:
 	thread_wait_remanings();
-}
-
-MeshDesc generate_sphere(Allocator arena) {
-	u32 lat_steps = 10;
-	u32 lon_steps = 10;
-	u32 vert_count = lat_steps*lon_steps;
-	u32 index_count = (lat_steps - 1) * lon_steps * 6;
-	var vertices = push_slice(arena, Vertex, vert_count);
-	var indices = push_slice(arena, u16, index_count);
-	f32 lat_step_angle = PI / lat_steps;
-	f32 lon_step_angle = 2*PI / lon_steps;
-	for(u32 i = 0; i < lat_steps; i++) {
-		f32 lat_angle = -PI/2 + i*lat_step_angle;
-		for(u32 j = 0; j < lon_steps; j++) {
-			f32 lon_angle = j * lon_step_angle;
-			Vertex vert = {
-				.pos.x = Cos(lat_angle) * Cos(lon_angle),
-				.pos.y = Sin(lat_angle),
-				.pos.z = Cos(lat_angle) * Sin(lon_angle),
-				.uv.x = (f32)j / (lon_steps - 1),  // 0 → 1 across longitude
-				.uv.y = (f32)i / (lat_steps - 1),  // 0 → 1 from bottom to top
-			};
-			vertices[i*lon_steps + j] = vert;
-		}
-	}
-	var idx = [&](u32 i, u32 j) {
-		return i * lon_steps + j;
-	};
-	u32 k = 0;
-	for(u32 i = 0; i < lat_steps - 1; i++) {
-		for(u32 j = 0; j < lon_steps; j++) {
-			u32 next_j = (j + 1) % lon_steps; // wrap around
-			u32 v0 = idx(i, j);
-			u32 v1 = idx(i, next_j);
-			u32 v2 = idx(i + 1, j);
-			u32 v3 = idx(i + 1, next_j);
-			indices[k++] = v0;
-			indices[k++] = v2;
-			indices[k++] = v1;
-			indices[k++] = v1;
-			indices[k++] = v2;
-			indices[k++] = v3;
-		}
-	}
-	// u32 north_pole_index = vert_count - 1; // last vertex
-	// for(u32 j = 0; j < lon_steps; ++j) {
-	//   u32 next_j = (j + 1) % lon_steps;
-	//   indices[k++] = idx(lat_steps - 2, j); // last row before pole
-	//   indices[k++] = north_pole_index;      // pole
-	//   indices[k++] = idx(lat_steps - 2, next_j);
-	// }
-	MeshDesc mesh = {
-		.vertices = vertices,
-		.indices = indices,
-	};
-	return mesh;
 }
 
 // b32 ray_intersect_AABB(Ray ray, AABB aabb) {
@@ -4316,7 +4304,6 @@ void init_game() {
 		};
 		mesh_set(Mesh_Triangle, make_mesh({.vertices = slice(triangle_vertices)}));
 		mesh_set(Mesh_Axis, make_mesh({.vertices = slice(axis_vertices)}));
-		mesh_set(Mesh_Sphere, make_mesh(generate_sphere(scratch)));
 
 		// Mesh
 		var load_mesh = [&](MeshEnum enum_name, String name) {
@@ -4330,9 +4317,10 @@ void init_game() {
 		load_mesh(Mesh_MonkeyGlb, "monkey.glb");
 		load_mesh(Mesh_CubeGlft, "cube.gltf");
 		load_mesh(Mesh_Barrack, "castle.gltf");
+		load_mesh(Mesh_CubeTest, "test_cube.glb");
 		// load_mesh(Mesh_T, "t.gltf");
 		{
-			var info = load_gltf(scratch, "t1.gltf", false);
+			var info = load_gltf(g.arena, "t1.gltf", false);
 			mesh_set(Mesh_T, make_mesh(info.mesh));
 			array_push_elems(g.bones, info.bones);
 			array_push_elems(g.inv_matrices, info.inv_matrices);
@@ -4583,19 +4571,22 @@ void update_game() {
 
 	// draw_mesh_trs(g.meshes_ids[Mesh_T], g.materials_ids[Material_Container], v3(), DrawCallFlag_Skeleton);
 
-	local_persist v3 p = v3(4,0,0);
-	v4 q = quat_axis_angle(v3(0,1,0), time_now);
-	v3 pos = quat_rotate(q, p);
-	draw_mesh_trs(g.meshes_ids[Mesh_T], g.materials_ids[Material_Container], pos, q, v3(1), DrawCallFlag_Skeleton);
+	// local_persist v3 p = v3(4,0,0);
+	// v4 q = quat_axis_angle(v3(0,1,0), time_now);
+	// v3 pos = quat_rotate(q, p);
+	draw_mesh(g.meshes_ids[Mesh_T], g.materials_ids[Material_Container], v3(-2,0,2), DrawCallFlag_Skeleton);
+	// draw_mesh_trs(g.meshes_ids[Mesh_Cube], g.materials_ids[Material_Container], pos, q, v3(0.2));
 
-	draw_mesh_trs(g.meshes_ids[Mesh_Cube], g.materials_ids[Material_Container], pos, q, v3(0.2));
-	v2 po = {};
-	g.visible = world_to_screen(g.proj_view, pos, &po);
-	if(g.visible) {
-		draw_texture(rng2_make(po, v2(100)), g.textures_ids[Texture_Dummy]);
-	}
-	v3 draw_pos = {};
-	screen_to_ground(g.inv_view_proj, g.cam.pos, os_mouse_pos(), 0, &draw_pos);
-	draw_mesh(g.meshes_ids[Mesh_Cube], g.materials_ids[Material_Orange], draw_pos);
+	// v2 po = {};
+	// g.visible = world_to_screen(g.proj_view, pos, &po);
+	// if(g.visible) {
+	// 	draw_texture(rng2_make(po, v2(100)), g.textures_ids[Texture_Dummy]);
+	// }
+	// v3 draw_pos = {};
+	// screen_to_ground(g.inv_view_proj, g.cam.pos, os_mouse_pos(), 0, &draw_pos);
+	// draw_mesh(g.meshes_ids[Mesh_Cube], g.materials_ids[Material_Orange], draw_pos);
 	draw_mesh_trs(g.meshes_ids[Mesh_Cube], g.materials_ids[Material_Orange], {}, quat_from_euler(g.euler), v3(1));
+
+	draw_mesh(g.meshes_ids[Mesh_Cube], g.materials_ids[Material_Container], v3(2,0,3));
+	draw_mesh(g.meshes_ids[Mesh_CubeTest], g.materials_ids[Material_Orange], v3(2,0,5));
 }

@@ -15,6 +15,3 @@ import com;
 #define CS_Entry [shader("compute")]
 
 #define st state[0]
-
-
-

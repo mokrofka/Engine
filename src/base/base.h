@@ -38,8 +38,9 @@ typedef __builtin_va_list VaList;
 	typedef __INT32_TYPE__ i32;
 	typedef __INT64_TYPE__ i64;
 
-	typedef float  f32;
-	typedef double f64;
+	typedef _Float16 f16;
+	typedef float    f32;
+	typedef double   f64;
 
 	typedef u8  b8;
 	typedef i32 b32;
@@ -85,6 +86,14 @@ typedef __builtin_va_list VaList;
 #define U16_MAX 0xffff
 #define U32_MAX 0xffffffff
 #define U64_MAX 0xffffffffffffffff
+#define I8_MAX  0x7f
+#define I16_MAX 0x7fff
+#define I32_MAX 0x7fffffff
+#define I64_MAX 0x7fffffffffffffff
+#define I8_MIN  (-0x80)
+#define I16_MIN (-0x8000)
+#define I32_MIN (-0x80000000)
+#define I64_MIN (-0x8000000000000000)
 #define F32_MIN 1.17549435e-38f
 #define F32_MAX 3.40282347e+38f
 #define F64_MIN 2.2250738585072014e-308
@@ -779,9 +788,19 @@ union v2b {
 	v2b() = default;
 	v2b(b32 x, b32 y):x(x),y(y){}
 };
+struct v2u8 { u8 v2[2]; };
+struct v2i8 { i8 v2[2]; };
+struct v2i16 { i16 v[2]; };
+struct v2u16 { u16 v[2]; };
+struct v2f16 {
+	f16 v[2];
+	v2f16() = default;
+	v2f16(v2 x) {v[0] = x.x; v[1] = x.y; }
+};
 
 ///////////////////////////////////
 // v3
+struct v3f16;
 union v3 {
 	struct {
 		f32 x;
@@ -816,6 +835,15 @@ union v3b {
 	v3b() = default;
 	v3b(b32 x, b32 y, b32 z):x(x),y(y),z(z){}
 };
+struct v3u8 { u8 v[3]; };
+struct v3i8 { i8 v[3]; };
+struct v3u16 { u16 v[3]; };
+struct v3i16 { i16 v[3]; };
+struct v3f16 {
+	f16 v[3];
+	v3f16() = default;
+	v3f16(v3 x) {v[0] = x.x; v[1] = x.y; v[2] = x.z; }
+};
 
 ///////////////////////////////////
 // v4
@@ -833,12 +861,8 @@ union v4 {
 	NO_DEBUG v4(f32 x, f32 y, f32 z, f32 w):x(x),y(y),z(z),w(w){}
 	NO_DEBUG v4(v3 v, f32 w):x(v.x),y(v.y),z(v.z),w(w){}
 };
-struct v4u8 {
-	u8 v[4];
-};
-struct v4u {
-	u32 v[4];
-};
+struct v4u8 { u8 v[4]; };
+struct v4u { u32 v[4]; };
 
 struct m2x2 { f32 v[2][2]; };
 struct m3x2 { f32 v[3][2]; };
@@ -949,6 +973,16 @@ NO_DEBUG f32 Log2(f32 x);
 NO_DEBUG f32 Log10(f32 x);
 NO_DEBUG void Sincos(f32 rad, f32* a, f32* b);
 
+inline i8 f32_to_i8(f32 v) { return Round(v*I8_MAX); }
+inline u8 f32_to_u8(f32 v) { return v*U8_MAX; }
+inline i16 f32_to_i16(f32 v) { return Round(v*I16_MAX); }
+inline u16 f32_to_u16(f32 v) { return v*U16_MAX; }
+inline v2i8 v2_to_v2i8(v2 v) { return {f32_to_i8(v.x), f32_to_i8(v.y)}; }
+inline v2u8 v2_to_v2u8(v2 v) { return {f32_to_u8(v.x), f32_to_u8(v.y)}; }
+inline v2i16 v2_to_v2i16(v2 v) { return {f32_to_i16(v.x), f32_to_i16(v.y)}; }
+inline v2u16 v2_to_v2u16(v2 v) { return {f32_to_u16(v.x), f32_to_u16(v.y)}; }
+inline v3i8 v3_to_v3i8(v3 v) { return {f32_to_i8(v.x), f32_to_i8(v.y), f32_to_i8(v.z)}; }
+
 NO_DEBUG f32 sind(f32 x);
 NO_DEBUG f32 cosd(f32 x);
 
@@ -960,7 +994,7 @@ f32 round_to(f32 x, f32 step);
 
 f64 mod_trunc(f64 x, f64 m);
 f32 mod_floor(f32 x, f32 m);
-f32 frac(f32 x);
+NO_DEBUG f32 frac(f32 x);
 
 ////////////////////////////////////////////////////////////////////////
 // Color
@@ -1043,6 +1077,8 @@ v3 cylindrical_coord(f32 r, f32 theta, f32 z);
 
 void plane_basis(v3 n, v3* u, v3* v);
 v3 best_fit_norm(Slice<v3> v);
+f32 v3_plane_signed_dist(v3 p, v3 n, f32 d);
+f32 v3_plane_signed_dist(v3 p, v3 a, v3 b, v3 c);
 
 f32 v2_falloff(v2 p, v2 center, f32 radius, f32 max);
 f32 v3_falloff(v3 p, v3 center, f32 radius, f32 max);
@@ -1200,13 +1236,13 @@ v3 v3_approach(v3 current, v3 target, f32 step);
 v3 v3_clamp_len(f32 min, v3 v, f32 max);
 v3 v3_bounce(v3 v, v3 normal, f32 restitution);
 
-NO_DEBUG v3  v3_pos_of_mat4(m4x4 mat);
-NO_DEBUG v3  v3_rotate_x(v3 v, f32 rad);
-NO_DEBUG v3  v3_rotate_y(v3 v, f32 rad);
-NO_DEBUG v3  v3_rotate_z(v3 v, f32 rad);
+NO_DEBUG v3 v3_pos_of_mat4(m4x4 mat);
+NO_DEBUG v3 v3_rotate_x(v3 v, f32 rad);
+NO_DEBUG v3 v3_rotate_y(v3 v, f32 rad);
+NO_DEBUG v3 v3_rotate_z(v3 v, f32 rad);
 v3 v3_rotate_around_pivot(v3 pos, v3 pivot, v4 q);
 
-v3 v3_barycentric(v3 v, v3 a, v3 b, v3 c);
+v3 v3_barycentric(v3 p, v3 a, v3 b, v3 c);
 v3 v3_perpendicular(v3 v);
 v3 v3_rotate_around_axis(v3 v, v3 axis, f32 rad);
 v3 v3_refract(v3 v, v3 n, f32 r);
@@ -2465,6 +2501,17 @@ template<typename T, i32 N> b32 map_get(Map<T, N>& m, u64 hash, T* out) {
 		idx = mod_pow2(idx + 1, m.cap);
 	}
 	return false;
+}
+template<typename T, i32 N> T* map_get_ptr(Map<T, N>& m, u64 hash) {
+	u64 idx = mod_pow2(hash, m.cap);
+	Loop(i, m.cap) {
+		if(m.hashes[idx] == hash) {
+			return &m.data[idx];
+		} 
+		else if(m.hashes[idx] == HASH_UNUSED) break;
+		idx = mod_pow2(idx + 1, m.cap);
+	}
+	return null;
 }
 template<typename T, i32 N> void map_remove(Map<T, N>& m, u64 hash) {
 	u64 idx = mod_pow2(hash, m.cap);

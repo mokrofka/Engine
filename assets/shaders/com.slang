@@ -11,6 +11,7 @@ typedef int16_t i16;
 typedef int32_t	i32;
 typedef int64_t i64;
 
+typedef float16_t f16;
 typedef float  f32;
 typedef double f64;
 
@@ -20,7 +21,15 @@ typedef i32 b32;
 typedef float2 v2;
 typedef float3 v3;
 typedef float4 v4;
-typedef uint8_t4 v4u8;
+typedef float16_t2 v2f16;
+typedef float16_t3 v3f16;
+typedef uint8_t2   v2u8;
+typedef int8_t2 		 v2i8;
+typedef uint16_t2  v2u16;
+typedef int16_t2   v2i16;
+typedef uint8_t3   v3u8;
+typedef int8_t3    v3i8;
+typedef uint8_t4   v4u8;
 typedef uint4 v4u;
 
 typedef float3x3 m3x3;
@@ -37,6 +46,10 @@ CONST u32 MaxMaterials = KB(1);
 CONST u32 MaxLights = KB(1);
 
 CONST f32 PI = 3.14159265358f;
+
+CONST u32 U8_MAX =  0xff;
+CONST u32 U16_MAX = 0xffff;
+CONST u32 U32_MAX = 0xffffffff;
 
 #include "../../src/shader_header.h"
 
@@ -83,15 +96,13 @@ VkBind(Bindings.Samplers)       SamplerState samplers[];
 VkBind(Bindings.CubeTextures)   TextureCube cube_texture[];
 VkBind(Bindings.State)          StructuredBuffer<GpuState> state;
 VkBind(Bindings.Materials)      StructuredBuffer<Material> materials;
-VkBind(Bindings.PointLights)    StructuredBuffer<PointLight> point_lights;
-VkBind(Bindings.DirLights)      StructuredBuffer<DirLight> dir_lights;
-VkBind(Bindings.SpotLights)     StructuredBuffer<SpotLight> spot_lights;
+VkBind(Bindings.Lights)    StructuredBuffer<Light> lights;
 VkBind(Bindings.DrawCtx)        StructuredBuffer<DrawCall> drawcalls;
 // VkBind(Bindings.SoftwareRender) StructuredBuffer<u32> software_render;
 VkBind(Bindings.UI_RectBinding) StructuredBuffer<UI_Rect> ui_rects;
 VkBind(Bindings.Vertices)       StructuredBuffer<Vertex> vertices;
 VkBind(Bindings.CpuVertices)    StructuredBuffer<Vertex> cpu_vertices;
-VkBind(Bindings.Indices)        StructuredBuffer<u16> indices;
+VkBind(Bindings.Indices)        StructuredBuffer<u32> indices;
 VkBind(Bindings.SkinMatrices)   StructuredBuffer<m4x4> skin_matrices;
 
 bool flag_has(u64 x, u64 f) { return (x & f) == (f); }

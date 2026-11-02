@@ -15,12 +15,52 @@ CONST v2 tex_coords[] = {
 	{2.0, 0.0},
 };
 
-void foo(u32 b, u32 c) {
+#define U8_MAX  0xff
+#define U16_MAX 0xffff
+#define U32_MAX 0xffffffff
+#define U64_MAX 0xffffffffffffffff
+#define I8_MAX  0x7f
+#define I16_MAX 0x7fff
+#define I32_MAX 0x7fffffff
+#define I64_MAX 0x7fffffffffffffff
+#define I8_MIN  (-0x80)
+#define I16_MIN (-0x8000)
+#define I32_MIN (-0x80000000)
+#define I64_MIN (-0x8000000000000000)
+
+f32 i8_to_f32(i8 v) {
+	return max(f32(v) / I8_MAX, -1);
+	// return f32(v) / 128;
+}
+f32 u8_to_f32(u8 v) {
+	return max(f32(v) / U8_MAX, 0);
+}
+f32 i16_to_f32(i16 v) {
+	return max(f32(v) / I16_MAX, -1);
+}
+f32 u16_to_f32(u16 v) {
+	return max(f32(v) / U16_MAX, 0);
 }
 
-// how to make hotkey in vscode that for example: void foo(u32 <cursor> a, u32 b, u32 c) { in place of cursor by pressing key, it'd become: void foo(u32 b, u32 c) { } ?
-
 // VS_Entry VSOutput vs_main(Vertex in, u32 vert_id: SV_VertexID, u32 draw_id: SV_DrawIndex, u32 inst_id: SV_InstanceID) {
+
+// v2 v2u16_to_v2(v2u16 v) { return v2(f32(v.x) / U16_MAX, f32(v.y) / U16_MAX); }
+// v2 v2u8_to_v2(v2u8 v) { return v2(f32(v.x) / U8_MAX, f32(v.y) / U8_MAX); }
+v2 v2i8_to_v2(v2i8 v) {
+	return v2(i8_to_f32(v.x), i8_to_f32(v.y));
+}
+v2 v2u8_to_v2(v2u8 v) {
+	return v2(u8_to_f32(v.x), u8_to_f32(v.y));
+}
+v2 v2i16_to_v2(v2i16 v) {
+	return v2(i16_to_f32(v.x), i16_to_f32(v.y));
+}
+v2 v2u16_to_v2(v2u16 v) {
+	return v2(u16_to_f32(v.x), u16_to_f32(v.y));
+}
+
+// v2 v2i16_to_v2(v2i16 v) { return v2(f32(v.x) / (U16_MAX/2), f32(v.y) / (U16_MAX/2)); }
+
 VS_Entry VSOutput vs_main(u32 vert_id: SV_VertexID, u32 draw_id: SV_DrawIndex, u32 inst_id: SV_InstanceID) {
 	u32 drawcall_idx = push.idx + draw_id;
 	DrawCall draw = drawcalls[drawcall_idx];
@@ -60,7 +100,13 @@ VS_Entry VSOutput vs_main(u32 vert_id: SV_VertexID, u32 draw_id: SV_DrawIndex, u
 				// printf("%i %i %i %i", in.joints.x, in.joints.y,in.joints.z,in.joints.w);
 			}
 			o.pos = st.projection_view * draw.model * pos;
+			// o.uv = in.uv;
+			// o.uv.x = f16tof32(in.uv.x);
+			// o.uv.y = f16tof32(in.uv.y);
+			// o.uv = f16tof32(in.uv);
 			o.uv = in.uv;
+			// o.uv = v2i8_to_v2(in.uv);
+			// o.uv = v2i16_to_v2(in.uv);
 		}break;
 		case ShaderType::VertColor: {
 			o.pos = st.projection_view * draw.model * v4(in.pos, 1.0);
