@@ -11,6 +11,7 @@
 // console
 // obj mouse selection
 // that scene + lighting
+// efficient image allocation?
 
 #define CONST const
 #include "shader_header.h"
@@ -446,13 +447,8 @@ enum JsType {
 	JsType_Obj,
 };
 
-struct JsField {
-	String key;
-	struct JsVal* val;
-};
-
 struct JsObj {
-	Slice<JsField> fields;
+	Slice<struct JsField> fields;
 };
 
 struct JsVal {
@@ -461,9 +457,14 @@ struct JsVal {
 		b32 boolean;
 		f64 number;
 		String str;
-		Slice<JsVal*> array;
+		Slice<JsVal> array;
 		JsObj obj;
 	};
+};
+
+struct JsField {
+	String key;
+	JsVal val;
 };
 
 struct JsParser {
@@ -578,7 +579,6 @@ enum ThingEnum {
 };
 
 struct GltfInfo {
-	MeshDesc mesh;
 	Slice<MeshDesc> meshes;
 	Slice<Bone> bones;
 	Slice<m4x4> inv_matrices;
@@ -677,6 +677,7 @@ struct GlobalState {
 	Array<m4x4, MaxSkinMatrices> skin_matrices;
 	Array<Bone, MaxRuntimeBones> runtime_bones;
 	Animation anim;
+	Slice<MeshId> scene_meshes;
 
 	Array<Gfx_Mesh, MaxMeshes> meshes;
 	Array<Texture, MaxTextures> textures;
@@ -741,6 +742,7 @@ MeshDesc load_mesh(Allocator arena, String name);
 TextureId make_texture(TextureDesc desc);
 TextureId make_texture_idle(TextureDesc desc);
 MeshId make_mesh(MeshDesc desc);
+MeshId try_make_mesh(MeshDesc desc);
 MeshId make_mesh_idle(MeshDesc desc);
 u32 make_pipeline_state(Gfx_PipelineState s);
 MaterialId make_material(Material mat);
@@ -842,7 +844,7 @@ b32 js_f32(JsObj obj, String key, f32* out);
 b32 js_u64(JsObj obj, String key, u64* out);
 b32 js_u32(JsObj obj, String key, u32* out);
 b32 js_str(JsObj obj, String key, String* out);
-b32 js_array(JsObj obj, String key, Slice<JsVal*>* out);
+b32 js_array(JsObj obj, String key, Slice<JsVal>* out);
 b32 js_obj(JsObj obj, String key, JsObj* out);
 b32 js_v3(JsObj obj, String key, v3* out);
 b32 js_v4(JsObj obj, String key, v4* out);

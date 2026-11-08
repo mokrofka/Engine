@@ -23,7 +23,7 @@ enum {
 	Gfx_DefaultSampleCount  = 4,
 	Gfx_StageBufferSize     = MB(10),
 	Gfx_CpuMemSize          = MB(20),
-	Gfx_GpuMemSize          = MB(10),
+	Gfx_GpuMemSize          = MB(30),
 };
 
 //    - unsigned normalized
@@ -461,7 +461,6 @@ struct VK_Device {
 	VkQueue transfer_queue;
 	VkQueue compute_queue;
 	VkCommandPool cmd_pool;
-	VkCommandPool upload_cmd_pool;
 	VkPhysicalDeviceProperties properties;
 	VkPhysicalDeviceFeatures features;
 	VkPhysicalDeviceMemoryProperties memory;

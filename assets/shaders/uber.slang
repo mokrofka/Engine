@@ -1,19 +1,6 @@
 #include "lib.slang"
-// #include "com.slang"
 // printf("hello %v4f", in.pos);
-
-
-CONST v2 positions[] = {
-	{-1.0, -1.0},
-	{-1.0,  3.0},
-	{ 3.0, -1.0},
-};
-
-CONST v2 tex_coords[] = {
-	{0.0, 0.0},
-	{0.0, 2.0},
-	{2.0, 0.0},
-};
+// VS_Entry VSOutput vs_main(Vertex in, u32 vert_id: SV_VertexID, u32 draw_id: SV_DrawIndex, u32 inst_id: SV_InstanceID) {
 
 #define U8_MAX  0xff
 #define U16_MAX 0xffff
@@ -27,6 +14,9 @@ CONST v2 tex_coords[] = {
 #define I16_MIN (-0x8000)
 #define I32_MIN (-0x80000000)
 #define I64_MIN (-0x8000000000000000)
+
+v2 make_screen_uv(u32 vert_id) { return v2(vert_id & 2, (vert_id << 1) & 2); }
+v4 make_screen_pos(v2 uv) { return v4(uv * 2.0 - 1.0, 0, 1); }
 
 f32 i8_to_f32(i8 v) {
 	return max(f32(v) / I8_MAX, -1);
@@ -42,7 +32,6 @@ f32 u16_to_f32(u16 v) {
 	return max(f32(v) / U16_MAX, 0);
 }
 
-// VS_Entry VSOutput vs_main(Vertex in, u32 vert_id: SV_VertexID, u32 draw_id: SV_DrawIndex, u32 inst_id: SV_InstanceID) {
 
 // v2 v2u16_to_v2(v2u16 v) { return v2(f32(v.x) / U16_MAX, f32(v.y) / U16_MAX); }
 // v2 v2u8_to_v2(v2u8 v) { return v2(f32(v.x) / U8_MAX, f32(v.y) / U8_MAX); }
@@ -117,12 +106,12 @@ VS_Entry VSOutput vs_main(u32 vert_id: SV_VertexID, u32 draw_id: SV_DrawIndex, u
 			o.color = rgba_from_u32(in.color);
 		}break;
 		case ShaderType::Screen: {
-			o.pos = v4(positions[vert_id], 0, 1);
-			o.uv = tex_coords[vert_id];
+			o.uv = make_screen_uv(vert_id);
+			o.pos = make_screen_pos(o.uv);
 		}break;
 		case ShaderType::SoftwareRender: {
-			o.pos = v4(positions[vert_id], 0, 1);
-			o.uv = tex_coords[vert_id];
+			o.uv = make_screen_uv(vert_id);
+			o.pos = make_screen_pos(o.uv);
 		}break;
 	}
 	o.id = drawcall_idx;

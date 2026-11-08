@@ -60,16 +60,16 @@ u8* OffsetBack(void* x, u64 a)         { return (u8*)x - a; }
 
 ////////////////////////////////////////////////////////////////////////
 // Bits
-u32 clz(u64 v)                     { return __builtin_clzll(v); }
+u64 clz64(u64 v)                   { return __builtin_clzll(v); }
 u32 clz32(u32 v)																	  { return __builtin_clz(v); }
-u32 ctz(u64 v)                     { return __builtin_ctzll(v); }
-u32 ctzu32(u32 v)																	 { return __builtin_ctz(v); }
+u64 ctz64(u64 v)                   { return __builtin_ctzll(v); }
+u32 ctz32(u32 v)																	  { return __builtin_ctz(v); }
 u32 count_ones(u64 v)              { return __builtin_popcountll(v); }
-u32 most_significant_bit(u32 v)    { return 31 - clz32(v); }
-u64 most_significant_bit(u64 v)    { return 63 - clz(v); }
-u32 remove_lowest_bit(u64 v)       { return v & (v - 1);}
-u32 remove_highest_bit(u32 v)      { return v ^ (1 << most_significant_bit(v)); }
-u64 remove_highest_bit(u64 v)      { return v ^ (1 << most_significant_bit(v)); }
+u32 fls32(u32 v)  																	{ return 31 - clz32(v); }
+u64 fls64(u64 v)  																	{ return 63 - clz64(v); }
+u64 remove_lowest_bit(u64 v)       { return v & (v - 1);}
+u32 remove_highest_bit32(u32 v)    { return v ^ (1 << fls32(v)); }
+u64 remove_highest_bit64(u64 v)    { return v ^ (1 << fls64(v)); }
 b32 bit_has(u64 x, u64 pos)        { return (x >> pos) & 1; }
 u64 flag_clear(u64 x, u64 f)       { return x & ~f; }
 u64 flag_toggle(u64 x, u64 f)      { return x ^ f; }
@@ -79,7 +79,7 @@ b32 flag_any(u64 x, u64 f)         { return x & f; }
 ////////////////////////////////////////////////////////////////////////
 // Common operations
 u64 mod_pow2(u64 x, u64 b)   { return x & (b - 1); }
-u64 div_pow2(u64 x, u64 b)   { return x >> ctz(b); }
+u64 div_pow2(u64 x, u64 b)   { return x >> ctz64(b); }
 u64 div_ceil(u64 x, u64 b)   { return (x + b - 1) / b; }
 u64 round_up(u64 x, u64 a)   { return div_ceil(x, a) * a; }
 u64 round_down(u64 x, u64 a) { return x / a * a; }
@@ -2794,22 +2794,6 @@ f32 ease_bounce_in_out(f32 t) {
 	}
 }
 
-const u32 MEM_ALLOC_HEADER_GUARD   = 0xA110C8;
-const u32 MEM_DEALLOC_HEADER_GUARD = 0xDE1E7E;
-const u32 MEM_ALLOC_GUARD          = 0xA1;
-const u32 MEM_DEALLOC_GUARD        = 0xDE;
-const u32 MEM_ALLOC_TAIL_GUARD     = 0xdeedbeef;
-
-#if MEM_GUARD
-	#define MemGuardAlloc(d, z)   MemSet(d, MEM_ALLOC_GUARD, z)
-	#define MemGuardDealloc(d, z) MemSet(d, MEM_DEALLOC_GUARD, z)
-#else
-	#define MemGuardAlloc(d, c)
-	#define MemGuardDealloc(d, c)
-#endif
-
-const u32 ARENA_LIST_BLOCK_SIZE = KB(64);
-
 ////////////////////////////////////////////////////////////////////////
 // Mem track
 #if MEM_TRACK
@@ -2847,10 +2831,10 @@ AllocatorInfo* mem_track_make(Allocator parent_alloc, AllocatorType type, String
 
 	LockScope(mem_track_st.mutex);
 	if(parent) {
-		dll_push_back(parent->first, parent->last, info);
+		dll_list_push_back(parent->first, parent->last, info);
 		parent->child_count++;
 	} else {
-		dll_push_back(mem_track_st.roots.first, mem_track_st.roots.last, info);
+		dll_list_push_back(mem_track_st.roots.first, mem_track_st.roots.last, info);
 		mem_track_st.roots.count++;
 	}
 	return info;
@@ -2860,10 +2844,10 @@ void mem_track_destroy(AllocatorInfo* info) {
 	if(info) {
 		LockScope(mem_track_st.mutex);
 		if(info->parent) {
-			dll_remove(info->parent->first, info->parent->last, info);
+			dll_list_remove(info->parent->first, info->parent->last, info);
 			info->parent->child_count--;
 		} else {
-			dll_remove(mem_track_st.roots.first, mem_track_st.roots.last, info);
+			dll_list_remove(mem_track_st.roots.first, mem_track_st.roots.last, info);
 			mem_track_st.roots.count--;
 		}
 	}
@@ -3013,83 +2997,6 @@ void temp_end(Temp temp) {
 }
 
 ////////////////////////////////////////////////////////////////////////
-// ArenaList
-ArenaList::operator Allocator() { return {.type = AllocatorType_ArenaList, .ctx = this}; }
-
-ArenaList alloc_arena_list_make(Allocator alloc) {
-	ArenaList res = {
-		.alloc = alloc,
-	};
-	return res;
-}
-
-void alloc_arena_list_clear(ArenaList& arena) {
-	for(ArenaBlock* b = arena.first;; b = b->next) {
-		u8* base = Offset(b, sizeof(ArenaBlock));
-		MemGuardDealloc(base, b->pos);
-		AsanPoisonMemRegion(base, ARENA_LIST_BLOCK_SIZE);
-		b->pos = 0;
-		if(b == arena.current)
-			break;
-	}
-	arena.current = arena.first;
-}
-
-ArenaBlock* arena_list_new_block(ArenaList* arena) {
-	ArenaBlock* b = (ArenaBlock*)mem_alloc(arena->alloc, sizeof(ArenaBlock) + ARENA_LIST_BLOCK_SIZE);
-	*b = {
-		.cap = ARENA_LIST_BLOCK_SIZE,
-	};
-	u8* base = Offset(b, sizeof(ArenaBlock));
-	MemGuardDealloc(base, ARENA_LIST_BLOCK_SIZE);
-	AsanPoisonMemRegion(base, ARENA_LIST_BLOCK_SIZE);
-	return b;
-}
-
-u8* arena_list_alloc(ArenaList* arena, u64 size, u64 align) {
-	Assert(align_up(size, align) <= KB(64));
-	if(!arena->current) {
-		arena->first = arena->current = arena_list_new_block(arena);
-	}
-	u8* base = Offset(arena->current, sizeof(ArenaBlock));
-	u64 pos = align_up((u64)base + arena->current->pos, align) - (u64)base;
-	if(pos + size > arena->current->cap) {
-		if(arena->current->next) {
-			arena->current = arena->current->next;
-		} else {
-			arena->current = arena->current->next = arena_list_new_block(arena);
-		}
-		base = Offset(arena->current, sizeof(ArenaBlock));
-		pos = align_up((u64)base, align) - (u64)base;
-	}
-	u64 pad = pos - arena->current->pos;
-	AsanUnpoisonMemRegion(Offset(base, arena->current->pos), size + pad);
-	MemGuardAlloc(Offset(base, arena->current->pos), size + pad);
-	u8* result = Offset(base, pos);
-	arena->current->pos = pos + size;
-	return result;
-}
-
-u8* arena_list_alloc_zero(ArenaList* arena, u64 size, u64 align) {
-	u8* result = arena_list_alloc(arena, size, align);
-	MemZero(result, size);
-	return result;
-}
-
-u8* arena_list_realloc(ArenaList* arena, void* ptr, u64 old_size, u64 new_size, u64 align) {
-	u8* result = arena_list_alloc(arena, new_size, align);
-	MemCopy(result, ptr, old_size);
-	return result;
-}
-
-u8* arena_list_realloc_zero(ArenaList* arena, void* ptr, u64 old_size, u64 new_size, u64 align) {
-	u8* result = arena_list_alloc(arena, new_size, align);
-	MemCopy(result, ptr, old_size);
-	MemZero(Offset(result, old_size), new_size - old_size);
-	return result;
-}
-
-////////////////////////////////////////////////////////////////////////
 // Segregated pow2 list
 struct AllocHeader {
 #if BUILD_DEBUG
@@ -3121,9 +3028,9 @@ void alloc_destroy(Alloc alloc) {
 u8* intern_alloc(Alloc* alloc, u64 size) {
 	Assert(size > 7);
 	u64 pow2_size = next_pow2(size);
-	u64 pool_idx = ctz(pow2_size) - ctz(8);
-	MemNode* p = alloc->pools[pool_idx].next;
-	if(p == null) {
+	u64 pool_idx = ctz64(pow2_size) - ctz64(8);
+	var p = alloc->pools[pool_idx];
+	if(p.next == null) {
 		u8* buf = mem_alloc(alloc->alloc, pow2_size);
 #if MEM_TRACK
 		mem_track_on_commit(alloc->info, pow2_size);
@@ -3132,19 +3039,19 @@ u8* intern_alloc(Alloc* alloc, u64 size) {
 		return buf;
 	}
 	sll_stack_pop(alloc->pools[pool_idx].next);
-	AsanUnpoisonMemRegion(p, pow2_size);
-	MemGuardAlloc(p, pow2_size);
+	AsanUnpoisonMemRegion(p.next, pow2_size);
+	MemGuardAlloc(p.next, pow2_size);
 #if MEM_TRACK
 	mem_track_on_alloc(alloc->info, size);
 #endif
-	return (u8*)p;
+	return (u8*)p.next;
 }
 
 void intern_free(Alloc* alloc, void* ptr, u64 size) {
 	Assert(size > 7);
 	u64 pow2_size = next_pow2(size);
-	u64 pool_idx = ctz(pow2_size) - ctz(8);
-	MemNode* p = (MemNode*)ptr;
+	u64 pool_idx = ctz64(pow2_size) - ctz64(8);
+	var p = (AllocNode*)ptr;
 	sll_stack_push(alloc->pools[pool_idx].next, p);
 	MemGuardDealloc(Offset(p, sizeof(void*)), pow2_size - sizeof(void*));
 	AsanPoisonMemRegion(Offset(p, sizeof(void*)), pow2_size - sizeof(void*));
@@ -3225,68 +3132,233 @@ u8* alloc_realloc_zero(Alloc* alloc, void* ptr, u64 old_size, u64 new_size, u64 
 	return res;
 }
 
-////////////////////////////////////////////////////////////////////////
-// tlsf
-// TLSF_Allocator tlsf_init() {
-//   return {};
-// }
+void tlsf__map(u32 size, u32* fl, u32* sl) {
+	if(size < TLSF_SL_COUNT) {
+		*fl = 0;
+		*sl = size;
+		return;
+	}
+	u32 f = fls32(size);
+	*fl = f - TLSF_SL_BITS + 1;
+	*sl = (size >> (f - TLSF_SL_BITS)) - TLSF_SL_COUNT;
+}
 
-// struct BinmapInfo {
-//   u32 bin_idx;
-//   u32 sub_bin_idx;
-//   u64 rounded_size;
-// };
+void tlsf__insert_free(TlsfOOB& t, u32 idx) {
+	TlsfNodeOOB& n = t.nodes[idx];
+	u32 fl, sl;
+	tlsf__map(n.size, &fl, &sl);
+	t.fl_bitmap |= 1 << fl;
+	t.sl_bitmap[fl] |= 1 << sl;
+	n.state = Tlsf_NodeFree;
 
-// struct BlockMap {
-//   u32 bin_idx;
-//   u32 sub_bin_idx;
-//   u64 rounded_size;
-//   u32 idx;
-// };
+	u32& head = t.heads[fl][sl];
+	n.next_free = TLSF_NIL;
+	n.prev_free = head;
+	t.nodes[head].next_free = idx;
+	head = idx;
+}
 
-// intern BinmapInfo binmap_up(u64 size) {
-//   u64 bin_idx = most_significant_bit(size | MinAllocation);
-//   u64 subbin_size = 1 << (bin_idx - ctz(SubbinCount));
-//   u64 rounded_size = AlignUp(size, subbin_size);
-//   u32 sub_bin_idx = (rounded_size - (1 << bin_idx)) / subbin_size;
+void tlsf__remove_free(TlsfOOB& t, u32 idx) {
+	TlsfNodeOOB& n = t.nodes[idx];
+	u32 fl, sl;
+	tlsf__map(n.size, &fl, &sl);
+	DLL_remove(t.nodes, idx, next_free, prev_free);
+	u32& head = t.heads[fl][sl];
+	if(head == idx) head = n.prev_free;
+	if(head == TLSF_NIL) {
+		t.sl_bitmap[fl] &= ~(1 << sl);
+		if(t.sl_bitmap[fl] == 0) t.fl_bitmap &= ~(1u << fl);
+	}
+}
 
-//   u32 adjusted_bin_idx = (bin_idx - ctz(MinAllocation)) + (sub_bin_idx / SubbinCount);
-//   u32 adjusted_subbin_idx = sub_bin_idx % SubbinCount;
+u32 tlsf__node_alloc(TlsfOOB& t) {
+	Assert(t.node_stack != TLSF_NIL);
+	u32 i = t.node_stack;
+	t.node_stack = t.nodes[i].next_free;
+	return i;
+}
+void tlsf__node_release(TlsfOOB& t, u32 i) {
+	t.nodes[i].state = Tlsf_NodeUnused;
+	t.nodes[i].next_free = t.node_stack;
+	t.node_stack = i;
+}
 
-//   return {
-//     .bin_idx = adjusted_bin_idx,
-//     .sub_bin_idx = adjusted_subbin_idx,
-//     .rounded_size = rounded_size,
-//   };
-// }
+TlsfOOB tlsf_oob_make(u32 size, TlsfNodeOOB* nodes, u32 node_cap) {
+	Assert(size > 0 && node_cap >= 2); // sentinel + first block
+	TlsfOOB t = {};
+	t.size = size;
+	t.free_size = size;
+	t.nodes = nodes;
+	t.node_cap = node_cap;
+	nodes[0] = {};
+	LoopOff(i, 2, node_cap) {
+		nodes[i] = {};
+		nodes[i].next_free = (i + 1 < node_cap) ? i + 1 : TLSF_NIL;
+	}
+	t.node_stack = node_cap > 2 ? 2u : TLSF_NIL;
+	nodes[1] = {};
+	nodes[1].size = size;
+	tlsf__insert_free(t, 1);
+	return t;
+}
 
-// intern BlockMap tlsf_find_free_block(TLSF_Allocator& a, u64 size) {
-//   BinmapInfo map = binmap_up(size);
-//   u32 sub_bin_bitmap = a.sub_bin_bitmaps[map.bin_idx] & (~0 << map.sub_bin_idx);
-//   if(sub_bin_bitmap == 0) {
-//     u32 bin_bitmap = a.bin_bitmap & (~0 << (map.bin_idx + 1));
-//     if(bin_bitmap == 0) return {};
-//     map.bin_idx = ctz(bin_bitmap);
-//     sub_bin_bitmap = a.sub_bin_bitmaps[map.sub_bin_idx];
-//   }
+void tlsf_oob_reset(TlsfOOB& t) { t = tlsf_oob_make(t.size, t.nodes, t.node_cap); }
 
-//   Assert(sub_bin_bitmap != 0);
-//   map.sub_bin_idx = ctz(sub_bin_bitmap);
-//   u32 idx = map.bin_idx * SubbinCount + map.sub_bin_idx;
+TlsfAllocOOB tlsf_oob_alloc(TlsfOOB& t, u32 size, u32 align) {
+	Assert(size > 0);
+	TlsfAllocOOB fail = {0, TLSF_NIL};
 
-//   return {
-//     .bin_idx = map.bin_idx,
-//     .sub_bin_idx = map.sub_bin_idx,
-//     .rounded_size = map.rounded_size,
-//     .idx = idx,
-//   };
-// }
+	u32 need = size + (align - 1);
+	u32 bi = TLSF_NIL;
 
-// u8* tlsf_alloc(TLSF_Allocator& a, u64 size, u64 alignment) {
-//   BlockMap block_map = tlsf_find_free_block(a, size);
+	{
+		// Round up to class boundary
+		u32 rounded = need;
+		if(need >= TLSF_SL_COUNT) {
+			u32 step = 1 << (fls32(need) - TLSF_SL_BITS);
+			rounded = align_up(rounded, step);
+		}
 
-//   return {};
-// }
+		// Find non-empty list at or above it
+		u32 fl, sl;
+		tlsf__map(rounded, &fl, &sl);
+		u32 sl_map = t.sl_bitmap[fl] & (~0u << sl);
+		if(!sl_map) {
+			u32 fl_map = t.fl_bitmap & (~0u << (fl + 1));
+			if(fl_map) {
+				fl = ctz32(fl_map);
+				sl_map = t.sl_bitmap[fl];
+			}
+		}
+		if(sl_map) {
+			sl = ctz32(sl_map);
+			bi = t.heads[fl][sl];
+		}
+	}
+
+	// If no suitable block, search original
+	if(bi == TLSF_NIL) {
+		u32 ef, es;
+		tlsf__map(need, &ef, &es);
+		u32 c = t.heads[ef][es];
+		for(u32 k = 0; k < TLSF_FALLBACK_SCAN && c != TLSF_NIL; k++, c = t.nodes[c].prev_free)
+			if(t.nodes[c].size >= need) {
+				bi = c;
+				break;
+			}
+	}
+	if(bi == TLSF_NIL) return fail;
+
+	TlsfNodeOOB* b = &t.nodes[bi];
+	tlsf__remove_free(t, bi);
+
+	u32 aligned = align_up(b->offset, align);
+	u32 pad = aligned - b->offset;
+	u32 end = aligned + size;
+	u32 rem = b->offset + b->size - end;
+
+	if(rem > 0) { // tail becomes a new free block
+		u32 ri = tlsf__node_alloc(t);
+		TlsfNodeOOB* r = &t.nodes[ri];
+		r->offset = end;
+		r->size = rem;
+		DLL_insert_after(t.nodes, bi, ri, next_phys, prev_phys);
+		b->size -= rem;
+		tlsf__insert_free(t, ri);
+	}
+	if(pad > 0) { // alignment gap becomes a free block too
+		u32 li = tlsf__node_alloc(t);
+		TlsfNodeOOB* l = &t.nodes[li];
+		l->offset = b->offset;
+		l->size = pad;
+		DLL_insert_before(t.nodes, bi, li, next_phys, prev_phys);
+		b->offset = aligned;
+		b->size -= pad;
+		tlsf__insert_free(t, li);
+	}
+
+	b->state = Tlsf_NodeUsed;
+	t.free_size -= b->size;
+	TlsfAllocOOB res = {aligned, bi};
+	return res;
+}
+
+void tlsf_oob_free(TlsfOOB& t, u32 idx) {
+	TlsfNodeOOB* nodes = t.nodes;
+	TlsfNodeOOB* n = &nodes[idx];
+	Assert(idx < t.node_cap && n->state == Tlsf_NodeUsed);
+	t.free_size += n->size;
+
+	// Merge into previous
+	u32 pi = n->prev_phys;
+	if(nodes[pi].state == Tlsf_NodeFree) {
+		tlsf__remove_free(t, pi);
+		nodes[pi].size += n->size;
+		DLL_remove(nodes, idx, next_phys, prev_phys);
+		tlsf__node_release(t, idx);
+		idx = pi;
+		n = &nodes[pi];
+	}
+	// Absorb the next one
+	u32 ni = n->next_phys;
+	if(nodes[ni].state == Tlsf_NodeFree) {
+		tlsf__remove_free(t, ni);
+		n->size += nodes[ni].size;
+		n->next_phys = nodes[ni].next_phys;
+		if(n->next_phys != TLSF_NIL) nodes[n->next_phys].prev_phys = idx;
+		tlsf__node_release(t, ni);
+	}
+	tlsf__insert_free(t, idx);
+}
+
+b32 tlsf_oob_validate(TlsfOOB& t) {
+	const TlsfNodeOOB* nodes = t.nodes;
+	if(nodes[0].state != Tlsf_NodeUnused) return 0;
+	u32 head = TLSF_NIL, heads_found = 0, live = 0, free_nodes = 0;
+	for(u32 i = 1; i < t.node_cap; i++) {
+		if(nodes[i].state == Tlsf_NodeUnused) continue;
+		live++;
+		if(nodes[i].state == Tlsf_NodeFree) free_nodes++;
+		if(nodes[i].prev_phys == TLSF_NIL) {
+			head = i;
+			heads_found++;
+		}
+	}
+	if(heads_found != 1) return 0;
+ 
+	u32 pos = 0, total_free = 0, walked = 0, prev = TLSF_NIL;
+	for(u32 i = head; i != TLSF_NIL; i = nodes[i].next_phys) {
+		const TlsfNodeOOB* n = &nodes[i];
+		if(n->state == Tlsf_NodeUnused || n->size == 0) return 0;
+		if(n->offset != pos || n->prev_phys != prev) return 0;
+		if(prev != TLSF_NIL && n->state == Tlsf_NodeFree && nodes[prev].state == Tlsf_NodeFree) return 0; // must be merged
+		if(n->state == Tlsf_NodeFree) total_free += n->size;
+		pos += n->size;
+		prev = i;
+		walked++;
+		if(walked > live) return 0;
+	}
+	if(pos != t.size || walked != live || total_free != t.free_size) return 0;
+ 
+	u32 in_lists = 0;
+	for(u32 f = 0; f < TLSF_FL_COUNT; f++) {
+		if(((t.fl_bitmap >> f) & 1u) != (t.sl_bitmap[f] != 0)) return 0;
+		for(u32 s = 0; s < TLSF_SL_COUNT; s++) {
+			u32 h = t.heads[f][s];
+			if(((t.sl_bitmap[f] >> s) & 1u) != (h != TLSF_NIL)) return 0;
+			u32 newer = TLSF_NIL; // walk newest -> oldest
+			for(u32 i = h; i != TLSF_NIL; i = nodes[i].prev_free) {
+				u32 mf, ms;
+				tlsf__map(nodes[i].size, &mf, &ms);
+				if(nodes[i].state != Tlsf_NodeFree || mf != f || ms != s || nodes[i].next_free != newer) return 0;
+				newer = i;
+				in_lists++;
+				if(in_lists > free_nodes) return 0;
+			}
+		}
+	}
+	return in_lists == free_nodes;
+}
 
 ////////////////////////////////////////////////////////////////////////
 // Allocator Interface
@@ -3294,7 +3366,6 @@ u8* mem_alloc(Allocator alloc, u64 size, u64 align) {
 	switch(alloc.type) {
 		InvalidDefaultCase;
 		case AllocatorType_Arena:     return arena_alloc((Arena*)alloc.ctx, size, align);
-		case AllocatorType_ArenaList: return arena_list_alloc((ArenaList*)alloc.ctx, size, align);
 		case AllocatorType_Alloc:     return alloc_alloc((Alloc*)alloc.ctx, size, align);
 	}
 }
@@ -3302,7 +3373,6 @@ u8* mem_alloc_zero(Allocator alloc, u64 size, u64 align) {
 	switch(alloc.type) {
 		InvalidDefaultCase;
 		case AllocatorType_Arena:     return arena_alloc_zero((Arena*)alloc.ctx, size, align);
-		case AllocatorType_ArenaList: return arena_list_alloc((ArenaList*)alloc.ctx, size, align);
 		case AllocatorType_Alloc:     return alloc_alloc_zero((Alloc*)alloc.ctx, size, align);
 	}
 }
@@ -3310,7 +3380,6 @@ u8* mem_realloc(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64 alig
 	switch(alloc.type) {
 		InvalidDefaultCase;
 		case AllocatorType_Arena:     return arena_realloc((Arena*)alloc.ctx, ptr, old_size, new_size, align);
-		case AllocatorType_ArenaList: return arena_list_realloc((ArenaList*)alloc.ctx, ptr, old_size, new_size, align);
 		case AllocatorType_Alloc:     return alloc_realloc((Alloc*)alloc.ctx, ptr, old_size, new_size, align);
 	}
 }
@@ -3318,7 +3387,6 @@ u8* mem_realloc_zero(Allocator alloc, void* ptr, u64 old_size, u64 new_size, u64
 	switch(alloc.type) {
 		InvalidDefaultCase;
 		case AllocatorType_Arena:     return arena_realloc_zero((Arena*)alloc.ctx, ptr, old_size, new_size, align);
-		case AllocatorType_ArenaList: return arena_list_realloc_zero((ArenaList*)alloc.ctx, ptr, old_size, new_size, align);
 		case AllocatorType_Alloc:     return alloc_realloc_zero((Alloc*)alloc.ctx, ptr, old_size, new_size, align);
 	}
 }
@@ -3326,55 +3394,8 @@ void mem_free(Allocator alloc, void* ptr, u64 size) {
 	switch(alloc.type) {
 		InvalidDefaultCase;
 		case AllocatorType_Arena:     return;
-		case AllocatorType_ArenaList: return;
 		case AllocatorType_Alloc:     return alloc_free((Alloc*)alloc.ctx, ptr, size);
 	}
-}
-
-////////////////////////////////////////////////////////////////////////
-// General GPU allocator (segregated pow2)
-GpuAllocSegList gpu_alloc_seglist_make(Allocator alloc) {
-	GpuAllocSegList res = {
-		.alloc = alloc,
-	};
-	res.range_cap = 8,
-	res.data = push_array(alloc, GpuBlockList, res.range_cap);
-	return res;
-}
-GpuMemId gpu_alloc_seglist_alloc(GpuAllocSegList& a, u64 size, u64 align) {
-	Assert(size > 0);
-	u64 alloc_size = align + size;
-	u64 pow2_size = next_pow2(alloc_size);
-	u64 pool_idx = ctz(pow2_size) - ctz(8);
-	u32& p = a.heads[pool_idx];
-	if(p == 0) {
-		u64 cur_pos = align_up(a.pos, align);
-		a.pos = cur_pos + pow2_size;
-		GpuBlockList range = {0, true, cur_pos, alloc_size};
-		u32 result = a.range_count;
-		if(a.range_count >= a.range_cap) {
-			a.range_cap *= 2;
-			mem_realloc_array(a.alloc, a.data, a.range_count, a.range_cap) ;
-		}
-		a.data[a.range_count++] = range;
-		return result;
-	}
-	u32 result = p;
-	p = a.data[p].next;
-	return result;
-}
-void gpu_alloc_seglist_free(GpuAllocSegList& a, GpuMemId h) {
-	GpuBlockList& range = a.data[h];
-	Assert(range.is_allocated == true);
-	u64 pow2_size = next_pow2(range.range.size);
-	u64 pool_idx = ctz(pow2_size) - ctz(8);
-	u32& p = a.heads[pool_idx];
-	range.next = p;
-	p = h;
-}
-
-u64 gpu_alloc_seglist_get(GpuAllocSegList& a, GpuMemId h) {
-	return a.data[h].range.offset;
 }
 
 ////////////////////////////////////////////////////////////////////////

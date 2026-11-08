@@ -2111,7 +2111,6 @@ void gfx_init() {
 			.queueFamilyIndex = g.device.graphics_queue_family_idx,
 		};
 		VK_CHECK(g.CreateCommandPool(vkdevice, &graphics_pool_create_info, g.allocator, &g.device.cmd_pool));
-		VK_CHECK(g.CreateCommandPool(vkdevice, &graphics_pool_create_info, g.allocator, &g.device.upload_cmd_pool));
 		g.images_in_flight = g.device.surface_capabilities.minImageCount;
 		g.frames_in_flight = g.images_in_flight - 1;
 		g.swapchain.surface_format = g.device.surface_formats[0];
@@ -2130,8 +2129,7 @@ void gfx_init() {
 		g.swapchain.present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
 		vk_swapchain_create();
 		vk_make_cmd(g.device.cmd_pool, g.frames_in_flight, g.render_cmds);
-		vk_make_cmd(g.device.upload_cmd_pool, 1, &g.upload_cmd);
-
+		vk_make_cmd(g.device.cmd_pool, 1, &g.upload_cmd);
 		// Query pool
 		VkQueryPoolCreateInfo pool_info = {
 			.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,

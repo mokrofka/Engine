@@ -158,14 +158,16 @@ u8* OffsetBack(void* x, u64 a);
 
 ////////////////////////////////////////////////////////////////////////
 // Bits
-u32 clz(u64 v);
+u64 clz64(u64 v);
 u32 clz32(u32 v);
-u32 ctz(u64 v);
+u64 ctz64(u64 v);
 u32 ctz32(u32 v);
 u32 count_ones(u64 v);
-u32 most_significant_bit(u32 size);
-u64 most_significant_bit(u64 size);
-u32 remove_lowest_bit(u64 v);
+u32 fls32(u32 size);
+u64 fls64(u64 size);
+u64 remove_lowest_bit(u64 v);
+u32 remove_highest_bit32(u32 v);
+u64 remove_highest_bit64(u64 v);
 b32 bit_has(u64 x, u64 pos);
 u64 flag_clear(u64 x, u64 f);
 u64 flag_toggle(u64 x, u64 f);
@@ -313,53 +315,53 @@ template <typename F> _Defer<F> operator+(_DeferDummy, F f) { return {f}; }
 #define DLL_list_init(a, n, next, prev) \
 	(a[n].next = n,                        \
 		a[n].prev = n)
-#define DLL_list_push(a, first, n, next, prev) \
-	a[n].next = first;                            \
-	a[n].prev = a[first].prev;                    \
-	a[a[first].prev].next = n;                    \
-	a[first].prev = n;
-#define DLL_list_insert(a, first, n, next, prev) \
-	a[n].next = a[first].next;                      \
-	a[n].prev = first;                              \
-	a[a[first].next].prev = n;                      \
-	a[first].next = n;
-#define DLL_list_remove(a, n, next, prev) \
+#define DLL_insert_before(a, at, n, next, prev) \
+	a[n].next = at;                            \
+	a[n].prev = a[at].prev;                    \
+	a[a[at].prev].next = n;                    \
+	a[at].prev = n;
+#define DLL_insert_after(a, at, n, next, prev) \
+	a[n].next = a[at].next;                      \
+	a[n].prev = at;                              \
+	a[a[at].next].prev = n;                      \
+	a[at].next = n;
+#define DLL_remove(a, n, next, prev) \
 	a[a[n].next].prev = a[n].prev;           \
 	a[a[n].prev].next = a[n].next;
-#define dll_list_init(a, x) DLL_list_init(a, x, next, prev)
-#define dll_list_push(a, first, n) DLL_list_push(a, first, n, next, prev)
-#define dll_list_insert(a, first, n) DLL_list_insert(a, first, n, next, prev)
-#define dll_list_remove(a, n) DLL_list_remove(a, n, next, prev)
+#define dll_init(a, x) DLL_list_init(a, x, next, prev)
+#define dll_insert_before(a, at, n) DLL_insert_before(a, at, n, next, prev)
+#define dll_insert_after(a, at, n) DLL_insert_after(a, at, n, next, prev)
+#define dll_remove(a, n) DLL_remove(a, n, next, prev)
 
-#define PDLL_list_init(first, next, prev) \
-	(first)->next = first;                   \
-	(first)->prev = first;
-#define PDLL_list_push(first, n, next, prev) \
-	(n)->next = (first);                        \
-	(n)->prev = (first)->prev;                  \
-	(first)->prev->next = n;                    \
-	(first)->prev = n;
-#define PDLL_list_insert(first, n, next, prev) \
-	(n)->next = (first)->next;                    \
-	(n)->prev = first;                            \
-	(first)->next->prev = n;                      \
-	(first)->next = n;
-#define PDLL_list_remove(n, next, prev) \
+#define PDLL_init(at, next, prev) \
+	(at)->next = at;                   \
+	(at)->prev = at;
+#define PDLL_insert_before(at, n, next, prev) \
+	(n)->next = (at);                        \
+	(n)->prev = (at)->prev;                  \
+	(at)->prev->next = n;                    \
+	(at)->prev = n;
+#define PDLL_insert_after(at, n, next, prev) \
+	(n)->next = (at)->next;                    \
+	(n)->prev = at;                            \
+	(at)->next->prev = n;                      \
+	(at)->next = n;
+#define PDLL_remove(n, next, prev) \
 	(n)->next->prev = (n)->prev;           \
 	(n)->prev->next = (n)->next;
-#define pdll_list_init(first) PDLL_list_init(first, next, prev)
-#define pdll_list_push(first, n) PDLL_list_push(first, n, next, prev)
-#define pdll_list_insert(first, n) PDLL_list_insert(first, n, next, prev)
-#define pdll_list_remove(n)	PDLL_list_remove(n, next, prev)
+#define pdll_init(at) PDLL_init(at, next, prev)
+#define pdll_insert_before(at, n) PDLL_insert_before(at, n, next, prev)
+#define pdll_insert_after(at, n) PDLL_insert_after(at, n, next, prev)
+#define pdll_remove(n)	PDLL_remove(n, next, prev)
 
 ////////////////////////////////////////////////////////////////////////
 // Doulby Linked List
-#define DLL_push_back(first, last, n, next, prev)    \
+#define PDLL_list_push_back(first, last, n, next, prev)    \
 	((n)->prev = (last),                                \
 	 (n)->next = null,                                  \
 	 ((last) ? ((last)->next = (n)) : ((first) = (n))), \
 	 (last) = (n))
-#define DLL_remove(first, last, n, next, prev) \
+#define PDLL_list_remove(first, last, n, next, prev) \
 	(((n)->prev ? ((n)->prev->next = (n)->next)   \
 													: ((first) = (n)->next)),         \
 		((n)->next ? ((n)->next->prev = (n)->prev)   \
@@ -379,8 +381,8 @@ template <typename F> _Defer<F> operator+(_DeferDummy, F f) { return {f}; }
 	(((first) == (last)) ? ((first) = (last) = null) \
 																						: ((first) = (first)->next))
 
-#define dll_push_back(first, last, n)  DLL_push_back(first, last, n, next, prev)
-#define dll_remove(first, last, n)     DLL_remove(first, last, n, next, prev)
+#define dll_list_push_back(first, last, n)  PDLL_list_push_back(first, last, n, next, prev)
+#define dll_list_remove(first, last, n)     PDLL_list_remove(first, last, n, next, prev)
 #define sll_stack_push(first, n)       SLL_stack_push(first, n, next)
 #define sll_stack_pop(first)           SLL_stack_pop(first, next)
 #define sll_queue_push(first, last, n) SLL_queue_push(first, last, n, next)
@@ -1565,12 +1567,24 @@ f32 ease_bounce_in_out(f32 t);
 ////////////////////////////////////////////////////////////////////////
 // @Mem
 const u32 MEM_DEFAULT_ALIGNMENT = sizeof(void*);
-const u32 ARENA_DEFAULT_RESERVE_SIZE = MB(64);
+const u32 ARENA_DEFAULT_RESERVE_SIZE = MB(512);
 const u32 ARENA_DEFAULT_COMMIT_SIZE  = KB(4);
+const u32 MEM_ALLOC_HEADER_GUARD   = 0xA110C8;
+const u32 MEM_DEALLOC_HEADER_GUARD = 0xDE1E7E;
+const u32 MEM_ALLOC_GUARD          = 0xA1;
+const u32 MEM_DEALLOC_GUARD        = 0xDE;
+const u32 MEM_ALLOC_TAIL_GUARD     = 0xdeedbeef;
+
+#if MEM_GUARD
+	#define MemGuardAlloc(d, z)   MemSet(d, MEM_ALLOC_GUARD, z)
+	#define MemGuardDealloc(d, z) MemSet(d, MEM_DEALLOC_GUARD, z)
+#else
+	#define MemGuardAlloc(d, c)
+	#define MemGuardDealloc(d, c)
+#endif
 
 enum AllocatorType {
 	AllocatorType_Arena = 1,
-	AllocatorType_ArenaList,
 	AllocatorType_Alloc,
 };
 
@@ -1632,23 +1646,6 @@ struct Temp {
 	u64 pos;
 };
 
-struct ArenaBlock {
-	u64 pos;
-	u64 cap;
-	ArenaBlock* next;
-};
-
-struct ArenaList {
-	Allocator alloc;
-	ArenaBlock* current;
-	ArenaBlock* first;
-	operator Allocator();
-};
-
-struct MemNode {
-	MemNode* next;
-};
-
 struct AllocParams {
 	String name;
 	String file;
@@ -1656,32 +1653,54 @@ struct AllocParams {
 	b32 lock;
 };
 
+struct AllocNode {
+	AllocNode* next;
+};
+
 struct Alloc {
 #if MEM_TRACK
 	AllocatorInfo* info;
 #endif
 	Allocator alloc;
-	MemNode pools[32];
+	AllocNode pools[32];
 	b32 lock;
 	Mutex mutex;
 	operator Allocator();
 };
 
-typedef u32 GpuMemId;
-struct GpuBlockList {
-	u32 next;
-	b32 is_allocated;
-	Region range;
+#define TLSF_SL_BITS 5
+#define TLSF_SL_COUNT (1u << TLSF_SL_BITS)
+#define TLSF_FL_COUNT (32u - TLSF_SL_BITS + 1u)
+#define TLSF_NIL 0
+#define TLSF_FALLBACK_SCAN 8
+
+enum {
+	Tlsf_NodeUnused,
+	Tlsf_NodeUsed,
+	Tlsf_NodeFree,
 };
 
-struct GpuAllocSegList {
-	u64 pos;
-	u64 cap;
-	Allocator alloc;
-	GpuBlockList* data;
-	u32 range_count;
-	u32 range_cap;
-	u32 heads[32];
+struct TlsfNodeOOB {
+	u32 offset, size;
+	u32 prev_phys, next_phys;
+	u32 prev_free, next_free;
+	u32 state;
+};
+
+struct TlsfOOB {
+	u32 size;
+	u32 free_size;
+	u32 fl_bitmap;
+	u32 sl_bitmap[TLSF_FL_COUNT];
+	u32 heads[TLSF_FL_COUNT][TLSF_SL_COUNT];
+	TlsfNodeOOB* nodes;
+	u32 node_cap;
+	u32 node_stack;
+};
+
+struct TlsfAllocOOB {
+	u32 offset;
+	u32 node;
 };
 
 struct SoA_Field {
@@ -1746,35 +1765,15 @@ void  arena_clear(Arena& arena);
 Temp temp_begin(Arena* arena);
 void temp_end(Temp temp);
 
-ArenaList alloc_arena_list_make(Allocator alloc);
-void alloc_arena_list_clear(ArenaList& arena);
-
 #define alloc_make(alloc, ...) _alloc_make(alloc, AllocParams{.name = __func__, .file = __FILE__, .line = __LINE__, __VA_ARGS__})
 Alloc _alloc_make(Allocator alloc, AllocParams params);
 void alloc_destroy(Alloc alloc);
 
-////////////////////////////////////////////////////////////////////////
-// tlsf TODO: implement
-
-// #define BinCount      32
-// #define SubbinCount   32
-// #define MinAllocation 128
-// struct TLSF_Allocator {
-//   u32 bin_bitmap;
-//   u32 sub_bin_bitmaps[BinCount];
-// };
-// TLSF_Allocator tlsf_init();
-// u8* tlsf_alloc(TLSF_Allocator& allocator, u64 size, u64 alignment = MEM_DEFAULT_ALIGNMENT);
-
-////////////////////////////////////////////////////////////////////////
-// atlas TODO: implement
-
-////////////////////////////////////////////////////////////////////////
-// GPU segregated pow2 list
-GpuAllocSegList gpu_alloc_seglist_make(Allocator alloc);
-GpuMemId gpu_alloc_seglist_alloc(GpuAllocSegList& a, u64 size, u64 align = MEM_DEFAULT_ALIGNMENT);
-void gpu_alloc_seglist_free(GpuAllocSegList& a, GpuMemId h);
-u64 gpu_alloc_seglist_get(GpuAllocSegList& a, GpuMemId h);
+TlsfOOB tlsf_oob_make(u32 size, TlsfNodeOOB* nodes, u32 node_cap);
+void tlsf_oob_reset(TlsfOOB& t);
+TlsfAllocOOB tlsf_oob_alloc(TlsfOOB& t, u32 size, u32 align);
+void tlsf_oob_free(TlsfOOB& t, u32 idx);
+b32 tlsf_oob_validate(TlsfOOB& t);
 
 #define SoA_push_field(ptr) {(void**)(&ptr), sizeof(*ptr), alignof(*ptr)}
 
@@ -2228,8 +2227,6 @@ template<typename T, i32 N, typename Handle> Handle pool_get_handle(Pool<T, N, H
 template<typename T, i32 N, typename Handle> void pool_clear(Pool<T, N, Handle>& p) {
 	p.head = 0;
 	p.max_idx = 0;
-	ArrayZero(p.data);
-	ArrayZero(p.gens);
 }
 template <typename T, i32 N, typename Handle> b32 pool_is_valid_handle(Pool<T, N, Handle>& p, Handle h) {
 	if(h.idx == 0 || p.gens[h.idx] != h.gen) {

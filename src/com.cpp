@@ -122,9 +122,9 @@ MeshDesc load_mesh(Allocator arena, String name) {
 	String format = str_skip_last_dot(name);
 	MeshDesc res = {};
 	if(str_match(format, "glb")) {
-		res = load_gltf(arena, name, true).mesh;
+		res = load_gltf(arena, name, true).meshes[0];
 	} else if(str_match(format, "gltf")) {
-		res = load_gltf(arena, name, false).mesh;
+		res = load_gltf(arena, name, false).meshes[0];
 	} else if(str_match(format, "obj")) {
 		res = load_obj(arena, name);
 	} else {
@@ -632,13 +632,13 @@ void r_init() {
 		Gfx_BufferDesc buffers[] = {
 			{
 				.binding = Bindings::Vertices,
-				.size = MB(1),
+				.size = MB(20),
 				.gpu = true,
 				.out_buffer = &g.gpu_vert_buf,
 			},
 			{
 				.binding = Bindings::Indices,
-				.size = MB(1),
+				.size = MB(10),
 				.gpu = true,
 				.out_buffer = &g.gpu_index_buf,
 			},
@@ -797,7 +797,7 @@ void r_end() {
 		} 
 
 		// Update font?
-		Loop(i, queue_count(g.waiting_fonts)) {
+		if(u32 count = queue_count(g.waiting_fonts)) Loop(i, count) {
 			if(g.textures[queue_front(g.waiting_fonts).font.texture.idx].is_ready) {
 				var slot = queue_pop(g.waiting_fonts);
 				g.fonts[slot.id.idx] = slot.font;
@@ -1577,50 +1577,6 @@ void test_arena_alloc() {
 	arena_destroy(arena);
 }
 
-void test_arena_list_alloc() {
-	Scratch scratch;
-	ArenaList arena(scratch);
-	Array<u8*, TEST_SAMPLES> arr = {};
-	Array<u32, TEST_SAMPLES> sizes = {};
-	Array<u32, TEST_SAMPLES> values = {};
-
-	Loop(i, TEST_SAMPLES) {
-		u32 size = rand_u32(8, KB(1));
-		u64 align = ArrayRand(test_alignments);
-		arr[i] = push_buffer(arena, size, align);
-		sizes[i] = size;
-		values[i] = rand_u32(0, 255);
-		MemSet(arr[i], values[i], size);
-	}
-	Loop(i, TEST_SAMPLES) {
-		u8* buf = arr[i];
-		u32 size = sizes[i];
-		u32 value = values[i];
-		Loop(j, size) {
-			AssertAlways(buf[j] == value);
-		}
-	}
-	alloc_arena_list_clear(arena);
-
-	Loop(i, TEST_SAMPLES) {
-		u32 size = rand_u32(8, KB(1));
-		u64 align = ArrayRand(test_alignments);
-		arr[i] = push_buffer(arena, size, align);
-		sizes[i] = size;
-		values[i] = rand_u32(0, 255);
-		MemSet(arr[i], values[i], size);
-	}
-	Loop(i, TEST_SAMPLES) {
-		u8* buf = arr[i];
-		u32 size = sizes[i];
-		u32 value = values[i];
-		Loop(j, size) {
-			AssertAlways(buf[j] == value);
-		}
-	}
-	alloc_arena_list_clear(arena);
-}
-
 void test_alloc() {
 	Scratch scratch;
 	Alloc alloc = alloc_make(scratch);
@@ -1659,36 +1615,37 @@ void test_alloc() {
 	}
 }
 
-void test_gpu_seglist_alloc() {
+void test_tlsf_oob_alloc() {
 	Scratch scratch;
-	GpuAllocSegList alloc = {.cap = MB(1)};
-	alloc = gpu_alloc_seglist_make(scratch);
-	Array<GpuMemId, TEST_SAMPLES> arr = {};
+	var nodes = push_slice(scratch, TlsfNodeOOB, KB(1));
+	var alloc = tlsf_oob_make(MB(1), nodes.data, KB(1));
+	Array<TlsfAllocOOB, TEST_SAMPLES> arr = {};
 
 	Loop(i, TEST_SAMPLES) {
 		u64 size = rand_u32(8, KB(1));
 		u64 align = ArrayRand(test_alignments);
-		array_push(arr, gpu_alloc_seglist_alloc(alloc, size, align));
+		array_push(arr, tlsf_oob_alloc(alloc, size, align));
 	}
 	Array<u32, TEST_SAMPLES> indices = {};
 	Loop(i, TEST_SAMPLES) array_push(indices, (u32)i);
 	rand_shuffle(slice(indices));
 	Loop(i, TEST_SAMPLES) {
-		gpu_alloc_seglist_free(alloc, arr[indices[i]]);
+		tlsf_oob_free(alloc, arr[indices[i]].node);
 	}
 
 	array_clear(arr);
 	Loop(i, TEST_SAMPLES) {
 		u64 size = rand_u32(8, KB(1));
 		u64 align = ArrayRand(test_alignments);
-		array_push(arr, gpu_alloc_seglist_alloc(alloc, size, align));
+		array_push(arr, tlsf_oob_alloc(alloc, size, align));
 	}
 	array_clear(indices);
 	Loop(i, TEST_SAMPLES) array_push(indices, (u32)i);
 	rand_shuffle(slice(indices));
 	Loop(i, TEST_SAMPLES) {
-		gpu_alloc_seglist_free(alloc, arr[indices[i]]);
+		tlsf_oob_free(alloc, arr[indices[i]].node);
 	}
+	Assert(tlsf_oob_validate(alloc));
 }
 
 void test_object_pool() {
@@ -1979,15 +1936,15 @@ void test_js() {
 		Info("%s", name);
 		b32 visible = 0; AssertOk(js_bool(root, "visible", &visible));
 		Info("%u", visible);
-		Slice<JsVal*> pos = {}; AssertOk(js_array(root, "pos", &pos));
+		Slice<JsVal> pos = {}; AssertOk(js_array(root, "pos", &pos));
 		Loop(i, pos.count) {
-			Info("%f", pos[i]->number);
+			Info("%f", pos[i].number);
 		}
 		{
 			JsObj material = {}; AssertOk(js_obj(root, "material", &material));
-			Slice<JsVal*> color = {}; AssertOk(js_array(material, "color", &color));
+			Slice<JsVal> color = {}; AssertOk(js_array(material, "color", &color));
 			Loop(i, color.count) {
-				Info("%f", color[i]->number);
+				Info("%f", color[i].number);
 			}
 			f64 roughness = 0; AssertOk(js_f64(material, "roughness", &roughness));
 			Info("%f", roughness);
@@ -2032,8 +1989,8 @@ void test() {
 	// os_exit(0);
 	test_alloc();
 	test_arena_alloc();
-	test_arena_list_alloc();
-	test_gpu_seglist_alloc();
+	test_tlsf_oob_alloc();
+	test_tlsf_oob_alloc();
 	test_object_pool();
 	// test_handle_darray();
 	test_id_pool();
@@ -2927,16 +2884,17 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 	String bin_path = push_strf(scratch, "%s.bin", str_chop_last_dot(path));
 	Slice data = is_glb ? cursor : os_file_path_read_all(scratch, bin_path);
 
-	u32 vert_count = 0;
-	u32 indices_count = 0;
-	u32 index_type = 0; 
-	Slice<v3> pos = {};
-	Slice<v3> norm = {};
-	Slice<v2> texcoord = {};
-	Slice<u32> indices32_view = {};
-	Slice<u16> indices16_view = {};
-	Slice<v4u8> joints = {};
-	Slice<v4> weights = {};
+	// u32 vert_count = 0;
+	// u32 indices_count = 0;
+	// u32 indices_type = 0; 
+	// Slice<v3> pos = {};
+	// Slice<v3> norm = {};
+	// Slice<v2> texcoord = {};
+	// Slice<u32> indices32_view = {};
+	// Slice<u16> indices16_view = {};
+	// Slice<v4u8> joints = {};
+	// Slice<v4> weights = {};
+	Slice<MeshDesc> meshes_desc = {};
 	Slice<m4x4> inv_matrices = {};
 	Slice<Bone> bones = {};
 	Slice<Channel> channels = {};
@@ -2944,9 +2902,9 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 
 	JsParser p = js_parse_make(scratch, json);
 	JsObj root = js_parse(p).obj;
-	Slice<JsVal*> nodes; AssertOk(js_array(root, "nodes", &nodes));
-	Slice<JsVal*> accessors; AssertOk(js_array(root, "accessors", &accessors));
-	Slice<JsVal*> buffer_views; AssertOk(js_array(root, "bufferViews", &buffer_views));
+	Slice<JsVal> nodes; AssertOk(js_array(root, "nodes", &nodes));
+	Slice<JsVal> accessors; AssertOk(js_array(root, "accessors", &accessors));
+	Slice<JsVal> buffer_views; AssertOk(js_array(root, "bufferViews", &buffer_views));
 
 	///////////////////////////////////
 	// Mesh
@@ -2954,110 +2912,139 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 		Slice<v3> pos;
 		Slice<v3> norm;
 		Slice<v2> texcoord;
-		Slice<u32> indices;
-		Slice<v3> joints;
-		Slice<v3> weights;
+		u32 indices_type;
+		u32 indices_count;
+		Slice<u32> indices32;
+		Slice<u16> indices16;
+		Slice<v4u8> joints;
+		Slice<v4> weights;
 	};
-	// var make_attributes = [](JsVal mesh){
-	// };
-	{
-		Slice<JsVal*> meshes; AssertOk(js_array(root, "meshes", &meshes));
-		JsObj first_mesh = meshes[0]->obj;
-		Slice<JsVal*> primitives; AssertOk(js_array(first_mesh, "primitives", &primitives));
-		JsObj first_primitive = primitives[0]->obj;
+	var make_attributes = [&](JsObj mesh)->Attributes{
+		Attributes res = {};
+		Slice<JsVal> primitives; AssertOk(js_array(mesh, "primitives", &primitives));
+		JsObj first_primitive = primitives[0].obj;
 		JsObj attributes; AssertOk(js_obj(first_primitive, "attributes", &attributes));
 		{
-			u32 pos_attribute; AssertOk(js_u32(attributes, "POSITION", &pos_attribute));
-			JsObj pos_accessor = accessors[pos_attribute]->obj;
-			u32 buffer_view; AssertOk(js_u32(pos_accessor, "bufferView", &buffer_view));
-			AssertOk(js_u32(pos_accessor, "count", &vert_count));
-			JsObj pos_buffer_view = buffer_views[buffer_view]->obj;
-			u64 size; AssertOk(js_u64(pos_buffer_view, "byteLength", &size));
-			u64 off; AssertOk(js_u64(pos_buffer_view, "byteOffset", &off));
-			pos = slice_reinterpret<v3>(slice_n(data, off, size));
+			u32 attribute; AssertOk(js_u32(attributes, "POSITION", &attribute));
+			JsObj accessor = accessors[attribute].obj;
+			u64 count; AssertOk(js_u64(accessor, "count", &count));
+			u32 buffer_view; AssertOk(js_u32(accessor, "bufferView", &buffer_view));
+			JsObj buffer_view_obj = buffer_views[buffer_view].obj;
+			u64 off = 0; js_u64(buffer_view_obj, "byteOffset", &off);
+			res.pos = {(v3*)(data.data+off), count};
 		}
 		{
-			u32 norm_attribute; AssertOk(js_u32(attributes, "NORMAL", &norm_attribute));
-			JsObj norm_accessor = accessors[norm_attribute]->obj;
-			u32 buffer_view; AssertOk(js_u32(norm_accessor, "bufferView", &buffer_view));
-			JsObj norm_buffer_view = buffer_views[buffer_view]->obj;
-			u64 size; js_u64(norm_buffer_view, "byteLength", &size);
-			u64 off; js_u64(norm_buffer_view, "byteOffset", &off);
-			norm = slice_reinterpret<v3>(slice_n(data, off, size));
+			u32 attribute; AssertOk(js_u32(attributes, "NORMAL", &attribute));
+			JsObj accessor = accessors[attribute].obj;
+			u64 count; AssertOk(js_u64(accessor, "count", &count));
+			u32 buffer_view; AssertOk(js_u32(accessor, "bufferView", &buffer_view));
+			JsObj buffer_view_obj = buffer_views[buffer_view].obj;
+			u64 off = 0; js_u64(buffer_view_obj, "byteOffset", &off);
+			res.norm = {(v3*)(data.data+off), count};
 		}
 		{
-			u32 texcoord_attribute; AssertOk(js_u32(attributes, "TEXCOORD_0", &texcoord_attribute));
-			JsObj texcoord_accessor = accessors[texcoord_attribute]->obj;
-			u32 buffer_view; AssertOk(js_u32(texcoord_accessor, "bufferView", &buffer_view));
-			JsObj texcoord_buffer_view = buffer_views[buffer_view]->obj;
-			u64 size; js_u64(texcoord_buffer_view, "byteLength", &size);
-			u64 off; js_u64(texcoord_buffer_view, "byteOffset", &off);
-			texcoord = slice_reinterpret<v2>(slice_n(data, off, size));
+			u32 attribute; AssertOk(js_u32(attributes, "TEXCOORD_0", &attribute));
+			JsObj accessor = accessors[attribute].obj;
+			u64 count; AssertOk(js_u64(accessor, "count", &count));
+			u32 buffer_view; AssertOk(js_u32(accessor, "bufferView", &buffer_view));
+			JsObj buffer_view_obj = buffer_views[buffer_view].obj;
+			u64 off = 0; js_u64(buffer_view_obj, "byteOffset", &off);
+			res.texcoord = {(v2*)(data.data+off), count};
 		}
 		{
-			u32 indices_attribute; AssertOk(js_u32(first_primitive, "indices", &indices_attribute));
-			JsObj indices_accessor = accessors[indices_attribute]->obj;
-			AssertOk(js_u32(indices_accessor, "bufferView", &index_type));
-			u32 buffer_view; AssertOk(js_u32(indices_accessor, "bufferView", &buffer_view));
-			AssertOk(js_u32(indices_accessor, "count", &indices_count));
-			JsObj indices_buffer_view = buffer_views[buffer_view]->obj;
-			u64 size; Assert(js_u64(indices_buffer_view, "byteLength", &size));
-			u64 off; Assert(js_u64(indices_buffer_view, "byteOffset", &off));
-			if(index_type == Gltf_u32) {
-				indices32_view = slice_reinterpret<u32>(slice_n(data, off, size));
+			u32 attribute; AssertOk(js_u32(first_primitive, "indices", &attribute));
+			JsObj accessor = accessors[attribute].obj;
+			AssertOk(js_u32(accessor, "bufferView", &res.indices_type));
+			u64 count; AssertOk(js_u64(accessor, "count", &count));
+			u32 buffer_view; AssertOk(js_u32(accessor, "bufferView", &buffer_view));
+			AssertOk(js_u32(accessor, "count", &res.indices_count));
+			JsObj buffer_view_obj = buffer_views[buffer_view].obj;
+			u64 size; Assert(js_u64(buffer_view_obj, "byteLength", &size));
+			u64 off = 0; js_u64(buffer_view_obj, "byteOffset", &off);
+			if(res.indices_type == Gltf_u32) {
+				res.indices32 = {(u32*)(data.data+off), count};
 			} else {
-				indices16_view = slice_reinterpret<u16>(slice_n(data, off, size));
+				res.indices16 = {(u16*)(data.data+off), count};
 			}
 		}
 		{
-			u32 joints_attribute = 0;
-			if(js_u32(attributes, "JOINTS_0", &joints_attribute)) {
-				JsObj joints_accessor = accessors[joints_attribute]->obj;
-				u32 buffer_view; AssertOk(js_u32(joints_accessor, "bufferView", &buffer_view));
-				JsObj joints_buffer_view = buffer_views[buffer_view]->obj;
-				u64 size; AssertOk(js_u64(joints_buffer_view, "byteLength", &size));
-				u64 offset; AssertOk(js_u64(joints_buffer_view, "byteOffset", &offset));
-				joints = slice_reinterpret<v4u8>(slice_n(data, offset, size));
+			u32 attribute = 0;
+			if(js_u32(attributes, "JOINTS_0", &attribute)) {
+				JsObj accessor = accessors[attribute].obj;
+				u32 buffer_view; AssertOk(js_u32(accessor, "bufferView", &buffer_view));
+				u64 count; AssertOk(js_u64(accessor, "count", &count));
+				JsObj buffer_view_obj = buffer_views[buffer_view].obj;
+				u64 off; AssertOk(js_u64(buffer_view_obj, "byteOffset", &off));
+				res.joints = {(v4u8*)(data.data+off), count};
 			}
 		}
 		{
-			u32 weights_attribute = 0;
-			if(js_u32(attributes, "WEIGHTS_0", &weights_attribute)) {
-				JsObj weights_accessor = accessors[weights_attribute]->obj;
-				u32 buffer_view; AssertOk(js_u32(weights_accessor, "bufferView", &buffer_view));
-				JsObj weights_buffer_view = buffer_views[buffer_view]->obj;
-				u64 size; AssertOk(js_u64(weights_buffer_view, "byteLength", &size));
-				u64 off; AssertOk(js_u64(weights_buffer_view, "byteOffset", &off));
-				weights = slice_reinterpret<v4>(slice_n(data, off, size));
+			u32 attribute = 0;
+			if(js_u32(attributes, "WEIGHTS_0", &attribute)) {
+				JsObj accessor = accessors[attribute].obj;
+				u32 buffer_view; AssertOk(js_u32(accessor, "bufferView", &buffer_view));
+				u64 count; AssertOk(js_u64(accessor, "count", &count));
+				JsObj buffer_view_obj = buffer_views[buffer_view].obj;
+				u64 size; AssertOk(js_u64(buffer_view_obj, "byteLength", &size));
+				u64 off; AssertOk(js_u64(buffer_view_obj, "byteOffset", &off));
+				res.weights = {(v4*)(data.data+off), count};
 			}
 		}
+		return res;
+	};
+	Slice<JsVal> meshes; AssertOk(js_array(root, "meshes", &meshes));
+	
+	meshes_desc = push_slice_zero(arena, MeshDesc, meshes.count);
+	var atts = push_slice(arena, Attributes, meshes.count);
+	Loop(i, meshes.count) {
+		var& att = atts[i];
+		att = make_attributes(meshes[i].obj);
+		Slice vertices = push_slice(arena, Vertex, att.pos.count);
+		Slice indices = push_slice(arena, u32, att.indices_count);
+		Loop(i, indices.count) {
+			if(att.indices_type == Gltf_u32) {
+				indices[i] = att.indices32[i];
+			} else {
+				indices[i] = att.indices16[i];
+			}
+		}
+		Loop(i, vertices.count) {
+			vertices[i] = {
+				.pos = att.pos[i],
+				.norm = v3_to_v3i8(att.norm[i]),
+				.uv = att.texcoord[i],
+			};
+		}
+		var& m = meshes_desc[i];
+		m.vertices = vertices;
+		m.indices = indices;
 	}
 
 	///////////////////////////////////
 	// Skin
 	{
-		Slice<JsVal*> skins = {};
+		Slice<JsVal> skins = {};
 		if(js_array(root, "skins", &skins)) {
-			JsObj first_skin = skins[0]->obj;
+			JsObj first_skin = skins[0].obj;
 			u32 inv_matrices_attribute; AssertOk(js_u32(first_skin, "inverseBindMatrices", &inv_matrices_attribute));
-			JsObj inv_matrices_accessor = accessors[inv_matrices_attribute]->obj;
+			JsObj inv_matrices_accessor = accessors[inv_matrices_attribute].obj;
 			u32 buffer_view; AssertOk(js_u32(inv_matrices_accessor, "bufferView", &buffer_view));
-			JsObj inv_matrices_buffer_view = buffer_views[buffer_view]->obj;
+			JsObj inv_matrices_buffer_view = buffer_views[buffer_view].obj;
 			u64 size; AssertOk(js_u64(inv_matrices_buffer_view, "byteLength", &size));
 			u64 off; AssertOk(js_u64(inv_matrices_buffer_view, "byteOffset", &off));
 			var matrices = slice_reinterpret<m4x4>(slice_n(data, off, size));
 			inv_matrices = push_slice(arena, m4x4, matrices.count);
-			Slice<JsVal*> joints_indices; AssertOk(js_array(first_skin, "joints", &joints_indices));
+			Slice<JsVal> joints_indices; AssertOk(js_array(first_skin, "joints", &joints_indices));
 			bones = push_slice(arena, Bone, joints_indices.count);
 			u32 bone_count = 0;
 			u32 node_to_joint[255] = {};
 			u32 node_to_bone[255] = {};
 			Loop(joint_idx, joints_indices.count) {
-				u32 node_idx = joints_indices[joint_idx]->number;
+				u32 node_idx = joints_indices[joint_idx].number;
 				node_to_joint[node_idx] = joint_idx;
 			}
 			var dfs = [&](var dfs, u32 node_idx, u32 parent_idx) -> void {
-				JsObj node = nodes[node_idx]->obj;
+				JsObj node = nodes[node_idx].obj;
 				u32 bone_idx = bone_count++;
 				node_to_bone[node_idx] = bone_idx;
 				inv_matrices[bone_idx] = matrices[node_to_joint[node_idx]];
@@ -3071,21 +3058,21 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 				js_v3(node, "scale", &trans.scale);
 				bones[bone_idx].local = trans;
 				bones[bone_idx].parent = parent_idx;
-				Slice<JsVal*> children = {}; js_array(node, "children", &children);
+				Slice<JsVal> children = {}; js_array(node, "children", &children);
 				Loop(i, children.count) {
-					dfs(dfs, children[i]->number, bone_idx);
+					dfs(dfs, children[i].number, bone_idx);
 				}
 			};
-			dfs(dfs, joints_indices[0]->number, 0);
+			dfs(dfs, joints_indices[0].number, 0);
 
 			// Animation
-			Slice<JsVal*> animations = {};
+			Slice<JsVal> animations = {};
 			if(js_array(root, "animations", &animations)) {
-				var first_animation = animations[0]->obj;
-				Slice<JsVal*> js_channels; AssertOk(js_array(first_animation, "channels", &js_channels));
+				var first_animation = animations[0].obj;
+				Slice<JsVal> js_channels; AssertOk(js_array(first_animation, "channels", &js_channels));
 				channels = push_slice(arena, Channel, js_channels.count);
 				Loop(i, js_channels.count) {
-					var channel = js_channels[i]->obj;
+					var channel = js_channels[i].obj;
 					u32 sampler; AssertOk(js_u32(channel, "sampler", &sampler));
 					JsObj target; AssertOk(js_obj(channel, "target", &target));
 					u32 node; AssertOk(js_u32(target, "node", &node));
@@ -3102,14 +3089,14 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 					} else InvalidPath;
 					channels[i].path = anim_path;
 				}
-				Slice<JsVal*> js_samplers; AssertOk(js_array(first_animation, "samplers", &js_samplers));
+				Slice<JsVal> js_samplers; AssertOk(js_array(first_animation, "samplers", &js_samplers));
 				samplers = push_slice(arena, Sampler, js_samplers.count);
 				Loop(i, js_samplers.count) {
-					var sampler = js_samplers[i]->obj;
+					var sampler = js_samplers[i].obj;
 					u32 input; AssertOk(js_u32(sampler, "input", &input));
-					JsObj input_accessor = accessors[input]->obj;
+					JsObj input_accessor = accessors[input].obj;
 					u32 input_buffer_view; AssertOk(js_u32(input_accessor, "bufferView", &input_buffer_view));
-					JsObj js_input_buffer_view = buffer_views[input_buffer_view]->obj;
+					JsObj js_input_buffer_view = buffer_views[input_buffer_view].obj;
 					u64 input_size; AssertOk(js_u64(js_input_buffer_view, "byteLength", &input_size));
 					u64 input_off; AssertOk(js_u64(js_input_buffer_view, "byteOffset", &input_off));
 					var timestamps = slice_reinterpret<f32>(slice_n(data, input_off, input_size));
@@ -3117,10 +3104,10 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 					samplers[i].count = timestamps.count;
 
 					u32 output; AssertOk(js_u32(sampler, "output", &output));
-					JsObj output_accessor = accessors[output]->obj;
+					JsObj output_accessor = accessors[output].obj;
 					u32 output_buffer_view; AssertOk(js_u32(output_accessor, "bufferView", &output_buffer_view));
 					String output_type; AssertOk(js_str(output_accessor, "type", &output_type));
-					JsObj js_output_buffer_view = buffer_views[output_buffer_view]->obj;
+					JsObj js_output_buffer_view = buffer_views[output_buffer_view].obj;
 					u64 output_size; AssertOk(js_u64(js_output_buffer_view, "byteLength", &output_size));
 					u64 output_off; AssertOk(js_u64(js_output_buffer_view, "byteOffset", &output_off));
 					if(str_match(output_type, "VEC3")) {
@@ -3135,39 +3122,20 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 		}
 	}
 
-	Slice vertices = push_slice(arena, Vertex, vert_count);
-	Slice indices = push_slice(arena, u32, indices_count);
-	Loop(i, indices.count) {
-		if(index_type == Gltf_u32) {
-			indices[i] = indices32_view[i];
-		} else {
-			indices[i] = indices16_view[i];
-		}
-	}
-	Loop(i, vertices.count) {
-		vertices[i] = {
-			.pos = pos[i],
-			.norm = v3_to_v3i8(norm[i]),
-			.uv = texcoord[i],
-		};
-	}
-	if(joints.count) {
-		Loop(i, vertices.count) {
-			vertices[i].joints.v[0] = joints[i].v[0];
-			vertices[i].joints.v[1] = joints[i].v[1];
-			vertices[i].joints.v[2] = joints[i].v[2];
-			vertices[i].joints.v[3] = joints[i].v[3];
-			vertices[i].weights.v[0] = weights[i].v[0] * 255;
-			vertices[i].weights.v[1] = weights[i].v[1] * 255;
-			vertices[i].weights.v[2] = weights[i].v[2] * 255;
-			vertices[i].weights.v[3] = weights[i].v[3] * 255;
+	if(atts[0].joints.count) {
+		Loop(i, meshes_desc[0].vertices.count) {
+			meshes_desc[0].vertices[i].joints.v[0] = atts[0].joints[i].v[0];
+			meshes_desc[0].vertices[i].joints.v[1] = atts[0].joints[i].v[1];
+			meshes_desc[0].vertices[i].joints.v[2] = atts[0].joints[i].v[2];
+			meshes_desc[0].vertices[i].joints.v[3] = atts[0].joints[i].v[3];
+			meshes_desc[0].vertices[i].weights.v[0] = atts[0].weights[i].v[0] * 255;
+			meshes_desc[0].vertices[i].weights.v[1] = atts[0].weights[i].v[1] * 255;
+			meshes_desc[0].vertices[i].weights.v[2] = atts[0].weights[i].v[2] * 255;
+			meshes_desc[0].vertices[i].weights.v[3] = atts[0].weights[i].v[3] * 255;
 		}
 	}
 	GltfInfo res = {
-		.mesh = {
-			.vertices = vertices,
-			.indices = indices,
-		},
+		.meshes = meshes_desc,
 		.bones = bones,
 		.inv_matrices = inv_matrices,
 		.anim = {
@@ -3304,15 +3272,14 @@ JsVal js_parse(JsParser& p) {
 		case 'n': p.cursor += 4; return {.type = JsType_Null};
 		case '[': {
 			p.cursor++;
-			var arr = array_make<JsVal*>(p.arena);
+			var arr = array_make<JsVal>(p.arena);
 			For {
 				js_skip_ws(p);
 				if(js_peek(p) == ']') {
 					p.cursor++;
 					break;
 				}
-				JsVal* val = push_struct(p.arena, JsVal);
-				*val = js_parse(p);
+				var val = js_parse(p);
 				// switch(val->type) {
 				//   case JsType_Null: Info("null"); break;
 				//   case JsType_Bool: Info("bool: %u", val->boolean); break;
@@ -3346,8 +3313,7 @@ JsVal js_parse(JsParser& p) {
 				js_skip_ws(p);
 				Assert(js_peek(p) == ':');
 				p.cursor++;
-				JsVal* val = push_struct(p.arena, JsVal);
-				*val = js_parse(p);
+				var val = js_parse(p);
 				// switch(val->type) {
 				//   case JsType_Null: Info("null"); break;
 				//   case JsType_Bool: Info("bool: %u", val->boolean); break;
@@ -3374,7 +3340,7 @@ JsVal js_parse(JsParser& p) {
 b32 js_val(JsVal val, String key, JsVal* out) {
 	for(var& field : val.obj.fields) {
 		if(str_match(field.key, key)) {
-			*out = *field.val;
+			*out = field.val;
 			return true;
 		}
 	}
@@ -3428,7 +3394,7 @@ b32 js_str(JsObj obj, String key, String* out) {
 	}
 	return false;
 }
-b32 js_array(JsObj obj, String key, Slice<JsVal*>* out) {
+b32 js_array(JsObj obj, String key, Slice<JsVal>* out) {
 	JsVal v = {};
 	if(js_val({.obj = obj}, key, &v)) {
 		*out = v.array;
@@ -3449,7 +3415,7 @@ b32 js_v3(JsObj obj, String key, v3* out) {
 	if(js_val({.obj = obj}, key, &v)) {
 		v3 res = {};
 		Loop(i, 3) {
-			res.v[i] = v.array[i]->number;
+			res.v[i] = v.array[i].number;
 		}
 		*out = res;
 		return true;
@@ -3461,7 +3427,7 @@ b32 js_v4(JsObj obj, String key, v4* out) {
 	if(js_val({.obj = obj}, key, &v)) {
 		v4 res = {};
 		Loop(i, 4) {
-			res.v[i] = v.array[i]->number;
+			res.v[i] = v.array[i].number;
 		}
 		*out = res;
 		return true;
@@ -3876,7 +3842,7 @@ u32 add_observation(ThingId observer, ThingId observed) {
 		u64 key = observer.idx;
 		u32 first = 0;
 		if(map_get(first_observed, key, &first)) {
-			DLL_list_push(observations.data, first, idx, next_observed, prev_observed);
+			DLL_insert_before(observations.data, first, idx, next_observed, prev_observed);
 		} else {
 			DLL_list_init(observations.data, idx, next_observed, prev_observed);
 			map_set(first_observed, key, idx);
@@ -3886,7 +3852,7 @@ u32 add_observation(ThingId observer, ThingId observed) {
 		u64 key = observed.idx;
 		u32 first = 0;
 		if(map_get(first_observer, key, &first)) {
-			DLL_list_push(observations.data, first, idx, next_observer, prev_observer);
+			DLL_insert_before(observations.data, first, idx, next_observer, prev_observer);
 		} else {
 			DLL_list_init(observations.data, idx, next_observer, prev_observer);
 			map_set(first_observer, key, idx);
@@ -3898,7 +3864,7 @@ u32 add_observation(ThingId observer, ThingId observed) {
 void remove_observation(u32 idx) {
 	var o = observations.data[idx];
 	{
-		DLL_list_remove(observations.data, idx, next_observed, prev_observed);
+		DLL_remove(observations.data, idx, next_observed, prev_observed);
 		u64 key = o.observer.idx;
 		u32 first = 0;
 		map_get(first_observed, key, &first);
@@ -3911,7 +3877,7 @@ void remove_observation(u32 idx) {
 		}
 	}
 	{
-		DLL_list_remove(observations.data, idx, next_observer, prev_observer);
+		DLL_remove(observations.data, idx, next_observer, prev_observer);
 		u64 key = o.observed.idx;
 		u32 first = 0;
 		map_get(first_observer, key, &first);
@@ -3970,21 +3936,6 @@ void check_observer_observed() {
 }
 
 void init() {
-	// Info("%u", u8(-255.0f));
-	// u8 v0 = f32_to_u8(0.3);
-	// u8 v1 = f32_to_u8(-0.3);
-	// u8 v2 = f32_to_u8(0.7);
-	// u8 v3 = f32_to_u8(-0.7);
-	// Info("%u", v0);
-	// Info("%u", v1);
-	// Info("%u", v2);
-	// sizeof(Vertex);
-	// Info("%u", v3);
-	// Info("%f", u8_to_f32(v0));
-	// Info("%f", u8_to_f32(v1));
-	// Info("%f", u8_to_f32(v2));
-	// Info("%f", u8_to_f32(v3));
-
 	Scratch scratch;
 	var& g = *st;
 	
@@ -4321,10 +4272,17 @@ void init_game() {
 		// load_mesh(Mesh_T, "t.gltf");
 		{
 			var info = load_gltf(g.arena, "t1.gltf", false);
-			mesh_set(Mesh_T, make_mesh(info.mesh));
+			mesh_set(Mesh_T, make_mesh(info.meshes[0]));
 			array_push_elems(g.bones, info.bones);
 			array_push_elems(g.inv_matrices, info.inv_matrices);
 			g.anim = info.anim;
+		}
+		{
+			// var info = load_gltf(g.arena, "scene.gltf", false);
+			// g.scene_meshes = push_slice(g.arena, MeshId, info.meshes.count);
+			// Loop(i, g.scene_meshes.count) {
+			// 	g.scene_meshes[i] = make_mesh_idle(info.meshes[i]);
+			// }
 		}
 
 		// Texture
