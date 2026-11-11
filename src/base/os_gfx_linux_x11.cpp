@@ -305,7 +305,7 @@ void os_gfx_init() {
 		100, 100, 800, 600,
 		1, XCB_WINDOW_CLASS_INPUT_OUTPUT, g.screen->root_visual, mask, values);
 	const char* title = "XCB Window Example";
-	xcb_change_property(g.connection, XCB_PROP_MODE_REPLACE, g.window, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, cstr_length(title), title);
+	xcb_change_property(g.connection, XCB_PROP_MODE_REPLACE, g.window, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, cstr_len(title), title);
 	xcb_intern_atom_cookie_t protocols_cookie = xcb_intern_atom(g.connection, 1, 12, "WM_PROTOCOLS");
 	xcb_intern_atom_reply_t* protocols_reply = xcb_intern_atom_reply(g.connection, protocols_cookie, null);
 	xcb_intern_atom_cookie_t delete_cookie = xcb_intern_atom(g.connection, 0, 16, "WM_DELETE_WINDOW");

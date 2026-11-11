@@ -1643,30 +1643,29 @@ u64 gfx_update_buffer(Gfx_Buffer buf, u64 off, Slice<u8> data, b32 sync) {
 	}
 }
 
-u64 gfx_update_vert_index(Gfx_Buffer vert_buf, u64 vert_off, Gfx_Buffer index_buf, u64 index_off, Slice<u8> vert_data, Slice<u8> index_data) {
+b32 gfx_update_vert_index(Gfx_Buffer vert_buf, u64 vert_off, Gfx_Buffer index_buf, u64 index_off, Slice<u8> vert_data, Slice<u8> index_data, u64* out_counter) {
 	var& g = st->gfx;
-	For {
-		os_mutex_lock(g.stage_mutex);
-		u64 stage_off;
-		if(ring_try_alloc(g.stage_ring, vert_data.size + index_data.size, &stage_off)) {
-			MemCopy(g.stage_ring.base + stage_off, vert_data);
-			MemCopy(g.stage_ring.base + stage_off + vert_data.size, index_data);
-			queue_push(g.stage_cmd_queue, {
-				.type = Gfx_StageType_VertIndex,
-				.stage_off = stage_off,
-				.buf = vert_buf,
-				.buf_off = vert_off,
-				.index_buf = index_buf,
-				.index_off = index_off,
-				.buf_size = vert_data.size,
-				.index_size = index_data.size,
-			});
-			os_mutex_unlock(g.stage_mutex);
-			return atomic_load(&g.stage_next_value);
-		}
+	os_mutex_lock(g.stage_mutex);
+	u64 stage_off;
+	if(ring_try_alloc(g.stage_ring, vert_data.size + index_data.size, &stage_off)) {
+		MemCopy(g.stage_ring.base + stage_off, vert_data);
+		MemCopy(g.stage_ring.base + stage_off + vert_data.size, index_data);
+		queue_push(g.stage_cmd_queue, {
+			.type = Gfx_StageType_VertIndex,
+			.stage_off = stage_off,
+			.buf = vert_buf,
+			.buf_off = vert_off,
+			.index_buf = index_buf,
+			.index_off = index_off,
+			.buf_size = vert_data.size,
+			.index_size = index_data.size,
+		});
 		os_mutex_unlock(g.stage_mutex);
-		os_sleep_ms(1);
+		*out_counter = atomic_load(&g.stage_next_value);
+		return true;
 	}
+	os_mutex_unlock(g.stage_mutex);
+	return false;
 }
 
 void gfx_destroy_image(Gfx_Image img) {

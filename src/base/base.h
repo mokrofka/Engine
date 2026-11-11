@@ -993,10 +993,12 @@ NO_DEBUG f32 rad2deg(f32 radians);
 f32 ceil_to(f32 x, f32 step);
 f32 floor_to(f32 x, f32 step);
 f32 round_to(f32 x, f32 step);
+f32 round_floor(f32 x);
+f32 round_floor_to(f32 x, f32 step);
 
 f64 mod_trunc(f64 x, f64 m);
-f32 mod_floor(f32 x, f32 m);
 NO_DEBUG f32 frac(f32 x);
+f32 frac_to(f32 x, f32 step);
 
 ////////////////////////////////////////////////////////////////////////
 // Color
@@ -1832,23 +1834,23 @@ void dstr_push(Dstring& arr, String str);
 void dstr_pushf(Dstring& arr, String fmt, ...);
 void dstr_clear(Dstring& arr);
 
-u64 cstr_length(const void* c);
+u64 cstr_len(const void* c);
 
 ////////////////////////////////////////////////////////////////////////
 // String <=> Integer Conversions
-u32 u32_length(u32 x);
-u32 u64_length(u64 x);
-u32 u32_write(u8* dest, u32 x);
-u32 u64_write(u8* dest, u64 x);
-u32 i32_length(i32 x);
-u32 i64_length(i64 x);
-u32 i32_write(u8* dest, i32 x);
-u32 i64_write(u8* dest, i64 x);
-u32 f32_length(f32 x, u32 precision);
-u32 f64_length(f64 x, u32 precision);
-u32 f32_write(u8* dest, f32 value, u32 precision);
-u32 f64_write(u8* dest, f64 value, u32 precision);
-void u64_hex_write(u8* dest, u64 value, b32 upper);
+u32 str_to_u32_len(u32 x);
+u32 str_to_u64_len(u64 x);
+u32 str_to_u32(u8* dest, u32 x);
+u32 str_to_u64(u8* dest, u64 x);
+u32 str_to_i32_len(i32 x);
+u32 str_to_i64_len(i64 x);
+u32 str_to_i32(u8* dest, i32 x);
+u32 str_to_i64(u8* dest, i64 x);
+u32 str_to_f32_len(f32 x, u32 precision);
+u32 str_to_f64_len(f64 x, u32 precision);
+u32 str_to_f32(u8* dest, f32 value, u32 precision);
+u32 str_to_f64(u8* dest, f64 value, u32 precision);
+void str_to_u64_hex(u8* dest, u64 value, b32 upper);
 
 u64 u64_from_str(String str);
 i64 i64_from_str(String str);
@@ -1882,8 +1884,8 @@ String str_range(u8* first, u8* one_past_last);
 
 ////////////////////////////////////////////////////////////////////////
 // String Stylization
-String upper_from_str(Allocator arena, String string);
-String lower_from_str(Allocator arena, String string);
+String str_to_upper(Allocator arena, String string);
+String str_to_lower(Allocator arena, String string);
 
 ////////////////////////////////////////////////////////////////////////
 // String Matching
@@ -1917,7 +1919,6 @@ StringNode* str_list_pushf(Allocator arena, StringList& list, String fmt, ...);
 // String utils
 void str_copy(String64& dest, String str);
 String str_next_word(String line, u32& start);
-// String str_read_line(Range* range);
 String str_trim(String string);
 i32 str_index_of_char(String str, u8 c);
 
@@ -2321,73 +2322,110 @@ template<typename T, i32 N> struct Queue {
 	T data[N];
 };
 
-template<typename T, i32 N> void queue_push(Queue<T, N>& q, T elem) {
-	Assert(q.write - q.read < q.cap);
+template<typename T, i32 N> u32 queue_count(Queue<T, N>& q) { return q.write - q.read; }
+template<typename T, i32 N> b32 queue_empty(Queue<T, N>& q) { return q.write == q.read; }
+template<typename T, i32 N> b32 queue_clear(Queue<T, N>& q) { return q.read = q.write; }
+template<typename T, i32 N> b32 queue_full(Queue<T, N>& q) { return q.write - q.read >= q.cap; }
+template<typename T, i32 N> b32 queue_try_push(Queue<T, N>& q, T elem) {
+	if(q.write - q.read >= q.cap) return false;
 	q.data[q.write++ % q.cap] = elem;
+	return true;
+}
+template<typename T, i32 N> b32 queue_try_pop(Queue<T, N>& q, T* out) {
+	if(q.write == q.read) return false;
+	*out = q.data[q.read++ % q.cap];
+	return true;
+}
+template<typename T, i32 N> void queue_push(Queue<T, N>& q, T elem) {
+	AssertOk(queue_try_push(q, elem));
 }
 template<typename T, i32 N> T queue_pop(Queue<T, N>& q) {
-	Assert(q.write != q.read);
-	return q.data[q.read++ % q.cap];
+	T res;
+	AssertOk(queue_try_pop(q, &res));
+	return res;
 }
 template<typename T, i32 N> T queue_back(Queue<T, N>& q) {
-	Assert(q.write - q.read < q.cap);
+	Assert(!queue_empty(q));
 	return q.data[(q.write-1) % q.cap];
 }
 template<typename T, i32 N> T queue_front(Queue<T, N>& q) {
-	Assert(q.write != q.read);
+	Assert(!queue_empty(q));
 	return q.data[(q.read) % q.cap];
 }
-template<typename T, i32 N> u32 queue_count(Queue<T, N>& q) { return q.write - q.read; }
 
 template<typename T, i32 N> struct QueueSPSC {
 	static constexpr u32 cap = N;
 	alignas(64) u32 read;
+	u32 cached_write;
 	alignas(64) u32 write;
+	u32 cached_read;
 	T data[N];
 };
 
+template<typename T, i32 N> u32 queue_count(QueueSPSC<T, N>& q) { return atomic_load_explicit(&q.write, AtomicAcquire) - atomic_load_explicit(&q.read, AtomicAcquire); }
+template<typename T, i32 N> u32 queue_empty(QueueSPSC<T, N>& q) { return queue_count(q) == 0; }
+template<typename T, i32 N> void queue_clear(QueueSPSC<T, N>& q) {
+	u32 w = atomic_load_explicit(&q.write, AtomicAcquire);
+	q.cached_write = w;
+	atomic_store_explicit(&q.read, w, AtomicRelease);
+}
+template<typename T, i32 N> u32 queue_full(QueueSPSC<T, N>& q) { return queue_count(q) >= q.cap; }
+template<typename T, i32 N> b32 queue_try_push(QueueSPSC<T, N>& q, T elem) {
+	u32 w = atomic_load_explicit(&q.write, AtomicRelaxed);
+	if(w - q.cached_read >= q.cap) {
+		q.cached_read = atomic_load_explicit(&q.read, AtomicAcquire);
+		if(w - q.cached_read >= q.cap) return false;
+	}
+	q.data[w % q.cap] = elem;
+	atomic_store_explicit(&q.write, w + 1, AtomicRelease);
+	return true;
+}
+template<typename T, i32 N> b32 queue_try_pop(QueueSPSC<T, N>& q, T* out) {
+	u32 r = atomic_load_explicit(&q.read, AtomicRelaxed);
+	if(r == q.cached_write) {
+		q.cached_write = atomic_load_explicit(&q.write, AtomicAcquire);
+		if(r == q.cached_write) return false;
+	}
+	*out = q.data[r % q.cap];
+	atomic_store_explicit(&q.read, r + 1, AtomicRelease);
+	return true;
+}
 template<typename T, i32 N> void queue_push(QueueSPSC<T, N>& q, T elem) {
-	u32 write = atomic_load_explicit(&q.write, AtomicRelaxed);
-	u32 read = atomic_load_explicit(&q.read, AtomicAcquire);
-	NoOp(read);
-	// if(write - read >= q.cap) return false;
-	Assert(write - read < q.cap);
-	q.data[write % q.cap] = elem;
-	atomic_inc_explicit(&q.write, AtomicRelease);
-	// return true;
+	AssertOk(queue_try_push(q, elem));
 }
 template<typename T, i32 N> T queue_pop(QueueSPSC<T, N>& q) {
-	u32 read = atomic_load_explicit(&q.read, AtomicRelaxed);
-	u32 write = atomic_load_explicit(&q.write, AtomicAcquire);   
-	NoOp(write);
-	// if (read == write) return {};
-	Assert(read != write);
-	T res = q.data[read % q.cap];
-	atomic_inc_explicit(&q.read, AtomicRelease);
-	// return {res, true};
+	T res;
+	AssertOk(queue_try_pop(q, &res));
+	return res;
+}
+template<typename T, i32 N> b32 queue_try_front(QueueSPSC<T, N>& q, T* out) {
+	u32 r = atomic_load_explicit(&q.read, AtomicRelaxed);
+	if(r == q.cached_write) {
+		q.cached_write = atomic_load_explicit(&q.write, AtomicAcquire);
+		if(r == q.cached_write) return false;
+	}
+	*out = q.data[r % q.cap];
+	return true;
+}
+template<typename T, i32 N> b32 queue_try_back(QueueSPSC<T, N>& q, T* out) {
+ u32 w = atomic_load_explicit(&q.write, AtomicRelaxed);
+ if(w == q.cached_read) {
+	 q.cached_read = atomic_load_explicit(&q.read, AtomicAcquire);
+	 if(w == q.cached_read) return false;
+ }
+ *out = q.data[(w-1) % q.cap];
+ return true;
+}
+template<typename T, i32 N> T queue_front(QueueSPSC<T, N>& q) {
+	T res;
+	AssertOk(queue_try_front(q, &res));
 	return res;
 }
 template<typename T, i32 N> T queue_back(QueueSPSC<T, N>& q) {
-	u32 write = atomic_load_explicit(&q.write, AtomicRelaxed);
-	u32 read = atomic_load_explicit(&q.read, AtomicAcquire);
-	NoOp(write);
-	NoOp(read);
-	// if(write - read >= q.cap) return {};
-	Assert(write - read < q.cap);
-	// return {q.data[(q.write-1) % q.cap], true};
-	return q.data[(q.write-1) % q.cap];
+	T res;
+	AssertOk(queue_try_back(q, &res));
+	return res;
 }
-template<typename T, i32 N> T queue_front(QueueSPSC<T, N>& q) {
-	u32 read = atomic_load_explicit(&q.read, AtomicRelaxed);
-	u32 write = atomic_load_explicit(&q.write, AtomicAcquire);   
-	NoOp(write);
-	NoOp(read);
-	// if(read == write) return {};
-	Assert(read != write);
-	// return {q.data[(q.read) % q.cap], true};
-	return q.data[(q.read) % q.cap];
-}
-template<typename T, i32 N> u32 queue_count(QueueSPSC<T, N>& q) { return atomic_load_explicit(&q.write, AtomicAcquire) - atomic_load_explicit(&q.read, AtomicRelaxed); }
 
 template<typename T, i32 N> struct QueueMPMC {
 	static constexpr u32 cap = N;
@@ -2405,7 +2443,7 @@ template<typename T, i32 N> QueueMPMC<T, N> queue_mpmc_make() {
 	Loop(i, N) res.data[i].seq = i;
 	return res;
 }
-template<typename T, i32 N> b32 queue_push(QueueMPMC<T, N>& q, T elem) {
+template<typename T, i32 N> b32 queue_try_push(QueueMPMC<T, N>& q, T elem) {
 	For {
 		u32 write = atomic_load(&q.write);
 		var& slot = q.data[write % q.cap];
@@ -2420,7 +2458,7 @@ template<typename T, i32 N> b32 queue_push(QueueMPMC<T, N>& q, T elem) {
 		} else if(dif < 0) return false; // full
 	}
 }
-template<typename T, i32 N> b32 queue_pop(QueueMPMC<T, N>& q, T* out) {
+template<typename T, i32 N> b32 queue_try_pop(QueueMPMC<T, N>& q, T* out) {
 	For {
 		u32 read = atomic_load(&q.read);
 		var& slot = q.data[read % q.cap];
@@ -2435,6 +2473,14 @@ template<typename T, i32 N> b32 queue_pop(QueueMPMC<T, N>& q, T* out) {
 			}
 		} else if(dif < 0) return false; // empty
 	}
+}
+template<typename T, i32 N> void queue_push(QueueMPMC<T, N>& q, T elem) {
+	AssertOk(queue_try_push(q, elem));
+}
+template<typename T, i32 N> T queue_pop(QueueMPMC<T, N>& q) {
+	T res;
+	AssertOk(queue_try_pop(q, &res));
+	return res;
 }
 
 ////////////////////////////////////////////////////////////////////////

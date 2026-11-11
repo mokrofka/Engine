@@ -46,7 +46,7 @@ struct FontId {u32 idx;};
 const u32 MaxThings 				= KB(1);
 const u32 MaxUIRects 			= KB(1);
 const u32 MaxMaterials  = 16;
-const u32 MaxMeshes     = 16;
+const u32 MaxMeshes     = 256;
 const u32 MaxTextures   = 16;
 const u32 MaxCubemaps   = 16;
 const u32 MaxFonts      = 16;
@@ -321,7 +321,16 @@ struct FinishedGpuTask {
 	MeshId mesh_id;
 	Gfx_Mesh mesh;
 	Texture texture;
-	u32 counter;
+	u64 counter;
+};
+
+struct TryStage {
+	MeshDesc desc;
+	u32 vert_buf_off;
+	u32 index_buf_off;
+	u32 vert_base;
+	u32 index_base;
+	MeshId id;
 };
 
 struct WaitingFont {
@@ -678,6 +687,7 @@ struct GlobalState {
 	Array<Bone, MaxRuntimeBones> runtime_bones;
 	Animation anim;
 	Slice<MeshId> scene_meshes;
+	MeshId mesh;
 
 	Array<Gfx_Mesh, MaxMeshes> meshes;
 	Array<Texture, MaxTextures> textures;
@@ -696,8 +706,10 @@ struct GlobalState {
 	Array<Vertex, MaxDebugLines> draw_lines_persistent;
 	Array<UI_Rect, MaxDebugLines> draw_rects;
 
-	QueueSPSC<FinishedGpuTask, 32> finished_gpu_queue;
+	QueueSPSC<FinishedGpuTask, 256> finished_gpu_queue;
 	Mutex finished_gpu_mutex;
+	QueueSPSC<TryStage, 256> try_stage_queue;
+	Mutex try_stage_mutex;
 	Mutex texture_mutex;
 	QueueSPSC<WaitingFont, 32> waiting_fonts;
 	Mutex font_mutex;

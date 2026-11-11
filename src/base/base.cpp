@@ -840,10 +840,12 @@ f32 rad2deg(f32 radians) { return radians * 180.0f / PI; }
 f32 ceil_to(f32 x, f32 step)  { return Ceil(x / step) * step; }
 f32 floor_to(f32 x, f32 step) { return Floor(x / step) * step; }
 f32 round_to(f32 x, f32 step) { return Round(x / step) * step; }
+f32 round_floor(f32 x) { return Floor(x + 0.5f); }
+f32 round_floor_to(f32 x, f32 step) { return round_floor(x / step) * step; }
 
 f64 mod_trunc(f64 x, f64 m) { return x - Trunc(x / m) * m; };
-f32 mod_floor(f32 x, f32 m) { return x - Floor(x / m) * m; }
 f32 frac(f32 x) { return x - Floor(x); }
+f32 frac_to(f32 x, f32 step) { return x - floor_to(x, step); }
 
 ////////////////////////////////////////////////////////////////////////
 // Color
@@ -3496,7 +3498,7 @@ MemFormatSize mem_format_size(f32 value) {
 
 String::String(const char* str_) { 
 	str = (u8*)str_;
-	size = cstr_length(str);
+	size = cstr_len(str);
 }
 
 Slice<u8> dstr_slice(Dstring dstr) {
@@ -3546,7 +3548,7 @@ void dstr_clear(Dstring&arr) {
 Dstring::operator String() { return String(str, size); }
 String64::operator String() { return String(str, size); }
 
-u64 cstr_length(const void* c) {
+u64 cstr_len(const void* c) {
 	u8* p = (u8*)c;
 	for(;*p != 0; p++);
 	return (u64)(p - (u8*)c);
@@ -3554,14 +3556,14 @@ u64 cstr_length(const void* c) {
 
 ////////////////////////////////////////////////////////////////////////
 // String <=> Integer Conversions
-u32 u64_length(u64 x) {
+u32 str_to_u64_len(u64 x) {
 	u32 n = 1;
 	while(n < 20 && x >= u64_pow10[n]) n++;
 	return n;
 }
 
-u32 u64_write(u8* dest, u64 x) {
-	u32 length = u64_length(x);
+u32 str_to_u64(u8* dest, u64 x) {
+	u32 length = str_to_u64_len(x);
 	u32 i = length;
 	do {
 		dest[--i] = '0' + (x % 10);
@@ -3570,30 +3572,30 @@ u32 u64_write(u8* dest, u64 x) {
 	return length;
 }
 
-u32 i64_length(i64 x) {
+u32 str_to_i64_len(i64 x) {
 	if(x < 0)
-		return 1+u64_length(-x);
+		return 1+str_to_u64_len(-x);
 	else
-		return u64_length(x);
+		return str_to_u64_len(x);
 }
 
-u32 i64_write(u8* dest, i64 x) {
+u32 str_to_i64(u8* dest, i64 x) {
 	if(x < 0) {
 		dest[0] = '-';
-		return 1 + u64_write(dest+1, -x);
+		return 1 + str_to_u64(dest+1, -x);
 	}
 	else {
-		return u64_write(dest, x);
+		return str_to_u64(dest, x);
 	}
 }
 
-u32 f64_length(f64 x, u32 precision) {
+u32 str_to_f64_len(f64 x, u32 precision) {
 	u32 len = 0;
 	if(x < 0.0) {
 		len++;
 		x = -x;
 	}
-	len += u64_length(x);
+	len += str_to_u64_len(x);
 	if(precision > 0) {
 		len++;
 		len += precision;
@@ -3601,7 +3603,7 @@ u32 f64_length(f64 x, u32 precision) {
 	return len;
 }
 
-u32 f64_write(u8* dest, f64 x, u32 precision) {
+u32 str_to_f64(u8* dest, f64 x, u32 precision) {
 	u32 len = 0;
 	if(is_nan(x)) { dest[0]='n'; dest[1]='a'; dest[2]='n'; return 3; }
 	if(is_inf(x)) { dest[0]='i'; dest[1]='n'; dest[2]='f'; return 3; }
@@ -3611,7 +3613,7 @@ u32 f64_write(u8* dest, f64 x, u32 precision) {
 	u64 mult = u64_pow10[precision];
 	u64 fr = fp * mult + 0.5;
 	if(fr >= mult) { fr -= mult; ip++; }
-	len += u64_write(dest + len, ip);
+	len += str_to_u64(dest + len, ip);
 	if(precision > 0) {
 		dest[len++] = '.';
 		LoopReverse(i, precision) {
@@ -3623,7 +3625,7 @@ u32 f64_write(u8* dest, f64 x, u32 precision) {
 	return len;
 }
 
-void u64_hex_write(u8* dest, u64 value, b32 upper) {
+void str_to_u64_hex(u8* dest, u64 value, b32 upper) {
 #define HEX_LENGTH 16
 	var* digits = upper ? "0123456789ABCDEF" : "0123456789abcdef";
 	LoopReverse(i, HEX_LENGTH) {
@@ -3632,12 +3634,12 @@ void u64_hex_write(u8* dest, u64 value, b32 upper) {
 	}
 }
 
-u32 u32_length(u32 x) { return u64_length(x); }
-u32 i32_length(i32 x) { return i64_length(x); }
-u32 f32_length(f32 x, u32 precision) { return f64_length(x, precision); }
-u32 u32_write(u8* dest, u32 x) { return u64_write(dest, x); }
-u32 i32_write(u8* dest, i32 x) { return i64_write(dest, x); }
-u32 f32_write(u8* dest, f32 x, u32 precision) { return f64_write(dest, x, precision); }
+u32 str_to_u32_len(u32 x) { return str_to_u64_len(x); }
+u32 str_to_i32_len(i32 x) { return str_to_i64_len(x); }
+u32 str_to_f32_len(f32 x, u32 precision) { return str_to_f64_len(x, precision); }
+u32 str_to_u32(u8* dest, u32 x) { return str_to_u64(dest, x); }
+u32 str_to_i32(u8* dest, i32 x) { return str_to_i64(dest, x); }
+u32 str_to_f32(u8* dest, f32 x, u32 precision) { return str_to_f64(dest, x, precision); }
 
 u64 u64_from_str(String str) {
 	u64 x = 0;
@@ -3771,11 +3773,11 @@ u32 str_fmt(u8* buf, String fmt, VaList args) {
 				w_bytes(&w, spec_start, p - spec_start + 1);
 			}break;
 			case 'i': {
-				u32 len = is64 ? i64_write(tmp, va_arg(args, i64)) : i32_write(tmp, va_arg(args, i32));
+				u32 len = is64 ? str_to_i64(tmp, va_arg(args, i64)) : str_to_i32(tmp, va_arg(args, i32));
 				w_bytes(&w, tmp, len);
 			}break;
 			case 'u': {
-				u32 len = is64 ? u64_write(tmp, va_arg(args, u64)) : u32_write(tmp, va_arg(args, u32));
+				u32 len = is64 ? str_to_u64(tmp, va_arg(args, u64)) : str_to_u32(tmp, va_arg(args, u32));
 				w_bytes(&w, tmp, len);
 			}break;
 			case 'f': {
@@ -3789,7 +3791,7 @@ u32 str_fmt(u8* buf, String fmt, VaList args) {
 					w_bytes(&w, nan.str, nan.size); break;
 				}
 #endif
-				u32 len = f64_write(tmp, v, prec < 0 ? 6 : prec);
+				u32 len = str_to_f64(tmp, v, prec < 0 ? 6 : prec);
 				w_bytes(&w, tmp, len);
 			}break;
 			case 's': {
@@ -3802,7 +3804,7 @@ u32 str_fmt(u8* buf, String fmt, VaList args) {
 			}break;
 			case 'p': {
 				u64 v = va_arg(args, u64);
-				u64_hex_write(tmp, v, true);
+				str_to_u64_hex(tmp, v, true);
 				w_bytes(&w, tmp, HEX_LENGTH);
 			}break;
 			case '%': {
@@ -3843,7 +3845,7 @@ String str_range(u8* first, u8* one_past_last) {
 
 ////////////////////////////////////////////////////////////////////////
 // String Stylization
-String upper_from_str(Allocator arena, String str) {
+String str_to_upper(Allocator arena, String str) {
 	str = push_str_copy(arena, str);
 	Loop(i, str.size) {
 		str.str[i] = char_to_upper(str.str[i]);
@@ -3851,7 +3853,7 @@ String upper_from_str(Allocator arena, String str) {
 	return str;
 }
 
-String lower_from_str(Allocator arena, String str) {
+String str_to_lower(Allocator arena, String str) {
 	str = push_str_copy(arena, str);
 	Loop(i, str.size) {
 		str.str[i] = char_to_lower(str.str[i]);
@@ -4575,8 +4577,8 @@ WaitGroup thread_push_batch(Slice<TaskDesc> tasks) {
 Task thread_pop_locked() {
 	var& g = thread_st;
 	Task res = {};
-	if(!queue_pop(g.tasks[TaskPriority_High], &res)) {
-		b32 ok = queue_pop(g.tasks[TaskPriority_Low], &res); Assert(ok);
+	if(!queue_try_pop(g.tasks[TaskPriority_High], &res)) {
+		res = queue_pop(g.tasks[TaskPriority_Low]);
 	}
 	return res;
 }

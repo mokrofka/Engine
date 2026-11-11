@@ -23,7 +23,7 @@ enum {
 	Gfx_DefaultSampleCount  = 4,
 	Gfx_StageBufferSize     = MB(10),
 	Gfx_CpuMemSize          = MB(20),
-	Gfx_GpuMemSize          = MB(30),
+	Gfx_GpuMemSize          = MB(200),
 };
 
 //    - unsigned normalized
@@ -642,7 +642,7 @@ struct Gfx_State {
 	u64 stage_next_value;
 
 	Mutex stage_mutex;
-	QueueSPSC<Gfx_Stage, 32> stage_cmd_queue;
+	QueueSPSC<Gfx_Stage, 128> stage_cmd_queue;
 	Mutex stage_reserve_mutex;
 	Gfx_Pass prev_pass;
 	b32 is_first_pass;
@@ -808,7 +808,7 @@ void gfx_update_shader(Gfx_Shader shd, Slice<u8> code);
 void gfx_update_pipeline(Gfx_Pipeline pip, Gfx_PipelineDesc desc);
 u64 gfx_update_image(Gfx_Image img, Slice<Slice<u8>> data, b32 sync = false);
 u64 gfx_update_buffer(Gfx_Buffer dst, u64 off, Slice<u8> data, b32 sync = false);
-u64 gfx_update_vert_index(Gfx_Buffer vert_dst, u64 vert_off, Gfx_Buffer index_dst, u64 index_off, Slice<u8> vert_data, Slice<u8> index_data);
+b32 gfx_update_vert_index(Gfx_Buffer vert_dst, u64 vert_off, Gfx_Buffer index_dst, u64 index_off, Slice<u8> vert_data, Slice<u8> index_data, u64* out_counter);
 
 void gfx_destroy_image(Gfx_Image img);
 void gfx_destroy_view(Gfx_View view);
