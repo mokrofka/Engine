@@ -1571,12 +1571,12 @@ void gfx_update_pipeline(Gfx_Pipeline pip, Gfx_PipelineDesc desc) {
 u64 gfx_update_image(Gfx_Image img, Slice<Slice<u8>> data, b32 sync) {
 	var& g = st->gfx;
 	var image = pool_get(g.images, img);
-	u64 whole_size = 0;
-	for(var buf : data) whole_size += buf.size;
+	u64 size = 0;
+	for(var e : data) size += e.size;
 	For {
 		os_mutex_lock(g.stage_mutex);
 		u64 stage_off;
-		if(ring_try_alloc(g.stage_ring, whole_size, &stage_off)) {
+		if(ring_try_alloc(g.stage_ring, size, &stage_off)) {
 			u64 off = 0;
 			for(var buf : data) {
 				MemCopy(g.stage_ring.base + stage_off + off, buf);

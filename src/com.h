@@ -45,9 +45,9 @@ struct FontId {u32 idx;};
 
 const u32 MaxThings 				= KB(1);
 const u32 MaxUIRects 			= KB(1);
-const u32 MaxMaterials  = 16;
+const u32 MaxMaterials  = 256;
 const u32 MaxMeshes     = 256;
-const u32 MaxTextures   = 16;
+const u32 MaxTextures   = 256;
 const u32 MaxCubemaps   = 16;
 const u32 MaxFonts      = 16;
 const u32 MaxLights     = 16;
@@ -216,7 +216,7 @@ struct MaterialProps {
 
 struct Material {
 	ShaderType type;
-	u32 batch;
+	u32 pip_state;
 	MaterialProps props;
 	TextureId base_color;
 	u32 idx;
@@ -589,9 +589,30 @@ enum ThingEnum {
 
 struct GltfInfo {
 	Slice<MeshDesc> meshes;
+	Slice<TextureDesc> textures;
 	Slice<Bone> bones;
 	Slice<m4x4> inv_matrices;
 	Animation anim;
+};
+
+struct GltfAttributes {
+	Slice<v3> pos;
+	Slice<v3> norm;
+	Slice<v2> texcoord;
+	u32 indices_type;
+	u32 indices_count;
+	u32* indices32;
+	u16* indices16;
+	Slice<v4u8> joints;
+	Slice<v4> weights;
+	String texture;
+};
+
+struct GltfInfo2 {
+	Slice<GltfAttributes> attributes;
+	Animation anim;
+	Slice<Bone> bones;
+	Slice<m4x4> inv_matrices;
 };
 
 struct ThingIter {
@@ -601,6 +622,11 @@ struct ThingIter {
 	u8* gens;
 	u32 idx;
 	ThingId id;
+};
+
+struct Model {
+	Slice<MeshId> meshes;
+	Slice<MaterialId> materials;
 };
 
 struct GlobalState {
@@ -686,8 +712,8 @@ struct GlobalState {
 	Array<m4x4, MaxSkinMatrices> skin_matrices;
 	Array<Bone, MaxRuntimeBones> runtime_bones;
 	Animation anim;
-	Slice<MeshId> scene_meshes;
-	MeshId mesh;
+	// Slice<MeshId> scene_meshes;
+	Model model;
 
 	Array<Gfx_Mesh, MaxMeshes> meshes;
 	Array<Texture, MaxTextures> textures;
@@ -836,6 +862,8 @@ void dev_update();
 
 MeshDesc load_obj(Allocator arena, String name);
 GltfInfo load_gltf(Allocator arena, String name, b32 is_glb);
+GltfInfo2 load_gltf2(Allocator arena, String name, b32 is_glb);
+Slice<MeshDesc> gltf_mesh_descs(Allocator arena, GltfInfo2 gltf);
 v3 sample_v3(Sampler s, f32 time);
 v4 sample_quat(Sampler s, f32 time);
 void update_animation(Animation anim, Slice<Bone> bones, f32 time);

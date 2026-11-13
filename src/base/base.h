@@ -3211,7 +3211,7 @@ struct ThreadPool {
 	Mutex task_mutex;
 	Mutex ctx_mutex;
 
-	u8 ctx_buffer[KB(4)];
+	u8 ctx_buffer[KB(100)];
 	u32 ctx_write;
 };
 

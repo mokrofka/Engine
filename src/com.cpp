@@ -165,8 +165,6 @@ TextureId make_texture(TextureDesc desc) {
 		Loop(i, 6) {
 			data[i] = Slice(desc.cube[i], desc.width * desc.height * gfx_format_bytesize(desc.format));
 		}
-		// u32 stage_off = desc.is_cube ? gfx_push_stage_buffers(slice(data)) : gfx_push_stage_buffer(data[0]);
-		// u32 stage_off = desc.is_cube ? gfx_push_stage_buffers(slice(data)) : gfx_push_stage_buffer(data[0]);
 		LockScope(g.texture_mutex);
 		Gfx_Image image = gfx_make_image({
 			.type = desc.is_cube ? Gfx_ImageType_Cube : Gfx_ImageType_2D,
@@ -176,13 +174,7 @@ TextureId make_texture(TextureDesc desc) {
 			.mipmaps = true,
 		});
 		Gfx_View view = gfx_make_view({image});
-		// u32 counter = gfx_push_stage_buffer_cmd({
-		// 	.type = Gfx_StageType_Texture,
-		// 	.img = image,
-		// 	.stage_off = stage_off,
-		// });
 		u32 counter = gfx_update_image(image, desc.is_cube ? slice(data) : Slice(data,1));
-		// u32 counter = 0;
 		queue_push(g.finished_gpu_queue, {
 			.texture_id = res,
 			.texture = {
@@ -194,7 +186,7 @@ TextureId make_texture(TextureDesc desc) {
 	};
 	if(desc.name.size) {
 		thread_push({&ctx, f});
-	} else {
+	} else if(desc.data) {
 		f(&ctx);
 	}
 	return res;
@@ -1015,7 +1007,7 @@ void r_end() {
 void draw_mesh(MeshId mesh, MaterialId mat, v3 pos, u32 flags) {
 	var& g = *st;
 	var material = g.materials[mat.idx];
-	u32 batch_idx = material.batch;
+	u32 batch_idx = material.pip_state;
 	DrawCall cmd = {
 		.pos = pos,
 		.scale = v3(1),
@@ -1031,7 +1023,7 @@ void draw_mesh(MeshId mesh, MaterialId mat, v3 pos, u32 flags) {
 void draw_mesh_trs(MeshId mesh, MaterialId mat, v3 pos, v4 rot, v3 scale, u32 flags) {
 	var& g = *st;
 	var material = g.materials[mat.idx];
-	u32 batch_idx = material.batch;
+	u32 batch_idx = material.pip_state;
 	DrawCall cmd = {
 		.pos = pos,
 		.scale = scale,
@@ -1048,7 +1040,7 @@ void draw_thing(ThingId id) {
 	var& g = *st;
 	Thing& e = get_thing(id);
 	var material = g.materials[e.mat.idx];
-	u32 batch_idx = material.batch;
+	u32 batch_idx = material.pip_state;
 	DrawCall cmd = {
 		.pos = e.pos,
 		.scale = e.scale,
@@ -2916,6 +2908,7 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 	Slice data = is_glb ? cursor : os_file_path_read_all(scratch, bin_path);
 
 	DArray<MeshDesc> meshes_desc = array_make<MeshDesc>(arena);
+	DArray<TextureDesc> texture_desc = array_make<TextureDesc>(arena);
 	Slice<m4x4> inv_matrices = {};
 	Slice<Bone> bones = {};
 	Slice<Channel> channels = {};
@@ -2926,6 +2919,9 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 	Slice<JsVal> nodes; AssertOk(js_array(root, "nodes", &nodes));
 	Slice<JsVal> accessors; AssertOk(js_array(root, "accessors", &accessors));
 	Slice<JsVal> buffer_views; AssertOk(js_array(root, "bufferViews", &buffer_views));
+	Slice<JsVal> materials = {}; js_array(root, "materials", &materials);
+	Slice<JsVal> textures = {}; js_array(root, "textures", &textures);
+	Slice<JsVal> images = {}; js_array(root, "images", &images);
 
 	///////////////////////////////////
 	// Mesh
@@ -2939,6 +2935,7 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 		Slice<u16> indices16;
 		Slice<v4u8> joints;
 		Slice<v4> weights;
+		TextureDesc base_color;
 	};
 	var make_attributes = [&](JsObj primitive)->Attributes{
 		Attributes res = {};
@@ -3009,6 +3006,22 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 				res.weights = {(v4*)(data.data+off), count};
 			}
 		}
+		{
+			u32 mat = 0;
+			if(js_u32(primitive, "material", &mat)) {
+				JsObj mat_obj = materials[mat].obj;
+				JsObj pbr;
+				if(js_obj(mat_obj, "pbrMetallicRoughness", &pbr)) {
+					JsObj base_color;
+					if(js_obj(pbr, "baseColorTexture", &base_color)) {
+						u32 idx; AssertOk(js_u32(base_color, "index", &idx));
+						u32 source; AssertOk(js_u32(textures[idx].obj, "source", &source));
+						String name; AssertOk(js_str(images[source].obj, "uri", &name));
+						// res.base_color = load_texture(push_strf(scratch, "sponza/%s", name));
+					}
+				}
+			}
+		}
 		return res;
 	};
 	Slice<JsVal> meshes; AssertOk(js_array(root, "meshes", &meshes));
@@ -3046,6 +3059,7 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 				}
 			}
 			array_push(meshes_desc, {.vertices = vertices, .indices = indices});
+			array_push(texture_desc, att.base_color);
 		}
 	}
 
@@ -3153,6 +3167,7 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 
 	GltfInfo res = {
 		.meshes = slice(meshes_desc),
+		.textures = slice(texture_desc),
 		.bones = bones,
 		.inv_matrices = inv_matrices,
 		.anim = {
@@ -3162,6 +3177,303 @@ GltfInfo load_gltf(Allocator arena, String name, b32 is_glb) {
 	};
 	res.anim.duration = animation_duration(res.anim);
 	return res;
+}
+
+GltfInfo2 load_gltf2(Allocator arena, String name, b32 is_glb) {
+	Scratch scratch(arena);
+	String path = push_strf(scratch, "%s/%s", st->models_dir, name);
+	String json = {};
+	Slice<u8> cursor = {};
+	if(is_glb) {
+		struct FileHeader {
+			u32 magic;
+			u32 version;
+			u32 size;
+		};
+		struct ChunkHeader {
+			u32 chunk_length;
+			u32 chunk_type;
+		};
+		cursor = os_file_path_read_all(scratch, path);
+
+		FileHeader* header = (FileHeader*)cursor.data;
+		NoOp(header);
+		Assert(str_match(String((u8*)&header->magic, 4), "glTF"));
+		cursor = slice_skip(cursor, sizeof(FileHeader));
+
+		ChunkHeader* json_chunk = (ChunkHeader*)cursor.data;
+		Assert(str_match(String((u8*)&json_chunk->chunk_type, 4), "JSON"));
+		cursor = slice_skip(cursor, sizeof(ChunkHeader));
+		json = str_make(slice_prefix(cursor, json_chunk->chunk_length));
+		cursor = slice_skip(cursor, json_chunk->chunk_length);
+
+		ChunkHeader* bin_chunk = (ChunkHeader*)cursor.data;
+		NoOp(bin_chunk);
+		Assert(str_match(String((u8*)&bin_chunk->chunk_type, 3), "BIN"));
+		cursor = slice_skip(cursor, sizeof(ChunkHeader));
+	} else {
+		json = os_file_path_read_all_str(scratch, path);
+	}
+
+	String bin_path = push_strf(scratch, "%s.bin", str_chop_last_dot(path));
+	Slice bin = is_glb ? cursor : os_file_path_read_all(scratch, bin_path);
+
+	GltfInfo2 res = {};
+
+	JsParser p = js_parse_make(scratch, json);
+	JsObj root = js_parse(p).obj;
+	Slice<JsVal> nodes; AssertOk(js_array(root, "nodes", &nodes));
+	Slice<JsVal> accessors; AssertOk(js_array(root, "accessors", &accessors));
+	Slice<JsVal> buffer_views; AssertOk(js_array(root, "bufferViews", &buffer_views));
+	Slice<JsVal> materials = {}; js_array(root, "materials", &materials);
+	Slice<JsVal> textures = {}; js_array(root, "textures", &textures);
+	Slice<JsVal> images = {}; js_array(root, "images", &images);
+
+	///////////////////////////////////
+	// Mesh
+	var make_attributes = [&](JsObj primitive)->GltfAttributes{
+		GltfAttributes res = {};
+		JsObj attributes; AssertOk(js_obj(primitive, "attributes", &attributes));
+		{
+			u32 attribute; AssertOk(js_u32(attributes, "POSITION", &attribute));
+			JsObj accessor = accessors[attribute].obj;
+			u64 count; AssertOk(js_u64(accessor, "count", &count));
+			u32 buffer_view; AssertOk(js_u32(accessor, "bufferView", &buffer_view));
+			JsObj buffer_view_obj = buffer_views[buffer_view].obj;
+			u64 off = 0; js_u64(buffer_view_obj, "byteOffset", &off);
+			res.pos = {(v3*)(bin.data+off), count};
+		}
+		{
+			u32 attribute; AssertOk(js_u32(attributes, "NORMAL", &attribute));
+			JsObj accessor = accessors[attribute].obj;
+			u64 count; AssertOk(js_u64(accessor, "count", &count));
+			u32 buffer_view; AssertOk(js_u32(accessor, "bufferView", &buffer_view));
+			JsObj buffer_view_obj = buffer_views[buffer_view].obj;
+			u64 off = 0; js_u64(buffer_view_obj, "byteOffset", &off);
+			res.norm = {(v3*)(bin.data+off), count};
+		}
+		{
+			u32 attribute; AssertOk(js_u32(attributes, "TEXCOORD_0", &attribute));
+			JsObj accessor = accessors[attribute].obj;
+			u64 count; AssertOk(js_u64(accessor, "count", &count));
+			u32 buffer_view; AssertOk(js_u32(accessor, "bufferView", &buffer_view));
+			JsObj buffer_view_obj = buffer_views[buffer_view].obj;
+			u64 off = 0; js_u64(buffer_view_obj, "byteOffset", &off);
+			res.texcoord = {(v2*)(bin.data+off), count};
+		}
+		{
+			u32 attribute; AssertOk(js_u32(primitive, "indices", &attribute));
+			JsObj accessor = accessors[attribute].obj;
+			AssertOk(js_u32(accessor, "componentType", &res.indices_type));
+			u64 count; AssertOk(js_u64(accessor, "count", &count));
+			res.indices_count = count;
+			u32 buffer_view; AssertOk(js_u32(accessor, "bufferView", &buffer_view));
+			JsObj buffer_view_obj = buffer_views[buffer_view].obj;
+			u64 size; Assert(js_u64(buffer_view_obj, "byteLength", &size));
+			u64 off = 0; js_u64(buffer_view_obj, "byteOffset", &off);
+			if(res.indices_type == Gltf_u32) {
+				res.indices32 = (u32*)(bin.data+off);
+			} else {
+				res.indices16 = (u16*)(bin.data+off);
+			}
+		}
+		{
+			u32 attribute = 0;
+			if(js_u32(attributes, "JOINTS_0", &attribute)) {
+				JsObj accessor = accessors[attribute].obj;
+				u32 buffer_view; AssertOk(js_u32(accessor, "bufferView", &buffer_view));
+				u64 count; AssertOk(js_u64(accessor, "count", &count));
+				JsObj buffer_view_obj = buffer_views[buffer_view].obj;
+				u64 off; AssertOk(js_u64(buffer_view_obj, "byteOffset", &off));
+				res.joints = {(v4u8*)(bin.data+off), count};
+			}
+		}
+		{
+			u32 attribute = 0;
+			if(js_u32(attributes, "WEIGHTS_0", &attribute)) {
+				JsObj accessor = accessors[attribute].obj;
+				u32 buffer_view; AssertOk(js_u32(accessor, "bufferView", &buffer_view));
+				u64 count; AssertOk(js_u64(accessor, "count", &count));
+				JsObj buffer_view_obj = buffer_views[buffer_view].obj;
+				u64 size; AssertOk(js_u64(buffer_view_obj, "byteLength", &size));
+				u64 off; AssertOk(js_u64(buffer_view_obj, "byteOffset", &off));
+				res.weights = {(v4*)(bin.data+off), count};
+			}
+		}
+		{
+			u32 mat = 0;
+			if(js_u32(primitive, "material", &mat)) {
+				JsObj mat_obj = materials[mat].obj;
+				JsObj pbr;
+				if(js_obj(mat_obj, "pbrMetallicRoughness", &pbr)) {
+					JsObj base_color;
+					if(js_obj(pbr, "baseColorTexture", &base_color)) {
+						u32 idx; AssertOk(js_u32(base_color, "index", &idx));
+						u32 source; AssertOk(js_u32(textures[idx].obj, "source", &source));
+						String name; AssertOk(js_str(images[source].obj, "uri", &name));
+						res.texture = name;
+					}
+				}
+			}
+		}
+		return res;
+	};
+	Slice<JsVal> meshes; AssertOk(js_array(root, "meshes", &meshes));
+	var atts = array_make<GltfAttributes>(arena);
+	
+	for(var mesh : meshes) {
+		Slice<JsVal> primitives; AssertOk(js_array(mesh.obj, "primitives", &primitives));
+		for(var prim : primitives) {
+			var att = make_attributes(prim.obj);
+			array_push(atts, att);
+		}
+	}
+	res.attributes = slice(atts);
+
+	///////////////////////////////////
+	// Skin
+	{
+		Slice<JsVal> skins = {};
+		if(js_array(root, "skins", &skins)) {
+			JsObj first_skin = skins[0].obj;
+			u32 inv_matrices_attribute; AssertOk(js_u32(first_skin, "inverseBindMatrices", &inv_matrices_attribute));
+			JsObj inv_matrices_accessor = accessors[inv_matrices_attribute].obj;
+			u32 buffer_view; AssertOk(js_u32(inv_matrices_accessor, "bufferView", &buffer_view));
+			JsObj inv_matrices_buffer_view = buffer_views[buffer_view].obj;
+			u64 size; AssertOk(js_u64(inv_matrices_buffer_view, "byteLength", &size));
+			u64 off; AssertOk(js_u64(inv_matrices_buffer_view, "byteOffset", &off));
+			var matrices = slice_reinterpret<m4x4>(slice_n(bin, off, size));
+			var& inv_matrices = res.inv_matrices;
+			inv_matrices = push_slice(arena, m4x4, matrices.count);
+			Slice<JsVal> joints_indices; AssertOk(js_array(first_skin, "joints", &joints_indices));
+			var& bones = res.bones;
+			bones = push_slice(arena, Bone, joints_indices.count);
+			u32 bone_count = 0;
+			u32 node_to_joint[255] = {};
+			u32 node_to_bone[255] = {};
+			Loop(joint_idx, joints_indices.count) {
+				u32 node_idx = joints_indices[joint_idx].number;
+				node_to_joint[node_idx] = joint_idx;
+			}
+			var dfs = [&](var dfs, u32 node_idx, u32 parent_idx) -> void {
+				JsObj node = nodes[node_idx].obj;
+				u32 bone_idx = bone_count++;
+				node_to_bone[node_idx] = bone_idx;
+				inv_matrices[bone_idx] = matrices[node_to_joint[node_idx]];
+				Transform trans = {
+					.pos = v3(),
+					.rot = quat_identity,
+					.scale = v3(1),
+				};
+				js_v3(node, "translation", &trans.pos);
+				js_v4(node, "rotation", &trans.rot);
+				js_v3(node, "scale", &trans.scale);
+				bones[bone_idx].local = trans;
+				bones[bone_idx].parent = parent_idx;
+				Slice<JsVal> children = {}; js_array(node, "children", &children);
+				Loop(i, children.count) {
+					dfs(dfs, children[i].number, bone_idx);
+				}
+			};
+			dfs(dfs, joints_indices[0].number, 0);
+
+			// Animation
+			Slice<JsVal> animations = {};
+			if(js_array(root, "animations", &animations)) {
+				var first_animation = animations[0].obj;
+				Slice<JsVal> js_channels; AssertOk(js_array(first_animation, "channels", &js_channels));
+				var& channels = res.anim.channels;
+				channels = push_slice(arena, Channel, js_channels.count);
+				Loop(i, js_channels.count) {
+					var channel = js_channels[i].obj;
+					u32 sampler; AssertOk(js_u32(channel, "sampler", &sampler));
+					JsObj target; AssertOk(js_obj(channel, "target", &target));
+					u32 node; AssertOk(js_u32(target, "node", &node));
+					String path; AssertOk(js_str(target, "path", &path));
+					channels[i].bone = node_to_bone[node];
+					channels[i].sampler = sampler;
+					AnimPath anim_path = {};
+					if(str_match(path, "translation")) {
+						anim_path = AnimPath_Pos;
+					} else if(str_match(path, "rotation")) {
+						anim_path = AnimPath_Rot;
+					} else if(str_match(path, "scale")) {
+						anim_path = AnimPath_Scale;
+					} else InvalidPath;
+					channels[i].path = anim_path;
+				}
+				Slice<JsVal> js_samplers; AssertOk(js_array(first_animation, "samplers", &js_samplers));
+				var& samplers = res.anim.samplers;
+				samplers = push_slice(arena, Sampler, js_samplers.count);
+				Loop(i, js_samplers.count) {
+					var sampler = js_samplers[i].obj;
+					u32 input; AssertOk(js_u32(sampler, "input", &input));
+					JsObj input_accessor = accessors[input].obj;
+					u32 input_buffer_view; AssertOk(js_u32(input_accessor, "bufferView", &input_buffer_view));
+					JsObj js_input_buffer_view = buffer_views[input_buffer_view].obj;
+					u64 input_size; AssertOk(js_u64(js_input_buffer_view, "byteLength", &input_size));
+					u64 input_off; AssertOk(js_u64(js_input_buffer_view, "byteOffset", &input_off));
+					var timestamps = slice_reinterpret<f32>(slice_n(bin, input_off, input_size));
+					samplers[i].times = slice_clone(arena, timestamps).data;
+					samplers[i].count = timestamps.count;
+
+					u32 output; AssertOk(js_u32(sampler, "output", &output));
+					JsObj output_accessor = accessors[output].obj;
+					u32 output_buffer_view; AssertOk(js_u32(output_accessor, "bufferView", &output_buffer_view));
+					String output_type; AssertOk(js_str(output_accessor, "type", &output_type));
+					JsObj js_output_buffer_view = buffer_views[output_buffer_view].obj;
+					u64 output_size; AssertOk(js_u64(js_output_buffer_view, "byteLength", &output_size));
+					u64 output_off; AssertOk(js_u64(js_output_buffer_view, "byteOffset", &output_off));
+					if(str_match(output_type, "VEC3")) {
+						var values = slice_reinterpret<v3>(slice_n(bin, output_off, output_size));
+						samplers[i].values = slice_clone(arena, values).data;
+					} else if(str_match(output_type, "VEC4")) {
+						var values = slice_reinterpret<v4>(slice_n(bin, output_off, output_size));
+						samplers[i].values = slice_clone(arena, values).data;
+					} else InvalidPath;
+				}
+			}
+		}
+	}
+
+	res.anim.duration = animation_duration(res.anim);
+	return res;
+}
+
+Slice<MeshDesc> gltf_mesh_descs(Allocator arena, GltfInfo2 gltf) {
+	var meshes = array_make<MeshDesc>(arena);
+	for(var att : gltf.attributes) {
+		Slice vertices = push_slice(arena, Vertex, att.pos.count);
+		Slice indices = push_slice(arena, u32, att.indices_count);
+		Loop(i, indices.count) {
+			if(att.indices_type == Gltf_u32) {
+				indices[i] = att.indices32[i];
+			} else {
+				indices[i] = att.indices16[i];
+			}
+		}
+		Loop(i, vertices.count) {
+			vertices[i] = {
+				.pos = att.pos[i],
+				.norm = v3_to_v3i8(att.norm[i]),
+				.uv = att.texcoord[i],
+			};
+		}
+		if(att.joints.count) {
+			Loop(i, vertices.count) {
+				vertices[i].joints.v[0] = att.joints[i].v[0];
+				vertices[i].joints.v[1] = att.joints[i].v[1];
+				vertices[i].joints.v[2] = att.joints[i].v[2];
+				vertices[i].joints.v[3] = att.joints[i].v[3];
+				vertices[i].weights.v[0] = att.weights[i].v[0] * 255;
+				vertices[i].weights.v[1] = att.weights[i].v[1] * 255;
+				vertices[i].weights.v[2] = att.weights[i].v[2] * 255;
+				vertices[i].weights.v[3] = att.weights[i].v[3] * 255;
+			}
+		}
+		array_push(meshes, {.vertices = vertices, .indices = indices});
+	}
+	return slice(meshes);
 }
 
 v3 sample_v3(Sampler s, f32 time) {
@@ -4261,9 +4573,22 @@ void init_game() {
 	///////////////////////////////////
 	// Assets
 	{
+		var pip_state = make_pipeline_state({
+			.depth = {
+				.compare = Gfx_CompareOp_Less,
+				.write_enabled = true,
+			}
+		});
+		var pip_state_line = make_pipeline_state({
+			.primitive_type = Gfx_PrimitiveType_Line,
+			.depth = {
+				.compare = Gfx_CompareOp_Less,
+				.write_enabled = true,
+			}
+		});
+		
 		set_cubemap(make_texture({.name = "night_cubemap", .is_cube = true}));
 
-		// Known assets
 		var mesh_set = [&](MeshEnum mesh_enum, MeshId id) { 
 			g.meshes_ids[mesh_enum] = id;
 			String str = push_str_copy(g.arena, meshes_strs[mesh_enum]);
@@ -4286,7 +4611,6 @@ void init_game() {
 		load_mesh(Mesh_CubeGlft, "cube.gltf");
 		load_mesh(Mesh_Barrack, "castle.gltf");
 		load_mesh(Mesh_CubeTest, "test_cube.glb");
-		// load_mesh(Mesh_T, "t.gltf");
 		{
 			var info = load_gltf(g.arena, "t1.gltf", false);
 			mesh_set(Mesh_T, make_mesh(info.meshes[0]));
@@ -4295,13 +4619,21 @@ void init_game() {
 			g.anim = info.anim;
 		}
 		{
-			// var info = load_gltf(g.arena, "scene.gltf", false);
-			var info = load_gltf(g.arena, "Sponza.gltf", false);
-			g.scene_meshes = push_slice(g.arena, MeshId, info.meshes.count);
-			Loop(i, g.scene_meshes.count) {
-				g.scene_meshes[i] = make_mesh(info.meshes[i]);
+			// var info = load_gltf(g.arena, "Sponza.gltf", false);
+			// g.model.meshes = push_slice(g.arena, MeshId, info.meshes.count);
+
+			var info2 = load_gltf2(g.arena, "Sponza.gltf", false);
+			var meshes_desc = gltf_mesh_descs(g.arena, info2);
+			g.model.meshes = push_slice(g.arena, MeshId, meshes_desc.count);
+			g.model.materials = push_slice(g.arena, MaterialId, meshes_desc.count);
+			Loop(i, g.model.meshes.count) {
+				g.model.meshes[i] = make_mesh(meshes_desc[i]);
+				g.model.materials[i] = make_material({
+				 .type = ShaderType::Texture,
+				 .pip_state = pip_state,
+				 .base_color = make_texture({.name = push_strf(g.arena, "sponza/%s", info2.attributes[i].texture)}),
+				});
 			}
-			// g.mesh = make_mesh(info.meshes[0]);
 		}
 
 		// Texture
@@ -4318,55 +4650,42 @@ void init_game() {
 		load_texture(Texture_Bricks, "bricks.png");
 
 		// Materials
-		var default_state = make_pipeline_state({
-			.depth = {
-				.compare = Gfx_CompareOp_Less,
-				.write_enabled = true,
-			}
-		});
-		var default_state_line = make_pipeline_state({
-			.primitive_type = Gfx_PrimitiveType_Line,
-			.depth = {
-				.compare = Gfx_CompareOp_Less,
-				.write_enabled = true,
-			}
-		});
-		var load_mat = [&](MaterialEnum enum_name, Material desc) {
+		var set_mat = [&](MaterialEnum enum_name, Material desc) {
 			MaterialId id = make_material(desc);
 			g.materials_ids[enum_name] = id;
 			String str = push_str_copy(g.arena, materials_strs[enum_name]);
 			map_set(g.str_to_material_id, hash(str), id);
 			g.material_id_to_str[id.idx] = str;
 		};
-		load_mat(Material_Dummy, {
+		set_mat(Material_Dummy, {
 			.type = ShaderType::Texture,
-			.batch = default_state,
+			.pip_state = pip_state,
 			.props = default_material_props(),
 			.base_color = g.textures_ids[Texture_Dummy],
 		});
-		load_mat(Material_Orange, {
+		set_mat(Material_Orange, {
 			.type = ShaderType::Texture,
-			.batch = default_state,
+			.pip_state = pip_state,
 			.props = default_material_props(),
 			.base_color = g.textures_ids[Texture_Orange],
 		});
-		load_mat(Material_Container, {
+		set_mat(Material_Container, {
 			.type = ShaderType::Texture,
-			.batch = default_state,
+			.pip_state = pip_state,
 			.props = default_material_props(),
 			.base_color = g.textures_ids[Texture_Container],
 		});
-		load_mat(Material_Axis, {
+		set_mat(Material_Axis, {
 			.type = ShaderType::VertColor,
-			.batch = default_state_line,
+			.pip_state = pip_state_line,
 		});
-		load_mat(Material_Line, {
+		set_mat(Material_Line, {
 			.type = ShaderType::E_Color,
-			.batch = default_state_line,
+			.pip_state = pip_state_line,
 		});
-		load_mat(Material_Barrack, {
+		set_mat(Material_Barrack, {
 			.type = ShaderType::Texture,
-			.batch = default_state,
+			.pip_state = pip_state,
 			.props = default_material_props(),
 			.base_color = g.textures_ids[Texture_Barrack],
 		});
@@ -4544,8 +4863,9 @@ void update_game() {
 	// draw_mesh(g.meshes_ids[Mesh_Cube], g.materials_ids[Material_Container], v3(2,0,3));
 	// draw_mesh(g.meshes_ids[Mesh_CubeTest], g.materials_ids[Material_Orange], v3(2,0,5));
 	
-	for(var mesh : g.scene_meshes) {
-		draw_mesh(mesh, g.materials_ids[Material_Orange], v3());
+	Loop(i, g.model.meshes.count) {
+		// draw_mesh(g.model.meshes[i], g.materials_ids[Material_Orange], v3());
+		draw_mesh(g.model.meshes[i], g.model.materials[i], v3());
 	}
 	// draw_mesh(g.mesh, g.materials_ids[Material_Orange], v3());
 
